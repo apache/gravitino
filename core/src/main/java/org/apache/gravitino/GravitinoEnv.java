@@ -44,6 +44,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
+import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
@@ -99,6 +100,7 @@ public class GravitinoEnv {
   private EventListenerManager eventListenerManager;
 
   private TagManager tagManager;
+  private EventBus eventBus;
 
   private GravitinoEnv() {}
 
@@ -119,85 +121,17 @@ public class GravitinoEnv {
    * Initialize the Gravitino environment.
    *
    * @param config The configuration object to initialize the environment.
+   * @param isGravitinoServer A boolean flag indicating whether the initialization is for the
+   *     Gravitino server. If true, server-specific components will be initialized in addition to
+   *     the base components.
    */
-  public void initialize(Config config) {
+  public void initialize(Config config, boolean isGravitinoServer) {
     LOG.info("Initializing Gravitino Environment...");
-
     this.config = config;
-    this.metricsSystem = new MetricsSystem();
-    metricsSystem.register(new JVMMetricsSource());
-
-    // Initialize EntityStore
-    this.entityStore = EntityStoreFactory.createEntityStore(config);
-    entityStore.initialize(config);
-
-    // create and initialize a random id generator
-    this.idGenerator = new RandomIdGenerator();
-
-    this.eventListenerManager = new EventListenerManager();
-    eventListenerManager.init(
-        config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
-    EventBus eventBus = eventListenerManager.createEventBus();
-
-    // Create and initialize metalake related modules
-    MetalakeManager metalakeManager = new MetalakeManager(entityStore, idGenerator);
-    MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
-        new MetalakeNormalizeDispatcher(metalakeManager);
-    this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
-
-    // Create and initialize Catalog related modules
-    this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    CatalogNormalizeDispatcher catalogNormalizeDispatcher =
-        new CatalogNormalizeDispatcher(catalogManager);
-    this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
-
-    SchemaOperationDispatcher schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    SchemaNormalizeDispatcher schemaNormalizeDispatcher =
-        new SchemaNormalizeDispatcher(schemaOperationDispatcher);
-    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
-
-    TableOperationDispatcher tableOperationDispatcher =
-        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
-    TableNormalizeDispatcher tableNormalizeDispatcher =
-        new TableNormalizeDispatcher(tableOperationDispatcher);
-    this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
-
-    PartitionOperationDispatcher partitionOperationDispatcher =
-        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
-    // todo: support PartitionEventDispatcher
-    this.partitionDispatcher = new PartitionNormalizeDispatcher(partitionOperationDispatcher);
-
-    FilesetOperationDispatcher filesetOperationDispatcher =
-        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
-    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
-        new FilesetNormalizeDispatcher(filesetOperationDispatcher);
-    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
-
-    TopicOperationDispatcher topicOperationDispatcher =
-        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
-    TopicNormalizeDispatcher topicNormalizeDispatcher =
-        new TopicNormalizeDispatcher(topicOperationDispatcher);
-    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
-
-    // Create and initialize access control related modules
-    boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
-    if (enableAuthorization) {
-      this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
-    } else {
-      this.accessControlManager = null;
+    initBaseComponents();
+    if (isGravitinoServer) {
+      initGravitinoServerComponents();
     }
-
-    this.auxServiceManager = new AuxiliaryServiceManager();
-    this.auxServiceManager.serviceInit(
-        config.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX));
-
-    // Tree lock
-    this.lockManager = new LockManager(config);
-
-    // Tag manager
-    this.tagManager = new TagManager(idGenerator, entityStore);
-
     LOG.info("Gravitino Environment is initialized.");
   }
 
@@ -247,6 +181,11 @@ public class GravitinoEnv {
     return tableDispatcher;
   }
 
+  /**
+   * Get the PartitionDispatcher associated with the Gravitino environment.
+   *
+   * @return The PartitionDispatcher instance.
+   */
   public PartitionDispatcher partitionDispatcher() {
     return partitionDispatcher;
   }
@@ -357,5 +296,83 @@ public class GravitinoEnv {
     }
 
     LOG.info("Gravitino Environment is shut down.");
+  }
+
+  private void initBaseComponents() {
+    this.metricsSystem = new MetricsSystem();
+    metricsSystem.register(new JVMMetricsSource());
+
+    this.eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(
+        config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
+    this.eventBus = eventListenerManager.createEventBus();
+  }
+
+  private void initGravitinoServerComponents() {
+    // Initialize EntityStore
+    this.entityStore = EntityStoreFactory.createEntityStore(config);
+    entityStore.initialize(config);
+
+    // create and initialize a random id generator
+    this.idGenerator = new RandomIdGenerator();
+
+    // Create and initialize metalake related modules
+    MetalakeManager metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
+        new MetalakeNormalizeDispatcher(metalakeManager);
+    this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
+
+    // Create and initialize Catalog related modules
+    this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    CatalogNormalizeDispatcher catalogNormalizeDispatcher =
+        new CatalogNormalizeDispatcher(catalogManager);
+    this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
+
+    SchemaOperationDispatcher schemaOperationDispatcher =
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+    SchemaNormalizeDispatcher schemaNormalizeDispatcher =
+        new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
+    this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
+
+    TableOperationDispatcher tableOperationDispatcher =
+        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+    TableNormalizeDispatcher tableNormalizeDispatcher =
+        new TableNormalizeDispatcher(tableOperationDispatcher, catalogManager);
+    this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
+
+    PartitionOperationDispatcher partitionOperationDispatcher =
+        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+    PartitionNormalizeDispatcher partitionNormalizeDispatcher =
+        new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
+    this.partitionDispatcher = new PartitionEventDispatcher(eventBus, partitionNormalizeDispatcher);
+
+    FilesetOperationDispatcher filesetOperationDispatcher =
+        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
+        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
+    this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
+
+    TopicOperationDispatcher topicOperationDispatcher =
+        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+    TopicNormalizeDispatcher topicNormalizeDispatcher =
+        new TopicNormalizeDispatcher(topicOperationDispatcher, catalogManager);
+    this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
+
+    // Create and initialize access control related modules
+    boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
+    if (enableAuthorization) {
+      this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
+    } else {
+      this.accessControlManager = null;
+    }
+
+    this.auxServiceManager = new AuxiliaryServiceManager();
+    this.auxServiceManager.serviceInit(config);
+
+    // Tree lock
+    this.lockManager = new LockManager(config);
+
+    // Tag manager
+    this.tagManager = new TagManager(idGenerator, entityStore);
   }
 }

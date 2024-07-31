@@ -26,7 +26,7 @@ By default, the loading of Gravitino's catalogs into Trino follows the naming co
 Usage in queries is as follows:
 
 ```text
-SELECT * from catalog.dbname.tabname
+SELECT * from catalog.dbname.tablename
 ```
 
 

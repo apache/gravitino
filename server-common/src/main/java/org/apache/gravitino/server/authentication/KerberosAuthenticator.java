@@ -133,6 +133,13 @@ public class KerberosAuthenticator implements Authenticator {
     }
   }
 
+  @Override
+  public boolean supportsToken(byte[] tokenData) {
+    return tokenData != null
+        && new String(tokenData, StandardCharsets.UTF_8)
+            .startsWith(AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER);
+  }
+
   private Principal retrievePrincipalFromToken(String serverPrincipal, byte[] clientToken)
       throws GSSException {
     GSSContext gssContext = null;

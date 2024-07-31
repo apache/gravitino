@@ -163,7 +163,7 @@ allprojects {
       // Default use MiniGravitino to run integration tests
       param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
       param.environment("IT_PROJECT_DIR", project.buildDir.path)
-      param.environment("HADOOP_USER_NAME", "datastrato")
+      param.environment("HADOOP_USER_NAME", "anonymous")
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
 
@@ -466,9 +466,11 @@ tasks.rat {
     "dev/docker/**/*.conf",
     "dev/docker/kerberos-hive/kadm5.acl",
     "**/*.log",
+    "**/testsets",
     "**/licenses/*.txt",
     "**/licenses/*.md",
-    "integration-test/**",
+    "integration-test/**/*.sql",
+    "integration-test/**/*.txt",
     "docs/**/*.md",
     "web/.**",
     "web/next-env.d.ts",
@@ -527,7 +529,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -560,8 +562,42 @@ tasks {
     }
   }
 
+  val compileIcebergRESTServer by registering {
+    dependsOn("iceberg:iceberg-rest-server:copyLibAndConfigsToStandalonePackage")
+    group = "gravitino distribution"
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-iceberg-rest-server"))
+    doLast {
+      copy {
+        from(projectDir.dir("conf")) {
+          include("${rootProject.name}-iceberg-rest-server.conf.template", "log4j2.properties.template")
+          into("${rootProject.name}-iceberg-rest-server/conf")
+        }
+        from(projectDir.dir("bin")) {
+          include("common.sh", "${rootProject.name}-iceberg-rest-server.sh")
+          into("${rootProject.name}-iceberg-rest-server/bin")
+        }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".template", "")
+        }
+        fileMode = 0b111101101
+      }
+
+      copy {
+        from(projectDir.dir("licenses")) { into("${rootProject.name}-iceberg-rest-server/licenses") }
+        from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
+    }
+  }
+
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector")
+    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
@@ -582,9 +618,36 @@ tasks {
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
+  val assembleIcebergRESTServer by registering(Tar::class) {
+    dependsOn("compileIcebergRESTServer")
+    group = "gravitino distribution"
+    finalizedBy("checksumIcebergRESTServerDistribution")
+    into("${rootProject.name}-iceberg-rest-server-$version-bin")
+    from(compileIcebergRESTServer.map { it.outputs.files.single() })
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-iceberg-rest-server-$version-bin.tar.gz")
+    destinationDirectory.set(projectDir.dir("distribution"))
+  }
+
+  register("checksumIcebergRESTServerDistribution") {
+    group = "gravitino distribution"
+    dependsOn(assembleIcebergRESTServer)
+    val archiveFile = assembleIcebergRESTServer.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
+  }
+
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector")
+    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -622,7 +685,7 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && it.name != "trino-connector" &&
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
       ) {
         from(it.configurations.runtimeClasspath)
@@ -637,8 +700,9 @@ tasks {
         !it.name.startsWith("client") &&
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
+        !it.name.startsWith("iceberg") &&
+        !it.name.startsWith("integration-test") &&
         it.name != "trino-connector" &&
-        it.name != "integration-test" &&
         it.name != "bundled-catalog" &&
         it.name != "flink-connector"
       ) {
@@ -689,8 +753,14 @@ fun printDockerCheckInfo() {
   val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
   val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
-
-  if (extra["skipDockerTests"].toString().toBoolean()) {
+  val skipDockerTests = if (extra["skipDockerTests"].toString().toBoolean()) {
+    // Read the environment variable (SKIP_DOCKER_TESTS) when skipDockerTests is true
+    // which means users can enable the docker tests by setting the gradle properties or the environment variable.
+    System.getenv("SKIP_DOCKER_TESTS")?.toBoolean() ?: true
+  } else {
+    false
+  }
+  if (skipDockerTests) {
     project.extra["dockerTest"] = false
   } else if (OperatingSystem.current().isMacOsX() &&
     dockerRunning &&
@@ -702,15 +772,15 @@ fun printDockerCheckInfo() {
   }
 
   println("------------------ Check Docker environment ---------------------")
-  println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
+  println("Docker server status ............................................ [${if (dockerRunning) "running" else "\u001B[31mstop\u001B[0m"}]")
   if (OperatingSystem.current().isMacOsX()) {
-    println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "stop"}]")
-    println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "no"}]")
+    println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "\u001B[31mstop\u001B[0m"}]")
+    println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "\u001B[31mno\u001B[0m"}]")
   }
 
   val dockerTest = project.extra["dockerTest"] as? Boolean ?: false
   if (dockerTest) {
-    println("Using Docker container to run all tests. [$testMode test]")
+    println("Using Docker container to run all tests ......................... [$testMode test]")
   } else {
     println("Run test cases without `gravitino-docker-test` tag .............. [$testMode test]")
   }

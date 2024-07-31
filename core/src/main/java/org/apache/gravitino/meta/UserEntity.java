@@ -121,6 +121,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
    *
    * @return The audit details of the user.
    */
+  @Override
   public AuditInfo auditInfo() {
     return auditInfo;
   }

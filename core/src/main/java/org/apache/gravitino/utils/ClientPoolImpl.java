@@ -147,7 +147,7 @@ public abstract class ClientPoolImpl<C, E extends Exception>
       clients.addFirst(client);
     }
     synchronized (signal) {
-      signal.notify();
+      signal.notifyAll();
     }
   }
 

@@ -21,6 +21,7 @@ package org.apache.gravitino.tag;
 
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 
@@ -36,16 +37,17 @@ public interface TagOperations {
    * List all the tag names under a metalake.
    *
    * @return The list of tag names.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
    */
-  String[] listTags();
+  String[] listTags() throws NoSuchMetalakeException;
 
   /**
    * List all the tags with detailed information under a metalake.
    *
-   * @param extended If true, the extended information of the tag will be included.
    * @return The list of tags.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
    */
-  Tag[] listTagsInfo(boolean extended);
+  Tag[] listTagsInfo() throws NoSuchMetalakeException;
 
   /**
    * Get a tag by its name under a metalake.

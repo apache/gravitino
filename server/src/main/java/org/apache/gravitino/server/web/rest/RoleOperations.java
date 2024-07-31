@@ -34,7 +34,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -175,10 +174,6 @@ public class RoleOperations {
 
     // Securable object ignores the metalake namespace, so we should add it back.
     if (object.type() == MetadataObject.Type.METALAKE) {
-      // All metalakes don't need to check the securable object whether exists.
-      if (object.name().equals(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)) {
-        return;
-      }
       identifier = NameIdentifier.parse(object.fullName());
     } else {
       identifier = NameIdentifier.parse(String.format("%s.%s", metalake, object.fullName()));

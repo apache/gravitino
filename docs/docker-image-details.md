@@ -96,6 +96,15 @@ You can use these kinds of Docker images to facilitate integration testing of al
 You can use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
+- gravitino-ci-kerberos-hive:0.1.5
+  - Start another HMS for the Hive cluster in the container with port 19083. This is to test whether Kerberos authentication works for a Kerberos-enabled Hive cluster with multiple HMS.
+  - Refresh ssh keys in the startup script.
+  - Add test logic to log in localhost via ssh without password.
+
+- gravitino-ci-kerberos-hive:0.1.4
+  - Increase the total check time for the status of DataNode to 150s.
+  - Output the log of the DataNode fails to start
+
 - gravitino-ci-kerberos-hive:0.1.3
   - Add more proxy users in the core-site.xml file.
   - fix bugs in the `start.sh` script.
@@ -117,6 +126,20 @@ Changelog
 You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
+
+- gravitino-ci-hive:0.1.13
+  - Support Hive 2.3.9 and HDFS 2.7.3
+    - Docker environment variables:
+      - `HIVE_RUNTIME_VERSION`: `hive2` (default)
+  - Support Hive 3.1.3, HDFS 3.1.0 and Ranger plugin version 2.4.0
+    - Docker environment variables:
+      - `HIVE_RUNTIME_VERSION`: `hive3`
+      - `RANGER_SERVER_URL`: Ranger admin URL
+      - `RANGER_HIVE_REPOSITORY_NAME`: Hive repository name in Ranger admin
+      - `RANGER_HDFS_REPOSITORY_NAME`: HDFS repository name in Ranger admin
+    - If you want to enable Hive Ranger plugin, you need both set the `RANGER_SERVER_URL` and `RANGER_HIVE_REPOSITORY_NAME` environment variables. Hive Ranger audit logs are stored in the `/tmp/root/ranger-hive-audit.log`.
+    - If you want to enable HDFS Ranger plugin, you need both set the `RANGER_SERVER_URL` and `RANGER_HDFS_REPOSITORY_NAME` environment variables. HDFS Ranger audit logs are stored in the `/usr/local/hadoop/logs/ranger-hdfs-audit.log`
+    - Example: docker run -e HIVE_RUNTIME_VERSION='hive3' -e RANGER_SERVER_URL='http://ranger-server:6080' -e RANGER_HIVE_REPOSITORY_NAME='hiveDev' -e RANGER_HDFS_REPOSITORY_NAME='hdfsDev' ... datastrato/gravitino-ci-hive:0.1.13
 
 - gravitino-ci-hive:0.1.12
   - Shrink hive Docker image size by 420MB
@@ -251,6 +274,12 @@ Changelog
   - Use `ranger-admin` release from `datastrato/apache-ranger:2.4.0` to build docker image.
   - Remove unnecessary hack in `start-ranger-service.sh`.
   - Reduce docker image build time from `~1h` to `~5min`.
+  - How to debug Ranger admin service:
+    - Use `docker exec -it <container_id> bash` to enter the docker container.
+    - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001` into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh` in the docker container.
+    - Execute `./opt/ranger-admin/stop-ranger-admin.sh` and `./opt/ranger-admin/start-ranger-admin.sh` to restart Ranger admin.
+    - Clone the `Apache Ranger` project from GiHub and checkout the `2.4.0` release.
+    - Create a remote debug configuration (`Use model classpath` = `EmbeddedServer`) in your IDE and connect to the Ranger admin container.
 
 - gravitino-ci-ranger:0.1.0
   - Docker image `datastrato/gravitino-ci-ranger:0.1.0`

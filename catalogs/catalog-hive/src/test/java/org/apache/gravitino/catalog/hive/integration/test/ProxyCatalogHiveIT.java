@@ -94,7 +94,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     System.setProperty("user.name", "datastrato");
 
     Map<String, String> configs = Maps.newHashMap();
-    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
     containerSuite.startHiveContainer();

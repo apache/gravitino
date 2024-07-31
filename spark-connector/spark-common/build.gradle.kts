@@ -37,7 +37,7 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(libs.guava)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
@@ -143,7 +143,7 @@ tasks.test {
     dependsOn(tasks.jar)
 
     doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit

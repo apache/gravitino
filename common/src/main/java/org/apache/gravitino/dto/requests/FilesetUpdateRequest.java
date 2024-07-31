@@ -138,6 +138,7 @@ public interface FilesetUpdateRequest extends RESTRequest {
     private final String value;
 
     /** @return The fileset change. */
+    @Override
     public FilesetChange filesetChange() {
       return FilesetChange.setProperty(property, value);
     }

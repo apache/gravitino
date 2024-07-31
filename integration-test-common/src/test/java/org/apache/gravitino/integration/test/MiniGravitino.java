@@ -21,12 +21,15 @@ package org.apache.gravitino.integration.test;
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 import static org.apache.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
 
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -41,7 +44,7 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.client.HTTPClient;
 import org.apache.gravitino.client.RESTClient;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.HttpUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.KerberosProviderHelper;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
@@ -57,7 +60,9 @@ import org.slf4j.LoggerFactory;
  * server in the same JVM process.
  */
 public class MiniGravitino {
+
   private static final Logger LOG = LoggerFactory.getLogger(MiniGravitino.class);
+  private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
   private MiniGravitinoContext context;
   private RESTClient restClient;
   private final File mockConfDir;
@@ -115,19 +120,20 @@ public class MiniGravitino {
     this.host = jettyServerConfig.getHost();
     this.port = jettyServerConfig.getHttpPort();
     String URI = String.format("http://%s:%d", host, port);
-    if (AuthenticatorType.OAUTH
-        .name()
-        .toLowerCase()
-        .equals(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))) {
+
+    List<String> authenticators = new ArrayList<>();
+    String authenticatorStr = context.customConfig.get(Configs.AUTHENTICATORS.getKey());
+    if (authenticatorStr != null) {
+      authenticators = COMMA.splitToList(authenticatorStr);
+    }
+
+    if (authenticators.contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
               .withAuthDataProvider(OAuthMockDataProvider.getInstance())
               .build();
-    } else if (AuthenticatorType.KERBEROS
-        .name()
-        .toLowerCase()
-        .equals(context.customConfig.get(Configs.AUTHENTICATOR.getKey()))) {
+    } else if (authenticators.contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       restClient =
           HTTPClient.builder(ImmutableMap.of())
               .uri(URI)
@@ -155,7 +161,7 @@ public class MiniGravitino {
 
     String url = URI + "/metrics";
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
-      started = AbstractIT.isHttpServerUp(url);
+      started = HttpUtils.isHttpServerUp(url);
       if (started || future.isDone()) {
         break;
       }
@@ -186,7 +192,7 @@ public class MiniGravitino {
     String url = String.format("http://%s:%d/metrics", host, port);
     while (System.currentTimeMillis() - beginTime < 1000 * 60 * 3) {
       sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
-      started = AbstractIT.isHttpServerUp(url);
+      started = HttpUtils.isHttpServerUp(url);
       if (!started) {
         break;
       }
@@ -215,22 +221,15 @@ public class MiniGravitino {
   Map<String, String> getIcebergRestServiceConfigs() throws IOException {
     Map<String, String> customConfigs = new HashMap<>();
 
-    String icebergJarPath =
-        Paths.get("catalogs", "catalog-lakehouse-iceberg", "build", "libs").toString();
+    String icebergJarPath = Paths.get("iceberg", "iceberg-rest-server", "build", "libs").toString();
     String icebergConfigPath =
-        Paths.get("catalogs", "catalog-lakehouse-iceberg", "src", "main", "resources").toString();
+        Paths.get("iceberg", "iceberg-rest-server", "src", "main", "resources").toString();
     customConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + "iceberg-rest"
-            + "."
-            + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+        "gravitino.iceberg-rest." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
         String.join(",", icebergJarPath, icebergConfigPath));
 
     customConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + "iceberg-rest"
-            + "."
-            + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        "gravitino.iceberg-rest." + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(3000, 4000)));
     return customConfigs;
   }

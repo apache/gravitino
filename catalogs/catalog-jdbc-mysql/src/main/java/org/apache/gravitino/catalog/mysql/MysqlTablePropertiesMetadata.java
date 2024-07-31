@@ -31,10 +31,12 @@ import org.apache.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class MysqlTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
-  public static final String GRAVITINO_ENGINE_KEY = "engine";
-  public static final String MYSQL_ENGINE_KEY = "ENGINE";
-  public static final String GRAVITINO_AUTO_INCREMENT_OFFSET_KEY = "auto-increment-offset";
-  public static final String MYSQL_AUTO_INCREMENT_OFFSET_KEY = "AUTO_INCREMENT";
+  public static final String GRAVITINO_ENGINE_KEY = MysqlConstants.GRAVITINO_ENGINE_KEY;
+  public static final String MYSQL_ENGINE_KEY = MysqlConstants.MYSQL_ENGINE_KEY;
+  public static final String GRAVITINO_AUTO_INCREMENT_OFFSET_KEY =
+      MysqlConstants.GRAVITINO_AUTO_INCREMENT_OFFSET_KEY;
+  public static final String MYSQL_AUTO_INCREMENT_OFFSET_KEY =
+      MysqlConstants.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       createPropertiesMetadata();
 

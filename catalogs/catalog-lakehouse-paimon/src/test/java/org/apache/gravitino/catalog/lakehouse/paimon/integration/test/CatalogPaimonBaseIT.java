@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
+import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.LocalDate;
@@ -38,6 +40,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -50,6 +53,7 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -280,6 +284,95 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
                     Transforms.EMPTY_TRANSFORM,
                     distribution,
                     sortOrders));
+  }
+
+  @Test
+  void testCreateAndLoadPaimonPartitionedTable()
+      throws org.apache.paimon.catalog.Catalog.TableNotExistException {
+    // Create table from Gravitino API
+    Column[] columns = createColumns();
+
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    Transform[] partitioning =
+        new Transform[] {identity(PAIMON_COL_NAME1), identity(PAIMON_COL_NAME3)};
+    String[] partitionKeys = new String[] {PAIMON_COL_NAME1, PAIMON_COL_NAME3};
+    SortOrder[] sortOrders = SortOrders.NONE;
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertEquals(createdTable.name(), tableName);
+    Map<String, String> resultProp = createdTable.properties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
+      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
+    }
+    Assertions.assertEquals(createdTable.comment(), table_comment);
+    Assertions.assertArrayEquals(partitioning, createdTable.partitioning());
+    Assertions.assertEquals(createdTable.columns().length, columns.length);
+
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), createdTable.columns()[i]);
+    }
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(table_comment, loadTable.comment());
+    resultProp = loadTable.properties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
+      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
+    }
+    Assertions.assertArrayEquals(partitioning, loadTable.partitioning());
+    String[] loadedPartitionKeys =
+        Arrays.stream(loadTable.partitioning())
+            .map(
+                transform -> {
+                  NamedReference[] references = transform.references();
+                  Assertions.assertTrue(
+                      references.length == 1
+                          && references[0] instanceof NamedReference.FieldReference);
+                  NamedReference.FieldReference fieldReference =
+                      (NamedReference.FieldReference) references[0];
+                  return fieldReference.fieldName()[0];
+                })
+            .toArray(String[]::new);
+    Assertions.assertArrayEquals(partitionKeys, loadedPartitionKeys);
+    Assertions.assertEquals(loadTable.columns().length, columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), loadTable.columns()[i]);
+    }
+
+    // catalog load check
+    org.apache.paimon.table.Table table =
+        paimonCatalog.getTable(Identifier.create(schemaName, tableName));
+    Assertions.assertEquals(tableName, table.name());
+    Assertions.assertTrue(table.comment().isPresent());
+    Assertions.assertEquals(table_comment, table.comment().get());
+    resultProp = table.options();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
+      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
+    }
+    Assertions.assertArrayEquals(partitionKeys, table.partitionKeys().toArray(new String[0]));
+    Assertions.assertInstanceOf(FileStoreTable.class, table);
+    FileStoreTable fileStoreTable = (FileStoreTable) table;
+
+    TableSchema schema = fileStoreTable.schema();
+    Assertions.assertEquals(schema.fields().size(), columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(columns[i].name(), schema.fieldNames().get(i));
+    }
+    Assertions.assertArrayEquals(partitionKeys, schema.partitionKeys().toArray(new String[0]));
   }
 
   @Test
@@ -525,7 +618,9 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(type), "Paimon Catalog backend type can not be null or empty.");
     catalogProperties.put(PaimonCatalogPropertiesMetadata.PAIMON_METASTORE, type);
-    paimonCatalog = CatalogUtils.loadCatalogBackend(new PaimonConfig(catalogProperties));
+    PaimonBackendCatalogWrapper paimonBackendCatalogWrapper =
+        CatalogUtils.loadCatalogBackend(new PaimonConfig(catalogProperties));
+    paimonCatalog = paimonBackendCatalogWrapper.getCatalog();
   }
 
   private void createSchema() {

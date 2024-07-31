@@ -1,4 +1,5 @@
 /*
+ * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
@@ -108,8 +109,8 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   }
 
   /**
-   * Proceduers will validate the equality of the catalog registered to Spark catalogManager and the
-   * catalog passed to `ProcedureBuilder` which invokes loadProceduer(). To meet the requirement ,
+   * Procedures will validate the equality of the catalog registered to Spark catalogManager and the
+   * catalog passed to `ProcedureBuilder` which invokes loadProcedure(). To meet the requirement ,
    * override the method to pass `GravitinoIcebergCatalog` to the `ProcedureBuilder` instead of the
    * internal spark catalog.
    */

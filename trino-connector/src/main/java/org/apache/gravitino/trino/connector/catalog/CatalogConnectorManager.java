@@ -60,7 +60,7 @@ public class CatalogConnectorManager {
 
   private static final int CATALOG_LOAD_FREQUENCY_SECOND = 10;
   private static final int NUMBER_EXECUTOR_THREAD = 1;
-  private static final int LOAD_METALAKE_TIMEOUT = 30;
+  private static final int LOAD_METALAKE_TIMEOUT = 60;
 
   private final ScheduledExecutorService executorService;
   private final CatalogRegister catalogRegister;
@@ -133,8 +133,8 @@ public class CatalogConnectorManager {
           LOG.error("Load Metalake {} failed.", usedMetalake, e);
         }
       }
-    } catch (Throwable t) {
-      LOG.error("Fatal errors when loading metalake", t);
+    } catch (Exception e) {
+      LOG.error("Error when loading metalake", e);
       System.exit(-1);
     }
   }

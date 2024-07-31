@@ -26,7 +26,7 @@ import org.apache.gravitino.connector.BasePropertiesMetadata;
 
 public abstract class JdbcTablePropertiesMetadata extends BasePropertiesMetadata {
 
-  public static final String COMMENT_KEY = "comment";
+  public static final String COMMENT_KEY = JdbcConstants.COMMENT;
 
   public Map<String, String> transformToJdbcProperties(Map<String, String> properties) {
     HashMap<String, String> resultProperties = Maps.newHashMap(properties);

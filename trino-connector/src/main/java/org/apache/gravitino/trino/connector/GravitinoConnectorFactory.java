@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -27,10 +29,12 @@ import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
 import java.util.Map;
 import java.util.function.Supplier;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorFactory;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogRegister;
+import org.apache.gravitino.trino.connector.catalog.DefaultCatalogConnectorFactory;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocdure.GravitinoStoredProcedureFactory;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
@@ -76,8 +80,8 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       if (catalogConnectorManager == null) {
         try {
           CatalogRegister catalogRegister = new CatalogRegister();
-          CatalogConnectorFactory catalogConnectorFactory = new CatalogConnectorFactory();
 
+          CatalogConnectorFactory catalogConnectorFactory = createCatalogConnectorFactory(config);
           catalogConnectorManager =
               new CatalogConnectorManager(catalogRegister, catalogConnectorFactory);
           catalogConnectorManager.config(config, clientProvider().get());
@@ -87,7 +91,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         } catch (Exception e) {
           String message = "Initialization of the GravitinoConnector failed" + e.getMessage();
           LOG.error(message);
-          throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
+          throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
         }
       }
     }
@@ -119,5 +123,25 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   @VisibleForTesting
   Supplier<GravitinoAdminClient> clientProvider() {
     return () -> null;
+  }
+
+  private CatalogConnectorFactory createCatalogConnectorFactory(GravitinoConfig config) {
+    // Create a CatalogConnectorFactory. If we specify a customized class name for the
+    // CatalogConnectorFactory,
+    // it creates a user-customized CatalogConnectorFactory; otherwise, it creates a
+    // DefaultCatalogConnectorFactory.
+    String className = config.getCatalogConnectorFactoryClassName();
+    if (StringUtils.isEmpty(className)) {
+      return new DefaultCatalogConnectorFactory(config);
+    }
+
+    try {
+      Class<?> clazz = Class.forName(className);
+      Object obj = clazz.getDeclaredConstructor(GravitinoConfig.class).newInstance(config);
+      return (CatalogConnectorFactory) obj;
+    } catch (Exception e) {
+      throw new TrinoException(
+          GRAVITINO_RUNTIME_ERROR, "Can not create CatalogConnectorFactory", e);
+    }
   }
 }
