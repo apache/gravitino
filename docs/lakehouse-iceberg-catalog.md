@@ -29,6 +29,7 @@ Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hado
 - Works as a catalog proxy, supporting `HiveCatalog`, `JdbcCatalog` and `RESTCatalog`.
 - Supports DDL operations for Iceberg schemas and tables.
 - Doesn't support snapshot or table management operations.
+- Supports Kerberos or simple authentication for Iceberg catalog with Hive backend. 
 
 ### Catalog properties
 
