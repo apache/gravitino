@@ -48,7 +48,14 @@ public class MapUtils {
     return Collections.unmodifiableMap(configs);
   }
 
-  public static Map<String, String> getSubMap(Map<String, String> m, Predicate predicate) {
+  /**
+   * Returns a map with all keys that match the predicate.
+   *
+   * @param m The map to filter.
+   * @param predicate The predicate expression to filter the keys.
+   * @return A map with all keys that match the predicate.
+   */
+  public static Map<String, String> getFilteredMap(Map<String, String> m, Predicate predicate) {
     Map<String, String> configs = Maps.newHashMap();
     m.forEach(
         (k, v) -> {

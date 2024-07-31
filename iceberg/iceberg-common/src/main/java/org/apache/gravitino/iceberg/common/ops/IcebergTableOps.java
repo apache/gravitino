@@ -87,7 +87,7 @@ public class IcebergTableOps implements AutoCloseable {
       this.asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
     this.catalogConfigToClients =
-        MapUtils.getSubMap(
+        MapUtils.getFilteredMap(
             icebergConfig.getIcebergCatalogProperties(),
             key -> catalogPropertiesToClientKeys.contains(key));
   }
