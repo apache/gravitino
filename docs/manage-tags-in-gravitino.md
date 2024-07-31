@@ -11,18 +11,21 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 0.6.0, Gravitino introduces a new tag system that allows you to manage tags for 
+Starting from 0.6.0, Gravitino introduces a new tag system that allows you to manage tags for
 metadata objects. Tags are a way to categorize and organize metadata objects in Gravitino.
 
-This document briefly introduces how to use tags in Gravitino by both Gravitino Java client and 
+This document briefly introduces how to use tags in Gravitino by both Gravitino Java client and
 REST APIs.
 
-Note that current tag system is a basic implementation, some advanced features will be added in 
+Note that current tag system is a basic implementation, some advanced features will be added in
 the future versions.
 
 :::info
-Currently, only `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC` objects can be tagged, 
-  tagging on `COLUMN` will be supported in the future.
+1. Currently, only `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC` objects can be tagged, tagging
+   on `COLUMN` will be supported in the future.
+2. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
+   tags of its parent metadata objects. For example, listing tags of a `Table` will also list
+   the tags of its parent `Schema` and `Catalog`.
 :::
 
 ## Tag operations
@@ -148,8 +151,8 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 Tag tag = client.alterTag(
-    "tag1", 
-    TagChange.rename("tag2"), 
+    "tag1",
+    TagChange.rename("tag2"),
     TagChange.updateComment("This is an updated tag"),
     TagChange.setProperty("key3", "value3"),
     TagChange.removeProperty("key1"));
@@ -222,7 +225,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 Catalog catalog1 = ...
 catalog1.supportsTags().associateTags(
-    new String[] {"tag1", "tag2"}, 
+    new String[] {"tag1", "tag2"},
     new String[] {"tag3"});
 
 Schema schema1 = ...
@@ -234,8 +237,8 @@ schema1.supportsTags().associateTags(new String[] {"tag1"}， null);
 
 ### List associated tags for a metadata object
 
-You can list all the tags associated with a metadata object. The tags in Gravitino is 
-inheritable, so listing tags of a metadata object will also list the tags of its parent metadata 
+You can list all the tags associated with a metadata object. The tags in Gravitino is
+inheritable, so listing tags of a metadata object will also list the tags of its parent metadata
 objects.
 
 <Tabs groupId='language' queryString>
@@ -261,7 +264,7 @@ http://localhost:8090/api/metalakes/test/tags/schema/catalog1.schema1?details=tr
 ```java
 Catalog catalog1 = ...
 String[] tags = catalog1.supportsTags().listTags();
-Tag[] tagsInfo = catalog1.supportsTags().listTagsInfo();        
+Tag[] tagsInfo = catalog1.supportsTags().listTagsInfo();
 
 Schema schema1 = ...
 String[] tags = schema1.supportsTags().listTags();
