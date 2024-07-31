@@ -30,9 +30,14 @@ public class MultipleHMSUserAuthenticationIT extends HiveUserAuthenticationIT {
   @BeforeAll
   static void setHiveURI() {
     String ip = kerberosHiveContainer.getContainerIpAddress();
-    int port = HiveContainer.HIVE_METASTORE_PORT;
+    int oldHMSPort = HiveContainer.HIVE_METASTORE_PORT;
+
+    // About the value of `newAddedHMSPort`, please see the value `hive.metastore.port` in the
+    // dev/docker/kerberos-hive/hive-site1.xml
+    int newAddedHMSPort = 19083;
     // Multiple HMS URIs, I put the new one first to test the new HMS URI first.
-    HIVE_METASTORE_URI = String.format("thrift://%s:1%d,thrift://%s:%d", ip, port, ip, port);
+    HIVE_METASTORE_URI =
+        String.format("thrift://%s:%d,thrift://%s:%d", ip, newAddedHMSPort, ip, oldHMSPort);
   }
 
   @Test
