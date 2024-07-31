@@ -17,7 +17,7 @@
   under the License.
 -->
 
-# Apache Gravitino&trade; (incubating)
+# Apache Gravitino :tm: (incubating)
 
 [![GitHub Actions Build](https://github.com/apache/gravitino/actions/workflows/build.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/build.yml)
 [![GitHub Actions Integration Test](https://github.com/apache/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/integration-test.yml)
