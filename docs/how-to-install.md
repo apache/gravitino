@@ -43,12 +43,12 @@ The Gravitino binary distribution package contains the following files:
     |   └── lakehouse-iceberg/                  # Apache Iceberg catalog dependencies and configurations.
     |   └── lakehouse-paimon/                   # Apache Paimon catalog dependencies and configurations.
     |── conf/                                   # All configurations for Gravitino.
-    |   ├── gravitino.conf                      # Gravitino server configuration.
+    |   ├── gravitino.conf                      # Gravitino server and Gravitino Iceberg REST server configuration.
     |   ├── gravitino-iceberg-rest-server.conf  # Gravitino server configuration.
     |   ├── gravitino-env.sh                    # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
-    |   └── log4j2.properties                   # log4j configuration for the Gravitino server.
+    |   └── log4j2.properties                   # log4j configuration for the Gravitino server and Gravitino Iceberg REST server.
     |── libs/                                   # Gravitino server dependencies libraries.
-    |── logs/                                   # Gravitino server logs. Automatically created after the Gravitino server starts.
+    |── logs/                                   # Gravitino server and Gravitino Iceberg REST server logs. Automatically created after the server starts.
     |── data/                                   # Default directory for the Gravitino server to store data.
     |── iceberg-rest-server/                    # Gravitino Iceberg REST server package and dependencies libraries.
     └── scripts/                                # Extra scripts for Gravitino.
