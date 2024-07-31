@@ -79,32 +79,18 @@ public class Privileges {
         return ConsumeTopic.allow();
 
         // User
-      case ADD_USER:
-        return AddUser.allow();
-      case REMOVE_USER:
-        return RemoveUser.allow();
-      case GET_USER:
-        return GetUser.allow();
+      case CREATE_USER:
+        return CreateUser.allow();
 
         // Group
-      case ADD_GROUP:
-        return AddGroup.allow();
-      case REMOVE_GROUP:
-        return RemoveGroup.allow();
-      case GET_GROUP:
-        return GetGroup.allow();
+      case CREATE_GROUP:
+        return CreateGroup.allow();
 
         // Role
       case CREATE_ROLE:
         return CreateRole.allow();
-      case DELETE_ROLE:
-        return DeleteRole.allow();
-      case GRANT_ROLE:
-        return GrantRole.allow();
-      case REVOKE_ROLE:
-        return RevokeRole.allow();
-      case GET_ROLE:
-        return GetRole.allow();
+      case MANAGE_GRANTS:
+        return ManageGrants.allow();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -167,32 +153,18 @@ public class Privileges {
         return ConsumeTopic.deny();
 
         // User
-      case ADD_USER:
-        return AddUser.deny();
-      case REMOVE_USER:
-        return RemoveUser.deny();
-      case GET_USER:
-        return GetUser.deny();
+      case CREATE_USER:
+        return CreateUser.deny();
 
         // Group
-      case ADD_GROUP:
-        return AddGroup.deny();
-      case REMOVE_GROUP:
-        return RemoveGroup.deny();
-      case GET_GROUP:
-        return GetGroup.deny();
+      case CREATE_GROUP:
+        return CreateGroup.deny();
 
         // Role
       case CREATE_ROLE:
         return CreateRole.deny();
-      case DELETE_ROLE:
-        return DeleteRole.deny();
-      case GRANT_ROLE:
-        return GrantRole.deny();
-      case REVOKE_ROLE:
-        return RevokeRole.deny();
-      case GET_ROLE:
-        return GetRole.deny();
+      case MANAGE_GRANTS:
+        return ManageGrants.deny();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -533,127 +505,46 @@ public class Privileges {
     }
   }
 
-  /** The privilege to get a user. */
-  public static class GetUser extends GenericPrivilege<GetUser> {
-    private static final GetUser ALLOW_INSTANCE = new GetUser(Condition.ALLOW, Name.GET_USER);
-    private static final GetUser DENY_INSTANCE = new GetUser(Condition.DENY, Name.GET_USER);
+  /** The privilege to create a user. */
+  public static class CreateUser extends GenericPrivilege<CreateUser> {
+    private static final CreateUser ALLOW_INSTANCE =
+        new CreateUser(Condition.ALLOW, Name.CREATE_USER);
+    private static final CreateUser DENY_INSTANCE =
+        new CreateUser(Condition.DENY, Name.CREATE_USER);
 
-    private GetUser(Condition condition, Name name) {
+    private CreateUser(Condition condition, Name name) {
       super(condition, name);
     }
 
     /** @return The instance with allow condition of the privilege. */
-    public static GetUser allow() {
+    public static CreateUser allow() {
       return ALLOW_INSTANCE;
     }
 
     /** @return The instance with deny condition of the privilege. */
-    public static GetUser deny() {
+    public static CreateUser deny() {
       return DENY_INSTANCE;
     }
   }
 
-  /** The privilege to add a user. */
-  public static class AddUser extends GenericPrivilege<AddUser> {
-    private static final AddUser ALLOW_INSTANCE = new AddUser(Condition.ALLOW, Name.ADD_USER);
-    private static final AddUser DENY_INSTANCE = new AddUser(Condition.DENY, Name.ADD_USER);
+  /** The privilege to create a group. */
+  public static class CreateGroup extends GenericPrivilege<CreateGroup> {
+    private static final CreateGroup ALLOW_INSTANCE =
+        new CreateGroup(Condition.ALLOW, Name.CREATE_GROUP);
+    private static final CreateGroup DENY_INSTANCE =
+        new CreateGroup(Condition.DENY, Name.CREATE_GROUP);
 
-    private AddUser(Condition condition, Name name) {
+    private CreateGroup(Condition condition, Name name) {
       super(condition, name);
     }
 
     /** @return The instance with allow condition of the privilege. */
-    public static AddUser allow() {
+    public static CreateGroup allow() {
       return ALLOW_INSTANCE;
     }
 
     /** @return The instance with deny condition of the privilege. */
-    public static AddUser deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to remove a user. */
-  public static class RemoveUser extends GenericPrivilege<RemoveUser> {
-    private static final RemoveUser ALLOW_INSTANCE =
-        new RemoveUser(Condition.ALLOW, Name.REMOVE_USER);
-    private static final RemoveUser DENY_INSTANCE =
-        new RemoveUser(Condition.DENY, Name.REMOVE_USER);
-
-    private RemoveUser(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static RemoveUser allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static RemoveUser deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to add a group. */
-  public static class AddGroup extends GenericPrivilege<AddGroup> {
-    private static final AddGroup ALLOW_INSTANCE = new AddGroup(Condition.ALLOW, Name.ADD_GROUP);
-    private static final AddGroup DENY_INSTANCE = new AddGroup(Condition.DENY, Name.ADD_GROUP);
-
-    private AddGroup(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static AddGroup allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static AddGroup deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to remove a group. */
-  public static class RemoveGroup extends GenericPrivilege<RemoveGroup> {
-    private static final RemoveGroup ALLOW_INSTANCE =
-        new RemoveGroup(Condition.ALLOW, Name.REMOVE_GROUP);
-    private static final RemoveGroup DENY_INSTANCE =
-        new RemoveGroup(Condition.DENY, Name.REMOVE_GROUP);
-
-    private RemoveGroup(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static RemoveGroup allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static RemoveGroup deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to get a group. */
-  public static class GetGroup extends GenericPrivilege<GetGroup> {
-    private static final GetGroup ALLOW_INSTANCE =
-        new GetGroup(Condition.ALLOW, Name.CREATE_CATALOG);
-    private static final GetGroup DENY_INSTANCE = new GetGroup(Condition.DENY, Name.CREATE_CATALOG);
-
-    private GetGroup(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static GetGroup allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static GetGroup deny() {
+    public static CreateGroup deny() {
       return DENY_INSTANCE;
     }
   }
@@ -680,86 +571,24 @@ public class Privileges {
     }
   }
 
-  /** The privilege to get a role. */
-  public static class GetRole extends GenericPrivilege<GetRole> {
-    private static final GetRole ALLOW_INSTANCE = new GetRole(Condition.ALLOW, Name.GET_ROLE);
-    private static final GetRole DENY_INSTANCE = new GetRole(Condition.DENY, Name.GET_ROLE);
+  /** The privilege to grant or revoke a role for the user or the group. */
+  public static class ManageGrants extends GenericPrivilege<ManageGrants> {
+    private static final ManageGrants ALLOW_INSTANCE =
+        new ManageGrants(Condition.ALLOW, Name.MANAGE_GRANTS);
+    private static final ManageGrants DENY_INSTANCE =
+        new ManageGrants(Condition.DENY, Name.MANAGE_GRANTS);
 
-    private GetRole(Condition condition, Name name) {
+    private ManageGrants(Condition condition, Name name) {
       super(condition, name);
     }
 
     /** @return The instance with allow condition of the privilege. */
-    public static GetRole allow() {
+    public static ManageGrants allow() {
       return ALLOW_INSTANCE;
     }
 
     /** @return The instance with deny condition of the privilege. */
-    public static GetRole deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to delete a role. */
-  public static class DeleteRole extends GenericPrivilege<DeleteRole> {
-    private static final DeleteRole ALLOW_INSTANCE =
-        new DeleteRole(Condition.ALLOW, Name.DELETE_ROLE);
-    private static final DeleteRole DENY_INSTANCE =
-        new DeleteRole(Condition.DENY, Name.DELETE_ROLE);
-
-    private DeleteRole(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static DeleteRole allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static DeleteRole deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to grant a role to the user or the group. */
-  public static class GrantRole extends GenericPrivilege<GrantRole> {
-    private static final GrantRole ALLOW_INSTANCE = new GrantRole(Condition.ALLOW, Name.GRANT_ROLE);
-    private static final GrantRole DENY_INSTANCE = new GrantRole(Condition.DENY, Name.GRANT_ROLE);
-
-    private GrantRole(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static GrantRole allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static GrantRole deny() {
-      return DENY_INSTANCE;
-    }
-  }
-
-  /** The privilege to revoke a role from the user or the group. */
-  public static class RevokeRole extends GenericPrivilege<RevokeRole> {
-    private static final RevokeRole ALLOW_INSTANCE =
-        new RevokeRole(Condition.ALLOW, Name.REVOKE_ROLE);
-    private static final RevokeRole DENY_INSTANCE =
-        new RevokeRole(Condition.DENY, Name.REVOKE_ROLE);
-
-    private RevokeRole(Condition condition, Name name) {
-      super(condition, name);
-    }
-
-    /** @return The instance with allow condition of the privilege. */
-    public static RevokeRole allow() {
-      return ALLOW_INSTANCE;
-    }
-
-    /** @return The instance with deny condition of the privilege. */
-    public static RevokeRole deny() {
+    public static ManageGrants deny() {
       return DENY_INSTANCE;
     }
   }

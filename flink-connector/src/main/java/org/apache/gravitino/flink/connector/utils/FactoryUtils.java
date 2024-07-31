@@ -94,7 +94,7 @@ public class FactoryUtils {
   }
 
   /**
-   * Creates a utility that helps validating options for a {@link CatalogFactory}.
+   * Creates a utility that helps to validate options for a {@link CatalogFactory}.
    *
    * <p>Note: This utility checks for left-over options in the final step.
    */

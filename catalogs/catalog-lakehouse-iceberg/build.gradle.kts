@@ -32,48 +32,20 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 
 dependencies {
   implementation(project(":api"))
-  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":common"))
   implementation(project(":core"))
+  implementation(project(":iceberg:iceberg-common"))
   implementation(project(":server-common"))
   implementation(libs.bundles.iceberg)
-  implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
+  implementation(libs.bundles.jetty)
   implementation(libs.bundles.log4j)
-  implementation(libs.caffeine)
   implementation(libs.cglib)
   implementation(libs.commons.collections4)
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.hive2.metastore) {
-    exclude("co.cask.tephra")
-    exclude("com.github.spotbugs")
-    exclude("com.google.code.findbugs", "jsr305")
-    exclude("com.tdunning", "json")
-    exclude("javax.transaction", "transaction-api")
-    exclude("org.apache.avro", "avro")
-    exclude("org.apache.hbase")
-    exclude("org.apache.hadoop", "hadoop-yarn-api")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-applicationhistoryservice")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-common")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
-    exclude("org.apache.hadoop", "hadoop-yarn-server-web-proxy")
-    exclude("org.apache.logging.log4j")
-    exclude("org.apache.parquet", "parquet-hadoop-bundle")
-    exclude("org.apache.zookeeper")
-    exclude("org.eclipse.jetty.aggregate", "jetty-all")
-    exclude("org.eclipse.jetty.orbit", "javax.servlet")
-    exclude("org.pentaho") // missing dependency
-    exclude("org.slf4j", "slf4j-log4j12")
-    exclude("com.zaxxer", "HikariCP")
-    exclude("com.sun.jersey", "jersey-server")
-  }
-  implementation(libs.iceberg.hive.metastore)
-  implementation(libs.jackson.annotations)
-  implementation(libs.jackson.databind)
-  implementation(libs.jackson.datatype.jdk8)
-  implementation(libs.jackson.datatype.jsr310)
   implementation(libs.sqlite.jdbc)
 
   annotationProcessor(libs.lombok)
@@ -86,13 +58,6 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
-  implementation(libs.hadoop2.common) {
-    exclude("com.github.spotbugs")
-  }
-  implementation(libs.hadoop2.hdfs)
-  implementation(libs.hadoop2.mapreduce.client.core)
-  implementation(libs.metrics.jersey2)
-
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
@@ -104,7 +69,9 @@ dependencies {
     exclude("org.rocksdb")
   }
 
-  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.hadoop2.common) {
+    exclude("com.github.spotbugs")
+  }
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
@@ -114,7 +81,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
-  // For test TestMultipleJDBCLoad, it was depended on testcontainers.mysql and testcontainers.postgresql)
+  // For test TestMultipleJDBCLoad, it was depended on testcontainers.mysql and testcontainers.postgresql
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
 
@@ -130,6 +97,10 @@ tasks {
   val runtimeJars by registering(Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
+  }
+
+  jar {
+    finalizedBy("runtimeJars")
   }
 
   val copyCatalogLibs by registering(Copy::class) {
@@ -180,7 +151,7 @@ tasks.test {
 
     doFirst {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
-      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.4")
+      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.5")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit

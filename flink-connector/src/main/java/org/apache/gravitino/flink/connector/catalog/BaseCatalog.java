@@ -20,12 +20,13 @@
 package org.apache.gravitino.flink.connector.catalog;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.compress.utils.Lists;
@@ -67,11 +68,14 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.TableUtils;
 import org.apache.gravitino.flink.connector.utils.TypeUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
 
 /**
  * The BaseCatalog that provides a default implementation for all methods in the {@link
@@ -79,11 +83,15 @@ import org.apache.gravitino.rel.TableChange;
  */
 public abstract class BaseCatalog extends AbstractCatalog {
   private final PropertiesConverter propertiesConverter;
+  private final PartitionConverter partitionConverter;
 
   protected BaseCatalog(String catalogName, String defaultDatabase) {
     super(catalogName, defaultDatabase);
     this.propertiesConverter = getPropertiesConverter();
+    this.partitionConverter = getPartitionConverter();
   }
+
+  protected abstract AbstractCatalog realCatalog();
 
   @Override
   public void open() throws CatalogException {}
@@ -249,6 +257,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   @Override
   public void createTable(ObjectPath tablePath, CatalogBaseTable table, boolean ignoreIfExists)
       throws TableAlreadyExistException, DatabaseNotExistException, CatalogException {
+    Preconditions.checkArgument(
+        table instanceof ResolvedCatalogBaseTable, "table should be resolved");
     NameIdentifier identifier =
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
 
@@ -260,8 +270,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
     String comment = table.getComment();
     Map<String, String> properties =
         propertiesConverter.toGravitinoTableProperties(table.getOptions());
+    Transform[] partitions =
+        partitionConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
     try {
-      catalog().asTableCatalog().createTable(identifier, columns, comment, properties);
+      catalog().asTableCatalog().createTable(identifier, columns, comment, properties, partitions);
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(catalogName(), tablePath.getDatabaseName(), e);
     } catch (TableAlreadyExistsException e) {
@@ -273,44 +285,105 @@ public abstract class BaseCatalog extends AbstractCatalog {
     }
   }
 
+  /**
+   * The method only is used to change the comments. To alter columns, use the other alterTable API
+   * and provide a list of TableChanges.
+   *
+   * @param tablePath path of the table or view to be modified
+   * @param newTable the new table definition
+   * @param ignoreIfNotExists flag to specify behavior when the table or view does not exist: if set
+   *     to false, throw an exception, if set to true, do nothing.
+   * @throws TableNotExistException if the table not exists.
+   * @throws CatalogException in case of any runtime exception.
+   */
   @Override
-  public void alterTable(ObjectPath objectPath, CatalogBaseTable catalogBaseTable, boolean b)
+  public void alterTable(ObjectPath tablePath, CatalogBaseTable newTable, boolean ignoreIfNotExists)
       throws TableNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    CatalogBaseTable existingTable;
+
+    try {
+      existingTable = this.getTable(tablePath);
+    } catch (TableNotExistException e) {
+      if (!ignoreIfNotExists) {
+        throw e;
+      }
+      return;
+    }
+
+    if (existingTable.getTableKind() != newTable.getTableKind()) {
+      throw new CatalogException(
+          String.format(
+              "Table types don't match. Existing table is '%s' and new table is '%s'.",
+              existingTable.getTableKind(), newTable.getTableKind()));
+    }
+
+    NameIdentifier identifier =
+        NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
+    catalog()
+        .asTableCatalog()
+        .alterTable(identifier, getGravitinoTableChanges(existingTable, newTable));
   }
 
   @Override
-  public List<CatalogPartitionSpec> listPartitions(ObjectPath objectPath)
+  public void alterTable(
+      ObjectPath tablePath,
+      CatalogBaseTable newTable,
+      List<org.apache.flink.table.catalog.TableChange> tableChanges,
+      boolean ignoreIfNotExists)
+      throws TableNotExistException, CatalogException {
+    CatalogBaseTable existingTable;
+    try {
+      existingTable = this.getTable(tablePath);
+    } catch (TableNotExistException e) {
+      if (!ignoreIfNotExists) {
+        throw e;
+      }
+      return;
+    }
+
+    if (existingTable.getTableKind() != newTable.getTableKind()) {
+      throw new CatalogException(
+          String.format(
+              "Table types don't match. Existing table is '%s' and new table is '%s'.",
+              existingTable.getTableKind(), newTable.getTableKind()));
+    }
+
+    NameIdentifier identifier =
+        NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
+    catalog().asTableCatalog().alterTable(identifier, getGravitinoTableChanges(tableChanges));
+  }
+
+  @Override
+  public List<CatalogPartitionSpec> listPartitions(ObjectPath tablePath)
       throws TableNotExistException, TableNotPartitionedException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().listPartitions(tablePath);
   }
 
   @Override
   public List<CatalogPartitionSpec> listPartitions(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+      ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws TableNotExistException, TableNotPartitionedException, PartitionSpecInvalidException,
           CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().listPartitions(tablePath, partitionSpec);
   }
 
   @Override
   public List<CatalogPartitionSpec> listPartitionsByFilter(
-      ObjectPath objectPath, List<Expression> list)
+      ObjectPath tablePath, List<Expression> filter)
       throws TableNotExistException, TableNotPartitionedException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().listPartitionsByFilter(tablePath, filter);
   }
 
   @Override
-  public CatalogPartition getPartition(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+  public CatalogPartition getPartition(ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws PartitionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getPartition(tablePath, partitionSpec);
   }
 
   @Override
-  public boolean partitionExists(ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+  public boolean partitionExists(ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().partitionExists(tablePath, partitionSpec);
   }
 
   @Override
@@ -347,9 +420,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public CatalogFunction getFunction(ObjectPath objectPath)
+  public CatalogFunction getFunction(ObjectPath tablePath)
       throws FunctionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getFunction(tablePath);
   }
 
   @Override
@@ -376,29 +449,29 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @Override
-  public CatalogTableStatistics getTableStatistics(ObjectPath objectPath)
+  public CatalogTableStatistics getTableStatistics(ObjectPath tablePath)
       throws TableNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getTableStatistics(tablePath);
   }
 
   @Override
-  public CatalogColumnStatistics getTableColumnStatistics(ObjectPath objectPath)
+  public CatalogColumnStatistics getTableColumnStatistics(ObjectPath tablePath)
       throws TableNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getTableColumnStatistics(tablePath);
   }
 
   @Override
   public CatalogTableStatistics getPartitionStatistics(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+      ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws PartitionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getPartitionStatistics(tablePath, partitionSpec);
   }
 
   @Override
   public CatalogColumnStatistics getPartitionColumnStatistics(
-      ObjectPath objectPath, CatalogPartitionSpec catalogPartitionSpec)
+      ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
       throws PartitionNotExistException, CatalogException {
-    throw new UnsupportedOperationException();
+    return realCatalog().getPartitionColumnStatistics(tablePath, partitionSpec);
   }
 
   @Override
@@ -437,6 +510,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   protected abstract PropertiesConverter getPropertiesConverter();
 
+  protected abstract PartitionConverter getPartitionConverter();
+
   protected CatalogBaseTable toFlinkTable(Table table) {
     org.apache.flink.table.api.Schema.Builder builder =
         org.apache.flink.table.api.Schema.newBuilder();
@@ -448,8 +523,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
     }
     Map<String, String> flinkTableProperties =
         propertiesConverter.toFlinkTableProperties(table.properties());
-    return CatalogTable.of(
-        builder.build(), table.comment(), ImmutableList.of(), flinkTableProperties);
+    List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
+    return CatalogTable.of(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
   }
 
   private Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {
@@ -460,6 +535,102 @@ public abstract class BaseCatalog extends AbstractCatalog {
         column.getDataType().getLogicalType().isNullable(),
         false,
         null);
+  }
+
+  private static void removeProperty(
+      org.apache.flink.table.catalog.TableChange.ResetOption change, List<TableChange> changes) {
+    changes.add(TableChange.removeProperty(change.getKey()));
+  }
+
+  private static void setProperty(
+      org.apache.flink.table.catalog.TableChange.SetOption change, List<TableChange> changes) {
+    changes.add(TableChange.setProperty(change.getKey(), change.getValue()));
+  }
+
+  private static void dropColumn(
+      org.apache.flink.table.catalog.TableChange.DropColumn change, List<TableChange> changes) {
+    changes.add(TableChange.deleteColumn(new String[] {change.getColumnName()}, true));
+  }
+
+  private static void addColumn(
+      org.apache.flink.table.catalog.TableChange.AddColumn change, List<TableChange> changes) {
+    changes.add(
+        TableChange.addColumn(
+            new String[] {change.getColumn().getName()},
+            TypeUtils.toGravitinoType(change.getColumn().getDataType().getLogicalType()),
+            change.getColumn().getComment().orElse(null),
+            TableUtils.toGravitinoColumnPosition(change.getPosition())));
+  }
+
+  private static void modifyColumn(
+      org.apache.flink.table.catalog.TableChange change, List<TableChange> changes) {
+    if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumnName) {
+      org.apache.flink.table.catalog.TableChange.ModifyColumnName modifyColumnName =
+          (org.apache.flink.table.catalog.TableChange.ModifyColumnName) change;
+      changes.add(
+          TableChange.renameColumn(
+              new String[] {modifyColumnName.getOldColumnName()},
+              modifyColumnName.getNewColumnName()));
+    } else if (change
+        instanceof org.apache.flink.table.catalog.TableChange.ModifyPhysicalColumnType) {
+      org.apache.flink.table.catalog.TableChange.ModifyPhysicalColumnType modifyColumnType =
+          (org.apache.flink.table.catalog.TableChange.ModifyPhysicalColumnType) change;
+      changes.add(
+          TableChange.updateColumnType(
+              new String[] {modifyColumnType.getOldColumn().getName()},
+              TypeUtils.toGravitinoType(modifyColumnType.getNewType().getLogicalType())));
+    } else if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumnPosition) {
+      org.apache.flink.table.catalog.TableChange.ModifyColumnPosition modifyColumnPosition =
+          (org.apache.flink.table.catalog.TableChange.ModifyColumnPosition) change;
+      changes.add(
+          TableChange.updateColumnPosition(
+              new String[] {modifyColumnPosition.getOldColumn().getName()},
+              TableUtils.toGravitinoColumnPosition(modifyColumnPosition.getNewPosition())));
+    } else if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumnComment) {
+      org.apache.flink.table.catalog.TableChange.ModifyColumnComment modifyColumnComment =
+          (org.apache.flink.table.catalog.TableChange.ModifyColumnComment) change;
+      changes.add(
+          TableChange.updateColumnComment(
+              new String[] {modifyColumnComment.getOldColumn().getName()},
+              modifyColumnComment.getNewComment()));
+    } else {
+      throw new IllegalArgumentException(
+          String.format("Not support ModifyColumn : %s", change.getClass()));
+    }
+  }
+
+  @VisibleForTesting
+  static TableChange[] getGravitinoTableChanges(
+      CatalogBaseTable existingTable, CatalogBaseTable newTable) {
+    Preconditions.checkNotNull(newTable.getComment(), "The new comment should not be null");
+    List<TableChange> changes = Lists.newArrayList();
+    if (!Objects.equals(newTable.getComment(), existingTable.getComment())) {
+      changes.add(TableChange.updateComment(newTable.getComment()));
+    }
+    return changes.toArray(new TableChange[0]);
+  }
+
+  @VisibleForTesting
+  static TableChange[] getGravitinoTableChanges(
+      List<org.apache.flink.table.catalog.TableChange> tableChanges) {
+    List<TableChange> changes = Lists.newArrayList();
+    for (org.apache.flink.table.catalog.TableChange change : tableChanges) {
+      if (change instanceof org.apache.flink.table.catalog.TableChange.AddColumn) {
+        addColumn((org.apache.flink.table.catalog.TableChange.AddColumn) change, changes);
+      } else if (change instanceof org.apache.flink.table.catalog.TableChange.DropColumn) {
+        dropColumn((org.apache.flink.table.catalog.TableChange.DropColumn) change, changes);
+      } else if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumn) {
+        modifyColumn(change, changes);
+      } else if (change instanceof org.apache.flink.table.catalog.TableChange.SetOption) {
+        setProperty((org.apache.flink.table.catalog.TableChange.SetOption) change, changes);
+      } else if (change instanceof org.apache.flink.table.catalog.TableChange.ResetOption) {
+        removeProperty((org.apache.flink.table.catalog.TableChange.ResetOption) change, changes);
+      } else {
+        throw new UnsupportedOperationException(
+            String.format("Not supported change : %s", change.getClass()));
+      }
+    }
+    return changes.toArray(new TableChange[0]);
   }
 
   @VisibleForTesting

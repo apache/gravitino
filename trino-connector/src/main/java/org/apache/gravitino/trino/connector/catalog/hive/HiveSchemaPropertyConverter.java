@@ -22,7 +22,7 @@ import static org.apache.gravitino.trino.connector.catalog.hive.HivePropertyMeta
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
-import org.apache.gravitino.catalog.hive.HiveSchemaPropertiesMetadata;
+import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 
 public class HiveSchemaPropertyConverter extends PropertyConverter {
@@ -31,7 +31,7 @@ public class HiveSchemaPropertyConverter extends PropertyConverter {
   private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
       new TreeBidiMap<>(
           new ImmutableMap.Builder<String, String>()
-              .put(HIVE_SCHEMA_LOCATION, HiveSchemaPropertiesMetadata.LOCATION)
+              .put(HIVE_SCHEMA_LOCATION, HiveConstants.LOCATION)
               .build());
 
   @Override

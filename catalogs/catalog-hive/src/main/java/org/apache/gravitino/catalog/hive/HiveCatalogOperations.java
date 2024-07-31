@@ -59,7 +59,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -675,11 +674,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         .filter(c -> c instanceof TableChange.ColumnChange)
         .forEach(
             c -> {
-              String fieldToAdd = String.join(".", ((TableChange.ColumnChange) c).fieldName());
+              String fieldName = String.join(".", ((TableChange.ColumnChange) c).fieldName());
               Preconditions.checkArgument(
                   c instanceof TableChange.UpdateColumnComment
-                      || !partitionFields.contains(fieldToAdd),
-                  "Cannot alter partition column: " + fieldToAdd);
+                      || !partitionFields.contains(fieldName),
+                  "Cannot alter partition column: " + fieldName);
 
               if (c instanceof TableChange.UpdateColumnPosition
                   && afterPartitionColumn(
@@ -688,12 +687,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                     "Cannot alter column position to after partition column");
               }
 
+              if (c instanceof TableChange.DeleteColumn) {
+                existingFields.remove(fieldName);
+              }
+
               if (c instanceof TableChange.AddColumn) {
                 TableChange.AddColumn addColumn = (TableChange.AddColumn) c;
 
-                if (existingFields.contains(fieldToAdd)) {
+                if (existingFields.contains(fieldName)) {
                   throw new IllegalArgumentException(
-                      "Cannot add column with duplicate name: " + fieldToAdd);
+                      "Cannot add column with duplicate name: " + fieldName);
                 }
 
                 if (addColumn.getPosition() == null) {

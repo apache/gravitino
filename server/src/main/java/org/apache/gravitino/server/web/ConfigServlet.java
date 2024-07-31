@@ -42,7 +42,7 @@ public class ConfigServlet extends HttpServlet {
       ImmutableSet.of(OAuthConfig.DEFAULT_SERVER_URI, OAuthConfig.DEFAULT_TOKEN_PATH);
 
   private static final ImmutableSet<ConfigEntry<?>> basicConfigEntries =
-      ImmutableSet.of(Configs.AUTHENTICATOR);
+      ImmutableSet.of(Configs.AUTHENTICATORS);
 
   private final Map<String, String> configs = Maps.newHashMap();
 
@@ -51,7 +51,10 @@ public class ConfigServlet extends HttpServlet {
       String config = String.valueOf(serverConfig.get(key));
       configs.put(key.getKey(), config);
     }
-    if (serverConfig.get(Configs.AUTHENTICATOR).equalsIgnoreCase(AuthenticatorType.OAUTH.name())) {
+
+    if (serverConfig
+        .get(Configs.AUTHENTICATORS)
+        .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       for (ConfigEntry<?> key : oauthConfigEntries) {
         String config = String.valueOf(serverConfig.get(key));
         configs.put(key.getKey(), config);

@@ -50,7 +50,7 @@ import org.apache.gravitino.messaging.TopicChange;
  * for example, topics list, creation, update and deletion. A Messaging catalog is under the
  * metalake.
  */
-public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
+class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog {
 
   MessagingCatalog(
       Namespace namespace,
@@ -121,7 +121,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
             ErrorHandlers.topicErrorHandler());
     resp.validate();
 
-    return resp.getTopic();
+    return new GenericTopic(resp.getTopic(), restClient, fullNamespace);
   }
 
   /**
@@ -160,7 +160,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
             ErrorHandlers.topicErrorHandler());
     resp.validate();
 
-    return resp.getTopic();
+    return new GenericTopic(resp.getTopic(), restClient, fullNamespace);
   }
 
   /**
@@ -194,7 +194,7 @@ public class MessagingCatalog extends BaseSchemaCatalog implements TopicCatalog 
             ErrorHandlers.topicErrorHandler());
     resp.validate();
 
-    return resp.getTopic();
+    return new GenericTopic(resp.getTopic(), restClient, fullNamespace);
   }
 
   /**

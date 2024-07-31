@@ -24,7 +24,6 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
@@ -34,6 +33,7 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 /** Transforming MySQL connector configuration and components into Apache Gravitino connector. */
 public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
 
+  private static final String CONNECTOR_MYSQL = "mysql";
   private final PropertyConverter catalogConverter;
   private final HasPropertyMeta propertyMetadata;
 
@@ -50,7 +50,7 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
 
   @Override
   public String internalConnectorName() {
-    return GravitinoConnectorPluginManager.CONNECTOR_MYSQL;
+    return CONNECTOR_MYSQL;
   }
 
   @Override

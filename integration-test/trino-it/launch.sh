@@ -33,19 +33,17 @@ fi
 cd ${playground_dir}
 
 # create log dir
-mkdir -p ../build/trino-ci-container-log
+LOG_DIR=../build/trino-ci-container-log
+rm -fr $LOG_DIR
+mkdir -p $LOG_DIR
 
 docker compose up -d
 
-if [ -n "$GRAVITINO_LOG_PATH" ]; then
-    LOG_PATH=$GRAVITINO_LOG_PATH
-else
-    LOG_PATH=../build/integration-test.log
-fi
+LOG_PATH=$LOG_DIR/trino-ci-docker-compose.log
 
 echo "The docker compose log is: $LOG_PATH"
 
-nohup docker compose logs -f  -t >> $LOG_PATH &
+nohup docker compose logs -f  -t > $LOG_PATH &
 
 max_attempts=300
 attempts=0

@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import static org.apache.gravitino.integration.test.container.RangerContainer.DOCKER_ENV_RANGER_SERVER_URL;
+
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.RemoveNetworkCmd;
 import com.github.dockerjava.api.model.Info;
@@ -32,6 +34,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
@@ -52,6 +55,9 @@ public class ContainerSuite implements Closeable {
 
   private static Network network = null;
   private static volatile HiveContainer hiveContainer;
+
+  // Enable the Ranger plugin in the Hive container
+  private static volatile HiveContainer hiveRangerContainer;
   private static volatile TrinoContainer trinoContainer;
   private static volatile TrinoITContainers trinoITContainers;
   private static volatile RangerContainer rangerContainer;
@@ -98,17 +104,6 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startHiveContainer() {
-    startHiveContainer(
-        ImmutableMap.<String, String>builder().put("HADOOP_USER_NAME", "datastrato").build());
-  }
-
-  /**
-   * To start the Hive container, you can to specify environment variables: HIVE_RUNTIME_VERSION:
-   * Hive version, currently support `hive2`(default) and `hive3` DOCKER_ENV_RANGER_SERVER_URL:
-   * Ranger server URL DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME: Ranger Hive repository name
-   * DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME: Ranger HDFS repository name
-   */
-  public void startHiveContainer(Map<String, String> envVars) {
     if (hiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainer == null) {
@@ -116,11 +111,53 @@ public class ContainerSuite implements Closeable {
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
                   .withHostName("gravitino-ci-hive")
-                  .withEnvVars(envVars)
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("HADOOP_USER_NAME", "anonymous")
+                          .build())
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
           hiveContainer = container;
+        }
+      }
+    }
+  }
+
+  /**
+   * To start and enable Ranger plugin in Hive container, <br>
+   * you can specify environment variables: <br>
+   * 1. HIVE_RUNTIME_VERSION: Hive version, currently only support `hive3`, We can support `hive2`
+   * in the future <br>
+   * 2. DOCKER_ENV_RANGER_SERVER_URL: Ranger server URL <br>
+   * 3. DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME: Ranger Hive repository name <br>
+   * 4. DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME: Ranger HDFS repository name <br>
+   */
+  public void startHiveRangerContainer(Map<String, String> envVars) {
+    // If you want to enable Hive Ranger plugin, you need both set the `RANGER_SERVER_URL` and
+    // `RANGER_HIVE_REPOSITORY_NAME` environment variables.
+    // If you want to enable HDFS Ranger plugin, you need both set the `RANGER_SERVER_URL` and
+    // `RANGER_HDFS_REPOSITORY_NAME` environment variables.
+    if (envVars == null
+        || (!Objects.equals(envVars.get(HiveContainer.HIVE_RUNTIME_VERSION), HiveContainer.HIVE3))
+        || (!envVars.containsKey(DOCKER_ENV_RANGER_SERVER_URL)
+            || (!envVars.containsKey(RangerContainer.DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME)
+                && !envVars.containsKey(RangerContainer.DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME)))) {
+      throw new IllegalArgumentException("Error environment variables for Hive Ranger container");
+    }
+
+    if (hiveRangerContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (hiveRangerContainer == null) {
+          // Start Hive container
+          HiveContainer.Builder hiveBuilder =
+              HiveContainer.builder()
+                  .withHostName("gravitino-ci-hive-ranger")
+                  .withEnvVars(envVars)
+                  .withNetwork(network);
+          HiveContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          hiveRangerContainer = container;
         }
       }
     }
@@ -158,7 +195,7 @@ public class ContainerSuite implements Closeable {
               TrinoContainer.builder()
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "datastrato")
+                          .put("HADOOP_USER_NAME", "anonymous")
                           .put("GRAVITINO_HOST_IP", "host.docker.internal")
                           .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
                           .put("GRAVITINO_METALAKE_NAME", metalakeName)
@@ -325,6 +362,10 @@ public class ContainerSuite implements Closeable {
 
   public HiveContainer getHiveContainer() {
     return hiveContainer;
+  }
+
+  public HiveContainer getHiveRangerContainer() {
+    return hiveRangerContainer;
   }
 
   public void startRangerContainer() {

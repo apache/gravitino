@@ -27,30 +27,30 @@ import org.apache.gravitino.connector.PropertyEntry;
 
 public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
-  public static final String CLIENT_POOL_SIZE = "client.pool-size";
+  public static final String CLIENT_POOL_SIZE = HiveConstants.CLIENT_POOL_SIZE;
   public static final int DEFAULT_CLIENT_POOL_SIZE = 1;
 
-  public static final String METASTORE_URIS = "metastore.uris";
+  public static final String METASTORE_URIS = HiveConstants.METASTORE_URIS;
 
   public static final String CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
-      "client.pool-cache.eviction-interval-ms";
+      HiveConstants.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 
   public static final long DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
       TimeUnit.MINUTES.toMillis(5);
 
-  public static final String IMPERSONATION_ENABLE = "impersonation-enable";
+  public static final String IMPERSONATION_ENABLE = HiveConstants.IMPERSONATION_ENABLE;
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
 
-  public static final String KEY_TAB_URI = "kerberos.keytab-uri";
+  public static final String KEY_TAB_URI = HiveConstants.KEY_TAB_URI;
 
-  public static final String PRINCIPAL = "kerberos.principal";
+  public static final String PRINCIPAL = HiveConstants.PRINCIPAL;
 
-  public static final String CHECK_INTERVAL_SEC = "kerberos.check-interval-sec";
+  public static final String CHECK_INTERVAL_SEC = HiveConstants.CHECK_INTERVAL_SEC;
 
-  public static final String FETCH_TIMEOUT_SEC = "kerberos.keytab-fetch-timeout-sec";
+  public static final String FETCH_TIMEOUT_SEC = HiveConstants.FETCH_TIMEOUT_SEC;
 
-  public static final String LIST_ALL_TABLES = "list-all-tables";
+  public static final String LIST_ALL_TABLES = HiveConstants.LIST_ALL_TABLES;
 
   public static final boolean DEFAULT_LIST_ALL_TABLES = false;
 

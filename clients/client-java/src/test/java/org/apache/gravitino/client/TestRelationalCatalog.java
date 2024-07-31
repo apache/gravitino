@@ -647,7 +647,7 @@ public class TestRelationalCatalog extends TestBase {
           createMockColumn("city", Types.IntegerType.get(), "comment1"),
           createMockColumn("dt", Types.DateType.get(), "comment2")
         };
-    IndexDTO[] indexDTOS =
+    IndexDTO[] indexDTOs =
         new IndexDTO[] {
           IndexDTO.builder()
               .withIndexType(IndexDTO.IndexType.PRIMARY_KEY)
@@ -670,7 +670,7 @@ public class TestRelationalCatalog extends TestBase {
             EMPTY_PARTITIONING,
             DistributionDTO.NONE,
             SortOrderDTO.EMPTY_SORT,
-            indexDTOS);
+            indexDTOs);
 
     TableCreateRequest req =
         new TableCreateRequest(
@@ -681,7 +681,7 @@ public class TestRelationalCatalog extends TestBase {
             SortOrderDTO.EMPTY_SORT,
             DistributionDTO.NONE,
             EMPTY_PARTITIONING,
-            indexDTOS);
+            indexDTOs);
     TableResponse resp = new TableResponse(expectedTable);
     buildMockResource(Method.POST, tablePath, req, resp, SC_OK);
 
@@ -696,7 +696,7 @@ public class TestRelationalCatalog extends TestBase {
                 EMPTY_PARTITIONING,
                 DistributionDTO.NONE,
                 SortOrderDTO.EMPTY_SORT,
-                indexDTOS);
+                indexDTOs);
     assertTableEquals(fromDTO(expectedTable), table);
 
     // Test throw TableAlreadyExistsException
@@ -719,7 +719,7 @@ public class TestRelationalCatalog extends TestBase {
                     EMPTY_PARTITIONING,
                     DistributionDTO.NONE,
                     SortOrderDTO.EMPTY_SORT,
-                    indexDTOS));
+                    indexDTOs));
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
   }
 
@@ -1260,7 +1260,7 @@ public class TestRelationalCatalog extends TestBase {
       Partitioning[] partitioning,
       DistributionDTO distributionDTO,
       SortOrderDTO[] sortOrderDTOs,
-      IndexDTO[] indexDTOS) {
+      IndexDTO[] indexDTOs) {
     return TableDTO.builder()
         .withName(name)
         .withColumns(columns)
@@ -1270,7 +1270,7 @@ public class TestRelationalCatalog extends TestBase {
         .withSortOrders(sortOrderDTOs)
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .withPartitioning(partitioning)
-        .withIndex(indexDTOS)
+        .withIndex(indexDTOs)
         .build();
   }
 }

@@ -18,11 +18,11 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
-import static org.apache.gravitino.catalog.lakehouse.iceberg.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
-import static org.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
-import static org.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosConfig.KET_TAB_URI_KEY;
-import static org.apache.gravitino.catalog.lakehouse.iceberg.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig.AUTH_TYPE_KEY;
+import static org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig.IMPERSONATION_ENABLE_KEY;
+import static org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig.KET_TAB_URI_KEY;
+import static org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig.PRINCIPAL_KEY;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
@@ -35,11 +35,12 @@ import java.nio.file.Files;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConfig;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.AbstractIT;
@@ -201,7 +202,7 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
   }
 
   private static void addKerberosConfig() {
-    AbstractIT.customConfigs.put("gravitino.authenticator", "kerberos");
+    AbstractIT.customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
     AbstractIT.customConfigs.put(
         "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
     AbstractIT.customConfigs.put(

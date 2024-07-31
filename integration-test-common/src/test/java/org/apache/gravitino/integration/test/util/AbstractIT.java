@@ -21,6 +21,7 @@ package org.apache.gravitino.integration.test.util;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
+import com.google.common.base.Splitter;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -30,8 +31,10 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -49,10 +52,6 @@ import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -67,6 +66,8 @@ public class AbstractIT {
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
+  private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
+
   protected static GravitinoAdminClient client;
 
   private static final OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
@@ -253,27 +254,25 @@ public class AbstractIT {
       Awaitility.await()
           .atMost(60, TimeUnit.SECONDS)
           .pollInterval(1, TimeUnit.SECONDS)
-          .until(() -> isHttpServerUp(checkServerUrl));
+          .until(() -> HttpUtils.isHttpServerUp(checkServerUrl));
     }
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
     serverUri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
-    if (AuthenticatorType.OAUTH
-        .name()
-        .toLowerCase()
-        .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
+
+    List<String> authenticators = new ArrayList<>();
+    String authenticatorStr = customConfigs.get(Configs.AUTHENTICATORS.getKey());
+    if (authenticatorStr != null) {
+      authenticators = COMMA.splitToList(authenticatorStr);
+    }
+
+    if (authenticators.contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       client = GravitinoAdminClient.builder(serverUri).withOAuth(mockDataProvider).build();
-    } else if (AuthenticatorType.SIMPLE
-        .name()
-        .toLowerCase()
-        .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
+    } else if (authenticators.contains(AuthenticatorType.SIMPLE.name().toLowerCase())) {
       client = GravitinoAdminClient.builder(serverUri).withSimpleAuth().build();
-    } else if (AuthenticatorType.KERBEROS
-        .name()
-        .toLowerCase()
-        .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
+    } else if (authenticators.contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
       client = null;
     } else {
@@ -314,26 +313,6 @@ public class AbstractIT {
     } catch (IOException e) {
       LOG.warn("Can't get git commit id for:", e);
       return "";
-    }
-  }
-
-  /**
-   * Check if the http server is up, If http response status code is 200, then we're assuming the
-   * server is up. Or else we assume the server is not ready.
-   *
-   * <p>Note: The method will ignore the response body and only check the status code.
-   *
-   * @param testUrl A url that we want to test ignore the response body.
-   * @return true if the server is up, false otherwise.
-   */
-  public static boolean isHttpServerUp(String testUrl) {
-    try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-      HttpGet request = new HttpGet(testUrl);
-      ClassicHttpResponse response = httpClient.execute(request, a -> a);
-      return response.getCode() == 200;
-    } catch (Exception e) {
-      LOG.warn("Check Gravitino server failed: ", e);
-      return false;
     }
   }
 }

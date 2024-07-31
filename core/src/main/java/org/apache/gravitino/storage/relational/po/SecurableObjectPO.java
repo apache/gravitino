@@ -149,7 +149,7 @@ public class SecurableObjectPO {
       Preconditions.checkArgument(
           securableObjectPO.privilegeNames != null, "Privilege names are required");
       Preconditions.checkArgument(
-          securableObjectPO.privilegeConditions != null, "Priviege conditions are required");
+          securableObjectPO.privilegeConditions != null, "Privilege conditions are required");
       Preconditions.checkArgument(
           securableObjectPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(
