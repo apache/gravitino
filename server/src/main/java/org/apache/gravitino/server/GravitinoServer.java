@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.server;
 
+import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.List;
 import java.util.Properties;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
@@ -94,7 +96,12 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   private void initializeRestApi() {
-    packages(serverConfig.get(Configs.REST_API_PACKAGES).split(","));
+    List<String> restApiPackages = Lists.newArrayList("org.apache.gravitino.server.web.rest");
+    serverConfig
+        .get(Configs.REST_API_EXTENSION_PACKAGES)
+        .ifPresent(packages -> restApiPackages.addAll(Lists.newArrayList(packages.split(","))));
+    packages(restApiPackages.toArray(new String[0]));
+
     boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
     register(
         new AbstractBinder() {

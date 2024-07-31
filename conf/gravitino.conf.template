@@ -39,8 +39,8 @@ gravitino.server.webserver.threadPoolWorkQueueSize = 100
 gravitino.server.webserver.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.server.webserver.responseHeaderSize = 131072
-# Comma separated list of REST API packages to scan
-gravitino.restApiPackages = org.apache.gravitino.server.web.rest
+# Comma separated list of REST API packages to expand
+gravitino.extension.restApiPackages = org.apache.gravitino.server.web.rest
 
 # THE CONFIGURATION FOR Gravitino ENTITY STORE
 # The entity store to use, we only supports relational

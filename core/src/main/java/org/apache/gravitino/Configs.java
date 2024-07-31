@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.List;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
@@ -323,10 +324,10 @@ public class Configs {
           .intConf()
           .createWithDefault(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
 
-  public static final ConfigEntry<String> REST_API_PACKAGES =
-      new ConfigBuilder("gravitino.restApiPackages")
-          .doc("Comma-separated list of REST API packages to scan")
+  public static final ConfigEntry<Optional<String>> REST_API_EXTENSION_PACKAGES =
+      new ConfigBuilder("gravitino.extension.restApiPackages")
+          .doc("Comma-separated list of REST API packages to expand")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
-          .createWithDefault("org.apache.gravitino.server.web.rest");
+          .createWithOptional();
 }
