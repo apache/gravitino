@@ -200,7 +200,7 @@ Dropping a catalog only removes metadata about the catalog, schemas, and tables 
 
 ### List all catalogs in a metalake
 
-You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs in
+You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs in
 a metalake:
 
 <Tabs groupId="language" queryString>
@@ -227,7 +227,7 @@ String[] catalogNames = gravitinoClient.listCatalogs();
 
 ### List all catalogs' information in a metalake
 
-You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs' information in a metalake:
+You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs' information in a metalake:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -463,7 +463,7 @@ Some catalogs may not support cascading deletion of a schema, please refer to th
 
 ### List all schemas under a catalog
 
-You can alter all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of list all schema
+You can list all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of listing all the schemas
     in a catalog:
 
 
@@ -723,6 +723,7 @@ The following types that Gravitino supports:
 | Map                        | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
 | Struct                     | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
 | Union                      | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                           |
+| UUID                       | `Types.UUIDType.get()`                                                   | `uuid`                              | UUID type, indicates a universally unique identifier |
 
 The related java doc is [here](pathname:///docs/0.5.1/api/java/org/apache/gravitino/rel/types/Type.html).
 
@@ -974,7 +975,7 @@ Hive catalog and lakehouse-iceberg catalog supports `purgeTable` while jdbc-mysq
 
 ### List all tables under a schema
 
-You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of list all tables in a schema:
+You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of listing all the tables in a schema:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

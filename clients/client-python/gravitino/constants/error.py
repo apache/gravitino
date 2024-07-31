@@ -24,7 +24,7 @@ from gravitino.exceptions.base import (
     IllegalArgumentException,
     NotFoundException,
     InternalError,
-    AlreadyExistException,
+    AlreadyExistsException,
     NotEmptyException,
     UnsupportedOperationException,
 )
@@ -63,7 +63,7 @@ EXCEPTION_MAPPING = {
     IllegalArgumentException: ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
     InternalError: ErrorConstants.INTERNAL_ERROR_CODE,
     NotFoundException: ErrorConstants.NOT_FOUND_CODE,
-    AlreadyExistException: ErrorConstants.ALREADY_EXISTS_CODE,
+    AlreadyExistsException: ErrorConstants.ALREADY_EXISTS_CODE,
     NotEmptyException: ErrorConstants.NON_EMPTY_CODE,
     UnsupportedOperationException: ErrorConstants.UNSUPPORTED_OPERATION_CODE,
 }

@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.trino.connector.catalog.hive;
 
-import static org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager.CONNECTOR_HIVE;
-
 import io.trino.spi.session.PropertyMetadata;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,6 +34,7 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
  */
 public class HiveConnectorAdapter implements CatalogConnectorAdapter {
 
+  private static final String CONNECTOR_HIVE = "hive";
   private final HasPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
 

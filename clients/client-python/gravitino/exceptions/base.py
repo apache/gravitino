@@ -67,8 +67,12 @@ class NoSuchMetalakeException(NotFoundException):
     """An exception thrown when a metalake is not found."""
 
 
-class AlreadyExistException(GravitinoRuntimeException):
+class AlreadyExistsException(GravitinoRuntimeException):
     """Base exception thrown when an entity or resource already exists."""
+
+
+class MetalakeAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a metalake already exists."""
 
 
 class NotEmptyException(GravitinoRuntimeException):

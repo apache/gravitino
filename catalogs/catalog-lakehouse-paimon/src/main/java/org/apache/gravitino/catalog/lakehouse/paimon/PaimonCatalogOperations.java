@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonTable.fromPaimonTable;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonProperties;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -50,6 +51,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -320,9 +322,18 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     if (!schemaExists(schemaIdentifier)) {
       throw new NoSuchSchemaException(NO_SUCH_SCHEMA_EXCEPTION, schemaIdentifier);
     }
+    if (partitioning == null) {
+      partitioning = EMPTY_TRANSFORM;
+    }
     Preconditions.checkArgument(
-        partitioning == null || partitioning.length == 0,
-        "Table Partitions are not supported when creating a Paimon table in Gravitino now.");
+        Arrays.stream(partitioning)
+            .allMatch(
+                partition -> {
+                  NamedReference[] references = partition.references();
+                  return references.length == 1
+                      && references[0] instanceof NamedReference.FieldReference;
+                }),
+        "Paimon partition columns should not be nested.");
     Preconditions.checkArgument(
         sortOrders == null || sortOrders.length == 0,
         "Sort orders are not supported for Paimon in Gravitino.");
@@ -352,6 +363,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                               .build();
                         })
                     .toArray(GravitinoPaimonColumn[]::new))
+            .withPartitioning(partitioning)
             .withComment(comment)
             .withProperties(properties)
             .withAuditInfo(

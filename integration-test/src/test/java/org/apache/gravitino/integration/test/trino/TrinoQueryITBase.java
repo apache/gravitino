@@ -53,12 +53,13 @@ public class TrinoQueryITBase {
 
   protected static boolean started = false;
 
-  protected static String gravitinoUri = "http://127.0.0.1:8090";
-  protected static String trinoUri = "http://127.0.0.1:8080";
-  protected static String hiveMetastoreUri = "thrift://127.0.0.1:9083";
-  protected static String hdfsUri = "hdfs://127.0.0.1:9000";
-  protected static String mysqlUri = "jdbc:mysql://127.0.0.1";
-  protected static String postgresqlUri = "jdbc:postgresql://127.0.0.1";
+  public static String testHost = "127.0.0.1";
+  public static String gravitinoUri = String.format("http://%s:8090", testHost);
+  public static String trinoUri = String.format("http://%s:8080", testHost);
+  public static String hiveMetastoreUri = String.format("thrift://%s:9083", testHost);
+  public static String hdfsUri = String.format("hdfs://%s:9000", testHost);
+  public static String mysqlUri = String.format("jdbc:mysql://%s", testHost);
+  public static String postgresqlUri = String.format("jdbc:postgresql://%s", testHost);
 
   protected static GravitinoAdminClient gravitinoClient;
   protected static TrinoITContainers trinoITContainers;
@@ -245,6 +246,6 @@ public class TrinoQueryITBase {
     if (dir.exists()) {
       return dir.list();
     }
-    throw new Exception("Test queries directory does not exist");
+    throw new Exception("Test queries directory " + dirname + " does not exist");
   }
 }

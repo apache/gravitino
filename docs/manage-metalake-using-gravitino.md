@@ -196,7 +196,7 @@ catalogs, schemas and tables under the metalake need to be removed before droppi
 
 ### List all metalakes
 
-You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all metalake names:
+You can list metalakes by sending a `GET` request to the `/api/metalakes` endpoint or just use the Gravitino Java client. The following is an example of listing all the metalake names:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
