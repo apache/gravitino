@@ -287,7 +287,7 @@ public class KerberosServerUtils {
       try {
         return new DER(oid.getDER());
       } catch (GSSException ex) {
-        // won't happen. a proper OID is encodable.
+        // won't happen.  a proper OID is encodable.
         throw new IllegalArgumentException(ex);
       }
     }
