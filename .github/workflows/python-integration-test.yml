@@ -46,6 +46,7 @@ jobs:
         java-version: [ 8 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
+      PYTHONPATH: ${{ github.workspace }}/clients/client-python
     steps:
       - uses: actions/checkout@v3
 
