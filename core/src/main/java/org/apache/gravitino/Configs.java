@@ -324,10 +324,11 @@ public class Configs {
           .intConf()
           .createWithDefault(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
 
-  public static final ConfigEntry<Optional<String>> REST_API_EXTENSION_PACKAGES =
-      new ConfigBuilder("gravitino.extension.restApiPackages")
+  public static final ConfigEntry<Optional<List<String>>> REST_API_EXTENSION_PACKAGES =
+      new ConfigBuilder("gravitino.server.rest.extensionPackages")
           .doc("Comma-separated list of REST API packages to expand")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
+          .toSequence()
           .createWithOptional();
 }

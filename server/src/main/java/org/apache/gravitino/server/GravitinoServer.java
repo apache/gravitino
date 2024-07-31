@@ -97,9 +97,7 @@ public class GravitinoServer extends ResourceConfig {
 
   private void initializeRestApi() {
     List<String> restApiPackages = Lists.newArrayList("org.apache.gravitino.server.web.rest");
-    serverConfig
-        .get(Configs.REST_API_EXTENSION_PACKAGES)
-        .ifPresent(packages -> restApiPackages.addAll(Lists.newArrayList(packages.split(","))));
+    serverConfig.get(Configs.REST_API_EXTENSION_PACKAGES).ifPresent(restApiPackages::addAll);
     packages(restApiPackages.toArray(new String[0]));
 
     boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
