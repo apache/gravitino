@@ -181,7 +181,7 @@ For example, we can configure Spark catalog options to use Gravitino Iceberg RES
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/
 ```
 
-You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in S3, you should download [iceberg-aws-bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and no extra config is needed because s3 related properties is transferred from Iceberg REST server to Iceberg REST client. 
+You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in S3, you should download [iceberg-aws-bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and no extra config is needed because S3 related properties is transferred from Iceberg REST server to Iceberg REST client. 
 
 ### Exploring Apache Iceberg with Apache Spark SQL
 
