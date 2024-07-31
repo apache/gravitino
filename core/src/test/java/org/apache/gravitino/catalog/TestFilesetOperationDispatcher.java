@@ -180,8 +180,8 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   public void testCreateAndGetFilesetContext() {
     String tmpDir = "/tmp/test_get_fileset_context_" + UUID.randomUUID();
     try {
-      Namespace filesetNs = Namespace.of(metalake, catalog, "schema91");
-      Map<String, String> props = ImmutableMap.of("k1", "v1", "location", "schema91");
+      Namespace filesetNs = Namespace.of(metalake, catalog, "schema1024");
+      Map<String, String> props = ImmutableMap.of("k1", "v1", "location", "schema1024");
       schemaOperationDispatcher.createSchema(
           NameIdentifier.of(filesetNs.levels()), "comment", props);
 
