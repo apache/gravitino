@@ -29,6 +29,7 @@ from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.metalake_list_response import MetalakeListResponse
 from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.api.metalake_change import MetalakeChange
+from gravitino.exceptions.handlers.metalake_error_handler import METALAKE_ERROR_HANDLER
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,9 @@ class GravitinoAdminClient(GravitinoClientBase):
         Returns:
             An array of GravitinoMetalake objects representing the Metalakes.
         """
-        resp = self._rest_client.get(self.API_METALAKES_LIST_PATH)
+        resp = self._rest_client.get(
+            self.API_METALAKES_LIST_PATH, error_handler=METALAKE_ERROR_HANDLER
+        )
         metalake_list_resp = MetalakeListResponse.from_json(
             resp.body, infer_missing=True
         )
@@ -74,7 +77,9 @@ class GravitinoAdminClient(GravitinoClientBase):
         req = MetalakeCreateRequest(name, comment, properties)
         req.validate()
 
-        resp = self._rest_client.post(self.API_METALAKES_LIST_PATH, req)
+        resp = self._rest_client.post(
+            self.API_METALAKES_LIST_PATH, req, error_handler=METALAKE_ERROR_HANDLER
+        )
         metalake_response = MetalakeResponse.from_json(resp.body, infer_missing=True)
         metalake_response.validate()
         metalake = metalake_response.metalake()
@@ -99,7 +104,9 @@ class GravitinoAdminClient(GravitinoClientBase):
         updates_request.validate()
 
         resp = self._rest_client.put(
-            self.API_METALAKES_IDENTIFIER_PATH + name, updates_request
+            self.API_METALAKES_IDENTIFIER_PATH + name,
+            updates_request,
+            error_handler=METALAKE_ERROR_HANDLER,
         )
         metalake_response = MetalakeResponse.from_json(resp.body, infer_missing=True)
         metalake_response.validate()
@@ -117,7 +124,10 @@ class GravitinoAdminClient(GravitinoClientBase):
             True if the Metalake was successfully dropped, false otherwise.
         """
         try:
-            resp = self._rest_client.delete(self.API_METALAKES_IDENTIFIER_PATH + name)
+            resp = self._rest_client.delete(
+                self.API_METALAKES_IDENTIFIER_PATH + name,
+                error_handler=METALAKE_ERROR_HANDLER,
+            )
             drop_response = DropResponse.from_json(resp.body, infer_missing=True)
 
             return drop_response.dropped()
