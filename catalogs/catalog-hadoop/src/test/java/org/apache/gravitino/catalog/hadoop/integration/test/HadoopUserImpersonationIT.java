@@ -68,7 +68,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 public class HadoopUserImpersonationIT extends AbstractIT {
-  private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HadoopUserImpersonationIT.class);
 
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("CatalogHadoopIT_metalake");

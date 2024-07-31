@@ -19,67 +19,33 @@
 package org.apache.gravitino.catalog.hadoop.integration.test;
 
 import static org.apache.gravitino.integration.test.container.S3MockContainer.HTTP_PORT;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Map;
-import org.apache.gravitino.Catalog;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
-import org.apache.gravitino.Schema;
-import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
-import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.integration.test.util.AbstractIT;
-import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
-public class HadoopCatalogS3IT extends AbstractIT {
-  private static final Logger LOGGER = LoggerFactory.getLogger(HadoopCatalogS3IT.class);
-  private static final String METALAKE_NAME =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_s3_metalake");
-  private static final String CATALOG_NAME =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_s3_catalog");
-  private static final String SCHEMA_NAME =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_s3_schema");
-  private static final String FILESET_PROVIDER = "hadoop";
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class HadoopCatalogS3IT extends HadoopCatalogCommonIT {
   private static final String DEFAULT_BASE_LOCATION = "s3a://gravitino-fileset-IT/";
   private static final String DEFAULT_AK = "foo";
   private static final String DEFAULT_SK = "bar";
 
-  private static GravitinoMetalake metalake;
-  private static Catalog catalog;
-  private static FileSystem s3fs;
   private static String s3Endpoint;
 
-  @BeforeAll
-  public static void setup() throws IOException {
-    containerSuite.startS3MockContainer();
+  @Override
+  protected void startContainer() {
+    containerSuite.startS3MockContainer(ImmutableMap.of("initialBuckets", "gravitino-fileset-IT"));
     s3Endpoint =
         String.format(
             "http://%s:%s/",
             containerSuite.getS3MockContainer().getContainerIpAddress(), HTTP_PORT);
+  }
 
+  @Override
+  protected Configuration hadoopConf() {
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", DEFAULT_BASE_LOCATION);
     conf.set("fs.s3a.access.key", DEFAULT_AK);
@@ -90,364 +56,32 @@ public class HadoopCatalogS3IT extends AbstractIT {
     conf.set("fs.s3a.connection.ssl.enabled", "false");
     conf.set(
         "fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
-    s3fs = FileSystem.get(conf);
-
-    createMetalake();
-    createCatalog();
-    createSchema();
+    return conf;
   }
 
-  private static void createMetalake() {
-    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
-    assertEquals(0, gravitinoMetalakes.length);
-
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);
-    assertEquals(createdMetalake, loadMetalake);
-
-    metalake = loadMetalake;
+  @Override
+  protected String defaultBaseLocation() {
+    return DEFAULT_BASE_LOCATION;
   }
 
-  private static void createCatalog() {
-    Map<String, String> hadoopS3CatalogProperties =
-        ImmutableMap.<String, String>builder()
-            .put("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-            .put("fs.s3a.connection.ssl.enabled", "false")
-            .put("fs.s3a.path.style.access", "true")
-            .put("fs.s3a.access.key", DEFAULT_AK)
-            .put("fs.s3a.secret.key", DEFAULT_SK)
-            .put("fs.s3a.endpoint", s3Endpoint)
-            .build();
-
-    metalake.createCatalog(
-        CATALOG_NAME, Catalog.Type.FILESET, FILESET_PROVIDER, "comment", hadoopS3CatalogProperties);
-
-    catalog = metalake.loadCatalog(CATALOG_NAME);
+  @Override
+  protected Map<String, String> catalogProperties() {
+    return ImmutableMap.<String, String>builder()
+        .put("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+        .put("fs.s3a.connection.ssl.enabled", "false")
+        .put("fs.s3a.path.style.access", "true")
+        .put("fs.s3a.access.key", DEFAULT_AK)
+        .put("fs.s3a.secret.key", DEFAULT_SK)
+        .put("fs.s3a.endpoint", s3Endpoint)
+        .build();
   }
 
-  private static void createSchema() {
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("key1", "val1");
-    properties.put("key2", "val2");
-    properties.put("location", DEFAULT_BASE_LOCATION);
-    String comment = "comment";
-
-    catalog.asSchemas().createSchema(SCHEMA_NAME, comment, properties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(SCHEMA_NAME);
-
-    assertEquals(SCHEMA_NAME, loadSchema.name());
-    assertEquals(comment, loadSchema.comment());
-    assertEquals("val1", loadSchema.properties().get("key1"));
-    assertEquals("val2", loadSchema.properties().get("key2"));
-    assertEquals(DEFAULT_BASE_LOCATION, loadSchema.properties().get("location"));
-  }
-
-  @Test
-  public void testCreateFilesetOnS3() throws IOException {
-    // create fileset
-    String filesetName = "test_create_fileset_on_s3";
-    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
-    assertFalse(
-        s3fs.exists(new Path(storageLocation)),
-        "storage location should not exist before creating");
-    Fileset fileset =
-        createFileset(
-            filesetName,
-            "comment",
-            Fileset.Type.MANAGED,
-            storageLocation,
-            ImmutableMap.of("k1", "v1"));
-
-    // verify fileset is created
-    assertFilesetExists(filesetName, storageLocation);
-    assertNotNull(fileset, "fileset should be created");
-    assertEquals("comment", fileset.comment());
-    assertEquals(Fileset.Type.MANAGED, fileset.type());
-    assertEquals(storageLocation, fileset.storageLocation());
-    assertEquals(1, fileset.properties().size());
-    assertEquals("v1", fileset.properties().get("k1"));
-
-    // test create a fileset that already exist
-    assertThrows(
-        FilesetAlreadyExistsException.class,
-        () ->
-            createFileset(
-                filesetName,
-                "comment",
-                Fileset.Type.MANAGED,
-                storageLocation,
-                ImmutableMap.of("k1", "v1")));
-
-    // create fileset with null fileset name
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            createFileset(
-                null,
-                "comment",
-                Fileset.Type.MANAGED,
-                storageLocation,
-                ImmutableMap.of("k1", "v1")),
-        "Should throw IllegalArgumentException when fileset name is null");
-
-    // create fileset with null storage location
-    String filesetName2 = "test_create_fileset_on_s3_no_storage_location";
-    String storageLocation2 = DEFAULT_BASE_LOCATION + filesetName2;
-    assertFalse(
-        s3fs.exists(new Path(storageLocation2)),
-        "storage location should not exist before creating");
-    Fileset fileset2 = createFileset(filesetName2, null, Fileset.Type.MANAGED, null, null);
-    assertFilesetExists(filesetName2, storageLocation);
-    assertNotNull(fileset2, "fileset should be created");
-    assertNull(fileset2.comment(), "comment should be null");
-    assertEquals(Fileset.Type.MANAGED, fileset2.type(), "type should be MANAGED");
-    assertEquals(
-        storageLocation2, fileset2.storageLocation(), "storage location should be created");
-    assertEquals(ImmutableMap.of(), fileset2.properties(), "properties should be empty");
-
-    // create fileset with null fileset type
-    String filesetName3 = "test_create_fileset_on_s3_no_type";
-    String storageLocation3 = DEFAULT_BASE_LOCATION + filesetName3;
-    Fileset fileset3 =
-        createFileset(filesetName3, "comment", null, storageLocation3, ImmutableMap.of("k1", "v1"));
-    assertFilesetExists(filesetName3, storageLocation3);
-    assertEquals(
-        Fileset.Type.MANAGED, fileset3.type(), "fileset type should be MANAGED by default");
-  }
-
-  @Test
-  public void testCreateExternalFilesetOnS3() throws IOException {
-    // create fileset
-    String filesetName = "test_external_fileset_on_s3";
-    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
-    Fileset fileset =
-        createFileset(
-            filesetName,
-            "comment",
-            Fileset.Type.EXTERNAL,
-            storageLocation,
-            ImmutableMap.of("k1", "v1"));
-
-    // verify fileset is created
-    assertFilesetExists(filesetName, storageLocation);
-    assertNotNull(fileset, "fileset should be created");
-    assertEquals("comment", fileset.comment());
-    assertEquals(Fileset.Type.EXTERNAL, fileset.type());
-    assertEquals(storageLocation, fileset.storageLocation());
-    assertEquals(1, fileset.properties().size());
-    assertEquals("v1", fileset.properties().get("k1"));
-    assertTrue(s3fs.exists(new Path(storageLocation)), "storage location should be created");
-
-    // create fileset with storage location that not exist
-    String filesetName2 = "test_external_fileset_on_s3_no_exist";
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            createFileset(
-                filesetName2, "comment", Fileset.Type.EXTERNAL, null, ImmutableMap.of("k1", "v1")),
-        "Should throw IllegalArgumentException when storage location is null");
-  }
-
-  @Test
-  public void testDropFilesetOnS3() throws IOException {
-    // create fileset
-    String filesetName = "test_drop_managed_fileset_on_s3";
-    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
-    assertFalse(
-        s3fs.exists(new Path(storageLocation)),
-        "storage location should not exist before creating");
-    createFileset(
-        filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
-    assertFilesetExists(filesetName, storageLocation);
-
-    // drop fileset
-    assertTrue(
-        catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, filesetName)),
-        "fileset should be dropped");
-
-    // verify fileset is dropped
-    assertFalse(
-        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(SCHEMA_NAME, filesetName)),
-        "fileset should not exist");
-    assertFalse(s3fs.exists(new Path(storageLocation)), "storage location should not exist");
-  }
-
-  @Test
-  public void testDropExternalFilesetOnS3() throws IOException {
-    // create fileset
-    String filesetName = "test_drop_external_fileset_on_s3";
-    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
-    createFileset(
-        filesetName,
-        "comment",
-        Fileset.Type.EXTERNAL,
-        storageLocation,
-        ImmutableMap.of("k1", "v1"));
-    assertFilesetExists(filesetName, storageLocation);
-
-    // drop fileset
-    assertTrue(
-        catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, filesetName)),
-        "fileset should be dropped");
-
-    // verify fileset is dropped
-    assertFalse(
-        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(SCHEMA_NAME, filesetName)),
-        "fileset should not exist");
-    assertTrue(s3fs.exists(new Path(storageLocation)), "storage location should exist");
-  }
-
-  @Test
-  public void testLoadFilesetOnS3() throws IOException {
-    // create fileset
-    String filesetName = "test_load_fileset_on_s3";
-    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
-    Fileset fileset =
-        createFileset(
-            filesetName,
-            "comment",
-            Fileset.Type.MANAGED,
-            storageLocation,
-            ImmutableMap.of("k1", "v1"));
-    assertFilesetExists(filesetName, storageLocation);
-
-    // test load fileset
-    Fileset loadFileset =
-        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(SCHEMA_NAME, filesetName));
-    assertEquals(fileset.name(), loadFileset.name(), "fileset should be loaded");
-    assertEquals(fileset.comment(), loadFileset.comment(), "comment should be loaded");
-    assertEquals(fileset.type(), loadFileset.type(), "type should be loaded");
-    assertEquals(
-        fileset.storageLocation(),
-        loadFileset.storageLocation(),
-        "storage location should be loaded");
-    assertEquals(fileset.properties(), loadFileset.properties(), "properties should be loaded");
-  }
-
-  @Test
-  public void testListFilesets() throws IOException {
-    // clear schema
-    catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
-    assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
-    createSchema();
-
-    // assert no fileset exists
-    NameIdentifier[] nameIdentifiers =
-        catalog.asFilesetCatalog().listFilesets(Namespace.of(SCHEMA_NAME));
-    assertEquals(0, nameIdentifiers.length, "should have no fileset");
-
-    // create fileset1
-    String filesetName1 = "test_list_filesets1_on_s3";
-    String storageLocation1 = DEFAULT_BASE_LOCATION + filesetName1;
-
-    Fileset fileset1 =
-        createFileset(
-            filesetName1,
-            "comment",
-            Fileset.Type.MANAGED,
-            storageLocation1,
-            ImmutableMap.of("k1", "v1"));
-    assertFilesetExists(filesetName1, storageLocation1);
-
-    // create fileset2
-    String filesetName2 = "test_list_filesets2_on_s3";
-    String storageLocation2 = DEFAULT_BASE_LOCATION + filesetName2;
-
-    Fileset fileset2 =
-        createFileset(
-            filesetName2,
-            "comment",
-            Fileset.Type.MANAGED,
-            storageLocation2,
-            ImmutableMap.of("k1", "v1"));
-    assertFilesetExists(filesetName2, storageLocation2);
-
-    // list filesets
-    NameIdentifier[] nameIdentifiers1 =
-        catalog.asFilesetCatalog().listFilesets(Namespace.of(SCHEMA_NAME));
-    Arrays.sort(nameIdentifiers1, Comparator.comparing(NameIdentifier::name));
-    assertEquals(2, nameIdentifiers1.length, "should have 2 filesets");
-    assertEquals(fileset1.name(), nameIdentifiers1[0].name());
-    assertEquals(fileset2.name(), nameIdentifiers1[1].name());
-  }
-
-  @Test
-  public void testRenameFileset() throws IOException {
-    // create fileset
-    String filesetName = "test_rename_fileset_on_s3";
-    String storageLocation = DEFAULT_BASE_LOCATION + filesetName;
-
-    createFileset(
-        filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
-    assertFilesetExists(filesetName, storageLocation);
-
-    // rename fileset
-    String newFilesetName = "test_rename_fileset_new";
-    Fileset newFileset =
-        catalog
-            .asFilesetCatalog()
-            .alterFileset(
-                NameIdentifier.of(SCHEMA_NAME, filesetName), FilesetChange.rename(newFilesetName));
-
-    // verify fileset is updated
-    assertNotNull(newFileset, "fileset should be created");
-    assertEquals(newFilesetName, newFileset.name(), "fileset name should be updated");
-    assertEquals("comment", newFileset.comment(), "comment should not be change");
-    assertEquals(Fileset.Type.MANAGED, newFileset.type(), "type should not be change");
-    assertEquals(
-        storageLocation, newFileset.storageLocation(), "storage location should not be change");
-    assertEquals(1, newFileset.properties().size(), "properties should not be change");
-    assertEquals("v1", newFileset.properties().get("k1"), "properties should not be change");
-    assertTrue(s3fs.exists(new Path(storageLocation)), "storage location should exist");
-  }
-
-  private Fileset createFileset(
-      String filesetName,
-      String comment,
-      Fileset.Type type,
-      String storageLocation,
-      Map<String, String> properties) {
-    if (storageLocation != null) {
-      Path location = new Path(storageLocation);
-      try {
-        s3fs.deleteOnExit(location);
-      } catch (IOException e) {
-        LOGGER.warn("Failed to delete location: {}", location, e);
-      }
-    }
-    return catalog
-        .asFilesetCatalog()
-        .createFileset(
-            NameIdentifier.of(SCHEMA_NAME, filesetName),
-            comment,
-            type,
-            storageLocation,
-            properties);
-  }
-
-  private void assertFilesetExists(String filesetName, String storageLocation) throws IOException {
-    assertTrue(
-        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(SCHEMA_NAME, filesetName)),
-        "fileset should exist");
-    assertTrue(s3fs.exists(new Path(storageLocation)), "storage location should exist");
-  }
-
-  @AfterAll
-  public static void stop() throws IOException {
-    Catalog catalog = metalake.loadCatalog(CATALOG_NAME);
-    catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
-    metalake.dropCatalog(CATALOG_NAME);
-    client.dropMetalake(METALAKE_NAME);
-
-    if (s3fs != null) {
-      s3fs.close();
-    }
-
-    try {
-      closer.close();
-    } catch (Exception e) {
-      LOGGER.error("Failed to close CloseableGroup", e);
-    }
+  @Override
+  protected Map<String, String> schemaProperties() {
+    return ImmutableMap.<String, String>builder()
+        .put("key1", "val1")
+        .put("key2", "val2")
+        .put("location", DEFAULT_BASE_LOCATION)
+        .build();
   }
 }

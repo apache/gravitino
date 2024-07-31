@@ -19,7 +19,7 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
-import static org.apache.gravitino.integration.test.util.AbstractIT.isHttpServerUp;
+import static org.apache.gravitino.integration.test.util.HttpUtils.isHttpServerUp;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;

@@ -347,14 +347,14 @@ public class ContainerSuite implements Closeable {
     }
   }
 
-  public void startS3MockContainer() {
+  public void startS3MockContainer(Map<String, String> envVars) {
     if (s3MockContainer == null) {
       synchronized (ContainerSuite.class) {
         if (s3MockContainer == null) {
           S3MockContainer.Builder s3MockContainerBuilder =
               S3MockContainer.builder()
                   .withHostName("gravitino-ci-s3mock")
-                  .withEnvVars(ImmutableMap.of("initialBuckets", "gravitino-fileset-IT"))
+                  .withEnvVars(envVars)
                   .withNetwork(network);
           S3MockContainer container = closer.register(s3MockContainerBuilder.build());
           container.start();
