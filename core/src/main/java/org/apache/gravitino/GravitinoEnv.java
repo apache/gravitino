@@ -41,8 +41,8 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
-import org.apache.gravitino.lifecycle.LifecycleHookHelper;
-import org.apache.gravitino.lifecycle.LifecycleHooks;
+import org.apache.gravitino.hook.DispatcherHookHelper;
+import org.apache.gravitino.hook.DispatcherHooks;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
@@ -323,27 +323,27 @@ public class GravitinoEnv {
     // Create and initialize metalake related modules
     MetalakeDispatcher metalakeManager = new MetalakeManager(entityStore, idGenerator);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
-        new MetalakeNormalizeDispatcher(installLifecycleHooks(metalakeManager));
+        new MetalakeNormalizeDispatcher(installDispatcherHooks(metalakeManager));
     this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
-        new CatalogNormalizeDispatcher(installLifecycleHooks((CatalogDispatcher) catalogManager));
+        new CatalogNormalizeDispatcher(installDispatcherHooks((CatalogDispatcher) catalogManager));
     this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(
-            installLifecycleHooks((SchemaDispatcher) schemaOperationDispatcher), catalogManager);
+            installDispatcherHooks((SchemaDispatcher) schemaOperationDispatcher), catalogManager);
     this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
 
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
     TableNormalizeDispatcher tableNormalizeDispatcher =
         new TableNormalizeDispatcher(
-            installLifecycleHooks((TableDispatcher) tableOperationDispatcher), catalogManager);
+            installDispatcherHooks((TableDispatcher) tableOperationDispatcher), catalogManager);
     this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
 
     // TODO: We can install hooks when we need, we only supports ownership post hook,
@@ -358,21 +358,21 @@ public class GravitinoEnv {
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
         new FilesetNormalizeDispatcher(
-            installLifecycleHooks((FilesetDispatcher) filesetOperationDispatcher), catalogManager);
+            installDispatcherHooks((FilesetDispatcher) filesetOperationDispatcher), catalogManager);
     this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
     TopicNormalizeDispatcher topicNormalizeDispatcher =
         new TopicNormalizeDispatcher(
-            installLifecycleHooks((TopicDispatcher) topicOperationDispatcher), catalogManager);
+            installDispatcherHooks((TopicDispatcher) topicOperationDispatcher), catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
       this.accessControlDispatcher =
-          installLifecycleHooks(
+          installDispatcherHooks(
               (AccessControlDispatcher) new AccessControlManager(entityStore, idGenerator, config));
     } else {
       this.accessControlDispatcher = null;
@@ -388,14 +388,16 @@ public class GravitinoEnv {
     this.tagManager = new TagManager(idGenerator, entityStore);
   }
 
-  // Provides a universal entrance to install lifecycle hooks. This method
+  // Provides a universal entrance to install dispatcher hooks. This method
   // focuses the logic of installing hooks.
-  // We should reuse the ability of *NormalizeDispatcher to avoid solving
+  // We should reuse the ability of (Metalake|Schema|Table|Fileset|...)NormalizeDispatcher to avoid
+  // solving
   // normalization names, this is useful for pre-hooks.
-  // so we can't install the hooks for the outside of *NormalizeDispatcher.
-  private <T> T installLifecycleHooks(T manager) {
+  // so we can't install the hooks for the outside of
+  // (Metalake|Schema|Table|Fileset|...)NormalizeDispatcher.
+  private <T> T installDispatcherHooks(T manager) {
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
-    LifecycleHooks hooks = new LifecycleHooks();
+    DispatcherHooks hooks = new DispatcherHooks();
     if (enableAuthorization) {
       AuthorizationUtils.prepareAuthorizationHooks(manager, hooks);
     }
@@ -404,6 +406,6 @@ public class GravitinoEnv {
       return manager;
     }
 
-    return LifecycleHookHelper.installHooks(manager, hooks);
+    return DispatcherHookHelper.installHooks(manager, hooks);
   }
 }

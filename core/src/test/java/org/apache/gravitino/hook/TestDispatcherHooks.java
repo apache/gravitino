@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.lifecycle;
+package org.apache.gravitino.hook;
 
 import static org.apache.gravitino.Configs.SERVICE_ADMINS;
 
@@ -38,7 +38,7 @@ import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestLifecycleHooks {
+public class TestDispatcherHooks {
 
   @Test
   public void testLifecycleHooks() throws IllegalAccessException {
@@ -50,7 +50,7 @@ public class TestLifecycleHooks {
     IdGenerator idGenerator = new RandomIdGenerator();
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
 
-    LifecycleHooks hooks = new LifecycleHooks();
+    DispatcherHooks hooks = new DispatcherHooks();
     AtomicBoolean result = new AtomicBoolean(true);
     hooks.addPostHook(
         "createMetalake",
@@ -58,7 +58,7 @@ public class TestLifecycleHooks {
           result.set(false);
         });
     MetalakeDispatcher metalakeDispatcher =
-        LifecycleHookHelper.installHooks(new MetalakeManager(entityStore, idGenerator), hooks);
+        DispatcherHookHelper.installHooks(new MetalakeManager(entityStore, idGenerator), hooks);
     Assertions.assertTrue(result.get());
     metalakeDispatcher.createMetalake(NameIdentifier.of("test"), "", Collections.emptyMap());
     Assertions.assertFalse(result.get());
@@ -69,7 +69,7 @@ public class TestLifecycleHooks {
           result.set(false);
         });
     AccessControlDispatcher accessControlManager =
-        LifecycleHookHelper.installHooks(
+        DispatcherHookHelper.installHooks(
             new AccessControlManager(entityStore, idGenerator, config), hooks);
     result.set(true);
     Assertions.assertTrue(result.get());

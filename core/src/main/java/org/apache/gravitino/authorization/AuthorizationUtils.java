@@ -29,7 +29,7 @@ import org.apache.gravitino.SupportsMetalakes;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.lifecycle.LifecycleHooks;
+import org.apache.gravitino.hook.DispatcherHooks;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.rel.TableCatalog;
 import org.slf4j.Logger;
@@ -126,7 +126,7 @@ public class AuthorizationUtils {
 
   // Install some post hooks used for ownership. The ownership will have the all privileges
   // of securable objects, users, groups, roles.
-  public static <T> void prepareAuthorizationHooks(T manager, LifecycleHooks hooks) {
+  public static <T> void prepareAuthorizationHooks(T manager, DispatcherHooks hooks) {
     if (manager instanceof SupportsMetalakes) {
       hooks.addPostHook(
           "createMetalake",

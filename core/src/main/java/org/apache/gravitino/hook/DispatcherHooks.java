@@ -16,29 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.lifecycle;
+package org.apache.gravitino.hook;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
-class LifecycleHookProxy<T> implements InvocationHandler {
-  private final LifecycleHooks hooks;
-  private final T dispatcher;
+/**
+ * DispatcherHooks provide the ability to execute specific hook actions before or after calling
+ * specific methods. Now we only support the post hook.
+ */
+public class DispatcherHooks {
 
-  LifecycleHookProxy(T dispatcher, LifecycleHooks hooks) {
-    this.hooks = hooks;
-    this.dispatcher = dispatcher;
+  private final Map<String, List<BiConsumer>> postHookMap = Maps.newHashMap();
+
+  public void addPostHook(String method, BiConsumer hook) {
+    List<BiConsumer> postHooks = postHookMap.computeIfAbsent(method, key -> Lists.newArrayList());
+    postHooks.add(hook);
   }
 
-  @Override
-  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    Object result = method.invoke(dispatcher, args);
-    List<BiConsumer> postHooks = hooks.getPostHooks(method.getName());
-    for (BiConsumer hook : postHooks) {
-      hook.accept(args, result);
+  public boolean isEmpty() {
+    return postHookMap.isEmpty();
+  }
+
+  List<BiConsumer> getPostHooks(String method) {
+    List<BiConsumer> postHooks = postHookMap.get(method);
+    if (postHooks == null) {
+      return Collections.emptyList();
     }
-    return result;
+    return postHooks;
   }
 }

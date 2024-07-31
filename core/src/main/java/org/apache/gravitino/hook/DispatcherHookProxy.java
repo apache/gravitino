@@ -16,20 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.lifecycle;
+package org.apache.gravitino.hook;
 
-import java.lang.reflect.Proxy;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.util.List;
+import java.util.function.BiConsumer;
 
-/** The class is a helper class of lifecycle hooks */
-public class LifecycleHookHelper {
+class DispatcherHookProxy<T> implements InvocationHandler {
+  private final DispatcherHooks hooks;
+  private final T dispatcher;
 
-  private LifecycleHookHelper() {}
+  DispatcherHookProxy(T dispatcher, DispatcherHooks hooks) {
+    this.hooks = hooks;
+    this.dispatcher = dispatcher;
+  }
 
-  public static <T> T installHooks(T dispatcher, LifecycleHooks hooks) {
-    return (T)
-        Proxy.newProxyInstance(
-            dispatcher.getClass().getClassLoader(),
-            dispatcher.getClass().getInterfaces(),
-            new LifecycleHookProxy<T>(dispatcher, hooks));
+  @Override
+  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+    Object result = method.invoke(dispatcher, args);
+    List<BiConsumer> postHooks = hooks.getPostHooks(method.getName());
+    for (BiConsumer hook : postHooks) {
+      hook.accept(args, result);
+    }
+    return result;
   }
 }
