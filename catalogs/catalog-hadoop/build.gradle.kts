@@ -24,8 +24,6 @@ plugins {
   id("idea")
 }
 
-val hadoopTestVersion: String = libs.versions.hadoop.minikdc.get()
-
 dependencies {
   implementation(project(":api"))
   implementation(project(":core"))
@@ -38,7 +36,6 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
   }
-
   implementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
@@ -53,7 +50,6 @@ dependencies {
 
   testImplementation(libs.minikdc)
   testImplementation(libs.hadoop3.minicluster)
-  testImplementation("org.apache.hadoop:hadoop-aws:$hadoopTestVersion")
 
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.mockito.core)
