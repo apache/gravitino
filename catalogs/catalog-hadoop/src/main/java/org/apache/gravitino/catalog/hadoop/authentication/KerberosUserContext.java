@@ -37,7 +37,7 @@ public class KerberosUserContext extends UserContext {
   public static final Logger LOGGER = LoggerFactory.getLogger(KerberosUserContext.class);
 
   private UserGroupInformation userGroupInformation;
-  private final boolean enableUserImpersonation;
+  private boolean enableUserImpersonation;
   private String kerberosRealm;
   private final String keytab;
 
@@ -46,6 +46,10 @@ public class KerberosUserContext extends UserContext {
   KerberosUserContext(boolean enableUserImpersonation, String keytabPath) {
     this.enableUserImpersonation = enableUserImpersonation;
     this.keytab = keytabPath;
+  }
+
+  public void setEnableUserImpersonation(boolean enableUserImpersonation) {
+    this.enableUserImpersonation = enableUserImpersonation;
   }
 
   public synchronized void initKerberos(
@@ -104,5 +108,12 @@ public class KerberosUserContext extends UserContext {
         LOGGER.error("Failed to delete file: {}", keytab);
       }
     }
+  }
+
+  public KerberosUserContext deepCopy() {
+    KerberosUserContext copy = new KerberosUserContext(enableUserImpersonation, keytab);
+    copy.userGroupInformation = userGroupInformation;
+    copy.kerberosRealm = kerberosRealm;
+    return copy;
   }
 }

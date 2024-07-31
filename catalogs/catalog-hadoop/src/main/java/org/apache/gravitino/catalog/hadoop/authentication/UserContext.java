@@ -20,6 +20,8 @@
 package org.apache.gravitino.catalog.hadoop.authentication;
 
 import static org.apache.gravitino.catalog.hadoop.SecureHadoopCatalogOperations.GRAVITINO_KEYTAB_FORMAT;
+import static org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig.AUTH_TYPE_ENTRY;
+import static org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig.ENABLE_IMPERSONATION_ENTRY;
 import static org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig.IMPERSONATION_ENABLE_KEY;
 
 import com.google.common.collect.Maps;
@@ -56,16 +58,7 @@ public abstract class UserContext implements Closeable {
   }
 
   public static void cleanAllUserContext() {
-    userContextMap
-        .values()
-        .forEach(
-            userContext -> {
-              try {
-                userContext.close();
-              } catch (IOException e) {
-                throw new RuntimeException("Failed to close user context", e);
-              }
-            });
+    userContextMap.keySet().forEach(UserContext::clearUserContext);
     userContextMap.clear();
   }
 
@@ -91,17 +84,26 @@ public abstract class UserContext implements Closeable {
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
 
     // If we do not set the impersonation, we will use the parent context;
-    boolean enableUserImpersonation = false;
+    boolean enableUserImpersonation = ENABLE_IMPERSONATION_ENTRY.getDefaultValue();
     if (properties.containsKey(IMPERSONATION_ENABLE_KEY)) {
       enableUserImpersonation = authenticationConfig.isImpersonationEnabled();
     } else if (parentContext != null) {
       enableUserImpersonation = parentContext.enableUserImpersonation();
     }
 
-    AuthenticationType authenticationType = AuthenticationType.SIMPLE;
+    AuthenticationType authenticationType =
+        AuthenticationType.fromString(AUTH_TYPE_ENTRY.getDefaultValue());
+    // If we do not set the authentication type explicitly, we will use the parent context. If the
+    // parent is null, then we will use the default value.
     if (properties.containsKey(AuthenticationConfig.AUTH_TYPE_KEY)) {
       authenticationType =
           authenticationConfig.isSimpleAuth()
+              ? AuthenticationType.SIMPLE
+              : AuthenticationType.KERBEROS;
+
+    } else if (parentContext != null) {
+      authenticationType =
+          parentContext instanceof SimpleUserContext
               ? AuthenticationType.SIMPLE
               : AuthenticationType.KERBEROS;
     }
@@ -120,17 +122,28 @@ public abstract class UserContext implements Closeable {
           new SimpleUserContext(userGroupInformation, enableUserImpersonation);
       addUserContext(nameIdentifier, simpleUserContext);
       return simpleUserContext;
-    }
+    } else if (authenticationType == AuthenticationType.KERBEROS) {
+      // if the kerberos authentication is inherited from the parent context, we will use the
+      // parent context's kerberos configuration.
+      if (authenticationConfig.isSimpleAuth()) {
+        KerberosUserContext kerberosUserContext = ((KerberosUserContext) parentContext).deepCopy();
+        kerberosUserContext.setEnableUserImpersonation(enableUserImpersonation);
+        addUserContext(nameIdentifier, kerberosUserContext);
+        return kerberosUserContext;
+      }
 
-    String keytabPath =
-        String.format(
-            GRAVITINO_KEYTAB_FORMAT,
-            catalogInfo.id() + "-" + nameIdentifier.toString().replace(".", "-"));
-    KerberosUserContext kerberosUserContext =
-        new KerberosUserContext(enableUserImpersonation, keytabPath);
-    kerberosUserContext.initKerberos(properties, configuration, parentContext == null);
-    addUserContext(nameIdentifier, kerberosUserContext);
-    return kerberosUserContext;
+      String keytabPath =
+          String.format(
+              GRAVITINO_KEYTAB_FORMAT,
+              catalogInfo.id() + "-" + nameIdentifier.toString().replace(".", "-"));
+      KerberosUserContext kerberosUserContext =
+          new KerberosUserContext(enableUserImpersonation, keytabPath);
+      kerberosUserContext.initKerberos(properties, configuration, parentContext == null);
+      addUserContext(nameIdentifier, kerberosUserContext);
+      return kerberosUserContext;
+    } else {
+      throw new RuntimeException("Unsupported authentication type: " + authenticationType);
+    }
   }
 
   abstract UserGroupInformation getUser();

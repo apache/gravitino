@@ -36,7 +36,11 @@ public class AuthenticationConfig extends Config {
 
   enum AuthenticationType {
     SIMPLE,
-    KERBEROS
+    KERBEROS;
+
+    public static AuthenticationType fromString(String type) {
+      return AuthenticationType.valueOf(type.toUpperCase());
+    }
   }
 
   public static final boolean KERBEROS_DEFAULT_IMPERSONATION_ENABLE = false;
