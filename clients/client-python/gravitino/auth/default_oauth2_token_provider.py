@@ -109,7 +109,7 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
 
         resp = self._client.post_form(
             self._path,
-            data=client_credential_request.to_dict(),
+            data=client_credential_request,
             error_handler=OAUTH_ERROR_HANDLER,
         )
         oauth2_resp = OAuth2TokenResponse.from_json(resp.body, infer_missing=True)

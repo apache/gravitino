@@ -238,7 +238,7 @@ class HTTPClient:
 
     def post_form(self, endpoint, data=None, error_handler=None, **kwargs):
         return self._request(
-            "post", endpoint, data=data, error_handler=error_handler**kwargs
+            "post", endpoint, data=data, error_handler=error_handler, **kwargs
         )
 
     def close(self):
