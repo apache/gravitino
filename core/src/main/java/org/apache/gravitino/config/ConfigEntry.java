@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.config;
 
-import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -159,9 +158,6 @@ public class ConfigEntry<T> {
    * @return The list of converted type.
    */
   public List<T> strToSeq(String str, Function<String, T> converter) {
-    if (str == null) {
-      return Lists.newArrayList();
-    }
     List<String> strList = Arrays.asList(str.split(","));
     List<T> valList = strList.stream().map(converter).collect(Collectors.toList());
 
