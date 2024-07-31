@@ -102,7 +102,7 @@ public class GravitinoEnv {
   private TagManager tagManager;
   private EventBus eventBus;
 
-  private GravitinoEnv() {}
+  protected GravitinoEnv() {}
 
   private static class InstanceHolder {
     private static final GravitinoEnv INSTANCE = new GravitinoEnv();
@@ -227,6 +227,26 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the CatalogManager associated with the Gravitino environment.
+   *
+   * @return The CatalogManager instance.
+   */
+  public CatalogManager catalogManager() {
+    Preconditions.checkArgument(catalogManager != null, "GravitinoEnv is not initialized.");
+    return catalogManager;
+  }
+
+  /**
+   * Get the EventBus associated with the Gravitino environment.
+   *
+   * @return The EventBus instance.
+   */
+  public EventBus eventBus() {
+    Preconditions.checkArgument(eventBus != null, "GravitinoEnv is not initialized.");
+    return eventBus;
+  }
+
+  /**
    * Get the MetricsSystem associated with the Gravitino environment.
    *
    * @return The MetricsSystem instance.
@@ -235,7 +255,7 @@ public class GravitinoEnv {
     return metricsSystem;
   }
 
-  public LockManager getLockManager() {
+  public LockManager lockManager() {
     return lockManager;
   }
 
