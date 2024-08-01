@@ -141,10 +141,14 @@ public class IcebergNamespaceOperations {
   @Timed(name = "register-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "register-table", absolute = true)
   public Response registerTable(
-      @PathParam("namespace") String namespace, RegisterTableRequest request) {
+      @PathParam("prefix") String prefix,
+      @PathParam("namespace") String namespace,
+      RegisterTableRequest request) {
     LOG.info("Register table, namespace: {}, request: {}", namespace, request);
     LoadTableResponse response =
-        icebergTableOps.registerTable(RESTUtil.decodeNamespace(namespace), request);
+        icebergTableOpsManager
+            .getOps(prefix)
+            .registerTable(RESTUtil.decodeNamespace(namespace), request);
     return IcebergRestUtils.ok(response);
   }
 }
