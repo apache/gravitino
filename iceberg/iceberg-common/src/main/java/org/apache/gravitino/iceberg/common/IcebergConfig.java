@@ -120,7 +120,8 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<String> ICEBERG_REST_SERVICE_CATALOG_PROVIDER =
       new ConfigBuilder(IcebergConstants.ICEBERG_REST_SERVICE_CATALOG_PROVIDER)
-          .doc("the implement of IcebergTableOpsProvider")
+          .doc(
+              "The implement of IcebergTableOpsProvider which is an interface defining how Iceberg REST catalog server gets iceberg catalogs.")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .createWithDefault(
