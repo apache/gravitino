@@ -68,7 +68,7 @@ gravitino.iceberg-rest.classpath = iceberg-rest-server/libs, iceberg-rest-server
 gravitino.iceberg-rest.host = 0.0.0.0
 # Iceberg REST service http port
 gravitino.iceberg-rest.httpPort = 9001
-# The backend Iceberg catalog for Iceberg REST service, it's recommanded to change to hive or jdbc
+# The backend Iceberg catalog for Iceberg REST service, it's recommended to change to hive or jdbc
 gravitino.iceberg-rest.catalog-backend = memory
 # The warehouse directory of Iceberg catalog for Iceberg REST service
 gravitino.iceberg-rest.warehouse = /tmp/

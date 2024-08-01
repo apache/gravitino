@@ -37,6 +37,7 @@ from gravitino.typing import JSONType
 from gravitino.constants.timeout import TIMEOUT
 
 from gravitino.dto.responses.error_response import ErrorResponse
+from gravitino.dto.responses.oauth2_error_response import OAuth2ErrorResponse
 from gravitino.exceptions.base import RESTException, UnknownError
 from gravitino.exceptions.handlers.error_handler import ErrorHandler
 
@@ -145,10 +146,18 @@ class HTTPClient:
                     ErrorResponse.generate_error_response(RESTException, err.reason),
                 )
 
-            err_resp = ErrorResponse.from_json(err_body, infer_missing=True)
+            err_resp = self._parse_error_response(err_body)
             err_resp.validate()
 
             return (False, err_resp)
+
+    def _parse_error_response(self, err_body: bytes) -> ErrorResponse:
+        json_err_body = _json.loads(err_body)
+
+        if "code" in json_err_body:
+            return ErrorResponse.from_json(err_body, infer_missing=True)
+
+        return OAuth2ErrorResponse.from_json(err_body, infer_missing=True)
 
     # pylint: disable=too-many-locals
     def _request(
@@ -228,7 +237,7 @@ class HTTPClient:
 
     def post_form(self, endpoint, data=None, error_handler=None, **kwargs):
         return self._request(
-            "post", endpoint, data=data, error_handler=error_handler**kwargs
+            "post", endpoint, data=data, error_handler=error_handler, **kwargs
         )
 
     def close(self):

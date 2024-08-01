@@ -1,0 +1,77 @@
+<configuration>
+  <property>
+    <name>hive.server2.enable.doAs</name>
+    <value>true</value>
+    <description>Enable user impersonation for HiveServer2</description>
+  </property>
+
+  <property>
+    <name>hive.exec.scratchdir</name>
+    <value>/tmp</value>
+    <description>Scratch space for Hive jobs</description>
+  </property>
+
+  <property>
+    <name>mapred.child.java.opts</name>
+    <value>-Xmx4G -XX:+UseConcMarkSweepGC</value>
+    <description>Max memory for Map Reduce Jobs</description>
+  </property>
+
+  <property>
+    <name>javax.jdo.option.ConnectionURL</name>
+    <value>jdbc:mysql://localhost/metastore_db?createDatabaseIfNotExist=true&amp;useSSL=false</value>
+  </property>
+
+  <property>
+    <name>javax.jdo.option.ConnectionUserName</name>
+    <value>hive</value>
+  </property>
+
+  <property>
+    <name>javax.jdo.option.ConnectionPassword</name>
+    <value>hive</value>
+  </property>
+
+  <property>
+    <name>javax.jdo.option.ConnectionDriverName</name>
+    <value>com.mysql.jdbc.Driver</value>
+  </property>
+
+  <property>
+    <name>hive.metastore.warehouse.dir</name>
+    <value>hdfs://localhost:9000/user/hive/warehouse</value>
+    <description>location of default database for the warehouse</description>
+  </property>
+
+  <property>
+    <name>hive.server2.authentication</name>
+    <value>KERBEROS</value>
+  </property>
+  <property>
+    <name>hive.server2.authentication.kerberos.principal</name>
+    <value>hive/mockhost@HADOOPKRB</value>
+  </property>
+  <property>
+    <name>hive.server2.authentication.kerberos.keytab</name>
+    <value>/hive.keytab</value>
+  </property>
+
+  <property>
+    <name>hive.metastore.sasl.enabled</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>hive.metastore.kerberos.keytab.file</name>
+    <value>/hive.keytab</value>
+  </property>
+  <property>
+    <name>hive.metastore.kerberos.principal</name>
+    <value>hive/mockhost@HADOOPKRB</value>
+  </property>
+
+  <property>
+    <name>hive.metastore.port</name>
+    <value>19083</value>
+  </property>
+
+</configuration>

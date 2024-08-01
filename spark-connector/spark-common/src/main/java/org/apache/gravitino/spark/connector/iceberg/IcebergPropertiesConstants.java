@@ -1,4 +1,5 @@
 /*
+ * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
@@ -29,12 +30,10 @@ public class IcebergPropertiesConstants {
 
   static final String ICEBERG_CATALOG_TYPE = CatalogUtil.ICEBERG_CATALOG_TYPE;
 
-  @VisibleForTesting
   public static final String GRAVITINO_ICEBERG_CATALOG_WAREHOUSE = IcebergConstants.WAREHOUSE;
 
   static final String ICEBERG_CATALOG_WAREHOUSE = CatalogProperties.WAREHOUSE_LOCATION;
 
-  @VisibleForTesting
   public static final String GRAVITINO_ICEBERG_CATALOG_URI = IcebergConstants.URI;
 
   static final String ICEBERG_CATALOG_URI = CatalogProperties.URI;

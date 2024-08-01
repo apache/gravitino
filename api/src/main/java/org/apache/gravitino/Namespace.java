@@ -65,6 +65,17 @@ public class Namespace {
     return new Namespace(levels);
   }
 
+  /**
+   * Create a namespace with the given string with levels separated by dots.
+   *
+   * @param namespace The namespace string
+   * @return A namespace with the given levels
+   */
+  public static Namespace fromString(String namespace) {
+    // todo: escape the dots in the levels if needed
+    return new Namespace(namespace.split("\\."));
+  }
+
   private Namespace(String[] levels) {
     this.levels = levels;
   }

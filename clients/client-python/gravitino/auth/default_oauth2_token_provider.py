@@ -27,6 +27,7 @@ from gravitino.dto.requests.oauth2_client_credential_request import (
     OAuth2ClientCredentialRequest,
 )
 from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.exceptions.handlers.oauth_error_handler import OAUTH_ERROR_HANDLER
 
 CLIENT_CREDENTIALS = "client_credentials"
 CREDENTIAL_SPLITTER = ":"
@@ -107,7 +108,9 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         )
 
         resp = self._client.post_form(
-            self._path, data=client_credential_request.to_dict()
+            self._path,
+            data=client_credential_request,
+            error_handler=OAUTH_ERROR_HANDLER,
         )
         oauth2_resp = OAuth2TokenResponse.from_json(resp.body, infer_missing=True)
         oauth2_resp.validate()

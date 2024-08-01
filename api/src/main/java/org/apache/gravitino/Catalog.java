@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino;
 
+import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.file.FilesetCatalog;
@@ -45,7 +46,26 @@ public interface Catalog extends Auditable {
     MESSAGING,
 
     /** Catalog Type for test only. */
-    UNSUPPORTED
+    UNSUPPORTED;
+
+    /**
+     * Convert the string (case-insensitive) to the catalog type.
+     *
+     * @param type The string to convert
+     * @return The catalog type
+     */
+    public static Type fromString(String type) {
+      switch (type.toLowerCase(Locale.ROOT)) {
+        case "relational":
+          return RELATIONAL;
+        case "fileset":
+          return FILESET;
+        case "messaging":
+          return MESSAGING;
+        default:
+          throw new IllegalArgumentException("Unknown catalog type: " + type);
+      }
+    }
   }
 
   /** The cloud that the catalog is running on. Used by the catalog property `cloud.name`. */

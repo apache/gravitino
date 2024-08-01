@@ -126,7 +126,7 @@ tasks.test {
 
     doFirst {
       environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
-      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.4")
+      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.5")
       environment("GRAVITINO_CI_S3MOCK_DOCKER_IMAGE", "adobe/s3mock:3.9.1")
     }
 

@@ -45,6 +45,7 @@ import org.junit.jupiter.api.Assertions;
  * <p>Referred from spark/v3.4/spark/src/test/java/org/apache/iceberg/spark/SparkTestBase.java
  */
 public abstract class SparkUtilIT extends AbstractIT {
+  protected static final String NULL_STRING = "NULL";
 
   protected abstract SparkSession getSparkSession();
 
@@ -103,6 +104,8 @@ public abstract class SparkUtilIT extends AbstractIT {
       SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
       sdf.setTimeZone(TimeZone.getTimeZone(TIME_ZONE_UTC));
       return sdf.format(timestamp);
+    } else if (item == null) {
+      return NULL_STRING;
     } else {
       return item.toString();
     }

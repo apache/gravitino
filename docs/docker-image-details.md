@@ -7,8 +7,6 @@ license: "This software is licensed under the Apache License version 2."
 
 # User Docker images
 
-There are two kinds of Docker images you can use: the Apache Gravitino Docker image and playground Docker images.
-
 ## Apache Gravitino Docker image
 
 You can deploy the service with the Gravitino Docker image.
@@ -42,6 +40,24 @@ Changelog
   - Gravitino Server
   - Expose ports:
     - `8090` Gravitino Web UI
+    - `9001` Iceberg REST service
+
+## Apache Gravitino Iceberg REST server Docker image
+
+You can deploy the standalone Gravitino Iceberg REST server with the Docker image.
+
+Container startup commands
+
+```shell
+docker run --rm -d -p 9001:9001 datastrato/gravitino-iceberg-rest-server
+```
+
+Changelog
+
+- gravitino-iceberg-rest-server:0.6.0
+  - Docker image `datastrato/gravitino-iceberg-rest-server:0.6.0`
+  - Gravitino Iceberg REST Server with memory catalog backend.
+  - Expose ports:
     - `9001` Iceberg REST service
 
 ## Playground Docker image
@@ -96,6 +112,15 @@ You can use these kinds of Docker images to facilitate integration testing of al
 You can use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
+- gravitino-ci-kerberos-hive:0.1.5
+  - Start another HMS for the Hive cluster in the container with port 19083. This is to test whether Kerberos authentication works for a Kerberos-enabled Hive cluster with multiple HMS.
+  - Refresh ssh keys in the startup script.
+  - Add test logic to log in localhost via ssh without password.
+
+- gravitino-ci-kerberos-hive:0.1.4
+  - Increase the total check time for the status of DataNode to 150s.
+  - Output the log of the DataNode fails to start
+
 - gravitino-ci-kerberos-hive:0.1.3
   - Add more proxy users in the core-site.xml file.
   - fix bugs in the `start.sh` script.

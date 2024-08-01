@@ -20,6 +20,8 @@
 package org.apache.gravitino.server.authentication;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
+import java.util.List;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
@@ -42,15 +44,21 @@ public class AuthenticatorFactory {
 
   private AuthenticatorFactory() {}
 
-  public static Authenticator createAuthenticator(Config config) {
-    String name = config.get(Configs.AUTHENTICATOR);
-    String className = AUTHENTICATORS.getOrDefault(name, name);
+  public static List<Authenticator> createAuthenticators(Config config) {
+    List<String> authenticatorNames = config.get(Configs.AUTHENTICATORS);
 
-    try {
-      return (Authenticator) Class.forName(className).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      LOG.error("Failed to create and initialize Authenticator by name {}.", name, e);
-      throw new RuntimeException("Failed to create and initialize Authenticator: " + name, e);
+    List<Authenticator> authenticators = Lists.newArrayList();
+    for (String name : authenticatorNames) {
+      String className = AUTHENTICATORS.getOrDefault(name, name);
+      try {
+        Authenticator authenticator =
+            (Authenticator) Class.forName(className).getDeclaredConstructor().newInstance();
+        authenticators.add(authenticator);
+      } catch (Exception e) {
+        LOG.error("Failed to create and initialize Authenticator by name {}.", name, e);
+        throw new RuntimeException("Failed to create and initialize Authenticator: " + name, e);
+      }
     }
+    return authenticators;
   }
 }
