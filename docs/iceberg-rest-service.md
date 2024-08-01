@@ -41,7 +41,7 @@ You could modify environment variables in `conf/gravitino-env.sh` and check the 
 
 ## Apache Gravitino Iceberg REST catalog server configuration
 
-The configuration settings for the Gravitino Iceberg REST server are identical for both the standalone server and the auxiliary server in the Gravitino system. Starting from version `0.6.0`, using the prefix `gravitino.auxService.iceberg-rest.` for the auxiliary server configuration is deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the `gravitino.iceberg-rest.key` will take precedence. The following configurations are shown with `gravitino.iceberg-rest.` prefix.
+The Iceberg REST server configurations are the same in Gravitino for both standalone and auxiliary server mode. Starting from version `0.6.0`, using the prefix `gravitino.auxService.iceberg-rest.` for the auxiliary server configuration is deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the `gravitino.iceberg-rest.key` will take precedence. The following configurations are shown with `gravitino.iceberg-rest.` prefix.
 
 ### Configuration to enable Iceberg REST service in Gravitino server.
 
@@ -50,7 +50,7 @@ The configuration settings for the Gravitino Iceberg REST server are identical f
 | `gravitino.auxService.names`       | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use **`iceberg-rest`**.                                                                                                                                      | (none)        | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.classpath` | The classpath of the Gravitino Iceberg REST catalog service; includes the directory containing jars and configuration. It supports both absolute and relative paths, for example, `iceberg-rest-server/libs, iceberg-rest-server/conf` | (none)        | Yes      | 0.2.0         |
 
-Please note that, it only takes affect in `gravitino.conf`, you doesn't need to specify the above configurations if start as a standalone server.
+Please note that, it only takes affect in `gravitino.conf`, you don't need to specify the above configurations if start as a standalone server.
 
 ### REST catalog server configuration
 
