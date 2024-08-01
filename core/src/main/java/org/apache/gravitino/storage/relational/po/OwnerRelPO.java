@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 
+/** This class is the persistent object of owner relation. */
 @Getter
 public class OwnerRelPO {
 

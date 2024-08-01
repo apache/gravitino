@@ -400,6 +400,7 @@ public class GravitinoEnv {
       this.accessControlDispatcher =
           installDispatcherHooks(
               (AccessControlDispatcher) new AccessControlManager(entityStore, idGenerator, config));
+      this.ownershipManager = new OwnershipManager(entityStore);
     } else {
       this.accessControlDispatcher = null;
     }

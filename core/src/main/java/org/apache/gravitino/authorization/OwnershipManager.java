@@ -32,6 +32,7 @@ import org.apache.gravitino.relation.Relation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** OwnershipManager is used for manage the owner of securable objects, user, group and role. */
 public class OwnershipManager {
   private static final Logger LOG = LoggerFactory.getLogger(OwnershipManager.class);
   private final EntityStore store;

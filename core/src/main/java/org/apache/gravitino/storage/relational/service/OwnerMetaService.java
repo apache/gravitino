@@ -26,6 +26,7 @@ import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
+/** This class is an utilization class to retrieve owner relation. */
 public class OwnerMetaService {
 
   private OwnerMetaService() {}
