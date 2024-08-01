@@ -47,10 +47,9 @@ public class CommandExecutor {
       Map<String, String> env) {
     List<String> subCommandsAsList = new ArrayList<>(Arrays.asList(command));
     String mergedCommand = StringUtils.join(subCommandsAsList, " ");
-
     LOG.info("Sending command \"{}\" to localhost", mergedCommand);
 
-    ProcessBuilder processBuilder = new ProcessBuilder(command);
+    ProcessBuilder processBuilder = new ProcessBuilder(subCommandsAsList);
     processBuilder.environment().putAll(env);
     Process process = null;
     try {
