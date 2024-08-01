@@ -11,9 +11,11 @@ Apache Gravitino supports two kinds of authentication mechanisms: simple and OAu
 
 ### Simple mode
 
-Simple mode is the default authentication option.
+Simple mode is the default authentication option of the server.
 
-Simple mode allows the client to use the environment variable `GRAVITINO_USER` as the user.
+If the client doesn't set the authentication, the client will use anonymous to access the server.
+
+If the client sets the simple mode,  the client will use the environment variable `GRAVITINO_USER` as the user. 
 
 If the environment variable `GRAVITINO_USER` isn't set, the client uses the user of the machine that sends requests.
 
