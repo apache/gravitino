@@ -57,7 +57,7 @@ public class SparkTestConfig extends Config {
           .create();
 
   private static final ConfigEntry<Boolean> GENERATE_GOLDEN_FILES =
-      new ConfigBuilder("gravitino.spark.test.generate.golden.files")
+      new ConfigBuilder("gravitino.spark.test.generateGoldenFiles")
           .doc(
               "Whether generate golden files which are used to check the correctness of the SQL result")
           .version(ConfigConstants.VERSION_0_6_0)
@@ -72,7 +72,7 @@ public class SparkTestConfig extends Config {
           .createWithDefault("test");
 
   private static final ConfigEntry<Boolean> SETUP_GRAVITINO_ENV =
-      new ConfigBuilder("gravitino.spark.test.setup.env")
+      new ConfigBuilder("gravitino.spark.test.setupEnv")
           .doc("Whether to setup Gravitino and Hive environment")
           .version(ConfigConstants.VERSION_0_6_0)
           .booleanConf()
@@ -81,15 +81,15 @@ public class SparkTestConfig extends Config {
   private static final ConfigEntry<String> GRAVITINO_URI =
       new ConfigBuilder("gravitino.spark.test.uri")
           .doc(
-              "Gravitino uri address, only available when `gravitino.spark.test.setup.env` is false")
+              "Gravitino uri address, only available when `gravitino.spark.test.setupEnv` is false")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .createWithDefault("http://127.0.0.1:8090");
 
-  private static final ConfigEntry<String> WAREHOUSE_DIR =
-      new ConfigBuilder("gravitino.spark.test.warehouse")
+  private static final ConfigEntry<String> ICEBERG_WAREHOUSE_DIR =
+      new ConfigBuilder("gravitino.spark.test.iceberg.warehouse")
           .doc(
-              "The warehouse location, only available when `gravitino.spark.test.setup.env` is false")
+              "Iceberg warehouse location, only available when `gravitino.spark.test.setupEnv` is false")
           .version("0.6.0")
           .stringConf()
           .createWithDefault("hdfs://127.0.0.1:9000/user/hive/warehouse-spark-test");
@@ -123,6 +123,6 @@ public class SparkTestConfig extends Config {
   }
 
   public String getWarehouseLocation() {
-    return get(WAREHOUSE_DIR);
+    return get(ICEBERG_WAREHOUSE_DIR);
   }
 }
