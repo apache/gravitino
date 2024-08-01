@@ -1,0 +1,614 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/tags:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+    get:
+      tags:
+        - tag
+      summary: List tags (names)
+      operationId: listTags
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns the list of tag objects if {details} is true, otherwise returns the list of tag name
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/responses/NameListResponse"
+                  - $ref: "#/components/responses/TagListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+                TagListResponse:
+                  $ref: "#/components/examples/TagListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - tag
+      summary: Create tag
+      operationId: createTag
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/requests/TagCreateRequest"
+            examples:
+              TagCreate:
+                $ref: "#/components/examples/TagCreate"
+
+      responses:
+        "200":
+          description: Returns the created tag object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/TagResponse"
+              examples:
+                TagResponse:
+                  $ref: "#/components/examples/TagResponse"
+        "409":
+          description: Conflict - The target tag already exists in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                TagAlreadyExistsException:
+                  $ref: "#/components/examples/TagAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+  /metalakes/{metalake}/tags/{tag}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/tag"
+
+    get:
+      tags:
+        - tag
+      summary: Get tag
+      operationId: getTag
+      description: Returns the specified tag information in the specified metalake
+      responses:
+        "200":
+          description: Returns the tag object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/TagResponse"
+                examples:
+                  TagResponse:
+                    $ref: "#/components/examples/TagResponse"
+        "404":
+          description: Not Found - The specified tag does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchTagException:
+                  $ref: "#/components/examples/NoSuchTagException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - tag
+      summary: Update tag
+      operationId: alterTag
+      description: Alters the specified tag information in the specified metalake
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/requests/TagUpdatesRequest"
+      responses:
+        "200":
+            description: Returns the updated tag object
+            content:
+              application/vnd.gravitino.v1+json:
+                schema:
+                  $ref: "#/components/responses/TagResponse"
+                examples:
+                  TagResponse:
+                    $ref: "#/components/examples/TagResponse"
+        "404":
+          description: Not Found - The specified tag does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchTagException:
+                  $ref: "#/components/examples/NoSuchTagException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - tag
+      summary: Delete tag
+      operationId: deleteTag
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DropResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+  /metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectFullName}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+    get:
+      tags:
+        - tag
+      summary: List tags (names) associated with the specified metadata object
+      operationId: listObjectTags
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns the list of tag objects associated with specified metadata object if {details} is true, otherwise returns the list of tag name
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/responses/NameListResponse"
+                  - $ref: "#/components/responses/TagListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+                TagListResponse:
+                  $ref: "#/components/examples/TagListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    post:
+      tags:
+        - tag
+      summary: Associate tags with the specified metadata object
+      operationId: associateTags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/requests/TagsAssociateRequest"
+            examples:
+              TagAssociate:
+                $ref: "#/components/examples/TagAssociate"
+      responses:
+        "200":
+          description: Returns the list of tag names associated with the specified metadata object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/NameListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+        "409":
+          description: Conflict - The target tag already associated with the specified metadata object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                TagAlreadyAssociatedException:
+                  $ref: "#/components/examples/TagAlreadyAssociatedException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+  /metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectFullName}/{tag}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+      - $ref: "./openapi.yaml#/components/parameters/tag"
+    get:
+      tags:
+        - tag
+      summary: get associated tag for metadata object with specified tag name
+      operationId: getObjectTag
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns the list of tag objects associated with specified metadata object if {details} is true, otherwise returns the list of tag name
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/TagResponse"
+              examples:
+                TagResponse:
+                  $ref: "#/components/examples/TagResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metadata object does not exist or the specified tag is not associated with the specified metadata object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchTagException:
+                  $ref: "#/components/examples/NoSuchTagException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+  parameters:
+    details:
+      name: details
+      in: query
+      description: Include detailed information about the tag
+      required: false
+      schema:
+        type: boolean
+        default: false
+
+  schemas:
+
+    Tag:
+      type: object
+      description: A tag
+      required:
+        - name
+        - audit
+      properties:
+        name:
+          type: string
+          description: The name of the tag
+        comment:
+          type: string
+          description: A comment about the tag
+          nullable: true
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+        properties:
+          type: object
+          description: Configured string to string map of properties for the tag
+          default: { }
+          additionalProperties:
+            type: string
+        inherited:
+          type: boolean
+          description: Whether the tag is inherited from the parent metadata object
+          nullable: true
+
+
+  requests:
+
+    TagCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the tag
+        comment:
+          type: string
+          description: A comment for the tag
+          nullable: true
+        properties:
+          type: object
+          description: A map of properties for the tag
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string
+
+    TagUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/requests/TagUpdateRequest"
+
+    TagUpdateRequest:
+      oneOf:
+        - $ref: "#/components/requests/RenameTagRequest"
+        - $ref: "#/components/requests/UpdateTagCommentRequest"
+        - $ref: "#/components/requests/SetTagPropertyRequest"
+        - $ref: "#/components/requests/RemoveTagPropertyRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/requests/RenameTagRequest"
+          updateComment: "#/components/requests/UpdateTagCommentRequest"
+          setProperty: "#/components/requests/SetTagPropertyRequest"
+          removeProperty: "#/components/requests/RemoveTagPropertyRequest"
+
+    RenameTagRequest:
+      type: object
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - rename
+        newName:
+          type: string
+          description: The new name of the tag
+      example: {
+        "@type": "rename",
+        "newName": "my_tag_new"
+      }
+
+    UpdateTagCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - updateComment
+        newComment:
+          type: string
+          description: The new comment of the tag
+      example: {
+        "@type": "updateComment",
+        "newComment": "This is my new tag comment"
+      }
+
+    SetTagPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setProperty
+        property:
+          type: string
+          description: The property to set
+        value:
+          type: string
+          description: The value to set
+      example: {
+        "@type": "setProperty",
+        "property": "key1",
+        "value": "value1"
+      }
+
+    RemoveTagPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          enum:
+            - removeProperty
+        property:
+          type: string
+          description: The property to remove
+      example: {
+        "@type": "removeProperty",
+        "property": "key2"
+      }
+
+    TagsAssociateRequest:
+      type: object
+      properties:
+        tagsToAdd:
+          type: array
+          items:
+            type: string
+          description: The tags to add
+          nullable: true
+        tagsToRemove:
+          type: array
+          items:
+            type: string
+          description: The tags to remove
+          nullable: true
+
+  responses:
+
+    NameListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        names:
+          type: array
+          items:
+            type: string
+
+    TagListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        tags:
+          type: array
+          description: A list of tag objects
+          items:
+            $ref: "#/components/schemas/Tag"
+
+    TagResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        tag:
+          $ref: "#/components/schemas/Tag"
+
+  examples:
+    NameListResponse:
+      value: {
+        "code": 0,
+        "names": ["my_tag1", "my_tag2"]
+      }
+
+    TagListResponse:
+      value: {
+        "code": 0,
+        "tags": [
+          {
+            "name": "my_tag1",
+            "comment": "This is my tag1",
+            "properties": {
+              "key1": "value1",
+              "key2": "value2"
+            },
+            "audit": {
+              "creator": "gravitino",
+              "createTime": "2023-12-08T03:41:25.595Z"
+            },
+            "inherited": null
+          },
+          {
+            "name": "my_tag2",
+            "comment": "This is my tag2",
+            "properties": {
+              "key2": "value2"
+            },
+            "audit": {
+              "creator": "gravitino",
+              "createTime": "2023-12-08T06:41:25.595Z"
+            },
+            "inherited": null
+          }
+        ]
+      }
+
+    TagCreate:
+      value: {
+        "name": "my_tag1",
+        "comment": "This is my tag1",
+        "properties": {
+          "key1": "value1",
+          "key2": "value2"
+        }
+      }
+
+    TagAssociate:
+      value: {
+        "tagsToAdd": ["my_tag1", "my_tag2"],
+        "tagsToRemove": ["my_tag3"]
+      }
+
+    TagResponse:
+      value: {
+        "code": 0,
+        "tag": {
+          "name": "my_tag1",
+          "comment": "This is my tag1",
+          "properties": {
+            "key1": "value1",
+            "key2": "value2"
+          },
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T03:41:25.595Z"
+          },
+          "inherited": false
+        }
+      }
+
+    TagAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "TagAlreadyExistsException",
+        "message": "Failed to operate tag(s) [my_tag] operation [CREATE], reason [TagAlreadyExistsException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.TagAlreadyExistsException: Gag my_tag already exists",
+          "..."
+        ]
+      }
+
+    TagAlreadyAssociatedException:
+      value: {
+        "code": 1004,
+        "type": "TagAlreadyAssociatedException",
+        "message": "Failed to operate tag(s) [my_tag] operation [ASSOCIATE] under metalake [my_test_metalake], reason [TagAlreadyAssociatedException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.TagAlreadyAssociatedException: Tag my_tag already associated",
+          "..."
+        ]
+      }
+
+    NoSuchTagException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchTagException",
+        "message": "Failed to operate tag(s) [my_tag] operation [LOAD] under metalake [my_test_metalake], reason [NoSuchTagException]",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchTagException: Tag my_tag does not exist",
+          "..."
+        ]
+      }
