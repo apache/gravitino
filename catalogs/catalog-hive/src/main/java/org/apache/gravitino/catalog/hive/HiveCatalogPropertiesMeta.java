@@ -82,7 +82,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   IMPERSONATION_ENABLE,
                   "Enable user impersonation for Hive catalog",
                   false /* Whether this property is required */,
-                  true /* Whether this property is immutable */,
+                  false /* Whether this property is immutable */,
                   DEFAULT_IMPERSONATION_ENABLE,
                   false,
                   false))
