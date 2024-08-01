@@ -99,7 +99,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> S3_ENDPOINT =
       new ConfigBuilder(IcebergConstants.GRAVITINO_S3_ENDPOINT)
           .doc(
-              "An alternative endpoint of the S3 service, This could be used to use S3FileIO with "
+              "An alternative endpoint of the S3 service, This could be used to for S3FileIO with "
                   + "any s3-compatible object storage service that has a different endpoint, or "
                   + "access a private S3 endpoint in a virtual private cloud")
           .version(ConfigConstants.VERSION_0_6_0)
