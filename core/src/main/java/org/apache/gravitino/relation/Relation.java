@@ -22,6 +22,7 @@ package org.apache.gravitino.relation;
 public interface Relation {
 
   enum Type {
+    /** The ownership relationship */
     OWNER_REL
   }
 }

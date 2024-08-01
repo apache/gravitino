@@ -40,7 +40,10 @@ public class OwnerMetaService {
   }
 
   public Entity getOwner(NameIdentifier identifier, Entity.EntityType type) {
-    Long finalEntityId = getEntityId(identifier, type);
+    long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    Long finalEntityId = getEntityId(metalakeId, identifier, type);
+
     OwnerRelPO ownerRelPO =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class,
