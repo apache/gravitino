@@ -144,14 +144,14 @@ tasks.test {
 
   val skipITs = project.hasProperty("skipITs")
   val skipSparkITs = project.hasProperty("skipSparkITs")
-  val skipSparkSQLITs = project.hasProperty("skipSparkSQLITs")
+  val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
+  if (!enableSparkSQLITs) {
+    exclude("**/integration/test/sql/**")
+  }
   if (skipITs || skipSparkITs) {
     // Exclude integration tests
     exclude("**/integration/**")
   } else {
-    if (skipSparkSQLITs) {
-      exclude("**/integration/test/sql/**")
-    }
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")
@@ -163,10 +163,6 @@ tasks.test {
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)
-    val configPath = project.properties["configFile"] as? String ?: ""
-    if (configPath != "") {
-      systemProperty("configFile", configPath)
-    }
   }
 }
 

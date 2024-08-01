@@ -34,7 +34,6 @@ import scala.Option;
 import scala.collection.JavaConverters;
 
 public class SQLQueryTestHelper {
-
   private static final String notIncludedMsg = "[not included in comparison]";
   private static final String clsName = SQLQueryTestHelper.class.getCanonicalName();
   private static final String emptySchema = new StructType().catalogString();
@@ -75,7 +74,7 @@ public class SQLQueryTestHelper {
     return Pair.of(schema, answer);
   }
 
-  // different Spark version may produce different exceptions, so here just produce
+  // Different Spark version may produce different exceptions, so here just produce
   // [SPARK_EXCEPTION]
   public static Pair<String, List<String>> handleExceptions(
       Supplier<Pair<String, List<String>>> result) {

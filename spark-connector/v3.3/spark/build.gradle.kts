@@ -145,13 +145,13 @@ tasks.test {
   val skipITs = project.hasProperty("skipITs")
   val skipSparkITs = project.hasProperty("skipSparkITs")
   val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
+  if (!enableSparkSQLITs) {
+    exclude("**/integration/test/sql/**")
+  }
   if (skipITs || skipSparkITs) {
     // Exclude integration tests
     exclude("**/integration/**")
   } else {
-    if (!enableSparkSQLITs) {
-      exclude("**/integration/test/sql/**")
-    }
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")

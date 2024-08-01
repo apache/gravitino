@@ -48,7 +48,6 @@ import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 
 /** Run and check the correctness of the SparkSQLs */
 public class SparkQueryRunner {
-
   private static final Logger LOG = LoggerFactory.getLogger(SparkSQLRegressionTest.class);
   private static final String HIVE_CATALOG_NAME = "hive";
   private static final String ICEBERG_CATALOG_NAME = "iceberg";
@@ -121,7 +120,7 @@ public class SparkQueryRunner {
   }
 
   private void setupGravitinoEnv() throws Exception {
-    // start hive and hdfs
+    // Start Hive and Hdfs
     containerSuite.startHiveContainer();
     String hiveMetastoreUri =
         String.format(
@@ -134,12 +133,12 @@ public class SparkQueryRunner {
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
 
-    // start Gravitino server
+    // Start Gravitino server
     AbstractIT.startIntegrationTest();
     int gravitinoPort = AbstractIT.getGravitinoServerPort();
     this.gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
 
-    // init metalake and catalog
+    // Init metalake and catalog
     GravitinoAdminClient client = AbstractIT.getGravitinoClient();
     client.createMetalake(metalakeName, "", Collections.emptyMap());
     GravitinoMetalake metalake = client.loadMetalake(metalakeName);
@@ -165,7 +164,7 @@ public class SparkQueryRunner {
     return catalogProperties;
   }
 
-  protected Map<String, String> getIcebergCatalogConfigs(String hiveMetastoreUri) {
+  private Map<String, String> getIcebergCatalogConfigs(String hiveMetastoreUri) {
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,

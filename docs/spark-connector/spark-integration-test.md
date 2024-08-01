@@ -11,7 +11,7 @@ There are two types of integration tests in spark connector, normal integration 
 
 ## Normal integration test
 
-Normal integration test are mainly used to test the correctness the metadata, it's enabled in the GitHub CI. You could run tests with specific Spark version like:
+Normal integration test are mainly used to test the correctness of the metadata, it's enabled in the GitHub CI. You could run tests with specific Spark version like:
 
 ```
 ./gradlew :spark-connector:spark3.3:test --tests "org.apache.gravitino.spark.connector.integration.test.hive.SparkHiveCatalogIT33.testCreateHiveFormatPartitionTable"
@@ -19,10 +19,10 @@ Normal integration test are mainly used to test the correctness the metadata, it
 
 ## Golden file integration test
 
-Golden file integration test are mainly to test the correctness of SQL result with massive data, it's disabled in the GitHub CI, you could run tests with following command:
+Golden file integration test are mainly to test the correctness of the SQL result with massive data, it's disabled in the GitHub CI, you could run tests with following command:
 
 ```
-./gradlew  :spark-connector:spark-3.3:test --tests  "com.datastrato.gravitino.spark.connector.integration.test.sql.SparkSQLRegressionTest33 -PenableSparkSQLITs"
+./gradlew :spark-connector:spark-3.3:test --tests  "org.apache.gravitino.spark.connector.integration.test.sql.SparkSQLRegressionTest33" -PenableSparkSQLITs
 ```
 
 Please change the Spark version number if you want to test other Spark versions.

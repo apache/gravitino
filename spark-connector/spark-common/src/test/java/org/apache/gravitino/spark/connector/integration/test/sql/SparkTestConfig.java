@@ -38,6 +38,7 @@ public class SparkTestConfig extends Config {
               "test",
               "resources")
           .toString();
+
   private static final ConfigEntry<String> TEST_BASE_DIR =
       new ConfigBuilder("gravitino.spark.test.dir")
           .doc("The Spark SQL test base dir")
