@@ -19,12 +19,14 @@
 package org.apache.gravitino.storage.relational.service;
 
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** This class is an utilization class to retrieve owner relation. */
 public class OwnerMetaService {
@@ -65,14 +67,12 @@ public class OwnerMetaService {
       Entity.EntityType entityType,
       NameIdentifier owner,
       Entity.EntityType ownerType) {
-    Long entityId = getEntityId(entity, entityType);
-    Long ownerId = getEntityId(owner, ownerType);
-    Long metalakeId;
-    if (entityType == Entity.EntityType.METALAKE) {
-      metalakeId = entityId;
-    } else {
-      metalakeId = getEntityId(NameIdentifier.of(getMetalake(entity)), Entity.EntityType.METALAKE);
-    }
+    long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(entity.namespace().level(0));
+
+    Long entityId = getEntityId(metalakeId, entity, entityType);
+    Long ownerId = getEntityId(metalakeId, owner, ownerType);
+
     OwnerRelPO ownerRelPO =
         POConverters.initializeOwnerRelPOsWithVersion(
             metalakeId, ownerType.name(), ownerId, entityType.name(), entityId);
@@ -85,63 +85,30 @@ public class OwnerMetaService {
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerEntityRel(ownerRelPO)));
   }
 
-  private static long getEntityId(NameIdentifier identifier, Entity.EntityType type) {
+  private static long getEntityId(
+      long metalakeId, NameIdentifier identifier, Entity.EntityType type) {
     long entityId;
-    if (type == Entity.EntityType.METALAKE) {
-      entityId = MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.name());
-    } else if (type == Entity.EntityType.CATALOG) {
-      long metalakeId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-      entityId =
-          CatalogMetaService.getInstance()
-              .getCatalogIdByMetalakeIdAndName(metalakeId, identifier.name());
-    } else if (type == Entity.EntityType.SCHEMA) {
-      long catalogId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-      entityId =
-          SchemaMetaService.getInstance()
-              .getSchemaIdByCatalogIdAndName(catalogId, identifier.name());
-    } else if (type == Entity.EntityType.FILESET) {
-      long schemaId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-      entityId =
-          FilesetMetaService.getInstance()
-              .getFilesetIdBySchemaIdAndName(schemaId, identifier.name());
-    } else if (type == Entity.EntityType.TABLE) {
-      long schemaId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-      entityId =
-          TableMetaService.getInstance().getTableIdBySchemaIdAndName(schemaId, identifier.name());
-    } else if (type == Entity.EntityType.TOPIC) {
-      long schemaId =
-          CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-      entityId =
-          TopicMetaService.getInstance().getTopicIdBySchemaIdAndName(schemaId, identifier.name());
-    } else if (type == Entity.EntityType.USER) {
-      long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    if (type == Entity.EntityType.USER) {
       entityId =
           UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
 
     } else if (type == Entity.EntityType.GROUP) {
-      long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
       entityId =
           GroupMetaService.getInstance()
               .getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
 
     } else if (type == Entity.EntityType.ROLE) {
-      long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
       entityId =
           RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());
     } else {
-      throw new IllegalArgumentException(String.format("Owner type doesn't support %s", type));
+      MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
+      entityId =
+          MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
     }
     return entityId;
   }
 
-  private String getMetalake(NameIdentifier identifier) {
+  private static String getMetalake(NameIdentifier identifier) {
     if (identifier.hasNamespace()) {
       return identifier.namespace().level(0);
     } else {
