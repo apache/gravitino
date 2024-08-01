@@ -37,6 +37,9 @@ github:
     issues: true
     # Enable projects for project management boards
     projects: true
+  collaborators:
+    - jerqi
+    - diqiu50
   enabled_merge_buttons:
     squash: true
     merge: false
