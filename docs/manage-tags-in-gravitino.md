@@ -15,17 +15,26 @@ Starting from 0.6.0, Gravitino introduces a new tag system that allows you to ma
 metadata objects. Tags are a way to categorize and organize metadata objects in Gravitino.
 
 This document briefly introduces how to use tags in Gravitino by both Gravitino Java client and
-REST APIs.
+REST APIs. If you want to know more about the tag system in Gravitino, please refer to the
+Javadoc and REST API documentation.
 
 Note that current tag system is a basic implementation, some advanced features will be added in
 the future versions.
 
 :::info
-1. Currently, only `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC` objects can be tagged, tagging
+1. Metadata objects are objects that are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
+   `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, etc. A metadata object is combined by a `type` and a
+   comma-separated `name`. For example, a `CATAGLOG` object has a name "catalog1" with type
+   "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
+   object has a name "catalog1.schema1.table1" with type "TABLE".
+2. Currently, only `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC` objects can be tagged, tagging
    on `COLUMN` will be supported in the future.
-2. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
+3. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
    tags of its parent metadata objects. For example, listing tags of a `Table` will also list
    the tags of its parent `Schema` and `Catalog`.
+4. Same tag can be associated to both parent and child metadata objects. When you list the
+   associated tags of a child metadata object, this tag will be included twice in the result
+   list with different `inherited` values.
 :::
 
 ## Tag operations
@@ -163,12 +172,12 @@ Tag tag = client.alterTag(
 
 Currently, Gravitino support the following tag changes:
 
-| Supported modification    | JSON                                                         | Java                                      |
-|---------------------------|--------------------------------------------------------------|-------------------------------------------|
-| Rename a tag              | `{"@type":"rename","newName":"tag_renamed"}`                 | `TagChange.rename("tag_renamed")`         |
-| Update a comment          | `{"@type":"updateComment","newComment":"new_comment"}`       | `TagChange.updateComment("new_comment")`  |
-| Set a fileset property    | `{"@type":"setProperty","property":"key1","value":"value1"}` | `TagChange.setProperty("key1", "value1")` |
-| Remove a fileset property | `{"@type":"removeProperty","property":"key1"}`               | `TagChange.removeProperty("key1")`        |
+| Supported modification | JSON                                                         | Java                                      |
+|------------------------|--------------------------------------------------------------|-------------------------------------------|
+| Rename a tag           | `{"@type":"rename","newName":"tag_renamed"}`                 | `TagChange.rename("tag_renamed")`         |
+| Update a comment       | `{"@type":"updateComment","newComment":"new_comment"}`       | `TagChange.updateComment("new_comment")`  |
+| Set a tag property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `TagChange.setProperty("key1", "value1")` |
+| Remove a tag property  | `{"@type":"removeProperty","property":"key1"}`               | `TagChange.removeProperty("key1")`        |
 
 ### Delete a tag
 
@@ -202,6 +211,8 @@ Gravitino allows you to associate and disassociate tags with metadata objects. C
 
 You can associate and disassociate tags with a metadata object by providing the object type, object
 name and tag names.
+
+The request path for REST API is `/api/metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectName}`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -237,9 +248,11 @@ schema1.supportsTags().associateTags(new String[] {"tag1"}， null);
 
 ### List associated tags for a metadata object
 
-You can list all the tags associated with a metadata object. The tags in Gravitino is
+You can list all the tags associated with a metadata object. The tags in Gravitino are
 inheritable, so listing tags of a metadata object will also list the tags of its parent metadata
 objects.
+
+The request path for REST API is `/api/metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectName}`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -277,6 +290,8 @@ Tag[] tagsInfo = schema1.supportsTags().listTagsInfo();
 ### Get an associated tag by name for a metadata object
 
 You can get an associated tag by its name for a metadata object.
+
+The request path for REST API is `/api/metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectName}/{tagName}`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
