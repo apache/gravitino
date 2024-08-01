@@ -19,7 +19,7 @@
 package org.apache.gravitino.authorization;
 
 /**
- * Every metadata object has owner. Every role, user or group has owner,too. The owner can have all
+ * Every metadata object has owner. Every role, user or group has owner, too. The owner can have all
  * their privileges. The owner could be a user or a group. The owner could be transferred to another
  * user or group.
  */
