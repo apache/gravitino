@@ -1,9 +1,24 @@
 """
-Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2.
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
 """
+
 from abc import ABC
-from dataclasses import field
+from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
@@ -38,37 +53,44 @@ class FilesetChange(ABC):
         return FilesetChange.UpdateFilesetComment(new_comment)
 
     @staticmethod
-    def set_property(property, value):
+    def set_property(fileset_property, value):
         """Creates a new fileset change to set the property and value for the fileset.
 
         Args:
-            property: The property name to set.
+            fileset_property: The property name to set.
             value: The value to set the property to.
 
         Returns:
              The fileset change.
         """
-        return FilesetChange.SetProperty(property, value)
+        return FilesetChange.SetProperty(fileset_property, value)
 
     @staticmethod
-    def remove_property(property):
+    def remove_property(fileset_property):
         """Creates a new fileset change to remove a property from the fileset.
 
         Args:
-            property: The property name to remove.
+            fileset_property: The property name to remove.
 
         Returns:
             The fileset change.
         """
-        return FilesetChange.RemoveProperty(property)
+        return FilesetChange.RemoveProperty(fileset_property)
 
+    @staticmethod
+    def remove_comment():
+        """Creates a new fileset change to remove comment from the fileset.
+
+        Returns:
+            The fileset change.
+        """
+        return FilesetChange.RemoveComment()
+
+    @dataclass
     class RenameFileset:
         """A fileset change to rename the fileset."""
 
-        _new_name: str = field(metadata=config(field_name='new_name'))
-
-        def __init__(self, new_name):
-            self._new_name = new_name
+        _new_name: str = field(metadata=config(field_name="new_name"))
 
         def new_name(self):
             """Retrieves the new name set for the fileset.
@@ -110,13 +132,11 @@ class FilesetChange(ABC):
             """
             return f"RENAMEFILESET {self._new_name}"
 
+    @dataclass
     class UpdateFilesetComment:
         """A fileset change to update the fileset comment."""
 
-        _new_comment: str = field(metadata=config(field_name='new_comment'))
-
-        def __init__(self, new_comment):
-            self._new_comment = new_comment
+        _new_comment: str = field(metadata=config(field_name="new_comment"))
 
         def new_comment(self):
             """Retrieves the new comment intended for the fileset.
@@ -158,15 +178,12 @@ class FilesetChange(ABC):
             """
             return f"UPDATEFILESETCOMMENT {self._new_comment}"
 
+    @dataclass
     class SetProperty:
         """A fileset change to set the property and value for the fileset."""
 
-        _property: str = field(metadata=config(field_name='property'))
-        _value: str = field(metadata=config(field_name='value'))
-
-        def __init__(self, property: str, value: str):
-            self._property = property
-            self._value = value
+        _property: str = field(metadata=config(field_name="property"))
+        _value: str = field(metadata=config(field_name="value"))
 
         def property(self):
             """Retrieves the name of the property being set in the fileset.
@@ -216,13 +233,11 @@ class FilesetChange(ABC):
             """
             return f"SETPROPERTY {self._property} {self._value}"
 
+    @dataclass
     class RemoveProperty:
         """A fileset change to remove a property from the fileset."""
 
-        _property: str = field(metadata=config(field_name='property'))
-
-        def __init__(self, property: str):
-            self._property = property
+        _property: str = field(metadata=config(field_name="property"))
 
         def property(self):
             """Retrieves the name of the property to be removed from the fileset.
@@ -263,3 +278,37 @@ class FilesetChange(ABC):
                  A string summary of the property removal operation.
             """
             return f"REMOVEPROPERTY {self._property}"
+
+    @dataclass
+    class RemoveComment:
+        """A fileset change to remove comment from the fileset."""
+
+        def __eq__(self, other) -> bool:
+            """Compares this RemoveComment instance with another object for equality.
+            Two instances are considered equal if they are RemoveComment instance.
+
+            Args:
+                 other: The object to compare with this instance.
+
+            Returns:
+                 true if the given object represents the comment removal; false otherwise.
+            """
+            return isinstance(other, FilesetChange.RemoveComment)
+
+        def __hash__(self):
+            """Generates a hash code for this RemoveComment instance.
+            The hash code is based on the RemoveComment instance name.
+
+            Returns:
+                 A hash code value for comment removal operation.
+            """
+            return hash("REMOVECOMMENT")
+
+        def __str__(self):
+            """Provides a string representation of the RemoveComment instance.
+            This string format includes the class name.
+
+            Returns:
+                 A string summary of the comment removal operation.
+            """
+            return "REMOVECOMMENT"

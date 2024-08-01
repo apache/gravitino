@@ -1,14 +1,28 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 import { useState, useEffect, Fragment } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Typography, Portal, Tooltip } from '@mui/material'
-import { DataGrid, GridActionsCellItem, GridToolbar } from '@mui/x-data-grid'
+import { Box, Typography, Portal, Tooltip, IconButton } from '@mui/material'
+import { DataGrid, GridToolbar } from '@mui/x-data-grid'
 import {
   VisibilityOutlined as ViewIcon,
   EditOutlined as EditIcon,
@@ -94,7 +108,7 @@ const TableBody = props => {
 
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Tooltip title={name} placement='right'>
+            <Tooltip title={row.comment} placement='right'>
               <Typography
                 noWrap
                 component={Link}
@@ -156,48 +170,39 @@ const TableBody = props => {
       type: 'actions',
       headerName: 'Actions',
       field: 'actions',
-      getActions: ({ id, row }) => [
-        <GridActionsCellItem
-          key='details'
-          label='Details'
-          title='Details'
-          data-refer={`view-metalake-${row.name}`}
-          icon={<ViewIcon viewBox='0 0 24 22' />}
-          onClick={handleShowDetails(row)}
-          sx={{
-            '& svg': {
-              fontSize: '24px'
-            }
-          }}
-        />,
-        <GridActionsCellItem
-          key='edit'
-          label='Edit'
-          title='Edit'
-          data-refer={`edit-metalake-${row.name}`}
-          icon={<EditIcon />}
-          onClick={handleShowEditDialog(row)}
-          sx={{
-            '& svg': {
-              fontSize: '24px'
-            }
-          }}
-        />,
-        <GridActionsCellItem
-          key='delete'
-          icon={<DeleteIcon />}
-          label='Delete'
-          title='Delete'
-          data-refer={`delete-metalake-${row.name}`}
-          onClick={handleDeleteMetalake(row.name)}
-          sx={{
-            '& svg': {
-              fontSize: '24px',
-              color: theme => theme.palette.error.light
-            }
-          }}
-        />
-      ]
+      renderCell: ({ id, row }) => (
+        <>
+          <IconButton
+            title='Details'
+            size='small'
+            sx={{ color: theme => theme.palette.text.secondary }}
+            onClick={handleShowDetails(row)}
+            data-refer={`view-metalake-${row.name}`}
+          >
+            <ViewIcon viewBox='0 0 24 22' />
+          </IconButton>
+
+          <IconButton
+            title='Edit'
+            size='small'
+            sx={{ color: theme => theme.palette.text.secondary }}
+            onClick={handleShowEditDialog(row)}
+            data-refer={`edit-metalake-${row.name}`}
+          >
+            <EditIcon />
+          </IconButton>
+
+          <IconButton
+            title='Delete'
+            size='small'
+            sx={{ color: theme => theme.palette.error.light }}
+            onClick={handleDeleteMetalake(row.name)}
+            data-refer={`delete-metalake-${row.name}`}
+          >
+            <DeleteIcon />
+          </IconButton>
+        </>
+      )
     }
   ]
 

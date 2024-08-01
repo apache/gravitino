@@ -1,7 +1,21 @@
 #!/bin/bash
 #
-# Copyright 2023 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 #
 #set -ex
 script_dir="$(dirname "${BASH_SOURCE-$0}")"
@@ -13,7 +27,7 @@ usage() {
   cat << EOF
 Usage:
 
-./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|trino|doris] --image {image_name} --tag {tag_name} --latest
+./build-docker.sh --platform [all|linux/amd64|linux/arm64] --type [gravitino|hive|kerberos-hive|trino|doris|ranger] --image {image_name} --tag {tag_name} --latest
 
 Notice: You shouldn't use 'all' for the platform if you don't use the Github action to publish the Docker image.
 EOF
@@ -73,6 +87,21 @@ fi
 
 if [[ "${component_type}" == "hive" ]]; then
   . ${script_dir}/hive/hive-dependency.sh
+  build_args="
+  --build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} \
+  --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} \
+  --build-arg HADOOP_VERSION=${HADOOP_VERSION} \
+  --build-arg HIVE_VERSION=${HIVE_VERSION} \
+  --build-arg MYSQL_JDBC_DRIVER_VERSION=${MYSQL_JDBC_DRIVER_VERSION} \
+  --build-arg RANGER_VERSION=${RANGER_VERSION} \
+  --build-arg ZOOKEEPER_VERSION=${ZOOKEEPER_VERSION} \
+  --build-arg HIVE2_VERSION=${HIVE2_VERSION} \
+  --build-arg HIVE3_VERSION=${HIVE3_VERSION} \
+  --build-arg HADOOP2_VERSION=${HADOOP2_VERSION} \
+  --build-arg HADOOP3_VERSION=${HADOOP3_VERSION}
+"
+elif [[ "${component_type}" == "kerberos-hive" ]]; then
+  . ${script_dir}/kerberos-hive/hive-dependency.sh
   build_args="--build-arg HADOOP_PACKAGE_NAME=${HADOOP_PACKAGE_NAME} --build-arg HIVE_PACKAGE_NAME=${HIVE_PACKAGE_NAME} --build-arg JDBC_DIVER_PACKAGE_NAME=${JDBC_DIVER_PACKAGE_NAME}"
 elif [ "${component_type}" == "trino" ]; then
   . ${script_dir}/trino/trino-dependency.sh
@@ -81,6 +110,9 @@ elif [ "${component_type}" == "gravitino" ]; then
 elif [ "${component_type}" == "doris" ]; then
   . ${script_dir}/doris/doris-dependency.sh --platform ${platform_type}
   build_args="--build-arg DORIS_VERSION=${DORIS_VERSION}"
+elif [ "${component_type}" == "ranger" ]; then
+  . ${script_dir}/ranger/ranger-dependency.sh
+  build_args="--build-arg RANGER_PACKAGE_NAME=${RANGER_PACKAGE_NAME} --build-arg MYSQL_CONNECTOR_PACKAGE_NAME=${MYSQL_CONNECTOR_PACKAGE_NAME} --build-arg LOG4JDBC_PACKAGE_NAME=${LOG4JDBC_PACKAGE_NAME} --build-arg RANGER_VERSION=${RANGER_VERSION}"
 else
   echo "ERROR : ${component_type} is not a valid component type"
   usage
@@ -96,7 +128,7 @@ if echo "${builders}" | grep -q "${BUILDER_NAME}"; then
   echo "BuildKit builder '${BUILDER_NAME}' already exists."
 else
   echo "BuildKit builder '${BUILDER_NAME}' does not exist."
-  docker buildx create --platform linux/amd64,linux/arm64 --use --name ${BUILDER_NAME}
+  docker buildx create --driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=10000000 --platform linux/amd64,linux/arm64 --use --name ${BUILDER_NAME}
 fi
 
 cd ${script_dir}/${component_type}

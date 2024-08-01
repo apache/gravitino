@@ -1,8 +1,21 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
-import java.util.*
 
 plugins {
   `maven-publish`
@@ -10,11 +23,6 @@ plugins {
   id("java")
   id("idea")
 }
-
-val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
-val sparkVersion: String = libs.versions.spark.get()
-val icebergVersion: String = libs.versions.iceberg.get()
-val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
   testAnnotationProcessor(libs.lombok)
@@ -29,11 +37,8 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":spark-connector:spark-connector")) {
-    exclude("org.apache.hadoop", "hadoop-client-api")
-    exclude("org.apache.hadoop", "hadoop-client-runtime")
-  }
 
+  testImplementation(libs.awaitility)
   testImplementation(libs.commons.cli)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.guava)
@@ -71,6 +76,9 @@ dependencies {
     exclude("org.pentaho")
     exclude("org.slf4j")
   }
+  testImplementation(libs.hive2.jdbc) {
+    exclude("org.slf4j")
+  }
   testImplementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")
     exclude("com.github.joshelser")
@@ -93,26 +101,15 @@ dependencies {
   }
   testImplementation(libs.httpclient5)
   testImplementation(libs.jline.terminal)
+  testImplementation(libs.jodd.core)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.minikdc) {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
   }
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mybatis)
   testImplementation(libs.mysql.driver)
-
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.hadoop", "hadoop-client-api")
-    exclude("org.apache.hadoop", "hadoop-client-runtime")
-  }
-  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
-  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.avro")
-    exclude("org.apache.hadoop")
-    exclude("org.apache.zookeeper")
-    exclude("io.dropwizard.metrics")
-    exclude("org.rocksdb")
-  }
 
   testImplementation(libs.okhttp3.loginterceptor)
   testImplementation(libs.postgresql.driver)
@@ -129,7 +126,16 @@ dependencies {
     exclude("jakarta.annotation")
   }
   testImplementation(libs.trino.jdbc)
-
+  testImplementation(libs.ranger.intg) {
+    exclude("org.apache.hadoop", "hadoop-common")
+    exclude("org.apache.hive", "hive-storage-api")
+    exclude("org.apache.lucene")
+    exclude("org.apache.solr")
+    exclude("org.apache.kafka")
+    exclude("org.elasticsearch")
+    exclude("org.elasticsearch.client")
+    exclude("org.elasticsearch.plugin")
+  }
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -150,12 +156,15 @@ tasks.test {
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
     dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
+    dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
 
     doFirst {
       // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.10")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
       environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
       environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
+      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.5")
+      environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "datastrato/gravitino-ci-ranger:0.1.1")
 
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")
@@ -170,7 +179,7 @@ tasks.test {
       // Check whether this module has already built
       val trinoConnectorBuildDir = project(":trino-connector").buildDir
       if (trinoConnectorBuildDir.exists()) {
-        // Check the version gravitino related jars in build equal to the current project version
+        // Check the version Gravitino related jars in build equal to the current project version
         val invalidGravitinoJars = trinoConnectorBuildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
           val name = it.name
           !name.endsWith(version + ".jar")
@@ -198,7 +207,7 @@ tasks.clean {
 
 tasks.register<JavaExec>("TrinoTest") {
   classpath = sourceSets["test"].runtimeClasspath
-  mainClass.set("com.datastrato.gravitino.integration.test.trino.TrinoQueryTestTool")
+  mainClass.set("org.apache.gravitino.integration.test.trino.TrinoQueryTestTool")
 
   if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
     jvmArgs = listOf(

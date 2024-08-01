@@ -1,7 +1,22 @@
 """
-Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2.
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
 """
+
 from abc import abstractmethod
 from enum import Enum
 from typing import Dict, Optional
@@ -14,6 +29,7 @@ class Catalog(Auditable):
     """The interface of a catalog. The catalog is the second level entity in the gravitino system,
     containing a set of tables.
     """
+
     class Type(Enum):
         """The type of the catalog."""
 
@@ -92,9 +108,11 @@ class Catalog(Auditable):
         Returns:
             The {@link SupportsSchemas} if the catalog supports schema operations.
         """
-        raise UnsupportedOperationException("Catalog does not support schema operations")
+        raise UnsupportedOperationException(
+            "Catalog does not support schema operations"
+        )
 
-    def as_table_catalog(self) -> 'TableCatalog':
+    def as_table_catalog(self) -> "TableCatalog":
         """
         Raises:
             UnsupportedOperationException if the catalog does not support table operations.
@@ -104,7 +122,7 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support table operations")
 
-    def as_fileset_catalog(self) -> 'FilesetCatalog':
+    def as_fileset_catalog(self) -> "FilesetCatalog":
         """
         Raises:
             UnsupportedOperationException if the catalog does not support fileset operations.
@@ -112,9 +130,11 @@ class Catalog(Auditable):
         Returns:
             the FilesetCatalog if the catalog supports fileset operations.
         """
-        raise UnsupportedOperationException("Catalog does not support fileset operations")
+        raise UnsupportedOperationException(
+            "Catalog does not support fileset operations"
+        )
 
-    def as_topic_catalog(self) -> 'TopicCatalog':
+    def as_topic_catalog(self) -> "TopicCatalog":
         """
         Returns:
             the {@link TopicCatalog} if the catalog supports topic operations.

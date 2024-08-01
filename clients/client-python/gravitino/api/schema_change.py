@@ -1,9 +1,24 @@
 """
-Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2.
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
 """
+
 from abc import ABC
-from dataclasses import field
+from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
@@ -12,39 +27,36 @@ class SchemaChange(ABC):
     """NamespaceChange class to set the property and value pairs for the namespace."""
 
     @staticmethod
-    def set_property(property: str, value: str):
+    def set_property(schema_property: str, value: str):
         """SchemaChange class to set the property and value pairs for the schema.
 
         Args:
-            property: The property name to set.
+            schema_property: The property name to set.
             value: The value to set the property to.
 
         Returns:
              The SchemaChange object.
         """
-        return SchemaChange.SetProperty(property, value)
+        return SchemaChange.SetProperty(schema_property, value)
 
     @staticmethod
-    def remove_property(property: str):
+    def remove_property(schema_property: str):
         """SchemaChange class to remove a property from the schema.
 
         Args:
-            property: The property name to remove.
+            schema_property: The property name to remove.
 
         Returns:
             The SchemaChange object.
         """
-        return SchemaChange.RemoveProperty(property)
+        return SchemaChange.RemoveProperty(schema_property)
 
+    @dataclass
     class SetProperty:
         """SchemaChange class to set the property and value pairs for the schema."""
 
-        _property: str = field(metadata=config(field_name='property'))
-        _value: str = field(metadata=config(field_name='value'))
-
-        def __init__(self, property: str, value: str):
-            self._property = property
-            self._value = value
+        _property: str = field(metadata=config(field_name="property"))
+        _value: str = field(metadata=config(field_name="value"))
 
         def property(self):
             """Retrieves the name of the property to be set.
@@ -94,13 +106,11 @@ class SchemaChange(ABC):
             """
             return f"SETPROPERTY {self._property} {self._value}"
 
+    @dataclass
     class RemoveProperty:
         """SchemaChange class to remove a property from the schema."""
 
-        _property: str = field(metadata=config(field_name='property'))
-
-        def __init__(self, property: str):
-            self._property = property
+        _property: str = field(metadata=config(field_name="property"))
 
         def property(self):
             """Retrieves the name of the property to be removed.

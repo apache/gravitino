@@ -1,9 +1,8 @@
 ---
-title: "Gravitino connector - MySQL catalog"
+title: "Apache Gravitino connector - MySQL catalog"
 slug: /trino-connector/catalog-mysql
 keyword: gravitino connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 The MySQL catalog allows querying and creating tables in an external MySQL instance. 
@@ -17,7 +16,7 @@ To connect to MySQL, you need:
 
 ## Create table
 
-At present, the Gravitino connector only supports basic MySQL table creation statements, which involve fields, null allowances, and comments. 
+At present, the Apache Gravitino connector only supports basic MySQL table creation statements, which involve fields, null allowances, and comments. 
 However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
 
 The Gravitino connector does not support `CREATE TABLE AS SELECT`.

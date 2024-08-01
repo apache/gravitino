@@ -3,13 +3,12 @@ title: "Apache Hive catalog"
 slug: /apache-hive-catalog
 date: 2023-12-10
 keyword: hive catalog
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-Gravitino offers the capability to utilize [Apache Hive](https://hive.apache.org) as a catalog for metadata management.
+Apache Gravitino offers the capability to utilize [Apache Hive](https://hive.apache.org) as a catalog for metadata management.
 
 ### Requirements and limitations
 
@@ -28,19 +27,25 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 
 ### Catalog properties
 
-| Property Name                            | Description                                                                                                                                                                                                       | Default Value | Required                     | Since Version |
-|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------|---------------|
-| `metastore.uris`                         | The Hive metastore service URIs, separate multiple addresses with commas. Such as `thrift://127.0.0.1:9083`                                                                                                       | (none)        | Yes                          | 0.2.0         |
-| `client.pool-size`                       | The maximum number of Hive metastore clients in the pool for Gravitino.                                                                                                                                           | 1             | No                           | 0.2.0         |
-| `gravitino.bypass.`                      | Property name with this prefix passed down to the underlying HMS client for use. Such as `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls | (none)        | No                           | 0.2.0         |
-| `client.pool-cache.eviction-interval-ms` | The cache pool eviction interval.                                                                                                                                                                                 | 300000        | No                           | 0.4.0         |
-| `impersonation-enable`                   | Enable user impersonation for Hive catalog.                                                                                                                                                                       | false         | No                           | 0.4.0         |
-| `kerberos.principal`                     | The Kerberos principal for the catalog. You should configure `gravitino.bypass.hadoop.security.authentication` and `gravitino.bypass.hive.metastore.sasl.enabled`if you want to use Kerberos.                     | (none)        | required if you use kerberos | 0.4.0         |
-| `kerberos.keytab-uri`                    | The uri of key tab for the catalog. Now supported protocols are `https`, `http`, `ftp`, `file`.                                                                                                                   | (none)        | required if you use kerberos | 0.4.0         |
-| `kerberos.check-interval-sec`            | The interval to check validness of the principal                                                                                                                                                                  | 60            | No                           | 0.4.0         |
-| `kerberos.keytab-fetch-timeout-sec`      | The timeout to fetch key tab                                                                                                                                                                                      | 60            | No                           | 0.4.0         |
+Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Hive catalog has the following properties:
+
+| Property Name                            | Description                                                                                                                                                                                                                                         | Default Value | Required                     | Since Version |
+|------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------|---------------|
+| `metastore.uris`                         | The Hive metastore service URIs, separate multiple addresses with commas. Such as `thrift://127.0.0.1:9083`                                                                                                                                         | (none)        | Yes                          | 0.2.0         |
+| `client.pool-size`                       | The maximum number of Hive metastore clients in the pool for Gravitino.                                                                                                                                                                             | 1             | No                           | 0.2.0         |
+| `gravitino.bypass.`                      | Property name with this prefix passed down to the underlying HMS client for use. Such as `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls                                   | (none)        | No                           | 0.2.0         |
+| `client.pool-cache.eviction-interval-ms` | The cache pool eviction interval.                                                                                                                                                                                                                   | 300000        | No                           | 0.4.0         |
+| `impersonation-enable`                   | Enable user impersonation for Hive catalog.                                                                                                                                                                                                         | false         | No                           | 0.4.0         |
+| `kerberos.principal`                     | The Kerberos principal for the catalog. You should configure `gravitino.bypass.hadoop.security.authentication`, `gravitino.bypass.hive.metastore.kerberos.principal` and `gravitino.bypass.hive.metastore.sasl.enabled`if you want to use Kerberos. | (none)        | required if you use kerberos | 0.4.0         |
+| `kerberos.keytab-uri`                    | The uri of key tab for the catalog. Now supported protocols are `https`, `http`, `ftp`, `file`.                                                                                                                                                     | (none)        | required if you use kerberos | 0.4.0         |
+| `kerberos.check-interval-sec`            | The interval to check validness of the principal                                                                                                                                                                                                    | 60            | No                           | 0.4.0         |
+| `kerberos.keytab-fetch-timeout-sec`      | The timeout to fetch key tab                                                                                                                                                                                                                        | 60            | No                           | 0.4.0         |
+| `list-all-tables`                        | Lists all tables in a database, including non-Hive tables, such as Iceberg, etc                                                                                                                                                                     | false         | No                           | 0.5.1         |
 
 When you use the Gravitino with Trino. You can pass the Trino Hive connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
+
+When you use the Gravitino with Spark. You can pass the Spark Hive connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
+
 
 ### Catalog operations
 
@@ -119,7 +124,7 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `uniontype`                 | `uniontype`         | 0.2.0         |
 
 :::info
-Since 0.5.0, the data types other than listed above are mapped to Gravitino **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type from the Hive catalog.
+Since 0.6.0, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.
 :::
 
 ### Table properties

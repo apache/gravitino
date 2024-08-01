@@ -1,15 +1,15 @@
 ---
-title: "Manage relational metadata using Gravitino"
+title: "Manage relational metadata using Apache Gravitino"
 slug: /manage-relational-metadata-using-gravitino
 date: 2023-12-10
 keyword: Gravitino relational metadata manage
-license: Copyright 2023 Datastrato Pvt Ltd. This software is licensed under the Apache License version 2.
+license: This software is licensed under the Apache License version 2.
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage relational metadata by Gravitino, relational metadata refers
+This page introduces how to manage relational metadata by Apache Gravitino, relational metadata refers
 to relational catalog, schema, table and partitions. Through Gravitino, you can create, edit, and
 delete relational metadata via unified REST APIs or Java client.
 
@@ -42,7 +42,7 @@ For relational catalog, you must specify the catalog `type` as `RELATIONAL` when
 
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -74,8 +74,7 @@ Map<String, String> hiveProperties = ImmutableMap.<String, String>builder()
         .put("metastore.uris", "thrift://localhost:9083")
         .build();
 
-Catalog catalog = gravitinoClient.createCatalog(
-    NameIdentifier.of("metalake", "catalog"),
+Catalog catalog = gravitinoClient.createCatalog("catalog",
     Type.RELATIONAL,
     "hive", // provider, We support hive, jdbc-mysql, jdbc-postgresql, lakehouse-iceberg, etc.
     "This is a hive catalog",
@@ -100,7 +99,7 @@ Currently, Gravitino supports the following catalog providers:
 
 You can load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a catalog:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -114,7 +113,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 // ...
 // Assuming you have created a metalake named `metalake` and a catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("catalog");
 // ...
 ```
 
@@ -125,7 +124,7 @@ Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "cat
 
 You can modify a catalog by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a catalog:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -151,7 +150,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 // ...
 // Assuming you have created a metalake named `metalake` and a catalog named `catalog`
-Catalog catalog = gravitinoClient.alterCatalog(NameIdentifier.of("metalake", "catalog"),
+Catalog catalog = gravitinoClient.alterCatalog("catalog",
     CatalogChange.rename("alter_catalog"), CatalogChange.updateComment("new comment"));
 // ...
 ```
@@ -172,7 +171,7 @@ Currently, Gravitino supports the following changes to a catalog:
 
 You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -187,7 +186,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```java
 // ...
 // Assuming you have created a metalake named `metalake` and a catalog named `catalog`
-gravitinoClient.dropCatalog(NameIdentifier.of("metalake", "catalog"));
+gravitinoClient.dropCatalog("catalog");
 // ...
 
 ```
@@ -201,10 +200,10 @@ Dropping a catalog only removes metadata about the catalog, schemas, and tables 
 
 ### List all catalogs in a metalake
 
-You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs in
+You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs in
 a metalake:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -219,7 +218,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs
 ```java
 // ...
 // Assuming you have just created a metalake named `metalake`
-NameIdentifier[] catalogsIdents = gravitinoClient.listCatalogs(Namespace.ofCatalog("metalake"));
+String[] catalogNames = gravitinoClient.listCatalogs();
 // ...
 ```
 
@@ -228,9 +227,9 @@ NameIdentifier[] catalogsIdents = gravitinoClient.listCatalogs(Namespace.ofCatal
 
 ### List all catalogs' information in a metalake
 
-You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs' information in a metalake:
+You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs' information in a metalake:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -245,7 +244,7 @@ http://localhost:8090/api/metalakes/metalake/catalogs?details=true
 ```java
 // ...
 // Assuming you have just created a metalake named `metalake`
-Catalog[] catalogsInfos = gravitinoMetaLake.listCatalogsInfo(Namespace.ofCatalog("metalake"));
+Catalog[] catalogsInfos = gravitinoMetaLake.listCatalogsInfo();
 // ...
 ```
 
@@ -263,7 +262,7 @@ Users should create a metalake and a catalog before creating a schema.
 
 You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -282,18 +281,28 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .build();
-Schema schema = supportsSchemas.createSchema(
-    NameIdentifier.of("metalake", "hive_catalog", "schema"),
+Schema schema = supportsSchemas.createSchema("schema",
     "This is a schema",
     schemaProperties
 );
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
+catalog.as_schemas().create_schema(name="schema",
+                                   comment="This is a schema",
+                                   properties={})
 ```
 
 </TabItem>
@@ -313,7 +322,7 @@ Currently, Gravitino supports the following schema property:
 
 You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -328,10 +337,19 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 SupportsSchemas supportsSchemas = catalog.asSchemas();
-Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "hive_catalog", "schema"));
+Schema schema = supportsSchemas.loadSchema("schema");
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
+schema: Schema = catalog.as_schemas().load_schema(name="schema")
 ```
 
 </TabItem>
@@ -341,7 +359,7 @@ Schema schema = supportsSchemas.loadSchema(NameIdentifier.of("metalake", "hive_c
 
 You can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -366,14 +384,29 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
-Schema schema = supportsSchemas.alterSchema(NameIdentifier.of("metalake", "hive_catalog", "schema"),
+Schema schema = supportsSchemas.alterSchema("schema",
     SchemaChange.removeProperty("key1"),
     SchemaChange.setProperty("key2", "value2"));
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
+
+changes = (
+    SchemaChange.remove_property("schema_properties_key1"),
+    SchemaChange.set_property("schema_properties_key2", "schema_properties_new_value"),
+)
+schema_new: Schema = catalog.as_schemas().alter_schema("schema", 
+                                                       *changes)
 ```
 
 </TabItem>
@@ -389,7 +422,7 @@ Currently, Gravitino supports the following changes to a schema:
 ### Drop a schema
 You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -405,11 +438,21 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema?cas
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 // cascade can be true or false
-supportsSchemas.dropSchema(NameIdentifier.of("metalake", "hive_catalog", "schema"), true);
+supportsSchemas.dropSchema("schema", true);
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
+
+catalog.as_schemas().drop_schema("schema", cascade=True)
 ```
 
 </TabItem>
@@ -420,11 +463,11 @@ Some catalogs may not support cascading deletion of a schema, please refer to th
 
 ### List all schemas under a catalog
 
-You can alter all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of list all schema
+You can list all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of listing all the schemas
     in a catalog:
 
 
-<Tabs>
+<Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -438,10 +481,20 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
-NameIdentifier[] schemas = supportsSchemas.listSchemas(Namespace.ofSchema("metalake", "hive_catalog"));
+String[] schemas = supportsSchemas.listSchemas();
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
+
+schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas()
 ```
 
 </TabItem>
@@ -457,7 +510,7 @@ Users should create a metalake, a catalog and a schema before creating a table.
 
 You can create a table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of creating a table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -590,7 +643,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 
@@ -602,7 +655,7 @@ Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .build();
 
 tableCatalog.createTable(
-  NameIdentifier.of("metalake", "hive_catalog", "schema", "example_table"),
+  NameIdentifier.of("schema", "example_table"),
   new Column[] {
     Column.of("id", Types.IntegerType.get(), "id column comment", false, true, Literals.integerLiteral(-1)),
     Column.of("name", Types.VarCharType.of(500), "name column comment", true, false, Literals.NULL),
@@ -637,50 +690,58 @@ In order to create a table, you need to provide the following information:
 - Table column auto-increment (optional)
 - Table property (optional)
 
-#### Gravitino table column type
+#### Apache Gravitino table column type
 
 The following types that Gravitino supports:
 
-| Type                      | Java                                                                     | JSON                                                                                                                                 | Description                                                                                      |
-|---------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| Boolean                   | `Types.BooleanType.get()`                                                | `boolean`                                                                                                                            | Boolean type                                                                                     |
-| Byte                      | `Types.ByteType.get()`                                                   | `byte`                                                                                                                               | Byte type, indicates a numerical value of 1 byte                                                 |
-| Short                     | `Types.ShortType.get()`                                                  | `short`                                                                                                                              | Short type, indicates a numerical value of 2 bytes                                               |
-| Integer                   | `Types.IntegerType.get()`                                                | `integer`                                                                                                                            | Integer type, indicates a numerical value of 4 bytes                                             |
-| Long                      | `Types.LongType.get()`                                                   | `long`                                                                                                                               | Long type, indicates a numerical value of 8 bytes                                                |
-| Float                     | `Types.FloatType.get()`                                                  | `float`                                                                                                                              | Float type, indicates a single-precision floating point number                                   |
-| Double                    | `Types.DoubleType.get()`                                                 | `double`                                                                                                                             | Double type, indicates a double-precision floating point number                                  |
-| Decimal(precision, scale) | `Types.DecimalType.of(precision, scale)`                                 | `decimal(p, s)`                                                                                                                      | Decimal type, indicates a fixed-precision decimal number                                         |
-| String                    | `Types.StringType.get()`                                                 | `string`                                                                                                                             | String type                                                                                      |
-| FixedChar(length)         | `Types.FixedCharType.of(length)`                                         | `char(l)`                                                                                                                            | Char type, indicates a fixed-length string                                                       |
-| VarChar(length)           | `Types.VarCharType.of(length)`                                           | `varchar(l)`                                                                                                                         | Varchar type, indicates a variable-length string, the length is the maximum length of the string |
-| Timestamp                 | `Types.TimestampType.withoutTimeZone()`                                  | `timestamp`                                                                                                                          | Timestamp type, indicates a timestamp without timezone                                           |
-| TimestampWithTimezone     | `Types.TimestampType.withTimeZone()`                                     | `timestamp_tz`                                                                                                                       | Timestamp with timezone type, indicates a timestamp with timezone                                |
-| Date                      | `Types.DateType.get()`                                                   | `date`                                                                                                                               | Date type                                                                                        |
-| Time                      | `Types.TimeType.withoutTimeZone()`                                       | `time`                                                                                                                               | Time type                                                                                        |
-| IntervalToYearMonth       | `Types.IntervalYearType.get()`                                           | `interval_year`                                                                                                                      | Interval type, indicates an interval of year and month                                           |
-| IntervalToDayTime         | `Types.IntervalDayType.get()`                                            | `interval_day`                                                                                                                       | Interval type, indicates an interval of day and time                                             |
-| Fixed(length)             | `Types.FixedType.of(length)`                                             | `fixed(l)`                                                                                                                           | Fixed type, indicates a fixed-length binary array                                                |
-| Binary                    | `Types.BinaryType.get()`                                                 | `binary`                                                                                                                             | Binary type, indicates a arbitrary-length binary array                                           |
-| List                      | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                        |
-| Map                       | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
-| Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
-| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                           |
+| Type                       | Java                                                                     | JSON                                                                                                                                 | Description                                                                                      |
+|----------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| Boolean                    | `Types.BooleanType.get()`                                                | `boolean`                                                                                                                            | Boolean type                                                                                     |
+| Byte                       | `Types.ByteType.get()`                                                   | `byte`                                                                                                                               | Byte type, indicates a numerical value of 1 byte                                                 |
+| Byte(false)                | `Types.ByteType.unsigned()`                                              | `byte unsigned`                                                                                                                      | Unsigned Byte type, indicates a unsigned numerical value of 1 byte                               |
+| Short                      | `Types.ShortType.get()`                                                  | `short`                                                                                                                              | Short type, indicates a numerical value of 2 bytes                                               |
+| Short(false)               | `Types.ShortType.unsigned()`                                             | `short unsigned`                                                                                                                     | Unsigned Short type, indicates a unsigned numerical value of 2 bytes                             |
+| Integer                    | `Types.IntegerType.get()`                                                | `integer`                                                                                                                            | Integer type, indicates a numerical value of 4 bytes                                             |
+| Integer(false)             | `Types.IntegerType.unsigned()`                                           | `integer unsigned`                                                                                                                   | Unsigned Integer type, indicates a unsigned numerical value of 4 bytes                           |
+| Long                       | `Types.LongType.get()`                                                   | `long`                                                                                                                               | Long type, indicates a numerical value of 8 bytes                                                |
+| Long(false)                | `Types.LongType.unsigned()`                                              | `long unsigned`                                                                                                                      | Unsigned Long type, indicates a unsigned numerical value of 8 bytes                              |
+| Float                      | `Types.FloatType.get()`                                                  | `float`                                                                                                                              | Float type, indicates a single-precision floating point number                                   |
+| Double                     | `Types.DoubleType.get()`                                                 | `double`                                                                                                                             | Double type, indicates a double-precision floating point number                                  |
+| Decimal(precision, scale)  | `Types.DecimalType.of(precision, scale)`                                 | `decimal(p, s)`                                                                                                                      | Decimal type, indicates a fixed-precision decimal number                                         |
+| String                     | `Types.StringType.get()`                                                 | `string`                                                                                                                             | String type                                                                                      |
+| FixedChar(length)          | `Types.FixedCharType.of(length)`                                         | `char(l)`                                                                                                                            | Char type, indicates a fixed-length string                                                       |
+| VarChar(length)            | `Types.VarCharType.of(length)`                                           | `varchar(l)`                                                                                                                         | Varchar type, indicates a variable-length string, the length is the maximum length of the string |
+| Timestamp                  | `Types.TimestampType.withoutTimeZone()`                                  | `timestamp`                                                                                                                          | Timestamp type, indicates a timestamp without timezone                                           |
+| TimestampWithTimezone      | `Types.TimestampType.withTimeZone()`                                     | `timestamp_tz`                                                                                                                       | Timestamp with timezone type, indicates a timestamp with timezone                                |
+| Date                       | `Types.DateType.get()`                                                   | `date`                                                                                                                               | Date type                                                                                        |
+| Time                       | `Types.TimeType.withoutTimeZone()`                                       | `time`                                                                                                                               | Time type                                                                                        |
+| IntervalToYearMonth        | `Types.IntervalYearType.get()`                                           | `interval_year`                                                                                                                      | Interval type, indicates an interval of year and month                                           |
+| IntervalToDayTime          | `Types.IntervalDayType.get()`                                            | `interval_day`                                                                                                                       | Interval type, indicates an interval of day and time                                             |
+| Fixed(length)              | `Types.FixedType.of(length)`                                             | `fixed(l)`                                                                                                                           | Fixed type, indicates a fixed-length binary array                                                |
+| Binary                     | `Types.BinaryType.get()`                                                 | `binary`                                                                                                                             | Binary type, indicates a arbitrary-length binary array                                           |
+| List                       | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                        |
+| Map                        | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
+| Struct                     | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
+| Union                      | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                           |
+| UUID                       | `Types.UUIDType.get()`                                                   | `uuid`                              | UUID type, indicates a universally unique identifier |
 
-The related java doc is [here](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/types/Type.html).
+The related java doc is [here](pathname:///docs/0.5.1/api/java/org/apache/gravitino/rel/types/Type.html).
 
-##### Unparsed type
+##### External type
 
-Unparsed type is a special type of column type, currently serves exclusively for presenting the data type of a column when it's unsolvable.
-The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
+External type is a special type of column type, when you need to use a data type that is not in the Gravitino type
+system, and you explicitly know its string representation in an external catalog (usually used in JDBC catalogs), then
+you can use the ExternalType to represent the type. Similarly, if the original type is unsolvable, it will be
+represented by ExternalType.
+The following shows the data structure of an external type in JSON and Java, enabling easy retrieval of its string value.
 
-<Tabs>
+<Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
 
 ```json
 {
-  "type": "unparsed",
-  "unparsedType": "user-defined"
+  "type": "external",
+  "catalogString": "user-defined"
 }
 ```
 
@@ -689,6 +750,34 @@ The following shows the data structure of an unparsed type in JSON and Java, ena
 
 ```java
 // The result of the following type is a string "user-defined"
+String typeString = ((ExternalType) type).catalogString();
+```
+
+  </TabItem>
+</Tabs>
+
+##### Unparsed type
+
+Unparsed type is a special type of column type, it used to address compatibility issues in type serialization and
+deserialization between the server and client. For instance, if a new column type is introduced on the Gravitino server
+that the client does not recognize, it will be treated as an unparsed type on the client side.
+The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
+
+<Tabs groupId='language' queryString>
+  <TabItem value="Json" label="Json">
+
+```json
+{
+  "type": "unparsed",
+  "unparsedType": "unknown-type"
+}
+```
+
+  </TabItem>
+  <TabItem value="java" label="Java">
+
+```java
+// The result of the following type is a string "unknown-type"
 String unparsedValue = ((UnparsedType) type).unparsedType();
 ```
 
@@ -738,10 +827,10 @@ In addition to the basic settings, Gravitino supports the following features:
 
 | Feature             | Description                                                                                                                                                                                                                                                                                    | Java doc                                                                                                                 |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/dto/rel/partitioning/Partitioning.html)             |
-| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.               | [Distribution](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/expressions/distributions/Distribution.html) |
-| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/expressions/sorts/SortOrder.html)               |
-| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.5.0/api/java/com/datastrato/gravitino/rel/indexes/Index.html)                                 |
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/0.5.1/api/java/org/apache/gravitino/dto/rel/partitioning/Partitioning.html)             |
+| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.               | [Distribution](pathname:///docs/0.5.1/api/java/org/apache/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.5.1/api/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.5.1/api/java/org/apache/gravitino/rel/indexes/Index.html)                                 |
 
 For more information, please see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
 
@@ -753,7 +842,7 @@ The code above is an example of creating a Hive table. For other catalogs, the c
 
 You can load a table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -768,10 +857,10 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
-tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"));
+tableCatalog.loadTable(NameIdentifier.of("schema", "table"));
 // ...
 ```
 
@@ -779,7 +868,7 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 </Tabs>
 
 :::note
-- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[Unparsed Type](#unparsed-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
+- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[External Type](#external-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
 - When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
 :::
 
@@ -787,7 +876,7 @@ tableCatalog.loadTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "
 
 You can modify a table by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -812,11 +901,11 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 
-Table t = tableCatalog.alterTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"),
+Table t = tableCatalog.alterTable(NameIdentifier.of("schema", "table"),
     TableChange.rename("table_renamed"), TableChange.updateComment("xxx"));
 // ...
 ```
@@ -845,7 +934,7 @@ Currently, Gravitino supports the following changes to a table:
 
 You can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a table:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -862,15 +951,15 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 
 // Drop a table
-tableCatalog.dropTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"));
+tableCatalog.dropTable(NameIdentifier.of("schema", "table"));
 
 // Purge a table
-tableCatalog.purgeTable(NameIdentifier.of("metalake", "hive_catalog", "schema", "table"));
+tableCatalog.purgeTable(NameIdentifier.of("schema", "table"));
 // ...
 ```
 
@@ -886,9 +975,9 @@ Hive catalog and lakehouse-iceberg catalog supports `purgeTable` while jdbc-mysq
 
 ### List all tables under a schema
 
-You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of list all tables in a schema:
+You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of listing all the tables in a schema:
 
-<Tabs>
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
@@ -903,11 +992,11 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tab
 ```java
 // ...
 // Assuming you have just created a Hive catalog named `hive_catalog`
-Catalog catalog = gravitinoClient.loadCatalog(NameIdentifier.of("metalake", "hive_catalog"));
+Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
 
 TableCatalog tableCatalog = catalog.asTableCatalog();
 NameIdentifier[] identifiers =
-    tableCatalog.listTables(Namespace.ofTable("metalake", "hive_catalog", "schema"));
+    tableCatalog.listTables(Namespace.of("schema"));
 // ...
 ```
 

@@ -1,0 +1,61 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.listener.api.event;
+
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.TopicInfo;
+
+/**
+ * Represents an event that is generated when an attempt to create a topic fails due to an
+ * exception.
+ */
+@DeveloperApi
+public final class CreateTopicFailureEvent extends TopicFailureEvent {
+  private final TopicInfo createTopicRequest;
+
+  /**
+   * Constructs a {@code CreateTopicFailureEvent} instance, capturing detailed information about the
+   * failed topic creation attempt.
+   *
+   * @param user The user who initiated the topic creation operation.
+   * @param identifier The identifier of the topic that was attempted to be created.
+   * @param exception The exception that was thrown during the topic creation operation, providing
+   *     insight into what went wrong.
+   * @param createTopicRequest The original request information used to attempt to create the topic.
+   *     This includes details such as the intended topic schema, properties, and other
+   *     configuration options that were specified.
+   */
+  public CreateTopicFailureEvent(
+      String user, NameIdentifier identifier, Exception exception, TopicInfo createTopicRequest) {
+    super(user, identifier, exception);
+    this.createTopicRequest = createTopicRequest;
+  }
+
+  /**
+   * Retrieves the original request information for the attempted topic creation.
+   *
+   * @return The {@link TopicInfo} instance representing the request information for the failed
+   *     topic creation attempt.
+   */
+  public TopicInfo createTopicRequest() {
+    return createTopicRequest;
+  }
+}

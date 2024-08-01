@@ -1,13 +1,12 @@
 ---
 title: How to use relational backend storage
 slug: /how-to-use-relational-backend-storage
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-Before the version `0.5.0`, Gravitino only supports KV backend storage to store metadata. Since
+Before the version `0.5.0`, Apache Gravitino only supports KV backend storage to store metadata. Since
 RDBMS is widely used in the industry, starting from the version `0.5.0`, Gravitino supports using
 RDBMS as relational backend storage to store metadata. This doc will guide you on how to use the
 relational backend storage in Gravitino.
@@ -43,8 +42,8 @@ ${GRAVITINO_HOME}/scripts/mysql/
 ```
 
 The script name is like `schema-{version}-mysql.sql`, and the `version` depends on your Gravitino version.
-For example, if your Gravitino version is `0.6.0`, then you can choose the **latest version** script
-file that is equal or smaller than `0.6.0`, you can choose the `schema-0.5.0-mysql.sql` script.
+For example, if your Gravitino version is `0.6.0`, then you can choose the **latest version** script.
+If you used a legacy script, you can use `upgrade-{old version}-to-{new version}-mysql.sql` to upgrade the schema.
 
 ### Step 2: Initialize the database
 
@@ -62,7 +61,7 @@ Then please place it in the distribution package directory:
 ${GRAVITINO_HOME}/libs/
 ```
 
-### Step 4: Set up the Gravitino server configs
+### Step 4: Set up the Apache Gravitino server configs
 
 Find the server configuration file which name is `gravitino.conf` in the distribution package directory:
 

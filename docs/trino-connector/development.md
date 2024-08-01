@@ -1,12 +1,11 @@
 ---
-title: "Gravitino connector development"
+title: "Apache Gravitino connector development"
 slug: /trino-connector/development
 keyword: gravitino connector development 
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
-This document is to guide users through the development of the Gravitino connector for Trino locally.
+This document is to guide users through the development of the Apache Gravitino connector for Trino locally.
 
 ## Prerequisites
 
@@ -37,7 +36,7 @@ To develop the Gravitino connector locally, you need to do the following steps:
 
 ### IDEA
 
-1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. We advise you to use the release version 426 or 435. 
+1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository. The released version Trino-435 is the least version that Gravitino supports.
 2. Open the Trino project in your IDEA.
 3. Create a new module for the Gravitino connector in the Trino project as the following picture (we will use the name `trino-gravitino` as the module name in the following steps). ![trino-gravitino](../assets/trino/create-gravitino-connector.jpg)
 4. Add a soft link to the Gravitino trino connector module in the Trino project. Assuming the src java main directory of the Gravitino trino connector in project Gravitino is `gravitino/path/to/gravitino-trino-connector/src/main/java`, 
@@ -54,129 +53,27 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
- Copyright 2024 Datastrato Pvt Ltd.
- This software is licensed under the Apache License version 2.
--->
-
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>io.trino</groupId>
         <artifactId>trino-root</artifactId>
-        <version>426</version>
+        <version>435</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
     <artifactId>trino-gravitino</artifactId>
     <packaging>trino-plugin</packaging>
-    <description>Trino - Graviton Connector</description>
+    <description>Trino - Gravitino Connector</description>
 
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
     </properties>
 
     <dependencies>
-        <!--
-        The following dependencies are required for the Gravitino connector. You can install them
-        locally (./gradlew publishToMavenLocal) or just use the release version like 0.4.0
-        -->
-        <dependency>
-            <groupId>com.datastrato.gravitino</groupId>
-            <artifactId>bundled-catalog</artifactId>
-            <version>0.5.0-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.datastrato.gravitino</groupId>
-            <artifactId>client-java-runtime</artifactId>
-            <version>0.5.0-SNAPSHOT</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.inject</groupId>
-            <artifactId>guice</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>io.airlift</groupId>
-            <artifactId>bootstrap</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.logging.log4j</groupId>
-                    <artifactId>log4j-to-slf4j</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-
-        <dependency>
-            <groupId>io.airlift</groupId>
-            <artifactId>configuration</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>json</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>io.trino</groupId>
-            <artifactId>trino-plugin-toolkit</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>jakarta.validation</groupId>
-            <artifactId>jakarta.validation-api</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-collections4</artifactId>
-            <version>4.4</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.httpcomponents.client5</groupId>
-            <artifactId>httpclient5</artifactId>
-            <version>5.2.1</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>io.airlift</groupId>
-            <artifactId>slice</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-api</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>io.opentelemetry</groupId>
-            <artifactId>opentelemetry-context</artifactId>
-            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -186,33 +83,69 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
         </dependency>
 
         <dependency>
-            <groupId>org.openjdk.jol</groupId>
-            <artifactId>jol-core</artifactId>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-jdbc</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.trino</groupId>
+            <artifactId>trino-client</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
             <scope>provided</scope>
         </dependency>
 
         <dependency>
-            <groupId>io.airlift</groupId>
-            <artifactId>node</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
             <groupId>io.trino</groupId>
-            <artifactId>trino-memory</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>io.trino</groupId>
-            <artifactId>trino-testing</artifactId>
-            <scope>test</scope>
+            <artifactId>trino-jdbc</artifactId>
         </dependency>
 
         <dependency>
-            <groupId>org.testng</groupId>
-            <artifactId>testng</artifactId>
-            <scope>test</scope>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+            <version>4.4</version>
         </dependency>
+
+        <dependency>
+               <groupId>org.slf4j</groupId>
+               <artifactId>slf4j-api</artifactId>
+               <version>1.7.32</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.9</version>
+        </dependency>
+
+        <!--
+            You can switch to the snapshot version as you like,  for example,
+            if you want to use the jar of latest main branch,
+            you can execute the following command to install Gravitino `client-java-runtime` jar locally.
+            ./gradlew publishToMavenLocal
+        -->
+        <dependency>
+            <groupId>org.apache.gravitino</groupId>
+            <artifactId>client-java-runtime</artifactId>
+            <version>0.5.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.gravitino</groupId>
+            <artifactId>bundled-catalog</artifactId>
+            <version>0.5.1</version>
+        </dependency>
+
     </dependencies>
+
 </project>
 ```
 
@@ -226,7 +159,7 @@ then you can see the `gravitino-trino-connecor` source files and directories in 
 ./mvnw clean -pl 'plugin/trino-gravitino' package -DskipTests -Dcheckstyle.skip -Dair.check.skip-checkstyle=true -DskipTests -Dair.check.skip-all=true
 ```
 :::note
-If a compile error occurs due to `The following artifacts could not be resolved: com.datastrato.gravitino:xxx:jar`, which can be resolved by executing `./gradlew publishToMavenLocal` in gravitino beforehand.
+If a compile error occurs due to `The following artifacts could not be resolved: org.apache.gravitino:xxx:jar`, which can be resolved by executing `./gradlew publishToMavenLocal` in gravitino beforehand.
 :::
 
 7. Set up the configuration for the Gravitino connector in the Trino project. You can do as the following picture shows:
@@ -236,11 +169,6 @@ The corresponding configuration files are here:
 
 - Gravitino properties file: `gravitino.properties`
 ```properties
-#
-# Copyright 2024 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
-#
-
 # the connector name is always 'gravitino'
 connector.name=gravitino
 
@@ -253,11 +181,6 @@ gravitino.metalake=test
 ```
 - Trino configuration file: `config.properties`
 ```properties
-#
-# Copyright 2024 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
-#
-
 #
 # WARNING
 # ^^^^^^^
@@ -298,6 +221,9 @@ plugin.bundles=\
   ../../plugin/trino-gravitino/pom.xml
 
 node-scheduler.include-coordinator=true
+
+# Note: The Gravitino connector olny supports with The dynamic catalog manager
+catalog.management=dynamic
 ```
 
 :::note

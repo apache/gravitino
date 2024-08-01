@@ -1,6 +1,20 @@
 /*
- * Copyright 2023 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
 'use client'
@@ -45,59 +59,62 @@ const MetalakeView = () => {
       fileset: searchParams.get('fileset'),
       topic: searchParams.get('topic')
     }
-    if ([...searchParams.keys()].length) {
-      const { metalake, catalog, type, schema, table, fileset, topic } = routeParams
+    async function fetchDependsData() {
+      if ([...searchParams.keys()].length) {
+        const { metalake, catalog, type, schema, table, fileset, topic } = routeParams
 
-      if (paramsSize === 1 && metalake) {
-        dispatch(fetchCatalogs({ init: true, page: 'metalakes', metalake }))
-        dispatch(getMetalakeDetails({ metalake }))
-      }
+        if (paramsSize === 1 && metalake) {
+          dispatch(fetchCatalogs({ init: true, page: 'metalakes', metalake }))
+          dispatch(getMetalakeDetails({ metalake }))
+        }
 
-      if (paramsSize === 3 && catalog) {
-        if (!store.catalogs.length) {
-          dispatch(fetchCatalogs({ metalake }))
+        if (paramsSize === 3 && catalog) {
+          if (!store.catalogs.length) {
+            await dispatch(fetchCatalogs({ metalake }))
+          }
+          dispatch(fetchSchemas({ init: true, page: 'catalogs', metalake, catalog, type }))
+          dispatch(getCatalogDetails({ metalake, catalog, type }))
         }
-        dispatch(fetchSchemas({ init: true, page: 'catalogs', metalake, catalog, type }))
-        dispatch(getCatalogDetails({ metalake, catalog, type }))
-      }
 
-      if (paramsSize === 4 && catalog && type && schema) {
-        if (!store.catalogs.length) {
-          dispatch(fetchCatalogs({ metalake }))
-          dispatch(fetchSchemas({ metalake, catalog, type }))
+        if (paramsSize === 4 && catalog && type && schema) {
+          if (!store.catalogs.length) {
+            await dispatch(fetchCatalogs({ metalake }))
+            await dispatch(fetchSchemas({ metalake, catalog, type }))
+          }
+          switch (type) {
+            case 'relational':
+              dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
+              break
+            case 'fileset':
+              dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema }))
+              break
+            case 'messaging':
+              dispatch(fetchTopics({ init: true, page: 'schemas', metalake, catalog, schema }))
+              break
+            default:
+              break
+          }
+          dispatch(getSchemaDetails({ metalake, catalog, schema }))
         }
-        switch (type) {
-          case 'relational':
-            dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
-            break
-          case 'fileset':
-            dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema }))
-            break
-          case 'messaging':
-            dispatch(fetchTopics({ init: true, page: 'schemas', metalake, catalog, schema }))
-            break
-          default:
-            break
-        }
-        dispatch(getSchemaDetails({ metalake, catalog, schema }))
-      }
 
-      if (paramsSize === 5 && catalog && schema) {
-        if (!store.catalogs.length) {
-          dispatch(fetchCatalogs({ metalake }))
-          dispatch(fetchSchemas({ metalake, catalog, type }))
-        }
-        if (table) {
-          dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
-        }
-        if (fileset) {
-          dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
-        }
-        if (topic) {
-          dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
+        if (paramsSize === 5 && catalog && schema) {
+          if (!store.catalogs.length) {
+            await dispatch(fetchCatalogs({ metalake }))
+            await dispatch(fetchSchemas({ metalake, catalog, type }))
+          }
+          if (table) {
+            dispatch(getTableDetails({ init: true, metalake, catalog, schema, table }))
+          }
+          if (fileset) {
+            dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
+          }
+          if (topic) {
+            dispatch(getTopicDetails({ init: true, metalake, catalog, schema, topic }))
+          }
         }
       }
     }
+    fetchDependsData()
 
     dispatch(
       setSelectedNodes(
