@@ -24,6 +24,7 @@ jobs:
             source_changes:
               - .github/**
               - api/**
+              - catalogs/catalog-hadoop/**
               - clients/client-python/**
               - common/**
               - conf/**
@@ -46,7 +47,6 @@ jobs:
         java-version: [ 8 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
-      PYTHONPATH: ${{ github.workspace }}/clients/client-python
     steps:
       - uses: actions/checkout@v3
 
