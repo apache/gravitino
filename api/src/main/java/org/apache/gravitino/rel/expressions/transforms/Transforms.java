@@ -293,10 +293,10 @@ public class Transforms {
   }
 
   /**
-   * Create a hour transform that applies a function to the input value.
+   * Create an hour transform that applies a function to the input value.
    *
    * @param ref The reference to transform.
-   * @return A hour transform.
+   * @return An hour transform.
    */
   private static HourTransform hour(NamedReference ref) {
     return new HourTransform(ref);

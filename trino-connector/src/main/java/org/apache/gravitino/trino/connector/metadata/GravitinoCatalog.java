@@ -18,10 +18,14 @@
  */
 package org.apache.gravitino.trino.connector.metadata;
 
+import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
+
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.trino.spi.TrinoException;
 import java.time.Instant;
 import java.util.Map;
@@ -40,6 +44,16 @@ public class GravitinoCatalog {
   private final String name;
   private final Map<String, String> properties;
   private final long lastModifiedTime;
+
+  static {
+    objectMapper =
+        JsonMapper.builder()
+            .disable(MapperFeature.AUTO_DETECT_CREATORS)
+            .disable(MapperFeature.AUTO_DETECT_FIELDS)
+            .disable(MapperFeature.AUTO_DETECT_SETTERS)
+            .disable(MapperFeature.AUTO_DETECT_GETTERS)
+            .build();
+  }
 
   public GravitinoCatalog(String metalake, Catalog catalog) {
     this.metalake = metalake;
@@ -115,5 +129,19 @@ public class GravitinoCatalog {
 
   public static GravitinoCatalog fromJson(String jsonString) throws JsonProcessingException {
     return objectMapper.readValue(jsonString, GravitinoCatalog.class);
+  }
+
+  public String getRegion() {
+    return properties.getOrDefault(CLOUD_REGION_CODE, "");
+  }
+
+  public boolean isSameRegion(String region) {
+    // When the Gravitino connector has not configured the cloud.region-code,
+    // or the catalog has not configured the cloud.region-code,
+    // or the catalog cluster name is equal to the connector-configured region code,
+    // the catalog is belong to the region
+    return StringUtils.isEmpty(region)
+        || StringUtils.isEmpty(getRegion())
+        || region.equals(getRegion());
   }
 }

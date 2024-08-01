@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This is an extension for juint 5, which aims to perform certain operations (such as resource
+ * This is an extension for JUnit 5, which aims to perform certain operations (such as resource
  * recycling, etc.) after all test executions are completed (regardless of success or failure). You
  * can Refer to {@link AbstractIT} for more information.
  */

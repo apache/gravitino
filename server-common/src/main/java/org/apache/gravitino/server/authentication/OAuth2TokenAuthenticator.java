@@ -126,6 +126,13 @@ class OAuth2TokenAuthenticator implements Authenticator {
     this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
   }
 
+  @Override
+  public boolean supportsToken(byte[] tokenData) {
+    return tokenData != null
+        && new String(tokenData, StandardCharsets.UTF_8)
+            .startsWith(AuthConstants.AUTHORIZATION_BEARER_HEADER);
+  }
+
   private static Key decodeSignKey(byte[] key, String algType) {
     try {
       SignatureAlgorithmFamilyType algFamilyType =

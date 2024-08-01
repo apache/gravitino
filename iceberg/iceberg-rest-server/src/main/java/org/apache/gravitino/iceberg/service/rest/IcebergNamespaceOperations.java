@@ -40,10 +40,12 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,6 +132,19 @@ public class IcebergNamespaceOperations {
         icebergTableOpsManager
             .getOps(prefix)
             .updateNamespaceProperties(RESTUtil.decodeNamespace(namespace), request);
+    return IcebergRestUtils.ok(response);
+  }
+
+  @POST
+  @Path("{namespace}/register")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "register-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "register-table", absolute = true)
+  public Response registerTable(
+      @PathParam("namespace") String namespace, RegisterTableRequest request) {
+    LOG.info("Register table, namespace: {}, request: {}", namespace, request);
+    LoadTableResponse response =
+        icebergTableOps.registerTable(RESTUtil.decodeNamespace(namespace), request);
     return IcebergRestUtils.ok(response);
   }
 }
