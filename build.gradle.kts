@@ -466,6 +466,7 @@ tasks.rat {
     "dev/docker/**/*.conf",
     "dev/docker/kerberos-hive/kadm5.acl",
     "**/*.log",
+    "**/testsets",
     "**/licenses/*.txt",
     "**/licenses/*.md",
     "integration-test/**/*.sql",

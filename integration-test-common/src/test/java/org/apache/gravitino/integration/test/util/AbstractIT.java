@@ -21,6 +21,7 @@ package org.apache.gravitino.integration.test.util;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
+import com.google.common.base.Splitter;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -30,8 +31,10 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -63,6 +66,8 @@ public class AbstractIT {
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
+  private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
+
   protected static GravitinoAdminClient client;
 
   private static final OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
@@ -256,20 +261,18 @@ public class AbstractIT {
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
     serverUri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
-    if (AuthenticatorType.OAUTH
-        .name()
-        .toLowerCase()
-        .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
+
+    List<String> authenticators = new ArrayList<>();
+    String authenticatorStr = customConfigs.get(Configs.AUTHENTICATORS.getKey());
+    if (authenticatorStr != null) {
+      authenticators = COMMA.splitToList(authenticatorStr);
+    }
+
+    if (authenticators.contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       client = GravitinoAdminClient.builder(serverUri).withOAuth(mockDataProvider).build();
-    } else if (AuthenticatorType.SIMPLE
-        .name()
-        .toLowerCase()
-        .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
+    } else if (authenticators.contains(AuthenticatorType.SIMPLE.name().toLowerCase())) {
       client = GravitinoAdminClient.builder(serverUri).withSimpleAuth().build();
-    } else if (AuthenticatorType.KERBEROS
-        .name()
-        .toLowerCase()
-        .equals(customConfigs.get(Configs.AUTHENTICATOR.getKey()))) {
+    } else if (authenticators.contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
       client = null;
     } else {

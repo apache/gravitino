@@ -281,7 +281,9 @@ public class TagOperations {
               return Utils.ok(new TagListResponse(tags.toArray(new TagDTO[0])));
 
             } else {
-              String[] tagNames = tags.stream().map(TagDTO::name).toArray(String[]::new);
+              // Due to same name tag will be associated to both parent and child objects, so we
+              // need to deduplicate the tag names.
+              String[] tagNames = tags.stream().map(TagDTO::name).distinct().toArray(String[]::new);
 
               LOG.info(
                   "List {} tags for object type: {}, full name: {} under metalake: {}",

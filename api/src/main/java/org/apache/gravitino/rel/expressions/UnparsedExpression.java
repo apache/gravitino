@@ -77,5 +77,10 @@ public interface UnparsedExpression extends Expression {
     public int hashCode() {
       return Objects.hash(unparsedExpression);
     }
+
+    @Override
+    public String toString() {
+      return "UnparsedExpressionImpl{" + "unparsedExpression='" + unparsedExpression + '\'' + '}';
+    }
   }
 }
