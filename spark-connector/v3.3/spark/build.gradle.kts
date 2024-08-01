@@ -144,12 +144,12 @@ tasks.test {
 
   val skipITs = project.hasProperty("skipITs")
   val skipSparkITs = project.hasProperty("skipSparkITs")
-  val skipSparkSQLITs = project.hasProperty("skipSparkSQLITs")
+  val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
   if (skipITs || skipSparkITs) {
     // Exclude integration tests
     exclude("**/integration/**")
   } else {
-    if (skipSparkSQLITs) {
+    if (!enableSparkSQLITs) {
       exclude("**/integration/test/sql/**")
     }
     dependsOn(tasks.jar)
