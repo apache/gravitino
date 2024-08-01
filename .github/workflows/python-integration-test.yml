@@ -24,6 +24,7 @@ jobs:
             source_changes:
               - .github/**
               - api/**
+              - catalogs/catalog-hadoop/**
               - clients/client-python/**
               - common/**
               - conf/**
