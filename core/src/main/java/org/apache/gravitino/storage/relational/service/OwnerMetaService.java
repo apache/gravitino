@@ -41,7 +41,7 @@ public class OwnerMetaService {
 
   public Entity getOwner(NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+        MetalakeMetaService.getInstance().getMetalakeIdByName(getMetalake(identifier));
     Long finalEntityId = getEntityId(metalakeId, identifier, type);
 
     OwnerRelPO ownerRelPO =
@@ -70,8 +70,7 @@ public class OwnerMetaService {
       Entity.EntityType entityType,
       NameIdentifier owner,
       Entity.EntityType ownerType) {
-    long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(entity.namespace().level(0));
+    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(getMetalake(entity));
 
     Long entityId = getEntityId(metalakeId, entity, entityType);
     Long ownerId = getEntityId(metalakeId, owner, ownerType);
