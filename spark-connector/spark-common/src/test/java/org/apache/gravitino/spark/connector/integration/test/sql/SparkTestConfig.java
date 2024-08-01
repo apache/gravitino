@@ -79,14 +79,16 @@ public class SparkTestConfig extends Config {
 
   private static final ConfigEntry<String> GRAVITINO_URI =
       new ConfigBuilder("gravitino.spark.test.uri")
-          .doc("Gravitino uri address, only available when `gravitino.spark.test.setup.env` is false")
+          .doc(
+              "Gravitino uri address, only available when `gravitino.spark.test.setup.env` is false")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .createWithDefault("http://127.0.0.1:8090");
 
   private static final ConfigEntry<String> WAREHOUSE_DIR =
       new ConfigBuilder("gravitino.spark.test.warehouse")
-          .doc("The warehouse location, only available when `gravitino.spark.test.setup.env` is false")
+          .doc(
+              "The warehouse location, only available when `gravitino.spark.test.setup.env` is false")
           .version("0.6.0")
           .stringConf()
           .createWithDefault("hdfs://127.0.0.1:9000/user/hive/warehouse-spark-test");
