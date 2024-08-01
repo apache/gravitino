@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
-import com.google.common.collect.Maps;
-import java.util.Map;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.apache.commons.lang.StringUtils;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.slf4j.Logger;
@@ -30,24 +30,27 @@ public class IcebergTableOpsManager implements AutoCloseable {
 
   public static final String DEFAULT_CATALOG = "default_catalog";
 
-  private final Map<String, IcebergTableOps> icebergTableOpsMap;
-
+  private final Cache<String, IcebergTableOps> icebergTableOpsCache;
   private final IcebergTableOpsProvider provider;
 
   public IcebergTableOpsManager(IcebergConfig config) {
-    this.icebergTableOpsMap = Maps.newConcurrentMap();
+    this.icebergTableOpsCache = Caffeine.newBuilder().build();
     this.provider = createProvider(config);
-    this.provider.initialize(config);
+    this.provider.initialize(config.getAllConfig());
   }
 
   public IcebergTableOps getOps(String rawPrefix) {
     String prefix = shelling(rawPrefix);
     String cacheKey = prefix;
+    if (DEFAULT_CATALOG.equals(prefix)) {
+      throw new RuntimeException(
+          String.format("%s is conflict with reserved key, please replace it", prefix));
+    }
     if (StringUtils.isBlank(prefix)) {
       LOG.debug("prefix is empty, return default iceberg catalog");
       cacheKey = DEFAULT_CATALOG;
     }
-    return icebergTableOpsMap.computeIfAbsent(cacheKey, k -> provider.getIcebergTableOps(prefix));
+    return icebergTableOpsCache.get(cacheKey, k -> provider.getIcebergTableOps(prefix));
   }
 
   private IcebergTableOpsProvider createProvider(IcebergConfig config) {
@@ -63,15 +66,16 @@ public class IcebergTableOpsManager implements AutoCloseable {
   private String shelling(String rawPrefix) {
     if (StringUtils.isBlank(rawPrefix)) {
       return rawPrefix;
+    } else if (!rawPrefix.endsWith("/")) {
+      throw new RuntimeException(String.format("rawPrefix %s is illegal", rawPrefix));
     } else {
-      return rawPrefix.replace("/", "");
+      // rawPrefix is a string matching ([^/]*/) which end with /
+      return rawPrefix.substring(0, rawPrefix.length() - 1);
     }
   }
 
   @Override
   public void close() throws Exception {
-    for (String catalog : icebergTableOpsMap.keySet()) {
-      icebergTableOpsMap.get(catalog).close();
-    }
+    icebergTableOpsCache.invalidateAll();
   }
 }

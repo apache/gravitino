@@ -18,16 +18,16 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
-import org.apache.gravitino.iceberg.common.IcebergConfig;
+import java.util.Map;
 
 /**
- * IcebergTableOpsProvider is an interface defining how iceberg rest catalog server gets iceberg
+ * IcebergTableOpsProvider is an interface defining how Iceberg REST catalog server gets iceberg
  * catalogs.
  */
 public interface IcebergTableOpsProvider {
 
-  /** @param config The configuration parameters for creating Provider. */
-  void initialize(IcebergConfig config);
+  /** @param properties The configuration parameters for creating Provider. */
+  void initialize(Map<String, String> properties);
 
   /**
    * @param prefix the path param send by clients.

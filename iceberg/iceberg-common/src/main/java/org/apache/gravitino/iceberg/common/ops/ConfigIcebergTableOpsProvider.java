@@ -41,17 +41,17 @@ import org.slf4j.LoggerFactory;
 public class ConfigIcebergTableOpsProvider implements IcebergTableOpsProvider {
   public static final Logger LOG = LoggerFactory.getLogger(ConfigIcebergTableOpsProvider.class);
 
-  private IcebergConfig icebergConfig;
+  private Map<String, String> properties;
 
   @Override
-  public void initialize(IcebergConfig config) {
-    this.icebergConfig = config;
+  public void initialize(Map<String, String> properties) {
+    this.properties = properties;
   }
 
   @Override
   public IcebergTableOps getIcebergTableOps(String prefix) {
     if (StringUtils.isBlank(prefix)) {
-      return new IcebergTableOps(icebergConfig);
+      return new IcebergTableOps(new IcebergConfig(properties));
     }
     if (!getCatalogs().contains(prefix)) {
       String errorMsg = String.format("%s can not match any catalog", prefix);
@@ -63,7 +63,7 @@ public class ConfigIcebergTableOpsProvider implements IcebergTableOpsProvider {
 
   private List<String> getCatalogs() {
     Map<String, Boolean> catalogs = Maps.newHashMap();
-    for (String key : this.icebergConfig.getAllConfig().keySet()) {
+    for (String key : this.properties.keySet()) {
       if (!key.startsWith("catalog.")) {
         continue;
       }
@@ -76,10 +76,9 @@ public class ConfigIcebergTableOpsProvider implements IcebergTableOpsProvider {
   }
 
   private IcebergConfig getCatalogConfig(String catalog) {
-    Map<String, String> base = Maps.newHashMap(this.icebergConfig.getAllConfig());
+    Map<String, String> base = Maps.newHashMap(this.properties);
     Map<String, String> merge =
-        MapUtils.getPrefixMap(
-            this.icebergConfig.getAllConfig(), String.format("catalog.%s.", catalog));
+        MapUtils.getPrefixMap(this.properties, String.format("catalog.%s.", catalog));
     for (String key : merge.keySet()) {
       base.put(key, merge.get(key));
     }
