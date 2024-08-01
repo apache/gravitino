@@ -80,7 +80,7 @@ public class TestAccessControlManager {
     accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
+        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlManager, true);
   }
 
   @AfterAll
