@@ -19,11 +19,8 @@
 package org.apache.gravitino.spark.connector.integration.test.sql;
 
 import com.google.common.collect.Maps;
-import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -47,6 +44,7 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
 
 /** Run and check the correctness of the SparkSQLs */
 public class SparkQueryRunner {
@@ -269,16 +267,12 @@ public class SparkQueryRunner {
     return expectedQueryOutputs;
   }
 
-  private static File stringToFile(Path path, String str) throws IOException {
-    File file = path.toFile();
-    try (PrintWriter out = new PrintWriter(file, StandardCharsets.UTF_8.toString())) {
-      out.write(str);
-    }
-    return file;
+  private static void stringToFile(Path path, String str) throws IOException {
+    FileUtils.writeStringToFile(path.toFile(), str, StandardCharsets.UTF_8);
   }
 
   private String fileToString(Path filePath) throws IOException {
-    return new String(Files.readAllBytes(filePath), StandardCharsets.UTF_8);
+    return FileUtils.readFileToString(filePath.toFile(), StandardCharsets.UTF_8);
   }
 
   private static Pair<List<String>, List<String>> splitCommentsAndCodes(String input) {

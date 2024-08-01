@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * "com.datastrato.gravitino.spark.connector.integration.test.sql.SparkSQLRegressionTest"
  * -PconfigFile=/xxx/xx
  */
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class SparkSQLRegressionTest {
   private static final Logger LOG = LoggerFactory.getLogger(SparkSQLRegressionTest.class);
