@@ -88,18 +88,12 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   false))
           .put(
               KEY_TAB_URI,
-              PropertyEntry.stringPropertyEntry(
-                  KEY_TAB_URI,
-                  "The uri of key tab for the catalog",
-                  false,
-                  false,
-                  null,
-                  false,
-                  false))
+              PropertyEntry.stringOptionalPropertyEntry(
+                  KEY_TAB_URI, "The uri of key tab for the catalog", false, null, false))
           .put(
               PRINCIPAL,
-              PropertyEntry.stringPropertyEntry(
-                  PRINCIPAL, "The principal for the catalog", false, false, null, false, false))
+              PropertyEntry.stringOptionalPropertyEntry(
+                  PRINCIPAL, "The principal for the catalog", false, null, false))
           .put(
               CHECK_INTERVAL_SEC,
               PropertyEntry.integerOptionalPropertyEntry(

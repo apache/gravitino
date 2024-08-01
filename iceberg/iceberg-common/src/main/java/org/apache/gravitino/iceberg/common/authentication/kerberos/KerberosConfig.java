@@ -105,23 +105,19 @@ public class KerberosConfig extends AuthenticationConfig {
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
               KET_TAB_URI_KEY,
-              PropertyEntry.stringPropertyEntry(
+              PropertyEntry.stringOptionalPropertyEntry(
                   KET_TAB_URI_KEY,
                   "The keytab of the Kerberos for Iceberg catalog with Kerberos authentication",
                   false,
-                  false,
                   null,
-                  false,
                   false))
           .put(
               PRINCIPAL_KEY,
-              PropertyEntry.stringPropertyEntry(
+              PropertyEntry.stringOptionalPropertyEntry(
                   PRINCIPAL_KEY,
                   "The principal of the Kerberos for Iceberg catalog with Kerberos authentication",
                   false,
-                  false,
                   null,
-                  false,
                   false))
           .put(
               CHECK_INTERVAL_SEC_KEY,

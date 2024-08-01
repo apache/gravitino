@@ -65,13 +65,11 @@ public class AuthenticationConfig extends Config {
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
               AUTH_TYPE_KEY,
-              PropertyEntry.stringPropertyEntry(
+              PropertyEntry.stringOptionalPropertyEntry(
                   AUTH_TYPE_KEY,
                   "The type of authentication for Paimon catalog, currently we only support simple and Kerberos",
                   false,
-                  false,
                   null,
-                  false,
                   false))
           .build();
 }

@@ -94,18 +94,12 @@ public class KerberosConfig extends AuthenticationConfig {
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
               KEY_TAB_URI_KEY,
-              PropertyEntry.stringPropertyEntry(
-                  KEY_TAB_URI_KEY,
-                  "The uri of key tab for the catalog",
-                  false,
-                  false,
-                  null,
-                  false,
-                  false))
+              PropertyEntry.stringOptionalPropertyEntry(
+                  KEY_TAB_URI_KEY, "The uri of key tab for the catalog", false, null, false))
           .put(
               PRINCIPAL_KEY,
-              PropertyEntry.stringPropertyEntry(
-                  PRINCIPAL_KEY, "The principal for the catalog", false, false, null, false, false))
+              PropertyEntry.stringOptionalPropertyEntry(
+                  PRINCIPAL_KEY, "The principal for the catalog", false, null, false))
           .put(
               CHECK_INTERVAL_SEC_KEY,
               PropertyEntry.integerOptionalPropertyEntry(

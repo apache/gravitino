@@ -95,13 +95,11 @@ public class AuthenticationConfig extends Config {
                   false))
           .put(
               AUTH_TYPE_KEY,
-              PropertyEntry.stringPropertyEntry(
+              PropertyEntry.stringOptionalPropertyEntry(
                   AUTH_TYPE_KEY,
                   "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos",
                   false,
-                  false,
                   null,
-                  false,
                   false))
           .build();
 }

@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.jdbc;
 
 import static org.apache.gravitino.connector.PropertyEntry.integerPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
@@ -53,38 +54,22 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 null,
                 false,
                 false),
-            stringPropertyEntry(
+            stringOptionalPropertyEntry(
                 JdbcConfig.JDBC_DATABASE.getKey(),
                 JdbcConfig.JDBC_DATABASE.getDoc(),
                 false,
-                false,
                 null,
-                false,
                 false),
-            stringPropertyEntry(
+            stringOptionalPropertyEntry(
                 JdbcConfig.JDBC_DRIVER.getKey(),
                 JdbcConfig.JDBC_DRIVER.getDoc(),
                 false,
-                false,
                 null,
-                false,
                 false),
-            stringPropertyEntry(
-                JdbcConfig.USERNAME.getKey(),
-                JdbcConfig.USERNAME.getDoc(),
-                false,
-                false,
-                null,
-                false,
-                false),
-            stringPropertyEntry(
-                JdbcConfig.PASSWORD.getKey(),
-                JdbcConfig.PASSWORD.getDoc(),
-                false,
-                false,
-                null,
-                false,
-                false),
+            stringOptionalPropertyEntry(
+                JdbcConfig.USERNAME.getKey(), JdbcConfig.USERNAME.getDoc(), false, null, false),
+            stringOptionalPropertyEntry(
+                JdbcConfig.PASSWORD.getKey(), JdbcConfig.PASSWORD.getDoc(), false, null, false),
             integerPropertyEntry(
                 JdbcConfig.POOL_MIN_SIZE.getKey(),
                 JdbcConfig.POOL_MIN_SIZE.getDoc(),
