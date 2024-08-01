@@ -681,8 +681,8 @@ public class TestJDBCBackend {
         Relation.Type.OWNER_REL,
         anotherMetaLake.nameIdentifier(),
         anotherMetaLake.type(),
-        user.nameIdentifier(),
-        user.type(),
+        anotherUser.nameIdentifier(),
+        anotherUser.type(),
         true);
 
     backend.insertRelation(
