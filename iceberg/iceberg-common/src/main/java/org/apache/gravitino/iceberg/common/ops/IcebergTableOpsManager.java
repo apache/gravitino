@@ -55,8 +55,7 @@ public class IcebergTableOpsManager implements AutoCloseable {
 
   private IcebergTableOpsProvider createProvider(IcebergConfig config) {
     try {
-      Class<?> providerClz =
-          Class.forName(config.get(IcebergConfig.ICEBERG_REST_SERVICE_CATALOG_PROVIDER));
+      Class<?> providerClz = Class.forName(config.get(IcebergConfig.ICEBERG_REST_CATALOG_PROVIDER));
       return (IcebergTableOpsProvider) providerClz.getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
