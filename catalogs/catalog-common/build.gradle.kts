@@ -24,4 +24,5 @@ plugins {
 // try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
   implementation(libs.slf4j.api)
+  implementation(libs.guava)
 }

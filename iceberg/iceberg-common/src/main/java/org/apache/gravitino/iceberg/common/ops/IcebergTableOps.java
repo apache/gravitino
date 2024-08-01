@@ -19,16 +19,23 @@
 package org.apache.gravitino.iceberg.common.ops;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.util.Collections;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.IsolatedClassLoader;
+import org.apache.gravitino.utils.MapUtils;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
@@ -51,23 +58,39 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class IcebergTableOps implements AutoCloseable {
+
   public static final Logger LOG = LoggerFactory.getLogger(IcebergTableOps.class);
 
   @Getter protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
-  private final String catalogType;
+  private final IcebergCatalogBackend catalogBackend;
   private String catalogUri = null;
+  private Map<String, String> catalogConfigToClients;
+  private static final Set<String> catalogPropertiesToClientKeys =
+      ImmutableSet.of(
+          IcebergConstants.IO_IMPL,
+          IcebergConstants.AWS_S3_REGION,
+          IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID,
+          IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY,
+          IcebergConstants.ICEBERG_S3_ENDPOINT);
 
   public IcebergTableOps(IcebergConfig icebergConfig) {
-    this.catalogType = icebergConfig.get(IcebergConfig.CATALOG_BACKEND);
-    if (!IcebergCatalogBackend.MEMORY.name().equalsIgnoreCase(catalogType)) {
+    this.catalogBackend =
+        IcebergCatalogBackend.valueOf(
+            icebergConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
+    if (!IcebergCatalogBackend.MEMORY.equals(catalogBackend)) {
+      // check whether IcebergConfig.CATALOG_WAREHOUSE exists
       icebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE);
       this.catalogUri = icebergConfig.get(IcebergConfig.CATALOG_URI);
     }
-    catalog = IcebergCatalogUtil.loadCatalogBackend(catalogType, icebergConfig.getAllConfig());
+    this.catalog = IcebergCatalogUtil.loadCatalogBackend(catalogBackend, icebergConfig);
     if (catalog instanceof SupportsNamespaces) {
-      asNamespaceCatalog = (SupportsNamespaces) catalog;
+      this.asNamespaceCatalog = (SupportsNamespaces) catalog;
     }
+    this.catalogConfigToClients =
+        MapUtils.getFilteredMap(
+            icebergConfig.getIcebergCatalogProperties(),
+            key -> catalogPropertiesToClientKeys.contains(key));
   }
 
   public IcebergTableOps() {
@@ -119,9 +142,9 @@ public class IcebergTableOps implements AutoCloseable {
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
     request.validate();
     if (request.stageCreate()) {
-      return CatalogHandlers.stageTableCreate(catalog, namespace, request);
+      return injectTableConfig(() -> CatalogHandlers.stageTableCreate(catalog, namespace, request));
     }
-    return CatalogHandlers.createTable(catalog, namespace, request);
+    return injectTableConfig(() -> CatalogHandlers.createTable(catalog, namespace, request));
   }
 
   public void dropTable(TableIdentifier tableIdentifier) {
@@ -133,7 +156,7 @@ public class IcebergTableOps implements AutoCloseable {
   }
 
   public LoadTableResponse loadTable(TableIdentifier tableIdentifier) {
-    return CatalogHandlers.loadTable(catalog, tableIdentifier);
+    return injectTableConfig(() -> CatalogHandlers.loadTable(catalog, tableIdentifier));
   }
 
   public boolean tableExists(TableIdentifier tableIdentifier) {
@@ -177,7 +200,7 @@ public class IcebergTableOps implements AutoCloseable {
       closeMySQLCatalogResource();
     } else if (catalogUri != null && catalogUri.contains("postgresql")) {
       closePostgreSQLCatalogResource();
-    } else if (catalogType.equalsIgnoreCase(IcebergCatalogBackend.HIVE.name())) {
+    } else if (catalogBackend.equals(IcebergCatalogBackend.HIVE)) {
       // TODO(yuqi) add close for other catalog types such Hive catalog, for more, please refer to
       // https://github.com/apache/gravitino/pull/2548/commits/ab876b69b7e094bbd8c174d48a2365a18ed5176d
     }
@@ -215,6 +238,19 @@ public class IcebergTableOps implements AutoCloseable {
 
   private void closePostgreSQLCatalogResource() {
     closeDriverLoadedByIsolatedClassLoader(catalogUri);
+  }
+
+  // Some io and security configuration should pass to Iceberg REST client
+  private LoadTableResponse injectTableConfig(Supplier<LoadTableResponse> supplier) {
+    LoadTableResponse loadTableResponse = supplier.get();
+    return LoadTableResponse.builder()
+        .withTableMetadata(loadTableResponse.tableMetadata())
+        .addAllConfig(getCatalogConfigToClient())
+        .build();
+  }
+
+  private Map<String, String> getCatalogConfigToClient() {
+    return catalogConfigToClients;
   }
 
   @Getter

@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
@@ -35,40 +36,13 @@ import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfi
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
-
   public static final String GRAVITINO_JDBC_USER = IcebergConstants.GRAVITINO_JDBC_USER;
-  public static final String ICEBERG_JDBC_USER = IcebergConstants.ICEBERG_JDBC_USER;
-
   public static final String GRAVITINO_JDBC_PASSWORD = IcebergConstants.GRAVITINO_JDBC_PASSWORD;
-  public static final String ICEBERG_JDBC_PASSWORD = IcebergConstants.ICEBERG_JDBC_PASSWORD;
-  public static final String ICEBERG_JDBC_INITIALIZE = IcebergConstants.ICEBERG_JDBC_INITIALIZE;
-
-  public static final String GRAVITINO_JDBC_DRIVER = IcebergConstants.GRAVITINO_JDBC_DRIVER;
   public static final String WAREHOUSE = IcebergConstants.WAREHOUSE;
   public static final String URI = IcebergConstants.URI;
   public static final String CATALOG_BACKEND_NAME = IcebergConstants.CATALOG_BACKEND_NAME;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
-
-  // Map that maintains the mapping of keys in Gravitino to that in Iceberg, for example, users
-  // will only need to set the configuration 'catalog-backend' in Gravitino and Gravitino will
-  // change it to `catalogType` automatically and pass it to Iceberg.
-  public static final Map<String, String> GRAVITINO_CONFIG_TO_ICEBERG =
-      ImmutableMap.of(
-          CATALOG_BACKEND,
-          CATALOG_BACKEND,
-          GRAVITINO_JDBC_DRIVER,
-          GRAVITINO_JDBC_DRIVER,
-          GRAVITINO_JDBC_USER,
-          ICEBERG_JDBC_USER,
-          GRAVITINO_JDBC_PASSWORD,
-          ICEBERG_JDBC_PASSWORD,
-          URI,
-          URI,
-          WAREHOUSE,
-          WAREHOUSE,
-          CATALOG_BACKEND_NAME,
-          CATALOG_BACKEND_NAME);
 
   public static final Map<String, String> KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND =
       ImmutableMap.of(
@@ -98,7 +72,17 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false),
             stringRequiredPropertyEntry(URI, "Iceberg catalog uri config", false, false),
             stringRequiredPropertyEntry(
-                WAREHOUSE, "Iceberg catalog warehouse config", false, false));
+                WAREHOUSE, "Iceberg catalog warehouse config", false, false),
+            stringOptionalPropertyEntry(
+                IcebergConstants.IO_IMPL, "FileIO implement for Iceberg", true, null, false),
+            stringOptionalPropertyEntry(
+                IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID, "s3 access-key-id", true, null, true),
+            stringOptionalPropertyEntry(
+                IcebergConstants.GRAVITINO_S3_SECRET_ACCESS_KEY,
+                "s3 secret-access-key",
+                true,
+                null,
+                true));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap(BASIC_CATALOG_PROPERTY_ENTRIES);
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
@@ -111,18 +95,15 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
     return PROPERTIES_METADATA;
   }
 
-  public Map<String, String> transformProperties(Map<String, String> properties) {
-    Map<String, String> gravitinoConfig = Maps.newHashMap();
-    properties.forEach(
-        (key, value) -> {
-          if (GRAVITINO_CONFIG_TO_ICEBERG.containsKey(key)) {
-            gravitinoConfig.put(GRAVITINO_CONFIG_TO_ICEBERG.get(key), value);
-          }
-
-          if (KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND.containsKey(key)) {
-            gravitinoConfig.put(KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND.get(key), value);
+  public Map<String, String> transformProperties(Map<String, String> gravitinoProperties) {
+    Map<String, String> icebergProperties =
+        IcebergPropertiesUtils.toIcebergCatalogProperties(gravitinoProperties);
+    gravitinoProperties.forEach(
+        (k, v) -> {
+          if (KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND.containsKey(k)) {
+            icebergProperties.put(KERBEROS_CONFIGURATION_FOR_HIVE_BACKEND.get(k), v);
           }
         });
-    return gravitinoConfig;
+    return icebergProperties;
   }
 }
