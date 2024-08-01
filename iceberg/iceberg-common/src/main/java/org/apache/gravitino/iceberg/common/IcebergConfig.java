@@ -126,13 +126,6 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .createWithDefault(
               "org.apache.gravitino.iceberg.common.ops.ConfigIcebergTableOpsProvider");
 
-  public static final ConfigEntry<String> ICEBERG_REST_SERVICE_CATALOG_PROVIDER_CLASSPATH =
-      new ConfigBuilder(IcebergConstants.ICEBERG_REST_SERVICE_CATALOG_PROVIDER_CLASSPATH)
-          .doc("the classpath for loading the implement of IcebergTableOpsProvider")
-          .version(ConfigConstants.VERSION_0_6_0)
-          .stringConf()
-          .createWithDefault("iceberg-rest-server/libs");
-
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }

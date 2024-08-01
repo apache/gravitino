@@ -30,7 +30,6 @@ import java.util.Properties;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.server.GravitinoIcebergRESTServer;
 import org.apache.gravitino.integration.test.util.HttpUtils;
@@ -124,12 +123,6 @@ public abstract class IcebergRESTServerManager {
         String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
 
     configMap.putAll(customConfigs);
-    if (ITUtils.EMBEDDED_TEST_MODE.equals(System.getProperty(ITUtils.TEST_MODE))) {
-      configMap.put(
-          IcebergConfig.ICEBERG_CONFIG_PREFIX
-              + IcebergConstants.ICEBERG_REST_SERVICE_CATALOG_PROVIDER_CLASSPATH,
-          "iceberg/iceberg-common/build/libs");
-    }
     ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
   }
 
