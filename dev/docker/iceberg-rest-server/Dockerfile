@@ -16,7 +16,8 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM openjdk:8-jdk-buster
+FROM openjdk:17
+
 LABEL maintainer="dev@gravitino.apache.org"
 
 WORKDIR /root/gravitino-iceberg-rest-server
