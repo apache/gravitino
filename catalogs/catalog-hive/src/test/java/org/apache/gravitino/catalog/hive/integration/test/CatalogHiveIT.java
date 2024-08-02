@@ -1650,9 +1650,14 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertEquals(wrongHiveMetastoreURI, createdCatalog.properties().get(METASTORE_URIS));
 
     // As it's wrong metastore uri, it should throw exception.
-    Assertions.assertThrows(
-        Exception.class,
-        () -> createdCatalog.asSchemas().createSchema("schema", "comment", ImmutableMap.of()));
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> createdCatalog.asSchemas().createSchema("schema", "comment", ImmutableMap.of()));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Could not connect to meta store using any of the URIs provided"));
 
     Catalog newCatalog =
         metalake.alterCatalog(
