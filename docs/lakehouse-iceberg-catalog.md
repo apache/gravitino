@@ -71,6 +71,24 @@ If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to
 You must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
 :::
 
+#### S3
+
+Supports using static access-key-id and secret-access-key to access S3 data.
+
+| Configuration item     | Description                                                                                                                                                                                                         | Default value | Required | Since Version |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `io-impl`              | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aws.s3.S3FileIO` for s3.                                                                                                                     | (none)        | No       | 0.6.0         |
+| `s3-access-key-id`     | The static access key ID used to access S3 data.                                                                                                                                                                    | (none)        | No       | 0.6.0         |
+| `s3-secret-access-key` | The static secret access key used to access S3 data.                                                                                                                                                                | (none)        | No       | 0.6.0         |
+| `s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)        | No       | 0.6.0         |
+| `s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)        | No       | 0.6.0         |
+
+For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
+
+:::info
+Please set `gravitino.iceberg-rest.warehouse` to `s3://{bucket_name}/${prefix_name}` for JDBC catalog backend, `s3a://{bucket_name}/${prefix_name}` for Hive catalog backend.
+:::
+
 ### Catalog operations
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
@@ -235,7 +253,7 @@ Meanwhile, the data types other than listed above are mapped to Gravitino **[Ext
 
 ### Table properties
 
-You can pass [Iceberg table properties](https://web.archive.org/web/20231210013537/https://iceberg.apache.org/docs/1.3.1/configuration/) to Gravitino when creating an Iceberg table.
+You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configuration/) to Gravitino when creating an Iceberg table.
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
