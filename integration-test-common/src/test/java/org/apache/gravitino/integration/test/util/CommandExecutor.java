@@ -17,12 +17,9 @@
 package org.apache.gravitino.integration.test.util;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,14 +42,10 @@ public class CommandExecutor {
       ProcessData.TypesOfData type,
       IGNORE_ERRORS ignore_errors,
       Map<String, String> env) {
-    List<String> subCommandsAsList = new ArrayList<>(Arrays.asList(command));
-    String mergedCommand = StringUtils.join(subCommandsAsList, " ");
-
-    LOG.info("Sending command \"{}\" to localhost", mergedCommand);
-
+    LOG.info("Sending command \"{}\" to localhost", Arrays.toString(command));
     ProcessBuilder processBuilder = new ProcessBuilder(command);
     processBuilder.environment().putAll(env);
-    Process process = null;
+    Process process;
     try {
       process = processBuilder.start();
     } catch (IOException e) {
@@ -66,7 +59,7 @@ public class CommandExecutor {
     if (!printToConsole) LOG.trace(outputOfProcess.toString());
     else LOG.debug(outputOfProcess.toString());
     if (ignore_errors == IGNORE_ERRORS.FALSE && exit_code != NORMAL_EXIT) {
-      LOG.error(String.format("Command '%s' failed with exit code %s", mergedCommand, exit_code));
+      LOG.error(String.format("Command '%s' failed with exit code %s", Arrays.toString(command), exit_code));
     }
     return outputOfProcess;
   }
