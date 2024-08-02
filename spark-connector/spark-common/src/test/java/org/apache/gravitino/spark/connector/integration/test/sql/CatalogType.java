@@ -39,8 +39,7 @@ public enum CatalogType {
     }
   }
 
-  // To find the catalog type from the directory name, the first name in directory match CatalogType
-  // determines the catalog type.
+  // The first non-unknown CatalogType from parent to child determines the catalog type.
   public static CatalogType merge(CatalogType parentCatalogType, CatalogType childCatalogType) {
     return parentCatalogType.equals(UNKNOWN) ? childCatalogType : parentCatalogType;
   }
