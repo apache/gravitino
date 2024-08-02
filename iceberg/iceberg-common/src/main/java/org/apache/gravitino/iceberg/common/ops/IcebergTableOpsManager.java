@@ -30,7 +30,6 @@ public class IcebergTableOpsManager implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergTableOpsManager.class);
 
   public static final String DEFAULT_CATALOG = "default_catalog";
-
   private final Cache<String, IcebergTableOps> icebergTableOpsCache;
   private final IcebergTableOpsProvider provider;
 
@@ -61,8 +60,11 @@ public class IcebergTableOpsManager implements AutoCloseable {
 
   private IcebergTableOpsProvider createProvider(Map<String, String> properties) {
     try {
-      Class<?> providerClz =
-          Class.forName(properties.get(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER));
+      String className =
+          properties.getOrDefault(
+              IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
+              ConfigIcebergTableOpsProvider.class.getName());
+      Class<?> providerClz = Class.forName(className);
       return (IcebergTableOpsProvider) providerClz.getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
