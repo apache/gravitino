@@ -21,7 +21,6 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 - Supports HDFS and S3 storage.
 
-
 :::info
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
 :::
