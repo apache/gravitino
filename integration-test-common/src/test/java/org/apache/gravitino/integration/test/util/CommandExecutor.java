@@ -52,7 +52,7 @@ public class CommandExecutor {
 
     ProcessBuilder processBuilder = new ProcessBuilder(command);
     processBuilder.environment().putAll(env);
-    Process process;
+    Process process = null;
     try {
       process = processBuilder.start();
     } catch (IOException e) {
