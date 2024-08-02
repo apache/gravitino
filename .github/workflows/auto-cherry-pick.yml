@@ -7,25 +7,6 @@ on:
     types: ["closed"]
 
 jobs:
-  cherry_pick_branch_0_3:
-    runs-on: ubuntu-latest
-    name: Cherry pick into branch_0.3
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'branch-0.3') && github.event.pull_request.merged == true }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Cherry pick into branch-0.3
-        uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
-        with:
-          token: ${{ secrets.BOT_TOKEN }}
-          branch: branch-0.3
-          labels: |
-            cherry-pick
-          reviewers: |
-            jerryshao
-
   cherry_pick_branch_0_4:
     runs-on: ubuntu-latest
     name: Cherry pick into branch_0.4
@@ -38,7 +19,6 @@ jobs:
       - name: Cherry pick into branch-0.4
         uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
         with:
-          token: ${{ secrets.BOT_TOKEN }}
           branch: branch-0.4
           labels: |
             cherry-pick
@@ -57,8 +37,25 @@ jobs:
       - name: Cherry pick into branch-0.5
         uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
         with:
-          token: ${{ secrets.BOT_TOKEN }}
           branch: branch-0.5
+          labels: |
+            cherry-pick
+          reviewers: |
+            jerryshao
+
+  cherry_pick_branch_0_6:
+    runs-on: ubuntu-latest
+    name: Cherry pick into branch_0.6
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'branch-0.5') && github.event.pull_request.merged == true }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Cherry pick into branch-0.6
+        uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
+        with:
+          branch: branch-0.6
           labels: |
             cherry-pick
           reviewers: |
