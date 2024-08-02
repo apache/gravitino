@@ -22,7 +22,7 @@ import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonTable
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonProperties;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
-import static org.apache.paimon.utils.Preconditions.checkArgument;
+import static org.apache.gravitino.rel.indexes.Indexes.EMPTY_INDEXES;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -326,6 +326,9 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     if (partitioning == null) {
       partitioning = EMPTY_TRANSFORM;
     }
+    if (indexes == null) {
+      indexes = EMPTY_INDEXES;
+    }
     Preconditions.checkArgument(
         Arrays.stream(partitioning)
             .allMatch(
@@ -338,9 +341,6 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     Preconditions.checkArgument(
         sortOrders == null || sortOrders.length == 0,
         "Sort orders are not supported for Paimon in Gravitino.");
-    Preconditions.checkArgument(
-        indexes == null || indexes.length == 0,
-        "Indexes are not supported for Paimon in Gravitino.");
     Preconditions.checkArgument(
         distribution == null || distribution.strategy() == Distributions.NONE.strategy(),
         "Distribution is not supported for Paimon in Gravitino now.");
@@ -367,6 +367,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
             .withPartitioning(partitioning)
             .withComment(comment)
             .withProperties(properties)
+            .withIndexes(indexes)
             .withAuditInfo(
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
