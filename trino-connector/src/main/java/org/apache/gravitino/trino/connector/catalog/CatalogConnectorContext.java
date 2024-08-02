@@ -96,13 +96,13 @@ public class CatalogConnectorContext {
     return adapter.getMetadataAdapter();
   }
 
-  static class Builder {
+  public static class Builder {
     private final CatalogConnectorAdapter connectorAdapter;
     private GravitinoCatalog catalog;
     private GravitinoMetalake metalake;
     private ConnectorContext context;
 
-    Builder(CatalogConnectorAdapter connectorAdapter) {
+    public Builder(CatalogConnectorAdapter connectorAdapter) {
       this.connectorAdapter = connectorAdapter;
     }
 
@@ -115,17 +115,17 @@ public class CatalogConnectorContext {
       return new Builder(connectorAdapter, catalog);
     }
 
-    Builder withMetalake(GravitinoMetalake metalake) {
+    public Builder withMetalake(GravitinoMetalake metalake) {
       this.metalake = metalake;
       return this;
     }
 
-    Builder withContext(ConnectorContext context) {
+    public Builder withContext(ConnectorContext context) {
       this.context = context;
       return this;
     }
 
-    CatalogConnectorContext build() throws Exception {
+    public CatalogConnectorContext build() throws Exception {
       Preconditions.checkArgument(metalake != null, "metalake is not null");
       Preconditions.checkArgument(catalog != null, "catalog is not null");
       Preconditions.checkArgument(context != null, "context is not null");

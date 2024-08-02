@@ -17,13 +17,13 @@
 # under the License.
 #
 FROM openjdk:17
+
 LABEL maintainer="dev@gravitino.apache.org"
 
-WORKDIR /root/gravitino
+WORKDIR /root/gravitino-iceberg-rest-server
 
-COPY packages/gravitino /root/gravitino
+COPY packages/gravitino-iceberg-rest-server /root/gravitino-iceberg-rest-server
 
-EXPOSE 8090
 EXPOSE 9001
 
-ENTRYPOINT ["/bin/bash", "/root/gravitino/bin/gravitino.sh", "start"]
+ENTRYPOINT ["/bin/bash", "/root/gravitino-iceberg-rest-server/bin/gravitino-iceberg-rest-server.sh", "start"]

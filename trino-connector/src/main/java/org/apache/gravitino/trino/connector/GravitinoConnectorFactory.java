@@ -89,7 +89,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         } catch (Exception e) {
-          String message = "Initialization of the GravitinoConnector failed" + e.getMessage();
+          String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
           LOG.error(message);
           throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
         }
@@ -141,7 +141,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       return (CatalogConnectorFactory) obj;
     } catch (Exception e) {
       throw new TrinoException(
-          GRAVITINO_RUNTIME_ERROR, "Can not create CatalogConnectorFactory", e);
+          GRAVITINO_RUNTIME_ERROR, "Can not create CatalogConnectorFactory ", e);
     }
   }
 }

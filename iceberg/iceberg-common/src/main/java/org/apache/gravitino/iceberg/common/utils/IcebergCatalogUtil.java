@@ -21,11 +21,13 @@ package org.apache.gravitino.iceberg.common.utils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
@@ -49,23 +51,22 @@ public class IcebergCatalogUtil {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogUtil.class);
 
-  private static InMemoryCatalog loadMemoryCatalog(Map<String, String> properties) {
-    IcebergConfig icebergConfig = new IcebergConfig(properties);
+  private static InMemoryCatalog loadMemoryCatalog(IcebergConfig icebergConfig) {
     String icebergCatalogName = icebergConfig.getCatalogBackendName("memory");
     InMemoryCatalog memoryCatalog = new InMemoryCatalog();
-    Map<String, String> resultProperties = new HashMap<>(properties);
+    Map<String, String> resultProperties = icebergConfig.getIcebergCatalogProperties();
     resultProperties.put(CatalogProperties.WAREHOUSE_LOCATION, "/tmp");
     memoryCatalog.initialize(icebergCatalogName, resultProperties);
     return memoryCatalog;
   }
 
-  private static HiveCatalog loadHiveCatalog(Map<String, String> properties) {
+  private static HiveCatalog loadHiveCatalog(IcebergConfig icebergConfig) {
     ClosableHiveCatalog hiveCatalog = new ClosableHiveCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
-    properties.forEach(hdfsConfiguration::set);
-    IcebergConfig icebergConfig = new IcebergConfig(properties);
     String icebergCatalogName = icebergConfig.getCatalogBackendName("hive");
 
+    Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
+    properties.forEach(hdfsConfiguration::set);
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (authenticationConfig.isSimpleAuth()) {
       hiveCatalog.setConf(hdfsConfiguration);
@@ -107,18 +108,17 @@ public class IcebergCatalogUtil {
     }
   }
 
-  private static JdbcCatalog loadJdbcCatalog(Map<String, String> properties) {
-    IcebergConfig icebergConfig = new IcebergConfig(properties);
+  private static JdbcCatalog loadJdbcCatalog(IcebergConfig icebergConfig) {
     String driverClassName = icebergConfig.getJdbcDriver();
     String icebergCatalogName = icebergConfig.getCatalogBackendName("jdbc");
 
+    Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
     Preconditions.checkNotNull(
         properties.get(IcebergConstants.ICEBERG_JDBC_USER),
         IcebergConstants.ICEBERG_JDBC_USER + " is null");
     Preconditions.checkNotNull(
         properties.get(IcebergConstants.ICEBERG_JDBC_PASSWORD),
         IcebergConstants.ICEBERG_JDBC_PASSWORD + " is null");
-
     try {
       // Load the jdbc driver
       Class.forName(driverClassName);
@@ -126,11 +126,8 @@ public class IcebergCatalogUtil {
       throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
     }
     JdbcCatalog jdbcCatalog =
-        new JdbcCatalog(
-            null,
-            null,
-            Boolean.parseBoolean(
-                properties.getOrDefault(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true")));
+        new JdbcCatalog(null, null, icebergConfig.get(IcebergConfig.JDBC_INIT_TABLES));
+
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     jdbcCatalog.setConf(hdfsConfiguration);
@@ -138,37 +135,41 @@ public class IcebergCatalogUtil {
     return jdbcCatalog;
   }
 
-  private static Catalog loadRestCatalog(Map<String, String> properties) {
-    IcebergConfig icebergConfig = new IcebergConfig(properties);
+  private static Catalog loadRestCatalog(IcebergConfig icebergConfig) {
     String icebergCatalogName = icebergConfig.getCatalogBackendName("rest");
     RESTCatalog restCatalog = new RESTCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
+    Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
     properties.forEach(hdfsConfiguration::set);
     restCatalog.setConf(hdfsConfiguration);
     restCatalog.initialize(icebergCatalogName, properties);
     return restCatalog;
   }
 
-  public static Catalog loadCatalogBackend(String catalogType) {
-    return loadCatalogBackend(catalogType, Collections.emptyMap());
+  @VisibleForTesting
+  static Catalog loadCatalogBackend(String catalogType) {
+    return loadCatalogBackend(
+        IcebergCatalogBackend.valueOf(catalogType.toUpperCase(Locale.ROOT)),
+        new IcebergConfig(Collections.emptyMap()));
   }
 
-  public static Catalog loadCatalogBackend(String catalogType, Map<String, String> properties) {
-    LOG.info("Load catalog backend of {}", catalogType);
-    switch (IcebergCatalogBackend.valueOf(catalogType.toUpperCase())) {
+  public static Catalog loadCatalogBackend(
+      IcebergCatalogBackend catalogBackend, IcebergConfig icebergConfig) {
+    LOG.info("Load catalog backend of {}", catalogBackend);
+    switch (catalogBackend) {
       case MEMORY:
-        return loadMemoryCatalog(properties);
+        return loadMemoryCatalog(icebergConfig);
       case HIVE:
-        return loadHiveCatalog(properties);
+        return loadHiveCatalog(icebergConfig);
       case JDBC:
-        return loadJdbcCatalog(properties);
+        return loadJdbcCatalog(icebergConfig);
       case REST:
-        return loadRestCatalog(properties);
+        return loadRestCatalog(icebergConfig);
       default:
         throw new RuntimeException(
-            catalogType
+            catalogBackend
                 + " catalog is not supported yet, supported catalogs: [memory]"
-                + catalogType);
+                + catalogBackend);
     }
   }
 

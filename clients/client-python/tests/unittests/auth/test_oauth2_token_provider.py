@@ -22,6 +22,7 @@ from unittest.mock import patch
 
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
+from gravitino.exceptions.base import BadRequestException, UnauthorizedException
 from tests.unittests.auth import mock_base
 
 OAUTH_PORT = 1082
@@ -40,8 +41,33 @@ class TestOAuth2TokenProvider(unittest.TestCase):
         with self.assertRaises(AssertionError):
             _ = DefaultOAuth2TokenProvider(uri="test", credential="xx", scope="test")
 
-    # TODO
-    # Error Test
+    @patch(
+        "gravitino.utils.http_client.HTTPClient._make_request",
+        return_value=mock_base.mock_authentication_invalid_client_error(),
+    )
+    def test_authertication_invalid_client_error(self, *mock_methods):
+
+        with self.assertRaises(UnauthorizedException):
+            _ = DefaultOAuth2TokenProvider(
+                uri=f"http://127.0.0.1:{OAUTH_PORT}",
+                credential="yy:xx",
+                path="oauth/token",
+                scope="test",
+            )
+
+    @patch(
+        "gravitino.utils.http_client.HTTPClient._make_request",
+        return_value=mock_base.mock_authentication_invalid_grant_error(),
+    )
+    def test_authertication_invalid_grant_error(self, *mock_methods):
+
+        with self.assertRaises(BadRequestException):
+            _ = DefaultOAuth2TokenProvider(
+                uri=f"http://127.0.0.1:{OAUTH_PORT}",
+                credential="yy:xx",
+                path="oauth/token",
+                scope="test",
+            )
 
     @patch(
         "gravitino.utils.http_client.HTTPClient.post_form",
