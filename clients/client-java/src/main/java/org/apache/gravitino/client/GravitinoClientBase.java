@@ -153,7 +153,7 @@ public abstract class GravitinoClientBase implements Closeable {
    * Retrieves the version of the Gravitino API.
    *
    * @deprecated This method is deprecated because it is a duplicate of {@link #serverVersion()}.
-   *             Use {@link #serverVersion()} instead for clarity and consistency.
+   *     Use {@link #serverVersion()} instead for clarity and consistency.
    */
   @Deprecated
   @InlineMe(replacement = "this.serverVersion()")
