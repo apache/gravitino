@@ -108,7 +108,7 @@ public class KerberosConfig extends AuthenticationConfig {
               PropertyEntry.stringOptionalPropertyEntry(
                   KET_TAB_URI_KEY,
                   "The keytab of the Kerberos for Iceberg catalog with Kerberos authentication",
-                  false /* Whether this property is immutable */,
+                  false /* immutable */,
                   null,
                   false))
           .put(
@@ -116,7 +116,7 @@ public class KerberosConfig extends AuthenticationConfig {
               PropertyEntry.stringOptionalPropertyEntry(
                   PRINCIPAL_KEY,
                   "The principal of the Kerberos for Iceberg catalog with Kerberos authentication",
-                  false /* Whether this property is immutable */,
+                  false /* immutable */,
                   null,
                   false))
           .put(
@@ -124,7 +124,7 @@ public class KerberosConfig extends AuthenticationConfig {
               PropertyEntry.integerOptionalPropertyEntry(
                   CHECK_INTERVAL_SEC_KEY,
                   "The check interval of the Kerberos credential for Iceberg catalog with Kerberos authentication",
-                  false /* Whether this property is immutable */,
+                  false /* immutable */,
                   60,
                   false))
           .put(
@@ -132,7 +132,7 @@ public class KerberosConfig extends AuthenticationConfig {
               PropertyEntry.integerOptionalPropertyEntry(
                   FETCH_TIMEOUT_SEC_KEY,
                   "The fetch timeout of the Kerberos key table of Iceberg catalog with Kerberos authentication",
-                  false /* Whether this property is immutable */,
+                  false /* immutable */,
                   60,
                   false))
           .build();

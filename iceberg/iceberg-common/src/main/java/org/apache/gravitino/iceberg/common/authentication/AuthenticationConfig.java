@@ -85,7 +85,7 @@ public class AuthenticationConfig extends Config {
                   IMPERSONATION_ENABLE_KEY,
                   "Whether to enable impersonation for the Iceberg catalog",
                   false,
-                  false /* Whether this property is immutable */,
+                  false /* immutable */,
                   DEFAULT_IMPERSONATION_ENABLE,
                   false,
                   false))
@@ -94,7 +94,7 @@ public class AuthenticationConfig extends Config {
               PropertyEntry.stringOptionalPropertyEntry(
                   AUTH_TYPE_KEY,
                   "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos",
-                  false /* Whether this property is immutable */,
+                  false /* immutable */,
                   "simple",
                   false))
           .build();
