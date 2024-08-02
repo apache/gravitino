@@ -99,9 +99,6 @@ public class OwnerMetaService {
           GroupMetaService.getInstance()
               .getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
 
-    } else if (type == Entity.EntityType.ROLE) {
-      entityId =
-          RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());
     } else {
       MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
       entityId =

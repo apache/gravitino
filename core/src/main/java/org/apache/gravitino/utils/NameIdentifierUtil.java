@@ -31,6 +31,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 
@@ -274,6 +275,10 @@ public class NameIdentifierUtil {
         checkTopic(ident);
         String topicParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(topicParent, ident.name(), MetadataObject.Type.TOPIC);
+
+      case ROLE:
+        AuthorizationUtils.checkRole(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ROLE);
 
       default:
         throw new IllegalArgumentException(

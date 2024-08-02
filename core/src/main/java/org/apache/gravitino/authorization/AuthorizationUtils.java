@@ -24,15 +24,8 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SupportsCatalogs;
-import org.apache.gravitino.SupportsMetalakes;
-import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.hook.DispatcherHooks;
-import org.apache.gravitino.messaging.TopicCatalog;
-import org.apache.gravitino.rel.TableCatalog;
-import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,132 +121,6 @@ public class AuthorizationUtils {
   // Install some post hooks used for ownership. The ownership will have the all privileges
   // of securable objects, users, groups, roles.
   public static <T> void prepareAuthorizationHooks(T manager, DispatcherHooks hooks) {
-    if (manager instanceof SupportsMetalakes) {
-      hooks.addPostHook(
-          "createMetalake",
-          (args, metalake) -> {
-            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
-            GravitinoEnv.getInstance()
-                .ownershipManager()
-                .setOwner(
-                    identifier,
-                    Entity.EntityType.METALAKE,
-                    PrincipalUtils.getCurrentUserName(),
-                    Owner.Type.USER);
-          });
-
-    } else if (manager instanceof SupportsCatalogs) {
-      hooks.addPostHook(
-          "createCatalog",
-          (args, catalog) -> {
-            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
-            GravitinoEnv.getInstance()
-                .ownershipManager()
-                .setOwner(
-                    identifier,
-                    Entity.EntityType.CATALOG,
-                    PrincipalUtils.getCurrentUserName(),
-                    Owner.Type.USER);
-          });
-
-    } else if (manager instanceof SupportsSchemas) {
-      hooks.addPostHook(
-          "createSchema",
-          (args, schema) -> {
-            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
-            GravitinoEnv.getInstance()
-                .ownershipManager()
-                .setOwner(
-                    identifier,
-                    Entity.EntityType.SCHEMA,
-                    PrincipalUtils.getCurrentUserName(),
-                    Owner.Type.USER);
-          });
-
-    } else if (manager instanceof TableCatalog) {
-      hooks.addPostHook(
-          "createTable",
-          (args, table) -> {
-            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
-            GravitinoEnv.getInstance()
-                .ownershipManager()
-                .setOwner(
-                    identifier,
-                    Entity.EntityType.TABLE,
-                    PrincipalUtils.getCurrentUserName(),
-                    Owner.Type.USER);
-          });
-
-    } else if (manager instanceof TopicCatalog) {
-      hooks.addPostHook(
-          "createTopic",
-          (args, topic) -> {
-            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
-            GravitinoEnv.getInstance()
-                .ownershipManager()
-                .setOwner(
-                    identifier,
-                    Entity.EntityType.TOPIC,
-                    PrincipalUtils.getCurrentUserName(),
-                    Owner.Type.USER);
-          });
-
-    } else if (manager instanceof FilesetCatalog) {
-      hooks.addPostHook(
-          "createFileset",
-          (args, fileset) -> {
-            NameIdentifier identifier = (NameIdentifier) ((Object[]) args)[0];
-            GravitinoEnv.getInstance()
-                .ownershipManager()
-                .setOwner(
-                    identifier,
-                    Entity.EntityType.FILESET,
-                    PrincipalUtils.getCurrentUserName(),
-                    Owner.Type.USER);
-          });
-    } else if (manager instanceof AccessControlDispatcher) {
-      hooks.addPostHook(
-          "addUser",
-          (args, user) -> {
-            NameIdentifier identifier =
-                AuthorizationUtils.ofUser(
-                    (String) ((Object[]) args)[0], (String) ((Object[]) args)[1]);
-            GravitinoEnv.getInstance()
-                .ownershipManager()
-                .setOwner(
-                    identifier,
-                    Entity.EntityType.USER,
-                    PrincipalUtils.getCurrentUserName(),
-                    Owner.Type.USER);
-          });
-      hooks.addPostHook(
-          "addGroup",
-          (args, group) -> {
-            NameIdentifier identifier =
-                AuthorizationUtils.ofGroup(
-                    (String) ((Object[]) args)[0], (String) ((Object[]) args)[1]);
-            GravitinoEnv.getInstance()
-                .ownershipManager()
-                .setOwner(
-                    identifier,
-                    Entity.EntityType.GROUP,
-                    PrincipalUtils.getCurrentUserName(),
-                    Owner.Type.USER);
-          });
-      hooks.addPostHook(
-          "createRole",
-          (args, role) -> {
-            NameIdentifier identifier =
-                AuthorizationUtils.ofRole(
-                    (String) ((Object[]) args)[0], (String) ((Object[]) args)[1]);
-            GravitinoEnv.getInstance()
-                .ownershipManager()
-                .setOwner(
-                    identifier,
-                    Entity.EntityType.ROLE,
-                    PrincipalUtils.getCurrentUserName(),
-                    Owner.Type.USER);
-          });
-    }
+    // TODO: Refactor the post hook by adding new dispatcher
   }
 }

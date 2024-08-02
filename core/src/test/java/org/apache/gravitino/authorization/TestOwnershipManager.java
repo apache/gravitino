@@ -32,6 +32,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -40,11 +41,11 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.exceptions.OwnerNotFoundException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -150,24 +151,22 @@ public class TestOwnershipManager {
   @Test
   public void testOwner() {
     // Test no owner
+    MetadataObject metalakeObject =
+        MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
     Assertions.assertThrows(
-        OwnerNotFoundException.class,
-        () -> ownershipManager.getOwner(NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE));
+        OwnerNotFoundException.class, () -> ownershipManager.getOwner(METALAKE, metalakeObject));
 
     // Test to set the user as the owner
-    ownershipManager.setOwner(
-        NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE, USER, Owner.Type.USER);
+    ownershipManager.setOwner(METALAKE, metalakeObject, USER, Owner.Type.USER);
 
-    Owner owner =
-        ownershipManager.getOwner(NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE);
+    Owner owner = ownershipManager.getOwner(METALAKE, metalakeObject);
     Assertions.assertEquals(USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
     // Test to set the group as the owner
-    ownershipManager.setOwner(
-        NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE, GROUP, Owner.Type.GROUP);
+    ownershipManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP);
 
-    owner = ownershipManager.getOwner(NameIdentifier.of(METALAKE), Entity.EntityType.METALAKE);
+    owner = ownershipManager.getOwner(METALAKE, metalakeObject);
     Assertions.assertEquals(GROUP, owner.name());
     Assertions.assertEquals(Owner.Type.GROUP, owner.type());
   }

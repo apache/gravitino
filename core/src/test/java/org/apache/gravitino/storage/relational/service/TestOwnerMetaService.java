@@ -182,10 +182,6 @@ class TestOwnerMetaService extends TestJDBCBackend {
     OwnerMetaService.getInstance()
         .setOwner(topic.nameIdentifier(), topic.type(), user.nameIdentifier(), user.type());
     OwnerMetaService.getInstance()
-        .setOwner(user.nameIdentifier(), user.type(), user.nameIdentifier(), user.type());
-    OwnerMetaService.getInstance()
-        .setOwner(group.nameIdentifier(), group.type(), user.nameIdentifier(), user.type());
-    OwnerMetaService.getInstance()
         .setOwner(role.nameIdentifier(), role.type(), user.nameIdentifier(), user.type());
 
     Entity entity =
@@ -210,14 +206,6 @@ class TestOwnerMetaService extends TestJDBCBackend {
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
     entity = OwnerMetaService.getInstance().getOwner(fileset.nameIdentifier(), fileset.type());
-    Assertions.assertTrue(entity instanceof UserEntity);
-    Assertions.assertEquals("user", ((UserEntity) entity).name());
-
-    entity = OwnerMetaService.getInstance().getOwner(user.nameIdentifier(), user.type());
-    Assertions.assertTrue(entity instanceof UserEntity);
-    Assertions.assertEquals("user", ((UserEntity) entity).name());
-
-    entity = OwnerMetaService.getInstance().getOwner(group.nameIdentifier(), group.type());
     Assertions.assertTrue(entity instanceof UserEntity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
