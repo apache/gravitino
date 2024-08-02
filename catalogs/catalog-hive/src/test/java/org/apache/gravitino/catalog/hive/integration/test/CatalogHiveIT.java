@@ -1657,7 +1657,7 @@ public class CatalogHiveIT extends AbstractIT {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains("Could not connect to meta store using any of the URIs provided"));
+            .contains("Failed to connect to Hive Metastore"));
 
     Catalog newCatalog =
         metalake.alterCatalog(
