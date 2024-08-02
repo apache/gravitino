@@ -20,8 +20,7 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 - Supports HDFS and S3 storage.
-- When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and
-  doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
+
 
 :::info
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
@@ -163,7 +162,7 @@ Please set `gravitino.iceberg-rest.warehouse` to `s3://{bucket_name}/${prefix_na
 
 ### HDFS configuration
 
-You should place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package.
+You should place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
 
 ## Starting the Iceberg REST server
 

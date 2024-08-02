@@ -12,7 +12,7 @@ Apache Gravitino supports running on Java 8, 11, and 17. Make sure you have Java
 `${JAVA_HOME}/bin/java -version` command.
 :::
 
-Gravitino includes both the Gravitino server and the Gravitino Iceberg REST server. You can manage these servers separately or launch them together in a single server.
+Gravitino package comprises both the Gravitino server and the Gravitino Iceberg REST server. You have the option to manage these servers independently or run them concurrently on a single server.
 
 ### Get the Apache Gravitino binary distribution package
 
@@ -137,7 +137,7 @@ configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
 
 #### Manage Gravitino Iceberg REST server in Gravitino package
 
-You could manage Iceberg REST server as a standalone server or an auxiliary service in Gravitino server, there are some differences: 
+You can operate the Iceberg REST server either as a standalone server or as an auxiliary service within the Gravitino server. There are some notable differences between these two modes:
 
 |                     | Standalone server                                                     | Auxiliary service in Gravitino server             | 
 |---------------------|-----------------------------------------------------------------------|---------------------------------------------------|
