@@ -99,27 +99,27 @@ public interface OwnerMetaMapper {
           + " WHERE EXISTS ("
           + " SELECT ct.catalog_id FROM "
           + CatalogMetaMapper.TABLE_NAME
-          + " ct where ct.catalog_id = #{catalogId}  AND ct.deleted_at = 0 AND ot.deleted_at = 0 AND "
+          + " ct WHERE ct.catalog_id = #{catalogId}  AND ct.deleted_at = 0 AND ot.deleted_at = 0 AND "
           + "ct.catalog_id = ot.metadata_object_id AND ot.metadata_object_type = 'CATALOG'"
           + " UNION "
           + " SELECT st.catalog_id FROM "
           + SchemaMetaMapper.TABLE_NAME
-          + " st where st.catalog_id = #{catalogId} AND st.deleted_at = 0 AND ot.deleted_at = 0 AND "
+          + " st WHERE st.catalog_id = #{catalogId} AND st.deleted_at = 0 AND ot.deleted_at = 0 AND "
           + "st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
           + " UNION "
           + " SELECT tt.catalog_id FROM "
           + TopicMetaMapper.TABLE_NAME
-          + " tt where tt.catalog_id = #{catalogId} AND tt.deleted_at = 0 AND ot.deleted_at = 0 AND "
+          + " tt WHERE tt.catalog_id = #{catalogId} AND tt.deleted_at = 0 AND ot.deleted_at = 0 AND "
           + "tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
           + " UNION "
           + " SELECT tat.catalog_id FROM "
           + TableMetaMapper.TABLE_NAME
-          + " tat where tat.catalog_id = #{catalogId} AND tat.deleted_at = 0 AND ot.deleted_at = 0 AND "
+          + " tat WHERE tat.catalog_id = #{catalogId} AND tat.deleted_at = 0 AND ot.deleted_at = 0 AND "
           + "tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
           + " UNION "
           + " SELECT ft.catalog_id FROM "
           + FilesetMetaMapper.META_TABLE_NAME
-          + " ft where ft.catalog_id = #{catalogId} AND ft.deleted_at = 0 AND ot.deleted_at = 0 AND"
+          + " ft WHERE ft.catalog_id = #{catalogId} AND ft.deleted_at = 0 AND ot.deleted_at = 0 AND"
           + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
           + ")")
   void softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId);
@@ -132,22 +132,22 @@ public interface OwnerMetaMapper {
           + " WHERE EXISTS ("
           + " SELECT st.schema_id FROM "
           + SchemaMetaMapper.TABLE_NAME
-          + " st where st.schema_id = #{schemaId} AND st.deleted_at = 0 AND ot.deleted_at = 0 "
+          + " st WHERE st.schema_id = #{schemaId} AND st.deleted_at = 0 AND ot.deleted_at = 0 "
           + "AND st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
           + " UNION "
           + " SELECT tt.schema_id FROM "
           + TopicMetaMapper.TABLE_NAME
-          + " tt where tt.schema_id = #{schemaId} AND tt.deleted_at = 0 AND ot.deleted_at = 0 AND "
+          + " tt WHERE tt.schema_id = #{schemaId} AND tt.deleted_at = 0 AND ot.deleted_at = 0 AND "
           + "tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
           + " UNION "
           + " SELECT tat.schema_id FROM "
           + TableMetaMapper.TABLE_NAME
-          + " tat where tat.schema_id = #{schemaId} AND tat.deleted_at = 0 AND ot.deleted_at = 0 AND "
+          + " tat WHERE tat.schema_id = #{schemaId} AND tat.deleted_at = 0 AND ot.deleted_at = 0 AND "
           + "tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
           + " UNION "
           + " SELECT ft.schema_id FROM "
           + FilesetMetaMapper.META_TABLE_NAME
-          + " ft where ft.schema_id = #{schemaId} AND ft.deleted_at = 0 AND ot.deleted_at = 0 AND "
+          + " ft WHERE ft.schema_id = #{schemaId} AND ft.deleted_at = 0 AND ot.deleted_at = 0 AND "
           + "ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
           + ")")
   void sotDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId);

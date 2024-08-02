@@ -24,47 +24,93 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.relation.Relation;
+import org.apache.gravitino.relation.SupportsRelationOperations;
+import org.apache.gravitino.storage.kv.KvEntityStore;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** OwnershipManager is used for manage the owner of securable objects, user, group and role. */
+/**
+ * OwnershipManager is used for manage the owner of metadata object. The user and group don't have
+ * an owner
+ */
 public class OwnershipManager {
   private static final Logger LOG = LoggerFactory.getLogger(OwnershipManager.class);
   private final EntityStore store;
 
   public OwnershipManager(EntityStore store) {
+    if (store instanceof KvEntityStore) {
+      String errorMsg =
+          "OwnershipManager cannot run with kv entity store, please configure the entity "
+              + "store to use relational entity store and restart the Gravitino server";
+      LOG.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
+
+    if (!(store instanceof SupportsRelationOperations)) {
+      String errorMsg =
+          "OwnershipManager cannot run with entity store that does not support relation operations, "
+              + "please configure the entity store to use relational entity store and restart the Gravitino server";
+      LOG.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
     this.store = store;
   }
 
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
     try {
+      NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       if (ownerType == Owner.Type.USER) {
-        store
-            .relationOperations()
-            .insertRelation(
-                Relation.Type.OWNER_REL,
-                MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
-                MetadataObjectUtil.toEntityType(metadataObject),
-                AuthorizationUtils.ofUser(metalake, ownerName),
-                Entity.EntityType.USER,
-                true);
+        NameIdentifier ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
+        TreeLockUtils.doWithTreeLock(
+            objectIdent,
+            LockType.READ,
+            () ->
+                TreeLockUtils.doWithTreeLock(
+                    ownerIdent,
+                    LockType.READ,
+                    () -> {
+                      store
+                          .relationOperations()
+                          .insertRelation(
+                              Relation.Type.OWNER_REL,
+                              objectIdent,
+                              MetadataObjectUtil.toEntityType(metadataObject),
+                              ownerIdent,
+                              Entity.EntityType.USER,
+                              true);
+                      return null;
+                    }));
       } else if (ownerType == Owner.Type.GROUP) {
-        store
-            .relationOperations()
-            .insertRelation(
-                Relation.Type.OWNER_REL,
-                MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
-                MetadataObjectUtil.toEntityType(metadataObject),
-                AuthorizationUtils.ofGroup(metalake, ownerName),
-                Entity.EntityType.GROUP,
-                true);
+        NameIdentifier ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
+        TreeLockUtils.doWithTreeLock(
+            objectIdent,
+            LockType.READ,
+            () ->
+                TreeLockUtils.doWithTreeLock(
+                    ownerIdent,
+                    LockType.READ,
+                    () -> {
+                      store
+                          .relationOperations()
+                          .insertRelation(
+                              Relation.Type.OWNER_REL,
+                              objectIdent,
+                              MetadataObjectUtil.toEntityType(metadataObject),
+                              ownerIdent,
+                              Entity.EntityType.GROUP,
+                              true);
+                      return null;
+                    }));
       }
     } catch (NoSuchEntityException nse) {
       LOG.warn(
@@ -84,13 +130,18 @@ public class OwnershipManager {
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
     try {
       OwnerImpl owner = new OwnerImpl();
+      NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       List entities =
-          store
-              .relationOperations()
-              .listEntitiesByRelation(
-                  Relation.Type.OWNER_REL,
-                  MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
-                  MetadataObjectUtil.toEntityType(metadataObject));
+          TreeLockUtils.doWithTreeLock(
+              ident,
+              LockType.READ,
+              () ->
+                  store
+                      .relationOperations()
+                      .listEntitiesByRelation(
+                          Relation.Type.OWNER_REL,
+                          ident,
+                          MetadataObjectUtil.toEntityType(metadataObject)));
 
       if (entities.isEmpty()) {
         return Optional.empty();
