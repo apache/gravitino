@@ -65,24 +65,36 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
             enumImmutablePropertyEntry(
                 CATALOG_BACKEND,
                 "Iceberg catalog type choose properties",
-                true,
+                true /* required */,
                 IcebergCatalogBackend.class,
-                null,
-                false,
-                false),
-            stringRequiredPropertyEntry(URI, "Iceberg catalog uri config", false, false),
+                null /* defaultValue */,
+                false /* hidden */,
+                false /* reserved */),
             stringRequiredPropertyEntry(
-                WAREHOUSE, "Iceberg catalog warehouse config", false, false),
+                URI, "Iceberg catalog uri config", false /* immutable */, false /* hidden */),
+            stringRequiredPropertyEntry(
+                WAREHOUSE,
+                "Iceberg catalog warehouse config",
+                false /* immutable */,
+                false /* hidden */),
             stringOptionalPropertyEntry(
-                IcebergConstants.IO_IMPL, "FileIO implement for Iceberg", true, null, false),
+                IcebergConstants.IO_IMPL,
+                "FileIO implement for Iceberg",
+                true /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
             stringOptionalPropertyEntry(
-                IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID, "s3 access-key-id", true, null, true),
+                IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID,
+                "s3 access-key-id",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.GRAVITINO_S3_SECRET_ACCESS_KEY,
                 "s3 secret-access-key",
-                true,
-                null,
-                true));
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap(BASIC_CATALOG_PROPERTY_ENTRIES);
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);

@@ -88,18 +88,18 @@ public class AuthenticationConfig extends Config {
               PropertyEntry.booleanPropertyEntry(
                   IMPERSONATION_ENABLE_KEY,
                   "Whether to enable impersonation for the Hadoop catalog",
-                  false,
-                  true,
-                  KERBEROS_DEFAULT_IMPERSONATION_ENABLE,
-                  false,
-                  false))
+                  false /* required */,
+                  true /* immutable */,
+                  KERBEROS_DEFAULT_IMPERSONATION_ENABLE /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
           .put(
               AUTH_TYPE_KEY,
               PropertyEntry.stringOptionalPropertyEntry(
                   AUTH_TYPE_KEY,
                   "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos",
-                  false,
-                  null,
-                  false))
+                  false /* immutable */,
+                  null /* default value */,
+                  false /* hidden */))
           .build();
 }

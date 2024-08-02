@@ -67,14 +67,23 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
             enumPropertyEntry(
                 GRAVITINO_CATALOG_BACKEND,
                 "Paimon catalog backend type",
-                true,
-                true,
-                PaimonCatalogBackend.class,
-                null,
-                false,
-                false),
-            stringRequiredPropertyEntry(WAREHOUSE, "Paimon catalog warehouse config", false, false),
-            stringOptionalPropertyEntry(URI, "Paimon catalog uri config", false, null, false));
+                true /* required */,
+                true /* immutable */,
+                PaimonCatalogBackend.class /* enumClass */,
+                null /* defaultValue */,
+                false /* hidden */,
+                false /* reserved */),
+            stringRequiredPropertyEntry(
+                WAREHOUSE,
+                "Paimon catalog warehouse config",
+                false /* immutable */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                URI,
+                "Paimon catalog uri config",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap(BASIC_CATALOG_PROPERTY_ENTRIES);
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);

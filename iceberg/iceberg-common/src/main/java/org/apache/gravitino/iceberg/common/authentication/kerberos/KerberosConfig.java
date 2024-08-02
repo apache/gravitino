@@ -109,31 +109,31 @@ public class KerberosConfig extends AuthenticationConfig {
                   KET_TAB_URI_KEY,
                   "The keytab of the Kerberos for Iceberg catalog with Kerberos authentication",
                   false /* immutable */,
-                  null,
-                  false))
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               PRINCIPAL_KEY,
               PropertyEntry.stringOptionalPropertyEntry(
                   PRINCIPAL_KEY,
                   "The principal of the Kerberos for Iceberg catalog with Kerberos authentication",
                   false /* immutable */,
-                  null,
-                  false))
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               CHECK_INTERVAL_SEC_KEY,
               PropertyEntry.integerOptionalPropertyEntry(
                   CHECK_INTERVAL_SEC_KEY,
                   "The check interval of the Kerberos credential for Iceberg catalog with Kerberos authentication",
                   false /* immutable */,
-                  60,
-                  false))
+                  60 /* defaultValue */,
+                  false /* hidden */))
           .put(
               FETCH_TIMEOUT_SEC_KEY,
               PropertyEntry.integerOptionalPropertyEntry(
                   FETCH_TIMEOUT_SEC_KEY,
                   "The fetch timeout of the Kerberos key table of Iceberg catalog with Kerberos authentication",
                   false /* immutable */,
-                  60,
-                  false))
+                  60 /* defaultValue */,
+                  false /* hidden */))
           .build();
 }

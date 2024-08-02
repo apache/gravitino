@@ -68,8 +68,8 @@ public class AuthenticationConfig extends Config {
               PropertyEntry.stringOptionalPropertyEntry(
                   AUTH_TYPE_KEY,
                   "The type of authentication for Paimon catalog, currently we only support simple and Kerberos",
-                  false,
-                  null,
-                  false))
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .build();
 }

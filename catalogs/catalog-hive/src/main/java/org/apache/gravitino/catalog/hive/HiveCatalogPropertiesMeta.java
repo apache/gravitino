@@ -59,7 +59,10 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
           .put(
               METASTORE_URIS,
               PropertyEntry.stringRequiredPropertyEntry(
-                  METASTORE_URIS, "The Hive metastore URIs", false, false))
+                  METASTORE_URIS,
+                  "The Hive metastore URIs",
+                  false /* immutable */,
+                  false /* hidden */))
           .put(
               CLIENT_POOL_SIZE,
               PropertyEntry.integerOptionalPropertyEntry(
@@ -67,7 +70,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   "The maximum number of Hive metastore clients in the pool for Gravitino",
                   false /* immutable */,
                   DEFAULT_CLIENT_POOL_SIZE,
-                  false))
+                  false /* hidden */))
           .put(
               CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
               PropertyEntry.longOptionalPropertyEntry(
@@ -75,7 +78,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   "The cache pool eviction interval",
                   false /* immutable */,
                   DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
-                  false))
+                  false /* hidden */))
           .put(
               IMPERSONATION_ENABLE,
               PropertyEntry.booleanPropertyEntry(
@@ -84,28 +87,32 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   false /* Whether this property is required */,
                   false /* immutable */,
                   DEFAULT_IMPERSONATION_ENABLE,
-                  false,
-                  false))
+                  false /* hidden */,
+                  false /* reserved */))
           .put(
               KEY_TAB_URI,
               PropertyEntry.stringOptionalPropertyEntry(
                   KEY_TAB_URI,
                   "The uri of key tab for the catalog",
                   false /* immutable */,
-                  null,
-                  false))
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               PRINCIPAL,
               PropertyEntry.stringOptionalPropertyEntry(
-                  PRINCIPAL, "The principal for the catalog", false /* immutable */, null, false))
+                  PRINCIPAL,
+                  "The principal for the catalog",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               CHECK_INTERVAL_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
                   CHECK_INTERVAL_SEC,
                   "The interval to check validness of the principal",
                   false /* immutable */,
-                  60,
-                  false))
+                  60 /* defaultValue */,
+                  false /* hidden */))
           .put(
               FETCH_TIMEOUT_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
@@ -115,11 +122,11 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
               PropertyEntry.booleanPropertyEntry(
                   LIST_ALL_TABLES,
                   "Lists all tables in a database, including non-Hive tables, such as Iceberg, etc.",
-                  false,
+                  false /* required */,
                   false /* immutable */,
                   DEFAULT_LIST_ALL_TABLES,
-                  false,
-                  false))
+                  false /* hidden */,
+                  false /* reserved */))
           .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           .build();
 

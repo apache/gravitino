@@ -96,22 +96,34 @@ public class KerberosConfig extends AuthenticationConfig {
           .put(
               KEY_TAB_URI_KEY,
               PropertyEntry.stringOptionalPropertyEntry(
-                  KEY_TAB_URI_KEY, "The uri of key tab for the catalog", false, null, false))
+                  KEY_TAB_URI_KEY,
+                  "The uri of key tab for the catalog",
+                  false /* immutable */,
+                  null /* default value */,
+                  false /* hidden */))
           .put(
               PRINCIPAL_KEY,
               PropertyEntry.stringOptionalPropertyEntry(
-                  PRINCIPAL_KEY, "The principal for the catalog", false, null, false))
+                  PRINCIPAL_KEY,
+                  "The principal for the catalog",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               CHECK_INTERVAL_SEC_KEY,
               PropertyEntry.integerOptionalPropertyEntry(
                   CHECK_INTERVAL_SEC_KEY,
                   "The interval to check validness of the principal",
-                  true,
-                  60,
-                  false))
+                  true /* immutable */,
+                  60 /* defaultValue */,
+                  false /* hidden */))
           .put(
               FETCH_TIMEOUT_SEC_KEY,
               PropertyEntry.integerOptionalPropertyEntry(
-                  FETCH_TIMEOUT_SEC_KEY, "The timeout to fetch key tab", true, 60, false))
+                  FETCH_TIMEOUT_SEC_KEY,
+                  "The timeout to fetch key tab",
+                  false /* immutable */,
+                  60 /* defaultValue */,
+                  false /* hidden */))
           .build();
 }
