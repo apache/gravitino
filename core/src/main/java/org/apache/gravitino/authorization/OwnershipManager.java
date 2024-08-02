@@ -20,12 +20,12 @@ package org.apache.gravitino.authorization;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.exceptions.OwnerNotFoundException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.relation.Relation;
@@ -67,7 +67,8 @@ public class OwnershipManager {
                 true);
       }
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Entity {} or owner {} is not found", metadataObject.fullName(), ownerName, nse);
+      LOG.warn(
+          "Metadata object {} or owner {} is not found", metadataObject.fullName(), ownerName, nse);
       throw new NotFoundException(
           nse, "Metadata object %s or owner %s is not found", metadataObject.fullName(), ownerName);
     } catch (IOException ioe) {
@@ -80,7 +81,7 @@ public class OwnershipManager {
     }
   }
 
-  public Owner getOwner(String metalake, MetadataObject metadataObject) {
+  public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
     try {
       OwnerImpl owner = new OwnerImpl();
       List entities =
@@ -90,8 +91,9 @@ public class OwnershipManager {
                   Relation.Type.OWNER_REL,
                   MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
                   MetadataObjectUtil.toEntityType(metadataObject));
+
       if (entities.isEmpty()) {
-        throw new OwnerNotFoundException("The owner of %s isn't found", metadataObject.fullName());
+        return Optional.empty();
       }
 
       if (entities.size() != 1) {
@@ -113,9 +115,10 @@ public class OwnershipManager {
                 "Doesn't support owner entity class %s", entities.get(0).getClass().getName()));
       }
 
-      return owner;
+      return Optional.of(owner);
     } catch (NoSuchEntityException nse) {
-      throw new OwnerNotFoundException("The owner of %s isn't found", metadataObject.fullName());
+      throw new NotFoundException(
+          "The metadata object of %s isn't found", metadataObject.fullName());
     } catch (IOException ioe) {
       LOG.info("Fail to get the owner of entity {}", metadataObject.fullName(), ioe);
       throw new RuntimeException(ioe);

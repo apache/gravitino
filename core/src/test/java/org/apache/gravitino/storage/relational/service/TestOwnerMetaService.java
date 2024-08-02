@@ -76,7 +76,7 @@ class TestOwnerMetaService extends TestJDBCBackend {
         .setOwner(metalake.nameIdentifier(), metalake.type(), user.nameIdentifier(), user.type());
 
     Entity entity =
-        OwnerMetaService.getInstance().getOwner(metalake.nameIdentifier(), metalake.type());
+        OwnerMetaService.getInstance().getOwner(metalake.nameIdentifier(), metalake.type()).get();
     Assertions.assertTrue(entity instanceof UserEntity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
@@ -84,7 +84,8 @@ class TestOwnerMetaService extends TestJDBCBackend {
     OwnerMetaService.getInstance()
         .setOwner(metalake.nameIdentifier(), metalake.type(), group.nameIdentifier(), group.type());
 
-    entity = OwnerMetaService.getInstance().getOwner(metalake.nameIdentifier(), metalake.type());
+    entity =
+        OwnerMetaService.getInstance().getOwner(metalake.nameIdentifier(), metalake.type()).get();
     Assertions.assertTrue(entity instanceof GroupEntity);
     Assertions.assertEquals("group", ((GroupEntity) entity).name());
   }
@@ -185,31 +186,33 @@ class TestOwnerMetaService extends TestJDBCBackend {
         .setOwner(role.nameIdentifier(), role.type(), user.nameIdentifier(), user.type());
 
     Entity entity =
-        OwnerMetaService.getInstance().getOwner(metalake.nameIdentifier(), metalake.type());
+        OwnerMetaService.getInstance().getOwner(metalake.nameIdentifier(), metalake.type()).get();
     Assertions.assertTrue(entity instanceof UserEntity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
-    entity = OwnerMetaService.getInstance().getOwner(catalog.nameIdentifier(), catalog.type());
+    entity =
+        OwnerMetaService.getInstance().getOwner(catalog.nameIdentifier(), catalog.type()).get();
     Assertions.assertTrue(entity instanceof UserEntity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
-    entity = OwnerMetaService.getInstance().getOwner(schema.nameIdentifier(), schema.type());
+    entity = OwnerMetaService.getInstance().getOwner(schema.nameIdentifier(), schema.type()).get();
     Assertions.assertTrue(entity instanceof UserEntity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
-    entity = OwnerMetaService.getInstance().getOwner(table.nameIdentifier(), table.type());
+    entity = OwnerMetaService.getInstance().getOwner(table.nameIdentifier(), table.type()).get();
     Assertions.assertTrue(entity instanceof UserEntity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
-    entity = OwnerMetaService.getInstance().getOwner(topic.nameIdentifier(), topic.type());
+    entity = OwnerMetaService.getInstance().getOwner(topic.nameIdentifier(), topic.type()).get();
     Assertions.assertTrue(entity instanceof UserEntity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
-    entity = OwnerMetaService.getInstance().getOwner(fileset.nameIdentifier(), fileset.type());
+    entity =
+        OwnerMetaService.getInstance().getOwner(fileset.nameIdentifier(), fileset.type()).get();
     Assertions.assertTrue(entity instanceof UserEntity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
 
-    entity = OwnerMetaService.getInstance().getOwner(role.nameIdentifier(), role.type());
+    entity = OwnerMetaService.getInstance().getOwner(role.nameIdentifier(), role.type()).get();
     Assertions.assertTrue(entity instanceof UserEntity);
     Assertions.assertEquals("user", ((UserEntity) entity).name());
   }

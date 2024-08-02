@@ -46,7 +46,6 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.exceptions.OwnerNotFoundException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -153,20 +152,19 @@ public class TestOwnershipManager {
     // Test no owner
     MetadataObject metalakeObject =
         MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
-    Assertions.assertThrows(
-        OwnerNotFoundException.class, () -> ownershipManager.getOwner(METALAKE, metalakeObject));
+    Assertions.assertFalse(ownershipManager.getOwner(METALAKE, metalakeObject).isPresent());
 
     // Test to set the user as the owner
     ownershipManager.setOwner(METALAKE, metalakeObject, USER, Owner.Type.USER);
 
-    Owner owner = ownershipManager.getOwner(METALAKE, metalakeObject);
+    Owner owner = ownershipManager.getOwner(METALAKE, metalakeObject).get();
     Assertions.assertEquals(USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
     // Test to set the group as the owner
     ownershipManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP);
 
-    owner = ownershipManager.getOwner(METALAKE, metalakeObject);
+    owner = ownershipManager.getOwner(METALAKE, metalakeObject).get();
     Assertions.assertEquals(GROUP, owner.name());
     Assertions.assertEquals(Owner.Type.GROUP, owner.type());
   }

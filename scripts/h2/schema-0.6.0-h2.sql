@@ -259,7 +259,7 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'owner relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ow_en_del` (`owner_id`, `metadata_object_id`, `deleted_at`),
+    UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `deleted_at`),
     KEY `idx_oid` (`owner_id`),
-    KEY `idx_eid` (`metadata_object_id`)
+    KEY `idx_meid` (`metadata_object_id`)
     ) ENGINE=InnoDB;

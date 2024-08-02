@@ -18,10 +18,10 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -39,7 +39,7 @@ public class OwnerMetaService {
     return INSTANCE;
   }
 
-  public Entity getOwner(NameIdentifier identifier, Entity.EntityType type) {
+  public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(getMetalake(identifier));
     Long finalEntityId = getEntityId(metalakeId, identifier, type);
@@ -50,15 +50,17 @@ public class OwnerMetaService {
             mapper -> mapper.selectOwnerMetaByEntityIdAndType(finalEntityId));
 
     if (ownerRelPO == null) {
-      throw new NoSuchEntityException("Owner %s type %s doesn't exist", identifier.name(), type);
+      return Optional.empty();
     }
 
     if (ownerRelPO.getOwnerType().equals(Entity.EntityType.USER.name())) {
-      return UserMetaService.getInstance()
-          .getUserById(getMetalake(identifier), ownerRelPO.getOwnerId());
+      return Optional.of(
+          UserMetaService.getInstance()
+              .getUserById(getMetalake(identifier), ownerRelPO.getOwnerId()));
     } else if (ownerRelPO.getOwnerType().equals(Entity.EntityType.GROUP.name())) {
-      return GroupMetaService.getInstance()
-          .getGroupById(getMetalake(identifier), ownerRelPO.getOwnerId());
+      return Optional.of(
+          GroupMetaService.getInstance()
+              .getGroupById(getMetalake(identifier), ownerRelPO.getOwnerId()));
     } else {
       throw new IllegalArgumentException(
           String.format("Owner type doesn't support %s", ownerRelPO.getOwnerType()));
