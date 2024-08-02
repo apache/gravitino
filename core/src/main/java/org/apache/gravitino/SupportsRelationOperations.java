@@ -29,7 +29,7 @@ public interface SupportsRelationOperations {
 
   /** Relation is an abstraction which connects two entities. */
   enum Type {
-    /** The ownership relationship */
+    /** The owner relationship */
     OWNER_REL
   }
 

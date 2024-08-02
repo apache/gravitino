@@ -118,7 +118,7 @@ public class AuthorizationUtils {
         namespace);
   }
 
-  // Install some post hooks used for ownership. The ownership will have the all privileges
+  // Install some post hooks used for owner. The owner will have the all privileges
   // of securable objects, users, groups, roles.
   public static <T> void prepareAuthorizationHooks(T manager, DispatcherHooks hooks) {
     // TODO: Refactor the post hook by adding new dispatcher

@@ -48,7 +48,7 @@ public class OwnerManager {
   public OwnerManager(EntityStore store) {
     if (store instanceof KvEntityStore) {
       String errorMsg =
-          "OwnershipManager cannot run with kv entity store, please configure the entity "
+          "OwnerManager cannot run with kv entity store, please configure the entity "
               + "store to use relational entity store and restart the Gravitino server";
       LOG.error(errorMsg);
       throw new RuntimeException(errorMsg);
@@ -56,7 +56,7 @@ public class OwnerManager {
 
     if (!(store instanceof SupportsRelationOperations)) {
       String errorMsg =
-          "OwnershipManager cannot run with entity store that does not support relation operations, "
+          "OwnerManager cannot run with entity store that does not support relation operations, "
               + "please configure the entity store to use relational entity store and restart the Gravitino server";
       LOG.error(errorMsg);
       throw new RuntimeException(errorMsg);
