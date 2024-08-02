@@ -38,8 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * OwnerManager is used for manage the owner of metadata object. The user and group don't have
- * an owner
+ * OwnerManager is used for manage the owner of metadata object. The user and group don't have an
+ * owner
  */
 public class OwnerManager {
   private static final Logger LOG = LoggerFactory.getLogger(OwnerManager.class);
