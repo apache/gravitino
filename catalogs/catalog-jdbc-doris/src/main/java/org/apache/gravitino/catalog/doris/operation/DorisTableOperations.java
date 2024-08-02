@@ -32,6 +32,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -154,6 +155,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       sqlBuilder.append(" BUCKETS ").append(distribution.number());
     }
 
+    properties = appendNecessaryProperties(properties);
     // Add table properties
     sqlBuilder.append(NEW_LINE).append(DorisUtils.generatePropertiesSql(properties));
 
@@ -162,6 +164,37 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     LOG.info("Generated create table:{} sql: {}", tableName, result);
     return result;
+  }
+
+  private Map<String, String> appendNecessaryProperties(Map<String, String> properties) {
+    Map<String, String> resultMap;
+    if (properties == null) {
+      resultMap = new HashMap<>();
+    } else {
+      resultMap = new HashMap<>(properties);
+    }
+
+    // If the backend server is less than 3, we need to set the property 'replication_allocation'
+    // to 1 explicitly.
+    if (!properties.containsKey("replication_num")) {
+      // Try to check the number of backend servers.
+      String query = "select count(*) from information_schema.backends where Alive = 'true'";
+
+      try (Connection connection = dataSource.getConnection();
+          Statement statement = connection.createStatement();
+          ResultSet resultSet = statement.executeQuery(query)) {
+        while (resultSet.next()) {
+          int backendCount = resultSet.getInt(1);
+          if (backendCount < 3) {
+            resultMap.put("replication_allocation", "tag.location.default: 1");
+          }
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to get the number of backend servers", e);
+      }
+    }
+
+    return resultMap;
   }
 
   private static void validateIncrementCol(JdbcColumn[] columns) {

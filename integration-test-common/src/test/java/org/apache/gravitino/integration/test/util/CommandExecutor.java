@@ -59,7 +59,9 @@ public class CommandExecutor {
     if (!printToConsole) LOG.trace(outputOfProcess.toString());
     else LOG.debug(outputOfProcess.toString());
     if (ignore_errors == IGNORE_ERRORS.FALSE && exit_code != NORMAL_EXIT) {
-      LOG.error(String.format("Command '%s' failed with exit code %s", Arrays.toString(command), exit_code));
+      LOG.error(
+          String.format(
+              "Command '%s' failed with exit code %s", Arrays.toString(command), exit_code));
     }
     return outputOfProcess;
   }
