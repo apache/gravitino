@@ -32,7 +32,7 @@ There are three deployment scenarios for Gravitino Iceberg REST server:
 - A standalone server in the Gravitino server package.
 - An auxiliary service embedded in the Gravitino server.
  
-For detailed instructions on how to build and install the Gravitino server package, please refer to [How to build](./how-to-build.md) and [How to install](./how-to-install.md) . To build the Gravitino Iceberg REST server package, use the command `./gradlew compileIcebergRESTServer -x test`. Alternatively, to create the corresponding compressed package in the distribution directory, use `./gradlew assembleIcebergRESTServer -x test`. The Gravitino Iceberg REST server package includes the following files:
+For detailed instructions on how to build and install the Gravitino server package, please refer to [How to build](./how-to-build.md) and [How to install](./how-to-install.md). To build the Gravitino Iceberg REST server package, use the command `./gradlew compileIcebergRESTServer -x test`. Alternatively, to create the corresponding compressed package in the distribution directory, use `./gradlew assembleIcebergRESTServer -x test`. The Gravitino Iceberg REST server package includes the following files:
 
 ```text
 |── ...

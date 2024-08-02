@@ -137,7 +137,9 @@ configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
 
 #### Manage Gravitino Iceberg REST server in Gravitino package
 
-You can run the Iceberg REST server as either a standalone server or as an auxiliary service within the Gravitino server. To start it as a standalone server, use the command `./bin/gravitino-iceberg-rest-server.sh start` with configurations specified in `./conf/gravitino-iceberg-rest-server.conf`. Alternatively, use `./bin/gravitino.sh start` to launch a Gravitino server that integrates both the Iceberg REST service and the Gravitino service, with all configurations centralized in `conf/gravitino.conf`. For more detailed information on the Iceberg REST server, please refer to [Iceberg REST server document](./iceberg-rest-service.md).
+You can run the Iceberg REST server as either a standalone server or as an auxiliary service embedded in the Gravitino server. To start it as a standalone server, use the command `./bin/gravitino-iceberg-rest-server.sh start` with configurations specified in `./conf/gravitino-iceberg-rest-server.conf`. Alternatively, use `./bin/gravitino.sh start` to launch a Gravitino server that integrates both the Iceberg REST service and the Gravitino service, with all configurations centralized in `conf/gravitino.conf`. 
+
+For more detailed information about the Gravitino Iceberg REST server, please refer to [Iceberg REST server document](./iceberg-rest-service.md).
 
 ## Install Apache Gravitino using Docker
 
