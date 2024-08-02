@@ -18,47 +18,17 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
-import io.trino.spi.TrinoException;
-import java.util.HashMap;
-import org.apache.gravitino.trino.connector.GravitinoErrorCode;
-import org.apache.gravitino.trino.connector.catalog.hive.HiveConnectorAdapter;
-import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
-import org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLConnectorAdapter;
-import org.apache.gravitino.trino.connector.catalog.jdbc.postgresql.PostgreSQLConnectorAdapter;
-import org.apache.gravitino.trino.connector.catalog.memory.MemoryConnectorAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-/** This class use to create CatalogConnectorContext instance by given catalog. */
-public class CatalogConnectorFactory {
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorFactory.class);
-
-  private final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders = new HashMap<>();
-
-  public CatalogConnectorFactory() {
-    catalogBuilders.put("hive", new CatalogConnectorContext.Builder(new HiveConnectorAdapter()));
-    catalogBuilders.put(
-        "memory", new CatalogConnectorContext.Builder(new MemoryConnectorAdapter()));
-    catalogBuilders.put(
-        "lakehouse-iceberg", new CatalogConnectorContext.Builder(new IcebergConnectorAdapter()));
-    catalogBuilders.put(
-        "jdbc-mysql", new CatalogConnectorContext.Builder(new MySQLConnectorAdapter()));
-    catalogBuilders.put(
-        "jdbc-postgresql", new CatalogConnectorContext.Builder(new PostgreSQLConnectorAdapter()));
-  }
-
-  public CatalogConnectorContext.Builder createCatalogConnectorContextBuilder(
-      GravitinoCatalog catalog) {
-    String catalogProvider = catalog.getProvider();
-    CatalogConnectorContext.Builder builder = catalogBuilders.get(catalogProvider);
-    if (builder == null) {
-      String message = String.format("Unsupported catalog provider %s.", catalogProvider);
-      LOG.error(message);
-      throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_CATALOG_PROVIDER, message);
-    }
-
-    // Avoid using the same builder object to prevent catalog creation errors.
-    return builder.clone(catalog);
-  }
+/**
+ * This interface is used to create a CatalogConnectorContext builder connector by Gravitino catalog
+ */
+public interface CatalogConnectorFactory {
+  /**
+   * Create a CatalogConnectorContext builder by Gravitino catalog
+   *
+   * @param catalog Gravitino catalog
+   * @return CatalogConnectorContext builder
+   */
+  CatalogConnectorContext.Builder createCatalogConnectorContextBuilder(GravitinoCatalog catalog);
 }

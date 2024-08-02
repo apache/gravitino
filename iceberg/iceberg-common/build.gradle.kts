@@ -31,9 +31,12 @@ dependencies {
   implementation(project(":server-common"))
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.log4j)
+  implementation(libs.aws.s3)
+  implementation(libs.aws.sts)
   implementation(libs.caffeine)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+  implementation(libs.iceberg.aws)
   implementation(libs.iceberg.hive.metastore)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")

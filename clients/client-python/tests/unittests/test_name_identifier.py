@@ -37,7 +37,6 @@ class TestNameIdentifier(unittest.TestCase):
         self.assertNotEqual("test2", identifier_dict.get(name_identifier1))
 
     def test_from_json_name_identifier(self):
-
         test_name = "test_name_identifier"
         test_namespace_levels = ["1", "2", "3", "4"]
 

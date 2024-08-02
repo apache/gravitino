@@ -58,6 +58,18 @@ paths:
     # escape the path name by replacing `{ }` with `%7B %7D`
     $ref: "./metalakes.yaml#/paths/~1metalakes~1%7Bname%7D"
 
+  /metalakes/{metalake}/tags:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags"
+
+  /metalakes/{metalake}/tags/{tag}:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D"
+
+  /metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectFullName}:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D"
+
+  /metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectFullName}/{tag}:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1%7Btag%7D"
+
   /metalakes/{metalake}/catalogs:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs"
 
@@ -287,6 +299,36 @@ components:
       name: topic
       in: path
       description: The name of the topic
+      required: true
+      schema:
+        type: string
+
+    tag:
+      name: tag
+      in: path
+      description: The name of the tag
+      required: true
+      schema:
+        type: string
+
+    metadataObjectType:
+      name: metadataObjectType
+      in: path
+      description: The type of the metadata object
+      required: true
+      schema:
+        type: string
+        enum:
+          - "catalog"
+          - "schema"
+          - "table"
+          - "fileset"
+          - "topic"
+
+    metadataObjectFullName:
+      name: metadataObjectFullName
+      in: path
+      description: The full name of the metadata object
       required: true
       schema:
         type: string

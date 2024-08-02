@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.doris.utils;
 
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,8 +26,13 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.partitions.ListPartition;
+import org.apache.gravitino.rel.partitions.Partition;
+import org.apache.gravitino.rel.partitions.RangePartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,5 +110,70 @@ public final class DorisUtils {
       LOGGER.warn("Failed to extract partition info", e);
       return Optional.empty();
     }
+  }
+
+  /**
+   * Generate sql fragment that create partition in Apache Doris.
+   *
+   * <p>The sql fragment looks like "PARTITION {partitionName} VALUES {values}", for example:
+   *
+   * <pre>PARTITION `p20240724` VALUES LESS THAN ("2024-07-24")</pre>
+   *
+   * <pre>PARTITION `p20240724_v1` VALUES IN ("2024-07-24", "v1")</pre>
+   *
+   * @param partition The partition to be created.
+   * @return The partition sql fragment.
+   */
+  public static String generatePartitionSqlFragment(Partition partition) {
+    String partitionSqlFragment = "PARTITION `%s` VALUES %s";
+    if (partition instanceof RangePartition) {
+      return String.format(
+          partitionSqlFragment,
+          partition.name(),
+          generateRangePartitionValues((RangePartition) partition));
+    } else if (partition instanceof ListPartition) {
+      return String.format(
+          partitionSqlFragment,
+          partition.name(),
+          generateListPartitionSqlValues((ListPartition) partition));
+    } else {
+      throw new IllegalArgumentException("Unsupported partition type of Doris");
+    }
+  }
+
+  private static String generateRangePartitionValues(RangePartition rangePartition) {
+    Literal<?> upper = rangePartition.upper();
+    Literal<?> lower = rangePartition.lower();
+    String partitionValues;
+    if (Literals.NULL.equals(upper) && Literals.NULL.equals(lower)) {
+      partitionValues = "LESS THAN MAXVALUE";
+    } else if (Literals.NULL.equals(lower)) {
+      partitionValues = String.format("LESS THAN (\"%s\")", upper.value());
+    } else if (Literals.NULL.equals(upper)) {
+      partitionValues = String.format("[(\"%s\"), (MAXVALUE))", lower.value());
+    } else {
+      partitionValues = String.format("[(\"%s\"), (\"%s\"))", lower.value(), upper.value());
+    }
+    return partitionValues;
+  }
+
+  private static String generateListPartitionSqlValues(ListPartition listPartition) {
+    Literal<?>[][] lists = listPartition.lists();
+    ImmutableList.Builder<String> listValues = ImmutableList.builder();
+    for (Literal<?>[] part : lists) {
+      String values;
+      if (part.length > 1) {
+        values =
+            String.format(
+                "(%s)",
+                Arrays.stream(part)
+                    .map(p -> "\"" + p.value() + "\"")
+                    .collect(Collectors.joining(",")));
+      } else {
+        values = String.format("\"%s\"", part[0].value());
+      }
+      listValues.add(values);
+    }
+    return String.format("IN (%s)", listValues.build().stream().collect(Collectors.joining(",")));
   }
 }

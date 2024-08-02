@@ -72,7 +72,7 @@ public class KerberosOperationsIT extends AbstractIT {
     initKeyTab();
 
     Map<String, String> configs = Maps.newHashMap();
-    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());
     configs.put(PRINCIPAL.getKey(), serverPrincipal);
     configs.put(KEYTAB.getKey(), keytabFile);
     configs.put("client.kerberos.principal", clientPrincipal);

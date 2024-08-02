@@ -66,7 +66,7 @@ public class IcebergRestTestUtil {
     }
 
     if (bindIcebergTableOps) {
-      IcebergTableOps icebergTableOps = new IcebergTableOps();
+      IcebergTableOps icebergTableOps = new IcebergTableOpsForTest();
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(
           new AbstractBinder() {

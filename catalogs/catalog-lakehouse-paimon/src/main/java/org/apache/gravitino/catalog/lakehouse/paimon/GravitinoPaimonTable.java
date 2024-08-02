@@ -23,6 +23,7 @@ import static org.apache.gravitino.dto.rel.partitioning.Partitioning.EMPTY_PARTI
 import static org.apache.gravitino.meta.AuditInfo.EMPTY;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,10 +31,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.paimon.schema.Schema;
@@ -80,9 +87,16 @@ public class GravitinoPaimonTable extends BaseTable {
         .options(normalizedProperties)
         .primaryKey(getPrimaryKeys(properties))
         .partitionKeys(
-            Arrays.stream(partitioning)
-                .map(partition -> partition.references()[0].toString())
-                .collect(Collectors.toList()));
+                Arrays.stream(partitioning)
+                        .map(
+                                partition -> {
+                                    NamedReference[] references = partition.references();
+                                    Preconditions.checkArgument(
+                                            references.length == 1,
+                                            "Partitioning column must be single-column, like 'a'.");
+                                    return references[0].toString();
+                                })
+                        .collect(Collectors.toList()));
     for (int index = 0; index < columns.length; index++) {
       DataField dataField = GravitinoPaimonColumn.toPaimonColumn(index, columns[index]);
       builder.column(dataField.name(), dataField.type(), dataField.description());
