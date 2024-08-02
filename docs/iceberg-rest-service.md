@@ -34,37 +34,25 @@ There are three conditions for Iceberg REST server:
 - Standalone server in Gravitino server package.
 - Auxiliary service in Gravitino server.
 
-You could refer to xx about how to build a Gravitino package or Gravitino Iceberg REST server package, refer to xx about how to install Gravitino server.
-
-For a standalone server
+You could refer to [How to build](how-to-build.md) and [How to install](how-to-install.md) about how to build and install Gravitino server package. You can use `./gradlew compileIcebergRESTServer -x test` to build Gravitino Iceberg REST server package or `./gradlew assembleIcebergRESTServer -x test` to build corresponding compressed package in `distribution` directory. The Gravitino Iceberg REST server package contains the following files:
 
 ```text
 |── ...
 └── distribution/gravitino-iceberg-rest-server
     |── bin/
     |   └── gravitino-iceberg-rest-server.sh    # Gravitino Iceberg REST server Launching scripts.
-    |── conf/                                   # All configurations for Gravitino.
-    |   ├── gravitino-iceberg-rest-server.conf  # Gravitino server configuration.
+    |── conf/                                   # All configurations for Gravitino Iceberg REST server.
+    |   ├── gravitino-iceberg-rest-server.conf  # Gravitino Iceberg REST server configuration.
     |   ├── gravitino-env.sh                    # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
-    |   └── log4j2.properties                   # log4j configuration for the Gravitino server and Gravitino Iceberg REST server.
+    |   └── log4j2.properties                   # log4j configuration for the Gravitino Iceberg REST server.
     |   └── hdfs-site.xml & core-site.xml       # HDFS configuration files.
     |── libs/                                   # Gravitino Iceberg REST server dependencies libraries.
     |── logs/                                   # Gravitino Iceberg REST server logs. Automatically created after the server starts.
 ```
 
-Iceberg REST server could start as a standalone server or an auxiliary service in Gravitino server. There are some differences like below:
-
-|                         | Standalone server                                                                                                                              | Auxiliary service in Gravitino server                                                                                             | 
-|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| How to build package    | `./gradlew compileIcebergRESTServer -x test` build a standalone Iceberg REST server in `distribution/gravitino-iceberg-rest-server` directory. | `./gradlew compileDistribution -x test` build Gravitino server and Iceberg REST server in `distribution/package` directory.       | 
-| How to assemble package | `./gradlew assembleIcebergRESTServer -x test` build a tar file with Iceberg REST server only in `distribution` directory.                      | `./gradlew assembleDistribution -x test` build a tar file with Gravitino server and Iceberg REST server `distribution` directory. | 
-| How to start server     | `./bin/gravitino-iceberg-rest-server.sh start`                                                                                                 | `./bin/gravitino.sh start`                                                                                                        | 
-| Configuration files     | `./conf/gravitino-iceberg-rest-server.conf`, `conf/log4j2.properties`                                                                          | `./conf/gravitino.conf`, `conf/log4j2.properties`                                                                                 | 
-
-You could modify environment variables in `conf/gravitino-env.sh` and check the log files in `./log/gravitino-iceberg-rest-server.log`, `./log/gravitino-iceberg-rest-server.out` for both mode.
-
 ## Apache Gravitino Iceberg REST catalog server configuration
 
+There are different configuration files for standalone server and auxiliary server, `gravitino-iceberg-rest-server.conf` for 
 The Iceberg REST server configurations are the same in Gravitino for both standalone and auxiliary server mode. Starting from version `0.6.0`, using the prefix `gravitino.auxService.iceberg-rest.` for the auxiliary server configuration is deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the `gravitino.iceberg-rest.key` will take precedence. The following configurations are shown with `gravitino.iceberg-rest.` prefix.
 
 ### Configuration to enable Iceberg REST service in Gravitino server.
