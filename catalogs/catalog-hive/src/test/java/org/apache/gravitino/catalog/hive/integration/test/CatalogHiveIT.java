@@ -1654,10 +1654,7 @@ public class CatalogHiveIT extends AbstractIT {
         Assertions.assertThrows(
             Exception.class,
             () -> createdCatalog.asSchemas().createSchema("schema", "comment", ImmutableMap.of()));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains("Failed to connect to Hive Metastore"));
+    Assertions.assertTrue(exception.getMessage().contains("Failed to connect to Hive Metastore"));
 
     Catalog newCatalog =
         metalake.alterCatalog(
