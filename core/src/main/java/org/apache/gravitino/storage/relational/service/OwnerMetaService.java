@@ -42,12 +42,12 @@ public class OwnerMetaService {
   public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(getMetalake(identifier));
-    Long finalEntityId = getEntityId(metalakeId, identifier, type);
+    Long entityId = getEntityId(metalakeId, identifier, type);
 
     OwnerRelPO ownerRelPO =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class,
-            mapper -> mapper.selectOwnerMetaByEntityIdAndType(finalEntityId));
+            mapper -> mapper.selectOwnerMetaByEntityIdAndType(entityId, type.name()));
 
     if (ownerRelPO == null) {
       return Optional.empty();
@@ -83,7 +83,11 @@ public class OwnerMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelByEntityId(entityId)),
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByEntityIdAndType(
+                        entityId,
+                        NameIdentifierUtil.toMetadataObject(entity, entityType).type().name())),
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerEntityRel(ownerRelPO)));

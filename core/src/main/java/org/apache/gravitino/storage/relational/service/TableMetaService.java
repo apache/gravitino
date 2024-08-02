@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -188,7 +189,10 @@ public class TableMetaService {
                 TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByTableId(tableId)),
         () ->
             SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelByEntityId(tableId)));
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByEntityIdAndType(
+                        tableId, MetadataObject.Type.TABLE.name())));
 
     return true;
   }

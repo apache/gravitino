@@ -727,22 +727,6 @@ public class TestJDBCBackend {
 
     backend.insertRelation(
         Relation.Type.OWNER_REL,
-        user.nameIdentifier(),
-        user.type(),
-        user.nameIdentifier(),
-        user.type(),
-        true);
-
-    backend.insertRelation(
-        Relation.Type.OWNER_REL,
-        group.nameIdentifier(),
-        group.type(),
-        user.nameIdentifier(),
-        user.type(),
-        true);
-
-    backend.insertRelation(
-        Relation.Type.OWNER_REL,
         role.nameIdentifier(),
         role.type(),
         user.nameIdentifier(),
@@ -803,7 +787,7 @@ public class TestJDBCBackend {
     assertTrue(legacyRecordExistsInDB(user.id(), Entity.EntityType.USER));
     assertTrue(legacyRecordExistsInDB(group.id(), Entity.EntityType.GROUP));
     assertEquals(2, countRoleRels(role.id()));
-    assertEquals(9, countOwnerRel(metalake.id()));
+    assertEquals(7, countOwnerRel(metalake.id()));
     assertEquals(1, countOwnerRel(anotherMetaLake.id()));
     assertEquals(2, countRoleRels(anotherRole.id()));
     assertEquals(2, listFilesetVersions(fileset.id()).size());

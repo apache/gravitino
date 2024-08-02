@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -242,7 +243,9 @@ public class SchemaMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     OwnerMetaMapper.class,
-                    mapper -> mapper.softDeleteOwnerRelByEntityId(schemaId)));
+                    mapper ->
+                        mapper.softDeleteOwnerRelByEntityIdAndType(
+                            schemaId, MetadataObject.Type.SCHEMA.name())));
       }
     }
     return true;

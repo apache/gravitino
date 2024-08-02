@@ -1044,7 +1044,11 @@ public class POConverters {
   }
 
   public static OwnerRelPO initializeOwnerRelPOsWithVersion(
-      Long metalakeId, String ownerType, Long ownerId, String entityType, Long entityId) {
+      Long metalakeId,
+      String ownerType,
+      Long ownerId,
+      String metadataObjectType,
+      Long metadataObjectId) {
     try {
       AuditInfo auditInfo =
           AuditInfo.builder()
@@ -1055,8 +1059,8 @@ public class POConverters {
           .withMetalakeId(metalakeId)
           .withOwnerId(ownerId)
           .withOwnerType(ownerType)
-          .withMetadataObjectId(entityId)
-          .withMetadataObjectType(entityType)
+          .withMetadataObjectId(metadataObjectId)
+          .withMetadataObjectType(metadataObjectType)
           .withAuditIfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
