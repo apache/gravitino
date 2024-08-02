@@ -19,6 +19,7 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
   - pagination
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
+- Supports HDFS and S3 storage.
 - When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and
   doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
 
@@ -27,6 +28,29 @@ Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hado
 :::
 
 ## Server management
+
+There are three conditions for Iceberg REST server:
+- Standalone server in Gravitino Iceberg REST server package.
+- Standalone server in Gravitino server package.
+- Auxiliary service in Gravitino server.
+
+You could refer to xx about how to build a Gravitino package or Gravitino Iceberg REST server package, refer to xx about how to install Gravitino server.
+
+For a standalone server
+
+```text
+|── ...
+└── distribution/gravitino-iceberg-rest-server
+    |── bin/
+    |   └── gravitino-iceberg-rest-server.sh    # Gravitino Iceberg REST server Launching scripts.
+    |── conf/                                   # All configurations for Gravitino.
+    |   ├── gravitino-iceberg-rest-server.conf  # Gravitino server configuration.
+    |   ├── gravitino-env.sh                    # Environment variables, etc., JAVA_HOME, GRAVITINO_HOME, and more.
+    |   └── log4j2.properties                   # log4j configuration for the Gravitino server and Gravitino Iceberg REST server.
+    |   └── hdfs-site.xml & core-site.xml       # HDFS configuration files.
+    |── libs/                                   # Gravitino Iceberg REST server dependencies libraries.
+    |── logs/                                   # Gravitino Iceberg REST server logs. Automatically created after the server starts.
+```
 
 Iceberg REST server could start as a standalone server or an auxiliary service in Gravitino server. There are some differences like below:
 

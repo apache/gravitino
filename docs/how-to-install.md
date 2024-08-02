@@ -12,6 +12,8 @@ Apache Gravitino supports running on Java 8, 11, and 17. Make sure you have Java
 `${JAVA_HOME}/bin/java -version` command.
 :::
 
+Gravitino includes both the Gravitino server and the Gravitino Iceberg REST server. You can manage these servers separately or launch them together in a single server.
+
 ### Get the Apache Gravitino binary distribution package
 
 Before installing Gravitino, make sure you have the Gravitino binary distribution package. You can
@@ -132,6 +134,17 @@ If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` env
 variable in the `conf/gravitino-env.sh` file. Then create a `Remote JVM Debug`
 configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
 :::
+
+#### Manage Gravitino Iceberg REST server in Gravitino package
+
+You could manage Iceberg REST server as a standalone server or an auxiliary service in Gravitino server, there are some differences: 
+
+|                     | Standalone server                                                     | Auxiliary service in Gravitino server             | 
+|---------------------|-----------------------------------------------------------------------|---------------------------------------------------|
+| How to start server | `./bin/gravitino-iceberg-rest-server.sh start`                        | `./bin/gravitino.sh start`                        | 
+| Configuration files | `./conf/gravitino-iceberg-rest-server.conf`, `conf/log4j2.properties` | `./conf/gravitino.conf`, `conf/log4j2.properties` | 
+
+You could refer to [Iceberg REST server](./iceberg-rest-service.md) for details of Iceberg REST server.
 
 ## Install Apache Gravitino using Docker
 
