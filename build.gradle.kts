@@ -472,6 +472,7 @@ tasks.rat {
     "integration-test/**/*.sql",
     "integration-test/**/*.txt",
     "docs/**/*.md",
+    "spark-connector/spark-common/src/test/resources/**",
     "web/.**",
     "web/next-env.d.ts",
     "web/dist/**/*",
