@@ -43,27 +43,12 @@ public class ConfigIcebergTableOpsProvider implements IcebergTableOpsProvider {
 
   private Map<String, String> properties;
 
+  private List<String> catalogNames;
+
   @Override
   public void initialize(Map<String, String> properties) {
-    this.properties = properties;
-  }
-
-  @Override
-  public IcebergTableOps getIcebergTableOps(String prefix) {
-    if (StringUtils.isBlank(prefix)) {
-      return new IcebergTableOps(new IcebergConfig(properties));
-    }
-    if (!getCatalogs().contains(prefix)) {
-      String errorMsg = String.format("%s can not match any catalog", prefix);
-      LOG.error(errorMsg);
-      throw new RuntimeException(errorMsg);
-    }
-    return new IcebergTableOps(getCatalogConfig(prefix));
-  }
-
-  private List<String> getCatalogs() {
     Map<String, Boolean> catalogs = Maps.newHashMap();
-    for (String key : this.properties.keySet()) {
+    for (String key : properties.keySet()) {
       if (!key.startsWith("catalog.")) {
         continue;
       }
@@ -72,7 +57,21 @@ public class ConfigIcebergTableOpsProvider implements IcebergTableOpsProvider {
       }
       catalogs.put(key.split("\\.")[1], true);
     }
-    return catalogs.keySet().stream().sorted().collect(Collectors.toList());
+    this.catalogNames = catalogs.keySet().stream().sorted().collect(Collectors.toList());
+    this.properties = properties;
+  }
+
+  @Override
+  public IcebergTableOps getIcebergTableOps(String prefix) {
+    if (StringUtils.isBlank(prefix)) {
+      return new IcebergTableOps(new IcebergConfig(properties));
+    }
+    if (!catalogNames.contains(prefix)) {
+      String errorMsg = String.format("%s can not match any catalog", prefix);
+      LOG.error(errorMsg);
+      throw new RuntimeException(errorMsg);
+    }
+    return new IcebergTableOps(getCatalogConfig(prefix));
   }
 
   private IcebergConfig getCatalogConfig(String catalog) {

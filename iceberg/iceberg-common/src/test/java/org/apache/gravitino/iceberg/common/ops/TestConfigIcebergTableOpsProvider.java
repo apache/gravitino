@@ -21,28 +21,21 @@ package org.apache.gravitino.iceberg.common.ops;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-public class TestIcebergTableOpsManager {
+public class TestConfigIcebergTableOpsProvider {
 
   @ParameterizedTest
-  @ValueSource(strings = {"", "hello/", "\\\n\t\\\'/", "\u0024/", "\100/", "[_~/"})
-  public void testValidGetOps(String rawPrefix) {
-    String prefix = rawPrefix;
-    if (!StringUtils.isBlank(rawPrefix)) {
-      prefix = rawPrefix.substring(0, rawPrefix.length() - 1);
-    }
+  @ValueSource(strings = {"", "hello", "\\\n\t\\\'", "\u0024", "\100", "[_~"})
+  public void testValidIcebergTableOps(String prefix) {
     Map<String, String> config = Maps.newHashMap();
     config.put(String.format("catalog.%s.catalog-backend-name", prefix), prefix);
-    config.put(
-        IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-        ConfigIcebergTableOpsProvider.class.getName());
-    IcebergTableOpsManager manager = new IcebergTableOpsManager(config);
+    ConfigIcebergTableOpsProvider provider = new ConfigIcebergTableOpsProvider();
+    provider.initialize(config);
 
-    IcebergTableOps ops = manager.getOps(rawPrefix);
+    IcebergTableOps ops = provider.getIcebergTableOps(prefix);
 
     if (StringUtils.isBlank(prefix)) {
       Assertions.assertEquals(ops.catalog.name(), "memory");
@@ -52,14 +45,12 @@ public class TestIcebergTableOpsManager {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"hello", "\\\n\t\\\'", "\u0024", "\100", "[_~", "default_catalog/"})
-  public void testInvalidGetOps(String rawPrefix) {
-    Map<String, String> config = Maps.newHashMap();
-    config.put(
-        IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-        ConfigIcebergTableOpsProvider.class.getName());
-    IcebergTableOpsManager manager = new IcebergTableOpsManager(config);
+  @ValueSource(strings = {"hello", "\\\n\t\\\'", "\u0024", "\100", "[_~"})
+  public void testInvalidIcebergTableOps(String prefix) {
+    ConfigIcebergTableOpsProvider provider = new ConfigIcebergTableOpsProvider();
+    provider.initialize(Maps.newHashMap());
 
-    Assertions.assertThrowsExactly(RuntimeException.class, () -> manager.getOps(rawPrefix));
+    Assertions.assertThrowsExactly(
+        RuntimeException.class, () -> provider.getIcebergTableOps(prefix));
   }
 }

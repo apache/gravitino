@@ -70,12 +70,11 @@ public class IcebergRestTestUtil {
 
     if (bindIcebergTableOps) {
       Map<String, String> catalogConf = Maps.newHashMap();
-      catalogConf.put(String.format("catalog.%s.xx", PREFIX), "xxx");
+      catalogConf.put(String.format("catalog.%s.catalog-backend-name", PREFIX), PREFIX);
       catalogConf.put(
           IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
           ConfigIcebergTableOpsProviderForTest.class.getName());
-      IcebergConfig icebergConfig = new IcebergConfig(catalogConf);
-      IcebergTableOpsManager icebergTableOpsManager = new IcebergTableOpsManager(icebergConfig);
+      IcebergTableOpsManager icebergTableOpsManager = new IcebergTableOpsManager(catalogConf);
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(

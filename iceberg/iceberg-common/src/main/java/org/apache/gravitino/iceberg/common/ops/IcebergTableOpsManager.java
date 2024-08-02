@@ -20,8 +20,9 @@ package org.apache.gravitino.iceberg.common.ops;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import java.util.Map;
 import org.apache.commons.lang.StringUtils;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,12 +34,17 @@ public class IcebergTableOpsManager implements AutoCloseable {
   private final Cache<String, IcebergTableOps> icebergTableOpsCache;
   private final IcebergTableOpsProvider provider;
 
-  public IcebergTableOpsManager(IcebergConfig config) {
+  public IcebergTableOpsManager(Map<String, String> properties) {
     this.icebergTableOpsCache = Caffeine.newBuilder().build();
-    this.provider = createProvider(config);
-    this.provider.initialize(config.getAllConfig());
+    this.provider = createProvider(properties);
+    this.provider.initialize(properties);
   }
 
+  /**
+   * @param rawPrefix The path parameter is passed by a Jetty handler. The pattern is matching
+   *     ([^/]*\/), end with /
+   * @return the instance of IcebergTableOps.
+   */
   public IcebergTableOps getOps(String rawPrefix) {
     String prefix = shelling(rawPrefix);
     String cacheKey = prefix;
@@ -53,9 +59,10 @@ public class IcebergTableOpsManager implements AutoCloseable {
     return icebergTableOpsCache.get(cacheKey, k -> provider.getIcebergTableOps(prefix));
   }
 
-  private IcebergTableOpsProvider createProvider(IcebergConfig config) {
+  private IcebergTableOpsProvider createProvider(Map<String, String> properties) {
     try {
-      Class<?> providerClz = Class.forName(config.get(IcebergConfig.ICEBERG_REST_CATALOG_PROVIDER));
+      Class<?> providerClz =
+          Class.forName(properties.get(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER));
       return (IcebergTableOpsProvider) providerClz.getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);

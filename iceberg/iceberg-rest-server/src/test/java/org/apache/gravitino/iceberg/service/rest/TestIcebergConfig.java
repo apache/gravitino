@@ -36,9 +36,9 @@ public class TestIcebergConfig extends IcebergTestBase {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testConfig(boolean withPrefix) {
-    setUrlPathWithPrefix(withPrefix);
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  public void testConfig(String prefix) {
+    setUrlPathWithPrefix(prefix);
     Response resp = getConfigClientBuilder().get();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
