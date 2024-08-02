@@ -283,7 +283,7 @@ public class GravitinoEnv {
     return tagManager;
   }
 
-  public OwnerManager ownershipManager() {
+  public OwnerManager ownerManager() {
     return ownerManager;
   }
 
