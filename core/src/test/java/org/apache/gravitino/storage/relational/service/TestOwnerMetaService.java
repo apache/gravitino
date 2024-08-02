@@ -23,7 +23,6 @@ import java.time.Instant;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -67,9 +66,10 @@ class TestOwnerMetaService extends TestJDBCBackend {
     backend.insert(group, false);
 
     // Test no owner
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> OwnerMetaService.getInstance().getOwner(metalake.nameIdentifier(), metalake.type()));
+    Assertions.assertFalse(
+        OwnerMetaService.getInstance()
+            .getOwner(metalake.nameIdentifier(), metalake.type())
+            .isPresent());
 
     // Test a user owner
     OwnerMetaService.getInstance()
