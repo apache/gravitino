@@ -29,8 +29,8 @@ public class OwnerRelPO {
   Long metalakeId;
   Long ownerId;
   String ownerType;
-  Long entityId;
-  String entityType;
+  Long metadataObjectId;
+  String metadataObjectType;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -64,13 +64,13 @@ public class OwnerRelPO {
       return this;
     }
 
-    public Builder withEntityId(Long entityId) {
-      ownerRelPO.entityId = entityId;
+    public Builder withMetadataObjectId(Long entityId) {
+      ownerRelPO.metadataObjectId = entityId;
       return this;
     }
 
-    public Builder withEntityType(String entityType) {
-      ownerRelPO.entityType = entityType;
+    public Builder withMetadataObjectType(String entityType) {
+      ownerRelPO.metadataObjectType = entityType;
       return this;
     }
 
@@ -103,8 +103,8 @@ public class OwnerRelPO {
       Preconditions.checkArgument(ownerRelPO.ownerId != null, "Owner id is required");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(ownerRelPO.ownerType), "Owner type is required");
-      Preconditions.checkArgument(ownerRelPO.entityId != null, "Entity id is required");
-      Preconditions.checkArgument(ownerRelPO.entityType != null, "Entity type is required");
+      Preconditions.checkArgument(ownerRelPO.metadataObjectId != null, "Entity id is required");
+      Preconditions.checkArgument(ownerRelPO.metadataObjectType != null, "Entity type is required");
       Preconditions.checkArgument(ownerRelPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(ownerRelPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(ownerRelPO.lastVersion != null, "Last version is required");

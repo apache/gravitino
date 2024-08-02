@@ -680,8 +680,8 @@ public class TestPOConverters {
 
     assertEquals(1L, ownerRelPO.getOwnerId());
     assertEquals(1L, ownerRelPO.getMetalakeId());
-    assertEquals(1L, ownerRelPO.getEntityId());
-    assertEquals(Entity.EntityType.METALAKE.name(), ownerRelPO.getEntityType());
+    assertEquals(1L, ownerRelPO.getMetadataObjectId());
+    assertEquals(Entity.EntityType.METALAKE.name(), ownerRelPO.getMetadataObjectType());
     assertEquals(Entity.EntityType.USER.name(), ownerRelPO.getOwnerType());
 
     assertEquals(1, ownerRelPO.getCurrentVersion());

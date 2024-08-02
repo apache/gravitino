@@ -41,26 +41,26 @@ public interface OwnerMetaMapper {
       "SELECT metalake_id as metalakeId,"
           + " owner_id as ownerId,"
           + " owner_type as ownerType,"
-          + " entity_id as entityId,"
-          + " entity_type as entityType,"
+          + " metadata_object_id as metadataObjectId,"
+          + " metadata_object_type as metadataObjectType,"
           + " audit_info as auditInfo,"
           + " current_version as currentVersion, last_version as lastVersion,"
           + " deleted_at as deletedAt"
           + " FROM "
           + OWNER_TABLE_NAME
-          + " WHERE entity_id = #{entityId}"
+          + " WHERE metadata_object_id = #{metadataObjectId}"
           + " AND deleted_at = 0")
-  OwnerRelPO selectOwnerMetaByEntityIdAndType(@Param("entityId") Long entityId);
+  OwnerRelPO selectOwnerMetaByEntityIdAndType(@Param("metadataObjectId") Long metadataObjectId);
 
   @Insert(
       "INSERT INTO "
           + OWNER_TABLE_NAME
-          + "(metalake_id, entity_id, entity_type, owner_id, owner_type,"
+          + "(metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
           + " audit_info, current_version, last_version, deleted_at)"
           + " VALUES ("
           + " #{ownerRelPO.metalakeId},"
-          + " #{ownerRelPO.entityId},"
-          + " #{ownerRelPO.entityType},"
+          + " #{ownerRelPO.metadataObjectId},"
+          + " #{ownerRelPO.metadataObjectType},"
           + " #{ownerRelPO.ownerId},"
           + " #{ownerRelPO.ownerType},"
           + " #{ownerRelPO.auditInfo},"
@@ -75,8 +75,8 @@ public interface OwnerMetaMapper {
           + OWNER_TABLE_NAME
           + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
           + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE entity_id = #{entityId} AND deleted_at = 0")
-  void softDeleteOwnerRelByEntityId(@Param("entityId") Long entityId);
+          + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0")
+  void softDeleteOwnerRelByEntityId(@Param("metadataObjectId") Long metadataObjectId);
 
   @Update(
       "UPDATE  "
@@ -94,23 +94,23 @@ public interface OwnerMetaMapper {
           + " WHERE EXISTS ("
           + " SELECT ct.catalog_id FROM "
           + CatalogMetaMapper.TABLE_NAME
-          + " ct where ct.catalog_id = #{catalogId}  AND ct.deleted_at = 0 AND ot.deleted_at = 0 AND ct.catalog_id = ot.entity_id"
+          + " ct where ct.catalog_id = #{catalogId}  AND ct.deleted_at = 0 AND ot.deleted_at = 0 AND ct.catalog_id = ot.metadata_object_id"
           + " UNION "
           + " SELECT st.catalog_id FROM "
           + SchemaMetaMapper.TABLE_NAME
-          + " st where st.catalog_id = #{catalogId} AND st.deleted_at = 0 AND ot.deleted_at = 0 AND st.schema_id = ot.entity_id"
+          + " st where st.catalog_id = #{catalogId} AND st.deleted_at = 0 AND ot.deleted_at = 0 AND st.schema_id = ot.metadata_object_id"
           + " UNION "
           + " SELECT tt.catalog_id FROM "
           + TopicMetaMapper.TABLE_NAME
-          + " tt where tt.catalog_id = #{catalogId} AND tt.deleted_at = 0 AND ot.deleted_at = 0 AND tt.topic_id = ot.entity_id"
+          + " tt where tt.catalog_id = #{catalogId} AND tt.deleted_at = 0 AND ot.deleted_at = 0 AND tt.topic_id = ot.metadata_object_id"
           + " UNION "
           + " SELECT tat.catalog_id FROM "
           + TableMetaMapper.TABLE_NAME
-          + " tat where tat.catalog_id = #{catalogId} AND tat.deleted_at = 0 AND ot.deleted_at = 0 AND tat.table_id = ot.entity_id"
+          + " tat where tat.catalog_id = #{catalogId} AND tat.deleted_at = 0 AND ot.deleted_at = 0 AND tat.table_id = ot.metadata_object_id"
           + " UNION "
           + " SELECT ft.catalog_id FROM "
           + FilesetMetaMapper.META_TABLE_NAME
-          + " ft where ft.catalog_id = #{catalogId} AND ft.deleted_at = 0 AND ot.deleted_at = 0 AND ft.fileset_id = ot.entity_id"
+          + " ft where ft.catalog_id = #{catalogId} AND ft.deleted_at = 0 AND ot.deleted_at = 0 AND ft.fileset_id = ot.metadata_object_id"
           + ")")
   void softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId);
 
@@ -122,19 +122,19 @@ public interface OwnerMetaMapper {
           + " WHERE EXISTS ("
           + " SELECT st.schema_id FROM "
           + SchemaMetaMapper.TABLE_NAME
-          + " st where st.schema_id = #{schemaId} AND st.deleted_at = 0 AND ot.deleted_at = 0 AND st.schema_id = ot.entity_id"
+          + " st where st.schema_id = #{schemaId} AND st.deleted_at = 0 AND ot.deleted_at = 0 AND st.schema_id = ot.metadata_object_id"
           + " UNION "
           + " SELECT tt.schema_id FROM "
           + TopicMetaMapper.TABLE_NAME
-          + " tt where tt.schema_id = #{schemaId} AND tt.deleted_at = 0 AND ot.deleted_at = 0 AND tt.topic_id = ot.entity_id"
+          + " tt where tt.schema_id = #{schemaId} AND tt.deleted_at = 0 AND ot.deleted_at = 0 AND tt.topic_id = ot.metadata_object_id"
           + " UNION "
           + " SELECT tat.schema_id FROM "
           + TableMetaMapper.TABLE_NAME
-          + " tat where tat.schema_id = #{schemaId} AND tat.deleted_at = 0 AND ot.deleted_at = 0 AND tat.table_id = ot.entity_id"
+          + " tat where tat.schema_id = #{schemaId} AND tat.deleted_at = 0 AND ot.deleted_at = 0 AND tat.table_id = ot.metadata_object_id"
           + " UNION "
           + " SELECT ft.schema_id FROM "
           + FilesetMetaMapper.META_TABLE_NAME
-          + " ft where ft.schema_id = #{schemaId} AND ft.deleted_at = 0 AND ot.deleted_at = 0 AND ft.fileset_id = ot.entity_id"
+          + " ft where ft.schema_id = #{schemaId} AND ft.deleted_at = 0 AND ot.deleted_at = 0 AND ft.fileset_id = ot.metadata_object_id"
           + ")")
   void sotDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId);
 
