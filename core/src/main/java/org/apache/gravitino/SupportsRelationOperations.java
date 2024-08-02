@@ -16,19 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.relation;
+package org.apache.gravitino;
 
 import java.io.IOException;
 import java.util.List;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.NameIdentifier;
 
 /**
  * This is an extended interface. This is mainly used for strengthen the ability of querying
  * relational data.
  */
 public interface SupportsRelationOperations {
+
+  /** Relation is an abstraction which connects two entities. */
+  enum Type {
+    /** The ownership relationship */
+    OWNER_REL
+  }
 
   /**
    * List the entities according to a give entity in a specific relation.
@@ -40,8 +43,7 @@ public interface SupportsRelationOperations {
    * @throws IOException When occurs storage issues, it will throw IOException.
    */
   <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      Relation.Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType)
-      throws IOException;
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType) throws IOException;
 
   /**
    * insert a relation between two entities
@@ -55,7 +57,7 @@ public interface SupportsRelationOperations {
    * @throws IOException When occurs storage issues, it will throw IOException.
    */
   void insertRelation(
-      Relation.Type relType,
+      Type relType,
       NameIdentifier srcIdentifier,
       Entity.EntityType srcType,
       NameIdentifier dstIdentifier,

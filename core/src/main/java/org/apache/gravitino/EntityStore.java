@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.function.Function;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.relation.SupportsRelationOperations;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
 

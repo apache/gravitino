@@ -26,6 +26,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
+import static org.apache.gravitino.SupportsRelationOperations.Type.OWNER_REL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -73,7 +74,6 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.relation.Relation;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
@@ -670,7 +670,7 @@ public class TestJDBCBackend {
     assertEquals(1, tags.size());
 
     backend.insertRelation(
-        Relation.Type.OWNER_REL,
+        OWNER_REL,
         metalake.nameIdentifier(),
         metalake.type(),
         user.nameIdentifier(),
@@ -678,7 +678,7 @@ public class TestJDBCBackend {
         true);
 
     backend.insertRelation(
-        Relation.Type.OWNER_REL,
+        OWNER_REL,
         anotherMetaLake.nameIdentifier(),
         anotherMetaLake.type(),
         anotherUser.nameIdentifier(),
@@ -686,7 +686,7 @@ public class TestJDBCBackend {
         true);
 
     backend.insertRelation(
-        Relation.Type.OWNER_REL,
+        OWNER_REL,
         catalog.nameIdentifier(),
         catalog.type(),
         user.nameIdentifier(),
@@ -694,7 +694,7 @@ public class TestJDBCBackend {
         true);
 
     backend.insertRelation(
-        Relation.Type.OWNER_REL,
+        OWNER_REL,
         schema.nameIdentifier(),
         schema.type(),
         user.nameIdentifier(),
@@ -702,23 +702,13 @@ public class TestJDBCBackend {
         true);
 
     backend.insertRelation(
-        Relation.Type.OWNER_REL,
-        table.nameIdentifier(),
-        table.type(),
-        user.nameIdentifier(),
-        user.type(),
-        true);
+        OWNER_REL, table.nameIdentifier(), table.type(), user.nameIdentifier(), user.type(), true);
 
     backend.insertRelation(
-        Relation.Type.OWNER_REL,
-        topic.nameIdentifier(),
-        topic.type(),
-        user.nameIdentifier(),
-        user.type(),
-        true);
+        OWNER_REL, topic.nameIdentifier(), topic.type(), user.nameIdentifier(), user.type(), true);
 
     backend.insertRelation(
-        Relation.Type.OWNER_REL,
+        OWNER_REL,
         fileset.nameIdentifier(),
         fileset.type(),
         user.nameIdentifier(),
@@ -726,12 +716,7 @@ public class TestJDBCBackend {
         true);
 
     backend.insertRelation(
-        Relation.Type.OWNER_REL,
-        role.nameIdentifier(),
-        role.type(),
-        user.nameIdentifier(),
-        user.type(),
-        true);
+        OWNER_REL, role.nameIdentifier(), role.type(), user.nameIdentifier(), user.type(), true);
 
     // meta data soft delete
     backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);

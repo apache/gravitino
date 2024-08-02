@@ -35,6 +35,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -47,7 +48,6 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.relation.Relation;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
@@ -365,8 +365,10 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      Relation.Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType) {
-    if (relType == Relation.Type.OWNER_REL) {
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType) {
+    if (relType == SupportsRelationOperations.Type.OWNER_REL) {
       List<E> list = Lists.newArrayList();
       OwnerMetaService.getInstance()
           .getOwner(nameIdentifier, identType)
@@ -380,13 +382,13 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public void insertRelation(
-      Relation.Type relType,
+      SupportsRelationOperations.Type relType,
       NameIdentifier srcIdentifier,
       Entity.EntityType srcType,
       NameIdentifier dstIdentifier,
       Entity.EntityType dstType,
       boolean override) {
-    if (relType == Relation.Type.OWNER_REL) {
+    if (relType == SupportsRelationOperations.Type.OWNER_REL) {
       OwnerMetaService.getInstance().setOwner(srcIdentifier, srcType, dstIdentifier, dstType);
     } else {
       throw new IllegalArgumentException(

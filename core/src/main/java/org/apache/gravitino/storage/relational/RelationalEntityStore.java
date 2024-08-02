@@ -34,10 +34,9 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.relation.Relation;
-import org.apache.gravitino.relation.SupportsRelationOperations;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -182,14 +181,16 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      Relation.Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType)
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType)
       throws IOException {
     return backend.listEntitiesByRelation(relType, nameIdentifier, identType);
   }
 
   @Override
   public void insertRelation(
-      Relation.Type relType,
+      SupportsRelationOperations.Type relType,
       NameIdentifier srcIdentifier,
       Entity.EntityType srcType,
       NameIdentifier dstIdentifier,

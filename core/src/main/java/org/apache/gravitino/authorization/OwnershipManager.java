@@ -25,14 +25,13 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.relation.Relation;
-import org.apache.gravitino.relation.SupportsRelationOperations;
 import org.apache.gravitino.storage.kv.KvEntityStore;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
@@ -82,7 +81,7 @@ public class OwnershipManager {
                       store
                           .relationOperations()
                           .insertRelation(
-                              Relation.Type.OWNER_REL,
+                              SupportsRelationOperations.Type.OWNER_REL,
                               objectIdent,
                               MetadataObjectUtil.toEntityType(metadataObject),
                               ownerIdent,
@@ -103,7 +102,7 @@ public class OwnershipManager {
                       store
                           .relationOperations()
                           .insertRelation(
-                              Relation.Type.OWNER_REL,
+                              SupportsRelationOperations.Type.OWNER_REL,
                               objectIdent,
                               MetadataObjectUtil.toEntityType(metadataObject),
                               ownerIdent,
@@ -139,7 +138,7 @@ public class OwnershipManager {
                   store
                       .relationOperations()
                       .listEntitiesByRelation(
-                          Relation.Type.OWNER_REL,
+                          SupportsRelationOperations.Type.OWNER_REL,
                           ident,
                           MetadataObjectUtil.toEntityType(metadataObject)));
 
