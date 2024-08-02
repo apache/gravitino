@@ -60,7 +60,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestOwnershipManager {
+public class TestOwnerManager {
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
 
@@ -72,7 +72,7 @@ public class TestOwnershipManager {
   private static EntityStore entityStore;
 
   private static IdGenerator idGenerator;
-  private static OwnershipManager ownershipManager;
+  private static OwnerManager ownerManager;
 
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
@@ -134,7 +134,7 @@ public class TestOwnershipManager {
             .build();
     entityStore.put(groupEntity, false /* overwritten*/);
 
-    ownershipManager = new OwnershipManager(entityStore);
+    ownerManager = new OwnerManager(entityStore);
   }
 
   @AfterAll
@@ -152,19 +152,19 @@ public class TestOwnershipManager {
     // Test no owner
     MetadataObject metalakeObject =
         MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
-    Assertions.assertFalse(ownershipManager.getOwner(METALAKE, metalakeObject).isPresent());
+    Assertions.assertFalse(ownerManager.getOwner(METALAKE, metalakeObject).isPresent());
 
     // Test to set the user as the owner
-    ownershipManager.setOwner(METALAKE, metalakeObject, USER, Owner.Type.USER);
+    ownerManager.setOwner(METALAKE, metalakeObject, USER, Owner.Type.USER);
 
-    Owner owner = ownershipManager.getOwner(METALAKE, metalakeObject).get();
+    Owner owner = ownerManager.getOwner(METALAKE, metalakeObject).get();
     Assertions.assertEquals(USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
     // Test to set the group as the owner
-    ownershipManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP);
+    ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP);
 
-    owner = ownershipManager.getOwner(METALAKE, metalakeObject).get();
+    owner = ownerManager.getOwner(METALAKE, metalakeObject).get();
     Assertions.assertEquals(GROUP, owner.name());
     Assertions.assertEquals(Owner.Type.GROUP, owner.type());
   }

@@ -38,14 +38,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * OwnershipManager is used for manage the owner of metadata object. The user and group don't have
+ * OwnerManager is used for manage the owner of metadata object. The user and group don't have
  * an owner
  */
-public class OwnershipManager {
-  private static final Logger LOG = LoggerFactory.getLogger(OwnershipManager.class);
+public class OwnerManager {
+  private static final Logger LOG = LoggerFactory.getLogger(OwnerManager.class);
   private final EntityStore store;
 
-  public OwnershipManager(EntityStore store) {
+  public OwnerManager(EntityStore store) {
     if (store instanceof KvEntityStore) {
       String errorMsg =
           "OwnershipManager cannot run with kv entity store, please configure the entity "

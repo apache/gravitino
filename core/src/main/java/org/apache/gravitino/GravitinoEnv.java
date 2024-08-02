@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.authorization.OwnershipManager;
+import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -106,7 +106,7 @@ public class GravitinoEnv {
 
   private TagManager tagManager;
   private EventBus eventBus;
-  private OwnershipManager ownershipManager;
+  private OwnerManager ownerManager;
 
   protected GravitinoEnv() {}
 
@@ -283,8 +283,8 @@ public class GravitinoEnv {
     return tagManager;
   }
 
-  public OwnershipManager ownershipManager() {
-    return ownershipManager;
+  public OwnerManager ownershipManager() {
+    return ownerManager;
   }
 
   public void start() {
@@ -400,7 +400,7 @@ public class GravitinoEnv {
       this.accessControlDispatcher =
           installDispatcherHooks(
               (AccessControlDispatcher) new AccessControlManager(entityStore, idGenerator, config));
-      this.ownershipManager = new OwnershipManager(entityStore);
+      this.ownerManager = new OwnerManager(entityStore);
     } else {
       this.accessControlDispatcher = null;
     }
