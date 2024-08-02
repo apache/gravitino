@@ -21,7 +21,7 @@ Supports most DDL and DML operations in SparkSQL, except such operations:
 
 
 :::info
-There are some limits for tables whose row format serde is `org.apache.hadoop.hive.serde2.OpenCSVSerde`. Due to HIVE-13709, the table's scheme may mismatch between Gravitino and Hive Metastore. Please make sure all fields are string type if used.
+Don't support reading and writing tables with `org.apache.hadoop.hive.serde2.OpenCSVSerde` row format.
 :::
 
 ## Requirement
