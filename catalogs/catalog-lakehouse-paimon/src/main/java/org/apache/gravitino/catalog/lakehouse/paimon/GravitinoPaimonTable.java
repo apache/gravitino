@@ -24,8 +24,8 @@ import static org.apache.gravitino.meta.AuditInfo.EMPTY;
 import static org.apache.gravitino.rel.indexes.Indexes.EMPTY_INDEXES;
 import static org.apache.gravitino.rel.indexes.Indexes.primary;
 
-import com.google.common.base.Preconditions;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Collections;
@@ -53,7 +53,8 @@ import org.apache.paimon.types.DataField;
 @Getter
 public class GravitinoPaimonTable extends BaseTable {
 
-  @VisibleForTesting private static final String PAIMON_PRIMARY_KEY_INDEX_NAME = "PAIMON_PRIMARY_KEY_INDEX";
+  @VisibleForTesting
+  private static final String PAIMON_PRIMARY_KEY_INDEX_NAME = "PAIMON_PRIMARY_KEY_INDEX";
 
   private GravitinoPaimonTable() {}
 
@@ -83,25 +84,22 @@ public class GravitinoPaimonTable extends BaseTable {
     Map<String, String> normalizedProperties = new HashMap<>(properties);
     normalizedProperties.remove(COMMENT);
 
-      List<String> partitionKeys =
-              Arrays.stream(partitioning)
-                      .map(
-                              partition -> {
-                                  NamedReference[] references = partition.references();
-                                  Preconditions.checkArgument(
-                                          references.length == 1,
-                                          "Partitioning column must be single-column, like 'a'.");
-                                  return references[0].toString();
-                              })
-                      .collect(Collectors.toList());
-      List<String> primaryKeys = getPrimaryKeys(indexes);
+    List<String> partitionKeys =
+        Arrays.stream(partitioning)
+            .map(
+                partition -> {
+                  NamedReference[] references = partition.references();
+                  Preconditions.checkArgument(
+                      references.length == 1,
+                      "Partitioning column must be single-column, like 'a'.");
+                  return references[0].toString();
+                })
+            .collect(Collectors.toList());
+    List<String> primaryKeys = getPrimaryKeys(indexes);
 
-      validate(primaryKeys, partitionKeys);
+    validate(primaryKeys, partitionKeys);
 
-      builder
-        .options(normalizedProperties)
-        .primaryKey(primaryKeys)
-        .partitionKeys(partitionKeys);
+    builder.options(normalizedProperties).primaryKey(primaryKeys).partitionKeys(partitionKeys);
     for (int index = 0; index < columns.length; index++) {
       DataField dataField = GravitinoPaimonColumn.toPaimonColumn(index, columns[index]);
       builder.column(dataField.name(), dataField.type(), dataField.description());
@@ -177,23 +175,23 @@ public class GravitinoPaimonTable extends BaseTable {
     return filedNames;
   }
 
-private static void validate(List<String> primaryKeys, List<String> partitionKeys) {
+  private static void validate(List<String> primaryKeys, List<String> partitionKeys) {
     if (!primaryKeys.isEmpty()) {
-        List<String> adjusted =
-                primaryKeys.stream()
-                        .filter(pk -> !partitionKeys.contains(pk))
-                        .collect(Collectors.toList());
+      List<String> adjusted =
+          primaryKeys.stream()
+              .filter(pk -> !partitionKeys.contains(pk))
+              .collect(Collectors.toList());
 
-        Preconditions.checkState(
-                !adjusted.isEmpty(),
-                String.format(
-                        "Paimon Table Primary key constraint %s should not be same with partition fields %s,"
-                                + " this will result in only one record in a partition.",
-                        primaryKeys, partitionKeys));
+      Preconditions.checkState(
+          !adjusted.isEmpty(),
+          String.format(
+              "Paimon Table Primary key constraint %s should not be same with partition fields %s,"
+                  + " this will result in only one record in a partition.",
+              primaryKeys, partitionKeys));
     }
-}
+  }
 
-    /** A builder class for constructing {@link GravitinoPaimonTable} instance. */
+  /** A builder class for constructing {@link GravitinoPaimonTable} instance. */
   public static class Builder extends BaseTableBuilder<Builder, GravitinoPaimonTable> {
 
     /** Creates a new instance of {@link Builder}. */
