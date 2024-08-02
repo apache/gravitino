@@ -28,11 +28,11 @@ Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hado
 ## Server management
 
 There are three deployment scenarios for Gravitino Iceberg REST server:
-- As a standalone server within the Gravitino Iceberg REST server package.
-- As a standalone server within the Gravitino server package.
-- As an auxiliary service within the Gravitino server.
-
-For detailed instructions on how to build and install the Gravitino server package, please refer to [How to build](how-to-build.md) and [How to install](how-to-install.md) . To build the Gravitino Iceberg REST server package, use the command `./gradlew compileIcebergRESTServer -x test`. Alternatively, to create the corresponding compressed package in the distribution directory, use `./gradlew assembleIcebergRESTServer -x test`. The Gravitino Iceberg REST server package includes the following files:
+- A standalone server with a standalone Gravitino Iceberg REST server package.
+- A standalone server in the Gravitino server package.
+- An auxiliary service embedded in the Gravitino server.
+ 
+For detailed instructions on how to build and install the Gravitino server package, please refer to [How to build](./how-to-build.md) and [How to install](./how-to-install.md) . To build the Gravitino Iceberg REST server package, use the command `./gradlew compileIcebergRESTServer -x test`. Alternatively, to create the corresponding compressed package in the distribution directory, use `./gradlew assembleIcebergRESTServer -x test`. The Gravitino Iceberg REST server package includes the following files:
 
 ```text
 |── ...
@@ -50,7 +50,9 @@ For detailed instructions on how to build and install the Gravitino server packa
 
 ## Apache Gravitino Iceberg REST catalog server configuration
 
-There are distinct configuration files for standalone and auxiliary server: `gravitino-iceberg-rest-server.conf` is used for the standalone server, while `gravitino.conf` is for the auxiliary server. Although the configuration files differ, the configuration items remain the same. Starting with version `0.6.0`, the prefix `gravitino.auxService.iceberg-rest.` for auxiliary server configurations has been deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the latter will take precedence. The configurations listed below use the `gravitino.iceberg-rest.` prefix.
+There are distinct configuration files for standalone and auxiliary server: `gravitino-iceberg-rest-server.conf` is used for the standalone server, while `gravitino.conf` is for the auxiliary server. Although the configuration files differ, the configuration items remain the same. 
+
+Starting with version `0.6.0`, the prefix `gravitino.auxService.iceberg-rest.` for auxiliary server configurations has been deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the latter will take precedence. The configurations listed below use the `gravitino.iceberg-rest.` prefix.
 
 ### Configuration to enable Iceberg REST service in Gravitino server.
 
