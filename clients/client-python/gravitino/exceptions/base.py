@@ -93,3 +93,11 @@ class UnauthorizedException(GravitinoRuntimeException):
 
 class BadRequestException(GravitinoRuntimeException):
     """An exception thrown when the request is invalid."""
+
+
+class NoSuchCatalogException(NotFoundException):
+    """An exception thrown when a catalog is not found."""
+
+
+class SchemaAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a schema already exists."""
