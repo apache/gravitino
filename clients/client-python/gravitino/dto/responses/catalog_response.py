@@ -39,12 +39,14 @@ class CatalogResponse(BaseResponse):
         """
         super().validate()
 
-        assert self.catalog is not None, "catalog must not be null"
+        assert self._catalog is not None, "catalog must not be null"
         assert (
-            self.catalog.name() is not None
+            self._catalog.name() is not None
         ), "catalog 'name' must not be null and empty"
-        assert self.catalog.type() is not None, "catalog 'type' must not be null"
-        assert self.catalog.audit_info() is not None, "catalog 'audit' must not be null"
+        assert self._catalog.type() is not None, "catalog 'type' must not be null"
+        assert (
+            self._catalog.audit_info() is not None
+        ), "catalog 'audit' must not be null"
 
     def catalog(self) -> CatalogDTO:
         return self._catalog

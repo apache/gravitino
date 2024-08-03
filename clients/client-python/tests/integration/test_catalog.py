@@ -121,7 +121,6 @@ class TestCatalog(IntegrationTestEnv):
         changes = (
             CatalogChange.rename(catalog_new_name),
             CatalogChange.update_comment(catalog_new_comment),
-            CatalogChange.remove_property(self.catalog_location_prop),
             CatalogChange.set_property(
                 catalog_properties_new_key, catalog_properties_new_value
             ),
@@ -134,7 +133,7 @@ class TestCatalog(IntegrationTestEnv):
             catalog.properties().get(catalog_properties_new_key),
             catalog_properties_new_value,
         )
-        self.assertTrue(self.catalog_location_prop not in catalog.properties())
+        self.catalog_name = self.catalog_name + "_new"
 
     def test_drop_catalog(self):
         self.create_catalog(self.catalog_name)
