@@ -339,11 +339,18 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 }),
         "Paimon partition columns should not be nested.");
     Preconditions.checkArgument(
-        sortOrders == null || sortOrders.length == 0,
-        "Sort orders are not supported for Paimon in Gravitino.");
-    Preconditions.checkArgument(
         distribution == null || distribution.strategy() == Distributions.NONE.strategy(),
         "Distribution is not supported for Paimon in Gravitino now.");
+    Preconditions.checkArgument(
+        sortOrders == null || sortOrders.length == 0,
+        "Sort orders are not supported for Paimon in Gravitino.");
+    Preconditions.checkArgument(indexes.length <= 1, "Paimon supports no more than one Index.");
+    Arrays.stream(indexes)
+        .forEach(
+            index ->
+                Preconditions.checkArgument(
+                    index.type() == Index.IndexType.PRIMARY_KEY,
+                    "Paimon only supports primary key Index."));
     String currentUser = currentUser();
     GravitinoPaimonTable createdTable =
         GravitinoPaimonTable.builder()
