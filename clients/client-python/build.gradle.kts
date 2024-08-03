@@ -213,16 +213,19 @@ tasks {
     if (dockerTest) {
       dependsOn("verifyHadoopPack")
       envMap.putAll(mapOf(
-          "HADOOP_VERSION" to hadoopVersion,
-          "PYTHON_BUILD_PATH" to project.rootDir.path + "/clients/client-python/build"
+        "HADOOP_VERSION" to hadoopVersion,
+        "PYTHON_BUILD_PATH" to project.rootDir.path + "/clients/client-python/build"
       ))
     }
     envMap.putAll(mapOf(
-        "PROJECT_VERSION" to project.version,
-        "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
-        "START_EXTERNAL_GRAVITINO" to "true",
-        "DOCKER_TEST" to dockerTest.toString(),
-        "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "datastrato/gravitino-ci-hive:0.1.13",
+      "PROJECT_VERSION" to project.version,
+      "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
+      "START_EXTERNAL_GRAVITINO" to "true",
+      "DOCKER_TEST" to dockerTest.toString(),
+      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "datastrato/gravitino-ci-hive:0.1.13",
+      // Set the PYTHONPATH to the client-python directory, make sure the tests can import the
+      // modules from the client-python directory.
+      "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
     ))
     environment = envMap
 
@@ -243,6 +246,12 @@ tasks {
     venvExec = "coverage"
     args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/unittests")
+
+    environment = mapOf(
+      // Set the PYTHONPATH to the client-python directory, make sure the tests can import the
+      // modules from the client-python directory.
+      "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
+    )
 
     finalizedBy(unitCoverageReport)
   }

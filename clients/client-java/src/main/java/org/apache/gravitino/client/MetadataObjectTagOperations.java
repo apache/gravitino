@@ -19,6 +19,7 @@
 package org.apache.gravitino.client;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
@@ -75,6 +76,7 @@ class MetadataObjectTagOperations implements SupportsTags {
     TagListResponse resp =
         restClient.get(
             tagRequestPath,
+            ImmutableMap.of("details", "true"),
             TagListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());

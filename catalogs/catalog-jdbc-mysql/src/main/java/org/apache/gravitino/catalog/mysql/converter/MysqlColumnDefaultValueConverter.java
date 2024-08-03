@@ -60,12 +60,20 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
     switch (type.getTypeName().toLowerCase()) {
       case MysqlTypeConverter.TINYINT:
         return Literals.byteLiteral(Byte.valueOf(columnDefaultValue));
+      case MysqlTypeConverter.TINYINT_UNSIGNED:
+        return Literals.unsignedByteLiteral(Short.valueOf(columnDefaultValue));
       case MysqlTypeConverter.SMALLINT:
         return Literals.shortLiteral(Short.valueOf(columnDefaultValue));
+      case MysqlTypeConverter.SMALLINT_UNSIGNED:
+        return Literals.unsignedShortLiteral(Integer.valueOf(columnDefaultValue));
       case MysqlTypeConverter.INT:
         return Literals.integerLiteral(Integer.valueOf(columnDefaultValue));
+      case MysqlTypeConverter.INT_UNSIGNED:
+        return Literals.unsignedIntegerLiteral(Long.valueOf(columnDefaultValue));
       case MysqlTypeConverter.BIGINT:
         return Literals.longLiteral(Long.valueOf(columnDefaultValue));
+      case MysqlTypeConverter.BIGINT_UNSIGNED:
+        return Literals.unsignedLongLiteral(Decimal.of(columnDefaultValue));
       case MysqlTypeConverter.FLOAT:
         return Literals.floatLiteral(Float.valueOf(columnDefaultValue));
       case MysqlTypeConverter.DOUBLE:
@@ -95,7 +103,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
       case JdbcTypeConverter.TEXT:
         return Literals.stringLiteral(columnDefaultValue);
       default:
-        throw new IllegalArgumentException("Unknown data type for literal: " + type);
+        return UnparsedExpression.of(columnDefaultValue);
     }
   }
 }

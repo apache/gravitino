@@ -25,6 +25,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -32,6 +33,7 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.OverwriteDefaultConfig;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
+
   public static final String ICEBERG_CONFIG_PREFIX = "gravitino.iceberg-rest.";
 
   public static final ConfigEntry<String> CATALOG_BACKEND =
@@ -72,7 +74,6 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
-
   public static final ConfigEntry<String> JDBC_DRIVER =
       new ConfigBuilder(IcebergConstants.GRAVITINO_JDBC_DRIVER)
           .doc("The driver of the Jdbc connection")
@@ -87,6 +88,45 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .version(ConfigConstants.VERSION_0_2_0)
           .booleanConf()
           .createWithDefault(true);
+
+  public static final ConfigEntry<String> IO_IMPL =
+      new ConfigBuilder(IcebergConstants.IO_IMPL)
+          .doc("The io implementation for `FileIO` in Iceberg")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> S3_ENDPOINT =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_ENDPOINT)
+          .doc(
+              "An alternative endpoint of the S3 service, This could be used to for S3FileIO with "
+                  + "any s3-compatible object storage service that has a different endpoint, or "
+                  + "access a private S3 endpoint in a virtual private cloud")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> S3_REGION =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_REGION)
+          .doc("The region of the S3 service")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  public static final ConfigEntry<String> S3_ACCESS_KEY_ID =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID)
+          .doc("The static access key ID used to access S3 data")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> S3_SECRET_ACCESS_KEY =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_SECRET_ACCESS_KEY)
+          .doc("The static secret access key used to access S3 data")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .create();
 
   public static final ConfigEntry<String> ICEBERG_METRICS_STORE =
       new ConfigBuilder(IcebergConstants.ICEBERG_METRICS_STORE)
@@ -133,6 +173,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public IcebergConfig() {
     super(false);
+  }
+
+  public Map<String, String> getIcebergCatalogProperties() {
+    Map<String, String> config = getAllConfig();
+    Map<String, String> transformedConfig =
+        IcebergPropertiesUtils.toIcebergCatalogProperties(config);
+    transformedConfig.putAll(config);
+    return transformedConfig;
   }
 
   @Override

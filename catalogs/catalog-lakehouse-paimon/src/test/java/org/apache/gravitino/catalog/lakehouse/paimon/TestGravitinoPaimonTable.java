@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonColumn.fromPaimonColumn;
 import static org.apache.gravitino.catalog.lakehouse.paimon.TestPaimonCatalog.PAIMON_PROPERTIES_METADATA;
 import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.checkColumnCapability;
+import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 
 import com.google.common.collect.Maps;
 import java.io.File;
@@ -29,6 +30,7 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
@@ -44,6 +46,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -202,6 +205,65 @@ public class TestGravitinoPaimonTable {
   }
 
   @Test
+  void testCreatePaimonPartitionedTable() {
+    String paimonTableName = "test_paimon_partitioned_table";
+    NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
+
+    GravitinoPaimonColumn col1 =
+        fromPaimonColumn(new DataField(0, "col_1", DataTypes.INT().nullable(), PAIMON_COMMENT));
+    GravitinoPaimonColumn col2 =
+        fromPaimonColumn(new DataField(1, "col_2", DataTypes.DATE().notNull(), PAIMON_COMMENT));
+    GravitinoPaimonColumn col3 =
+        fromPaimonColumn(new DataField(2, "col_3", DataTypes.STRING().notNull(), PAIMON_COMMENT));
+    Column[] columns = new Column[] {col1, col2, col3};
+
+    Transform[] transforms = new Transform[] {identity("col_1"), identity("col_2")};
+    String[] partitionKeys = new String[] {"col_1", "col_2"};
+
+    Table table =
+        paimonCatalogOperations.createTable(
+            tableIdentifier,
+            columns,
+            PAIMON_COMMENT,
+            properties,
+            transforms,
+            Distributions.NONE,
+            new SortOrder[0]);
+
+    Assertions.assertEquals(tableIdentifier.name(), table.name());
+    Assertions.assertEquals(PAIMON_COMMENT, table.comment());
+    Assertions.assertEquals("val1", table.properties().get("key1"));
+    Assertions.assertEquals("val2", table.properties().get("key2"));
+    Assertions.assertArrayEquals(transforms, table.partitioning());
+
+    Table loadedTable = paimonCatalogOperations.loadTable(tableIdentifier);
+
+    Assertions.assertEquals("val1", loadedTable.properties().get("key1"));
+    Assertions.assertEquals("val2", loadedTable.properties().get("key2"));
+    Assertions.assertTrue(loadedTable.columns()[0].nullable());
+    Assertions.assertFalse(loadedTable.columns()[1].nullable());
+    Assertions.assertFalse(loadedTable.columns()[2].nullable());
+    Assertions.assertArrayEquals(transforms, loadedTable.partitioning());
+    String[] loadedPartitionKeys =
+        Arrays.stream(loadedTable.partitioning())
+            .map(
+                transform -> {
+                  NamedReference[] references = transform.references();
+                  Assertions.assertTrue(
+                      references.length == 1
+                          && references[0] instanceof NamedReference.FieldReference);
+                  NamedReference.FieldReference fieldReference =
+                      (NamedReference.FieldReference) references[0];
+                  return fieldReference.fieldName()[0];
+                })
+            .toArray(String[]::new);
+    Assertions.assertArrayEquals(partitionKeys, loadedPartitionKeys);
+  }
+
+  @Test
   void testDropPaimonTable() {
     NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();
@@ -313,6 +375,61 @@ public class TestGravitinoPaimonTable {
             .withProperties(properties)
             .build();
     Schema paimonTableSchema = gravitinoPaimonTable.toPaimonTableSchema();
+    Assertions.assertEquals(gravitinoPaimonTable.comment(), gravitinoPaimonTable.comment());
+    Assertions.assertEquals(gravitinoPaimonTable.properties(), paimonTableSchema.options());
+    Assertions.assertEquals(
+        gravitinoPaimonTable.columns().length, paimonTableSchema.fields().size());
+    Assertions.assertEquals(3, paimonTableSchema.fields().size());
+    for (int i = 0; i < gravitinoPaimonTable.columns().length; i++) {
+      Column column = gravitinoPaimonTable.columns()[i];
+      DataField dataField = paimonTableSchema.fields().get(i);
+      Assertions.assertEquals(column.name(), dataField.name());
+      Assertions.assertEquals(column.comment(), dataField.description());
+    }
+    Assertions.assertEquals(new IntType().nullable(), paimonTableSchema.fields().get(0).type());
+    Assertions.assertEquals(new DateType().nullable(), paimonTableSchema.fields().get(1).type());
+    Assertions.assertEquals(
+        new VarCharType(Integer.MAX_VALUE).nullable(), paimonTableSchema.fields().get(2).type());
+  }
+
+  @Test
+  public void testGravitinoToPaimonTableWithPartitions() {
+    Column[] columns = createColumns();
+    NameIdentifier identifier = NameIdentifier.of("test_schema", "test_partitioned_table");
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("key1", "val1");
+
+    Transform[] partitions =
+        new Transform[] {identity(columns[0].name()), identity(columns[1].name())};
+    List<String> partitionKeys = Arrays.asList(columns[0].name(), columns[1].name());
+
+    GravitinoPaimonTable gravitinoPaimonTable =
+        GravitinoPaimonTable.builder()
+            .withName(identifier.name())
+            .withColumns(
+                Arrays.stream(columns)
+                    .map(
+                        column -> {
+                          checkColumnCapability(
+                              column.name(), column.defaultValue(), column.autoIncrement());
+                          return GravitinoPaimonColumn.builder()
+                              .withName(column.name())
+                              .withType(column.dataType())
+                              .withComment(column.comment())
+                              .withNullable(column.nullable())
+                              .withAutoIncrement(column.autoIncrement())
+                              .withDefaultValue(column.defaultValue())
+                              .build();
+                        })
+                    .toArray(GravitinoPaimonColumn[]::new))
+            .withPartitioning(partitions)
+            .withComment("test_table_comment")
+            .withProperties(properties)
+            .build();
+    Schema paimonTableSchema = gravitinoPaimonTable.toPaimonTableSchema();
+    Assertions.assertArrayEquals(
+        partitionKeys.toArray(new String[0]),
+        paimonTableSchema.partitionKeys().toArray(new String[0]));
     Assertions.assertEquals(gravitinoPaimonTable.comment(), gravitinoPaimonTable.comment());
     Assertions.assertEquals(gravitinoPaimonTable.properties(), paimonTableSchema.options());
     Assertions.assertEquals(

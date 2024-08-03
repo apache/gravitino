@@ -97,3 +97,11 @@ class NoSuchCatalogException(NotFoundException):
 
 class CatalogAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a resource already exists."""
+
+
+class UnauthorizedException(GravitinoRuntimeException):
+    """An exception thrown when a user is not authorized to perform an action."""
+
+
+class BadRequestException(GravitinoRuntimeException):
+    """An exception thrown when the request is invalid."""
