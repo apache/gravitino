@@ -32,11 +32,15 @@ from gravitino.exceptions.base import (
     AlreadyExistsException,
     NotEmptyException,
     UnsupportedOperationException,
+    ConnectionFailedException,
+    NoSuchCatalogException,
+    CatalogAlreadyExistsException,
 )
 
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
 from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HANDLER
 from gravitino.exceptions.handlers.metalake_error_handler import METALAKE_ERROR_HANDLER
+from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 
 
 class TestErrorHandler(unittest.TestCase):
@@ -145,5 +149,45 @@ class TestErrorHandler(unittest.TestCase):
 
         with self.assertRaises(RESTException):
             METALAKE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(Exception, "mock error")
+            )
+
+    def test_catalog_error_handler(self):
+
+        with self.assertRaises(ConnectionFailedException):
+            CATALOG_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    ConnectionFailedException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchMetalakeException):
+            CATALOG_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchMetalakeException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchCatalogException):
+            CATALOG_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchCatalogException, "mock error"
+                )
+            )
+
+        with self.assertRaises(CatalogAlreadyExistsException):
+            CATALOG_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    CatalogAlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(InternalError):
+            CATALOG_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(InternalError, "mock error")
+            )
+
+        with self.assertRaises(RESTException):
+            CATALOG_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(Exception, "mock error")
             )

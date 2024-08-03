@@ -30,6 +30,7 @@ from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
+from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 from gravitino.utils import HTTPClient
 
 
@@ -66,7 +67,7 @@ class GravitinoMetalake(MetalakeDTO):
             A list of the catalog names under this metalake.
         """
         url = f"api/metalakes/{self.name()}/catalogs"
-        response = self.rest_client.get(url)
+        response = self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
         entity_list = EntityListResponse.from_json(response.body, infer_missing=True)
         entity_list.validate()
         return [identifier.name() for identifier in entity_list.identifiers()]
@@ -82,7 +83,9 @@ class GravitinoMetalake(MetalakeDTO):
         """
         params = {"details": "true"}
         url = f"api/metalakes/{self.name()}/catalogs"
-        response = self.rest_client.get(url, params=params)
+        response = self.rest_client.get(
+            url, params=params, error_handler=CATALOG_ERROR_HANDLER
+        )
         catalog_list = CatalogListResponse.from_json(response.body, infer_missing=True)
 
         return [
@@ -103,7 +106,7 @@ class GravitinoMetalake(MetalakeDTO):
             The Catalog with specified name.
         """
         url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
-        response = self.rest_client.get(url)
+        response = self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
         return DTOConverters.to_catalog(
@@ -145,7 +148,9 @@ class GravitinoMetalake(MetalakeDTO):
         catalog_create_request.validate()
 
         url = f"api/metalakes/{self.name()}/catalogs"
-        response = self.rest_client.post(url, json=catalog_create_request)
+        response = self.rest_client.post(
+            url, json=catalog_create_request, error_handler=CATALOG_ERROR_HANDLER
+        )
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
         return DTOConverters.to_catalog(
@@ -172,7 +177,9 @@ class GravitinoMetalake(MetalakeDTO):
         updates_request.validate()
 
         url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
-        response = self.rest_client.put(url, json=updates_request)
+        response = self.rest_client.put(
+            url, json=updates_request, error_handler=CATALOG_ERROR_HANDLER
+        )
         catalog_response = CatalogResponse.from_json(response.body, infer_missing=True)
         catalog_response.validate()
 
@@ -191,7 +198,7 @@ class GravitinoMetalake(MetalakeDTO):
         """
         try:
             url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
-            response = self.rest_client.delete(url)
+            response = self.rest_client.delete(url, error_handler=CATALOG_ERROR_HANDLER)
 
             drop_response = DropResponse.from_json(response.body, infer_missing=True)
             drop_response.validate()
