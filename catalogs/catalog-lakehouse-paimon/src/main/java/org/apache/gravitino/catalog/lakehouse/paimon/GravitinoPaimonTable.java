@@ -170,14 +170,10 @@ public class GravitinoPaimonTable extends BaseTable {
   }
 
   private static String[][] constructIndexFiledNames(List<String> primaryKeys) {
-    String[][] filedNames = new String[primaryKeys.size()][];
-
-    int index = 0;
-    for (String primaryKey : primaryKeys) {
-      filedNames[index++] = new String[] {primaryKey};
-    }
-
-    return filedNames;
+    return primaryKeys.stream()
+        .map(pk -> new String[] {pk})
+        .collect(Collectors.toList())
+        .toArray(new String[0][0]);
   }
 
   private static void validate(List<String> primaryKeys, List<String> partitionKeys) {
