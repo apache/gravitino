@@ -460,12 +460,13 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     }
 
     try {
-      SchemaEntity entity =
-          store.update(
-              ident,
-              SchemaEntity.class,
-              Entity.EntityType.SCHEMA,
-              schemaEntity -> updateSchemaEntity(ident, schemaEntity, changes));
+      store.update(
+          ident,
+          SchemaEntity.class,
+          Entity.EntityType.SCHEMA,
+          schemaEntity -> updateSchemaEntity(ident, schemaEntity, changes));
+       
+      SchemaEntity entity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
 
       return HadoopSchema.builder()
           .withName(ident.name())
