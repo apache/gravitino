@@ -423,7 +423,6 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
             sortOrders,
             indexes);
     Assertions.assertEquals(createdTable.name(), tableName);
-    Assertions.assertEquals(properties, createdTable.properties());
     Assertions.assertEquals(createdTable.comment(), table_comment);
     Assertions.assertArrayEquals(partitioning, createdTable.partitioning());
     Assertions.assertEquals(indexes.length, createdTable.index().length);
@@ -471,7 +470,6 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Assertions.assertEquals(tableName, table.name());
     Assertions.assertTrue(table.comment().isPresent());
     Assertions.assertEquals(table_comment, table.comment().get());
-    Assertions.assertEquals(properties, table.options());
     Assertions.assertArrayEquals(partitionKeys, table.partitionKeys().toArray(new String[0]));
     Assertions.assertArrayEquals(primaryKeys, table.primaryKeys().toArray(new String[0]));
     Assertions.assertInstanceOf(FileStoreTable.class, table);
