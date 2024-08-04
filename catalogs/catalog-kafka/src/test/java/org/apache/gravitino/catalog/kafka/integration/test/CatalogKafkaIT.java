@@ -436,6 +436,28 @@ public class CatalogKafkaIT extends AbstractIT {
     Assertions.assertFalse(catalog.asTopicCatalog().topicExists(ident));
   }
 
+  @Test
+  void testAlterCatalogProperties() {
+
+    String catalogName1 = GravitinoITUtils.genRandomName("test_catalog");
+    Catalog catalog1 =
+        metalake.createCatalog(
+            catalogName1,
+            Catalog.Type.MESSAGING,
+            PROVIDER,
+            "comment",
+            ImmutableMap.of(BOOTSTRAP_SERVERS, "wrong_address"));
+    Assertions.assertEquals("wrong_address", catalog1.properties().get(BOOTSTRAP_SERVERS));
+
+    // alter catalog properties
+    Catalog alteredCatalog =
+        metalake.alterCatalog(
+            catalogName1, CatalogChange.setProperty(BOOTSTRAP_SERVERS, "right_address"));
+
+    Assertions.assertEquals("right_address", alteredCatalog.properties().get(BOOTSTRAP_SERVERS));
+    Assertions.assertTrue(alteredCatalog.properties().containsKey(BOOTSTRAP_SERVERS));
+  }
+
   private void assertTopicWithKafka(Topic createdTopic)
       throws ExecutionException, InterruptedException {
     // get topic from Kafka directly
