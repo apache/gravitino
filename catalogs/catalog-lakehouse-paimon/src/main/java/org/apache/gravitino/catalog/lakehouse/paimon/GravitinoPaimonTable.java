@@ -54,7 +54,7 @@ import org.apache.paimon.types.DataField;
 public class GravitinoPaimonTable extends BaseTable {
 
   @VisibleForTesting
-  private static final String PAIMON_PRIMARY_KEY_INDEX_NAME = "PAIMON_PRIMARY_KEY_INDEX";
+  public static final String PAIMON_PRIMARY_KEY_INDEX_NAME = "PAIMON_PRIMARY_KEY_INDEX";
 
   private GravitinoPaimonTable() {}
 
@@ -141,9 +141,6 @@ public class GravitinoPaimonTable extends BaseTable {
     if (indexes == null || indexes.length == 0) {
       return Collections.emptyList();
     }
-
-    Preconditions.checkArgument(
-        indexes.length == 1, "Paimon only supports no more than one Index.");
 
     Index primaryKeyIndex = indexes[0];
     Arrays.stream(primaryKeyIndex.fieldNames())

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
+import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonTable.PAIMON_PRIMARY_KEY_INDEX_NAME;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 import static org.apache.gravitino.rel.indexes.Indexes.primary;
 
@@ -405,7 +406,9 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     String[] primaryKeys = new String[] {PAIMON_COL_NAME5};
     Index[] indexes =
         Collections.singletonList(
-                primary("index1", new String[][] {new String[] {PAIMON_COL_NAME5}}))
+                primary(
+                    PAIMON_PRIMARY_KEY_INDEX_NAME,
+                    new String[][] {new String[] {PAIMON_COL_NAME5}}))
             .toArray(new Index[0]);
 
     Map<String, String> properties = createProperties();
@@ -456,6 +459,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Assertions.assertArrayEquals(partitionKeys, loadedPartitionKeys);
     Assertions.assertEquals(indexes.length, loadTable.index().length);
     for (int i = 0; i < indexes.length; i++) {
+      Assertions.assertEquals(indexes[i].name(), loadTable.index()[i].name());
       Assertions.assertEquals(indexes[i].type(), loadTable.index()[i].type());
       Assertions.assertEquals(indexes[i].fieldNames(), loadTable.index()[i].fieldNames());
     }

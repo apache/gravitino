@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
 import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonColumn.fromPaimonColumn;
+import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonTable.PAIMON_PRIMARY_KEY_INDEX_NAME;
 import static org.apache.gravitino.catalog.lakehouse.paimon.TestPaimonCatalog.PAIMON_PROPERTIES_METADATA;
 import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.checkColumnCapability;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -284,7 +285,8 @@ public class TestGravitinoPaimonTable {
     Transform[] transforms = new Transform[] {identity("col_1")};
     String[] partitionKeys = new String[] {"col_1"};
     Index[] indexes =
-        Collections.singletonList(primary("index", new String[][] {new String[] {"col_2"}}))
+        Collections.singletonList(
+                primary(PAIMON_PRIMARY_KEY_INDEX_NAME, new String[][] {new String[] {"col_2"}}))
             .toArray(new Index[0]);
 
     Table table =
@@ -327,6 +329,7 @@ public class TestGravitinoPaimonTable {
     Assertions.assertArrayEquals(partitionKeys, loadedPartitionKeys);
     Assertions.assertEquals(indexes.length, loadedTable.index().length);
     for (int i = 0; i < indexes.length; i++) {
+      Assertions.assertEquals(indexes[i].name(), loadedTable.index()[i].name());
       Assertions.assertEquals(indexes[i].type(), loadedTable.index()[i].type());
       Assertions.assertArrayEquals(indexes[i].fieldNames(), loadedTable.index()[i].fieldNames());
     }
@@ -527,7 +530,9 @@ public class TestGravitinoPaimonTable {
     List<String> primaryKeys = Collections.singletonList(columns[2].name());
     Index[] indexes =
         Collections.singletonList(
-                primary("index1", new String[][] {new String[] {columns[2].name()}}))
+                primary(
+                    PAIMON_PRIMARY_KEY_INDEX_NAME,
+                    new String[][] {new String[] {columns[2].name()}}))
             .toArray(new Index[0]);
 
     GravitinoPaimonTable gravitinoPaimonTable =
