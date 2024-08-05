@@ -37,17 +37,17 @@ public class CommonMetaService {
         !namespace.isEmpty() && namespace.levels().length <= 3,
         "Namespace should not be empty and length should be less than or equal to 3.");
     Long parentEntityId = null;
-    if (namespace.levels().length > 0) {
+    if (namespace.levels().length >= 1) {
       parentEntityId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
     }
 
-    if (namespace.levels().length > 1) {
+    if (namespace.levels().length >= 2) {
       parentEntityId =
           CatalogMetaService.getInstance()
               .getCatalogIdByMetalakeIdAndName(parentEntityId, namespace.level(1));
     }
 
-    if (namespace.levels().length > 2) {
+    if (namespace.levels().length >= 3) {
       parentEntityId =
           SchemaMetaService.getInstance()
               .getSchemaIdByCatalogIdAndName(parentEntityId, namespace.level(2));
