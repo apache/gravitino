@@ -88,19 +88,19 @@ public class OwnerOperations {
   }
 
   @PUT
-  @Path("{type}/{fullName}")
+  @Path("{metadataObjectType}/{fullName}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "set-object-owner." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-object-owner", absolute = true)
   public Response setOwnerForObject(
       @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
+      @PathParam("metadataObjectType") String metadataObjectType,
       @PathParam("fullName") String fullName,
       OwnerSetRequest request) {
     try {
       MetadataObject object =
           MetadataObjects.parse(
-              fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+              fullName, MetadataObject.Type.valueOf(metadataObjectType.toUpperCase(Locale.ROOT)));
 
       return Utils.doAs(
           httpRequest,
