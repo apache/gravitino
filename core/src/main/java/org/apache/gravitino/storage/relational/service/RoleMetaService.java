@@ -196,7 +196,7 @@ public class RoleMetaService {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
-                    mapper.softDeleteOwnerRelByEntityIdAndType(
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         roleId, MetadataObject.Type.ROLE.name())));
     return true;
   }

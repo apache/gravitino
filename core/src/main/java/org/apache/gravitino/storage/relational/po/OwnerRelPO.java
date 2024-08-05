@@ -64,13 +64,13 @@ public class OwnerRelPO {
       return this;
     }
 
-    public Builder withMetadataObjectId(Long entityId) {
-      ownerRelPO.metadataObjectId = entityId;
+    public Builder withMetadataObjectId(Long metadataObjectId) {
+      ownerRelPO.metadataObjectId = metadataObjectId;
       return this;
     }
 
-    public Builder withMetadataObjectType(String entityType) {
-      ownerRelPO.metadataObjectType = entityType;
+    public Builder withMetadataObjectType(String metadataObjectType) {
+      ownerRelPO.metadataObjectType = metadataObjectType;
       return this;
     }
 
@@ -103,8 +103,10 @@ public class OwnerRelPO {
       Preconditions.checkArgument(ownerRelPO.ownerId != null, "Owner id is required");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(ownerRelPO.ownerType), "Owner type is required");
-      Preconditions.checkArgument(ownerRelPO.metadataObjectId != null, "Entity id is required");
-      Preconditions.checkArgument(ownerRelPO.metadataObjectType != null, "Entity type is required");
+      Preconditions.checkArgument(
+          ownerRelPO.metadataObjectId != null, "Metadata object id is required");
+      Preconditions.checkArgument(
+          ownerRelPO.metadataObjectType != null, "Metadata object type is required");
       Preconditions.checkArgument(ownerRelPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(ownerRelPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(ownerRelPO.lastVersion != null, "Last version is required");

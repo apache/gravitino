@@ -244,7 +244,7 @@ public class FilesetMetaService {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
-                    mapper.softDeleteOwnerRelByEntityIdAndType(
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         filesetId, MetadataObject.Type.FILESET.name())));
 
     return true;

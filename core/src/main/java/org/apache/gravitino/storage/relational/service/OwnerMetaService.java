@@ -47,23 +47,24 @@ public class OwnerMetaService {
     OwnerRelPO ownerRelPO =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class,
-            mapper -> mapper.selectOwnerMetaByEntityIdAndType(entityId, type.name()));
+            mapper -> mapper.selectOwnerMetaByMetadataObjectIdAndType(entityId, type.name()));
 
     if (ownerRelPO == null) {
       return Optional.empty();
     }
 
-    if (ownerRelPO.getOwnerType().equals(Entity.EntityType.USER.name())) {
-      return Optional.of(
-          UserMetaService.getInstance()
-              .getUserById(getMetalake(identifier), ownerRelPO.getOwnerId()));
-    } else if (ownerRelPO.getOwnerType().equals(Entity.EntityType.GROUP.name())) {
-      return Optional.of(
-          GroupMetaService.getInstance()
-              .getGroupById(getMetalake(identifier), ownerRelPO.getOwnerId()));
-    } else {
-      throw new IllegalArgumentException(
-          String.format("Owner type doesn't support %s", ownerRelPO.getOwnerType()));
+    switch (Entity.EntityType.valueOf(ownerRelPO.getOwnerType())) {
+      case USER:
+        return Optional.of(
+            UserMetaService.getInstance()
+                .getUserById(getMetalake(identifier), ownerRelPO.getOwnerId()));
+      case GROUP:
+        return Optional.of(
+            GroupMetaService.getInstance()
+                .getGroupById(getMetalake(identifier), ownerRelPO.getOwnerId()));
+      default:
+        throw new IllegalArgumentException(
+            String.format("Owner type doesn't support %s", ownerRelPO.getOwnerType()));
     }
   }
 
@@ -85,32 +86,28 @@ public class OwnerMetaService {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
-                    mapper.softDeleteOwnerRelByEntityIdAndType(
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         entityId,
                         NameIdentifierUtil.toMetadataObject(entity, entityType).type().name())),
         () ->
             SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class, mapper -> mapper.insertOwnerEntityRel(ownerRelPO)));
+                OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(ownerRelPO)));
   }
 
   private static long getEntityId(
       long metalakeId, NameIdentifier identifier, Entity.EntityType type) {
-    long entityId;
-    if (type == Entity.EntityType.USER) {
-      entityId =
-          UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
-
-    } else if (type == Entity.EntityType.GROUP) {
-      entityId =
-          GroupMetaService.getInstance()
-              .getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
-
-    } else {
-      MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
-      entityId =
-          MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
+    switch (type) {
+      case USER:
+        return UserMetaService.getInstance()
+            .getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
+      case GROUP:
+        return GroupMetaService.getInstance()
+            .getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
+      default:
+        MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
+        return MetadataObjectService.getMetadataObjectId(
+            metalakeId, object.fullName(), object.type());
     }
-    return entityId;
   }
 
   private static String getMetalake(NameIdentifier identifier) {

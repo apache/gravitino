@@ -244,7 +244,7 @@ public class SchemaMetaService {
                 SessionUtils.doWithoutCommit(
                     OwnerMetaMapper.class,
                     mapper ->
-                        mapper.softDeleteOwnerRelByEntityIdAndType(
+                        mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                             schemaId, MetadataObject.Type.SCHEMA.name())));
       }
     }

@@ -191,7 +191,7 @@ public class TableMetaService {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
-                    mapper.softDeleteOwnerRelByEntityIdAndType(
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         tableId, MetadataObject.Type.TABLE.name())));
 
     return true;

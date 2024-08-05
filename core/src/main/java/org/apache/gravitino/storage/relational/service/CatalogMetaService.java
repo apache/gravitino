@@ -245,7 +245,7 @@ public class CatalogMetaService {
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
                   mapper ->
-                      mapper.softDeleteOwnerRelByEntityIdAndType(
+                      mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                           catalogId, MetadataObject.Type.CATALOG.name())));
     }
 

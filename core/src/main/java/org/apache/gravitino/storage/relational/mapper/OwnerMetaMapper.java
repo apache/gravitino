@@ -51,7 +51,7 @@ public interface OwnerMetaMapper {
           + " WHERE metadata_object_id = #{metadataObjectId} AND"
           + " metadata_object_type = #{metadataObjectType}"
           + " AND deleted_at = 0")
-  OwnerRelPO selectOwnerMetaByEntityIdAndType(
+  OwnerRelPO selectOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
@@ -71,7 +71,7 @@ public interface OwnerMetaMapper {
           + " #{ownerRelPO.lastVersion},"
           + " #{ownerRelPO.deletedAt}"
           + ")")
-  void insertOwnerEntityRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO);
+  void insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO);
 
   @Update(
       "UPDATE "
@@ -79,7 +79,7 @@ public interface OwnerMetaMapper {
           + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
           + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
           + " WHERE metadata_object_id = #{metadataObjectId} AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0")
-  void softDeleteOwnerRelByEntityIdAndType(
+  void softDeleteOwnerRelByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 

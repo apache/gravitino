@@ -204,7 +204,7 @@ public class TopicMetaService {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
-                    mapper.softDeleteOwnerRelByEntityIdAndType(
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         topicId, MetadataObject.Type.TOPIC.name())));
 
     return true;
