@@ -389,11 +389,13 @@ public class JDBCBackend implements RelationalBackend {
       NameIdentifier dstIdentifier,
       Entity.EntityType dstType,
       boolean override) {
-    if (relType == SupportsRelationOperations.Type.OWNER_REL) {
-      OwnerMetaService.getInstance().setOwner(srcIdentifier, srcType, dstIdentifier, dstType);
-    } else {
-      throw new IllegalArgumentException(
-          String.format("Doesn't support the relation type %s", relType));
+    switch (relType) {
+      case OWNER_REL:
+        OwnerMetaService.getInstance().setOwner(srcIdentifier, srcType, dstIdentifier, dstType);
+        break;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
     }
   }
 

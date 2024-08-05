@@ -150,6 +150,13 @@ public class OwnerManager {
             String.format("The number of the owner %s must be 1", metadataObject.fullName()));
       }
 
+      Entity entity = entities.get(0);
+      if (!(entity instanceof UserEntity) && !(entity instanceof GroupEntity)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Doesn't support owner entity class %s", entities.get(0).getClass().getName()));
+      }
+
       if (entities.get(0) instanceof UserEntity) {
         UserEntity user = (UserEntity) entities.get(0);
         owner.name = user.name();
@@ -158,12 +165,7 @@ public class OwnerManager {
         GroupEntity group = (GroupEntity) entities.get(0);
         owner.name = group.name();
         owner.type = Owner.Type.GROUP;
-      } else {
-        throw new IllegalArgumentException(
-            String.format(
-                "Doesn't support owner entity class %s", entities.get(0).getClass().getName()));
       }
-
       return Optional.of(owner);
     } catch (NoSuchEntityException nse) {
       throw new NotFoundException(
