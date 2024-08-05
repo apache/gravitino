@@ -132,7 +132,7 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 :::
 
 :::info
-You can also specify catalog parameters by setting configuration entries in the style `gravitino.auxService.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
+You can also specify catalog parameters by setting configuration entries in the style `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
 :::
 
 ### Other Apache Iceberg catalog properties
