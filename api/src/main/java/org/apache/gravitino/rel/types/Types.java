@@ -262,8 +262,8 @@ public class Types {
       Preconditions.checkArgument(
           scale >= 0 && scale <= precision,
           "Decimal scale must be in range [0, precision (%d)]: scala: %d",
-          scale,
-          precision);
+          precision,
+          scale);
     }
 
     /** @return The name of the decimal type. */
