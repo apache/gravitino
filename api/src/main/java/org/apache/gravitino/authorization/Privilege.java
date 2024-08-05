@@ -67,10 +67,10 @@ public interface Privilege {
     PRODUCE_TOPIC(0L, 1L << 12),
     /** The privilege to consume from a topic. */
     CONSUME_TOPIC(0L, 1L << 13),
-    /** The privilege to create a user */
-    CREATE_USER(0L, 1L << 14),
-    /** The privilege to create a group */
-    CREATE_GROUP(0L, 1L << 15),
+    /** The privilege to manage users */
+    MANAGE_USERS(0L, 1L << 14),
+    /** The privilege to manage groups */
+    MANAGE_GROUPS(0L, 1L << 15),
     /** The privilege to create a role */
     CREATE_ROLE(0L, 1L << 16),
     /** The privilege to grant or revoke a role for the user or the group. */

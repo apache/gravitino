@@ -53,6 +53,7 @@ import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
@@ -1036,6 +1037,34 @@ public class POConverters {
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
           .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static OwnerRelPO initializeOwnerRelPOsWithVersion(
+      Long metalakeId,
+      String ownerType,
+      Long ownerId,
+      String metadataObjectType,
+      Long metadataObjectId) {
+    try {
+      AuditInfo auditInfo =
+          AuditInfo.builder()
+              .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+              .withCreateTime(Instant.now())
+              .build();
+      return OwnerRelPO.builder()
+          .withMetalakeId(metalakeId)
+          .withOwnerId(ownerId)
+          .withOwnerType(ownerType)
+          .withMetadataObjectId(metadataObjectId)
+          .withMetadataObjectType(metadataObjectType)
+          .withAuditIfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeleteAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
