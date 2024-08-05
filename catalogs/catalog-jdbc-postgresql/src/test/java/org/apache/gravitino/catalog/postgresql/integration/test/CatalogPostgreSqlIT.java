@@ -292,6 +292,42 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Assertions.assertTrue(column.isPresent());
   }
 
+  @Test
+  void testCreateUpperCaseSchemaAndTable() {
+    // Create table from Gravitino API
+    Column[] columns = columnsWithSpecialNames();
+
+    String tableN = GravitinoITUtils.genRandomName("postgresql_it_table").toUpperCase();
+    String schemaN = GravitinoITUtils.genRandomName("postgresql_it_schema").toUpperCase();
+
+    // Create a schema with upper case name
+    Schema schema =
+        catalog.asSchemas().createSchema(schemaN, schema_comment, Collections.EMPTY_MAP);
+    System.out.println(schema);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaN, tableN);
+    Distribution distribution = Distributions.NONE;
+
+    SortOrder[] sortOrders = new SortOrder[0];
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    // Create a table with upper case name
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
+
+    Table t = tableCatalog.loadTable(tableIdentifier);
+    Optional<Column> column =
+        Arrays.stream(t.columns()).filter(c -> c.name().equals("binary")).findFirst();
+    Assertions.assertTrue(column.isPresent());
+  }
+
   private Map<String, String> createProperties() {
     Map<String, String> properties = Maps.newHashMap();
     return properties;
