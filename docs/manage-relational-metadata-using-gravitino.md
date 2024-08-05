@@ -167,6 +167,15 @@ Currently, Gravitino supports the following changes to a catalog:
 | Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `CatalogChange.setProperty("key1", "value1")`  |
 | Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `CatalogChange.removeProperty("key1")`         |
 
+:::warning
+
+Most catalog-altering operations are generally safe. However, if you want to change the catalog's URI, you should proceed with caution. Changing the URI may point to a different cluster, rendering the metadata stored in Gravitino unusable.
+For instance, if the old URI and the new URI point to different clusters that both have a database named db1, changing the URI might cause the old metadata, such as audit information, to be used when accessing db1, which is undesirable.
+
+Therefore, do not change the catalog's URI unless you fully understand the consequences of such a modification.
+
+:::
+
 ### Drop a catalog
 
 You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:

@@ -18,8 +18,16 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import com.google.common.collect.Maps;
+import java.util.Map;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
@@ -39,5 +47,38 @@ public class CatalogIcebergHiveIT extends CatalogIcebergBaseIT {
             "hdfs://%s:%d/user/hive/warehouse-catalog-iceberg/",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
+  }
+
+  @Test
+  void testAlterCatalogProperties() {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    catalogProperties.put("key1", "val1");
+    catalogProperties.put("key2", "val2");
+    String icebergCatalogBackendName = "iceberg-catalog-name-test";
+
+    String wrongURIS = URIS + "wrong";
+    catalogProperties.put(IcebergConfig.CATALOG_BACKEND.getKey(), TYPE);
+    catalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), wrongURIS);
+    catalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    catalogProperties.put(IcebergConfig.CATALOG_BACKEND_NAME.getKey(), icebergCatalogBackendName);
+
+    String catalogNm = GravitinoITUtils.genRandomName("iceberg_it_catalog");
+    Catalog createdCatalog =
+        metalake.createCatalog(
+            catalogNm, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", catalogProperties);
+    Catalog loadCatalog = metalake.loadCatalog(catalogNm);
+    Assertions.assertEquals(createdCatalog, loadCatalog);
+
+    Assertions.assertThrows(
+        Exception.class, () -> createdCatalog.asSchemas().createSchema("schema1", "", null));
+
+    metalake.alterCatalog(
+        catalogNm, CatalogChange.setProperty(IcebergConfig.CATALOG_URI.getKey(), URIS));
+
+    Assertions.assertDoesNotThrow(
+        () -> createdCatalog.asSchemas().createSchema("schema1", "", null));
+
+    createdCatalog.asSchemas().dropSchema("schema1", false);
+    metalake.dropCatalog(catalogNm);
   }
 }

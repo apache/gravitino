@@ -84,19 +84,18 @@ public class AuthenticationConfig extends Config {
               PropertyEntry.booleanPropertyEntry(
                   IMPERSONATION_ENABLE_KEY,
                   "Whether to enable impersonation for the Iceberg catalog",
-                  false,
-                  true,
+                  false /* required */,
+                  false /* immutable */,
                   DEFAULT_IMPERSONATION_ENABLE,
-                  false,
-                  false))
+                  false /* hidden */,
+                  false /* reserved */))
           .put(
               AUTH_TYPE_KEY,
-              PropertyEntry.stringImmutablePropertyEntry(
+              PropertyEntry.stringOptionalPropertyEntry(
                   AUTH_TYPE_KEY,
                   "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos",
-                  false,
-                  "simple",
-                  false,
-                  false))
+                  false /* immutable */,
+                  "simple" /* defaultValue */,
+                  false /* hidden */))
           .build();
 }

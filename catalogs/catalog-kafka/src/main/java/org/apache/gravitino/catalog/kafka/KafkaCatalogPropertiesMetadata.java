@@ -35,7 +35,7 @@ public class KafkaCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadat
           PropertyEntry.stringRequiredPropertyEntry(
               BOOTSTRAP_SERVERS,
               "The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them",
-              true /* immutable */,
+              false /* immutable */,
               false /* hidden */));
 
   @Override
