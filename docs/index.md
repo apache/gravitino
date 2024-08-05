@@ -68,6 +68,7 @@ Gravitino currently supports the following catalogs:
 **Relational catalogs:**
 
 * [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
+* [**Paimon catalog**](./lakehouse-paimon-catalog.md)
 * [**Hive catalog**](./apache-hive-catalog.md)
 * [**MySQL catalog**](./jdbc-mysql-catalog.md)
 * [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
@@ -104,10 +105,8 @@ complete environment. To experience all the features, see
 
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
-* [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to using Gravitino to
-  manage Apache Iceberg data.
-* [Iceberg REST catalog service](./iceberg-rest-service.md): a
-  complete guide to using Gravitino as an Apache Iceberg REST catalog service.
+* [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to using Gravitino to manage Apache Iceberg data.
+* [Paimon catalog](./lakehouse-paimon-catalog.md): a complete guide to using Gravitino to manage Apache Paimon data.
 * [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino to manage Apache Hive data.
 * [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino to manage MySQL data.
 * [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino to manage PostgreSQL data.
@@ -116,13 +115,30 @@ Gravitino supports different catalogs to manage the metadata in different source
   using Hadoop Compatible File System (HCFS).
 * [Kafka catalog](./kafka-catalog.md): a complete guide to using Gravitino to manage Kafka topics metadata.
 
-### Trino connector
+### Gravitino Iceberg REST catalog service
 
-Gravitino provides a Trino connector to manage Trino metadata in a unified
-way. To use the Trino connector, see:
+* [Iceberg REST catalog service](./iceberg-rest-service.md): a complete guide to using Gravitino as an Apache Iceberg REST catalog service.
 
-* [How to use Gravitino Trino connector](./trino-connector/index.md): a complete guide to using the Gravitino
-  Trino connector.
+### Connectors
+
+#### Trino connector
+
+Gravitino provides a Trino connector to manage Trino metadata in a unified way. To use the Trino connector, see:
+
+* [How to use Gravitino Trino connector](./trino-connector/index.md): a complete guide to using the Gravitino Trino connector.
+
+#### Spark connector
+
+Gravitino provides a Spark connector to manage metadata in a unified way. To use the Spark connector, see:
+
+* [Gravitino Spark connector](./spark-connector/spark-connector.md): a complete guide to using the Gravitino Spark connector.
+
+#### Flink connector
+
+Gravitino provides a Flink connector to manage metadata in a unified way. To use the Flink connector, see:
+
+* [Gravitino Flink connector](./flink-connector/flink-connector.md): a complete guide to using the Gravitino Flink connector.
+
 
 ### Server administration
 

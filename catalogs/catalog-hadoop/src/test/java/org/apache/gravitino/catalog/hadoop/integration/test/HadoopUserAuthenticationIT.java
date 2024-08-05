@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SchemaChange;
@@ -270,6 +271,20 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     // Make sure real user is 'gravitino_client'
     Assertions.assertTrue(
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
+
+    // Make the property wrong by changing the principal
+    gravitinoMetalake.alterCatalog(
+        CATALOG_NAME, CatalogChange.setProperty(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL + "wrong"));
+    exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
+    exceptionMessage = Throwables.getStackTraceAsString(exception);
+    Assertions.assertTrue(exceptionMessage.contains("Failed to login with Kerberos"));
+
+    // Restore the property, everything goes okay.
+    gravitinoMetalake.alterCatalog(
+        CATALOG_NAME, CatalogChange.setProperty(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL));
 
     // Now try to give the user the permission to create schema again
     kerberosHiveContainer.executeInContainer("hadoop", "fs", "-chmod", "-R", "777", "/user/hadoop");

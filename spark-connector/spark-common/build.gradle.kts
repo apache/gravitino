@@ -155,6 +155,14 @@ tasks.clean {
   delete("spark-warehouse")
 }
 
+sourceSets {
+  named("test") {
+    resources {
+      exclude("**/*")
+    }
+  }
+}
+
 val testJar by tasks.registering(Jar::class) {
   archiveClassifier.set("tests")
   from(sourceSets["test"].output)

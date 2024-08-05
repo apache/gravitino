@@ -108,6 +108,10 @@ Alternatively, to run the Gravitino server in frontend, please run:
 
 And press `CTRL+C` to stop the Gravitino server.
 
+### Gravitino Iceberg REST catalog service
+
+Gravitino provides Iceberg REST catalog service to manage Iceberg, please refer to [Gravitino Iceberg REST catalog service](docs/iceberg-rest-service.md) for more details.
+
 ### Using Trino with Apache Gravitino
 
 Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-connector/index.md).

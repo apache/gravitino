@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -135,6 +136,29 @@ public class HadoopCatalogIT extends AbstractIT {
   private static void dropSchema() {
     catalog.asSchemas().dropSchema(schemaName, true);
     Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaName));
+  }
+
+  @Test
+  void testAlterCatalogLocation() {
+    String catalogName = GravitinoITUtils.genRandomName("test_alter_catalog_location");
+    String location = defaultBaseLocation();
+    String newLocation = location + "/new_location";
+
+    Map<String, String> catalogProperties = ImmutableMap.of("location", location);
+    // Create a catalog using location
+    Catalog filesetCatalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, provider, "comment", catalogProperties);
+
+    Assertions.assertEquals(location, filesetCatalog.properties().get("location"));
+
+    // Now try to alter the location and change it to `newLocation`.
+    Catalog modifiedCatalog =
+        metalake.alterCatalog(catalogName, CatalogChange.setProperty("location", newLocation));
+
+    Assertions.assertEquals(newLocation, modifiedCatalog.properties().get("location"));
+
+    metalake.dropCatalog(catalogName);
   }
 
   @Test

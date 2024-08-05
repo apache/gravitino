@@ -70,8 +70,9 @@ public class MetadataObjects {
     Preconditions.checkArgument(
         names.size() != 1
             || type == MetadataObject.Type.CATALOG
-            || type == MetadataObject.Type.METALAKE,
-        "If the length of names is 1, it must be the CATALOG or METALAKE type");
+            || type == MetadataObject.Type.METALAKE
+            || type == MetadataObject.Type.ROLE,
+        "If the length of names is 1, it must be the CATALOG, METALAKE, or ROLE type");
 
     Preconditions.checkArgument(
         names.size() != 2 || type == MetadataObject.Type.SCHEMA,
@@ -109,7 +110,8 @@ public class MetadataObjects {
 
     // Return null if the object is the root object
     if (object.type() == MetadataObject.Type.METALAKE
-        || object.type() == MetadataObject.Type.CATALOG) {
+        || object.type() == MetadataObject.Type.CATALOG
+        || object.type() == MetadataObject.Type.ROLE) {
       return null;
     }
 
