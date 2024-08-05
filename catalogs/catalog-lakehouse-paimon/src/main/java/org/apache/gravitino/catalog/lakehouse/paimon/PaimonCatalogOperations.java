@@ -344,13 +344,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     Preconditions.checkArgument(
         sortOrders == null || sortOrders.length == 0,
         "Sort orders are not supported for Paimon in Gravitino.");
-    Preconditions.checkArgument(indexes.length <= 1, "Paimon supports no more than one Index.");
-    Arrays.stream(indexes)
-        .forEach(
-            index ->
-                Preconditions.checkArgument(
-                    index.type() == Index.IndexType.PRIMARY_KEY,
-                    "Paimon only supports primary key Index."));
+    checkPaimonIndexes(indexes);
     String currentUser = currentUser();
     GravitinoPaimonTable createdTable =
         GravitinoPaimonTable.builder()
@@ -465,5 +459,15 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
         "Namespace can not be null or empty.");
     String[] levels = identifier.namespace().levels();
     return NameIdentifier.of(levels[levels.length - 1], identifier.name());
+  }
+
+  private void checkPaimonIndexes(Index[] indexes) {
+    Preconditions.checkArgument(indexes.length <= 1, "Paimon supports no more than one Index.");
+    Arrays.stream(indexes)
+        .forEach(
+            index ->
+                Preconditions.checkArgument(
+                    index.type() == Index.IndexType.PRIMARY_KEY,
+                    "Paimon only supports primary key Index."));
   }
 }
