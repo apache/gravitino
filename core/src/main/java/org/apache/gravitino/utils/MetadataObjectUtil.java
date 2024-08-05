@@ -27,6 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 
 public class MetadataObjectUtil {
 
@@ -41,6 +42,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.TOPIC, Entity.EntityType.TOPIC)
           .put(MetadataObject.Type.FILESET, Entity.EntityType.FILESET)
           .put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN)
+          .put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE)
           .build();
 
   private MetadataObjectUtil() {}
@@ -78,6 +80,8 @@ public class MetadataObjectUtil {
     switch (metadataObject.type()) {
       case METALAKE:
         return NameIdentifierUtil.ofMetalake(metalakeName);
+      case ROLE:
+        return AuthorizationUtils.ofRole(metalakeName, metadataObject.name());
       case CATALOG:
       case SCHEMA:
       case TABLE:
