@@ -60,6 +60,18 @@ public interface UserMetaMapper {
   UserPO selectUserMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name);
 
+  @Select(
+      "SELECT user_id as userId, user_name as userName,"
+          + " metalake_id as metalakeId,"
+          + " audit_info as auditInfo,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
+          + " FROM "
+          + USER_TABLE_NAME
+          + " WHERE user_id = #{userId}"
+          + " AND deleted_at = 0")
+  UserPO selectUserMetaById(@Param("userId") Long userId);
+
   @Insert(
       "INSERT INTO "
           + USER_TABLE_NAME
