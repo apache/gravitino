@@ -37,6 +37,7 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -86,6 +87,19 @@ public class FilesetIT extends AbstractIT {
     }
   }
 
+  @AfterEach
+  public void cleanUp() {
+    String[] catalog = metalake.listCatalogs();
+    for (String catalogName : catalog) {
+      Catalog filesetCatalog = metalake.loadCatalog(catalogName);
+      String[] schemas = filesetCatalog.asSchemas().listSchemas();
+      for (String schemaName : schemas) {
+        filesetCatalog.asSchemas().dropSchema(schemaName, true);
+      }
+      metalake.dropCatalog(catalogName);
+    }
+  }
+
   @Test
   public void testGetFilesetContext() {
     String catalogName = GravitinoITUtils.genRandomName("catalog");
@@ -104,8 +118,7 @@ public class FilesetIT extends AbstractIT {
     Assertions.assertTrue(catalog.asSchemas().schemaExists(schemaName));
 
     String filesetName = GravitinoITUtils.genRandomName("fileset");
-    NameIdentifier filesetIdent =
-        NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName);
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     Assertions.assertFalse(catalog.asFilesetCatalog().filesetExists(filesetIdent));
     Fileset expectedFileset =
         catalog
