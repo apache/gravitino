@@ -432,7 +432,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     for (int i = 0; i < indexes.length; i++) {
       Assertions.assertEquals(indexes[i].name(), createdTable.index()[i].name());
       Assertions.assertEquals(indexes[i].type(), createdTable.index()[i].type());
-      Assertions.assertEquals(indexes[i].fieldNames(), createdTable.index()[i].fieldNames());
+      Assertions.assertArrayEquals(indexes[i].fieldNames(), createdTable.index()[i].fieldNames());
     }
     Assertions.assertEquals(createdTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
@@ -461,7 +461,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     for (int i = 0; i < indexes.length; i++) {
       Assertions.assertEquals(indexes[i].name(), loadTable.index()[i].name());
       Assertions.assertEquals(indexes[i].type(), loadTable.index()[i].type());
-      Assertions.assertEquals(indexes[i].fieldNames(), loadTable.index()[i].fieldNames());
+      Assertions.assertArrayEquals(indexes[i].fieldNames(), loadTable.index()[i].fieldNames());
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {

@@ -21,7 +21,6 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.dto.rel.partitioning.Partitioning.EMPTY_PARTITIONING;
 import static org.apache.gravitino.meta.AuditInfo.EMPTY;
-import static org.apache.gravitino.rel.indexes.Indexes.EMPTY_INDEXES;
 import static org.apache.gravitino.rel.indexes.Indexes.primary;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -76,9 +75,6 @@ public class GravitinoPaimonTable extends BaseTable {
     }
     if (partitioning == null) {
       partitioning = EMPTY_PARTITIONING;
-    }
-    if (indexes == null) {
-      indexes = EMPTY_INDEXES;
     }
 
     Map<String, String> normalizedProperties = new HashMap<>(properties);
@@ -141,6 +137,9 @@ public class GravitinoPaimonTable extends BaseTable {
     if (indexes == null || indexes.length == 0) {
       return Collections.emptyList();
     }
+
+    Preconditions.checkArgument(
+        indexes.length == 1, "Paimon only supports no more than one Index.");
 
     Index primaryKeyIndex = indexes[0];
     Arrays.stream(primaryKeyIndex.fieldNames())
