@@ -49,6 +49,10 @@ public class MetadataObjectService {
     }
 
     List<String> names = DOT_SPLITTER.splitToList(fullName);
+    if (type == MetadataObject.Type.ROLE) {
+      return RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, names.get(0));
+    }
+
     long catalogId =
         CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, names.get(0));
     if (type == MetadataObject.Type.CATALOG) {

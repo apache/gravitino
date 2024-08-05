@@ -26,6 +26,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
+import static org.apache.gravitino.SupportsRelationOperations.Type.OWNER_REL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -668,6 +669,55 @@ public class TestJDBCBackend {
     assertTrue(tags.contains(tag));
     assertEquals(1, tags.size());
 
+    backend.insertRelation(
+        OWNER_REL,
+        metalake.nameIdentifier(),
+        metalake.type(),
+        user.nameIdentifier(),
+        user.type(),
+        true);
+
+    backend.insertRelation(
+        OWNER_REL,
+        anotherMetaLake.nameIdentifier(),
+        anotherMetaLake.type(),
+        anotherUser.nameIdentifier(),
+        anotherUser.type(),
+        true);
+
+    backend.insertRelation(
+        OWNER_REL,
+        catalog.nameIdentifier(),
+        catalog.type(),
+        user.nameIdentifier(),
+        user.type(),
+        true);
+
+    backend.insertRelation(
+        OWNER_REL,
+        schema.nameIdentifier(),
+        schema.type(),
+        user.nameIdentifier(),
+        user.type(),
+        true);
+
+    backend.insertRelation(
+        OWNER_REL, table.nameIdentifier(), table.type(), user.nameIdentifier(), user.type(), true);
+
+    backend.insertRelation(
+        OWNER_REL, topic.nameIdentifier(), topic.type(), user.nameIdentifier(), user.type(), true);
+
+    backend.insertRelation(
+        OWNER_REL,
+        fileset.nameIdentifier(),
+        fileset.type(),
+        user.nameIdentifier(),
+        user.type(),
+        true);
+
+    backend.insertRelation(
+        OWNER_REL, role.nameIdentifier(), role.type(), user.nameIdentifier(), user.type(), true);
+
     // meta data soft delete
     backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);
 
@@ -722,6 +772,8 @@ public class TestJDBCBackend {
     assertTrue(legacyRecordExistsInDB(user.id(), Entity.EntityType.USER));
     assertTrue(legacyRecordExistsInDB(group.id(), Entity.EntityType.GROUP));
     assertEquals(2, countRoleRels(role.id()));
+    assertEquals(7, countOwnerRel(metalake.id()));
+    assertEquals(1, countOwnerRel(anotherMetaLake.id()));
     assertEquals(2, countRoleRels(anotherRole.id()));
     assertEquals(2, listFilesetVersions(fileset.id()).size());
     assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
@@ -744,6 +796,8 @@ public class TestJDBCBackend {
     assertEquals(2, countRoleRels(anotherRole.id()));
     assertEquals(0, listFilesetVersions(fileset.id()).size());
     assertFalse(legacyRecordExistsInDB(tag.id(), Entity.EntityType.TAG));
+    assertEquals(0, countOwnerRel(metalake.id()));
+    assertEquals(1, countOwnerRel(anotherMetaLake.id()));
 
     // soft delete for old version fileset
     assertEquals(3, listFilesetVersions(anotherFileset.id()).size());
@@ -867,6 +921,25 @@ public class TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return count;
+  }
+
+  private Integer countOwnerRel(Long metalakeId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM owner_meta WHERE metalake_id = %d", metalakeId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
   }
 
   public static BaseMetalake createBaseMakeLake(Long id, String name, AuditInfo auditInfo) {
