@@ -46,16 +46,29 @@ public interface Distribution extends Expression {
   /**
    * Indicates whether some other object is "equal to" this one.
    *
-   * @param distribution The reference distribution object with which to compare.
+   * @param obj The reference object with which to compare.
    * @return returns true if this object is the same as the obj argument; false otherwise.
    */
-  default boolean equals(Distribution distribution) {
-    if (distribution == null) {
+  @Override
+  default boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if(obj == null || getClass() != obj.getClass()){
       return false;
     }
+    Distribution that = (Distribution) obj;
+    return number() == that.number()
+        && strategy().equals(that.strategy())
+        && Arrays.equals(expressions(), that.expressions());
+  }
 
-    return strategy().equals(distribution.strategy())
-        && number() == distribution.number()
-        && Arrays.equals(expressions(), distribution.expressions());
+  @Override
+  default int hashCode() {
+    int result = strategy().hashCode();
+    result = 31 * result + number();
+    result = 31 * result + Arrays.hashCode(expressions());
+    return result;
+    
   }
 }
