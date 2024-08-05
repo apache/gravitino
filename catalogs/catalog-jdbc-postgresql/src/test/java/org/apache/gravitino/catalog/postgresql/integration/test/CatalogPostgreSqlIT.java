@@ -301,9 +301,7 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     String schemaN = GravitinoITUtils.genRandomName("postgresql_it_schema").toUpperCase();
 
     // Create a schema with upper case name
-    Schema schema =
-        catalog.asSchemas().createSchema(schemaN, schema_comment, Collections.EMPTY_MAP);
-    System.out.println(schema);
+    catalog.asSchemas().createSchema(schemaN, schema_comment, Collections.EMPTY_MAP);
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaN, tableN);
     Distribution distribution = Distributions.NONE;
 
