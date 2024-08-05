@@ -93,11 +93,15 @@ public class TestTypes {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains("Decimals with precision larger than 38 are not supported"));
+            .contains("Decimal precision must be in range[1, 38]:"));
 
     exception =
-        Assertions.assertThrows(IllegalArgumentException.class, () -> Types.DecimalType.of(0, 40));
-    Assertions.assertTrue(exception.getMessage().contains("Scale cannot be larger than precision"));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> Types.DecimalType.of(1, 40));
+    Assertions.assertTrue(exception.getMessage().contains("Decimal scale must be in range [0, precision (1)]:"));
+
+    exception =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> Types.DecimalType.of(0, 0));
+    Assertions.assertTrue(exception.getMessage().contains("Decimal precision must be in range[1, 38]:"));
 
     Types.DecimalType decimalType = Types.DecimalType.of(26, 10);
     Assertions.assertEquals(Type.Name.DECIMAL, decimalType.name());
