@@ -20,6 +20,7 @@ package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -31,6 +32,8 @@ import org.apache.gravitino.dto.authorization.OwnerDTO;
 @ToString
 @EqualsAndHashCode(callSuper = true)
 public class OwnerResponse extends BaseResponse {
+
+  @Nullable
   @JsonProperty("owner")
   private final OwnerDTO owner;
 
@@ -54,9 +57,10 @@ public class OwnerResponse extends BaseResponse {
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(owner != null, "owner must not be null");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(owner.name()), "owner 'name' must not be null and empty");
-    Preconditions.checkArgument(owner.type() != null, "owner 'type' must not be null");
+    if (owner != null) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(owner.name()), "owner 'name' must not be null and empty");
+      Preconditions.checkArgument(owner.type() != null, "owner 'type' must not be null");
+    }
   }
 }

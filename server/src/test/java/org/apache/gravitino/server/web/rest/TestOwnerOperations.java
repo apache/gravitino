@@ -42,7 +42,6 @@ import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.MessageResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -142,9 +141,9 @@ class TestOwnerOperations extends JerseyTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
 
-    MessageResponse messageResponse = resp1.readEntity(MessageResponse.class);
-    Assertions.assertEquals(0, messageResponse.getCode());
-    Assertions.assertEquals("Owner is not set", messageResponse.message());
+    OwnerResponse ownerResponse1 = resp1.readEntity(OwnerResponse.class);
+    Assertions.assertEquals(0, ownerResponse1.getCode());
+    Assertions.assertNull(ownerResponse1.getOwner());
 
     // Test to throw NotFoundException
     doThrow(new NotFoundException("mock error")).when(manager).getOwner(any(), any());

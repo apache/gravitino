@@ -36,7 +36,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
-import org.apache.gravitino.dto.responses.MessageResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -48,7 +47,7 @@ import org.apache.gravitino.server.web.Utils;
 @Path("/metalakes/{metalake}/owners")
 public class OwnerOperations {
 
-  private final OwnerManager ownershipManager;
+  private final OwnerManager ownerManager;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -56,7 +55,7 @@ public class OwnerOperations {
     // Because ownerManager may be null when Gravitino doesn't enable authorization,
     // and Jersey injection doesn't support null value. So OwnerOperations chooses to retrieve
     // ownerManager from GravitinoEnv instead of injection here.
-    this.ownershipManager = GravitinoEnv.getInstance().ownerManager();
+    this.ownerManager = GravitinoEnv.getInstance().ownerManager();
   }
 
   @GET
@@ -75,11 +74,11 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Optional<Owner> owner = ownershipManager.getOwner(metalake, object);
+            Optional<Owner> owner = ownerManager.getOwner(metalake, object);
             if (owner.isPresent()) {
               return Utils.ok(new OwnerResponse(DTOConverters.toDTO(owner.get())));
             } else {
-              return Utils.ok(new MessageResponse("Owner is not set"));
+              return Utils.ok(new OwnerResponse(null));
             }
           });
     } catch (Exception e) {
@@ -106,7 +105,7 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            ownershipManager.setOwner(metalake, object, request.getName(), request.getType());
+            ownerManager.setOwner(metalake, object, request.getName(), request.getType());
             return Utils.ok(new SetResponse(true));
           });
     } catch (Exception e) {
