@@ -52,16 +52,15 @@ public class OwnerManager {
               + "store to use relational entity store and restart the Gravitino server";
       LOG.error(errorMsg);
       throw new RuntimeException(errorMsg);
-    }
-
-    if (!(store instanceof SupportsRelationOperations)) {
+    } else if (store instanceof SupportsRelationOperations) {
+      this.store = store;
+    } else {
       String errorMsg =
-          "OwnerManager cannot run with entity store that does not support relation operations, "
+          "OwnerManager currently only supports relational entity store, "
               + "please configure the entity store to use relational entity store and restart the Gravitino server";
       LOG.error(errorMsg);
       throw new RuntimeException(errorMsg);
     }
-    this.store = store;
   }
 
   public void setOwner(
