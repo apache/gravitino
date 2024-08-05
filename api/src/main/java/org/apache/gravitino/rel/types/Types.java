@@ -256,11 +256,14 @@ public class Types {
 
     static void checkPrecisionScale(int precision, int scale) {
       Preconditions.checkArgument(
-          precision <= 38,
-          "Decimals with precision larger than 38 are not supported: %s",
+          precision > 0 && precision <= 38,
+          "Decimal precision must be in range[1, 38]: precision: %d",
           precision);
       Preconditions.checkArgument(
-          scale <= precision, "Scale cannot be larger than precision: %s > %s", scale, precision);
+          scale >= 0 && scale <= precision,
+          "Decimal scale must be in range [0, precision (%d)]: scala: %d",
+          scale,
+          precision);
     }
 
     /** @return The name of the decimal type. */
