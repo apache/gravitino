@@ -130,7 +130,7 @@ public class OwnerManager {
     try {
       OwnerImpl owner = new OwnerImpl();
       NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-      List entities =
+      List<? extends Entity> entities =
           TreeLockUtils.doWithTreeLock(
               ident,
               LockType.READ,
