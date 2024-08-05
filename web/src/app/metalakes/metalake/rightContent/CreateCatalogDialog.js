@@ -376,7 +376,7 @@ const CreateCatalogDialog = props => {
       propsItems = propsItems.map((it, idx) => {
         let propItem = {
           ...it,
-          disabled: true
+          disabled: it.key === 'catalog-backend' && type === 'update'
         }
 
         const findProp = Object.keys(properties).find(i => i === it.key)
@@ -394,8 +394,7 @@ const CreateCatalogDialog = props => {
         if (findPropIndex === -1) {
           let propItem = {
             key: item,
-            value: properties[item],
-            disabled: data.type === 'fileset' && item === 'location' && type === 'update'
+            value: properties[item]
           }
           propsItems.push(propItem)
         }
