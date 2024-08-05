@@ -257,11 +257,11 @@ public class Types {
     static void checkPrecisionScale(int precision, int scale) {
       Preconditions.checkArgument(
           precision > 0 && precision <= 38,
-          "Decimal precision must be in range[1, 38]: precision: %d",
+          "Decimal precision must be in range[1, 38]: precision: %s",
           precision);
       Preconditions.checkArgument(
           scale >= 0 && scale <= precision,
-          "Decimal scale must be in range [0, precision (%d)]: scala: %d",
+          "Decimal scale must be in range [0, precision (%s)]: scala: %s",
           precision,
           scale);
     }
