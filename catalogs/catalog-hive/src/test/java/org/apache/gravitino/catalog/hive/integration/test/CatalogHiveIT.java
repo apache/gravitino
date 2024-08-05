@@ -1637,6 +1637,40 @@ public class CatalogHiveIT extends AbstractIT {
                 catalogName + "_not_exists", "org.apache.gravitino.catalog.not.exists"));
   }
 
+  @Test
+  void testAlterCatalogProperties() {
+    Map<String, String> properties = Maps.newHashMap();
+    String nameOfCatalog = GravitinoITUtils.genRandomName("catalog");
+    // Wrong Hive HIVE_METASTORE_URIS
+    String wrongHiveMetastoreURI = HIVE_METASTORE_URIS + "_wrong";
+    properties.put(METASTORE_URIS, wrongHiveMetastoreURI);
+    Catalog createdCatalog =
+        metalake.createCatalog(
+            nameOfCatalog, Catalog.Type.RELATIONAL, provider, "comment", properties);
+    Assertions.assertEquals(wrongHiveMetastoreURI, createdCatalog.properties().get(METASTORE_URIS));
+
+    // As it's wrong metastore uri, it should throw exception.
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> createdCatalog.asSchemas().createSchema("schema", "comment", ImmutableMap.of()));
+    Assertions.assertTrue(exception.getMessage().contains("Failed to connect to Hive Metastore"));
+
+    Catalog newCatalog =
+        metalake.alterCatalog(
+            nameOfCatalog, CatalogChange.setProperty(METASTORE_URIS, HIVE_METASTORE_URIS));
+    Assertions.assertEquals(HIVE_METASTORE_URIS, newCatalog.properties().get(METASTORE_URIS));
+
+    // The URI has restored, so it should not throw exception.
+    Assertions.assertDoesNotThrow(
+        () -> {
+          newCatalog.asSchemas().createSchema("schema", "comment", ImmutableMap.of());
+        });
+
+    newCatalog.asSchemas().dropSchema("schema", true);
+    metalake.dropCatalog(nameOfCatalog);
+  }
+
   private static void createCatalogWithCustomOperation(String catalogName, String customImpl) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(METASTORE_URIS, HIVE_METASTORE_URIS);

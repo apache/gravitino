@@ -18,8 +18,7 @@ Apache Gravitino provides the ability to manage Apache Iceberg metadata.
 ### Requirements and limitations
 
 :::info
-Builds with Apache Iceberg `1.3.1`. The Apache Iceberg table format version is `1` by default.
-Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hadoop 3.x clusters.
+Builds with Apache Iceberg `1.5.2`. The Apache Iceberg table format version is `2` by default.
 :::
 
 ## Catalog
@@ -29,6 +28,7 @@ Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hado
 - Works as a catalog proxy, supporting `HiveCatalog`, `JdbcCatalog` and `RESTCatalog`.
 - Supports DDL operations for Iceberg schemas and tables.
 - Doesn't support snapshot or table management operations.
+- Supports S3 and HDFS storage.
 - Supports Kerberos or simple authentication for Iceberg catalog with Hive backend. 
 
 ### Catalog properties
@@ -304,6 +304,7 @@ If you update a nullability column to non nullability, there may be compatibilit
 
 You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory to automatically load as the default HDFS configuration.
 
-:::caution
+:::info
+Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hadoop 3.x clusters.
 When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md) for more details.
 :::
