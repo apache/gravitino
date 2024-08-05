@@ -59,7 +59,7 @@ public class OwnerResponse extends BaseResponse {
 
     if (owner != null) {
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(owner.name()), "owner 'name' must not be null and empty");
+          StringUtils.isNotBlank(owner.name()), "owner 'name' must not be null or empty");
       Preconditions.checkArgument(owner.type() != null, "owner 'type' must not be null");
     }
   }

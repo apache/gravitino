@@ -21,7 +21,7 @@ package org.apache.gravitino.dto.authorization;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.gravitino.authorization.Owner;
 
-/** Represents a Owner Data Transfer Object (DTO). */
+/** Represents an Owner Data Transfer Object (DTO). */
 public class OwnerDTO implements Owner {
   @JsonProperty("name")
   private String name;
