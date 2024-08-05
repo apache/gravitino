@@ -54,4 +54,13 @@ public class DeleteResponse extends BaseResponse {
   public boolean deleted() {
     return deleted;
   }
+
+  /**
+   * Returns whether the remove operation was successful.
+   *
+   * @return True if the remove operation was successful, otherwise false.
+   */
+  public boolean removed() {
+    return deleted;
+  }
 }
