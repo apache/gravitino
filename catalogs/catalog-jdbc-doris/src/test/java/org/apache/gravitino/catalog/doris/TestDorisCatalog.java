@@ -37,9 +37,6 @@ public class TestDorisCatalog {
 
     PropertyEntry<?> propertyEntry = propertyEntryMap.get(REPLICATION_FACTOR);
     Assertions.assertEquals(REPLICATION_FACTOR, propertyEntry.getName());
-    Assertions.assertEquals(
-        "The number of replications for the table, if not specified, ",
-        propertyEntry.getDescription());
     Assertions.assertTrue(propertyEntry.isImmutable());
     Assertions.assertEquals(
         DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR, propertyEntry.getDefaultValue());

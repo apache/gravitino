@@ -22,10 +22,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.connector.BasePropertiesMetadata;
+import org.apache.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
-public class DorisTablePropertiesMetadata extends BasePropertiesMetadata {
+public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
   public static final String REPLICATION_FACTOR = "replication_allocation";
   public static final String DEFAULT_REPLICATION_FACTOR = "tag.location.default: 1";
@@ -38,7 +38,8 @@ public class DorisTablePropertiesMetadata extends BasePropertiesMetadata {
             // TODO: make REPLICATION_FACTOR mutable if needed
             PropertyEntry.stringOptionalPropertyEntry(
                 REPLICATION_FACTOR,
-                "The number of replications for the table, if not specified, ",
+                "The number of replications for the table. If not specified and the backend server less than 3,"
+                    + " the default value will be used",
                 true /* immutable */,
                 DEFAULT_REPLICATION_FACTOR, /* default value */
                 false /* hidden */));
