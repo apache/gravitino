@@ -37,7 +37,7 @@ public class TestDorisCatalog {
 
     PropertyEntry<?> propertyEntry = propertyEntryMap.get(REPLICATION_FACTOR);
     Assertions.assertEquals(REPLICATION_FACTOR, propertyEntry.getName());
-    Assertions.assertTrue(propertyEntry.isImmutable());
+    Assertions.assertFalse(propertyEntry.isImmutable());
     Assertions.assertEquals(
         DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR, propertyEntry.getDefaultValue());
     Assertions.assertFalse(propertyEntry.isHidden());
