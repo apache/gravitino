@@ -176,7 +176,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       resultMap = new HashMap<>(properties);
     }
 
-    // If the backend server is less than 3, we need to set the property 'replication_allocation'
+    // If the backend server is less than 3, we need to set the property 'replication_num'
     // to 1 explicitly.
     if (!properties.containsKey(REPLICATION_FACTOR)) {
       // Try to check the number of backend servers.
