@@ -40,7 +40,7 @@ public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
                 REPLICATION_FACTOR,
                 "The number of replications for the table. If not specified and the backend server less than 3,"
                     + " the default value will be used",
-                true /* immutable */,
+                false /* immutable */,
                 DEFAULT_REPLICATION_FACTOR, /* default value */
                 false /* hidden */));
 
