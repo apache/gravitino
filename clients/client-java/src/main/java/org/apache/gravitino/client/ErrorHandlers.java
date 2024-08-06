@@ -188,6 +188,15 @@ public class ErrorHandlers {
     return TagErrorHandler.INSTANCE;
   }
 
+  /**
+   * Creates an error handler specific to Owner operations.
+   *
+   * @return A Consumer representing the Owner error handler.
+   */
+  public static Consumer<ErrorResponse> ownerErrorHandler() {
+    return OwnerErrorHandler.INSTANCE;
+  }
+
   private ErrorHandlers() {}
 
   /**
@@ -703,6 +712,32 @@ public class ErrorHandlers {
           } else {
             throw new AlreadyExistsException(errorMessage);
           }
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Owner operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class OwnerErrorHandler extends RestErrorHandler {
+
+    private static final OwnerErrorHandler INSTANCE = new OwnerErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          throw new NotFoundException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
