@@ -105,37 +105,35 @@ public class KerberosConfig extends AuthenticationConfig {
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
               KET_TAB_URI_KEY,
-              PropertyEntry.stringImmutablePropertyEntry(
+              PropertyEntry.stringOptionalPropertyEntry(
                   KET_TAB_URI_KEY,
                   "The keytab of the Kerberos for Iceberg catalog with Kerberos authentication",
-                  false,
-                  null,
-                  false,
-                  false))
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               PRINCIPAL_KEY,
-              PropertyEntry.stringImmutablePropertyEntry(
+              PropertyEntry.stringOptionalPropertyEntry(
                   PRINCIPAL_KEY,
                   "The principal of the Kerberos for Iceberg catalog with Kerberos authentication",
-                  false,
-                  null,
-                  false,
-                  false))
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               CHECK_INTERVAL_SEC_KEY,
               PropertyEntry.integerOptionalPropertyEntry(
                   CHECK_INTERVAL_SEC_KEY,
                   "The check interval of the Kerberos credential for Iceberg catalog with Kerberos authentication",
-                  true,
-                  60,
-                  false))
+                  false /* immutable */,
+                  60 /* defaultValue */,
+                  false /* hidden */))
           .put(
               FETCH_TIMEOUT_SEC_KEY,
               PropertyEntry.integerOptionalPropertyEntry(
                   FETCH_TIMEOUT_SEC_KEY,
                   "The fetch timeout of the Kerberos key table of Iceberg catalog with Kerberos authentication",
-                  true,
-                  60,
-                  false))
+                  false /* immutable */,
+                  60 /* defaultValue */,
+                  false /* hidden */))
           .build();
 }

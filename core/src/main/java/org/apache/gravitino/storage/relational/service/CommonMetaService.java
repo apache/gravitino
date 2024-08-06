@@ -37,7 +37,6 @@ public class CommonMetaService {
     Preconditions.checkArgument(
         !namespace.isEmpty() && namespace.levels().length <= 3,
         "Namespace should not be empty and length should be less than or equal to 3.");
-
     String[] level = namespace.levels();
     NameIdentifier ident = NameIdentifier.of(level);
     Long entityId = null;

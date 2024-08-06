@@ -93,7 +93,7 @@ SELECT * FROM employee FOR SYSTEM_TIME AS OF '2024-05-27 01:01:00';
 DESC EXTENDED employee;
 ```
 
-For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/latest/spark-procedures/#spark-procedures) in Iceberg official document. 
+For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/1.5.2/spark-procedures/#spark-procedures) in Iceberg official document. 
 
 ## Apache Iceberg backend-catalog support
 - HiveCatalog

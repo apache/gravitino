@@ -29,6 +29,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
@@ -202,7 +203,13 @@ public class RoleMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
-                mapper -> mapper.softDeleteSecurableObjectsByRoleId(roleId)));
+                mapper -> mapper.softDeleteSecurableObjectsByRoleId(roleId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        roleId, MetadataObject.Type.ROLE.name())));
     return true;
   }
 

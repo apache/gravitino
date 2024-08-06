@@ -37,6 +37,7 @@ import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -259,7 +260,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,
-                    mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    OwnerMetaMapper.class,
+                    mapper -> mapper.softDeleteOwnerRelByMetalakeId(metalakeId)));
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()
@@ -304,17 +309,30 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,
-                    mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    OwnerMetaMapper.class,
+                    mapper -> mapper.softDeleteOwnerRelByMetalakeId(metalakeId)));
       }
     }
     return true;
   }
 
   public int deleteMetalakeMetasByLegacyTimeline(Long legacyTimeline, int limit) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        MetalakeMetaMapper.class,
-        mapper -> {
-          return mapper.deleteMetalakeMetasByLegacyTimeline(legacyTimeline, limit);
-        });
+    int[] metalakeDeleteCount = new int[] {0};
+    int[] ownerRelDeleteCount = new int[] {0};
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            metalakeDeleteCount[0] =
+                SessionUtils.doWithCommitAndFetchResult(
+                    MetalakeMetaMapper.class,
+                    mapper -> mapper.deleteMetalakeMetasByLegacyTimeline(legacyTimeline, limit)),
+        () ->
+            ownerRelDeleteCount[0] =
+                SessionUtils.doWithCommitAndFetchResult(
+                    OwnerMetaMapper.class,
+                    mapper -> mapper.deleteOwnerMetasByLegacyTimeline(legacyTimeline, limit)));
+    return metalakeDeleteCount[0] + ownerRelDeleteCount[0];
   }
 }

@@ -48,6 +48,7 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
         "jdbc-mysql", new CatalogConnectorContext.Builder(new MySQLConnectorAdapter()));
     catalogBuilders.put(
         "jdbc-postgresql", new CatalogConnectorContext.Builder(new PostgreSQLConnectorAdapter()));
+    LOG.info("Start the DefaultCatalogConnectorFactory");
   }
 
   public CatalogConnectorContext.Builder createCatalogConnectorContextBuilder(

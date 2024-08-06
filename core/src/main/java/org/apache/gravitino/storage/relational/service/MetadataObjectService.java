@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.Entity.ROLE_SCHEMA_NAME;
+import static org.apache.gravitino.Entity.SYSTEM_CATALOG_RESERVED_NAME;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
@@ -48,6 +51,11 @@ public class MetadataObjectService {
       String metalakeName, String fullName, MetadataObject.Type type) {
     if (type == MetadataObject.Type.METALAKE) {
       return MetalakeMetaService.getInstance().getMetalakeIdByName(fullName);
+    }
+
+    if (type == MetadataObject.Type.ROLE) {
+      NameIdentifier nameIdentifier = NameIdentifier.of(metalakeName, SYSTEM_CATALOG_RESERVED_NAME, ROLE_SCHEMA_NAME, fullName);
+      return RoleMetaService.getInstance().getRoleIdByNameIdentifier(nameIdentifier);
     }
 
     List<String> names = DOT_SPLITTER.splitToList(fullName);

@@ -17,6 +17,7 @@
 # under the License.
 #
 [versions]
+aws = "2.26.20"
 junit = "5.8.1"
 protoc = "3.24.4"
 jackson = "2.15.2"
@@ -43,7 +44,7 @@ commons-collections4 = "4.4"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 rocksdbjni = "7.10.2"
-iceberg = '1.3.1' # used for Gravitino Iceberg catalog and Iceberg REST service
+iceberg = '1.5.2' # used for Gravitino Iceberg catalog and Iceberg REST service
 iceberg4spark = "1.4.1" # used for compile spark connector
 paimon = '0.8.0'
 spark33 = "3.3.4"
@@ -92,6 +93,8 @@ sun-activation-version = "1.2.0"
 error-prone = "3.1.0"
 
 [libraries]
+aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "aws" }
+aws-sts = { group = "software.amazon.awssdk", name = "sts", version.ref = "aws" }
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
 protobuf-java-util = { group = "com.google.protobuf", name = "protobuf-java-util", version.ref = "protoc" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
@@ -149,6 +152,7 @@ commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
 rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksdbjni" }
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
+iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }

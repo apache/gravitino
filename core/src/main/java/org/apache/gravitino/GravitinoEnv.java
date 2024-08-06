@@ -19,7 +19,10 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -39,6 +42,8 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
+import org.apache.gravitino.hook.DispatcherHookHelper;
+import org.apache.gravitino.hook.DispatcherHooks;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
@@ -87,7 +92,7 @@ public class GravitinoEnv {
 
   private MetalakeDispatcher metalakeDispatcher;
 
-  private AccessControlManager accessControlManager;
+  private AccessControlDispatcher accessControlDispatcher;
 
   private IdGenerator idGenerator;
 
@@ -101,8 +106,9 @@ public class GravitinoEnv {
 
   private TagManager tagManager;
   private EventBus eventBus;
+  private OwnerManager ownerManager;
 
-  private GravitinoEnv() {}
+  protected GravitinoEnv() {}
 
   private static class InstanceHolder {
     private static final GravitinoEnv INSTANCE = new GravitinoEnv();
@@ -227,6 +233,26 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the CatalogManager associated with the Gravitino environment.
+   *
+   * @return The CatalogManager instance.
+   */
+  public CatalogManager catalogManager() {
+    Preconditions.checkArgument(catalogManager != null, "GravitinoEnv is not initialized.");
+    return catalogManager;
+  }
+
+  /**
+   * Get the EventBus associated with the Gravitino environment.
+   *
+   * @return The EventBus instance.
+   */
+  public EventBus eventBus() {
+    Preconditions.checkArgument(eventBus != null, "GravitinoEnv is not initialized.");
+    return eventBus;
+  }
+
+  /**
    * Get the MetricsSystem associated with the Gravitino environment.
    *
    * @return The MetricsSystem instance.
@@ -235,17 +261,17 @@ public class GravitinoEnv {
     return metricsSystem;
   }
 
-  public LockManager getLockManager() {
+  public LockManager lockManager() {
     return lockManager;
   }
 
   /**
-   * Get the AccessControlManager associated with the Gravitino environment.
+   * Get the AccessControlDispatcher associated with the Gravitino environment.
    *
-   * @return The AccessControlManager instance.
+   * @return The AccessControlDispatcher instance.
    */
-  public AccessControlManager accessControlManager() {
-    return accessControlManager;
+  public AccessControlDispatcher accessControlDispatcher() {
+    return accessControlDispatcher;
   }
 
   /**
@@ -255,6 +281,10 @@ public class GravitinoEnv {
    */
   public TagManager tagManager() {
     return tagManager;
+  }
+
+  public OwnerManager ownerManager() {
+    return ownerManager;
   }
 
   public void start() {
@@ -317,29 +347,33 @@ public class GravitinoEnv {
     this.idGenerator = new RandomIdGenerator();
 
     // Create and initialize metalake related modules
-    MetalakeManager metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    MetalakeDispatcher metalakeManager = new MetalakeManager(entityStore, idGenerator);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
-        new MetalakeNormalizeDispatcher(metalakeManager);
+        new MetalakeNormalizeDispatcher(installDispatcherHooks(metalakeManager));
     this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
-        new CatalogNormalizeDispatcher(catalogManager);
+        new CatalogNormalizeDispatcher(installDispatcherHooks((CatalogDispatcher) catalogManager));
     this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
-        new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
+        new SchemaNormalizeDispatcher(
+            installDispatcherHooks((SchemaDispatcher) schemaOperationDispatcher), catalogManager);
     this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
 
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
     TableNormalizeDispatcher tableNormalizeDispatcher =
-        new TableNormalizeDispatcher(tableOperationDispatcher, catalogManager);
+        new TableNormalizeDispatcher(
+            installDispatcherHooks((TableDispatcher) tableOperationDispatcher), catalogManager);
     this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
 
+    // TODO: We can install hooks when we need, we only supports ownership post hook,
+    //  partition doesn't have ownership, so we don't need it now.
     PartitionOperationDispatcher partitionOperationDispatcher =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
     PartitionNormalizeDispatcher partitionNormalizeDispatcher =
@@ -349,21 +383,27 @@ public class GravitinoEnv {
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
-        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
+        new FilesetNormalizeDispatcher(
+            installDispatcherHooks((FilesetDispatcher) filesetOperationDispatcher), catalogManager);
     this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
     TopicNormalizeDispatcher topicNormalizeDispatcher =
-        new TopicNormalizeDispatcher(topicOperationDispatcher, catalogManager);
+        new TopicNormalizeDispatcher(
+            installDispatcherHooks((TopicDispatcher) topicOperationDispatcher), catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
-      this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
+      this.accessControlDispatcher =
+          installDispatcherHooks(
+              (AccessControlDispatcher) new AccessControlManager(entityStore, idGenerator, config));
+      this.ownerManager = new OwnerManager(entityStore);
     } else {
-      this.accessControlManager = null;
+      this.accessControlDispatcher = null;
+      this.ownerManager = null;
     }
 
     this.auxServiceManager = new AuxiliaryServiceManager();
@@ -374,5 +414,26 @@ public class GravitinoEnv {
 
     // Tag manager
     this.tagManager = new TagManager(idGenerator, entityStore);
+  }
+
+  // Provides a universal entrance to install dispatcher hooks. This method
+  // focuses the logic of installing hooks.
+  // We should reuse the ability of (Metalake|Schema|Table|Fileset|...)NormalizeDispatcher to avoid
+  // solving
+  // normalization names, this is useful for pre-hooks.
+  // so we can't install the hooks for the outside of
+  // (Metalake|Schema|Table|Fileset|...)NormalizeDispatcher.
+  private <T> T installDispatcherHooks(T manager) {
+    boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
+    DispatcherHooks hooks = new DispatcherHooks();
+    if (enableAuthorization) {
+      AuthorizationUtils.prepareAuthorizationHooks(manager, hooks);
+    }
+
+    if (hooks.isEmpty()) {
+      return manager;
+    }
+
+    return DispatcherHookHelper.installHooks(manager, hooks);
   }
 }

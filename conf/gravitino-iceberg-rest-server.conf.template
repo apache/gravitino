@@ -44,4 +44,20 @@ gravitino.iceberg-rest.responseHeaderSize = 131072
 # The Iceberg catalog backend, it's recommended to change to hive or jdbc
 gravitino.iceberg-rest.catalog-backend = memory
 # The warehouse directory of Iceberg catalog
-gravitino.iceberg-rest.warehouse = /tmp/
+gravitino.iceberg-rest.warehouse = /tmp
+
+# THE CONFIGURATION EXAMPLE FOR JDBC CATALOG BACKEND WITH S3 SUPPORT
+
+# gravitino.iceberg-rest.catalog-backend = jdbc
+# gravitino.iceberg-rest.jdbc-driver = org.postgresql.Driver
+# gravitino.iceberg-rest.uri = jdbc:postgresql://127.0.0.1:5432/postgres
+# gravitino.iceberg-rest.jdbc-user = postgres
+# gravitino.iceberg-rest.jdbc-password = abc123
+# gravitino.iceberg-rest.jdbc-initialize = true
+# change to s3a://test/my/key/prefix for Hive catalog backend
+# gravitino.iceberg-rest.warehouse = s3://test/my/key/prefix
+# gravitino.iceberg-rest.io-impl= org.apache.iceberg.aws.s3.S3FileIO
+# gravitino.iceberg-rest.s3-access-key-id = xxx
+# gravitino.iceberg-rest.s3-secret-access-key = xxx
+# gravitino.iceberg-rest.s3-endpoint = http://192.168.215.4:9010
+# gravitino.iceberg-rest.s3-region = xxx

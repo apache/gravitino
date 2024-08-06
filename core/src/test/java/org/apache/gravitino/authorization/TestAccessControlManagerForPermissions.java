@@ -125,7 +125,7 @@ public class TestAccessControlManagerForPermissions {
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlManager", accessControlManager, true);
+        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlManager, true);
   }
 
   @AfterAll
