@@ -595,6 +595,7 @@ const CreateCatalogDialog = props => {
                                     onChange={event => handleFormChange({ index, event })}
                                     data-refer={`props-value-${index}`}
                                     data-prev-refer={`props-${item.key}`}
+                                    type={item.key === 'jdbc-password' ? 'password' : 'text'}
                                   />
                                 )}
                               </Box>
