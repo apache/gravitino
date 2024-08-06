@@ -21,7 +21,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets; // Updated import
+import java.nio.charset.StandardCharsets;
 import java.nio.charset.IllegalCharsetNameException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -351,7 +351,7 @@ public class KerberosServerUtils {
 
     String getAsString() {
       try {
-        return new String(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), StandardCharsets.UTF_8); // Updated line
+        return new String(bb.array(), bb.arrayOffset() + bb.position(), bb.remaining(), StandardCharsets.UTF_8);
       } catch (UnsupportedEncodingException e) {
         throw new IllegalCharsetNameException("UTF-8"); // won't happen.
       }
