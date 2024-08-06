@@ -38,7 +38,7 @@ import org.apache.gravitino.connector.capability.Capability;
 /** Implementation of an Apache Doris catalog in Apache Gravitino. */
 public class DorisCatalog extends JdbcCatalog {
 
-  private static final DorisTablePropertiesMetadata TABLE_PROPERTIES_META =
+  public static final DorisTablePropertiesMetadata DORIS_TABLE_PROPERTIES_META =
       new DorisTablePropertiesMetadata();
 
   @Override
@@ -89,6 +89,6 @@ public class DorisCatalog extends JdbcCatalog {
 
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
-    return TABLE_PROPERTIES_META;
+    return DORIS_TABLE_PROPERTIES_META;
   }
 }

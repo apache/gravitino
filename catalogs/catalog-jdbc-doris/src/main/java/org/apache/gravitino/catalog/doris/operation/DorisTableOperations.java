@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.doris.operation;
 
-import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR;
+import static org.apache.gravitino.catalog.doris.DorisCatalog.DORIS_TABLE_PROPERTIES_META;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
@@ -189,7 +189,13 @@ public class DorisTableOperations extends JdbcTableOperations {
         while (resultSet.next()) {
           int backendCount = resultSet.getInt(1);
           if (backendCount < DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE) {
-            resultMap.put(REPLICATION_FACTOR, String.valueOf(DEFAULT_REPLICATION_FACTOR));
+            resultMap.put(
+                REPLICATION_FACTOR,
+                DORIS_TABLE_PROPERTIES_META
+                    .propertyEntries()
+                    .get(REPLICATION_FACTOR)
+                    .getDefaultValue()
+                    .toString());
           }
         }
       } catch (Exception e) {
