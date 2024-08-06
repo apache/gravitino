@@ -628,9 +628,7 @@ const CreateCatalogDialog = props => {
                             </FormHelperText>
                           )}
                           {!item.key.trim() && (
-                            <FormHelperText className={'twc-text-error-main'}>
-                              Key is required field
-                            </FormHelperText>
+                            <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
                           )}
                         </FormControl>
                       </Grid>
