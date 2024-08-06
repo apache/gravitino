@@ -662,6 +662,8 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public User grantRolesToUser(List<String> roles, String user)
       throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
     RoleGrantRequest request = new RoleGrantRequest(roles);
+    request.validate();
+
     UserResponse resp =
         restClient.put(
             String.format(API_PERMISSION_PATH, this.name(), String.format("users/%s/grant", user)),
@@ -688,6 +690,8 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public Group grantRolesToGroup(List<String> roles, String group)
       throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
     RoleGrantRequest request = new RoleGrantRequest(roles);
+    request.validate();
+
     GroupResponse resp =
         restClient.put(
             String.format(
@@ -715,6 +719,8 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public User revokeRolesFromUser(List<String> roles, String user)
       throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
     RoleRevokeRequest request = new RoleRevokeRequest(roles);
+    request.validate();
+
     UserResponse resp =
         restClient.put(
             String.format(API_PERMISSION_PATH, this.name(), String.format("users/%s/revoke", user)),
@@ -741,6 +747,8 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public Group revokeRolesFromGroup(List<String> roles, String group)
       throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
     RoleRevokeRequest request = new RoleRevokeRequest(roles);
+    request.validate();
+
     GroupResponse resp =
         restClient.put(
             String.format(
