@@ -123,6 +123,8 @@ public abstract class UserContext implements Closeable {
       addUserContext(nameIdentifier, simpleUserContext);
       return simpleUserContext;
     } else if (authenticationType == AuthenticationType.KERBEROS) {
+      // if the kerberos authentication is inherited from the parent context, we will use the
+      // parent context's kerberos configuration.
       // Improvement: Check if parentContext is not null before using it
       if (parentContext != null && authenticationConfig.isSimpleAuth()) {
         KerberosUserContext kerberosUserContext = ((KerberosUserContext) parentContext).deepCopy();
