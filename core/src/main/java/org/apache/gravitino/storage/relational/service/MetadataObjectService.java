@@ -54,7 +54,8 @@ public class MetadataObjectService {
     }
 
     if (type == MetadataObject.Type.ROLE) {
-      NameIdentifier nameIdentifier = NameIdentifier.of(metalakeName, SYSTEM_CATALOG_RESERVED_NAME, ROLE_SCHEMA_NAME, fullName);
+      NameIdentifier nameIdentifier =
+          NameIdentifier.of(metalakeName, SYSTEM_CATALOG_RESERVED_NAME, ROLE_SCHEMA_NAME, fullName);
       return RoleMetaService.getInstance().getRoleIdByNameIdentifier(nameIdentifier);
     }
 
