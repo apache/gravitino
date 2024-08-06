@@ -465,6 +465,22 @@ public class TestCatalogManager {
     Assertions.assertNull(catalogManager.catalogCache.getIfPresent(ident));
   }
 
+  @Test
+  void testAlterMutableProperties() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "test41");
+    Map<String, String> props =
+        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
+    String comment = "comment";
+
+    Catalog oldCatalog =
+        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    Catalog newCatalog =
+        catalogManager.alterCatalog(ident, CatalogChange.setProperty("key2", "value3"));
+    Assertions.assertEquals("value2", oldCatalog.properties().get("key2"));
+    Assertions.assertEquals("value3", newCatalog.properties().get("key2"));
+    Assertions.assertNotEquals(oldCatalog, newCatalog);
+  }
+
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
     expectedProps.forEach(
         (k, v) -> {

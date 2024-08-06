@@ -32,4 +32,5 @@ public enum OperationType {
   GRANT,
   REVOKE,
   ASSOCIATE,
+  SET,
 }

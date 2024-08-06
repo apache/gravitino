@@ -19,7 +19,8 @@
 package org.apache.gravitino.catalog.jdbc;
 
 import static org.apache.gravitino.connector.PropertyEntry.integerPropertyEntry;
-import static org.apache.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -45,57 +46,54 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
   static {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
-            stringImmutablePropertyEntry(
+            stringPropertyEntry(
                 JdbcConfig.JDBC_URL.getKey(),
                 JdbcConfig.JDBC_URL.getDoc(),
-                true,
-                null,
-                false,
-                false),
-            stringImmutablePropertyEntry(
+                true /* required */,
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */,
+                false /* reserved */),
+            stringOptionalPropertyEntry(
                 JdbcConfig.JDBC_DATABASE.getKey(),
                 JdbcConfig.JDBC_DATABASE.getDoc(),
-                false,
-                null,
-                false,
-                false),
-            stringImmutablePropertyEntry(
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
                 JdbcConfig.JDBC_DRIVER.getKey(),
                 JdbcConfig.JDBC_DRIVER.getDoc(),
-                false,
-                null,
-                false,
-                false),
-            stringImmutablePropertyEntry(
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
                 JdbcConfig.USERNAME.getKey(),
                 JdbcConfig.USERNAME.getDoc(),
-                false,
-                null,
-                false,
-                false),
-            stringImmutablePropertyEntry(
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
                 JdbcConfig.PASSWORD.getKey(),
                 JdbcConfig.PASSWORD.getDoc(),
-                false,
-                null,
-                false,
-                false),
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
             integerPropertyEntry(
                 JdbcConfig.POOL_MIN_SIZE.getKey(),
                 JdbcConfig.POOL_MIN_SIZE.getDoc(),
-                false,
-                true,
+                false /* required */,
+                false /* immutable */,
                 JdbcConfig.POOL_MIN_SIZE.getDefaultValue(),
-                true,
-                false),
+                true /* hidden */,
+                false /* reserved */),
             integerPropertyEntry(
                 JdbcConfig.POOL_MAX_SIZE.getKey(),
                 JdbcConfig.POOL_MAX_SIZE.getDoc(),
-                false,
-                true,
+                false /* required */,
+                false /* immutable */,
                 JdbcConfig.POOL_MAX_SIZE.getDefaultValue(),
-                true,
-                false));
+                true /* hidden */,
+                false /* reserved */));
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }
 

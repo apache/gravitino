@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonTable
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonSchema.fromPaimonProperties;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
+import static org.apache.gravitino.rel.indexes.Indexes.EMPTY_INDEXES;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -325,6 +326,9 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     if (partitioning == null) {
       partitioning = EMPTY_TRANSFORM;
     }
+    if (indexes == null) {
+      indexes = EMPTY_INDEXES;
+    }
     Preconditions.checkArgument(
         Arrays.stream(partitioning)
             .allMatch(
@@ -335,14 +339,12 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 }),
         "Paimon partition columns should not be nested.");
     Preconditions.checkArgument(
-        sortOrders == null || sortOrders.length == 0,
-        "Sort orders are not supported for Paimon in Gravitino.");
-    Preconditions.checkArgument(
-        indexes == null || indexes.length == 0,
-        "Indexes are not supported for Paimon in Gravitino.");
-    Preconditions.checkArgument(
         distribution == null || distribution.strategy() == Distributions.NONE.strategy(),
         "Distribution is not supported for Paimon in Gravitino now.");
+    Preconditions.checkArgument(
+        sortOrders == null || sortOrders.length == 0,
+        "Sort orders are not supported for Paimon in Gravitino.");
+    checkPaimonIndexes(indexes);
     String currentUser = currentUser();
     GravitinoPaimonTable createdTable =
         GravitinoPaimonTable.builder()
@@ -366,6 +368,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
             .withPartitioning(partitioning)
             .withComment(comment)
             .withProperties(properties)
+            .withIndexes(indexes)
             .withAuditInfo(
                 AuditInfo.builder().withCreator(currentUser).withCreateTime(Instant.now()).build())
             .build();
@@ -456,5 +459,15 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
         "Namespace can not be null or empty.");
     String[] levels = identifier.namespace().levels();
     return NameIdentifier.of(levels[levels.length - 1], identifier.name());
+  }
+
+  private void checkPaimonIndexes(Index[] indexes) {
+    Preconditions.checkArgument(indexes.length <= 1, "Paimon supports no more than one Index.");
+    Arrays.stream(indexes)
+        .forEach(
+            index ->
+                Preconditions.checkArgument(
+                    index.type() == Index.IndexType.PRIMARY_KEY,
+                    "Paimon only supports primary key Index."));
   }
 }
