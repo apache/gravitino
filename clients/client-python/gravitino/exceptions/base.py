@@ -99,10 +99,6 @@ class ConnectionFailedException(GravitinoRuntimeException):
     """An exception thrown when connect to catalog failed."""
 
 
-class NoSuchCatalogException(NotFoundException):
-    """An exception thrown when a catalog is not found."""
-
-
 class CatalogAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a resource already exists."""
 
@@ -113,4 +109,3 @@ class UnauthorizedException(GravitinoRuntimeException):
 
 class BadRequestException(GravitinoRuntimeException):
     """An exception thrown when the request is invalid."""
-

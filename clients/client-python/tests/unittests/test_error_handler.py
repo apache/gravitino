@@ -35,7 +35,6 @@ from gravitino.exceptions.base import (
     SchemaAlreadyExistsException,
     UnsupportedOperationException,
     ConnectionFailedException,
-    NoSuchCatalogException,
     CatalogAlreadyExistsException,
 )
 
@@ -155,7 +154,6 @@ class TestErrorHandler(unittest.TestCase):
                 ErrorResponse.generate_error_response(Exception, "mock error")
             )
 
-
     def test_catalog_error_handler(self):
 
         with self.assertRaises(ConnectionFailedException):
@@ -183,18 +181,19 @@ class TestErrorHandler(unittest.TestCase):
             CATALOG_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(
                     CatalogAlreadyExistsException, "mock error"
+                )
+            )
 
         with self.assertRaises(InternalError):
             CATALOG_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(InternalError, "mock error")
             )
-        
+
         with self.assertRaises(RESTException):
             CATALOG_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(Exception, "mock error")
             )
-           
-                  
+
     def test_schema_error_handler(self):
 
         with self.assertRaises(NoSuchCatalogException):
