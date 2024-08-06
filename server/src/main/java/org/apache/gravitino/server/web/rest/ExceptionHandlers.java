@@ -138,6 +138,11 @@ public class ExceptionHandlers {
         .build();
   }
 
+  public static Response handleOwnerException(
+      OperationType type, String name, String metalake, Exception e) {
+    return OwnerExceptionHandler.INSTANCE.handle(type, name, metalake, e);
+  }
+
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new PartitionExceptionHandler();
@@ -557,6 +562,33 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, tag, parent, e);
+      }
+    }
+  }
+
+  private static class OwnerExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new OwnerExceptionHandler();
+
+    private static String getOwnerErrorMsg(
+        String name, String operation, String metalake, String reason) {
+      return String.format(
+          "Failed to execute %s owner operation [%s] under metalake [%s], reason [%s]",
+          name, operation, metalake, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String name, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(name) ? "" : " [" + name + "]";
+      String errorMsg = getOwnerErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+      } else {
+        return super.handle(op, name, parent, e);
       }
     }
   }
