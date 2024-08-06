@@ -562,7 +562,7 @@ const CreateCatalogDialog = props => {
                                   value={item.key}
                                   disabled={item.required || item.disabled}
                                   onChange={event => handleFormChange({ index, event })}
-                                  error={item.hasDuplicateKey}
+                                  error={item.hasDuplicateKey || item.invalid || !item.key.trim()}
                                   data-refer={`props-key-${index}`}
                                 />
                               </Box>
@@ -621,10 +621,15 @@ const CreateCatalogDialog = props => {
                           {item.hasDuplicateKey && (
                             <FormHelperText className={'twc-text-error-main'}>Key already exists</FormHelperText>
                           )}
-                          {item.invalid && (
+                          {item.key && item.invalid && (
                             <FormHelperText className={'twc-text-error-main'}>
                               Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
                               characters, underscores, hyphens, or dots.
+                            </FormHelperText>
+                          )}
+                          {!item.key.trim() && (
+                            <FormHelperText className={'twc-text-error-main'}>
+                              Key is required field
                             </FormHelperText>
                           )}
                         </FormControl>
