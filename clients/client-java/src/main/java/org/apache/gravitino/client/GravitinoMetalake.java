@@ -775,8 +775,8 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
    * Get the owner of a metadata object.
    *
    * @param object The metadata object
-   * @return The owner of the metadata object. If the metadata object doesn't set the owner, it
-   *     will return Optional.empty().
+   * @return The owner of the metadata object. If the metadata object doesn't set the owner, it will
+   *     return Optional.empty().
    * @throws NotFoundException If the metadata object is not found.
    */
   public Optional<Owner> getOwner(MetadataObject object) throws NotFoundException {
