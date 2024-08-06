@@ -27,18 +27,17 @@ import org.apache.gravitino.connector.PropertyEntry;
 
 public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
-  public static final String REPLICATION_FACTOR = "replication_allocation";
-  public static final String DEFAULT_REPLICATION_FACTOR = "tag.location.default: 1";
+  public static final String REPLICATION_FACTOR = "replication_num";
+  public static final int DEFAULT_REPLICATION_FACTOR = 1;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
   static {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
-            // TODO: make REPLICATION_FACTOR mutable if needed
-            PropertyEntry.stringOptionalPropertyEntry(
+            PropertyEntry.integerOptionalPropertyEntry(
                 REPLICATION_FACTOR,
-                "The number of replications for the table. If not specified and the backend server less than 3,"
+                "The number of replications for the table. If not specified and the number of backend server less than 3,"
                     + " the default value will be used",
                 false /* immutable */,
                 DEFAULT_REPLICATION_FACTOR, /* default value */

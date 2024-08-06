@@ -188,7 +188,7 @@ public class DorisTableOperations extends JdbcTableOperations {
         while (resultSet.next()) {
           int backendCount = resultSet.getInt(1);
           if (backendCount < 3) {
-            resultMap.put(REPLICATION_FACTOR, DEFAULT_REPLICATION_FACTOR);
+            resultMap.put(REPLICATION_FACTOR, String.valueOf(DEFAULT_REPLICATION_FACTOR));
           }
         }
       } catch (Exception e) {
