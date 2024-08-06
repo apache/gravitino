@@ -74,7 +74,7 @@ public class TestDorisTablePartitionOperations extends TestDoris {
   }
 
   private static Map<String, String> createProperties() {
-    return ImmutableMap.of("replication_allocation", "tag.location.default: 1");
+    return ImmutableMap.of();
   }
 
   @Test
