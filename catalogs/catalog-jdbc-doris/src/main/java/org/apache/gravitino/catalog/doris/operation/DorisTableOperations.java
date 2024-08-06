@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.doris.operation;
 
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -176,8 +177,8 @@ public class DorisTableOperations extends JdbcTableOperations {
       resultMap = new HashMap<>(properties);
     }
 
-    // If the backend server is less than 3, we need to set the property 'replication_num'
-    // to 1 explicitly.
+    // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
+    // set the property 'replication_num' to 1 explicitly.
     if (!properties.containsKey(REPLICATION_FACTOR)) {
       // Try to check the number of backend servers.
       String query = "select count(*) from information_schema.backends where Alive = 'true'";
@@ -187,7 +188,7 @@ public class DorisTableOperations extends JdbcTableOperations {
           ResultSet resultSet = statement.executeQuery(query)) {
         while (resultSet.next()) {
           int backendCount = resultSet.getInt(1);
-          if (backendCount < 3) {
+          if (backendCount < DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE) {
             resultMap.put(REPLICATION_FACTOR, String.valueOf(DEFAULT_REPLICATION_FACTOR));
           }
         }

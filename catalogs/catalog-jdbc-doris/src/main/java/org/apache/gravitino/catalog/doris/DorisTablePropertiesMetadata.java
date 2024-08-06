@@ -29,6 +29,7 @@ public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
   public static final String REPLICATION_FACTOR = "replication_num";
   public static final int DEFAULT_REPLICATION_FACTOR = 1;
+  public static final int DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE = 3;
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
