@@ -83,7 +83,7 @@ public class UserMetaService {
     return userId;
   }
 
-  private Long getUserIdByNameIdentifier(NameIdentifier identifier) {
+  public Long getUserIdByNameIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
     return NameIdMappingService.getInstance()

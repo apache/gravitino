@@ -83,7 +83,7 @@ public class GroupMetaService {
     return groupId;
   }
 
-  private Long getGroupIdByNameIdentifier(NameIdentifier identifier) {
+  public Long getGroupIdByNameIdentifier(NameIdentifier identifier) {
     return NameIdMappingService.getInstance()
         .get(
             identifier,
