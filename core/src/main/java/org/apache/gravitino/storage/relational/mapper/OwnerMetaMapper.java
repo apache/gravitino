@@ -84,6 +84,15 @@ public interface OwnerMetaMapper {
       @Param("metadataObjectType") String metadataObjectType);
 
   @Update(
+      "UPDATE "
+          + OWNER_TABLE_NAME
+          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+          + " WHERE owner_id = #{ownerId} AND owner_type = #{ownerType} AND deleted_at = 0")
+  void softDeleteOwnerRelByOwnerIdAndType(
+      @Param("ownerId") Long ownerId, @Param("ownerType") String ownerType);
+
+  @Update(
       "UPDATE  "
           + OWNER_TABLE_NAME
           + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"

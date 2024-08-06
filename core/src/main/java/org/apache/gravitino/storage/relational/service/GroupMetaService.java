@@ -36,6 +36,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -165,7 +166,13 @@ public class GroupMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 GroupRoleRelMapper.class,
-                mapper -> mapper.softDeleteGroupRoleRelByGroupId(groupId)));
+                mapper -> mapper.softDeleteGroupRoleRelByGroupId(groupId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByOwnerIdAndType(
+                        groupId, Entity.EntityType.GROUP.name())));
     return true;
   }
 
