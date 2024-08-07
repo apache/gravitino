@@ -2,11 +2,10 @@
 title: "Spark connector Iceberg catalog"
 slug: /spark-connector/spark-catalog-iceberg
 keyword: spark connector iceberg catalog
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
-The Gravitino Spark connector offers the capability to read and write Iceberg tables, with the metadata managed by the Gravitino server. To enable the use of the Iceberg catalog within the Spark connector, you must set the configuration `spark.sql.gravitino.enableIcebergSupport` to `true` and download Iceberg Spark runtime jar to Spark classpath.
+The Apache Gravitino Spark connector offers the capability to read and write Iceberg tables, with the metadata managed by the Gravitino server. To enable the use of the Iceberg catalog within the Spark connector, you must set the configuration `spark.sql.gravitino.enableIcebergSupport` to `true` and download Iceberg Spark runtime jar to Spark classpath.
 
 ## Capabilities
 
@@ -94,9 +93,9 @@ SELECT * FROM employee FOR SYSTEM_TIME AS OF '2024-05-27 01:01:00';
 DESC EXTENDED employee;
 ```
 
-For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/latest/spark-procedures/#spark-procedures) in Iceberg official document. 
+For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/1.5.2/spark-procedures/#spark-procedures) in Iceberg official document. 
 
-## Iceberg backend-catalog support
+## Apache Iceberg backend-catalog support
 - HiveCatalog
 - JdbcCatalog
 - RESTCatalog

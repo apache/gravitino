@@ -1,0 +1,63 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# THE CONFIGURATION FOR Iceberg REST SERVER
+gravitino.iceberg-rest.shutdown.timeout = 3000
+
+# THE CONFIGURATION FOR Iceberg REST WEB SERVER
+# The host name of the built-in web server
+gravitino.iceberg-rest.host = 0.0.0.0
+# The http port number of the built-in web server
+gravitino.iceberg-rest.httpPort = 9001
+# The min thread size of the built-in web server
+gravitino.iceberg-rest.minThreads = 24
+# The max thread size of the built-in web server
+gravitino.iceberg-rest.maxThreads = 200
+# The stop timeout of the built-in web server
+gravitino.iceberg-rest.stopTimeout = 30000
+# The timeout of idle connections
+gravitino.iceberg-rest.idleTimeout = 30000
+# The executor thread pool work queue size of the built-in web server
+gravitino.iceberg-rest.threadPoolWorkQueueSize = 100
+# The request header size of the built-in web server
+gravitino.iceberg-rest.requestHeaderSize = 131072
+# The response header size of the built-in web server
+gravitino.iceberg-rest.responseHeaderSize = 131072
+
+# THE CONFIGURATION FOR Iceberg catalog backend
+# The Iceberg catalog backend, it's recommended to change to hive or jdbc
+gravitino.iceberg-rest.catalog-backend = memory
+# The warehouse directory of Iceberg catalog
+gravitino.iceberg-rest.warehouse = /tmp
+
+# THE CONFIGURATION EXAMPLE FOR JDBC CATALOG BACKEND WITH S3 SUPPORT
+
+# gravitino.iceberg-rest.catalog-backend = jdbc
+# gravitino.iceberg-rest.jdbc-driver = org.postgresql.Driver
+# gravitino.iceberg-rest.uri = jdbc:postgresql://127.0.0.1:5432/postgres
+# gravitino.iceberg-rest.jdbc-user = postgres
+# gravitino.iceberg-rest.jdbc-password = abc123
+# gravitino.iceberg-rest.jdbc-initialize = true
+# change to s3a://test/my/key/prefix for Hive catalog backend
+# gravitino.iceberg-rest.warehouse = s3://test/my/key/prefix
+# gravitino.iceberg-rest.io-impl= org.apache.iceberg.aws.s3.S3FileIO
+# gravitino.iceberg-rest.s3-access-key-id = xxx
+# gravitino.iceberg-rest.s3-secret-access-key = xxx
+# gravitino.iceberg-rest.s3-endpoint = http://192.168.215.4:9010
+# gravitino.iceberg-rest.s3-region = xxx

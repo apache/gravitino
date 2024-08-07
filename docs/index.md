@@ -1,13 +1,12 @@
 ---
-title: Gravitino overview
+title: Apache Gravitino overview
 slug: /
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
-## What's Gravitino?
+## What's Apache Gravitino?
 
-Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
+Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
 metadata directly in different sources, types, and regions. It also provides users with unified
 metadata access for data and AI assets.
 
@@ -15,7 +14,7 @@ metadata access for data and AI assets.
 
 ## Downloading
 
-You can get Gravitino from the [GitHub release page](https://github.com/datastrato/gravitino/releases),
+You can get Gravitino from the [GitHub release page](https://github.com/apache/gravitino/releases),
 or you can build Gravitino from source code. See [How to build Gravitino](./how-to-build.md).
 
 Gravitino runs on both Linux and macOS platforms, and it requires the installation of Java 8, Java 11, or Java 17. Gravitino trino-connector runs with
@@ -30,7 +29,7 @@ Pull the image and run it. For details of the Gravitino Docker image, see
 [Docker image details](./docker-image-details.md).
 
 Gravitino also provides a playground to experience the whole Gravitino system with other components.
-See the [Gravitino playground repository](https://github.com/datastrato/gravitino-playground)
+See the [Gravitino playground repository](https://github.com/apache/gravitino-playground)
 and [How to use the playground](./how-to-use-the-playground.md).
 
 ## Getting started
@@ -44,7 +43,7 @@ To get started with Gravitino, see [Getting started](./getting-started.md) for t
 * [Running on Google Cloud Platform](./getting-started.md#getting-started-on-google-cloud-platform):
   a quick guide to starting and using Gravitino on GCP.
 
-## How to use Gravitino
+## How to use Apache Gravitino
 
 Gravitino provides two SDKs to manage metadata from different catalogs in a unified way: the
 REST API and the Java SDK. You can use either to manage metadata. See
@@ -69,6 +68,7 @@ Gravitino currently supports the following catalogs:
 **Relational catalogs:**
 
 * [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
+* [**Paimon catalog**](./lakehouse-paimon-catalog.md)
 * [**Hive catalog**](./apache-hive-catalog.md)
 * [**MySQL catalog**](./jdbc-mysql-catalog.md)
 * [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
@@ -85,7 +85,7 @@ Gravitino currently supports the following catalogs:
 Gravitino also provides an Iceberg REST catalog service for the Iceberg table format. See the
 [Iceberg REST catalog service](./iceberg-rest-service.md) for details.
 
-## Gravitino playground
+## Apache Gravitino playground
 
 To experience Gravitino with other components easily, Gravitino provides a playground to run. It
 integrates Apache Hadoop, Apache Hive, Trino, MySQL, PostgreSQL, and Gravitino together as a
@@ -105,10 +105,8 @@ complete environment. To experience all the features, see
 
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
-* [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to using Gravitino to
-  manage Apache Iceberg data.
-* [Iceberg REST catalog service](./iceberg-rest-service.md): a
-  complete guide to using Gravitino as an Apache Iceberg REST catalog service.
+* [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to using Gravitino to manage Apache Iceberg data.
+* [Paimon catalog](./lakehouse-paimon-catalog.md): a complete guide to using Gravitino to manage Apache Paimon data.
 * [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino to manage Apache Hive data.
 * [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino to manage MySQL data.
 * [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino to manage PostgreSQL data.
@@ -117,13 +115,30 @@ Gravitino supports different catalogs to manage the metadata in different source
   using Hadoop Compatible File System (HCFS).
 * [Kafka catalog](./kafka-catalog.md): a complete guide to using Gravitino to manage Kafka topics metadata.
 
-### Trino connector
+### Gravitino Iceberg REST catalog service
 
-Gravitino provides a Trino connector to manage Trino metadata in a unified
-way. To use the Trino connector, see:
+* [Iceberg REST catalog service](./iceberg-rest-service.md): a complete guide to using Gravitino as an Apache Iceberg REST catalog service.
 
-* [How to use Gravitino Trino connector](./trino-connector/index.md): a complete guide to using the Gravitino
-  Trino connector.
+### Connectors
+
+#### Trino connector
+
+Gravitino provides a Trino connector to manage Trino metadata in a unified way. To use the Trino connector, see:
+
+* [How to use Gravitino Trino connector](./trino-connector/index.md): a complete guide to using the Gravitino Trino connector.
+
+#### Spark connector
+
+Gravitino provides a Spark connector to manage metadata in a unified way. To use the Spark connector, see:
+
+* [Gravitino Spark connector](./spark-connector/spark-connector.md): a complete guide to using the Gravitino Spark connector.
+
+#### Flink connector
+
+Gravitino provides a Flink connector to manage metadata in a unified way. To use the Flink connector, see:
+
+* [Gravitino Flink connector](./flink-connector/flink-connector.md): a complete guide to using the Gravitino Flink connector.
+
 
 ### Server administration
 
@@ -150,3 +165,4 @@ Gravitino provides several ways to configure and manage the Gravitino server. Se
   a Gravitino release.
 * [Publish Docker images](./publish-docker-images.md): a guide to publishing Gravitino Docker images;
   also lists the change logs of Gravitino CI Docker images and release images.
+* [How to upgrade Gravitino](./how-to-upgrade.md): a guide to upgrading the schema of Gravitino storage backend from one release version to another.

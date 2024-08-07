@@ -1,60 +1,27 @@
 <!--
-  Copyright 2023 Datastrato Pvt Ltd.
-  This software is licensed under the Apache License version 2.
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
 -->
 
-This document lists the maintainers and contributors of the Project.
+Note: This maintainer and contributor tables at the end of this document list the maintainers and contributors of the project before it become an ASF project and are no longer updated.
 
-# Maintainers
+# Committers
 
-Maintainers may be added once approved by the existing maintainers (see [Governance document](GOVERNANCE.md)). By adding your name to this list you agree to follow the project's guidelines and governance including the [Code of Conduct](CODE-OF-CONDUCT.md) and that you have permission to contribute from your employer. All contributions are licensed under the Apache License version 2.
-
-| **NAME**      | **GitHub Username** | **Organization** |
-|---------------|---------------------|------------------|
-| Justin Mclean | justinmclean        | Datastrato       |
-| He Qi         | qqqttt123           | Datastrato       |
-| Minghuang Li  | mchades             | Datastrato       |
-| Xun Liu       | xunliu              | Datastrato       |
-| Hui Yu        | diqiu50             | Datastrato       |
-| Xiaojing Fang | FANNG1              | Datastrato       |
-| Qi Yu         | yuqi1129            | Datastrato       |
-| Decheng Liu   | ch3yne              | Datastrato       |
-| Saisai Shao   | jerryshao           | Datastrato       |
-| Shaofeng Shi  | shaofengshi         | Datastrato       |
-| Lisa Cao      | lisancao            | Datastrato       |
-| Qian Xia      | LauraXia123         | Datastrato       |
-| Danhua Wang   | danhuawang          | Datastrato       |
-
-# Contributors
-
-Contributors may be added by existing maintainers (see [Governance document](GOVERNANCE.md)). By adding your name to this list you agree to follow the project's guidelines and governance including the [Code of Conduct](CODE-OF-CONDUCT.md) and that you have permission to contribute from your employer. All contributions are licensed under the Apache License version 2.
-
-| **NAME**       | **GitHub Username** | **Organization** |
-|----------------|---------------------|------------------|
-| Kuan-Po Tseng  | brandboat           | SUSE             |
-| Nicholas Jiang | SteNicholas         | Bilibili         |
-| Eric Chang     | unknowntpo          | Lawsnote         |
-| Sophie Sun     | SophieTech88        | ExtraHop Network |
-| Xing Yong      | YxAc                | Xiaomi           |
-| Liwei Yang     | lw-yang             | Xiaomi           |
-| Yu-Ting Wang   | noidname01          | opensource4you   |
-| Ziva Li        | zivali              | Yahoo            |
-| Kang Zhou      | zhoukangcn          | Xiaomi           |
-| Han Zhang      | xiaozcy             | Xiaomi           |
-| Yu-Hsin Lai    | laiyousin           | Virginia Tech    |
-| Charlie Cheng  | charliecheng630     | cacaFly          |
-| PoAn Yang      | FrankYang0592       | SUSE             |
-| Congling Xia   | xiacongling         | Xiaomi           |
-| JieBao Xiao    | xloya               | Xiaomi           |
-| Can Cai        | caican00            | Xiaomi           |
-| Peidian Li     | coolderli           | Xiaomi           |
-| Brandon Lu     | Lanznx              | LINE             |
-| Lewis Jackson  | xnge                | opensource4you   |
-| Li-Hsing Liu   | austin362667        | opensource4you   |
-| Tianhang Li    | TEOTEO520           | Bilibili         |
-| Hiren Sharma   | hiirrxnn            | opensource4you   |
-| Chun-Hung Tseng| henrybear327        | opensource4you   |
-| Carl Chang     | ichuniq             | opensource4you   |
+The current Apache Gravitino project committers can be [viewed here](https://projects.apache.org/project.html?incubator-gravitino).
 
 ## Review process
 
@@ -117,3 +84,56 @@ For those bug fixes we should not backport:
    that could introduce new bugs.
 2. The bug being addressed is low priority or not critical to the community.
 3. The backported fix varies widely from the main branch fix.
+
+# Pre-ASF Maintainers
+
+Maintainers of the project are now called committers.
+
+All contributions from the people listed are licensed under the Apache License version 2.
+
+| **NAME**      | **GitHub Username** | **Organization** |
+|---------------|---------------------|------------------|
+| Justin Mclean | justinmclean        | Datastrato       |
+| He Qi         | qqqttt123           | Datastrato       |
+| Minghuang Li  | mchades             | Datastrato       |
+| Xun Liu       | xunliu              | Datastrato       |
+| Hui Yu        | diqiu50             | Datastrato       |
+| Xiaojing Fang | FANNG1              | Datastrato       |
+| Qi Yu         | yuqi1129            | Datastrato       |
+| Decheng Liu   | ch3yne              | Datastrato       |
+| Saisai Shao   | jerryshao           | Datastrato       |
+| Shaofeng Shi  | shaofengshi         | Datastrato       |
+| Lisa Cao      | lisancao            | Datastrato       |
+| Qian Xia      | LauraXia123         | Datastrato       |
+| Danhua Wang   | danhuawang          | Datastrato       |
+
+# Pre-ASF Contributors
+
+All contributions from the people listed are licensed under the Apache License version 2.
+
+| **NAME**       | **GitHub Username** | **Organization** |
+|----------------|---------------------|------------------|
+| Kuan-Po Tseng  | brandboat           | SUSE             |
+| Nicholas Jiang | SteNicholas         | Bilibili         |
+| Eric Chang     | unknowntpo          | Lawsnote         |
+| Sophie Sun     | SophieTech88        | ExtraHop Network |
+| Xing Yong      | YxAc                | Xiaomi           |
+| Liwei Yang     | lw-yang             | Xiaomi           |
+| Yu-Ting Wang   | noidname01          | opensource4you   |
+| Ziva Li        | zivali              | Yahoo            |
+| Kang Zhou      | zhoukangcn          | Xiaomi           |
+| Han Zhang      | xiaozcy             | Xiaomi           |
+| Yu-Hsin Lai    | laiyousin           | Virginia Tech    |
+| Charlie Cheng  | charliecheng630     | cacaFly          |
+| PoAn Yang      | FrankYang0592       | SUSE             |
+| Congling Xia   | xiacongling         | Xiaomi           |
+| JieBao Xiao    | xloya               | Xiaomi           |
+| Can Cai        | caican00            | Xiaomi           |
+| Peidian Li     | coolderli           | Xiaomi           |
+| Brandon Lu     | Lanznx              | LINE             |
+| Lewis Jackson  | xnge                | opensource4you   |
+| Li-Hsing Liu   | austin362667        | opensource4you   |
+| Tianhang Li    | TEOTEO520           | Bilibili         |
+| Hiren Sharma   | hiirrxnn            | opensource4you   |
+| Chun-Hung Tseng| henrybear327        | opensource4you   |
+| Carl Chang     | ichuniq             | opensource4you   |

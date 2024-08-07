@@ -5,8 +5,7 @@ keywords:
 - jdbc
 - Apache Doris
 - metadata
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';
@@ -14,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Gravitino provides the ability to manage [Apache Doris](https://doris.apache.org/) metadata through JDBC connection..
+Apache Gravitino provides the ability to manage [Apache Doris](https://doris.apache.org/) metadata through JDBC connection.
 
 :::caution
 Gravitino saves some system information in schema and table comments, like
@@ -40,17 +39,18 @@ You can check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
 more details.
 
-Here are the catalog properties defined in Gravitino for Doris catalog:
+Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Doris catalog has the following properties:
 
-| Configuration item   | Description                                                                         | Default value | Required | Since Version |
-|----------------------|-------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030` | (none)        | Yes      | 0.5.0         |
-| `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.            | (none)        | Yes      | 0.5.0         |
-| `jdbc-user`          | The JDBC user name.                                                                 | (none)        | Yes      | 0.5.0         |
-| `jdbc-password`      | The JDBC password.                                                                  | (none)        | Yes      | 0.5.0         |
-| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                      | `2`           | No       | 0.5.0         |
-| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                     | `10`          | No       | 0.5.0         |
-
+| Configuration item   | Description                                                                                                                                                                                                                                                                                                                                                                                                      | Default value | Required | Since Version |
+|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`                                                                                                                                                                                                                                                                                                                              | (none)        | Yes      | 0.5.0         |
+| `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                                                                                                                                                                                                                                                                                                                                         | (none)        | Yes      | 0.5.0         |
+| `jdbc-user`          | The JDBC user name.                                                                                                                                                                                                                                                                                                                                                                                              | (none)        | Yes      | 0.5.0         |
+| `jdbc-password`      | The JDBC password.                                                                                                                                                                                                                                                                                                                                                                                               | (none)        | Yes      | 0.5.0         |
+| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                                                                                                                                                                                                                                                                                                                                   | `2`           | No       | 0.5.0         |
+| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                                                                                                                                                                                                                                                                                                                  | `10`          | No       | 0.5.0         |
+| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                                                                                                                                                                                                                                                                                                                  | `10`          | No       | 0.5.0         |
+| `replication_num`    | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If not specified and the number of backend servers greater or equals to 3, the default value (3) in Doris server will be used. For more, please see the [doc](https://doris.apache.org/docs/1.2/sql-manual/sql-reference/Data-Definition-Statements/Create/CREATE-TABLE/) | `1` or `3`    | No       | 0.6.0         |
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
 Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
 
@@ -121,7 +121,7 @@ Unsupported for now.
 
     Please be aware that the index can only apply to a single column.
 
-    <Tabs>
+    <Tabs groupId='language' queryString>
     <TabItem value="json" label="Json">
 
     ```json

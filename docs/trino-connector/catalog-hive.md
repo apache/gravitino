@@ -1,9 +1,8 @@
 ---
-title: "Gravitino connector - Hive catalog"
+title: "Apache Gravitino connector - Hive catalog"
 slug: /trino-connector/catalog-hive
 keyword: gravitino connector trino
-license: "Copyright 2023 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
 The Hive catalog allows Trino querying data stored in an Apache Hive data warehouse.
@@ -41,7 +40,7 @@ per catalog:
 
 ### Create a schema 
 
-Users can create a schema with properties through Gravitino Trino connector as follows:
+Users can create a schema with properties through Apache Gravitino Trino connector as follows:
 
 ```SQL
 CREATE SCHEMA catalog.schema_name 
@@ -112,7 +111,7 @@ Reserved properties: A reserved property is one can't be set by users but can be
 Users can use the following example to create a table with properties: 
 
 ```sql
-CREATE TABLE catalog.dbname.tabname
+CREATE TABLE catalog.dbname.tablename
 (
   name varchar,
   salary int

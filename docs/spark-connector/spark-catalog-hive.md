@@ -2,11 +2,10 @@
 title: "Spark connector hive catalog"
 slug: /spark-connector/spark-catalog-hive
 keyword: spark connector hive catalog
-license: "Copyright 2024 Datastrato Pvt Ltd.
-This software is licensed under the Apache License version 2."
+license: "This software is licensed under the Apache License version 2."
 ---
 
-With the Gravitino Spark connector, accessing data or managing metadata in Hive catalogs becomes straightforward, enabling seamless federation queries across different Hive catalogs.
+With the Apache Gravitino Spark connector, accessing data or managing metadata in Hive catalogs becomes straightforward, enabling seamless federation queries across different Hive catalogs.
 
 ## Capabilities
 
@@ -19,6 +18,11 @@ Supports most DDL and DML operations in SparkSQL, except such operations:
 - `LOAD` clause
 - `CREATE TABLE LIKE` clause
 - `TRUCATE TABLE` clause
+
+
+:::info
+Don't support reading and writing tables with `org.apache.hadoop.hive.serde2.OpenCSVSerde` row format.
+:::
 
 ## Requirement
 

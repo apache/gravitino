@@ -1,6 +1,20 @@
 /*
- * Copyright 2024 Datastrato Pvt Ltd.
- * This software is licensed under the Apache License version 2.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 plugins {
   `maven-publish`
@@ -13,14 +27,21 @@ repositories {
 }
 
 val flinkVersion: String = libs.versions.flink.get()
-val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+
+// The Flink only support scala 2.12, and all scala api will be removed in a future version.
+// You can find more detail at the following issues:
+// https://issues.apache.org/jira/browse/FLINK-23986,
+// https://issues.apache.org/jira/browse/FLINK-20845,
+// https://issues.apache.org/jira/browse/FLINK-13414.
+val scalaVersion: String = "2.12"
+val artifactName = "gravitino-${project.name}-$scalaVersion"
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(project(":clients:client-java"))
-  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
@@ -65,6 +86,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
@@ -115,6 +137,7 @@ dependencies {
     exclude("com.google.code.findbugs", "jsr305")
   }
   testImplementation("org.apache.flink:flink-table-planner_$scalaVersion:$flinkVersion")
+  testImplementation("org.apache.flink:flink-test-utils:$flinkVersion")
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -133,12 +156,25 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
+    dependsOn(":catalogs:catalog-hive:jar")
 
     doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
+      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
     }
 
     val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
     init(this)
+  }
+}
+
+tasks.withType<Jar> {
+  archiveBaseName.set(artifactName)
+}
+
+publishing {
+  publications {
+    withType<MavenPublication>().configureEach {
+      artifactId = artifactName
+    }
   }
 }

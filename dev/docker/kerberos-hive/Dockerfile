@@ -1,10 +1,24 @@
 #
-# Copyright 2024 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 #
 
 FROM ubuntu:16.04
-LABEL maintainer="support@datastrato.com"
+LABEL maintainer="dev@gravitino.apache.org"
 
 ARG HADOOP_PACKAGE_NAME
 ARG HIVE_PACKAGE_NAME
@@ -44,7 +58,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install --fix-missing -yq \
   krb5-admin-server \
   krb5-user \
   krb5-config \
-  jsvc
+  jsvc \
+  net-tools
 
 #################################################################################
 ## setup ssh
@@ -126,6 +141,8 @@ ADD check-status.sh /tmp/check-status.sh
 RUN mkdir ${HIVE_HOME}
 RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME}
 ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
+RUN mkdir ${HIVE_HOME}/conf1 && cp ${HIVE_HOME}/conf/* ${HIVE_HOME}/conf1/
+ADD hive-site1.xml ${HIVE_HOME}/conf1/hive-site.xml
 
 ################################################################################
 # install MySQL
@@ -163,7 +180,7 @@ RUN rm -rf /tmp/packages
 
 ################################################################################
 # expose port
-EXPOSE 3306 9000 9083 10000 10002 50070 50075 50010 88
+EXPOSE 3306 9000 9083 10000 10002 50070 50075 50010 88 19083
 
 ################################################################################
 # create startup script and set ENTRYPOINT

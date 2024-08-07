@@ -1,8 +1,23 @@
 #
-# Copyright 2023 Datastrato Pvt Ltd.
-# This software is licensed under the Apache License version 2.
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 #
 [versions]
+aws = "2.26.20"
 junit = "5.8.1"
 protoc = "3.24.4"
 jackson = "2.15.2"
@@ -15,6 +30,7 @@ jersey = "2.41"
 mockito = "4.11.0"
 airlift-json = "237"
 airlift-log = "231"
+airlift-resolver = "1.6"
 airlift-units = "1.8"
 hive2 = "2.3.9"
 hadoop2 = "2.10.2"
@@ -28,8 +44,9 @@ commons-collections4 = "4.4"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 rocksdbjni = "7.10.2"
-iceberg = '1.3.1' # used for Gravitino Iceberg catalog and Iceberg REST service
+iceberg = '1.5.2' # used for Gravitino Iceberg catalog and Iceberg REST service
 iceberg4spark = "1.4.1" # used for compile spark connector
+paimon = '0.8.0'
 spark33 = "3.3.4"
 spark34 = "3.4.3"
 spark35 = "3.5.1"
@@ -76,6 +93,8 @@ sun-activation-version = "1.2.0"
 error-prone = "3.1.0"
 
 [libraries]
+aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "aws" }
+aws-sts = { group = "software.amazon.awssdk", name = "sts", version.ref = "aws" }
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
 protobuf-java-util = { group = "com.google.protobuf", name = "protobuf-java-util", version.ref = "protoc" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
@@ -108,9 +127,11 @@ jersey-test-framework-core = { group = "org.glassfish.jersey.test-framework", na
 jersey-test-framework-provider-jetty = { group = "org.glassfish.jersey.test-framework.providers", name = "jersey-test-framework-provider-jetty", version.ref = "jersey" }
 jodd-core = { group = "org.jodd", name = "jodd-core", version.ref = "jodd" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
+mockito-inline = { group = "org.mockito", name = "mockito-inline", version.ref = "mockito" }
 hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive2"}
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
 hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
+hive2-jdbc = { group = "org.apache.hive", name = "hive-jdbc", version.ref = "hive2"}
 hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
 hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
@@ -120,6 +141,7 @@ hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.
 hadoop3-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop3"}
 hadoop3-minicluster = { group = "org.apache.hadoop", name = "hadoop-minicluster", version.ref = "hadoop-minikdc"}
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
+airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 airlift-units = { group = "io.airlift", name = "units", version.ref = "airlift-units"}
 airlift-log = { group = "io.airlift", name = "log", version.ref = "airlift-log"}
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
@@ -130,9 +152,13 @@ commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
 rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksdbjni" }
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
+iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
+paimon-core = { group = "org.apache.paimon", name = "paimon-core", version.ref = "paimon" }
+paimon-format = { group = "org.apache.paimon", name = "paimon-format", version.ref = "paimon" }
+paimon-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog", version.ref = "paimon" }
 trino-spi= { group = "io.trino", name = "trino-spi", version.ref = "trino" }
 trino-toolkit= { group = "io.trino", name = "trino-plugin-toolkit", version.ref = "trino" }
 trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trino" }
@@ -184,6 +210,7 @@ log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-
 jetty = ["jetty-server", "jetty-servlet", "jetty-webapp", "jetty-servlets"]
 jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-jetty-http", "jersey-media-json-jackson", "jersey-hk2"]
 iceberg = ["iceberg-core", "iceberg-api"]
+paimon = ["paimon-core", "paimon-format", "paimon-hive-catalog"]
 jwt = ["jwt-api", "jwt-impl", "jwt-gson"]
 metrics = ["metrics-core", "metrics-jersey2", "metrics-jvm", "metrics-jmx", "metrics-servlets"]
 prometheus = ["prometheus-servlet", "prometheus-dropwizard", "prometheus-client"]
