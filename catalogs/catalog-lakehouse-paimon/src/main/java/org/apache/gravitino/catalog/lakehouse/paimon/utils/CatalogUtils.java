@@ -46,7 +46,6 @@ public class CatalogUtils {
 
   private CatalogUtils() {}
 
-  @VisibleForTesting
   public static PaimonBackendCatalogWrapper loadCatalogBackend(PaimonConfig paimonConfig) {
     Map<String, String> allConfig = paimonConfig.getAllConfig();
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(allConfig);
