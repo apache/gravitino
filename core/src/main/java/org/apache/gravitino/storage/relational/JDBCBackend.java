@@ -368,17 +368,12 @@ public class JDBCBackend implements RelationalBackend {
       SupportsRelationOperations.Type relType,
       NameIdentifier nameIdentifier,
       Entity.EntityType identType) {
-    switch (relType) {
-      case OWNER_REL:
-        List<E> list = Lists.newArrayList();
-        OwnerMetaService.getInstance()
-            .getOwner(nameIdentifier, identType)
-            .ifPresent(e -> list.add((E) e));
-        return list;
-      default:
-        throw new IllegalArgumentException(
-            String.format("Doesn't support the relation type %s", relType));
+    if (relType != Type.OWNER_REL) {
+      throw new IllegalArgumentException(String.format("Doesn't support the relation type %s", relType));
     }
+    List<E> list = Lists.newArrayList();
+    OwnerMetaService.getInstance().getOwner(nameIdentifier, identType).ifPresent(e -> list.add((E) e));
+    return list;
   }
 
   @Override
