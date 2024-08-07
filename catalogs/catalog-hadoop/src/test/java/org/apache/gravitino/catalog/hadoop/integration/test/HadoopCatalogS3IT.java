@@ -22,6 +22,8 @@ import static org.apache.gravitino.integration.test.container.S3MockContainer.HT
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.authentication.aws.AwsConfig;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
@@ -67,12 +69,10 @@ public class HadoopCatalogS3IT extends HadoopCatalogCommonIT {
   @Override
   protected Map<String, String> catalogProperties() {
     return ImmutableMap.<String, String>builder()
-        .put("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .put("fs.s3a.connection.ssl.enabled", "false")
-        .put("fs.s3a.path.style.access", "true")
-        .put("fs.s3a.access.key", DEFAULT_AK)
-        .put("fs.s3a.secret.key", DEFAULT_SK)
-        .put("fs.s3a.endpoint", s3Endpoint)
+        .put(AuthenticationConfig.AUTH_TYPE_KEY, "aws")
+        .put(AwsConfig.ENDPOINT, s3Endpoint)
+        .put(AwsConfig.ACCESS_KEY, DEFAULT_AK)
+        .put(AwsConfig.SECRET_KEY, DEFAULT_SK)
         .build();
   }
 

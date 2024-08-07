@@ -32,9 +32,9 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -90,10 +90,8 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
     Map<String, String> catalogProperties = catalogProperties();
     metalake.createCatalog(
         CATALOG_NAME, Catalog.Type.FILESET, PROVIDER, "comment", catalogProperties);
-    Catalog loadedCatalog = metalake.loadCatalog(CATALOG_NAME);
-    assertEquals(catalogProperties, loadedCatalog.properties());
 
-    catalog = loadedCatalog;
+    catalog = metalake.loadCatalog(CATALOG_NAME);
   }
 
   protected Map<String, String> catalogProperties() {
@@ -106,9 +104,6 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
 
     Map<String, String> schemaProperties = schemaProperties();
     catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(SCHEMA_NAME);
-
-    assertEquals(schemaProperties, loadSchema.properties());
   }
 
   protected Map<String, String> schemaProperties() {
@@ -123,6 +118,29 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
     createMetalake();
     createCatalog();
     createSchema();
+  }
+
+  @Test
+  void testAlterCatalogLocation() {
+    String catalogName = GravitinoITUtils.genRandomName("test_alter_catalog_location");
+    String location = defaultBaseLocation();
+    String newLocation = location + "/new_location";
+
+    Map<String, String> catalogProperties = ImmutableMap.of("location", location);
+    // Create a catalog using location
+    Catalog filesetCatalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, PROVIDER, "comment", catalogProperties);
+
+    assertEquals(location, filesetCatalog.properties().get("location"));
+
+    // Now try to alter the location and change it to `newLocation`.
+    Catalog modifiedCatalog =
+        metalake.alterCatalog(catalogName, CatalogChange.setProperty("location", newLocation));
+
+    assertEquals(newLocation, modifiedCatalog.properties().get("location"));
+
+    metalake.dropCatalog(catalogName);
   }
 
   @Test

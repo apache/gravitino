@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.hadoop;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.hadoop.authentication.aws.AwsConfig;
 import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
@@ -48,6 +49,7 @@ public class HadoopSchemaPropertiesMetadata extends BasePropertiesMetadata {
                   null,
                   false /* hidden */))
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
+          .putAll(AwsConfig.AWS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
           .build();
 
