@@ -34,6 +34,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -90,16 +91,17 @@ public class TableMetaService {
 
   public Long getTableByNameIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
+    EntityIdentifier tableIdentifier = EntityIdentifier.of(identifier, Entity.EntityType.TABLE);
 
     return NameIdMappingService.getInstance()
         .get(
-            identifier,
+            tableIdentifier,
             ident -> {
               Long schemaId =
                   CommonMetaService.getInstance()
-                      .getParentEntityIdByNamespace(identifier.namespace());
+                      .getParentEntityIdByNamespace(ident.ident.namespace());
 
-              return getTableIdBySchemaIdAndName(schemaId, identifier.name());
+              return getTableIdBySchemaIdAndName(schemaId, ident.ident.name());
             });
   }
 

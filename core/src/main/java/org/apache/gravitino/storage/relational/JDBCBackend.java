@@ -30,6 +30,7 @@ import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -55,6 +56,7 @@ import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.NameIdMappingService;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
@@ -124,32 +126,44 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException, IOException {
+    EntityType entityType;
     if (e instanceof BaseMetalake) {
       MetalakeMetaService.getInstance().insertMetalake((BaseMetalake) e, overwritten);
+      entityType = EntityType.METALAKE;
     } else if (e instanceof CatalogEntity) {
       CatalogMetaService.getInstance().insertCatalog((CatalogEntity) e, overwritten);
+      entityType = EntityType.CATALOG;
     } else if (e instanceof SchemaEntity) {
       SchemaMetaService.getInstance().insertSchema((SchemaEntity) e, overwritten);
+      entityType = EntityType.SCHEMA;
     } else if (e instanceof TableEntity) {
       TableMetaService.getInstance().insertTable((TableEntity) e, overwritten);
+      entityType = EntityType.TABLE;
     } else if (e instanceof FilesetEntity) {
       FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
+      entityType = EntityType.FILESET;
     } else if (e instanceof TopicEntity) {
       TopicMetaService.getInstance().insertTopic((TopicEntity) e, overwritten);
+      entityType = EntityType.TOPIC;
     } else if (e instanceof UserEntity) {
       UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
+      entityType = EntityType.USER;
     } else if (e instanceof RoleEntity) {
       RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
+      entityType = EntityType.ROLE;
     } else if (e instanceof GroupEntity) {
       GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
+      entityType = EntityType.GROUP;
     } else if (e instanceof TagEntity) {
       TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
+      entityType = EntityType.TAG;
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
     }
 
-    NameIdMappingService.getInstance().put(e.nameIdentifier(), e.id());
+    NameIdMappingService.getInstance()
+        .put(EntityIdentifier.of(e.nameIdentifier(), entityType), e.id());
   }
 
   @Override
@@ -158,7 +172,8 @@ public class JDBCBackend implements RelationalBackend {
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     // Remove all the children entities in the cache as we can't guarantee the children entities
     // are still valid after the parent entity is updated.
-    NameIdMappingService.getInstance().invalidateWithPrefix(ident);
+    EntityIdentifier entityIdentifier = EntityIdentifier.of(ident, entityType);
+    NameIdMappingService.getInstance().invalidateWithPrefix(entityIdentifier);
     switch (entityType) {
       case METALAKE:
         return (E) MetalakeMetaService.getInstance().updateMetalake(ident, updater);
@@ -218,10 +233,11 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade) {
     // Invalidate the cache first
-    NameIdMappingService.getInstance().invalidate(ident);
+    EntityIdentifier entityIdentifier = EntityIdentifier.of(ident, entityType);
+    NameIdMappingService.getInstance().invalidate(entityIdentifier);
     if (cascade) {
       // Remove all the children entities in the cache;
-      NameIdMappingService.getInstance().invalidateWithPrefix(ident);
+      NameIdMappingService.getInstance().invalidateWithPrefix(entityIdentifier);
     }
 
     try {
@@ -253,7 +269,7 @@ public class JDBCBackend implements RelationalBackend {
     } finally {
       // Remove the entity from the cache again because we may add the cache during the deletion
       // process
-      NameIdMappingService.getInstance().invalidateWithPrefix(ident);
+      NameIdMappingService.getInstance().invalidateWithPrefix(entityIdentifier);
     }
   }
 

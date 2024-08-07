@@ -35,6 +35,7 @@ import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -86,13 +87,16 @@ public class RoleMetaService {
   public Long getRoleIdByNameIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkRole(identifier);
 
+    EntityIdentifier entityIdentifier = EntityIdentifier.of(identifier, Entity.EntityType.ROLE);
+
     return NameIdMappingService.getInstance()
         .get(
-            identifier,
+            entityIdentifier,
             ident -> {
               Long metalakeId =
-                  MetalakeMetaService.getInstance().getMetalakeIdByName(ident.namespace().level(0));
-              return getRoleIdByMetalakeIdAndName(metalakeId, ident.name());
+                  MetalakeMetaService.getInstance()
+                      .getMetalakeIdByName(ident.ident.namespace().level(0));
+              return getRoleIdByMetalakeIdAndName(metalakeId, ident.ident.name());
             });
   }
 

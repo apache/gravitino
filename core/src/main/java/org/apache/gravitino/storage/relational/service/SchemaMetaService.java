@@ -41,6 +41,7 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -94,15 +95,17 @@ public class SchemaMetaService {
   }
 
   public Long getSchemaIdByNameIdentifier(NameIdentifier identifier) {
+    EntityIdentifier entityIdentifier = EntityIdentifier.of(identifier, Entity.EntityType.SCHEMA);
     return NameIdMappingService.getInstance()
         .get(
-            identifier,
-            ident -> {
-              NameIdentifierUtil.checkSchema(ident);
-              String schemaName = ident.name();
+            entityIdentifier,
+            entityIdent -> {
+              NameIdentifierUtil.checkSchema(entityIdent.ident);
+              String schemaName = entityIdent.ident.name();
 
               Long catalogId =
-                  CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(entityIdent.ident.namespace());
 
               return getSchemaIdByCatalogIdAndName(catalogId, schemaName);
             });
@@ -199,8 +202,10 @@ public class SchemaMetaService {
 
     String schemaName = identifier.name();
     Long schemaId = getSchemaIdByNameIdentifier(identifier);
+
     // Invalidate it in the cache.
-    NameIdMappingService.getInstance().invalidate(identifier);
+    NameIdMappingService.getInstance()
+        .invalidate(EntityIdentifier.of(identifier, Entity.EntityType.SCHEMA));
 
     if (schemaId != null) {
       if (cascade) {

@@ -29,13 +29,14 @@ import java.io.IOException;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 
 public class NameIdMappingService implements Closeable {
 
   private static volatile NameIdMappingService instance;
 
-  private Cache<NameIdentifier, Long> ident2IdCache;
+  private Cache<EntityIdentifier, Long> ident2IdCache;
 
   private NameIdMappingService() {
     this.ident2IdCache =
@@ -54,6 +55,20 @@ public class NameIdMappingService implements Closeable {
             .build();
   }
 
+  public static class EntityIdentifier {
+    final NameIdentifier ident;
+    final EntityType type;
+
+    private EntityIdentifier(NameIdentifier ident, EntityType type) {
+      this.ident = ident;
+      this.type = type;
+    }
+
+    public static EntityIdentifier of(NameIdentifier ident, EntityType type) {
+      return new EntityIdentifier(ident, type);
+    }
+  }
+
   public static NameIdMappingService getInstance() {
     if (instance == null) {
       synchronized (NameIdMappingService.class) {
@@ -66,25 +81,25 @@ public class NameIdMappingService implements Closeable {
     return instance;
   }
 
-  public void put(NameIdentifier key, Long value) {
+  public void put(EntityIdentifier key, Long value) {
     ident2IdCache.put(key, value);
   }
 
-  public Long get(NameIdentifier key, Function<NameIdentifier, Long> mappingFunction) {
+  public Long get(EntityIdentifier key, Function<EntityIdentifier, Long> mappingFunction) {
     return ident2IdCache.get(key, mappingFunction);
   }
 
-  public Long get(NameIdentifier key) {
+  public Long get(EntityIdentifier key) {
     return ident2IdCache.getIfPresent(key);
   }
 
-  public NameIdentifier getById(Long value, Function<Long, NameIdentifier> mappingFunction) {
+  public EntityIdentifier getById(Long value, Function<Long, EntityIdentifier> mappingFunction) {
     synchronized (this) {
-      BiMap<NameIdentifier, Long> map = HashBiMap.create(ident2IdCache.asMap());
+      BiMap<EntityIdentifier, Long> map = HashBiMap.create(ident2IdCache.asMap());
       if (map.containsValue(value)) {
         return map.inverse().get(value);
       } else {
-        NameIdentifier nameIdentifier = mappingFunction.apply(value);
+        EntityIdentifier nameIdentifier = mappingFunction.apply(value);
         if (nameIdentifier != null) {
           ident2IdCache.put(nameIdentifier, value);
         }
@@ -93,9 +108,9 @@ public class NameIdMappingService implements Closeable {
     }
   }
 
-  public NameIdentifier getById(Long value) {
+  public EntityIdentifier getById(Long value) {
     synchronized (this) {
-      BiMap<NameIdentifier, Long> map = HashBiMap.create(ident2IdCache.asMap());
+      BiMap<EntityIdentifier, Long> map = HashBiMap.create(ident2IdCache.asMap());
       if (map.containsValue(value)) {
         return map.inverse().get(value);
       }
@@ -103,13 +118,13 @@ public class NameIdMappingService implements Closeable {
     }
   }
 
-  public void invalidate(NameIdentifier key) {
+  public void invalidate(EntityIdentifier key) {
     ident2IdCache.invalidate(key);
   }
 
-  public void invalidateWithPrefix(NameIdentifier nameIdentifier) {
+  public void invalidateWithPrefix(EntityIdentifier nameIdentifier) {
     ident2IdCache.asMap().keySet().stream()
-        .filter(k -> k.toString().startsWith(nameIdentifier.toString()))
+        .filter(k -> k.ident.toString().startsWith(nameIdentifier.ident.toString()))
         .forEach(ident2IdCache::invalidate);
   }
 

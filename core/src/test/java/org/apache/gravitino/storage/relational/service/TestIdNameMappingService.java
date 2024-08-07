@@ -19,7 +19,9 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -28,19 +30,24 @@ public class TestIdNameMappingService {
   @Test
   public void testGetInstance() throws IOException {
     NameIdMappingService instance = NameIdMappingService.getInstance();
-    Assertions.assertNull(instance.get(NameIdentifier.of("m1")));
-    Assertions.assertEquals(1L, instance.get(NameIdentifier.of("m1"), (NameIdentifier key) -> 1L));
 
-    instance.put(NameIdentifier.of("m2"), 2L);
-    Assertions.assertEquals(2L, instance.get(NameIdentifier.of("m2")));
+    EntityIdentifier makeLakeIdent1 =
+        EntityIdentifier.of(NameIdentifier.of("m1"), EntityType.METALAKE);
+    EntityIdentifier makeLakeIdent2 =
+        EntityIdentifier.of(NameIdentifier.of("m2"), EntityType.METALAKE);
 
-    instance.invalidate(NameIdentifier.of("m2"));
-    Assertions.assertNull(instance.get(NameIdentifier.of("m2")));
+    instance.put(makeLakeIdent1, 1L);
+    Assertions.assertEquals(1L, instance.get(makeLakeIdent1, (EntityIdentifier key) -> 1L));
 
-    Assertions.assertEquals(NameIdentifier.of("m1"), instance.getById(1L));
+    instance.put(makeLakeIdent2, 2L);
+    Assertions.assertEquals(2L, instance.get(makeLakeIdent2));
 
-    Assertions.assertEquals(
-        NameIdentifier.of("m2"), instance.getById(2L, (Long value) -> NameIdentifier.of("m2")));
+    instance.invalidate(makeLakeIdent2);
+    Assertions.assertNull(instance.get(makeLakeIdent2));
+
+    Assertions.assertEquals(makeLakeIdent1, instance.getById(1L));
+
+    Assertions.assertEquals(makeLakeIdent2, instance.getById(2L, (Long value) -> makeLakeIdent2));
 
     instance.close();
   }

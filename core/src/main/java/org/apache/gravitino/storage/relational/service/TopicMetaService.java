@@ -34,6 +34,7 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -217,13 +218,15 @@ public class TopicMetaService {
   public Long getTopicIdByNameIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTopic(identifier);
 
+    EntityIdentifier topicEntity = EntityIdentifier.of(identifier, Entity.EntityType.TOPIC);
     return NameIdMappingService.getInstance()
         .get(
-            identifier,
+            topicEntity,
             ident -> {
               Long schemaId =
-                  CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
-              return getTopicIdBySchemaIdAndName(schemaId, ident.name());
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(ident.ident.namespace());
+              return getTopicIdBySchemaIdAndName(schemaId, ident.ident.name());
             });
   }
 

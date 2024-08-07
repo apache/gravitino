@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -36,6 +37,7 @@ import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -85,13 +87,15 @@ public class FilesetMetaService {
   public Long getFilesetIdByNameIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkFileset(identifier);
 
+    EntityIdentifier fileIdentifier = EntityIdentifier.of(identifier, EntityType.FILESET);
     return NameIdMappingService.getInstance()
         .get(
-            identifier,
+            fileIdentifier,
             ident -> {
               Long schemaId =
-                  CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
-              return getFilesetIdBySchemaIdAndName(schemaId, ident.name());
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(ident.ident.namespace());
+              return getFilesetIdBySchemaIdAndName(schemaId, ident.ident.name());
             });
   }
 

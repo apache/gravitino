@@ -42,6 +42,7 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -103,14 +104,16 @@ public class CatalogMetaService {
 
   public Long getCatalogIdByNameIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkCatalog(identifier);
+    EntityIdentifier catalogIdent = EntityIdentifier.of(identifier, Entity.EntityType.CATALOG);
 
     return NameIdMappingService.getInstance()
         .get(
-            identifier,
+            catalogIdent,
             ident -> {
-              String catalogName = ident.name();
+              String catalogName = ident.ident.name();
               Long metalakeId =
-                  CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(ident.ident.namespace());
               return getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
             });
   }

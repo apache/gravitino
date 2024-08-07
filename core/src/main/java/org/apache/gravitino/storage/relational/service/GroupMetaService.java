@@ -39,6 +39,7 @@ import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -84,14 +85,15 @@ public class GroupMetaService {
   }
 
   public Long getGroupIdByNameIdentifier(NameIdentifier identifier) {
+    EntityIdentifier groupIdentifier = EntityIdentifier.of(identifier, Entity.EntityType.GROUP);
     return NameIdMappingService.getInstance()
         .get(
-            identifier,
+            groupIdentifier,
             ident -> {
               Long metalakeId =
                   MetalakeMetaService.getInstance()
-                      .getMetalakeIdByName(identifier.namespace().level(0));
-              return getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
+                      .getMetalakeIdByName(ident.ident.namespace().level(0));
+              return getGroupIdByMetalakeIdAndName(metalakeId, ident.ident.name());
             });
   }
 
