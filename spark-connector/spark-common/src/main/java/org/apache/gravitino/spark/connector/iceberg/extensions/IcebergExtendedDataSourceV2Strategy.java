@@ -18,9 +18,9 @@
  */
 package org.apache.gravitino.spark.connector.iceberg.extensions;
 
-import java.util.ArrayList;
+import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.toJavaList;
+
 import java.util.Collections;
-import java.util.List;
 import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
 import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.SparkSession;
@@ -234,12 +234,6 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     return JavaConverters.asScalaIteratorConverter(Collections.singletonList(plan).listIterator())
         .asScala()
         .toIndexedSeq();
-  }
-
-  private static List<String> toJavaList(Seq<String> identifiers) {
-    List<String> identifierList = new ArrayList<>();
-    identifiers.foreach(identifierList::add);
-    return identifierList;
   }
 
   static class IcebergCatalogAndIdentifier {
