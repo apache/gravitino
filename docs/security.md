@@ -11,9 +11,11 @@ Apache Gravitino supports two kinds of authentication mechanisms: simple and OAu
 
 ### Simple mode
 
-Simple mode is the default authentication option.
+Simple mode is the default authentication option of the server.
 
-Simple mode allows the client to use the environment variable `GRAVITINO_USER` as the user.
+For the client side, if it doesn't set the authentication explicitly, it will use anonymous to access the server.
+
+If the client sets the simple mode,  it will use the environment variable `GRAVITINO_USER` as the user. 
 
 If the environment variable `GRAVITINO_USER` isn't set, the client uses the user of the machine that sends requests.
 
@@ -202,20 +204,20 @@ Both the Gravitino server and Iceberg REST service can configure HTTPS.
 
 ### Apache Iceberg REST service's configuration
 
-| Configuration item                                         | Description                                                        | Default value | Required                                          | Since version |
-|------------------------------------------------------------|--------------------------------------------------------------------|---------------|---------------------------------------------------|---------------|
-| `gravitino.auxService.iceberg-rest.enableHttps`            | Enables HTTPS.                                                     | `false`       | No                                                | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `9433`        | No                                                | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.keyStorePath`           | Path to the key store file.                                        | (none)        | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.keyStorePassword`       | Password to the key store.                                         | (none)        | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.keyStoreType`           | The type to the key store.                                         | `JKS`         | No                                                | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.managerPassword`        | Manager password to the key store.                                 | (none)        | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.tlsProtocol`            | TLS protocol to use. The JVM must support the TLS protocol to use. | (none)        | No                                                | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.enableCipherAlgorithms` | The collection of enabled cipher algorithms.                       | ``            | No                                                | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.enableClientAuth`       | Enables the authentication of the client.                          | `false`       | No                                                | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.trustStorePath`         | Path to the trust store file.                                      | (none)        | Yes if use HTTPS and the authentication of client | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.trustStorePassword`     | Password to the trust store.                                       | (none)        | Yes if use HTTPS and the authentication of client | 0.3.0         |
-| `gravitino.auxService.iceberg-rest.trustStoreType`         | The type to the trust store.                                       | `JKS`         | No                                                | 0.3.0         |
+| Configuration item                              | Description                                                        | Default value | Required                                          | Since version |
+|-------------------------------------------------|--------------------------------------------------------------------|---------------|---------------------------------------------------|---------------|
+| `gravitino.iceberg-rest.enableHttps`            | Enables HTTPS.                                                     | `false`       | No                                                | 0.3.0         |
+| `gravitino.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `9433`        | No                                                | 0.3.0         |
+| `gravitino.iceberg-rest.keyStorePath`           | Path to the key store file.                                        | (none)        | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.iceberg-rest.keyStorePassword`       | Password to the key store.                                         | (none)        | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.iceberg-rest.keyStoreType`           | The type to the key store.                                         | `JKS`         | No                                                | 0.3.0         |
+| `gravitino.iceberg-rest.managerPassword`        | Manager password to the key store.                                 | (none)        | Yes if use HTTPS                                  | 0.3.0         |
+| `gravitino.iceberg-rest.tlsProtocol`            | TLS protocol to use. The JVM must support the TLS protocol to use. | (none)        | No                                                | 0.3.0         |
+| `gravitino.iceberg-rest.enableCipherAlgorithms` | The collection of enabled cipher algorithms.                       | ``            | No                                                | 0.3.0         |
+| `gravitino.iceberg-rest.enableClientAuth`       | Enables the authentication of the client.                          | `false`       | No                                                | 0.3.0         |
+| `gravitino.iceberg-rest.trustStorePath`         | Path to the trust store file.                                      | (none)        | Yes if use HTTPS and the authentication of client | 0.3.0         |
+| `gravitino.iceberg-rest.trustStorePassword`     | Password to the trust store.                                       | (none)        | Yes if use HTTPS and the authentication of client | 0.3.0         |
+| `gravitino.iceberg-rest.trustStoreType`         | The type to the trust store.                                       | `JKS`         | No                                                | 0.3.0         |
 
 Refer to the "Additional JSSE Standard Names" section of the [Java security guide](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#jssenames) for the list of protocols related to tlsProtocol. You can find the list of `tlsProtocol` values for Java 8 in this document.
 
@@ -311,14 +313,14 @@ curl -v -X GET --cacert ./certificate.pem -H "Accept: application/vnd.gravitino.
 
 ### Apache Iceberg REST service's configuration
 
-| Configuration item                                        | Description                                                                                                                                                                                                  | Default value                                 | Required | Since version |
-|-----------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|----------|---------------|
-| `gravitino.auxService.iceberg-rest.enableCorsFilter`      | Enable cross-origin resource share filter.                                                                                                                                                                   | false                                         | No       | 0.4.0         |
-| `gravitino.auxService.iceberg-rest.allowedOrigins`        | A comma separated list of allowed origins that access the resources. The default value is *, which means all origins.                                                                                        | `*`                                           | No       | 0.4.0         |
-| `gravitino.auxService.iceberg-rest.allowedTimingOrigins`  | A comma separated list of allowed origins that time the resource. The default value is the empty string, which means no origins.                                                                             | ``                                            | No       | 0.4.0         |
-| `gravitino.auxService.iceberg-rest.allowedMethods`        | A comma separated list of allowed HTTP methods used when accessing the resources. The default values are GET, POST, HEAD, and DELETE.                                                                        | `GET,POST,HEAD,DELETE,PUT`                    | No       | 0.4.0         |
-| `gravitino.auxService.iceberg-rest.allowedHeaders`        | A comma separated list of HTTP allowed headers specified when accessing the resources. The default value is X-Requested-With,Content-Type,Accept,Origin. If the value is a single *, it accepts all headers. | `X-Requested-With,Content-Type,Accept,Origin` | No       | 0.4.0         |
-| `gravitino.auxService.iceberg-rest.preflightMaxAgeInSecs` | The number of seconds to cache preflight requests by the client. The default value is 1800 seconds or 30 minutes.                                                                                            | `1800`                                        | No       | 0.4.0         |
-| `gravitino.auxService.iceberg-rest.allowCredentials`      | A boolean indicating if the resource allows requests with credentials. The default value is true.                                                                                                            | `true`                                        | No       | 0.4.0         |
-| `gravitino.auxService.iceberg-rest.exposedHeaders`        | A comma separated list of allowed HTTP headers exposed on the client. The default value is the empty list.                                                                                                   | ``                                            | No       | 0.4.0         |
-| `gravitino.auxService.iceberg-rest.chainPreflight`        | If true chained preflight requests for normal handling (as an OPTION request). Otherwise, the filter responds to the preflight. The default is true.                                                         | `true`                                        | No       | 0.4.0         |
+| Configuration item                             | Description                                                                                                                                                                                                  | Default value                                 | Required | Since version |
+|------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|----------|---------------|
+| `gravitino.iceberg-rest.enableCorsFilter`      | Enable cross-origin resource share filter.                                                                                                                                                                   | false                                         | No       | 0.4.0         |
+| `gravitino.iceberg-rest.allowedOrigins`        | A comma separated list of allowed origins that access the resources. The default value is *, which means all origins.                                                                                        | `*`                                           | No       | 0.4.0         |
+| `gravitino.iceberg-rest.allowedTimingOrigins`  | A comma separated list of allowed origins that time the resource. The default value is the empty string, which means no origins.                                                                             | ``                                            | No       | 0.4.0         |
+| `gravitino.iceberg-rest.allowedMethods`        | A comma separated list of allowed HTTP methods used when accessing the resources. The default values are GET, POST, HEAD, and DELETE.                                                                        | `GET,POST,HEAD,DELETE,PUT`                    | No       | 0.4.0         |
+| `gravitino.iceberg-rest.allowedHeaders`        | A comma separated list of HTTP allowed headers specified when accessing the resources. The default value is X-Requested-With,Content-Type,Accept,Origin. If the value is a single *, it accepts all headers. | `X-Requested-With,Content-Type,Accept,Origin` | No       | 0.4.0         |
+| `gravitino.iceberg-rest.preflightMaxAgeInSecs` | The number of seconds to cache preflight requests by the client. The default value is 1800 seconds or 30 minutes.                                                                                            | `1800`                                        | No       | 0.4.0         |
+| `gravitino.iceberg-rest.allowCredentials`      | A boolean indicating if the resource allows requests with credentials. The default value is true.                                                                                                            | `true`                                        | No       | 0.4.0         |
+| `gravitino.iceberg-rest.exposedHeaders`        | A comma separated list of allowed HTTP headers exposed on the client. The default value is the empty list.                                                                                                   | ``                                            | No       | 0.4.0         |
+| `gravitino.iceberg-rest.chainPreflight`        | If true chained preflight requests for normal handling (as an OPTION request). Otherwise, the filter responds to the preflight. The default is true.                                                         | `true`                                        | No       | 0.4.0         |

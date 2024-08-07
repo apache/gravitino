@@ -48,6 +48,12 @@ public class TrinoQueryTestTool {
           "Generate the output file for the test set, the default value is 'false'");
 
       options.addOption(
+          "test_host",
+          true,
+          "Host address for all test services (include gravitino server, trino, hive, postgresql, mysql..., "
+              + "if the services are not running on the same host. set the arguments like --gravitino_uri=xxx and --trino_uri=xxx), "
+              + "all test services use 127.0.0.1 as default, if --auto is set to 'all', this option is ignored");
+      options.addOption(
           "gravitino_uri",
           true,
           "URL for Gravitino server, if --auto is set to 'all', this option is ignored");
@@ -129,6 +135,8 @@ public class TrinoQueryTestTool {
 
       TrinoQueryIT.ciTestsets.clear();
 
+      String testHost = commandLine.getOptionValue("test_host");
+      TrinoQueryIT.testHost = Strings.isBlank(testHost) ? TrinoQueryIT.testHost : testHost;
       String gravitinoUri = commandLine.getOptionValue("gravitino_uri");
       TrinoQueryIT.gravitinoUri =
           Strings.isBlank(gravitinoUri) ? TrinoQueryIT.gravitinoUri : gravitinoUri;

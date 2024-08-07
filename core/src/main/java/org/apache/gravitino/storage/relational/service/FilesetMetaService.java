@@ -25,12 +25,14 @@ import java.util.Objects;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -237,7 +239,13 @@ public class FilesetMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 FilesetVersionMapper.class,
-                mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId)));
+                mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        filesetId, MetadataObject.Type.FILESET.name())));
 
     return true;
   }

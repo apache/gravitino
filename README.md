@@ -17,7 +17,7 @@
   under the License.
 -->
 
-# Apache Gravitino (incubating)
+# Apache Gravitino™ (incubating)
 
 [![GitHub Actions Build](https://github.com/apache/gravitino/actions/workflows/build.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/build.yml)
 [![GitHub Actions Integration Test](https://github.com/apache/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/integration-test.yml)
@@ -107,6 +107,10 @@ Alternatively, to run the Gravitino server in frontend, please run:
 ```
 
 And press `CTRL+C` to stop the Gravitino server.
+
+### Gravitino Iceberg REST catalog service
+
+Gravitino provides Iceberg REST catalog service to manage Iceberg, please refer to [Gravitino Iceberg REST catalog service](docs/iceberg-rest-service.md) for more details.
 
 ### Using Trino with Apache Gravitino
 

@@ -67,8 +67,20 @@ class NoSuchMetalakeException(NotFoundException):
     """An exception thrown when a metalake is not found."""
 
 
-class AlreadyExistException(GravitinoRuntimeException):
+class NoSuchCatalogException(NotFoundException):
+    """An exception thrown when a catalog is not found."""
+
+
+class AlreadyExistsException(GravitinoRuntimeException):
     """Base exception thrown when an entity or resource already exists."""
+
+
+class MetalakeAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a metalake already exists."""
+
+
+class SchemaAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a schema already exists."""
 
 
 class NotEmptyException(GravitinoRuntimeException):
@@ -81,3 +93,12 @@ class UnsupportedOperationException(GravitinoRuntimeException):
 
 class UnknownError(RuntimeError):
     """An exception thrown when other unknown exception is thrown"""
+
+
+class UnauthorizedException(GravitinoRuntimeException):
+    """An exception thrown when a user is not authorized to perform an action."""
+
+
+class BadRequestException(GravitinoRuntimeException):
+    """An exception thrown when the request is invalid."""
+

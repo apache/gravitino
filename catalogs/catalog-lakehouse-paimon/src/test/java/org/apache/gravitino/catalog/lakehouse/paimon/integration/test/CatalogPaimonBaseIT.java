@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
+import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonTable.PAIMON_PRIMARY_KEY_INDEX_NAME;
+import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
+import static org.apache.gravitino.rel.indexes.Indexes.primary;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.LocalDate;
@@ -51,12 +55,14 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.paimon.catalog.Catalog.DatabaseNotExistException;
 import org.apache.paimon.catalog.Identifier;
@@ -89,6 +95,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   private static final String PAIMON_COL_NAME2 = "paimon_col_name2";
   private static final String PAIMON_COL_NAME3 = "paimon_col_name3";
   private static final String PAIMON_COL_NAME4 = "paimon_col_name4";
+  private static final String PAIMON_COL_NAME5 = "paimon_col_name5";
   private String metalakeName = GravitinoITUtils.genRandomName("paimon_it_metalake");
   private String catalogName = GravitinoITUtils.genRandomName("paimon_it_catalog");
   private String schemaName = GravitinoITUtils.genRandomName("paimon_it_schema");
@@ -281,6 +288,204 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
                     Transforms.EMPTY_TRANSFORM,
                     distribution,
                     sortOrders));
+  }
+
+  @Test
+  void testCreateAndLoadPaimonPartitionedTable()
+      throws org.apache.paimon.catalog.Catalog.TableNotExistException {
+    // Create table from Gravitino API
+    Column[] columns = createColumns();
+
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    Transform[] partitioning =
+        new Transform[] {identity(PAIMON_COL_NAME1), identity(PAIMON_COL_NAME3)};
+    String[] partitionKeys = new String[] {PAIMON_COL_NAME1, PAIMON_COL_NAME3};
+    SortOrder[] sortOrders = SortOrders.NONE;
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders);
+    Assertions.assertEquals(createdTable.name(), tableName);
+    Map<String, String> resultProp = createdTable.properties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
+      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
+    }
+    Assertions.assertEquals(createdTable.comment(), table_comment);
+    Assertions.assertArrayEquals(partitioning, createdTable.partitioning());
+    Assertions.assertEquals(createdTable.columns().length, columns.length);
+
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), createdTable.columns()[i]);
+    }
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(table_comment, loadTable.comment());
+    resultProp = loadTable.properties();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
+      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
+    }
+    Assertions.assertArrayEquals(partitioning, loadTable.partitioning());
+    String[] loadedPartitionKeys =
+        Arrays.stream(loadTable.partitioning())
+            .map(
+                transform -> {
+                  NamedReference[] references = transform.references();
+                  Assertions.assertTrue(
+                      references.length == 1
+                          && references[0] instanceof NamedReference.FieldReference);
+                  NamedReference.FieldReference fieldReference =
+                      (NamedReference.FieldReference) references[0];
+                  return fieldReference.fieldName()[0];
+                })
+            .toArray(String[]::new);
+    Assertions.assertArrayEquals(partitionKeys, loadedPartitionKeys);
+    Assertions.assertEquals(loadTable.columns().length, columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), loadTable.columns()[i]);
+    }
+
+    // catalog load check
+    org.apache.paimon.table.Table table =
+        paimonCatalog.getTable(Identifier.create(schemaName, tableName));
+    Assertions.assertEquals(tableName, table.name());
+    Assertions.assertTrue(table.comment().isPresent());
+    Assertions.assertEquals(table_comment, table.comment().get());
+    resultProp = table.options();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
+      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
+    }
+    Assertions.assertArrayEquals(partitionKeys, table.partitionKeys().toArray(new String[0]));
+    Assertions.assertInstanceOf(FileStoreTable.class, table);
+    FileStoreTable fileStoreTable = (FileStoreTable) table;
+
+    TableSchema schema = fileStoreTable.schema();
+    Assertions.assertEquals(schema.fields().size(), columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(columns[i].name(), schema.fieldNames().get(i));
+    }
+    Assertions.assertArrayEquals(partitionKeys, schema.partitionKeys().toArray(new String[0]));
+  }
+
+  @Test
+  void testCreateAndLoadPaimonPrimaryKeyTable()
+      throws org.apache.paimon.catalog.Catalog.TableNotExistException {
+    // Create table from Gravitino API
+    Column[] columns = createColumns();
+    ArrayList<Column> newColumns = new ArrayList<>(Arrays.asList(columns));
+    Column col5 =
+        Column.of(
+            PAIMON_COL_NAME5,
+            Types.StringType.get(),
+            "col_5_comment",
+            false,
+            false,
+            Column.DEFAULT_VALUE_NOT_SET);
+    newColumns.add(col5);
+    columns = newColumns.toArray(new Column[0]);
+
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    Transform[] partitioning =
+        new Transform[] {identity(PAIMON_COL_NAME1), identity(PAIMON_COL_NAME3)};
+    String[] partitionKeys = new String[] {PAIMON_COL_NAME1, PAIMON_COL_NAME3};
+
+    String[] primaryKeys = new String[] {PAIMON_COL_NAME5};
+    Index[] indexes =
+        Collections.singletonList(
+                primary(
+                    PAIMON_PRIMARY_KEY_INDEX_NAME,
+                    new String[][] {new String[] {PAIMON_COL_NAME5}}))
+            .toArray(new Index[0]);
+
+    Map<String, String> properties = createProperties();
+
+    SortOrder[] sortOrders = SortOrders.NONE;
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders,
+            indexes);
+    Assertions.assertEquals(createdTable.name(), tableName);
+    Assertions.assertEquals(createdTable.comment(), table_comment);
+    Assertions.assertArrayEquals(partitioning, createdTable.partitioning());
+    Assertions.assertEquals(indexes.length, createdTable.index().length);
+    for (int i = 0; i < indexes.length; i++) {
+      Assertions.assertEquals(indexes[i].name(), createdTable.index()[i].name());
+      Assertions.assertEquals(indexes[i].type(), createdTable.index()[i].type());
+      Assertions.assertArrayEquals(indexes[i].fieldNames(), createdTable.index()[i].fieldNames());
+    }
+    Assertions.assertEquals(createdTable.columns().length, columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), createdTable.columns()[i]);
+    }
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(table_comment, loadTable.comment());
+    Assertions.assertArrayEquals(partitioning, loadTable.partitioning());
+    String[] loadedPartitionKeys =
+        Arrays.stream(loadTable.partitioning())
+            .map(
+                transform -> {
+                  NamedReference[] references = transform.references();
+                  Assertions.assertTrue(
+                      references.length == 1
+                          && references[0] instanceof NamedReference.FieldReference);
+                  NamedReference.FieldReference fieldReference =
+                      (NamedReference.FieldReference) references[0];
+                  return fieldReference.fieldName()[0];
+                })
+            .toArray(String[]::new);
+    Assertions.assertArrayEquals(partitionKeys, loadedPartitionKeys);
+    Assertions.assertEquals(indexes.length, loadTable.index().length);
+    for (int i = 0; i < indexes.length; i++) {
+      Assertions.assertEquals(indexes[i].name(), loadTable.index()[i].name());
+      Assertions.assertEquals(indexes[i].type(), loadTable.index()[i].type());
+      Assertions.assertArrayEquals(indexes[i].fieldNames(), loadTable.index()[i].fieldNames());
+    }
+    Assertions.assertEquals(loadTable.columns().length, columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), loadTable.columns()[i]);
+    }
+
+    // catalog load check
+    org.apache.paimon.table.Table table =
+        paimonCatalog.getTable(Identifier.create(schemaName, tableName));
+    Assertions.assertEquals(tableName, table.name());
+    Assertions.assertTrue(table.comment().isPresent());
+    Assertions.assertEquals(table_comment, table.comment().get());
+    Assertions.assertArrayEquals(partitionKeys, table.partitionKeys().toArray(new String[0]));
+    Assertions.assertArrayEquals(primaryKeys, table.primaryKeys().toArray(new String[0]));
+    Assertions.assertInstanceOf(FileStoreTable.class, table);
+    FileStoreTable fileStoreTable = (FileStoreTable) table;
+
+    TableSchema schema = fileStoreTable.schema();
+    Assertions.assertEquals(schema.fields().size(), columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(columns[i].name(), schema.fieldNames().get(i));
+    }
+    Assertions.assertArrayEquals(partitionKeys, schema.partitionKeys().toArray(new String[0]));
+    Assertions.assertArrayEquals(primaryKeys, schema.primaryKeys().toArray(new String[0]));
   }
 
   @Test

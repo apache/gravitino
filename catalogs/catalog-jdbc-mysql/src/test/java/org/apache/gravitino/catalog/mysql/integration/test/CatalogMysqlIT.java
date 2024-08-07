@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -484,18 +485,18 @@ public class CatalogMysqlIT extends AbstractIT {
             + "  int_col_1 int default 0x01AF,\n"
             + "  int_col_2 int default (rand()),\n"
             + "  int_col_3 int default '3.321',\n"
+            + "  unsigned_int_col_1 INT UNSIGNED default 1,\n"
+            + "  unsigned_bigint_col_1 BIGINT(20) UNSIGNED UNSIGNED default 0,\n"
             + "  double_col_1 double default 123.45,\n"
             + "  varchar20_col_1 varchar(20) default (10),\n"
             + "  varchar100_col_1 varchar(100) default 'CURRENT_TIMESTAMP',\n"
             + "  varchar200_col_1 varchar(200) default 'curdate()',\n"
             + "  varchar200_col_2 varchar(200) default (curdate()),\n"
             + "  varchar200_col_3 varchar(200) default (CURRENT_TIMESTAMP),\n"
-            // todo: uncomment when we support datetime type
-            + "  /* we don't support datetime type now\n"
             + "  datetime_col_1 datetime default CURRENT_TIMESTAMP,\n"
             + "  datetime_col_2 datetime default current_timestamp,\n"
             + "  datetime_col_3 datetime default null,\n"
-            + "  datetime_col_4 datetime default 19830905, */\n"
+            + "  datetime_col_4 datetime default 19830905,\n"
             + "  date_col_1 date default (CURRENT_DATE),\n"
             + "  date_col_2 date,\n"
             + "  date_col_3 date DEFAULT (CURRENT_DATE + INTERVAL 1 YEAR),\n"
@@ -503,7 +504,8 @@ public class CatalogMysqlIT extends AbstractIT {
             + "  date_col_5 date DEFAULT '2024-04-01',\n"
             + "  timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
             + "  timestamp_col_2 timestamp default 19830905,\n"
-            + "  decimal_6_2_col_1 decimal(6, 2) default 1.2\n"
+            + "  decimal_6_2_col_1 decimal(6, 2) default 1.2,\n"
+            + "  bit_col_1 bit default b'1'\n"
             + ");\n";
 
     mysqlService.executeQuery(sql);
@@ -520,6 +522,13 @@ public class CatalogMysqlIT extends AbstractIT {
           break;
         case "int_col_3":
           Assertions.assertEquals(Literals.integerLiteral(3), column.defaultValue());
+          break;
+        case "unsigned_int_col_1":
+          Assertions.assertEquals(Literals.unsignedIntegerLiteral(1L), column.defaultValue());
+          break;
+        case "unsigned_bigint_col_1":
+          Assertions.assertEquals(
+              Literals.unsignedLongLiteral(Decimal.of("0")), column.defaultValue());
           break;
         case "double_col_1":
           Assertions.assertEquals(Literals.doubleLiteral(123.45), column.defaultValue());
@@ -539,6 +548,17 @@ public class CatalogMysqlIT extends AbstractIT {
           break;
         case "varchar200_col_3":
           Assertions.assertEquals(UnparsedExpression.of("now()"), column.defaultValue());
+          break;
+        case "datetime_col_1":
+        case "datetime_col_2":
+          Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
+          break;
+        case "datetime_col_3":
+          Assertions.assertEquals(Literals.NULL, column.defaultValue());
+          break;
+        case "datetime_col_4":
+          Assertions.assertEquals(
+              Literals.timestampLiteral("1983-09-05T00:00"), column.defaultValue());
           break;
         case "date_col_1":
           Assertions.assertEquals(UnparsedExpression.of("curdate()"), column.defaultValue());
@@ -569,8 +589,15 @@ public class CatalogMysqlIT extends AbstractIT {
           Assertions.assertEquals(
               Literals.decimalLiteral(Decimal.of("1.2", 6, 2)), column.defaultValue());
           break;
+        case "bit_col_1":
+          Assertions.assertEquals(UnparsedExpression.of("b'1'"), column.defaultValue());
+          break;
         default:
-          Assertions.fail("Unexpected column name: " + column.name());
+          Assertions.fail(
+              "Unexpected column name: "
+                  + column.name()
+                  + ", default value: "
+                  + column.defaultValue());
       }
     }
   }
@@ -1944,5 +1971,39 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertEquals(columns[5].dataType().simpleString(), "integer unsigned");
     Assertions.assertEquals(columns[6].dataType().simpleString(), "long");
     Assertions.assertEquals(columns[7].dataType().simpleString(), "long unsigned");
+  }
+
+  @Test
+  void testAlterCatalogProperties() throws SQLException {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    String testCatalogName = GravitinoITUtils.genRandomName("mysql_it_catalog");
+
+    catalogProperties.put(
+        JdbcConfig.JDBC_URL.getKey(),
+        StringUtils.substring(
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            0,
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
+
+    String password = MYSQL_CONTAINER.getPassword();
+    String wrongPassword = password + "wrong";
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), wrongPassword);
+
+    metalake.createCatalog(
+        testCatalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
+    Catalog loadCatalog = metalake.loadCatalog(testCatalogName);
+
+    Assertions.assertThrows(
+        Exception.class, () -> loadCatalog.asSchemas().createSchema("test", "", null));
+    metalake.alterCatalog(
+        testCatalogName, CatalogChange.setProperty(JdbcConfig.PASSWORD.getKey(), password));
+
+    Assertions.assertDoesNotThrow(() -> loadCatalog.asSchemas().createSchema("test", "", null));
+
+    loadCatalog.asSchemas().dropSchema("test", true);
+    metalake.dropCatalog(testCatalogName);
   }
 }
