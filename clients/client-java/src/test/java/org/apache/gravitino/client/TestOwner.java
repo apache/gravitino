@@ -36,6 +36,7 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
@@ -95,12 +96,13 @@ public class TestOwner extends TestBase {
     buildMockResource(Method.GET, ownerPath, null, noOwnerResp, SC_OK);
     Assertions.assertFalse(gravitinoClient.getOwner(object).isPresent());
 
-    // not found exception
+    // no such metadata object exception
     ErrorResponse errorResp1 =
-        ErrorResponse.notFound(NotFoundException.class.getSimpleName(), "not found");
+        ErrorResponse.notFound(NoSuchMetadataObjectException.class.getSimpleName(), "not found");
     buildMockResource(Method.GET, ownerPath, null, errorResp1, SC_NOT_FOUND);
     Throwable ex1 =
-        Assertions.assertThrows(NotFoundException.class, () -> gravitinoClient.getOwner(object));
+        Assertions.assertThrows(
+            NoSuchMetadataObjectException.class, () -> gravitinoClient.getOwner(object));
     Assertions.assertTrue(ex1.getMessage().contains("not found"));
   }
 
