@@ -80,7 +80,6 @@ public class TableOpsUtils {
   public static SchemaChange buildSchemaChange(TableChange tableChange)
       throws UnsupportedOperationException {
     if (tableChange instanceof ColumnChange) {
-
       if (tableChange instanceof AddColumn) {
         AddColumn addColumn = (AddColumn) tableChange;
         String fieldName = getfieldName(addColumn);
