@@ -319,7 +319,6 @@ public class GravitinoClient extends GravitinoClientBase
    * @param object The metadata object
    * @return The owner of the metadata object. If the metadata object doesn't set the owner, it will
    *     return Optional.empty().
-   * @throws NotFoundException If the metadata object is not found
    * @throws NoSuchMetadataObjectException If the metadata object is not found.
    */
   public Optional<Owner> getOwner(MetadataObject object) throws NoSuchMetadataObjectException {

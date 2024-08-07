@@ -21,7 +21,7 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Exception thrown when a metadata object with specified name is not existed. */
+/** Exception thrown when a metadata object with specified name doesn't exist. */
 public class NoSuchMetadataObjectException extends NotFoundException {
   /**
    * Constructs a new exception with the specified detail message.
