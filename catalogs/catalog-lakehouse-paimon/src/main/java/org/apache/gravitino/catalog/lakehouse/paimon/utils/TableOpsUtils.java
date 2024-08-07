@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.utils;
 
-import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TypeUtils.toPaimonType;
 import static org.apache.paimon.schema.SchemaChange.addColumn;
 import static org.apache.paimon.schema.SchemaChange.dropColumn;
