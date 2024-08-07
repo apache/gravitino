@@ -118,17 +118,9 @@ public class TableOpsUtils {
       return updateComment(((UpdateComment) tableChange).getNewComment());
     } else if (tableChange instanceof SetProperty) {
       SetProperty setProperty = ((SetProperty) tableChange);
-      String setPropertyKey = setProperty.getProperty();
-      if (COMMENT.equals(setPropertyKey)) {
-        return updateComment(setProperty.getValue());
-      }
       return setOption(setProperty.getProperty(), setProperty.getValue());
     } else if (tableChange instanceof RemoveProperty) {
       RemoveProperty removeProperty = (RemoveProperty) tableChange;
-      String removedPropertyKey = removeProperty.getProperty();
-      if (COMMENT.equals(removedPropertyKey)) {
-        return updateComment(null);
-      }
       return removeOption(removeProperty.getProperty());
     }
     throw new UnsupportedOperationException(
