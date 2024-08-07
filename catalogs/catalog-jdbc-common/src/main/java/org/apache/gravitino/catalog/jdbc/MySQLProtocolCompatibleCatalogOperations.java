@@ -55,7 +55,7 @@ public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperati
     if (driverInfo.majorVersion < MYSQL_JDBC_DRIVER_MINIMAL_SUPPORT_VERSION) {
       throw new RuntimeException(
           String.format(
-              "Mysql catalog does not support the version %s, minimal required version is 8.0",
+              "Mysql catalog does not support the jdbc driver version %s, minimal required version is 8.0",
               driverInfo.version));
     }
     return true;
