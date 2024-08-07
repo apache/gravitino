@@ -205,9 +205,7 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private Map<String, String> createTableProperties() {
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("replication_allocation", "tag.location.default: 1");
-    return properties;
+    return ImmutableMap.of();
   }
 
   private Distribution createDistribution() {

@@ -90,6 +90,12 @@ function addJarInDir(){
   fi
 }
 
+function addDirToClasspath(){
+  if [[ -d "${1}" ]]; then
+    GRAVITINO_CLASSPATH="${1}:${GRAVITINO_CLASSPATH}"
+  fi
+}
+
 if [[ -z "${GRAVITINO_MEM}" ]]; then
   export GRAVITINO_MEM="-Xmx1024m"
 fi
