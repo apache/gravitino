@@ -27,6 +27,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -168,7 +169,7 @@ public class OwnerManager {
       }
       return Optional.of(owner);
     } catch (NoSuchEntityException nse) {
-      throw new NotFoundException(
+      throw new NoSuchMetadataObjectException(
           "The metadata object of %s isn't found", metadataObject.fullName());
     } catch (IOException ioe) {
       LOG.info("Fail to get the owner of entity {}", metadataObject.fullName(), ioe);

@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
@@ -38,20 +40,44 @@ public interface OwnerMetaMapper {
   String OWNER_TABLE_NAME = "owner_meta";
 
   @Select(
-      "SELECT metalake_id as metalakeId,"
-          + " owner_id as ownerId,"
-          + " owner_type as ownerType,"
-          + " metadata_object_id as metadataObjectId,"
-          + " metadata_object_type as metadataObjectType,"
-          + " audit_info as auditInfo,"
-          + " current_version as currentVersion, last_version as lastVersion,"
-          + " deleted_at as deletedAt"
+      "SELECT ut.user_id as userId,"
+          + " ut.user_name as userName,"
+          + " ut.metalake_id as metalakeId,"
+          + " ut.audit_info as auditInfo,"
+          + " ut.current_version as currentVersion,"
+          + " ut.last_version as lastVersion,"
+          + " ut.deleted_at as deletedAt"
           + " FROM "
           + OWNER_TABLE_NAME
-          + " WHERE metadata_object_id = #{metadataObjectId} AND"
-          + " metadata_object_type = #{metadataObjectType}"
-          + " AND deleted_at = 0")
-  OwnerRelPO selectOwnerMetaByMetadataObjectIdAndType(
+          + " ot JOIN "
+          + UserMetaMapper.USER_TABLE_NAME
+          + " ut ON ut.user_id = ot.owner_id"
+          + " WHERE ot.metadata_object_id = #{metadataObjectId} AND"
+          + " ot.metadata_object_type = #{metadataObjectType} AND"
+          + " ot.owner_type = 'USER' AND"
+          + " ot.deleted_at = 0 AND ut.deleted_at = 0")
+  UserPO selectUserOwnerMetaByMetadataObjectIdAndType(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
+  @Select(
+      "SELECT gt.group_id as groupId,"
+          + " gt.group_name as groupName,"
+          + " gt.metalake_id as metalakeId,"
+          + " gt.audit_info as auditInfo,"
+          + " gt.current_version as currentVersion,"
+          + " gt.last_version as lastVersion,"
+          + " gt.deleted_at as deletedAt"
+          + " FROM "
+          + OWNER_TABLE_NAME
+          + " ot JOIN "
+          + GroupMetaMapper.GROUP_TABLE_NAME
+          + " gt ON gt.group_id = ot.owner_id"
+          + " WHERE ot.metadata_object_id = #{metadataObjectId} AND"
+          + " ot.metadata_object_type = #{metadataObjectType} AND"
+          + " ot.owner_type = 'GROUP' AND"
+          + " ot.deleted_at = 0 AND gt.deleted_at = 0")
+  GroupPO selectGroupOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 

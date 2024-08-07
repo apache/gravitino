@@ -69,18 +69,6 @@ import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
-import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
-import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.exceptions.NoSuchGroupException;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchRoleException;
-import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.exceptions.NoSuchUserException;
-import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
-import org.apache.gravitino.exceptions.TagAlreadyExistsException;
-import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -777,9 +765,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
    * @param object The metadata object
    * @return The owner of the metadata object. If the metadata object doesn't set the owner, it will
    *     return Optional.empty().
-   * @throws NotFoundException If the metadata object is not found.
+   * @throws NoSuchMetadataObjectException If the metadata object is not found.
    */
-  public Optional<Owner> getOwner(MetadataObject object) throws NotFoundException {
+  public Optional<Owner> getOwner(MetadataObject object) throws NoSuchMetadataObjectException {
     OwnerResponse resp =
         restClient.get(
             String.format(
@@ -800,7 +788,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
    * @param object The metadata object.
    * @param ownerName The name of the owner
    * @param ownerType The type of the owner, The owner can be a user or a group.
-   * @throws NotFoundException If the metadata object isn't found or the owner is deleted.
+   * @throws NotFoundException If the metadata object isn't found or the owner doesn't exist.
    */
   public void setOwner(MetadataObject object, String ownerName, Owner.Type ownerType)
       throws NotFoundException {

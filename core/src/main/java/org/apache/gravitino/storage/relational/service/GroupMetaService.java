@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -93,20 +92,6 @@ public class GroupMetaService {
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
 
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
-  }
-
-  public GroupEntity getGroupById(String metalake, Long groupId) {
-    GroupPO groupPO =
-        SessionUtils.getWithoutCommit(
-            GroupMetaMapper.class, mapper -> mapper.selectGroupMetaById(groupId));
-    if (groupPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.GROUP.name().toLowerCase(),
-          String.valueOf(groupId));
-    }
-    return POConverters.fromGroupPO(
-        groupPO, Collections.emptyList(), AuthorizationUtils.ofGroupNamespace(metalake));
   }
 
   public void insertGroup(GroupEntity groupEntity, boolean overwritten) throws IOException {

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -159,20 +158,6 @@ public class UserMetaService {
                     mapper.softDeleteOwnerRelByOwnerIdAndType(
                         userId, Entity.EntityType.USER.name())));
     return true;
-  }
-
-  public UserEntity getUserById(String metalake, Long userId) {
-    UserPO userPO =
-        SessionUtils.getWithoutCommit(
-            UserMetaMapper.class, mapper -> mapper.selectUserMetaById(userId));
-    if (userPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.USER.name().toLowerCase(),
-          String.valueOf(userId));
-    }
-    return POConverters.fromUserPO(
-        userPO, Collections.emptyList(), AuthorizationUtils.ofUserNamespace(metalake));
   }
 
   public <E extends Entity & HasIdentifier> UserEntity updateUser(

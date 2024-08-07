@@ -35,6 +35,7 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -737,7 +738,11 @@ public class ErrorHandlers {
           throw new IllegalArgumentException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
-          throw new NotFoundException(errorMessage);
+          if (errorResponse.getType().equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
