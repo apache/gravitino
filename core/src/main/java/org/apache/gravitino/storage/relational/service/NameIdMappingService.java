@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.base.Objects;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -66,6 +67,23 @@ public class NameIdMappingService implements Closeable {
 
     public static EntityIdentifier of(NameIdentifier ident, EntityType type) {
       return new EntityIdentifier(ident, type);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof EntityIdentifier)) {
+        return false;
+      }
+      EntityIdentifier that = (EntityIdentifier) o;
+      return Objects.equal(ident, that.ident) && type == that.type;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(ident, type);
     }
   }
 
