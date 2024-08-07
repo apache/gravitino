@@ -48,6 +48,7 @@ public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
   static {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
+            stringReservedPropertyEntry(COMMENT, "The table comment", false),
             stringReservedPropertyEntry(OWNER, "The table owner", false),
             stringReservedPropertyEntry(BUCKET_KEY, "The table bucket key", false),
             stringReservedPropertyEntry(MERGE_ENGINE, "The table merge engine", false),

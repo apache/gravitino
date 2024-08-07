@@ -405,7 +405,6 @@ public class TestGravitinoPaimonTable {
       }
 
       map = Maps.newHashMap();
-      map.put(PaimonTablePropertiesMetadata.COMMENT, "test");
       map.put("key1", "val1");
       map.put("key2", "val2");
       for (Map.Entry<String, String> entry : map.entrySet()) {
