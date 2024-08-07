@@ -83,6 +83,10 @@ class SchemaAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a schema already exists."""
 
 
+class CatalogAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a resource already exists."""
+
+
 class NotEmptyException(GravitinoRuntimeException):
     """Base class for all exceptions thrown when a resource is not empty."""
 
@@ -97,10 +101,6 @@ class UnknownError(RuntimeError):
 
 class ConnectionFailedException(GravitinoRuntimeException):
     """An exception thrown when connect to catalog failed."""
-
-
-class CatalogAlreadyExistsException(AlreadyExistsException):
-    """An exception thrown when a resource already exists."""
 
 
 class UnauthorizedException(GravitinoRuntimeException):
