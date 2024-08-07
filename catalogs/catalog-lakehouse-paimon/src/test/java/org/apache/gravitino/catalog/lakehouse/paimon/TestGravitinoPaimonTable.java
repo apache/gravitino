@@ -383,6 +383,7 @@ public class TestGravitinoPaimonTable {
       ops.initialize(
           initBackendCatalogProperties(), entity.toCatalogInfo(), PAIMON_PROPERTIES_METADATA);
       Map<String, String> map = Maps.newHashMap();
+      map.put(PaimonTablePropertiesMetadata.COMMENT, "test");
       map.put(PaimonTablePropertiesMetadata.OWNER, "test");
       map.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "test");
       map.put(PaimonTablePropertiesMetadata.MERGE_ENGINE, "test");
