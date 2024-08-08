@@ -79,12 +79,12 @@ public class Privileges {
         return ConsumeTopic.allow();
 
         // User
-      case CREATE_USER:
-        return CreateUser.allow();
+      case MANAGE_USERS:
+        return ManageUsers.allow();
 
         // Group
-      case CREATE_GROUP:
-        return CreateGroup.allow();
+      case MANAGE_GROUPS:
+        return ManageGroups.allow();
 
         // Role
       case CREATE_ROLE:
@@ -153,12 +153,12 @@ public class Privileges {
         return ConsumeTopic.deny();
 
         // User
-      case CREATE_USER:
-        return CreateUser.deny();
+      case MANAGE_USERS:
+        return ManageUsers.deny();
 
         // Group
-      case CREATE_GROUP:
-        return CreateGroup.deny();
+      case MANAGE_GROUPS:
+        return ManageGroups.deny();
 
         // Role
       case CREATE_ROLE:
@@ -505,46 +505,46 @@ public class Privileges {
     }
   }
 
-  /** The privilege to create a user. */
-  public static class CreateUser extends GenericPrivilege<CreateUser> {
-    private static final CreateUser ALLOW_INSTANCE =
-        new CreateUser(Condition.ALLOW, Name.CREATE_USER);
-    private static final CreateUser DENY_INSTANCE =
-        new CreateUser(Condition.DENY, Name.CREATE_USER);
+  /** The privilege to manage users. */
+  public static class ManageUsers extends GenericPrivilege<ManageUsers> {
+    private static final ManageUsers ALLOW_INSTANCE =
+        new ManageUsers(Condition.ALLOW, Name.MANAGE_USERS);
+    private static final ManageUsers DENY_INSTANCE =
+        new ManageUsers(Condition.DENY, Name.MANAGE_USERS);
 
-    private CreateUser(Condition condition, Name name) {
+    private ManageUsers(Condition condition, Name name) {
       super(condition, name);
     }
 
     /** @return The instance with allow condition of the privilege. */
-    public static CreateUser allow() {
+    public static ManageUsers allow() {
       return ALLOW_INSTANCE;
     }
 
     /** @return The instance with deny condition of the privilege. */
-    public static CreateUser deny() {
+    public static ManageUsers deny() {
       return DENY_INSTANCE;
     }
   }
 
-  /** The privilege to create a group. */
-  public static class CreateGroup extends GenericPrivilege<CreateGroup> {
-    private static final CreateGroup ALLOW_INSTANCE =
-        new CreateGroup(Condition.ALLOW, Name.CREATE_GROUP);
-    private static final CreateGroup DENY_INSTANCE =
-        new CreateGroup(Condition.DENY, Name.CREATE_GROUP);
+  /** The privilege to manage groups. */
+  public static class ManageGroups extends GenericPrivilege<ManageGroups> {
+    private static final ManageGroups ALLOW_INSTANCE =
+        new ManageGroups(Condition.ALLOW, Name.MANAGE_GROUPS);
+    private static final ManageGroups DENY_INSTANCE =
+        new ManageGroups(Condition.DENY, Name.MANAGE_GROUPS);
 
-    private CreateGroup(Condition condition, Name name) {
+    private ManageGroups(Condition condition, Name name) {
       super(condition, name);
     }
 
     /** @return The instance with allow condition of the privilege. */
-    public static CreateGroup allow() {
+    public static ManageGroups allow() {
       return ALLOW_INSTANCE;
     }
 
     /** @return The instance with deny condition of the privilege. */
-    public static CreateGroup deny() {
+    public static ManageGroups deny() {
       return DENY_INSTANCE;
     }
   }

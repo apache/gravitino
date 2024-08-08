@@ -74,7 +74,7 @@ public interface SecurableObjectMapper {
           + SECURABLE_OBJECT_TABLE_NAME
           + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
           + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " where exists ( select * from "
+          + " WHERE exists (SELECT * from "
           + ROLE_TABLE_NAME
           + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
           + " AND ro.deleted_at = 0) AND ob.deleted_at = 0")

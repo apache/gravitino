@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -34,6 +35,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
@@ -206,7 +208,10 @@ public class SchemaMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     TopicMetaMapper.class,
-                    mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)));
+                    mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    OwnerMetaMapper.class, mapper -> mapper.sotDeleteOwnerRelBySchemaId(schemaId)));
       } else {
         List<TableEntity> tableEntities =
             TableMetaService.getInstance()
@@ -230,8 +235,17 @@ public class SchemaMetaService {
           throw new NonEmptyEntityException(
               "Entity %s has sub-entities, you should remove sub-entities first", identifier);
         }
-        SessionUtils.doWithCommit(
-            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId));
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SchemaMetaMapper.class,
+                    mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    OwnerMetaMapper.class,
+                    mapper ->
+                        mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                            schemaId, MetadataObject.Type.SCHEMA.name())));
       }
     }
     return true;
