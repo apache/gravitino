@@ -376,7 +376,7 @@ const CreateCatalogDialog = props => {
       propsItems = propsItems.map((it, idx) => {
         let propItem = {
           ...it,
-          disabled: true
+          disabled: it.key === 'catalog-backend' && type === 'update'
         }
 
         const findProp = Object.keys(properties).find(i => i === it.key)
@@ -394,8 +394,7 @@ const CreateCatalogDialog = props => {
         if (findPropIndex === -1) {
           let propItem = {
             key: item,
-            value: properties[item],
-            disabled: data.type === 'fileset' && item === 'location' && type === 'update'
+            value: properties[item]
           }
           propsItems.push(propItem)
         }
@@ -563,7 +562,7 @@ const CreateCatalogDialog = props => {
                                   value={item.key}
                                   disabled={item.required || item.disabled}
                                   onChange={event => handleFormChange({ index, event })}
-                                  error={item.hasDuplicateKey}
+                                  error={item.hasDuplicateKey || item.invalid || !item.key.trim()}
                                   data-refer={`props-key-${index}`}
                                 />
                               </Box>
@@ -596,6 +595,7 @@ const CreateCatalogDialog = props => {
                                     onChange={event => handleFormChange({ index, event })}
                                     data-refer={`props-value-${index}`}
                                     data-prev-refer={`props-${item.key}`}
+                                    type={item.key === 'jdbc-password' ? 'password' : 'text'}
                                   />
                                 )}
                               </Box>
@@ -622,11 +622,14 @@ const CreateCatalogDialog = props => {
                           {item.hasDuplicateKey && (
                             <FormHelperText className={'twc-text-error-main'}>Key already exists</FormHelperText>
                           )}
-                          {item.invalid && (
+                          {item.key && item.invalid && (
                             <FormHelperText className={'twc-text-error-main'}>
                               Invalid key, matches strings starting with a letter/underscore, followed by alphanumeric
                               characters, underscores, hyphens, or dots.
                             </FormHelperText>
+                          )}
+                          {!item.key.trim() && (
+                            <FormHelperText className={'twc-text-error-main'}>Key is required field</FormHelperText>
                           )}
                         </FormControl>
                       </Grid>

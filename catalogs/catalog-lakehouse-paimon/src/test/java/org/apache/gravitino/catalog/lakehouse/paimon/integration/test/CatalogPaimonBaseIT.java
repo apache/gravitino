@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
+import static org.apache.gravitino.catalog.lakehouse.paimon.GravitinoPaimonTable.PAIMON_PRIMARY_KEY_INDEX_NAME;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
+import static org.apache.gravitino.rel.indexes.Indexes.primary;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -53,13 +56,16 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.paimon.catalog.Catalog.DatabaseNotExistException;
 import org.apache.paimon.catalog.Identifier;
@@ -92,6 +98,8 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   private static final String PAIMON_COL_NAME2 = "paimon_col_name2";
   private static final String PAIMON_COL_NAME3 = "paimon_col_name3";
   private static final String PAIMON_COL_NAME4 = "paimon_col_name4";
+  private static final String PAIMON_COL_NAME5 = "paimon_col_name5";
+  private static final String alertTableName = "alert_table_name";
   private String metalakeName = GravitinoITUtils.genRandomName("paimon_it_metalake");
   private String catalogName = GravitinoITUtils.genRandomName("paimon_it_catalog");
   private String schemaName = GravitinoITUtils.genRandomName("paimon_it_schema");
@@ -376,6 +384,115 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   }
 
   @Test
+  void testCreateAndLoadPaimonPrimaryKeyTable()
+      throws org.apache.paimon.catalog.Catalog.TableNotExistException {
+    // Create table from Gravitino API
+    Column[] columns = createColumns();
+    ArrayList<Column> newColumns = new ArrayList<>(Arrays.asList(columns));
+    Column col5 =
+        Column.of(
+            PAIMON_COL_NAME5,
+            Types.StringType.get(),
+            "col_5_comment",
+            false,
+            false,
+            Column.DEFAULT_VALUE_NOT_SET);
+    newColumns.add(col5);
+    columns = newColumns.toArray(new Column[0]);
+
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Distribution distribution = Distributions.NONE;
+
+    Transform[] partitioning =
+        new Transform[] {identity(PAIMON_COL_NAME1), identity(PAIMON_COL_NAME3)};
+    String[] partitionKeys = new String[] {PAIMON_COL_NAME1, PAIMON_COL_NAME3};
+
+    String[] primaryKeys = new String[] {PAIMON_COL_NAME5};
+    Index[] indexes =
+        Collections.singletonList(
+                primary(
+                    PAIMON_PRIMARY_KEY_INDEX_NAME,
+                    new String[][] {new String[] {PAIMON_COL_NAME5}}))
+            .toArray(new Index[0]);
+
+    Map<String, String> properties = createProperties();
+
+    SortOrder[] sortOrders = SortOrders.NONE;
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Table createdTable =
+        tableCatalog.createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            properties,
+            partitioning,
+            distribution,
+            sortOrders,
+            indexes);
+    Assertions.assertEquals(createdTable.name(), tableName);
+    Assertions.assertEquals(createdTable.comment(), table_comment);
+    Assertions.assertArrayEquals(partitioning, createdTable.partitioning());
+    Assertions.assertEquals(indexes.length, createdTable.index().length);
+    for (int i = 0; i < indexes.length; i++) {
+      Assertions.assertEquals(indexes[i].name(), createdTable.index()[i].name());
+      Assertions.assertEquals(indexes[i].type(), createdTable.index()[i].type());
+      Assertions.assertArrayEquals(indexes[i].fieldNames(), createdTable.index()[i].fieldNames());
+    }
+    Assertions.assertEquals(createdTable.columns().length, columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), createdTable.columns()[i]);
+    }
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(tableName, loadTable.name());
+    Assertions.assertEquals(table_comment, loadTable.comment());
+    Assertions.assertArrayEquals(partitioning, loadTable.partitioning());
+    String[] loadedPartitionKeys =
+        Arrays.stream(loadTable.partitioning())
+            .map(
+                transform -> {
+                  NamedReference[] references = transform.references();
+                  Assertions.assertTrue(
+                      references.length == 1
+                          && references[0] instanceof NamedReference.FieldReference);
+                  NamedReference.FieldReference fieldReference =
+                      (NamedReference.FieldReference) references[0];
+                  return fieldReference.fieldName()[0];
+                })
+            .toArray(String[]::new);
+    Assertions.assertArrayEquals(partitionKeys, loadedPartitionKeys);
+    Assertions.assertEquals(indexes.length, loadTable.index().length);
+    for (int i = 0; i < indexes.length; i++) {
+      Assertions.assertEquals(indexes[i].name(), loadTable.index()[i].name());
+      Assertions.assertEquals(indexes[i].type(), loadTable.index()[i].type());
+      Assertions.assertArrayEquals(indexes[i].fieldNames(), loadTable.index()[i].fieldNames());
+    }
+    Assertions.assertEquals(loadTable.columns().length, columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), loadTable.columns()[i]);
+    }
+
+    // catalog load check
+    org.apache.paimon.table.Table table =
+        paimonCatalog.getTable(Identifier.create(schemaName, tableName));
+    Assertions.assertEquals(tableName, table.name());
+    Assertions.assertTrue(table.comment().isPresent());
+    Assertions.assertEquals(table_comment, table.comment().get());
+    Assertions.assertArrayEquals(partitionKeys, table.partitionKeys().toArray(new String[0]));
+    Assertions.assertArrayEquals(primaryKeys, table.primaryKeys().toArray(new String[0]));
+    Assertions.assertInstanceOf(FileStoreTable.class, table);
+    FileStoreTable fileStoreTable = (FileStoreTable) table;
+
+    TableSchema schema = fileStoreTable.schema();
+    Assertions.assertEquals(schema.fields().size(), columns.length);
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals(columns[i].name(), schema.fieldNames().get(i));
+    }
+    Assertions.assertArrayEquals(partitionKeys, schema.partitionKeys().toArray(new String[0]));
+    Assertions.assertArrayEquals(primaryKeys, schema.primaryKeys().toArray(new String[0]));
+  }
+
+  @Test
   void testCreateTableWithTimestampColumn()
       throws org.apache.paimon.catalog.Catalog.TableNotExistException {
     Column col1 = Column.of("paimon_column_1", Types.TimestampType.withTimeZone(), "col_1_comment");
@@ -490,6 +607,153 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Assertions.assertEquals(0, nameIdentifiers.length);
 
     Assertions.assertEquals(0, paimonCatalog.listTables(schemaName).size());
+  }
+
+  @Test
+  public void testAlterPaimonTable() {
+    Column[] columns = createColumns();
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, tableName), columns, table_comment, createProperties());
+
+    // The RenameTable operation cannot be performed together with other operations.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .alterTable(
+                    NameIdentifier.of(schemaName, tableName),
+                    TableChange.rename(alertTableName),
+                    TableChange.updateComment(table_comment + "_new")));
+
+    // rename table.
+    catalog
+        .asTableCatalog()
+        .alterTable(NameIdentifier.of(schemaName, tableName), TableChange.rename(alertTableName));
+
+    // other operations.
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            NameIdentifier.of(schemaName, alertTableName),
+            TableChange.updateComment(table_comment + "_new"),
+            TableChange.setProperty("key2", "val2_new"),
+            TableChange.removeProperty("key1"),
+            TableChange.addColumn(
+                new String[] {"paimon_col_name5_for_add"}, Types.StringType.get()),
+            TableChange.renameColumn(new String[] {PAIMON_COL_NAME2}, "paimon_col_name2_new"),
+            TableChange.updateColumnComment(new String[] {PAIMON_COL_NAME1}, "comment_new"),
+            TableChange.updateColumnType(new String[] {PAIMON_COL_NAME1}, Types.StringType.get()),
+            TableChange.updateColumnNullability(new String[] {PAIMON_COL_NAME1}, false));
+
+    Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
+    Assertions.assertEquals(alertTableName, table.name());
+    Assertions.assertEquals("val2_new", table.properties().get("key2"));
+
+    Assertions.assertEquals(PAIMON_COL_NAME1, table.columns()[0].name());
+    Assertions.assertEquals(Types.StringType.get(), table.columns()[0].dataType());
+    Assertions.assertEquals("comment_new", table.columns()[0].comment());
+    Assertions.assertFalse(table.columns()[0].nullable());
+
+    Assertions.assertEquals("paimon_col_name2_new", table.columns()[1].name());
+    Assertions.assertEquals(Types.DateType.get(), table.columns()[1].dataType());
+    Assertions.assertEquals("col_2_comment", table.columns()[1].comment());
+
+    Assertions.assertEquals(PAIMON_COL_NAME3, table.columns()[2].name());
+    Assertions.assertEquals(Types.StringType.get(), table.columns()[2].dataType());
+    Assertions.assertEquals("col_3_comment", table.columns()[2].comment());
+
+    Assertions.assertEquals(PAIMON_COL_NAME4, table.columns()[3].name());
+    Assertions.assertEquals(columns[3].dataType(), table.columns()[3].dataType());
+    Assertions.assertEquals("col_4_comment", table.columns()[3].comment());
+
+    Assertions.assertEquals("paimon_col_name5_for_add", table.columns()[4].name());
+    Assertions.assertEquals(Types.StringType.get(), table.columns()[4].dataType());
+    Assertions.assertNull(table.columns()[4].comment());
+
+    // test add column with exceptions
+    // 1. with column default value
+    TableChange withDefaultValue =
+        TableChange.addColumn(
+            new String[] {"newColumn"}, Types.ByteType.get(), "comment", Literals.NULL);
+    RuntimeException exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .alterTable(NameIdentifier.of(schemaName, alertTableName), withDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Paimon set column default value through table properties instead of column info"));
+
+    // 2. with column autoIncrement
+    TableChange withAutoIncrement =
+        TableChange.addColumn(
+            new String[] {"newColumn"}, Types.ByteType.get(), "comment", null, true, true);
+    exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .alterTable(NameIdentifier.of(schemaName, alertTableName), withAutoIncrement));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Paimon does not support auto increment column"));
+
+    // update column position
+    Column col1 = Column.of("name", Types.StringType.get(), "comment");
+    Column col2 = Column.of("address", Types.StringType.get(), "comment");
+    Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
+
+    Column[] newColumns = new Column[] {col1, col2, col3};
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("PaimonAlterTableIT"));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            newColumns,
+            table_comment,
+            ImmutableMap.of(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0],
+            new Index[0]);
+
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            tableIdentifier,
+            TableChange.updateColumnPosition(
+                new String[] {col1.name()}, TableChange.ColumnPosition.after(col2.name())),
+            TableChange.updateColumnPosition(
+                new String[] {col3.name()}, TableChange.ColumnPosition.first()));
+
+    Table updateColumnPositionTable = catalog.asTableCatalog().loadTable(tableIdentifier);
+
+    Column[] updateCols = updateColumnPositionTable.columns();
+    Assertions.assertEquals(3, updateCols.length);
+    Assertions.assertEquals(col3.name(), updateCols[0].name());
+    Assertions.assertEquals(col2.name(), updateCols[1].name());
+    Assertions.assertEquals(col1.name(), updateCols[2].name());
+
+    // delete column
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog
+                .asTableCatalog()
+                .alterTable(
+                    tableIdentifier,
+                    TableChange.deleteColumn(new String[] {col3.name()}, true),
+                    TableChange.deleteColumn(new String[] {col2.name()}, true)));
+    Table delColTable = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(1, delColTable.columns().length);
+    Assertions.assertEquals(col1.name(), delColTable.columns()[0].name());
   }
 
   @Test

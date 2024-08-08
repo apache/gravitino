@@ -937,6 +937,7 @@ export const appMetalakesSlice = createSlice({
     },
     resetTableData(state, action) {
       state.tableData = []
+      state.tableProps = []
     },
     resetTree(state, action) {
       state.metalakeTree = []

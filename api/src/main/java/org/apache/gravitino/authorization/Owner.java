@@ -16,29 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.hook;
+package org.apache.gravitino.authorization;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.util.List;
-import java.util.function.BiConsumer;
+/**
+ * Every metadata object has an owner. The owner can have all their privileges. The owner could be a
+ * user or a group. The owner could be transferred to another user or group.
+ */
+public interface Owner {
 
-class DispatcherHookProxy<T> implements InvocationHandler {
-  private final DispatcherHooks hooks;
-  private final T dispatcher;
+  /**
+   * The name of the owner.
+   *
+   * @return The name of the owner.
+   */
+  String name();
 
-  DispatcherHookProxy(T dispatcher, DispatcherHooks hooks) {
-    this.hooks = hooks;
-    this.dispatcher = dispatcher;
-  }
+  /**
+   * The type of the owner. Only supports user or group.
+   *
+   * @return The type of the owner.
+   */
+  Type type();
 
-  @Override
-  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    Object result = method.invoke(dispatcher, args);
-    List<BiConsumer> postHooks = hooks.getPostHooks(method.getName());
-    for (BiConsumer hook : postHooks) {
-      hook.accept(args, result);
-    }
-    return result;
+  /** The type of the owner. */
+  enum Type {
+    /** The type of the owner is a user. */
+    USER,
+    /** The type of the owner is a group. */
+    GROUP
   }
 }
