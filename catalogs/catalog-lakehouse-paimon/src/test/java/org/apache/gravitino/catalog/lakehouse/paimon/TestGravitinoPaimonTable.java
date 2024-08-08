@@ -384,7 +384,13 @@ public class TestGravitinoPaimonTable {
           initBackendCatalogProperties(), entity.toCatalogInfo(), PAIMON_PROPERTIES_METADATA);
       Map<String, String> map = Maps.newHashMap();
       map.put(PaimonTablePropertiesMetadata.COMMENT, "test");
-      map.put(PaimonTablePropertiesMetadata.CREATOR, "test");
+      map.put(PaimonTablePropertiesMetadata.OWNER, "test");
+      map.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "test");
+      map.put(PaimonTablePropertiesMetadata.MERGE_ENGINE, "test");
+      map.put(PaimonTablePropertiesMetadata.SEQUENCE_FIELD, "test");
+      map.put(PaimonTablePropertiesMetadata.ROWKIND_FIELD, "test");
+      map.put(PaimonTablePropertiesMetadata.PRIMARY_KEY, "test");
+      map.put(PaimonTablePropertiesMetadata.PARTITION, "test");
       for (Map.Entry<String, String> entry : map.entrySet()) {
         HashMap<String, String> properties =
             new HashMap<String, String>() {
