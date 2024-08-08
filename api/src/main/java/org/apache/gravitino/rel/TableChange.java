@@ -1353,6 +1353,9 @@ public interface TableChange {
     private final ColumnPosition position;
 
     private UpdateColumnPosition(String[] fieldName, ColumnPosition position) {
+      if (position instanceof Default){
+        throw new IllegalArgumentException("Default position is not allowed for UpdateColumnPosition.");
+      }
       this.fieldName = fieldName;
       this.position = position;
     }

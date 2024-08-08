@@ -169,6 +169,17 @@ public class TestTableChange {
   }
 
   @Test
+  public void testDoesNotAllowDefaultInColumnPosition() {
+    String[] fieldName = {"Name", "Last Name"};
+    ColumnPosition newPosition = TableChange.ColumnPosition.defaultPos();
+    try {
+      TableChange.updateColumnPosition(fieldName, newPosition);
+    }catch (Exception e){
+      assertEquals("Default position is not allowed for UpdateColumnPosition.", e.getMessage());
+    }
+  }
+
+  @Test
   public void testUpdateColumnComment() {
     String[] fieldName = {"First Name"};
     String newComment = "First or given name";
