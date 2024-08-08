@@ -1,0 +1,298 @@
+#!/usr/bin/env bash
+
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Referred from Apache Spark's release script
+# dev/create-release/release-build.sh
+
+SELF=$(cd $(dirname $0) && pwd)
+. "$SELF/release-util.sh"
+
+function exit_with_usage {
+  cat << EOF
+usage: release-build.sh <package|docs|publish-release|finalize>
+Creates build deliverables from a Apache Gravitino commit.
+
+Top level targets are
+  package: Create binary packages and commit them to dist.apache.org/repos/dist/dev/incubator/gravitino/
+  docs: Build docs and commit them to dist.apache.org/repos/dist/dev/incubator/gravitino/
+  publish-release: Publish a release to Apache release repo
+  finalize: Finalize the release after an RC passes vote
+
+All other inputs are environment variables
+
+GIT_REF - Release tag or commit to build from
+GRAVITINO_PACKAGE_VERSION - Release identifier in top level package directory (e.g. 0.6.0-incubating-rc1)
+GRAVITINO_VERSION - (optional) Version of Gravitino being built (e.g. 0.6.0-incubating)
+
+ASF_USERNAME - Username of ASF committer account
+ASF_PASSWORD - Password of ASF committer account
+
+GPG_KEY - GPG key used to sign release artifacts
+GPG_PASSPHRASE - Passphrase for GPG key
+EOF
+  exit 1
+}
+
+set -e
+
+if [ $# -eq 0 ]; then
+  exit_with_usage
+fi
+
+if [[ $@ == *"help"* ]]; then
+  exit_with_usage
+fi
+
+if [[ -z "$ASF_PASSWORD" ]]; then
+  echo 'The environment variable ASF_PASSWORD is not set. Enter the password.'
+  echo
+  stty -echo && printf "ASF password: " && read ASF_PASSWORD && printf '\n' && stty echo
+fi
+
+if [[ -z "$GPG_PASSPHRASE" ]]; then
+  echo 'The environment variable GPG_PASSPHRASE is not set. Enter the passphrase to'
+  echo 'unlock the GPG signing key that will be used to sign the release!'
+  echo
+  stty -echo && printf "GPG passphrase: " && read GPG_PASSPHRASE && printf '\n' && stty echo
+fi
+
+for env in ASF_USERNAME GPG_PASSPHRASE GPG_KEY; do
+  if [ -z "${!env}" ]; then
+    echo "ERROR: $env must be set to run this script"
+    exit_with_usage
+  fi
+done
+
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
+
+# Commit ref to checkout when building
+GIT_REF=${GIT_REF:-main}
+
+RELEASE_STAGING_LOCATION="https://dist.apache.org/repos/dist/dev/incubator/gravitino"
+RELEASE_LOCATION="https://dist.apache.org/repos/dist/release/incubator/gravitino"
+
+GPG="gpg -u $GPG_KEY --no-tty --batch --pinentry-mode loopback"
+NEXUS_ROOT=https://repository.apache.org/service/local/staging
+NEXUS_PROFILE=d63f592e7eac0 # Profile for Gravitino staging uploads
+BASE_DIR=$(pwd)
+
+init_java
+init_gradle
+
+if [[ "$1" == "finalize" ]]; then
+  if [[ -z "$PYPI_API_TOKEN" ]]; then
+    error 'The environment variable PYPI_API_TOKEN is not set. Exiting.'
+  fi
+
+  git config --global user.name "$GIT_NAME"
+  git config --global user.email "$GIT_EMAIL"
+
+  # Create the git tag for the new release
+  echo "Creating the git tag for the new release"
+  if check_for_tag "v$RELEASE_VERSION"; then
+    echo "v$RELEASE_VERSION already exists. Skip creating it."
+  else
+    rm -rf gravitino
+    git clone "https://$ASF_USERNAME:$ASF_PASSWORD@$ASF_GRAVITINO_REPO" -b master
+    cd gravitino
+    git tag "v$RELEASE_VERSION" "$RELEASE_TAG"
+    git push origin "v$RELEASE_VERSION"
+    cd ..
+    rm -rf gravitino
+    echo "git tag v$RELEASE_VERSION created"
+  fi
+
+  # download Gravitino Python binary from the dev directory and upload to PyPi.
+  echo "Uploading Gravitino to PyPi"
+  svn co --depth=empty "$RELEASE_STAGING_LOCATION/$RELEASE_TAG-bin" svn-gravitino
+  cd svn-gravitino
+  PYGRAVITINO_VERSION=`echo "$RELEASE_VERSION" |  sed -e "s/-/./" -e "s/preview/dev/"`
+  svn update "gravitino-$PYGRAVITINO_VERSION.tar.gz"
+  svn update "gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
+  twine upload -u __token__  -p $PYPI_API_TOKEN \
+    --repository-url https://upload.pypi.org/legacy/ \
+    "gravitino-$PYGRAVITINO_VERSION.tar.gz" \
+    "gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
+  cd ..
+  rm -rf svn-gravitino
+  echo "Python Gravitino package uploaded"
+
+  # Moves the binaries from dev directory to release directory.
+  echo "Moving Gravitino binaries to the release directory"
+  svn mv --username "$ASF_USERNAME" --password "$ASF_PASSWORD" -m"Apache Gravitino $RELEASE_VERSION" \
+    --no-auth-cache "$RELEASE_STAGING_LOCATION/$RELEASE_TAG" "$RELEASE_LOCATION/$RELEASE_VERSION"
+  echo "Gravitino binaries moved"
+
+  # Update the KEYS file.
+  echo "Sync'ing KEYS"
+  svn co --depth=files "$RELEASE_LOCATION" svn-gravitino
+  curl "$RELEASE_STAGING_LOCATION/KEYS" > svn-gravitino/KEYS
+  (cd svn-gravitino && svn ci --username $ASF_USERNAME --password "$ASF_PASSWORD" -m"Update KEYS")
+  echo "KEYS sync'ed"
+  rm -rf svn-gravitino
+
+  exit 0
+fi
+
+rm -rf gravitino
+git clone "$ASF_REPO"
+cd gravitino
+git checkout $GIT_REF
+git_hash=`git rev-parse --short HEAD`
+export GIT_HASH=$git_hash
+echo "Checked out Gravitino git hash $git_hash"
+
+if [ -z "$GRAVITINO_VERSION" ]; then
+  GRAVITINO_VERSION=$(cat gradle.properties | parse_version)
+fi
+
+if [ -z "$PYGRAVITINO_VERSION"]; then
+  PYGRAVITINO_VERSION=$(cat clients/client-python/setup.py | grep "version=" | awk -F"\"" '{print $2}')
+fi
+
+# This is a band-aid fix to avoid the failure of Maven nightly snapshot in some Jenkins
+# machines by explicitly calling /usr/sbin/lsof.
+LSOF=lsof
+if ! hash $LSOF 2>/dev/null; then
+  LSOF=/usr/sbin/lsof
+fi
+
+if [ -z "$GRAVITINO_PACKAGE_VERSION" ]; then
+  GRAVITINO_PACKAGE_VERSION="${GRAVITINO_VERSION}-$(date +%Y_%m_%d_%H_%M)-${git_hash}"
+fi
+
+DEST_DIR_NAME="$GRAVITINO_PACKAGE_VERSION"
+
+git clean -d -f -x
+cd ..
+
+if [[ "$1" == "package" ]]; then
+  # Source and binary tarballs
+  echo "Packaging release source tarballs"
+  cp -r gravitino gravitino-$GRAVITINO_VERSION-src
+
+  rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.bin
+  rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.bin
+  rm -f gravitino-$GRAVITINO_VERSION-src/web/LICENSE.bin
+  rm -f gravitino-$GRAVITINO_VERSION-src/web/NOTICE.bin
+
+  tar cvzf gravitino-$GRAVITINO_VERSION-src.tar.gz --exclude gravitino-$GRAVITINO_VERSION-src/.git gravitino-$GRAVITINO_VERSION-src
+  echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour --output gravitino-$GRAVITINO_VERSION-src.tar.gz.asc \
+    --detach-sig gravitino-$GRAVITINO_VERSION-src.tar.gz
+  shasum -a 512 gravitino-$GRAVITINO_VERSION-src.tar.gz > gravitino-$GRAVITINO_VERSION-src.tar.gz.sha512
+  rm -rf gravitino-$GRAVITINO_VERSION-src
+
+  # Updated for each binary build
+  make_binary_release() {
+    echo "Building Gravitino binary dist"
+    cp -r gravitino gravitino-$GRAVITINO_VERSION-bin
+    cd gravitino-$GRAVITINO_VERSION-bin
+
+    echo "Creating distribution"
+
+    $GRADLE assembleDistribution -x test
+    $GRADLE :clients:client-python:distribution -x test
+    cd ..
+
+    echo "Copying and signing Gravitino server binary distribution"
+    cp gravitino-$GRAVITINO_VERSION-bin/distribution/gravitino-$GRAVITINO_VERSION-bin.tar.gz .
+    echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
+      --output gravitino-$GRAVITINO_VERSION-bin.tar.gz.asc \
+      --detach-sig gravitino-$GRAVITINO_VERSION-bin.tar.gz
+    shasum -a 512 gravitino-$GRAVITINO_VERSION-bin.tar.gz > gravitino-$GRAVITINO_VERSION-bin.tar.gz.sha512
+
+    echo "Copying and signing Gravitino Iceberg REST server binary distribution"
+    cp gravitino-$GRAVITINO_VERSION-bin/distribution/gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz .
+    echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
+      --output gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz.asc \
+      --detach-sig gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz
+    shasum -a 512 gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz > gravitino-iceberg-rest-server-$GRAVITINO_VERSION-bin.tar.gz.sha512
+
+    echo "Copying and signing Gravitino Trino connector binary distribution"
+    cp gravitino-$GRAVITINO_VERSION-bin/distribution/gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz .
+    echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
+      --output gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz.asc \
+      --detach-sig gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz
+    shasum -a 512 gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz > gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz.sha512
+
+    echo "Copying and signing Gravitino Python client binary distribution"
+    cp gravitino-$GRAVITINO_VERSION-bin/clients/client-python/dist/gravitino-$PYGRAVITINO_VERSION.tar.gz .
+    echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
+      --output gravitino-$PYGRAVITINO_VERSION.tar.gz.asc \
+      --detach-sig gravitino-$PYGRAVITINO_VERSION.tar.gz
+    shasum -a 512 gravitino-$PYGRAVITINO_VERSION.tar.gz > gravitino-$PYGRAVITINO_VERSION.tar.gz.sha512
+  }
+
+  make_binary_release
+  rm -rf gravitino-$GRAVITINO_VERSION-bin-*/
+
+  if ! is_dry_run; then
+    svn co --depth=empty $RELEASE_STAGING_LOCATION svn-gravitino
+    rm -rf "svn-gravitino/${DEST_DIR_NAME}"
+    mkdir -p "svn-gravitino/${DEST_DIR_NAME}"
+
+    echo "Copying release tarballs"
+    cp gravitino-* "svn-gravitino/${DEST_DIR_NAME}/"
+    svn add "svn-gravitino/${DEST_DIR_NAME}"
+
+    cd svn-gravitino
+    svn ci --username $ASF_USERNAME --password "$ASF_PASSWORD" -m"Apache GRAVITINO $GRAVITINO_PACKAGE_VERSION" --no-auth-cache
+    cd ..
+    rm -rf svn-gravitino
+  fi
+
+  exit 0
+fi
+
+if [[ "$1" == "docs" ]]; then
+  # Documentation
+  cp -r gravitino gravitino-$GRAVITINO_VERSION-docs
+  cd gravitino-$GRAVITINO_VERSION-docs
+  echo "Building Gravitino Java and Python docs"
+  $GRADLE :clients:client-java:build -x test
+  $GRADLE :clients:client-python:pydoc
+  cd ..
+
+  cp -r gravitino-$GRAVITINO_VERSION-docs/clients/client-java/build/docs/javadoc gravitino-$GRAVITINO_VERSION-javadoc
+  cp -r gravitino-$GRAVITINO_VERSION-docs/clients/client-python/docs gravitino-$PYGRAVITINO_VERSION-pydoc
+
+  rm -fr gravitino-$GRAVITINO_VERSION-docs
+fi
+
+if [[ "$1" == "publish-release" ]]; then
+  # Publish Gravitino to Maven release repo
+  echo "Publishing Gravitino checkout at '$GIT_REF' ($git_hash)"
+  echo "Publish version is $GRAVITINO_VERSION"
+
+  cp -r gravitino gravitino-$GRAVITINO_VERSION-publish
+  cd gravitino-$GRAVITINO_VERSION-publish
+
+  $GRADLE clean
+  $GRADLE build -x test -PscalaVersion=2.12
+  $GRADLE build -x test -PscalaVersion=2.13
+
+  if ! is_dry_run; then
+    $GRADLE publish -PscalaVersion=2.12
+    $GRADLE publish -PscalaVersion=2.13
+  fi
+
+  cd ..
+  rm -rf gravitino-$GRAVITINO_VERSION-publish
+fi
