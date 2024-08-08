@@ -67,7 +67,6 @@ public class KerberosClient implements Closeable {
     UserGroupInformation.setConfiguration(hadoopConf);
     UserGroupInformation kerberosLoginUgi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(catalogPrincipal, keytabFilePath);
-    // Replace setLoginUser with an alternative approach
     UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
 
     // Refresh the cache if it's out of date.
