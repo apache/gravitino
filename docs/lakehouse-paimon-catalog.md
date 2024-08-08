@@ -122,13 +122,11 @@ Please refer to [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spa
 - Only supports primary key Index.
 
 :::info
-We cannot specify more than one primary key Index,
-and a primary key Index can contain multiple fields as a joint primary key.
+We cannot specify more than one primary key Index, and a primary key Index can contain multiple fields as a joint primary key.
 :::
 
 :::info
-Paimon Table primary key constraint should not be same with partition fields,
-this will result in only one record in a partition.
+Paimon Table primary key constraint should not be same with partition fields, this will result in only one record in a partition.
 :::
 
 ### Table column types
