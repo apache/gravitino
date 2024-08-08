@@ -21,7 +21,7 @@ version: '3.0'
 services:
 
   hive:
-    image: datastrato/gravitino-ci-hive:0.1.12
+    image: datastrato/gravitino-ci-hive:0.1.13
     networks:
       - trino-net
     container_name: trino-ci-hive
