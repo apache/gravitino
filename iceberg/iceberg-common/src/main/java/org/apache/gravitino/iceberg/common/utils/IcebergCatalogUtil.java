@@ -99,7 +99,6 @@ public class IcebergCatalogUtil {
       Map<String, String> properties, Configuration conf) {
     try {
       KerberosClient kerberosClient = new KerberosClient(properties, conf);
-
       File keytabFile =
           kerberosClient.saveKeyTabFileFromUri(Long.valueOf(properties.get("catalog_uuid")));
       kerberosClient.login(keytabFile.getAbsolutePath());
