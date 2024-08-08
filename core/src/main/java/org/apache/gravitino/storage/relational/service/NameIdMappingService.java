@@ -37,6 +37,11 @@ public class NameIdMappingService implements Closeable {
 
   private static volatile NameIdMappingService instance;
 
+  /**
+   * Cache to store the mapping between the entity identifier and the entity id.
+   *
+   * <p>Note: both the key and value are unique, so we can use BiMap here and get the key by value.
+   */
   private Cache<EntityIdentifier, Long> ident2IdCache;
 
   private NameIdMappingService() {
@@ -111,6 +116,13 @@ public class NameIdMappingService implements Closeable {
     return ident2IdCache.getIfPresent(key);
   }
 
+  /**
+   * Get the entity identifier by the entity id.
+   *
+   * @param value the entity id
+   * @param mappingFunction the function to get the entity identifier by the entity id
+   * @return the entity identifier
+   */
   public EntityIdentifier getById(Long value, Function<Long, EntityIdentifier> mappingFunction) {
     synchronized (this) {
       BiMap<EntityIdentifier, Long> map = HashBiMap.create(ident2IdCache.asMap());
@@ -126,6 +138,12 @@ public class NameIdMappingService implements Closeable {
     }
   }
 
+  /**
+   * Get the entity identifier by the entity id.
+   *
+   * @param value the entity id
+   * @return the entity identifier
+   */
   public EntityIdentifier getById(Long value) {
     synchronized (this) {
       BiMap<EntityIdentifier, Long> map = HashBiMap.create(ident2IdCache.asMap());
