@@ -76,7 +76,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private HasPropertyMetadata propertiesMetadata;
 
-  @VisibleForTesting Configuration hadoopConf;
+  private Configuration hadoopConf;
 
   @VisibleForTesting Optional<Path> catalogStorageLocation;
 

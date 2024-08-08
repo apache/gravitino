@@ -61,7 +61,7 @@ public class AwsHadoopUserContext extends UserContext {
     String credentialsProvider = awsConfig.getCredentialsProvider();
     if ("anonymous".equalsIgnoreCase(credentialsProvider)) {
       configuration.set(CREDENTIALS_PROVIDER_PROPERTY, ANONYMOUS_CREDENTIALS_PROVIDER);
-    } else if ("temporary".equalsIgnoreCase(credentialsProvider)) {
+    } else if ("token".equalsIgnoreCase(credentialsProvider)) {
       String accessKey = awsConfig.getAccessKey();
       checkArgument(StringUtils.isNotBlank(accessKey), "aws access key cannot be blank");
       String secretKey = awsConfig.getSecretKey();

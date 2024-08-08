@@ -226,13 +226,13 @@ public class TestHadoopCatalogOperations {
 
     CatalogInfo catalogInfo = randomCatalogInfo();
     ops.initialize(emptyProps, catalogInfo, HADOOP_PROPERTIES_METADATA);
-    Configuration conf = ops.hadoopConf;
+    Configuration conf = ops.getHadoopConf();
     String value = conf.get("fs.defaultFS");
     Assertions.assertEquals("file:///", value);
 
     emptyProps.put(CATALOG_BYPASS_PREFIX + "fs.defaultFS", "hdfs://localhost:9000");
     ops.initialize(emptyProps, catalogInfo, HADOOP_PROPERTIES_METADATA);
-    Configuration conf1 = ops.hadoopConf;
+    Configuration conf1 = ops.getHadoopConf();
     String value1 = conf1.get("fs.defaultFS");
     Assertions.assertEquals("hdfs://localhost:9000", value1);
 
