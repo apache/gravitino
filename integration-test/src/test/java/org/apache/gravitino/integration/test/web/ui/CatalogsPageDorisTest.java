@@ -121,7 +121,6 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
       String tableName,
       String colName) {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put("replication_allocation", "tag.location.default: 1");
     Column column = Column.of(colName, Types.IntegerType.get(), "column comment");
     Catalog catalog_doris = metalake.loadCatalog(catalogName);
     catalog_doris

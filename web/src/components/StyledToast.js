@@ -43,7 +43,7 @@ export default function StyledToast() {
             {({ icon, message }) => (
               <>
                 {icon}
-                <div className='twc-flex twc-w-full twc-break-all [&>div]:twc-justify-start'>{message}</div>
+                <div className='twc-flex twc-w-full twc-break-normal [&>div]:twc-justify-start'>{message}</div>
                 <div className='twc-flex twc-h-full'>
                   {t.type !== 'loading' && (
                     <button
