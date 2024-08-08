@@ -75,7 +75,36 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 ```
 dropTable will delete the table location directly, similar with purgeTable.
 ```
-- Supporting Column default value through table properties, such as `fields.{columnName}.default-value`.
+- Supporting Column default value through table properties, such as `fields.{columnName}.default-value`, not column expression.
+
+:::caution
+Paimon does not support auto increment column.
+:::
+
+#### Table changes
+
+- AddColumn
+```
+AddColumn supports add a new column with first, after and defualt position.
+```
+- DeleteColumn
+- RenameColumn
+- UpdateColumnComment
+- UpdateColumnNullability
+- UpdateColumnPosition
+```
+UpdateColumnPosition only supports update a column position with first, after position, cannot use default position.
+```
+- UpdateColumnType
+- UpdateComment
+- SetProperty
+```
+SetProperty cannot update table comment, please use UpdateComment instead.
+```
+- RemoveProperty
+```
+RemoveProperty cannot remove table comment.
+```
 
 #### Table partitions
 
@@ -93,14 +122,12 @@ Please refer to [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spa
 
 ### Table indexes
 
-- Only supports primary key Index
+- Only supports primary key Index.
 
-:::info
-We cannot specify more than one primary key Index, and a primary key Index can contain multiple fields as a joint primary key.
+:::info We cannot specify more than one primary key Index, and a primary key Index can contain multiple fields as a joint primary key.
 :::
 
-:::caution
-Paimon Table primary key constraint should not be same with partition fields, this will result in only one record in a partition.
+:::caution Paimon Table primary key constraint should not be same with partition fields, this will result in only one record in a partition.
 :::
 
 ### Table column types
@@ -138,18 +165,16 @@ You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/mainte
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
-| Configuration item              | Description                                              |
-|---------------------------------|----------------------------------------------------------|
-| `comment`                       | The table comment.                                       |
-| `creator`                       | The table creator.                                       |
-| `comment`                       | The table comment.                                       |
-| `creator`                       | The table creator.                                       |
-| `comment`                       | The table comment.                                       |
-| `creator`                       | The table creator.                                       |
-| `comment`                       | The table comment.                                       |
-| `creator`                       | The table creator.                                       |
-| `comment`                       | The table comment.                                       |
-| `creator`                       | The table creator.                                       |
+| Configuration item                 | Description                                                  |
+|------------------------------------|--------------------------------------------------------------|
+| `comment`                          | The table comment.                                           |
+| `owner`                            | The table owner.                                             |
+| `bucket-key`                       | The table bucket-key.                                        |
+| `merge-engine`                     | The table merge-engine.                                      |
+| `sequence.field`                   | The table sequence.field.                                    |
+| `rowkind.field`                    | The table rowkind.field.                                     |
+| `primary-key`                      | The table primary-key.                                       |
+| `partition`                        | The table partition.                                         |
 
 ### Table operations
 
