@@ -49,6 +49,20 @@ public class TestGravitinoVersion {
     assertEquals(5, versionNumber[1]);
     assertEquals(3, versionNumber[2]);
 
+    // Test incubator version
+    version = new GravitinoVersion("2.5.3-incubating", "2023-01-01", "1234567");
+    versionNumber = version.getVersionNumber();
+    assertEquals(2, versionNumber[0]);
+    assertEquals(5, versionNumber[1]);
+    assertEquals(3, versionNumber[2]);
+
+    // Test incubator snapshot version
+    version = new GravitinoVersion("2.5.3-incubating-SNAPSHOT", "2023-01-01", "1234567");
+    versionNumber = version.getVersionNumber();
+    assertEquals(2, versionNumber[0]);
+    assertEquals(5, versionNumber[1]);
+    assertEquals(3, versionNumber[2]);
+
     // Test an invalid the version string with 2 part
     version = new GravitinoVersion("2.5", "2023-01-01", "1234567");
     assertThrows(GravitinoRuntimeException.class, version::getVersionNumber);
