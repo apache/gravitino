@@ -24,16 +24,16 @@ try:
     with open("README.md") as f:
         long_description = f.read()
 except FileNotFoundError:
-    long_description = "Gravitino Python client"
+    long_description = "Apache Gravitino Python client"
 
 setup(
-    name="gravitino",
-    description="Python lib/client for Gravitino",
-    version="0.6.0.dev",
+    name="apache-gravitino",
+    description="Python lib/client for Apache Gravitino",
+    version="0.6.0.dev0",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/apache/gravitino",
-    author="gravitino",
+    author="apache-gravitino",
     author_email="dev@gravitino.apache.org",
     python_requires=">=3.8",
     packages=find_packages(exclude=["tests*", "scripts*"]),
