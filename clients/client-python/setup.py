@@ -29,7 +29,7 @@ except FileNotFoundError:
 setup(
     name="gravitino",
     description="Python lib/client for Gravitino",
-    version="0.6.0.dev1",
+    version="0.6.0.dev",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/apache/gravitino",
