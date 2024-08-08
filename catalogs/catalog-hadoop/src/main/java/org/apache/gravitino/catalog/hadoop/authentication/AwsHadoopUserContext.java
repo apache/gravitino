@@ -35,6 +35,7 @@ public class AwsHadoopUserContext extends UserContext {
   private static final String SECRET_KEY_PROPERTY = "fs.s3a.secret.key";
   private static final String SESSION_TOKEN_PROPERTY = "fs.s3a.session.token";
   private static final String ENDPOINT_PROPERTY = "fs.s3a.endpoint";
+  private static final String REGION_PROPERTY = "fs.s3a.endpoint.region";
   private static final String ANONYMOUS_CREDENTIALS_PROVIDER =
       "org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider";
   private static final String TEMPORARY_CREDENTIALS_PROVIDER =
@@ -54,9 +55,14 @@ public class AwsHadoopUserContext extends UserContext {
     AwsConfig awsConfig = new AwsConfig(properties);
     checkArgument(configuration != null, "hadoop conf cannot be null");
 
-    String endpoint = awsConfig.getEndpoint();
-    checkArgument(StringUtils.isNotBlank(endpoint), "aws endpoint cannot be blank");
-    configuration.set(ENDPOINT_PROPERTY, endpoint);
+    String region = awsConfig.getRegion();
+    if (StringUtils.isBlank(region)) {
+      String endpoint = awsConfig.getEndpoint();
+      checkArgument(StringUtils.isNotBlank(endpoint), "aws region or endpoint must be specified");
+      configuration.set(ENDPOINT_PROPERTY, endpoint);
+    } else {
+      configuration.set(REGION_PROPERTY, region);
+    }
 
     String credentialsProvider = awsConfig.getCredentialsProvider();
     if ("anonymous".equalsIgnoreCase(credentialsProvider)) {

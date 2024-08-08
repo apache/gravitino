@@ -20,7 +20,6 @@ package org.apache.gravitino.catalog.hadoop.authentication.aws;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
@@ -28,11 +27,12 @@ import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class AwsConfig extends AuthenticationConfig {
-  public static final String ACCESS_KEY = "aws.s3.access-key";
-  public static final String SECRET_KEY = "aws.s3.secret-key";
-  public static final String SESSION_TOKEN = "aws.s3.session-token";
-  public static final String CREDENTIALS_PROVIDER = "aws.s3.credentials-provider";
-  public static final String ENDPOINT = "aws.s3.endpoint";
+  public static final String ACCESS_KEY = "s3-access-key-id";
+  public static final String SECRET_KEY = "s3-secret-access-key";
+  public static final String SESSION_TOKEN = "s3-session-token";
+  public static final String CREDENTIALS_PROVIDER = "s3-credentials-provider";
+  public static final String ENDPOINT = "s3-endpoint";
+  public static final String REGION = "s3-region";
 
   public static final ConfigEntry<String> ACCESS_KEY_ENTRY =
       new ConfigBuilder(ACCESS_KEY)
@@ -66,7 +66,13 @@ public class AwsConfig extends AuthenticationConfig {
           .doc("The endpoint of AWS S3")
           .version(ConfigConstants.VERSION_0_5_1)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
+  public static final ConfigEntry<String> REGION_ENTRY =
+      new ConfigBuilder(REGION)
+          .doc("The region of AWS S3")
+          .version(ConfigConstants.VERSION_0_5_1)
+          .stringConf()
           .create();
 
   public AwsConfig(Map<String, String> properties) {
@@ -91,6 +97,10 @@ public class AwsConfig extends AuthenticationConfig {
 
   public String getEndpoint() {
     return get(ENDPOINT_ENTRY);
+  }
+
+  public String getRegion() {
+    return get(REGION_ENTRY);
   }
 
   public static final Map<String, PropertyEntry<?>> AWS_PROPERTY_ENTRIES =
@@ -132,6 +142,14 @@ public class AwsConfig extends AuthenticationConfig {
               PropertyEntry.stringOptionalPropertyEntry(
                   ENDPOINT,
                   "The endpoint of AWS S3",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              REGION,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  REGION,
+                  "The region of AWS S3",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
