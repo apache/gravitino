@@ -137,25 +137,22 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
 
   private static void prepareKerberosConfig() throws IOException, KrbException {
     // Keytab of the Gravitino SDK client
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileFromContainer("/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
+    kerberosHiveContainer.copyFileFromContainer(
+        "/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
 
     createKeyTableForSchemaAndFileset();
 
     // Keytab of the Gravitino server
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileFromContainer("/gravitino_server.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
+    kerberosHiveContainer.copyFileFromContainer(
+        "/gravitino_server.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
 
     // Keytab of Gravitino server to connector to HDFS
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileFromContainer("/etc/admin.keytab", TMP_DIR + HADOOP_CLIENT_KEYTAB);
+    kerberosHiveContainer.copyFileFromContainer(
+        "/etc/admin.keytab", TMP_DIR + HADOOP_CLIENT_KEYTAB);
 
     String tmpKrb5Path = TMP_DIR + "krb5.conf_tmp";
     String krb5Path = TMP_DIR + "krb5.conf";
-    kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
+    kerberosHiveContainer.copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
     String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
@@ -190,10 +187,8 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
             HADOOP_SCHEMA_PRINCIPAL,
             REALM),
         StandardCharsets.UTF_8);
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileToContainer(
-            MountableFile.forHostPath(TMP_DIR + createSchemaShellFile), createSchemaShellFile);
+    kerberosHiveContainer.copyFileToContainer(
+        MountableFile.forHostPath(TMP_DIR + createSchemaShellFile), createSchemaShellFile);
     kerberosHiveContainer.executeInContainer("bash", createSchemaShellFile);
 
     FileUtils.writeStringToFile(
@@ -208,18 +203,14 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
             HADOOP_FILESET_PRINCIPAL,
             REALM),
         StandardCharsets.UTF_8);
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileToContainer(
-            MountableFile.forHostPath(TMP_DIR + createFileSetShellFile), createFileSetShellFile);
+    kerberosHiveContainer.copyFileToContainer(
+        MountableFile.forHostPath(TMP_DIR + createFileSetShellFile), createFileSetShellFile);
     kerberosHiveContainer.executeInContainer("bash", createFileSetShellFile);
 
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileFromContainer(HADOOP_SCHEMA_KEYTAB, TMP_DIR + HADOOP_SCHEMA_KEYTAB);
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileFromContainer(HADOOP_FILESET_KEYTAB, TMP_DIR + HADOOP_FILESET_KEYTAB);
+    kerberosHiveContainer.copyFileFromContainer(
+        HADOOP_SCHEMA_KEYTAB, TMP_DIR + HADOOP_SCHEMA_KEYTAB);
+    kerberosHiveContainer.copyFileFromContainer(
+        HADOOP_FILESET_KEYTAB, TMP_DIR + HADOOP_FILESET_KEYTAB);
   }
 
   private static void addKerberosConfig() {
@@ -256,7 +247,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
     properties.put("location", HDFS_URL + "/user/hadoop/");
 
-    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", "/user/hadoop");
+    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", "-p", "/user/hadoop");
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(

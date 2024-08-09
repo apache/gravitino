@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.testcontainers.containers.Container;
-import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
@@ -77,9 +76,8 @@ public class KafkaContainer extends BaseContainer {
 
       String kafkaLogJarPath = "/home/appuser/kafka-logs.tar";
 
-      GenericContainer<?> kafkaContainer = getContainer();
-      kafkaContainer.execInContainer("tar", "cf", kafkaLogJarPath, KAFKA_LOGS_DIR);
-      kafkaContainer.copyFileFromContainer(kafkaLogJarPath, destPath + "/kafka-logs.tar");
+      executeInContainer("tar", "cf", kafkaLogJarPath, KAFKA_LOGS_DIR);
+      container.copyFileFromContainer(kafkaLogJarPath, destPath + "/kafka-logs.tar");
     } catch (Exception e) {
       LOG.error("Failed to package Kafka logs", e);
     }

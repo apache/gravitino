@@ -32,6 +32,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
 import org.apache.gravitino.integration.test.util.AbstractIT;
@@ -56,10 +57,10 @@ public class TestMultipleJDBCLoad extends AbstractIT {
 
   @BeforeAll
   public static void startup() throws IOException {
-    containerSuite.startMySQLContainer(TEST_DB_NAME);
-    mySQLContainer = containerSuite.getMySQLContainer();
-    containerSuite.startPostgreSQLContainer(TEST_DB_NAME);
-    postgreSQLContainer = containerSuite.getPostgreSQLContainer();
+    ContainerSuite.getInstance().startMySQLContainer(TEST_DB_NAME);
+    mySQLContainer = ContainerSuite.getInstance().getMySQLContainer();
+    ContainerSuite.getInstance().startPostgreSQLContainer(TEST_DB_NAME);
+    postgreSQLContainer = ContainerSuite.getInstance().getPostgreSQLContainer();
   }
 
   @Test

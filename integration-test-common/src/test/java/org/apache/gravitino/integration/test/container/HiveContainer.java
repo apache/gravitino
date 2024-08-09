@@ -19,21 +19,27 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
+import static org.apache.gravitino.integration.test.container.RangerContainer.DOCKER_ENV_RANGER_SERVER_URL;
+import static org.apache.gravitino.integration.test.util.ProcessData.TypesOfData.STREAMS_MERGED;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
+import java.lang.reflect.Constructor;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.CommandExecutor;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.Network;
+import org.testcontainers.utility.MountableFile;
 
 public class HiveContainer extends BaseContainer {
   public static final Logger LOG = LoggerFactory.getLogger(HiveContainer.class);
@@ -57,6 +63,8 @@ public class HiveContainer extends BaseContainer {
   private static final String HIVE_LOG_PATH = "/tmp/root/";
   private static final String HDFS_LOG_PATH = "/usr/local/hadoop/logs/";
 
+  private String containerName = "trino-ci-hive-with-kerberos";
+
   public static Builder builder() {
     return new Builder();
   }
@@ -78,14 +86,103 @@ public class HiveContainer extends BaseContainer {
 
   @Override
   protected void setupContainer() {
+
     super.setupContainer();
     withLogConsumer(new PrintingContainerLog(format("%-14s| ", "HiveContainer-" + hostName)));
   }
 
   @Override
   public void start() {
-    super.start();
-    Preconditions.check("Hive container startup failed!", checkContainerStatus(15));
+    if (activeCI) {
+      if (envVars.containsKey(DOCKER_ENV_RANGER_SERVER_URL)) {
+        ContainerSuite.getTrinoITContainers().launch(envVars, AbstractIT.Service.HIVE_WITH_RANGER);
+
+      } else if (image.equals(KERBEROS_IMAGE)) {
+        ContainerSuite.getTrinoITContainers().launch(AbstractIT.Service.HIVE_WITH_KERBEROS);
+
+      } else {
+        ContainerSuite.getTrinoITContainers().launch(AbstractIT.Service.HIVE);
+      }
+    } else {
+      super.start();
+      Preconditions.check("Hive container startup failed!", checkContainerStatus(15));
+    }
+  }
+
+  @Override
+  public String getContainerIpAddress() {
+    if (activeCI) {
+      if (envVars.containsKey(DOCKER_ENV_RANGER_SERVER_URL)) {
+        return ContainerSuite.getTrinoITContainers()
+            .getServiceIpAddress(AbstractIT.Service.HIVE_WITH_RANGER);
+
+      } else if (image.equals(KERBEROS_IMAGE)) {
+        return ContainerSuite.getTrinoITContainers()
+            .getServiceIpAddress(AbstractIT.Service.HIVE_WITH_KERBEROS);
+
+      } else {
+        return ContainerSuite.getTrinoITContainers().getServiceIpAddress(AbstractIT.Service.HIVE);
+      }
+    }
+    return super.getContainerIpAddress();
+  }
+
+  /** Copies a file which resides inside the container to user defined directory */
+  public void copyFileFromContainer(String containerPath, String destinationPath) {
+    if (activeCI) {
+      Object output =
+          CommandExecutor.executeCommandLocalHost(
+              format("docker cp %s:%s %s", containerName, containerPath, destinationPath),
+              false,
+              STREAMS_MERGED);
+      LOG.info("Command output:\n{}", output);
+    } else {
+      container.copyFileFromContainer(containerPath, destinationPath);
+    }
+  }
+
+  /**
+   * Copies a file or directory to the container.
+   *
+   * @param mountableFile file or directory which is copied into the container
+   * @param containerPath destination path inside the container
+   */
+  public void copyFileToContainer(MountableFile mountableFile, String containerPath) {
+    if (activeCI) {
+      File file = new File(mountableFile.getResolvedPath());
+      Object output =
+          CommandExecutor.executeCommandLocalHost(
+              format("docker cp %s %s:%s", file.getAbsolutePath(), containerName, containerPath),
+              false,
+              STREAMS_MERGED);
+      LOG.info("Command output:\n{}", output);
+    } else {
+      container.copyFileToContainer(mountableFile, containerPath);
+    }
+  }
+
+  @Override
+  public Container.ExecResult executeInContainer(String... commandAndArgs) {
+    if (activeCI) {
+      Object output =
+          CommandExecutor.executeCommandLocalHost(
+              format("docker exec %s %s", containerName, String.join(" ", commandAndArgs)),
+              false,
+              STREAMS_MERGED);
+      LOG.info("Command output:\n{}", output);
+      // todo: overwrite this method
+      try {
+        Constructor<Container.ExecResult> constructor =
+            Container.ExecResult.class.getDeclaredConstructor(
+                int.class, String.class, String.class);
+        constructor.setAccessible(true);
+        return constructor.newInstance(0, "output", "error");
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    } else {
+      return super.executeInContainer(commandAndArgs);
+    }
   }
 
   @Override

@@ -143,23 +143,19 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
 
   private static void prepareKerberosConfig() throws Exception {
     // Keytab of the Gravitino SDK client
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileFromContainer("/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
+    kerberosHiveContainer.copyFileFromContainer(
+        "/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
 
     // Keytab of the Gravitino server
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileFromContainer("/gravitino_server.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
+    kerberosHiveContainer.copyFileFromContainer(
+        "/gravitino_server.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
 
     // Keytab of Gravitino server to connector to Hive
-    kerberosHiveContainer
-        .getContainer()
-        .copyFileFromContainer("/etc/admin.keytab", TMP_DIR + HDFS_CLIENT_KEYTAB);
+    kerberosHiveContainer.copyFileFromContainer("/etc/admin.keytab", TMP_DIR + HDFS_CLIENT_KEYTAB);
 
     String tmpKrb5Path = TMP_DIR + "/krb5.conf_tmp";
     String krb5Path = TMP_DIR + "/krb5.conf";
-    kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
+    kerberosHiveContainer.copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
     String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
@@ -243,7 +239,7 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
 
     // Now try to permit the user to create the schema again
     kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hive/paimon_catalog_warehouse");
+        "hadoop", "fs", "-mkdir", "-p", "/user/hive/paimon_catalog_warehouse");
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/paimon_catalog_warehouse");
     Assertions.assertDoesNotThrow(

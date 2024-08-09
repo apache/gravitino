@@ -76,6 +76,99 @@ services:
       timeout: 60s
       retries: 5
 
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: trino-ci-kafka
+    networks:
+      - trino-net
+    hostname: gravitino-ci-kafka
+    environment:
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@gravitino-ci-kafka:9093'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LISTENERS: 'PLAINTEXT://:9092,CONTROLLER://:9093'
+      DEFAULT_BROKER_PORT: 9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://gravitino-ci-kafka:9092'
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: [ "CMD", "true" ]
+      interval: 5s
+      timeout: 60s
+      retries: 5
+
+  doris:
+    image: datastrato/gravitino-ci-doris:0.1.5
+    container_name: trino-ci-doris
+    networks:
+      - trino-net
+    hostname: gravitino-ci-doris
+    ports:
+      - "9030:9030"
+      - "8030:8030"
+    healthcheck:
+      test: [ "CMD", "true" ]
+      interval: 5s
+      timeout: 60s
+      retries: 5
+
+  ranger:
+    image: datastrato/gravitino-ci-ranger:0.1.1
+    container_name: trino-ci-ranger
+    networks:
+      - trino-net
+    hostname: gravitino-ci-ranger
+    environment:
+      RANGER_PASSWORD: 'rangerR0cks!'
+    entrypoint: /bin/bash /tmp/ranger/init.sh
+    volumes:
+      - ./init/ranger:/tmp/ranger
+    ports:
+      - "6080:6080"
+    healthcheck:
+      test: [ "CMD-SHELL", "lsof -i :6080 | grep -q LISTEN || exit 1" ]
+      interval: 10s
+      timeout: 60s
+      retries: 10
+
+  hive_with_ranger:
+    image: datastrato/gravitino-ci-hive:0.1.13
+    networks:
+      - trino-net
+    container_name: trino-ci-hive-with-ranger
+    hostname: gravitino-ci-hive-with-ranger
+    environment:
+      - HADOOP_USER_NAME=gravitino
+      - HIVE_RUNTIME_VERSION=hive3
+      - RANGER_SERVER_URL=${GRAVITINO_RANGER_URL:-http://gravitino-ci-ranger:6080}
+      - RANGER_HIVE_REPOSITORY_NAME=${GRAVITINO_RANGER_HIVE_REPOSITORY_NAME:-hiveDev}
+      - RANGER_HDFS_REPOSITORY_NAME=${GRAVITINO_RANGER_HDFS_REPOSITORY_NAME:-hdfsDev}
+    entrypoint: /bin/bash /tmp/hive/init.sh
+    volumes:
+      - ./init/hive:/tmp/hive
+    healthcheck:
+      test: [ "CMD", "/tmp/check-status.sh" ]
+      interval: 10s
+      timeout: 60s
+      retries: 10
+    depends_on:
+      ranger:
+        condition: service_healthy
+
+  hive_with_kerberos:
+    image: datastrato/gravitino-ci-kerberos-hive:0.1.5
+    networks:
+      - trino-net
+    container_name: trino-ci-hive-with-kerberos
+    hostname: gravitino-ci-kerberos-hive
+    healthcheck:
+      test: [ "CMD", "/tmp/check-status.sh" ]
+      interval: 10s
+      timeout: 60s
+      retries: 10
+
   trino:
     image: trinodb/trino:435
     networks:

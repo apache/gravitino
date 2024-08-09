@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.integration.test.web.ui;
 
+import static org.apache.gravitino.integration.test.util.AbstractIT.Service.HIVE;
+import static org.apache.gravitino.integration.test.util.AbstractIT.Service.MYSQL;
+import static org.apache.gravitino.integration.test.util.AbstractIT.Service.POSTGRESQL;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 
 import com.google.common.collect.Maps;
@@ -121,7 +124,7 @@ public class CatalogsPageTest extends AbstractWebIT {
     gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
 
     trinoITContainers = ContainerSuite.getTrinoITContainers();
-    trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
+    trinoITContainers.launch(HIVE, MYSQL, POSTGRESQL);
 
     hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
     hdfsUri = trinoITContainers.getHdfsUri();

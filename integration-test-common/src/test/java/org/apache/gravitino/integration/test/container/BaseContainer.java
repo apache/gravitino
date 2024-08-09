@@ -19,6 +19,7 @@
 package org.apache.gravitino.integration.test.container;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.gravitino.integration.test.util.AbstractIT.ACTIVE_CI;
 import static org.testcontainers.utility.MountableFile.forHostPath;
 
 import com.github.dockerjava.api.DockerClient;
@@ -50,6 +51,9 @@ import org.testcontainers.containers.wait.strategy.Wait;
  */
 public abstract class BaseContainer implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(BaseContainer.class);
+
+  protected static final boolean activeCI = "true".equals(System.getenv(ACTIVE_CI));
+
   // Host name of the container
   protected final String hostName;
   // Exposed ports of the container
@@ -57,7 +61,10 @@ public abstract class BaseContainer implements AutoCloseable {
   // Files to mount in the container
   private final Map<String, String> filesToMount;
   // environment variables of the container
-  private final Map<String, String> envVars;
+  protected final Map<String, String> envVars;
+
+  protected final String image;
+
   // Additional host and IP address mapping
   private final Map<String, String> extraHosts;
   // Network of the container
@@ -81,6 +88,7 @@ public abstract class BaseContainer implements AutoCloseable {
                         .withSysctls(
                             Collections.singletonMap(
                                 "net.ipv4.ip_local_port_range", "20000 40000")));
+    this.image = image;
     this.ports = requireNonNull(ports, "ports is null");
     this.hostName = requireNonNull(hostName, "hostName is null");
     this.extraHosts = extraHosts;
@@ -126,10 +134,6 @@ public abstract class BaseContainer implements AutoCloseable {
   // This method is used to get the expose port number of the container.
   public Integer getMappedPort(int exposedPort) {
     return container.getMappedPort(exposedPort);
-  }
-
-  public GenericContainer<?> getContainer() {
-    return container;
   }
 
   // This method is used to get the IP address of the container.

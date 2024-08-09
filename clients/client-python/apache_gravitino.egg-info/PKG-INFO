@@ -1,0 +1,48 @@
+Metadata-Version: 2.1
+Name: apache-gravitino
+Version: 0.7.0.dev0
+Summary: Python lib/client for Apache Gravitino
+Home-page: https://github.com/apache/gravitino
+Author: Apache Software Foundation
+Author-email: dev@gravitino.apache.org
+Maintainer: Apache Gravitino Community
+Maintainer-email: dev@gravitino.apache.org
+License: Apache-2.0
+Project-URL: Homepage, https://gravitino.apache.org/
+Project-URL: Source Code, https://github.com/apache/gravitino
+Project-URL: Documentation, https://gravitino.apache.org/docs/overview
+Project-URL: Bug Tracker, https://github.com/apache/gravitino/issues
+Project-URL: Slack Chat, https://the-asf.slack.com/archives/C078RESTT19
+Keywords: Data,AI,metadata,catalog
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: requests==2.32.2
+Requires-Dist: dataclasses-json==0.6.6
+Requires-Dist: readerwriterlock==1.0.9
+Requires-Dist: fsspec==2024.3.1
+Requires-Dist: pyarrow==15.0.2
+Requires-Dist: cachetools==5.3.3
+Provides-Extra: dev
+Requires-Dist: requests==2.32.2; extra == "dev"
+Requires-Dist: dataclasses-json==0.6.6; extra == "dev"
+Requires-Dist: pylint==3.2.2; extra == "dev"
+Requires-Dist: black==24.4.2; extra == "dev"
+Requires-Dist: twine==5.1.1; extra == "dev"
+Requires-Dist: coverage==7.5.1; extra == "dev"
+Requires-Dist: pandas==2.0.3; extra == "dev"
+Requires-Dist: pyarrow==15.0.2; extra == "dev"
+Requires-Dist: llama-index==0.10.40; extra == "dev"
+Requires-Dist: tenacity==8.3.0; extra == "dev"
+Requires-Dist: cachetools==5.3.3; extra == "dev"
+Requires-Dist: readerwriterlock==1.0.9; extra == "dev"
+Requires-Dist: docker==7.1.0; extra == "dev"
+Requires-Dist: pyjwt[crypto]==2.8.0; extra == "dev"
+
+Apache Gravitino Python client

@@ -55,16 +55,12 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
 public class AbstractIT {
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-
   private static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
   private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
 
@@ -90,12 +86,31 @@ public class AbstractIT {
   public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
+  public static final String ACTIVE_CI = "ACTIVE_CI";
+
   private static TestDatabaseName META_DATA;
   private static MySQLContainer MYSQL_CONTAINER;
 
   protected static String serverUri;
 
   protected static String originConfig;
+
+  public enum Service {
+    TRINO,
+    HIVE,
+    HIVE_WITH_RANGER,
+    HIVE_WITH_KERBEROS,
+    MYSQL,
+    POSTGRESQL,
+    KAFKA,
+    DORIS,
+    RANGER;
+
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  }
 
   public static int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
@@ -198,13 +213,6 @@ public class AbstractIT {
     }
   }
 
-  @ParameterizedTest
-  @CsvSource({
-    "embedded, jdbcBackend",
-    "embedded, kvBackend",
-    "deploy, jdbcBackend",
-    "deploy, kvBackend"
-  })
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
     testMode =
@@ -217,8 +225,8 @@ public class AbstractIT {
     if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
       META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
-      containerSuite.startMySQLContainer(META_DATA);
-      MYSQL_CONTAINER = containerSuite.getMySQLContainer();
+      ContainerSuite.getInstance().startMySQLContainer(META_DATA);
+      MYSQL_CONTAINER = ContainerSuite.getInstance().getMySQLContainer();
 
       setMySQLBackend();
     }

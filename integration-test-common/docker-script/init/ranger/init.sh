@@ -16,12 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-IP=$(hostname -I | awk '{print $1}')
-sed -i "s|<value>hdfs://__REPLACE__HOST_NAME:9000|<value>hdfs://${IP}:9000|g" ${HIVE_TMP_CONF_DIR}/hive-site.xml
-# replace "export HADOOP_HEAPSIZE=512" with "export HADOOP_HEAPSIZE=256" in hadoop-env.sh
-sed -i "s|export HADOOP_HEAPSIZE=512|export HADOOP_HEAPSIZE=256|g" ${HADOOP_TMP_CONF_DIR}/hadoop-env.sh
 
-# add jvm options to ${ZK_HOME}/conf/java.env
-echo "export JVMFLAGS=\"-Xmx256m\"" >> ${ZK_HOME}/conf/java.env
+sed -i -E 's/-Xmx[^ ]+/-Xmx256m/g; s/-Xms[^ ]+/-Xms256m/g' /opt/ranger-admin/ews/ranger-admin-services.sh
 
-/bin/bash /usr/local/sbin/start.sh
+/bin/bash /tmp/start-ranger-services.sh
