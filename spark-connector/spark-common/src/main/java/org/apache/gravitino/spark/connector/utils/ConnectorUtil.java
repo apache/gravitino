@@ -19,12 +19,12 @@
 
 package org.apache.gravitino.spark.connector.utils;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Collections;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import scala.collection.immutable.Seq;
@@ -42,8 +42,10 @@ public class ConnectorUtil {
         .orElse("");
   }
 
-  @VisibleForTesting
   public static List<String> toJavaList(Seq<String> seq) {
+    if (seq == null || seq.isEmpty()) {
+      return Collections.emptyList();
+    }
     List<String> javaList = new ArrayList<>();
     seq.foreach(javaList::add);
     return javaList;
