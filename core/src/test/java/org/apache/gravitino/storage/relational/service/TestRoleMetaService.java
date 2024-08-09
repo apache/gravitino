@@ -38,8 +38,12 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -127,12 +131,62 @@ class TestRoleMetaService extends TestJDBCBackend {
             auditInfo);
     backend.insert(overwriteCatalog, false);
 
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog"),
+            "schema",
+            auditInfo);
+    backend.insert(schema, false);
+
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "topic",
+            auditInfo);
+    backend.insert(topic, false);
+
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "fileset",
+            auditInfo);
+    backend.insert(fileset, false);
+
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "table",
+            auditInfo);
+    backend.insert(table, false);
+
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
 
+    // Test with different securable objects
+    SecurableObject metalakeObject =
+        SecurableObjects.ofMetalake(
+            "metalake", Lists.newArrayList(Privileges.CreateCatalog.allow()));
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
             "catalog",
             Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.deny()));
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            catalogObject,
+            "schema",
+            Lists.newArrayList(Privileges.UseSchema.allow(), Privileges.CreateTable.allow()));
+    SecurableObject topicObject =
+        SecurableObjects.ofTopic(
+            schemaObject, "topic", Lists.newArrayList(Privileges.ConsumeTopic.allow()));
+    SecurableObject filesetObject =
+        SecurableObjects.ofFileset(
+            schemaObject, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
+    SecurableObject tableObject =
+        SecurableObjects.ofTable(
+            schemaObject, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
 
     // insert role
     RoleEntity role1 =
@@ -143,6 +197,11 @@ class TestRoleMetaService extends TestJDBCBackend {
             auditInfo,
             Lists.newArrayList(
                 catalogObject,
+                metalakeObject,
+                schemaObject,
+                filesetObject,
+                topicObject,
+                tableObject,
                 SecurableObjects.ofCatalog(
                     "anotherCatalog", Lists.newArrayList(Privileges.UseCatalog.allow()))),
             ImmutableMap.of("k1", "v1"));

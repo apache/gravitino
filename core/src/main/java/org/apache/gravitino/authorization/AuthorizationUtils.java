@@ -19,12 +19,21 @@
 package org.apache.gravitino.authorization;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Consumer;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,5 +124,36 @@ public class AuthorizationUtils {
         namespace != null && namespace.length() == 3,
         "Role namespace must have 3 levels, the input namespace is %s",
         namespace);
+  }
+
+  // Every catalog has one authorization plugin, we should avoid calling
+  // underlying authorization repeatedly. So we use a set to record which
+  // catalog has been called the authorization plugin.
+  public static void callAuthorizationPlugin(
+      String metalake,
+      List<SecurableObject> securableObjects,
+      Set<NameIdentifier> catalogsAlreadySet,
+      Consumer<AuthorizationPlugin> consumer) {
+    for (SecurableObject securableObject : securableObjects) {
+      if (supportsAuthorizationPlugin(securableObject.type())) {
+        NameIdentifier catalogIdent =
+            NameIdentifierUtil.getCatalogIdentifier(
+                MetadataObjectUtil.toEntityIdent(metalake, securableObject));
+        if (!catalogsAlreadySet.contains(catalogIdent)) {
+          catalogsAlreadySet.add(catalogIdent);
+          Catalog catalog = GravitinoEnv.getInstance().catalogManager().loadCatalog(catalogIdent);
+          if (catalog instanceof BaseCatalog) {
+            BaseCatalog baseCatalog = (BaseCatalog) catalog;
+            if (baseCatalog.getAuthorizationPlugin() != null) {
+              consumer.accept(baseCatalog.getAuthorizationPlugin());
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private static boolean supportsAuthorizationPlugin(MetadataObject.Type type) {
+    return type != MetadataObject.Type.METALAKE && type != MetadataObject.Type.ROLE;
   }
 }
