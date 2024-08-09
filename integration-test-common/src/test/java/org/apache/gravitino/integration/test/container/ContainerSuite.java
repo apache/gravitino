@@ -239,39 +239,25 @@ public class ContainerSuite implements Closeable {
           dorisContainer = container;
 
           // Get the largest 20 files in the Doris container
-          String[] largetFiles = {
-              "du",
-              "-ah",
-              "/",
-              "|",
-              "sort",
-              "-rh",
-              "|",
-              "head",
-              "-n",
-              "20"
-          };
-          String[] allSpace = {
-              "df",
-              "-h"
-          };
+          String[] largetFiles = {"du", "-ah", "/", "|", "sort", "-rh", "|", "head", "-n", "20"};
+          String[] allSpace = {"df", "-h"};
 
-          Object output = CommandExecutor.executeCommandLocalHost(
-              largetFiles,
-              false,
-              ProcessData.TypesOfData.OUTPUT,
-              CommandExecutor.IGNORE_ERRORS.TRUE,
-              ImmutableMap.of()
-          );
+          Object output =
+              CommandExecutor.executeCommandLocalHost(
+                  largetFiles,
+                  false,
+                  ProcessData.TypesOfData.OUTPUT,
+                  CommandExecutor.IGNORE_ERRORS.TRUE,
+                  ImmutableMap.of());
           LOG.info("current largest 20 files in Doris container: {}", output);
 
-          output = CommandExecutor.executeCommandLocalHost(
-              allSpace,
-              false,
-              ProcessData.TypesOfData.OUTPUT,
-              CommandExecutor.IGNORE_ERRORS.TRUE,
-              ImmutableMap.of()
-          );
+          output =
+              CommandExecutor.executeCommandLocalHost(
+                  allSpace,
+                  false,
+                  ProcessData.TypesOfData.OUTPUT,
+                  CommandExecutor.IGNORE_ERRORS.TRUE,
+                  ImmutableMap.of());
 
           LOG.info("current space usage in Doris container: {}", output);
         }
