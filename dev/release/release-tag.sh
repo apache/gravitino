@@ -77,7 +77,7 @@ git config user.name "$GIT_NAME"
 git config user.email "$GIT_EMAIL"
 
 PYGRAVITINO_RELEASE_VERSION="${RELEASE_VERSION/-incubating}"
-PYGRAVITINO_NEXT_VERSION=$(echo $NEXT_VERSION | sed 's/-incubating-SNAPSHOT/.dev/')
+PYGRAVITINO_NEXT_VERSION=$(echo $NEXT_VERSION | sed 's/-incubating-SNAPSHOT/.dev0/')
 
 # Create release version for Java and Python
 sed -i".tmp1" 's/version = .*$/version = '"$RELEASE_VERSION"'/g' gradle.properties
