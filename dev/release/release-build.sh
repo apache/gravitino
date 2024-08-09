@@ -121,15 +121,15 @@ if [[ "$1" == "finalize" ]]; then
 
   # download Gravitino Python binary from the dev directory and upload to PyPi.
   echo "Uploading Gravitino to PyPi"
-  svn co --depth=empty "$RELEASE_STAGING_LOCATION/$RELEASE_TAG-bin" svn-gravitino
+  svn co --depth=empty "$RELEASE_STAGING_LOCATION/$RELEASE_TAG" svn-gravitino
   cd svn-gravitino
   PYGRAVITINO_VERSION=`echo "$RELEASE_VERSION" |  sed -e "s/-/./" -e "s/preview/dev/"`
-  svn update "gravitino-$PYGRAVITINO_VERSION.tar.gz"
-  svn update "gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
+  svn update "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz"
+  svn update "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
   twine upload -u __token__  -p $PYPI_API_TOKEN \
     --repository-url https://upload.pypi.org/legacy/ \
-    "gravitino-$PYGRAVITINO_VERSION.tar.gz" \
-    "gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
+    "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz" \
+    "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
   cd ..
   rm -rf svn-gravitino
   echo "Python Gravitino package uploaded"
@@ -233,11 +233,11 @@ if [[ "$1" == "package" ]]; then
     shasum -a 512 gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz > gravitino-trino-connector-$GRAVITINO_VERSION.tar.gz.sha512
 
     echo "Copying and signing Gravitino Python client binary distribution"
-    cp gravitino-$GRAVITINO_VERSION-bin/clients/client-python/dist/gravitino-$PYGRAVITINO_VERSION.tar.gz .
+    cp gravitino-$GRAVITINO_VERSION-bin/clients/client-python/dist/apache_gravitino-$PYGRAVITINO_VERSION.tar.gz .
     echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour \
-      --output gravitino-$PYGRAVITINO_VERSION.tar.gz.asc \
-      --detach-sig gravitino-$PYGRAVITINO_VERSION.tar.gz
-    shasum -a 512 gravitino-$PYGRAVITINO_VERSION.tar.gz > gravitino-$PYGRAVITINO_VERSION.tar.gz.sha512
+      --output apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.asc \
+      --detach-sig apache_gravitino-$PYGRAVITINO_VERSION.tar.gz
+    shasum -a 512 apache_gravitino-$PYGRAVITINO_VERSION.tar.gz > apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.sha512
   }
 
   make_binary_release
