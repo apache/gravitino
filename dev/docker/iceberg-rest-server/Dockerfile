@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM openjdk:17
+FROM openjdk:17-jdk-buster
 
 LABEL maintainer="dev@gravitino.apache.org"
 

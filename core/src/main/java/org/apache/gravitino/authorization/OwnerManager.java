@@ -40,7 +40,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * OwnerManager is used for manage the owner of metadata object. The user and group don't have an
- * owner
+ * owner. Because the post hook will call the methods. We shouldn't add the lock of the metadata
+ * object. Otherwise, it will cause deadlock.
  */
 public class OwnerManager {
   private static final Logger LOG = LoggerFactory.getLogger(OwnerManager.class);
@@ -71,45 +72,37 @@ public class OwnerManager {
       if (ownerType == Owner.Type.USER) {
         NameIdentifier ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
         TreeLockUtils.doWithTreeLock(
-            objectIdent,
+            ownerIdent,
             LockType.READ,
-            () ->
-                TreeLockUtils.doWithTreeLock(
-                    ownerIdent,
-                    LockType.READ,
-                    () -> {
-                      store
-                          .relationOperations()
-                          .insertRelation(
-                              SupportsRelationOperations.Type.OWNER_REL,
-                              objectIdent,
-                              MetadataObjectUtil.toEntityType(metadataObject),
-                              ownerIdent,
-                              Entity.EntityType.USER,
-                              true);
-                      return null;
-                    }));
+            () -> {
+              store
+                  .relationOperations()
+                  .insertRelation(
+                      SupportsRelationOperations.Type.OWNER_REL,
+                      objectIdent,
+                      MetadataObjectUtil.toEntityType(metadataObject),
+                      ownerIdent,
+                      Entity.EntityType.USER,
+                      true);
+              return null;
+            });
       } else if (ownerType == Owner.Type.GROUP) {
         NameIdentifier ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
         TreeLockUtils.doWithTreeLock(
-            objectIdent,
+            ownerIdent,
             LockType.READ,
-            () ->
-                TreeLockUtils.doWithTreeLock(
-                    ownerIdent,
-                    LockType.READ,
-                    () -> {
-                      store
-                          .relationOperations()
-                          .insertRelation(
-                              SupportsRelationOperations.Type.OWNER_REL,
-                              objectIdent,
-                              MetadataObjectUtil.toEntityType(metadataObject),
-                              ownerIdent,
-                              Entity.EntityType.GROUP,
-                              true);
-                      return null;
-                    }));
+            () -> {
+              store
+                  .relationOperations()
+                  .insertRelation(
+                      SupportsRelationOperations.Type.OWNER_REL,
+                      objectIdent,
+                      MetadataObjectUtil.toEntityType(metadataObject),
+                      ownerIdent,
+                      Entity.EntityType.GROUP,
+                      true);
+              return null;
+            });
       }
     } catch (NoSuchEntityException nse) {
       LOG.warn(

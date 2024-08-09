@@ -35,7 +35,13 @@ import org.apache.gravitino.connector.PropertyEntry;
 public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
 
   public static final String COMMENT = "comment";
-  public static final String CREATOR = "creator";
+  public static final String OWNER = "owner";
+  public static final String BUCKET_KEY = "bucket-key";
+  public static final String MERGE_ENGINE = "merge-engine";
+  public static final String SEQUENCE_FIELD = "sequence.field";
+  public static final String ROWKIND_FIELD = "rowkind.field";
+  public static final String PRIMARY_KEY = "primary-key";
+  public static final String PARTITION = "partition";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -43,7 +49,13 @@ public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
             stringReservedPropertyEntry(COMMENT, "The table comment", true),
-            stringReservedPropertyEntry(CREATOR, "The table creator", false));
+            stringReservedPropertyEntry(OWNER, "The table owner", false),
+            stringReservedPropertyEntry(BUCKET_KEY, "The table bucket key", false),
+            stringReservedPropertyEntry(MERGE_ENGINE, "The table merge engine", false),
+            stringReservedPropertyEntry(SEQUENCE_FIELD, "The table sequence field", false),
+            stringReservedPropertyEntry(ROWKIND_FIELD, "The table rowkind field", false),
+            stringReservedPropertyEntry(PRIMARY_KEY, "The table primary key", false),
+            stringReservedPropertyEntry(PARTITION, "The table partition", false));
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }
 

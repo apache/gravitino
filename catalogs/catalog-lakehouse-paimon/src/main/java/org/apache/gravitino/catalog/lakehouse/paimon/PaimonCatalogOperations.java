@@ -31,7 +31,10 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -43,6 +46,7 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -52,6 +56,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.TableChange.RenameTable;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -84,6 +89,8 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
       "Paimon schema (database) %s already exists.";
   private static final String NO_SUCH_TABLE_EXCEPTION = "Paimon table %s does not exist.";
   private static final String TABLE_ALREADY_EXISTS_EXCEPTION = "Paimon table %s already exists.";
+  private static final String NO_SUCH_COLUMN_EXCEPTION =
+      "Paimon column of table %s does not exist.";
 
   /**
    * Initializes the Paimon catalog operations with the provided configuration.
@@ -402,7 +409,25 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public GravitinoPaimonTable alterTable(NameIdentifier identifier, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    throw new UnsupportedOperationException("alterTable is unsupported now for Paimon Catalog.");
+    Optional<TableChange> renameTableOpt =
+        Arrays.stream(changes)
+            .filter(tableChange -> tableChange instanceof RenameTable)
+            .reduce((a, b) -> b);
+    if (renameTableOpt.isPresent()) {
+      String otherChanges =
+          Arrays.stream(changes)
+              .filter(tableChange -> !(tableChange instanceof RenameTable))
+              .map(String::valueOf)
+              .collect(Collectors.joining("\n"));
+      Preconditions.checkArgument(
+          StringUtils.isEmpty(otherChanges),
+          String.format(
+              "The operation to change the table name cannot be performed together with other operations. "
+                  + "The list of operations that you cannot perform includes: \n%s",
+              otherChanges));
+      return renameTable(identifier, (RenameTable) renameTableOpt.get());
+    }
+    return internalAlterTable(identifier, changes);
   }
 
   /**
@@ -469,5 +494,56 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                 Preconditions.checkArgument(
                     index.type() == Index.IndexType.PRIMARY_KEY,
                     "Paimon only supports primary key Index."));
+  }
+
+  /**
+   * Performs rename table change with the provided identifier.
+   *
+   * @param identifier The identifier of the table to rename.
+   * @param renameTable Table Change to modify the table name.
+   * @return The renamed {@link GravitinoPaimonTable} instance.
+   * @throws NoSuchTableException If the table with the provided identifier does not exist.
+   * @throws IllegalArgumentException This exception will not be thrown in this method.
+   */
+  private GravitinoPaimonTable renameTable(
+      NameIdentifier identifier, TableChange.RenameTable renameTable)
+      throws NoSuchTableException, IllegalArgumentException {
+    NameIdentifier newNnameIdentifier =
+        NameIdentifier.of(identifier.namespace(), renameTable.getNewName());
+    NameIdentifier oldIdentifier = buildPaimonNameIdentifier(identifier);
+    NameIdentifier newIdentifier = buildPaimonNameIdentifier(newNnameIdentifier);
+    try {
+      paimonCatalogOps.renameTable(oldIdentifier.toString(), newIdentifier.toString());
+    } catch (Catalog.TableNotExistException e) {
+      throw new NoSuchTableException(e, NO_SUCH_TABLE_EXCEPTION, oldIdentifier);
+    } catch (Catalog.TableAlreadyExistException e) {
+      throw new TableAlreadyExistsException(e, TABLE_ALREADY_EXISTS_EXCEPTION, newIdentifier);
+    }
+    return loadTable(newNnameIdentifier);
+  }
+
+  /**
+   * Performs alter table changes with the provided identifier according to the specified {@link
+   * TableChange} changes.
+   *
+   * @param identifier The identifier of the table to alter.
+   * @param changes The changes to apply to the table.
+   * @return The altered {@link GravitinoPaimonTable} instance.
+   * @throws NoSuchTableException If the table with the provided identifier does not exist.
+   * @throws IllegalArgumentException This exception will not be thrown in this method.
+   */
+  private GravitinoPaimonTable internalAlterTable(NameIdentifier identifier, TableChange... changes)
+      throws NoSuchTableException, IllegalArgumentException {
+    NameIdentifier paimonNameIdentifier = buildPaimonNameIdentifier(identifier);
+    try {
+      paimonCatalogOps.alterTable(paimonNameIdentifier.toString(), changes);
+    } catch (Catalog.TableNotExistException e) {
+      throw new NoSuchTableException(e, NO_SUCH_TABLE_EXCEPTION, paimonNameIdentifier);
+    } catch (Catalog.ColumnNotExistException e) {
+      throw new NoSuchColumnException(e, NO_SUCH_COLUMN_EXCEPTION, paimonNameIdentifier);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    return loadTable(identifier);
   }
 }
