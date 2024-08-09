@@ -86,7 +86,7 @@ public abstract class IcebergRESTServiceBaseIT {
     LOG.info("Iceberg REST service config registered, {}", StringUtils.join(icebergConfigs));
   }
 
-  protected int getServerPort() {
+  private int getServerPort() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(
             icebergRESTServerManager.getServerConfig(), IcebergConfig.ICEBERG_CONFIG_PREFIX);

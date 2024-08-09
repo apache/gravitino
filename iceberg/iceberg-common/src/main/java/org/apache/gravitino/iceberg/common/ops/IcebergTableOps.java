@@ -144,6 +144,13 @@ public class IcebergTableOps implements AutoCloseable {
     return CatalogHandlers.registerTable(catalog, namespace, request);
   }
 
+  /**
+   * Reload hadoop configuration, this is useful when the hadoop configuration UserGroupInformation
+   * is shared by multiple threads. UserGroupInformation#authenticationMethod was first initialized
+   * in KerberosClient, however, when switching to iceberg-rest thead,
+   * UserGroupInformation#authenticationMethod will be reset to the default value; we need to
+   * reinitialize it again.
+   */
   public void reloadHadoopConf() {
     Configuration configuration = new Configuration();
     this.hadoopConfigMap.forEach(configuration::set);
