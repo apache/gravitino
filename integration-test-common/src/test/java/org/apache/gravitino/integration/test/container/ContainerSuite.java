@@ -36,6 +36,8 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
+import org.apache.gravitino.integration.test.util.CommandExecutor;
+import org.apache.gravitino.integration.test.util.ProcessData;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -235,6 +237,43 @@ public class ContainerSuite implements Closeable {
           DorisContainer container = closer.register(dorisBuilder.build());
           container.start();
           dorisContainer = container;
+
+          // Get the largest 20 files in the Doris container
+          String[] largetFiles = {
+              "du",
+              "-ah",
+              "/",
+              "|",
+              "sort",
+              "-rh",
+              "|",
+              "head",
+              "-n",
+              "20"
+          };
+          String[] allSpace = {
+              "df",
+              "-h"
+          };
+
+          Object output = CommandExecutor.executeCommandLocalHost(
+              largetFiles,
+              false,
+              ProcessData.TypesOfData.OUTPUT,
+              CommandExecutor.IGNORE_ERRORS.TRUE,
+              ImmutableMap.of()
+          );
+          LOG.info("current largest 20 files in Doris container: {}", output);
+
+          output = CommandExecutor.executeCommandLocalHost(
+              allSpace,
+              false,
+              ProcessData.TypesOfData.OUTPUT,
+              CommandExecutor.IGNORE_ERRORS.TRUE,
+              ImmutableMap.of()
+          );
+
+          LOG.info("current space usage in Doris container: {}", output);
         }
       }
     }
