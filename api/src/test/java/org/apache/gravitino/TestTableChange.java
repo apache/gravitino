@@ -174,8 +174,8 @@ public class TestTableChange {
     ColumnPosition newPosition = TableChange.ColumnPosition.defaultPos();
     try {
       TableChange.updateColumnPosition(fieldName, newPosition);
-    }catch (Exception e){
-      assertEquals("Default position is not allowed for UpdateColumnPosition.", e.getMessage());
+    } catch (Exception e) {
+      assertEquals("Position cannot be DEFAULT", e.getMessage());
     }
   }
 

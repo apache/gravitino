@@ -613,7 +613,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
         .alterTable(
             tableIdentifier,
             TableChange.updateColumnPosition(
-                new String[] {col1.name()}, TableChange.ColumnPosition.defaultPos()));
+                new String[] {col1.name()}, TableChange.ColumnPosition.after(col3.name())));
 
     Table updateColumnPositionTable = catalog.asTableCatalog().loadTable(tableIdentifier);
 
