@@ -40,7 +40,7 @@ INSERT: 15000 rows
 
 "Trino version: %
 %
-    TableScan[table = gt_postgresql:gt_db1.orders->Query[SELECT % INNER JOIN %] limit=10 columns=%]
+    TableScan[table = gt_postgresql:gt_db1.%->Query[SELECT % INNER JOIN %] limit=10 columns=%]
 %
 "
 

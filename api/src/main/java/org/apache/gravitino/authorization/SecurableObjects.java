@@ -34,7 +34,18 @@ public class SecurableObjects {
   private static final Splitter DOT_SPLITTER = Splitter.on('.');
 
   /**
-   * Create the catalog {@link SecurableObject} with the given catalog name.
+   * Create the metalake {@link SecurableObject} with the given metalake name and privileges.
+   *
+   * @param metalake The metalake name
+   * @param privileges The privileges of the metalake
+   * @return The created metalake {@link SecurableObject}
+   */
+  public static SecurableObject ofMetalake(String metalake, List<Privilege> privileges) {
+    return of(MetadataObject.Type.METALAKE, Lists.newArrayList(metalake), privileges);
+  }
+
+  /**
+   * Create the catalog {@link SecurableObject} with the given catalog name and privileges.
    *
    * @param catalog The catalog name
    * @param privileges The privileges of the catalog
@@ -45,8 +56,8 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the schema {@link SecurableObject} with the given securable catalog object and schema
-   * name.
+   * Create the schema {@link SecurableObject} with the given securable catalog object, schema name
+   * and privileges.
    *
    * @param catalog The catalog securable object.
    * @param schema The schema name
@@ -60,7 +71,8 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the table {@link SecurableObject} with the given securable schema object and table name.
+   * Create the table {@link SecurableObject} with the given securable schema object, table name and
+   * privileges.
    *
    * @param schema The schema securable object
    * @param table The table name
@@ -75,7 +87,8 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the topic {@link SecurableObject} with the given securable schema object and topic name.
+   * Create the topic {@link SecurableObject} with the given securable schema object ,topic name and
+   * privileges.
    *
    * @param schema The schema securable object
    * @param topic The topic name
@@ -90,8 +103,8 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the table {@link SecurableObject} with the given securable schema object and fileset
-   * name.
+   * Create the table {@link SecurableObject} with the given securable schema object, fileset name
+   * and privileges.
    *
    * @param schema The schema securable object
    * @param fileset The fileset name

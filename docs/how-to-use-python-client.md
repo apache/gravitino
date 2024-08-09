@@ -119,9 +119,9 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 
 ## Resources
 
-+ Official website https://gravitino.apache.org/ (coming soon)
++ Official website https://gravitino.apache.org/
 + Project home on GitHub: https://github.com/apache/gravitino/
 + Playground with Docker: https://github.com/apache/gravitino-playground
 + User documentation: https://datastrato.ai/docs/
 + Videos on Youtube: https://www.youtube.com/@Datastrato
-+ Slack Community: [https://the-asf.slack.com
++ Slack Community: [https://the-asf.slack.com#gravitino](https://the-asf.slack.com/archives/C078RESTT19)
