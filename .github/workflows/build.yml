@@ -98,6 +98,11 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build -PskipITs -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false -x :clients:client-python:build
 
+      - name: Build spark connector with scala 2.13
+        run: |
+          ./gradlew -PscalaVersion=2.13 :spark-connector:spark-3.4:test
+          ./gradlew -PscalaVersion=2.13 :spark-connector:spark-3.5:test
+
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3
         if: failure()
@@ -107,41 +112,4 @@ jobs:
             build/reports
             catalogs/**/*.log
             catalogs/**/*.tar
-
-  spark-connector-build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        scala-version: [ 2.12, 2.13 ]
-    timeout-minutes: 30
-    needs: changes
-    if: needs.changes.outputs.source_changes == 'true'
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-java@v4
-        with:
-          java-version: 8
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
-
-      - name: Build with Gradle
-        run: |
-          if [ "${{ matrix.scala-version }}" == "2.12" ];then 
-            ./gradlew -PscalaVersion=${{ matrix.scala-version }} :spark-connector:spark-3.3:test
-          fi
-          ./gradlew -PscalaVersion=${{ matrix.scala-version }} :spark-connector:spark-3.4:test
-          ./gradlew -PscalaVersion=${{ matrix.scala-version }} :spark-connector:spark-3.5:test
-
-      - name: Upload unit tests report
-        uses: actions/upload-artifact@v3
-        if: failure()
-        with:
-          name: unit test report
-          path: |
-            build/reports
             spark-connector/**/*.log
