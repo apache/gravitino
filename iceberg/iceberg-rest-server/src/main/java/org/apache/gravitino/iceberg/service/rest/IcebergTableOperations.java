@@ -70,6 +70,10 @@ public class IcebergTableOperations {
   public IcebergTableOperations(
       IcebergTableOps icebergTableOps, IcebergMetricsManager icebergMetricsManager) {
     this.icebergTableOps = icebergTableOps;
+
+    // Reload conf to reset UserGroupInformation or icebergTableOps will always use
+    // Simple auth.
+    icebergTableOps.reloadHadoopConf();
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
     this.icebergMetricsManager = icebergMetricsManager;
   }

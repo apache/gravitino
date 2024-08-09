@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.iceberg.integration.test;
 
-import static org.apache.gravitino.integration.test.util.HttpUtils.isHttpServerUp;
-
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -30,13 +28,9 @@ import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.junit.jupiter.api.condition.EnabledIf;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
@@ -51,14 +45,6 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
     super();
   }
 
-  @BeforeAll
-  void prepareSQLContext() {
-    // use rest catalog
-    sql("USE rest");
-    purgeAllIcebergTestNamespaces();
-  }
-
-  @Override
   void initEnv() {
     containerSuite.startKerberosHiveContainer();
     try {
@@ -89,6 +75,11 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
       System.setProperty("java.security.krb5.conf", krb5Path);
       System.setProperty("sun.security.krb5.debug", "true");
 
+      // Give cli@HADOOPKRB permission to access the hdfs
+      containerSuite
+          .getKerberosHiveContainer()
+          .executeInContainer("hadoop", "fs", "-chown", "-R", "cli", "/user/hive/");
+
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -103,14 +94,20 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
         "gravitino.iceberg-rest.authentication.kerberos.principal",
         HIVE_METASTORE_CLIENT_PRINCIPAL);
     configMap.put(
+        "gravitino.iceberg-rest.authentication.kerberos.keytab-uri",
+        tempDir + HIVE_METASTORE_CLIENT_KEYTAB);
+    configMap.put("gravitino.iceberg-rest.hive.metastore.sasl.enabled", "true");
+    configMap.put(
         "gravitino.iceberg-rest.hive.metastore.kerberos.principal",
         "hive/_HOST@HADOOPKRB"
             .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
 
+    configMap.put("gravitino.iceberg-rest.hadoop.security.authentication", "kerberos");
+
     configMap.put(
-        "gravitino.iceberg-rest.authentication.kerberos.keytab-uri",
-        tempDir + HIVE_METASTORE_CLIENT_KEYTAB);
-    configMap.put("gravitino.iceberg-rest.hive.metastore.sasl.enabled", "true");
+        "gravitino.iceberg-rest.dfs.namenode.kerberos.principal",
+        "hdfs/_HOST@HADOOPKRB"
+            .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_BACKEND.getKey(),
@@ -132,74 +129,4 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
                 HiveContainer.HDFS_DEFAULTFS_PORT)));
     return configMap;
   }
-
-  @Test
-  void testCreateNamespace() {}
-
-  @Test
-  void testListNamespace() {
-    int port = getServerPort();
-    String url = String.format("http://localhost:%s/iceberg/v1/namespaces", port);
-
-    Assertions.assertTrue(isHttpServerUp(url));
-  }
-
-  @Test
-  void testDropNameSpace() {}
-
-  @Test
-  void testNameSpaceProperties() {}
-
-  @Test
-  void testDML() {}
-
-  @Test
-  void testCreateTable() {}
-
-  @Test
-  void testDropTable() {}
-
-  @Test
-  void testListTable() {}
-
-  @Test
-  void testRenameTable() {}
-
-  @Test
-  void testSetTableProperties() {}
-
-  @Test
-  void testAddColumns() {}
-
-  @Test
-  void testRenameColumns() {}
-
-  @Test
-  void testDropColumns() {}
-
-  @Test
-  void testUpdateColumnType() {}
-
-  @Test
-  void testUpdateColumnPosition() {}
-
-  @Test
-  void testAlterPartitions() {}
-
-  @Test
-  void testAlterSortBy() {}
-
-  @Test
-  void testAlterPartitionBy() {}
-
-  @Test
-  void testAlterIdentifier() {}
-
-  @Test
-  @EnabledIf("catalogTypeNotMemory")
-  void testSnapshot() {}
-
-  @Test
-  @EnabledIf("catalogTypeNotMemory")
-  void testRegisterTable() {}
 }
