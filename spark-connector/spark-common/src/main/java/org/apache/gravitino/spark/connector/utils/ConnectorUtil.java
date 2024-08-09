@@ -21,10 +21,10 @@ package org.apache.gravitino.spark.connector.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.Collections;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import scala.collection.immutable.Seq;
