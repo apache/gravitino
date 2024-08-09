@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.client;
 
-import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
@@ -855,7 +854,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     }
 
     GravitinoMetalake that = (GravitinoMetalake) o;
-    return super.equals(that) && Objects.equal(restClient, that.restClient);
+    return super.equals(that);
   }
 
   /** @return the builder for creating a new instance of GravitinoMetaLake. */
