@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.audit;
 
+/** Constants used for fileset data operation audits. */
 public class FilesetAuditConstants {
   private FilesetAuditConstants() {}
 

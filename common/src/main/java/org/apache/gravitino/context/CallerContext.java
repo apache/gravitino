@@ -28,7 +28,7 @@ import java.util.Map;
  *
  * <p>Reference:
  *
- * <p>hadoop-common-project/hadoop-common/src/main/java/org/apache/hadoop/\ ipc/CallerContext.java
+ * <p>hadoop-common-project/hadoop-common/src/main/java/org/apache/hadoop/ipc/CallerContext.java
  */
 public class CallerContext {
   private Map<String, String> context;

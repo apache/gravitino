@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -260,7 +261,7 @@ public class FilesetOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("fileset") String fileset,
-      @QueryParam("subPath") String subPath) {
+      @QueryParam("subPath") @NotNull String subPath) {
     LOG.info(
         "Received get file location request: {}.{}.{}.{}, sub path:{}",
         metalake,

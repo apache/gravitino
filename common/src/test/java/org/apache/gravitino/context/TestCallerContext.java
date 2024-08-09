@@ -27,15 +27,19 @@ import org.junit.jupiter.api.Test;
 public class TestCallerContext {
   @Test
   public void testCallerContext() {
-    Map<String, String> contextMap = new HashMap<>();
-    contextMap.put("test", "test");
-    contextMap.put("test2", "test2");
-    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
-    CallerContext.CallerContextHolder.set(callerContext);
+    try {
+      Map<String, String> contextMap = new HashMap<>();
+      contextMap.put("test", "test");
+      contextMap.put("test2", "test2");
+      CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+      CallerContext.CallerContextHolder.set(callerContext);
 
-    CallerContext actualCallerContext = CallerContext.CallerContextHolder.get();
+      CallerContext actualCallerContext = CallerContext.CallerContextHolder.get();
 
-    Assertions.assertEquals(callerContext, actualCallerContext);
-    Assertions.assertEquals(callerContext.context(), actualCallerContext.context());
+      Assertions.assertEquals(callerContext, actualCallerContext);
+      Assertions.assertEquals(callerContext.context(), actualCallerContext.context());
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
   }
 }

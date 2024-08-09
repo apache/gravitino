@@ -93,4 +93,10 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
   public boolean filesetExists(NameIdentifier ident) {
     return dispatcher.filesetExists(ident);
   }
+
+  @Override
+  public String getFileLocation(NameIdentifier ident, String subPath)
+      throws NoSuchFilesetException {
+    return dispatcher.getFileLocation(ident, subPath);
+  }
 }
