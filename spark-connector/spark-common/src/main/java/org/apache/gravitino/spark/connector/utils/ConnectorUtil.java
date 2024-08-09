@@ -21,7 +21,6 @@ package org.apache.gravitino.spark.connector.utils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -43,10 +42,10 @@ public class ConnectorUtil {
   }
 
   public static List<String> toJavaList(Seq<String> seq) {
-    if (seq == null || seq.isEmpty()) {
-      return Collections.emptyList();
-    }
     List<String> javaList = new ArrayList<>();
+    if (seq == null || seq.isEmpty()) {
+      return javaList;
+    }
     seq.foreach(javaList::add);
     return javaList;
   }

@@ -132,10 +132,10 @@ jobs:
       - name: Build with Gradle
         run: |
           if [ "${{ matrix.scala-version }}" == "2.12" ];then 
-            ./gradlew -PjdkVersion=8 -PscalaVersion=${{ matrix.scala-version }} :spark-connector:spark-3.3:test
+            ./gradlew -PscalaVersion=${{ matrix.scala-version }} :spark-connector:spark-3.3:test
           fi
-          ./gradlew -PjdkVersion=8 -PscalaVersion=${{ matrix.scala-version }} :spark-connector:spark-3.4:test
-          ./gradlew -PjdkVersion=8 -PscalaVersion=${{ matrix.scala-version }} :spark-connector:spark-3.5:test
+          ./gradlew -PscalaVersion=${{ matrix.scala-version }} :spark-connector:spark-3.4:test
+          ./gradlew -PscalaVersion=${{ matrix.scala-version }} :spark-connector:spark-3.5:test
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3
