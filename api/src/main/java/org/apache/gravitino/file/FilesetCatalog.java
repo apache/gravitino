@@ -122,13 +122,13 @@ public interface FilesetCatalog {
   boolean dropFileset(NameIdentifier ident);
 
   /**
-   * Get a fileset context.
+   * Get the actual location of a file or directory based on the storage location of Fileset and the
+   * sub path.
    *
    * @param ident A fileset identifier.
-   * @param ctx The data operation context.
-   * @return The fileset context.
+   * @param subPath The sub path to the file or directory.
+   * @return The actual location of the file or directory.
    * @throws NoSuchFilesetException If the fileset does not exist.
    */
-  FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
-      throws NoSuchFilesetException;
+  String getFileLocation(NameIdentifier ident, String subPath) throws NoSuchFilesetException;
 }

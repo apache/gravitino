@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -32,11 +31,9 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.TestFileset;
-import org.apache.gravitino.TestFilesetContext;
 import org.apache.gravitino.TestSchema;
 import org.apache.gravitino.TestTable;
 import org.apache.gravitino.TestTopic;
-import org.apache.gravitino.catalog.EntityCombinedFileset;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -51,8 +48,6 @@ import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.file.FilesetContext;
-import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicCatalog;
@@ -69,8 +64,6 @@ import org.apache.gravitino.rel.indexes.Index;
 
 public class TestCatalogOperations
     implements CatalogOperations, TableCatalog, FilesetCatalog, TopicCatalog, SupportsSchemas {
-
-  private HasPropertyMetadata propertiesMetadata;
 
   private final Map<NameIdentifier, TestTable> tables;
 
@@ -94,9 +87,7 @@ public class TestCatalogOperations
   @Override
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertyMetadata)
-      throws RuntimeException {
-    this.propertiesMetadata = propertyMetadata;
-  }
+      throws RuntimeException {}
 
   @Override
   public void close() throws IOException {}
@@ -442,33 +433,24 @@ public class TestCatalogOperations
   }
 
   @Override
-  public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx) {
-    String subPath = ctx.subPath();
+  public String getFileLocation(NameIdentifier ident, String subPath) {
     Preconditions.checkArgument(subPath != null, "subPath must not be null");
 
     Fileset fileset = loadFileset(ident);
 
     String storageLocation = fileset.storageLocation();
-    String actualPath;
+    String fileLocation;
     // subPath cannot be null, so we only need check if it is blank
     if (StringUtils.isBlank(subPath)) {
-      actualPath = storageLocation;
+      fileLocation = storageLocation;
     } else {
-      actualPath =
+      fileLocation =
           subPath.startsWith("/")
               ? String.format("%s%s", storageLocation, subPath)
               : String.format("%s/%s", storageLocation, subPath);
     }
 
-    return TestFilesetContext.builder()
-        .withFileset(
-            EntityCombinedFileset.of(fileset)
-                .withHiddenPropertiesSet(
-                    fileset.properties().keySet().stream()
-                        .filter(propertiesMetadata.filesetPropertiesMetadata()::isHiddenProperty)
-                        .collect(Collectors.toSet())))
-        .withActualPath(actualPath)
-        .build();
+    return fileLocation;
   }
 
   @Override

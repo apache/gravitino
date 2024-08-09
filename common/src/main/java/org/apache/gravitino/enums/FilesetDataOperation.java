@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.file;
+package org.apache.gravitino.enums;
 
 /** An enum class containing fileset data operations that supported. */
 public enum FilesetDataOperation {
@@ -45,4 +45,13 @@ public enum FilesetDataOperation {
   SET_WORKING_DIR,
   /** This data operation means that it is an unknown data operation. */
   UNKNOWN;
+
+  public static boolean checkValid(String operation) {
+    try {
+      FilesetDataOperation.valueOf(operation);
+      return true;
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Unknown fileset data operation: " + operation, e);
+    }
+  }
 }

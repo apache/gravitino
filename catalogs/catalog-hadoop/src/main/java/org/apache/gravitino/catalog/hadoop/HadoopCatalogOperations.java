@@ -40,7 +40,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
-import org.apache.gravitino.catalog.EntityCombinedFileset;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -56,8 +55,6 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.file.FilesetContext;
-import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -358,34 +355,25 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
-  public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
+  public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
     // TODO we need move some check logics in the Hadoop / Python GVFS to here.
-    String subPath = ctx.subPath();
     Preconditions.checkArgument(subPath != null, "subPath must not be null");
 
     Fileset fileset = loadFileset(ident);
 
     String storageLocation = fileset.storageLocation();
-    String actualPath;
+    String fileLocation;
     // subPath cannot be null, so we only need check if it is blank
     if (StringUtils.isBlank(subPath)) {
-      actualPath = storageLocation;
+      fileLocation = storageLocation;
     } else {
-      actualPath =
+      fileLocation =
           subPath.startsWith("/")
               ? String.format("%s%s", storageLocation, subPath)
               : String.format("%s/%s", storageLocation, subPath);
     }
-    return HadoopFilesetContext.builder()
-        .withFileset(
-            EntityCombinedFileset.of(fileset)
-                .withHiddenPropertiesSet(
-                    fileset.properties().keySet().stream()
-                        .filter(propertiesMetadata.filesetPropertiesMetadata()::isHiddenProperty)
-                        .collect(Collectors.toSet())))
-        .withActualPath(actualPath)
-        .build();
+    return fileLocation;
   }
 
   @Override

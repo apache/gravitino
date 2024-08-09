@@ -22,45 +22,54 @@ import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.jsonwebtoken.lang.Maps;
 import java.nio.file.NoSuchFileException;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.context.CallerContext;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
-import org.apache.gravitino.dto.file.FilesetContextDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.FilesetCreateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
-import org.apache.gravitino.dto.requests.GetFilesetContextRequest;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.FilesetContextResponse;
+import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.enums.FilesetDataOperation;
+import org.apache.gravitino.enums.InternalClientType;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.file.BaseFilesetDataOperationCtx;
-import org.apache.gravitino.file.ClientType;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.file.FilesetContext;
-import org.apache.gravitino.file.FilesetDataOperation;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.platform.commons.util.StringUtils;
+import org.mockserver.matchers.Times;
+import org.mockserver.model.HttpRequest;
+import org.mockserver.model.HttpResponse;
+import org.mockserver.model.Parameter;
 
 public class TestFilesetCatalog extends TestBase {
 
@@ -408,44 +417,87 @@ public class TestFilesetCatalog extends TestBase {
   }
 
   @Test
-  public void testGetFilesetContext() throws JsonProcessingException {
+  public void testGetFileLocation() throws JsonProcessingException {
     NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
+    String mockSubPath = "mock_location/test";
     String filesetPath =
         withSlash(
-            FilesetCatalog.formatFilesetRequestPath(fileset.namespace()) + "/fileset1/context");
+            FilesetCatalog.formatFilesetRequestPath(
+                    Namespace.of(metalakeName, catalogName, "schema1"))
+                + "/fileset1/fileLocation");
+    Map<String, String> queryParams = Maps.of("subPath", mockSubPath).build();
+    String mockFileLocation =
+        String.format("file:/fileset/%s/%s/%s/%s", catalogName, "schema1", "fileset1", mockSubPath);
+    FileLocationResponse resp = new FileLocationResponse(mockFileLocation);
+    buildMockResource(Method.GET, filesetPath, queryParams, null, resp, SC_OK);
 
-    FilesetDTO mockFileset =
-        mockFilesetDTO(
-            fileset.name(),
-            Fileset.Type.MANAGED,
-            "mock comment",
-            "mock location",
-            ImmutableMap.of("k1", "v1"));
-    String mockActualPath = "mock location/test";
-    FilesetContextDTO mockContext = mockFilesetContextDTO(mockFileset, mockActualPath);
-    FilesetContextResponse resp = new FilesetContextResponse(mockContext);
-    GetFilesetContextRequest req =
-        GetFilesetContextRequest.builder()
-            .subPath("/test")
-            .operation(FilesetDataOperation.OPEN)
-            .clientType(ClientType.HADOOP_GVFS)
-            .build();
-    buildMockResource(Method.POST, filesetPath, req, resp, SC_OK);
-    BaseFilesetDataOperationCtx ctx =
-        BaseFilesetDataOperationCtx.builder()
-            .withSubPath("/test")
-            .withOperation(FilesetDataOperation.OPEN)
-            .withClientType(ClientType.HADOOP_GVFS)
-            .build();
-    FilesetContext filesetContext =
+    String actualFileLocation =
         catalog
             .asFilesetCatalog()
-            .getFilesetContext(
-                NameIdentifier.of(fileset.namespace().level(2), fileset.name()), ctx);
-    Assertions.assertNotNull(filesetContext);
-    assertFileset(mockFileset, filesetContext.fileset());
+            .getFileLocation(
+                NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath);
+    Assertions.assertTrue(StringUtils.isNotBlank(actualFileLocation));
+    Assertions.assertEquals(mockFileLocation, actualFileLocation);
+  }
 
-    Assertions.assertEquals(mockActualPath, filesetContext.actualPath());
+  @Test
+  public void testCallerContextToHeader() throws JsonProcessingException {
+    NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
+    String mockSubPath = "mock_location/test";
+    String filesetPath =
+        withSlash(
+            FilesetCatalog.formatFilesetRequestPath(
+                    Namespace.of(metalakeName, catalogName, "schema1"))
+                + "/fileset1/fileLocation");
+    Map<String, String> queryParams = Maps.of("subPath", mockSubPath).build();
+    String mockFileLocation =
+        String.format("file:/fileset/%s/%s/%s/%s", catalogName, "schema1", "fileset1", mockSubPath);
+    FileLocationResponse resp = new FileLocationResponse(mockFileLocation);
+    String respJson = MAPPER.writeValueAsString(resp);
+
+    List<Parameter> parameters =
+        queryParams.entrySet().stream()
+            .map(kv -> new Parameter(kv.getKey(), kv.getValue()))
+            .collect(Collectors.toList());
+    HttpRequest mockRequest =
+        HttpRequest.request(filesetPath)
+            .withMethod(Method.GET.name())
+            .withQueryStringParameters(parameters);
+    HttpResponse mockResponse = HttpResponse.response().withStatusCode(SC_OK).withBody(respJson);
+
+    // set the thread local context
+    Map<String, String> context = new HashMap<>();
+    context.put(
+        FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
+        InternalClientType.HADOOP_GVFS.name());
+    context.put(
+        FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+        FilesetDataOperation.GET_FILE_STATUS.name());
+    CallerContext callerContext = CallerContext.builder().withContext(context).build();
+    CallerContext.CallerContextHolder.set(callerContext);
+
+    // Using Times.exactly(1) will only match once for the request, so we could set difference
+    // responses for the same request and path.
+    AtomicReference<String> internalClientType = new AtomicReference<>(null);
+    AtomicReference<String> dataOperation = new AtomicReference<>(null);
+    mockServer
+        .when(mockRequest, Times.exactly(1))
+        .respond(
+            httpRequest -> {
+              internalClientType.set(
+                  httpRequest.getFirstHeader(
+                      FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE));
+              dataOperation.set(
+                  httpRequest.getFirstHeader(
+                      FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION));
+              return mockResponse;
+            });
+    catalog
+        .asFilesetCatalog()
+        .getFileLocation(
+            NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath);
+    assertEquals(FilesetDataOperation.GET_FILE_STATUS.name(), dataOperation.get());
+    assertEquals(InternalClientType.HADOOP_GVFS.name(), internalClientType.get());
   }
 
   private FilesetDTO mockFilesetDTO(
@@ -462,10 +514,6 @@ public class TestFilesetCatalog extends TestBase {
         .properties(properties)
         .audit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
-  }
-
-  private FilesetContextDTO mockFilesetContextDTO(FilesetDTO fileset, String actualPath) {
-    return FilesetContextDTO.builder().fileset(fileset).actualPath(actualPath).build();
   }
 
   private void assertFileset(FilesetDTO expected, Fileset actual) {

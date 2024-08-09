@@ -66,12 +66,8 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.file.BaseFilesetDataOperationCtx;
-import org.apache.gravitino.file.ClientType;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.file.FilesetContext;
-import org.apache.gravitino.file.FilesetDataOperation;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
@@ -767,7 +763,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
-  public void testGetFilesetContext() throws IOException {
+  public void testGetFileLocation() throws IOException {
     String schemaName = "schema1024";
     String comment = "comment1024";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
@@ -782,37 +778,15 @@ public class TestHadoopCatalogOperations {
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
-      BaseFilesetDataOperationCtx dataOperationCtx1 =
-          BaseFilesetDataOperationCtx.builder()
-              .withSubPath("/test/test.parquet")
-              .withOperation(FilesetDataOperation.OPEN)
-              .withClientType(ClientType.HADOOP_GVFS)
-              .build();
-      FilesetContext context1 = ops.getFilesetContext(filesetIdent, dataOperationCtx1);
-      Assertions.assertEquals(name, context1.fileset().name());
-      Assertions.assertEquals(Fileset.Type.MANAGED, context1.fileset().type());
-      Assertions.assertEquals("comment1024", context1.fileset().comment());
-      Assertions.assertEquals(fileset.storageLocation(), context1.fileset().storageLocation());
+      String subPath1 = "/test/test.parquet";
+      String fileLocation1 = ops.getFileLocation(filesetIdent, subPath1);
       Assertions.assertEquals(
-          String.format("%s%s", context1.fileset().storageLocation(), dataOperationCtx1.subPath()),
-          context1.actualPath());
-      Assertions.assertFalse(context1.fileset().properties().containsKey(StringIdentifier.ID_KEY));
+          String.format("%s%s", fileset.storageLocation(), subPath1), fileLocation1);
 
-      BaseFilesetDataOperationCtx dataOperationCtx2 =
-          BaseFilesetDataOperationCtx.builder()
-              .withSubPath("test/test.parquet")
-              .withOperation(FilesetDataOperation.OPEN)
-              .withClientType(ClientType.HADOOP_GVFS)
-              .build();
-      FilesetContext context2 = ops.getFilesetContext(filesetIdent, dataOperationCtx2);
-      Assertions.assertEquals(name, context2.fileset().name());
-      Assertions.assertEquals(Fileset.Type.MANAGED, context2.fileset().type());
-      Assertions.assertEquals("comment1024", context2.fileset().comment());
-      Assertions.assertEquals(fileset.storageLocation(), context2.fileset().storageLocation());
-      Assertions.assertFalse(context2.fileset().properties().containsKey(StringIdentifier.ID_KEY));
+      String subPath2 = "test/test.parquet";
+      String fileLocation2 = ops.getFileLocation(filesetIdent, subPath2);
       Assertions.assertEquals(
-          String.format("%s/%s", context2.fileset().storageLocation(), dataOperationCtx2.subPath()),
-          context2.actualPath());
+          String.format("%s/%s", fileset.storageLocation(), subPath2), fileLocation2);
     }
   }
 

@@ -24,30 +24,30 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.gravitino.dto.file.FilesetContextDTO;
+import org.apache.commons.lang3.StringUtils;
 
-/** Response for fileset context. */
+/** Response for the actual file location. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class FilesetContextResponse extends BaseResponse {
-  @JsonProperty("filesetContext")
-  private final FilesetContextDTO context;
+public class FileLocationResponse extends BaseResponse {
+  @JsonProperty("fileLocation")
+  private final String fileLocation;
 
-  /** Constructor for FilesetContextResponse. */
-  public FilesetContextResponse() {
+  /** Constructor for FileLocationResponse. */
+  public FileLocationResponse() {
     super(0);
-    this.context = null;
+    this.fileLocation = null;
   }
 
   /**
-   * Constructor for FilesetContextResponse.
+   * Constructor for FileLocationResponse.
    *
-   * @param context the fileset context DTO.
+   * @param fileLocation the actual file location.
    */
-  public FilesetContextResponse(FilesetContextDTO context) {
+  public FileLocationResponse(String fileLocation) {
     super(0);
-    this.context = context;
+    this.fileLocation = fileLocation;
   }
 
   /**
@@ -58,6 +58,7 @@ public class FilesetContextResponse extends BaseResponse {
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
-    Preconditions.checkArgument(context != null, "context must not be null");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(fileLocation), "fileLocation must not be null");
   }
 }

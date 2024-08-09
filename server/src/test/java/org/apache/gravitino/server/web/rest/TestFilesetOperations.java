@@ -47,21 +47,17 @@ import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.requests.FilesetCreateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
-import org.apache.gravitino.dto.requests.GetFilesetContextRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.FilesetContextResponse;
+import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.file.ClientType;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.file.FilesetContext;
-import org.apache.gravitino.file.FilesetDataOperation;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -438,26 +434,22 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetFilesetContext() {
-    Fileset fileset =
-        mockFileset(
-            "fileset1",
-            Fileset.Type.MANAGED,
-            "mock comment",
-            "mock location",
-            ImmutableMap.of("k1", "v1"));
+  public void testGetFileLocation() {
     String actualPath = "mock location/path1";
 
-    FilesetContext context = mockFilesetContext(fileset, actualPath);
+    when(dispatcher.getFileLocation(any(), any())).thenReturn(actualPath);
+    Response resp =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/fileLocation")
+            .queryParam("subPath", "test/1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 
-    GetFilesetContextRequest req =
-        GetFilesetContextRequest.builder()
-            .subPath("path1")
-            .operation(FilesetDataOperation.OPEN)
-            .clientType(ClientType.HADOOP_GVFS)
-            .build();
+    FileLocationResponse contextResponse = resp.readEntity(FileLocationResponse.class);
+    Assertions.assertEquals(0, contextResponse.getCode());
 
-    assertGetFilesetContext(req, context);
+    Assertions.assertEquals(actualPath, contextResponse.getFileLocation());
   }
 
   private void assertUpdateFileset(FilesetUpdatesRequest req, Fileset updatedFileset) {
@@ -478,27 +470,6 @@ public class TestFilesetOperations extends JerseyTest {
     Assertions.assertEquals(updatedFileset.comment(), filesetDTO.comment());
     Assertions.assertEquals(updatedFileset.type(), filesetDTO.type());
     Assertions.assertEquals(updatedFileset.properties(), filesetDTO.properties());
-  }
-
-  private void assertGetFilesetContext(GetFilesetContextRequest req, FilesetContext context) {
-    when(dispatcher.getFilesetContext(any(), any())).thenReturn(context);
-    Response resp =
-        target(filesetPath(metalake, catalog, schema) + "fileset1/context")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-
-    FilesetContextResponse contextResponse = resp.readEntity(FilesetContextResponse.class);
-    Assertions.assertEquals(0, contextResponse.getCode());
-
-    FilesetDTO filesetDTO = contextResponse.getContext().fileset();
-    Assertions.assertEquals(context.fileset().name(), filesetDTO.name());
-    Assertions.assertEquals(context.fileset().comment(), filesetDTO.comment());
-    Assertions.assertEquals(context.fileset().type(), filesetDTO.type());
-    Assertions.assertEquals(context.fileset().properties(), filesetDTO.properties());
-
-    Assertions.assertEquals(context.actualPath(), contextResponse.getContext().actualPath());
   }
 
   private static String filesetPath(String metalake, String catalog, String schema) {
@@ -532,12 +503,5 @@ public class TestFilesetOperations extends JerseyTest {
     when(mockFileset.auditInfo()).thenReturn(mockAudit);
 
     return mockFileset;
-  }
-
-  private static FilesetContext mockFilesetContext(Fileset fileset, String actualPath) {
-    FilesetContext context = mock(FilesetContext.class);
-    when(context.fileset()).thenReturn(fileset);
-    when(context.actualPath()).thenReturn(actualPath);
-    return context;
   }
 }

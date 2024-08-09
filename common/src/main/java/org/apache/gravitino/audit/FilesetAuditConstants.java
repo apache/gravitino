@@ -17,20 +17,14 @@
  *  under the License.
  */
 
-package org.apache.gravitino.file;
+package org.apache.gravitino.audit;
 
-/** An enum class containing fileset data operations client type that supported. */
-public enum ClientType {
-  /**
-   * The client type is `org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem` which in
-   * the filesystem-hadoop3 module.
-   */
-  HADOOP_GVFS,
-  /**
-   * The client type is `gravitino.filesystem.gvfs.GravitinoVirtualFileSystem` which in the
-   * client-python module.
-   */
-  PYTHON_GVFS,
-  /** The client type is unknown. */
-  UNKNOWN;
+public class FilesetAuditConstants {
+  private FilesetAuditConstants() {}
+
+  /** The HTTP header used to pass the internal client type. */
+  public static final String HTTP_HEADER_INTERNAL_CLIENT_TYPE = "InternalClientType";
+
+  /** The HTTP header used to pass the fileset data operation. */
+  public static final String HTTP_HEADER_FILESET_DATA_OPERATION = "FilesetDataOperation";
 }

@@ -17,25 +17,25 @@
  *  under the License.
  */
 
-package org.apache.gravitino.file;
+package org.apache.gravitino.context;
 
-import org.apache.gravitino.annotation.Evolving;
+import java.util.HashMap;
+import java.util.Map;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-/**
- * An interface representing a fileset data operation context. This interface defines some
- * information need to report to the server.
- *
- * <p>{@link FilesetDataOperationCtx} defines the basic properties of a fileset data operation
- * context object.
- */
-@Evolving
-public interface FilesetDataOperationCtx {
-  /** @return The sub path which is operated by the data operation . */
-  String subPath();
+public class TestCallerContext {
+  @Test
+  public void testCallerContext() {
+    Map<String, String> contextMap = new HashMap<>();
+    contextMap.put("test", "test");
+    contextMap.put("test2", "test2");
+    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+    CallerContext.CallerContextHolder.set(callerContext);
 
-  /** @return The data operation type. */
-  FilesetDataOperation operation();
+    CallerContext actualCallerContext = CallerContext.CallerContextHolder.get();
 
-  /** @return The client type of the data operation. */
-  ClientType clientType();
+    Assertions.assertEquals(callerContext, actualCallerContext);
+    Assertions.assertEquals(callerContext.context(), actualCallerContext.context());
+  }
 }

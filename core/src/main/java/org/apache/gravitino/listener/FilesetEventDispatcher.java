@@ -23,21 +23,20 @@ import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.context.CallerContext;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.file.FilesetContext;
-import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.listener.api.event.AlterFilesetEvent;
 import org.apache.gravitino.listener.api.event.AlterFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateFilesetEvent;
 import org.apache.gravitino.listener.api.event.CreateFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetFailureEvent;
-import org.apache.gravitino.listener.api.event.GetFilesetContextEvent;
-import org.apache.gravitino.listener.api.event.GetFilesetContextFailureEvent;
+import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
+import org.apache.gravitino.listener.api.event.GetFileLocationFailureEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadFilesetEvent;
@@ -144,16 +143,19 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
+  public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
     try {
-      FilesetContext context = dispatcher.getFilesetContext(ident, ctx);
+      String actualFileLocation = dispatcher.getFileLocation(ident, subPath);
+      // get the audit info from the thread local context
+      CallerContext context = CallerContext.CallerContextHolder.get();
       eventBus.dispatchEvent(
-          new GetFilesetContextEvent(PrincipalUtils.getCurrentUserName(), ident, ctx));
-      return context;
+          new GetFileLocationEvent(
+              PrincipalUtils.getCurrentUserName(), ident, actualFileLocation, context));
+      return actualFileLocation;
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new GetFilesetContextFailureEvent(PrincipalUtils.getCurrentUserName(), ident, ctx, e));
+          new GetFileLocationFailureEvent(PrincipalUtils.getCurrentUserName(), ident, subPath, e));
       throw e;
     }
   }

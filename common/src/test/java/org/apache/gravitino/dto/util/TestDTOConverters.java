@@ -19,12 +19,9 @@
 
 package org.apache.gravitino.dto.util;
 
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
-import org.apache.gravitino.Audit;
-import org.apache.gravitino.dto.file.FilesetContextDTO;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.rel.partitioning.ListPartitioningDTO;
 import org.apache.gravitino.dto.rel.partitioning.RangePartitioningDTO;
@@ -32,8 +29,6 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
-import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.file.FilesetContext;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -250,73 +245,5 @@ public class TestDTOConverters {
     Assertions.assertEquals(
         Types.StringType.get().simpleString(), listPartitionAssignments[0].lists()[0][0].value());
     Assertions.assertEquals(properties, listPartitionAssignments[0].properties());
-  }
-
-  @Test
-  void testFilesetContextConvert() {
-    FilesetContext filesetContext =
-        new FilesetContext() {
-          @Override
-          public Fileset fileset() {
-            Fileset mockFileset =
-                new Fileset() {
-                  @Override
-                  public String name() {
-                    return "test";
-                  }
-
-                  @Override
-                  public Type type() {
-                    return Type.MANAGED;
-                  }
-
-                  @Override
-                  public String storageLocation() {
-                    return "hdfs://host/test";
-                  }
-
-                  @Override
-                  public Audit auditInfo() {
-                    Audit mockAudit =
-                        new Audit() {
-                          @Override
-                          public String creator() {
-                            return null;
-                          }
-
-                          @Override
-                          public Instant createTime() {
-                            return null;
-                          }
-
-                          @Override
-                          public String lastModifier() {
-                            return null;
-                          }
-
-                          @Override
-                          public Instant lastModifiedTime() {
-                            return null;
-                          }
-                        };
-                    return mockAudit;
-                  }
-                };
-            return mockFileset;
-          }
-
-          @Override
-          public String actualPath() {
-            return "hdfs://host/test/1.txt";
-          }
-        };
-
-    FilesetContextDTO filesetContextDTO = DTOConverters.toDTO(filesetContext);
-
-    // then
-    Assertions.assertEquals("test", filesetContextDTO.fileset().name());
-    Assertions.assertEquals(Fileset.Type.MANAGED, filesetContextDTO.fileset().type());
-    Assertions.assertEquals("hdfs://host/test", filesetContextDTO.fileset().storageLocation());
-    Assertions.assertEquals("hdfs://host/test/1.txt", filesetContextDTO.actualPath());
   }
 }

@@ -19,19 +19,18 @@
 
 package org.apache.gravitino.integration.test.client;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import com.google.common.collect.Maps;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.file.BaseFilesetDataOperationCtx;
-import org.apache.gravitino.file.ClientType;
+import org.apache.gravitino.context.CallerContext;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.file.FilesetContext;
-import org.apache.gravitino.file.FilesetDataOperation;
-import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.AbstractIT;
@@ -101,7 +100,7 @@ public class FilesetIT extends AbstractIT {
   }
 
   @Test
-  public void testGetFilesetContext() {
+  public void testGetFileLocation() {
     String catalogName = GravitinoITUtils.genRandomName("catalog");
     Assertions.assertFalse(metalake.catalogExists(catalogName));
 
@@ -131,22 +130,39 @@ public class FilesetIT extends AbstractIT {
                 Maps.newHashMap());
     Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(filesetIdent));
 
-    FilesetDataOperationCtx ctx =
-        BaseFilesetDataOperationCtx.builder()
-            .withSubPath("/test.par")
-            .withOperation(FilesetDataOperation.CREATE)
-            .withClientType(ClientType.HADOOP_GVFS)
-            .build();
-    FilesetContext context = catalog.asFilesetCatalog().getFilesetContext(filesetIdent, ctx);
+    String actualFileLocation =
+        catalog.asFilesetCatalog().getFileLocation(filesetIdent, "/test.par");
 
-    Fileset actualFileset = context.fileset();
-    Assertions.assertEquals(expectedFileset.name(), actualFileset.name());
-    Assertions.assertEquals(expectedFileset.comment(), actualFileset.comment());
-    Assertions.assertEquals(expectedFileset.type(), actualFileset.type());
-    Assertions.assertEquals(expectedFileset.storageLocation(), actualFileset.storageLocation());
-    Assertions.assertFalse(actualFileset.properties().containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(expectedFileset.storageLocation() + "/test.par", actualFileLocation);
+  }
 
-    Assertions.assertEquals(expectedFileset.storageLocation() + "/test.par", context.actualPath());
+  @Test
+  public void testGetFileLocationWithInvalidAuditHeaders() {
+    try {
+      String catalogName = GravitinoITUtils.genRandomName("catalog");
+      String schemaName = GravitinoITUtils.genRandomName("schema");
+      String filesetName = GravitinoITUtils.genRandomName("fileset");
+      NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+
+      Map<String, String> properties = Maps.newHashMap();
+      properties.put("metastore.uris", hmsUri);
+      Catalog catalog =
+          metalake.createCatalog(
+              catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
+      Assertions.assertTrue(metalake.catalogExists(catalogName));
+
+      Map<String, String> context = new HashMap<>();
+      // this is a invalid internal client type.
+      context.put(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE, "test");
+      CallerContext callerContext = CallerContext.builder().withContext(context).build();
+      CallerContext.CallerContextHolder.set(callerContext);
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> catalog.asFilesetCatalog().getFileLocation(filesetIdent, "/test.par"));
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
   }
 
   private static String generateLocation(

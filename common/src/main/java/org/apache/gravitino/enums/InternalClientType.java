@@ -17,22 +17,29 @@
  *  under the License.
  */
 
-package org.apache.gravitino.file;
+package org.apache.gravitino.enums;
 
-import org.apache.gravitino.annotation.Evolving;
+/** An enum class containing internal client type that supported. */
+public enum InternalClientType {
+  /**
+   * The client type is `org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem` which in
+   * the filesystem-hadoop3 module.
+   */
+  HADOOP_GVFS,
+  /**
+   * The client type is `gravitino.filesystem.gvfs.GravitinoVirtualFileSystem` which in the
+   * client-python module.
+   */
+  PYTHON_GVFS,
+  /** The client type is unknown. */
+  UNKNOWN;
 
-/**
- * An interface representing a fileset context with an existing fileset {@link Fileset}. This
- * interface defines some contextual information related to Fileset that can be passed.
- *
- * <p>{@link FilesetContext} defines the basic properties of a fileset context object. A catalog
- * implementation with {@link FilesetCatalog} should implement this interface.
- */
-@Evolving
-public interface FilesetContext {
-  /** @return The fileset object. */
-  Fileset fileset();
-
-  /** @return The actual storage path after processing. */
-  String actualPath();
+  public static boolean checkValid(String clientType) {
+    try {
+      InternalClientType.valueOf(clientType);
+      return true;
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Unknown internal client type: " + clientType, e);
+    }
+  }
 }

@@ -20,6 +20,7 @@ package org.apache.gravitino.client;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -29,23 +30,21 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.context.CallerContext;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.FilesetCreateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
-import org.apache.gravitino.dto.requests.GetFilesetContextRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
-import org.apache.gravitino.dto.responses.FilesetContextResponse;
+import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.file.FilesetContext;
-import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.rest.RESTUtils;
 
 /**
@@ -231,34 +230,33 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
   }
 
   /**
-   * Get a fileset context from the catalog.
+   * Get the actual path of a file or directory based on the storage location of Fileset and the sub
+   * path.
    *
    * @param ident A fileset identifier.
-   * @param ctx The data operation context.
-   * @return The fileset context.
+   * @param subPath The sub path to the file or directory.
+   * @return The actual location of the file or directory.
+   * @throws NoSuchFilesetException If the fileset does not exist.
    */
   @Override
-  public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
+  public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
     checkFilesetNameIdentifier(ident);
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
-    GetFilesetContextRequest req =
-        GetFilesetContextRequest.builder()
-            .subPath(ctx.subPath())
-            .operation(ctx.operation())
-            .clientType(ctx.clientType())
-            .build();
 
-    FilesetContextResponse resp =
-        restClient.post(
-            formatFilesetRequestPath(fullNamespace) + "/" + ident.name() + "/" + "context",
-            req,
-            FilesetContextResponse.class,
-            Collections.emptyMap(),
+    CallerContext callerContext = CallerContext.CallerContextHolder.get();
+    Map<String, String> queryParams = Maps.newHashMap();
+    queryParams.put("subPath", subPath);
+    FileLocationResponse resp =
+        restClient.get(
+            formatFilesetRequestPath(fullNamespace) + "/" + ident.name() + "/" + "fileLocation",
+            queryParams,
+            FileLocationResponse.class,
+            callerContext != null ? callerContext.context() : Collections.emptyMap(),
             ErrorHandlers.filesetErrorHandler());
     resp.validate();
 
-    return resp.getContext();
+    return resp.getFileLocation();
   }
 
   @VisibleForTesting

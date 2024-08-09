@@ -27,12 +27,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.file.BaseFilesetDataOperationCtx;
-import org.apache.gravitino.file.ClientType;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.file.FilesetContext;
-import org.apache.gravitino.file.FilesetDataOperation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -177,8 +173,8 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndGetFilesetContext() {
-    String tmpDir = "/tmp/test_get_fileset_context_" + UUID.randomUUID();
+  public void testCreateAndGetFileLocation() {
+    String tmpDir = "/tmp/test_get_file_location_" + UUID.randomUUID();
     try {
       Namespace filesetNs = Namespace.of(metalake, catalog, "schema1024");
       Map<String, String> props = ImmutableMap.of("k1", "v1", "location", "schema1024");
@@ -194,22 +190,9 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
       testProperties(props, fileset1.properties());
       Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
       Assertions.assertNotNull(fileset1.storageLocation());
-
-      BaseFilesetDataOperationCtx ctx =
-          BaseFilesetDataOperationCtx.builder()
-              .withSubPath("/test/x.parquet")
-              .withOperation(FilesetDataOperation.CREATE)
-              .withClientType(ClientType.HADOOP_GVFS)
-              .build();
-      FilesetContext context1 = filesetOperationDispatcher.getFilesetContext(filesetIdent1, ctx);
-      Assertions.assertEquals(fileset1.name(), context1.fileset().name());
-      Assertions.assertEquals(fileset1.comment(), context1.fileset().comment());
-      testProperties(props, context1.fileset().properties());
-      Assertions.assertEquals(fileset1.type(), context1.fileset().type());
-      Assertions.assertEquals(fileset1.storageLocation(), context1.fileset().storageLocation());
-
-      Assertions.assertEquals(
-          fileset1.storageLocation() + "/test/x.parquet", context1.actualPath());
+      String subPath = "/test/x.parquet";
+      String fileLocation = filesetOperationDispatcher.getFileLocation(filesetIdent1, subPath);
+      Assertions.assertEquals(fileset1.storageLocation() + subPath, fileLocation);
     } finally {
       File path = new File(tmpDir);
       if (path.exists()) {

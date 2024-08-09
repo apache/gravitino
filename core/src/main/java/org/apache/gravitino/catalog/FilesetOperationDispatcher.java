@@ -33,8 +33,6 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.file.FilesetContext;
-import org.apache.gravitino.file.FilesetDataOperationCtx;
 import org.apache.gravitino.storage.IdGenerator;
 
 public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetDispatcher {
@@ -199,18 +197,20 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   }
 
   /**
-   * Get a fileset context from the catalog.
+   * Get the actual location of a file or directory based on the storage location of Fileset and the
+   * sub path.
    *
    * @param ident A fileset identifier.
-   * @param ctx A fileset data operation context.
-   * @return true If the fileset is dropped, false the fileset did not exist.
+   * @param subPath The sub path to the file or directory.
+   * @return The actual location of the file or directory.
+   * @throws NoSuchFilesetException If the fileset does not exist.
    */
   @Override
-  public FilesetContext getFilesetContext(NameIdentifier ident, FilesetDataOperationCtx ctx)
+  public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
     return doWithCatalog(
         getCatalogIdentifier(ident),
-        c -> c.doWithFilesetOps(f -> f.getFilesetContext(ident, ctx)),
+        c -> c.doWithFilesetOps(f -> f.getFileLocation(ident, subPath)),
         NonEmptyEntityException.class);
   }
 }

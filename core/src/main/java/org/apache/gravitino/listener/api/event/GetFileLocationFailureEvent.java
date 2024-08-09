@@ -21,28 +21,31 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.file.FilesetDataOperationCtx;
 
-/** Represents an event that occurs when getting a fileset context. */
+/**
+ * Represents an event that is generated when an attempt to get a file location from the system
+ * fails.
+ */
 @DeveloperApi
-public final class GetFilesetContextEvent extends FilesetEvent {
-  private final FilesetDataOperationCtx ctx;
-
+public final class GetFileLocationFailureEvent extends FilesetFailureEvent {
+  private final String subPath;
   /**
-   * Constructs a new {@code GetFilesetContextEvent}, recording the attempt to get a fileset
-   * context.
+   * Constructs a new {@code GetFileLocationFailureEvent}.
    *
-   * @param user The user who initiated the get fileset context operation.
-   * @param identifier The identifier of the fileset context that was attempted to be got.
-   * @param ctx The data operation context to get the fileset context.
+   * @param user The user who initiated the get a file location.
+   * @param identifier The identifier of the file location that was attempted to be got.
+   * @param subPath The sub path of the actual file location which want to get.
+   * @param exception The exception that was thrown during the get a file location. This exception
+   *     is key to diagnosing the failure, providing insights into what went wrong during the
+   *     operation.
    */
-  public GetFilesetContextEvent(
-      String user, NameIdentifier identifier, FilesetDataOperationCtx ctx) {
-    super(user, identifier);
-    this.ctx = ctx;
+  public GetFileLocationFailureEvent(
+      String user, NameIdentifier identifier, String subPath, Exception exception) {
+    super(user, identifier, exception);
+    this.subPath = subPath;
   }
 
-  public FilesetDataOperationCtx dataOperationContext() {
-    return ctx;
+  public String subPath() {
+    return subPath;
   }
 }

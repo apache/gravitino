@@ -41,14 +41,11 @@ import org.apache.gravitino.dto.authorization.GroupDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
-import org.apache.gravitino.dto.file.FilesetContextDTO;
-import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
@@ -382,28 +379,15 @@ public class TestResponses {
   }
 
   @Test
-  void testFilesetContextResponse() {
-    AuditDTO audit =
-        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    FilesetDTO filesetDTO =
-        FilesetDTO.builder()
-            .name("test")
-            .type(Fileset.Type.MANAGED)
-            .audit(audit)
-            .storageLocation("hdfs://host/test")
-            .build();
-    FilesetContextDTO dto =
-        FilesetContextDTO.builder()
-            .fileset(filesetDTO)
-            .actualPath("hdfs://host/test/zz.parquet")
-            .build();
-    FilesetContextResponse response = new FilesetContextResponse(dto);
+  void testFileLocationResponse() {
+    String actualFileLocation = "file:/test/1";
+    FileLocationResponse response = new FileLocationResponse(actualFileLocation);
     response.validate(); // No exception thrown
   }
 
   @Test
-  void testFilesetContextResponseException() {
-    FilesetContextResponse response = new FilesetContextResponse();
+  void testFileLocationResponseException() {
+    FileLocationResponse response = new FileLocationResponse();
     assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 }
