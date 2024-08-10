@@ -40,6 +40,7 @@ public class SchemaDTO implements Schema {
   @JsonProperty("audit")
   private AuditDTO audit;
 
+  /** Default constructor for Jackson deserialization. */
   private SchemaDTO() {}
 
   /**
@@ -86,13 +87,17 @@ public class SchemaDTO implements Schema {
    *
    * @param <S> The type of the builder subclass.
    */
-  public static class Builder<S extends Builder> {
+  public static class Builder<S extends Builder<S>> {
+
     /** The name of the schema. */
     protected String name;
+
     /** The comment associated with the schema. */
     protected String comment;
+
     /** The properties associated with the schema. */
     protected Map<String, String> properties;
+
     /** The audit information for the schema. */
     protected AuditDTO audit;
 
@@ -158,7 +163,7 @@ public class SchemaDTO implements Schema {
   }
 
   /** @return the builder for creating a new instance of SchemaDTO. */
-  public static Builder builder() {
-    return new Builder();
+  public static Builder<?> builder() {
+    return new Builder<>();
   }
 }

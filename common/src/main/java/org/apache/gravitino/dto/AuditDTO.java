@@ -112,6 +112,7 @@ public class AuditDTO implements Audit {
      * @param creator The creator of the audit.
      * @return The builder instance.
      */
+    @SuppressWarnings("unchecked")
     public S withCreator(String creator) {
       this.creator = creator;
       return (S) this;
@@ -123,6 +124,7 @@ public class AuditDTO implements Audit {
      * @param createTime The create time of the audit.
      * @return The builder instance.
      */
+    @SuppressWarnings("unchecked")
     public S withCreateTime(Instant createTime) {
       this.createTime = createTime;
       return (S) this;
@@ -134,6 +136,7 @@ public class AuditDTO implements Audit {
      * @param lastModifier The last modifier of the audit.
      * @return The builder instance.
      */
+    @SuppressWarnings("unchecked")
     public S withLastModifier(String lastModifier) {
       this.lastModifier = lastModifier;
       return (S) this;
@@ -145,6 +148,7 @@ public class AuditDTO implements Audit {
      * @param lastModifiedTime The last modified time of the audit.
      * @return The builder instance.
      */
+    @SuppressWarnings("unchecked")
     public S withLastModifiedTime(Instant lastModifiedTime) {
       this.lastModifiedTime = lastModifiedTime;
       return (S) this;

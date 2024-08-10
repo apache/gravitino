@@ -93,7 +93,7 @@ public class MetalakeDTO implements Metalake {
    *
    * @param <S> The type of the builder subclass.
    */
-  public static class Builder<S extends Builder> {
+  public static class Builder<S extends Builder<S>> {
 
     /** The name of the Metalake DTO. */
     protected String name;
@@ -186,25 +186,22 @@ public class MetalakeDTO implements Metalake {
     if (p1 == null && p2 == null) {
       return true;
     }
-
     if (p1 != null && p1.isEmpty() && p2 == null) {
       return true;
     }
-
     if (p2 != null && p2.isEmpty() && p1 == null) {
       return true;
     }
-
     return java.util.Objects.equals(p1, p2);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(name, comment, audit);
+    return Objects.hashCode(name, comment, properties, audit);
   }
 
   /** @return the builder for creating a new instance of MetalakeDTO. */
-  public static Builder builder() {
-    return new Builder();
+  public static Builder<?> builder() {
+    return new Builder<>();
   }
 }
