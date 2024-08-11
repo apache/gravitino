@@ -49,6 +49,8 @@ if [ "${GITHUB_ACTIONS}" = "true" ]; then
   sudo rm -rf /opt/hostedtoolcache/PyPy || :
   # 376MB
   sudo rm -rf /opt/hostedtoolcache/node || :
+  # free at least 10G
+  sudo rm -rf /usr/local/lib/android || :
   # Remove Web browser packages
   if dpkg-query -l firefox;then
     sudo apt purge -y firefox
