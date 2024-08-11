@@ -90,10 +90,6 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Setup debug Github Action
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
-        uses: csexton/debugger-action@master
-
       - name: Backend Integration Test
         id: integrationTest
         run: >
