@@ -138,14 +138,9 @@ public class ExceptionHandlers {
         .build();
   }
 
-  public static Response handleOwnerException(
-      OperationType type, String name, String metalake, Exception e) {
-    return OwnerExceptionHandler.INSTANCE.handle(type, name, metalake, e);
-  }
-
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
 
-    private static final ExceptionHandler INSTANCE = new PartitionExceptionHandler();
+    private PartitionExceptionHandler() {}
 
     private static String getPartitionErrorMsg(
         String partition, String operation, String table, String reason) {
@@ -180,7 +175,7 @@ public class ExceptionHandlers {
 
   private static class TableExceptionHandler extends BaseExceptionHandler {
 
-    private static final ExceptionHandler INSTANCE = new TableExceptionHandler();
+    private TableExceptionHandler() {}
 
     private static String getTableErrorMsg(
         String table, String operation, String schema, String reason) {
@@ -215,7 +210,7 @@ public class ExceptionHandlers {
 
   private static class SchemaExceptionHandler extends BaseExceptionHandler {
 
-    private static final ExceptionHandler INSTANCE = new SchemaExceptionHandler();
+    private SchemaExceptionHandler() {}
 
     private static String getSchemaErrorMsg(
         String schema, String operation, String catalog, String reason) {
@@ -253,7 +248,7 @@ public class ExceptionHandlers {
 
   private static class CatalogExceptionHandler extends BaseExceptionHandler {
 
-    private static final ExceptionHandler INSTANCE = new CatalogExceptionHandler();
+    private CatalogExceptionHandler() {}
 
     private static String getCatalogErrorMsg(
         String catalog, String operation, String metalake, String reason) {
@@ -288,7 +283,7 @@ public class ExceptionHandlers {
 
   private static class MetalakeExceptionHandler extends BaseExceptionHandler {
 
-    private static final ExceptionHandler INSTANCE = new MetalakeExceptionHandler();
+    private MetalakeExceptionHandler() {}
 
     private static String getMetalakeErrorMsg(String metalake, String operation, String reason) {
       return String.format(
@@ -318,7 +313,7 @@ public class ExceptionHandlers {
   }
 
   private static class FilesetExceptionHandler extends BaseExceptionHandler {
-    private static final ExceptionHandler INSTANCE = new FilesetExceptionHandler();
+    private FilesetExceptionHandler() {}
 
     private static String getFilesetErrorMsg(
         String fileset, String operation, String schema, String reason) {
@@ -350,7 +345,7 @@ public class ExceptionHandlers {
 
   private static class UserExceptionHandler extends BaseExceptionHandler {
 
-    private static final ExceptionHandler INSTANCE = new UserExceptionHandler();
+    private UserExceptionHandler() {}
 
     private static String getUserErrorMsg(
         String user, String operation, String metalake, String reason) {
@@ -388,7 +383,7 @@ public class ExceptionHandlers {
 
   private static class GroupExceptionHandler extends BaseExceptionHandler {
 
-    private static final ExceptionHandler INSTANCE = new GroupExceptionHandler();
+    private GroupExceptionHandler() {}
 
     private static String getGroupErrorMsg(
         String group, String operation, String metalake, String reason) {
@@ -420,7 +415,7 @@ public class ExceptionHandlers {
 
   private static class RoleExceptionHandler extends BaseExceptionHandler {
 
-    private static final ExceptionHandler INSTANCE = new RoleExceptionHandler();
+    private RoleExceptionHandler() {}
 
     private static String getRoleErrorMsg(
         String role, String operation, String metalake, String reason) {
@@ -451,7 +446,7 @@ public class ExceptionHandlers {
   }
 
   private static class TopicExceptionHandler extends BaseExceptionHandler {
-    private static final ExceptionHandler INSTANCE = new TopicExceptionHandler();
+    private TopicExceptionHandler() {}
 
     private static String getTopicErrorMsg(
         String topic, String operation, String schema, String reason) {
@@ -483,7 +478,7 @@ public class ExceptionHandlers {
 
   private static class UserPermissionOperationExceptionHandler
       extends BasePermissionExceptionHandler {
-    private static final ExceptionHandler INSTANCE = new UserPermissionOperationExceptionHandler();
+    private UserPermissionOperationExceptionHandler() {}
 
     @Override
     protected String getPermissionErrorMsg(
@@ -497,7 +492,7 @@ public class ExceptionHandlers {
   private static class GroupPermissionOperationExceptionHandler
       extends BasePermissionExceptionHandler {
 
-    private static final ExceptionHandler INSTANCE = new GroupPermissionOperationExceptionHandler();
+    private GroupPermissionOperationExceptionHandler() {}
 
     @Override
     protected String getPermissionErrorMsg(
@@ -533,7 +528,7 @@ public class ExceptionHandlers {
 
   private static class TagExceptionHandler extends BaseExceptionHandler {
 
-    private static final ExceptionHandler INSTANCE = new TagExceptionHandler();
+    private TagExceptionHandler() {}
 
     private static String getTagErrorMsg(
         String tag, String operation, String parent, String reason) {
@@ -562,33 +557,6 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, tag, parent, e);
-      }
-    }
-  }
-
-  private static class OwnerExceptionHandler extends BaseExceptionHandler {
-    private static final ExceptionHandler INSTANCE = new OwnerExceptionHandler();
-
-    private static String getOwnerErrorMsg(
-        String name, String operation, String metalake, String reason) {
-      return String.format(
-          "Failed to execute %s owner operation [%s] under metalake [%s], reason [%s]",
-          name, operation, metalake, reason);
-    }
-
-    @Override
-    public Response handle(OperationType op, String name, String parent, Exception e) {
-      String formatted = StringUtil.isBlank(name) ? "" : " [" + name + "]";
-      String errorMsg = getOwnerErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
-      LOG.warn(errorMsg, e);
-
-      if (e instanceof IllegalArgumentException) {
-        return Utils.illegalArguments(errorMsg, e);
-
-      } else if (e instanceof NotFoundException) {
-        return Utils.notFound(errorMsg, e);
-      } else {
-        return super.handle(op, name, parent, e);
       }
     }
   }
