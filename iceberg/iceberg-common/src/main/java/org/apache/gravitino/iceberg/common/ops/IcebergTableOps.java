@@ -68,7 +68,7 @@ public class IcebergTableOps implements AutoCloseable {
   private final IcebergCatalogBackend catalogBackend;
   private String catalogUri = null;
   private Map<String, String> catalogConfigToClients;
-  private Map<String, String> hadoopConfigMap;
+  private Map<String, String> catalogPropertiesMap;
   private static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
           IcebergConstants.IO_IMPL,
@@ -95,7 +95,7 @@ public class IcebergTableOps implements AutoCloseable {
             icebergConfig.getIcebergCatalogProperties(),
             key -> catalogPropertiesToClientKeys.contains(key));
 
-    this.hadoopConfigMap = icebergConfig.getIcebergCatalogProperties();
+    this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
   }
 
   public IcebergTableOps() {
@@ -153,7 +153,7 @@ public class IcebergTableOps implements AutoCloseable {
    */
   public void reloadHadoopConf() {
     Configuration configuration = new Configuration();
-    this.hadoopConfigMap.forEach(configuration::set);
+    this.catalogPropertiesMap.forEach(configuration::set);
     UserGroupInformation.setConfiguration(configuration);
   }
 
