@@ -46,6 +46,8 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -154,6 +156,12 @@ public class TestOwnerManager {
         MetadataObjects.of(Lists.newArrayList(METALAKE), MetadataObject.Type.METALAKE);
     Assertions.assertFalse(ownerManager.getOwner(METALAKE, metalakeObject).isPresent());
 
+    // Test not-existed metadata object
+    MetadataObject notExistObject =
+        MetadataObjects.of(Lists.newArrayList("not-exist"), MetadataObject.Type.CATALOG);
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class, () -> ownerManager.getOwner(METALAKE, notExistObject));
+
     // Test to set the user as the owner
     ownerManager.setOwner(METALAKE, metalakeObject, USER, Owner.Type.USER);
 
@@ -163,6 +171,11 @@ public class TestOwnerManager {
 
     // Test to set the group as the owner
     ownerManager.setOwner(METALAKE, metalakeObject, GROUP, Owner.Type.GROUP);
+
+    // Test not-existed metadata object
+    Assertions.assertThrows(
+        NotFoundException.class,
+        () -> ownerManager.setOwner(METALAKE, notExistObject, GROUP, Owner.Type.GROUP));
 
     owner = ownerManager.getOwner(METALAKE, metalakeObject).get();
     Assertions.assertEquals(GROUP, owner.name());

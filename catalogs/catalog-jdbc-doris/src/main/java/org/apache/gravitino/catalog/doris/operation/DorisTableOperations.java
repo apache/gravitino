@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog.doris.operation;
 
+import static org.apache.gravitino.catalog.doris.DorisCatalog.DORIS_TABLE_PROPERTIES_META;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
@@ -32,6 +35,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -154,6 +158,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       sqlBuilder.append(" BUCKETS ").append(distribution.number());
     }
 
+    properties = appendNecessaryProperties(properties);
     // Add table properties
     sqlBuilder.append(NEW_LINE).append(DorisUtils.generatePropertiesSql(properties));
 
@@ -162,6 +167,43 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     LOG.info("Generated create table:{} sql: {}", tableName, result);
     return result;
+  }
+
+  private Map<String, String> appendNecessaryProperties(Map<String, String> properties) {
+    Map<String, String> resultMap;
+    if (properties == null) {
+      resultMap = new HashMap<>();
+    } else {
+      resultMap = new HashMap<>(properties);
+    }
+
+    // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
+    // set the property 'replication_num' to 1 explicitly.
+    if (!properties.containsKey(REPLICATION_FACTOR)) {
+      // Try to check the number of backend servers.
+      String query = "select count(*) from information_schema.backends where Alive = 'true'";
+
+      try (Connection connection = dataSource.getConnection();
+          Statement statement = connection.createStatement();
+          ResultSet resultSet = statement.executeQuery(query)) {
+        while (resultSet.next()) {
+          int backendCount = resultSet.getInt(1);
+          if (backendCount < DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE) {
+            resultMap.put(
+                REPLICATION_FACTOR,
+                DORIS_TABLE_PROPERTIES_META
+                    .propertyEntries()
+                    .get(REPLICATION_FACTOR)
+                    .getDefaultValue()
+                    .toString());
+          }
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to get the number of backend servers", e);
+      }
+    }
+
+    return resultMap;
   }
 
   private static void validateIncrementCol(JdbcColumn[] columns) {

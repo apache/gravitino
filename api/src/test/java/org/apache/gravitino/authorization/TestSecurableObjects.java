@@ -27,6 +27,19 @@ public class TestSecurableObjects {
 
   @Test
   public void testSecurableObjects() {
+
+    SecurableObject metalake =
+        SecurableObjects.ofMetalake(
+            "metalake", Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertEquals("metalake", metalake.fullName());
+    Assertions.assertEquals(MetadataObject.Type.METALAKE, metalake.type());
+    SecurableObject anotherMetalake =
+        SecurableObjects.of(
+            MetadataObject.Type.METALAKE,
+            Lists.newArrayList("metalake"),
+            Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertEquals(metalake, anotherMetalake);
+
     SecurableObject catalog =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     Assertions.assertEquals("catalog", catalog.fullName());

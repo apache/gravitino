@@ -180,6 +180,7 @@ fi
 
 if [ -d "${GRAVITINO_HOME}/iceberg-rest-server/libs" ]; then
   addJarInDir "${GRAVITINO_HOME}/iceberg-rest-server/libs"
+  addDirToClasspath "${GRAVITINO_HOME}/iceberg-rest-server/conf"
 else
   addJarInDir "${GRAVITINO_HOME}/libs"
 fi
