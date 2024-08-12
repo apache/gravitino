@@ -116,8 +116,6 @@ function start() {
   if [[ -z "${pid}" ]]; then
     echo "Gravitino Server start error!"
     return 1;
-  else
-    echo "Gravitino Server start success!"
   fi
 
   sleep 2
