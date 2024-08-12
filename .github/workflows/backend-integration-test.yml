@@ -108,8 +108,7 @@ jobs:
             iceberg/iceberg-rest-server/build/*.log
             integration-test/build/*.log
             integration-test/build/*.tar
-            integration-test/build/trino-ci-container-log/hive/*.*
-            integration-test/build/trino-ci-container-log/hdfs/*.*
+            integration-test/build/trino-ci-container-log
             distribution/package/logs/*.out
             distribution/package/logs/*.log
             catalogs/**/*.log
