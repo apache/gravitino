@@ -154,9 +154,9 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 
 You can also specify catalog parameters by setting configuration entries in the style `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
 
-Using `ConfigBasedIcebergTableOpsProvider`, the default value, could be backward compatible with configurations without catalog names. It constructs a default catalog using those configurations for clients not setting the prefix.
+Using `ConfigBasedIcebergTableOpsProvider`, the default value, could be backward compatible with configurations without catalog names. It constructs a default catalog using those configurations for clients not setting `prefix`.
 
-For example, we can configure three different catalogs simultaneously, which one is anonymous and the others named `hive_backend` and `jdbc_backend`: 
+For instance, we can configure three different catalogs simultaneously, which one is anonymous and the others named `hive_backend` and `jdbc_backend`: 
 
 ```text
 gravitino.iceberg-rest.catalog-backend = jdbc
@@ -173,6 +173,23 @@ gravitino.iceberg-rest.catalog.jdbc_backend.warehouse = hdfs://127.0.0.1:9000/us
 ...
 ```
 
+Then we can set `prefix` in client config to use those catalogs. Take Spark SQL as an example:
+
+```shell
+./bin/spark-sql -v \
+...
+--conf spark.sql.catalog.default_rest_catalog.type=rest  \
+--conf spark.sql.catalog.default_rest_catalog.uri=http://127.0.0.1:9001/iceberg/ \
+...
+--conf spark.sql.catalog.hive_backend_catalog.type=rest  \
+--conf spark.sql.catalog.hive_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.hive_backend_catalog.prefix=hive_backend \
+...
+--conf spark.sql.catalog.jdbc_backend_catalog.type=rest  \
+--conf spark.sql.catalog.jdbc_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.jdbc_backend_catalog.prefix=jdbc_backend \
+...
+```
 
 ### Other Apache Iceberg catalog properties
 
