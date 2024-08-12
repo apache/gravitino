@@ -374,20 +374,23 @@ subprojects {
     }
 
     repositories {
-      maven {
-        name = "apacheSnapshots"
-        url = uri("https://repository.apache.org/content/repositories/snapshots/")
-        credentials {
-          username = System.getenv("APACHE_USERNAME")
-          password = System.getenv("APACHE_PASSWORD")
+      if (project.hasProperty("release")) {
+        maven {
+          name = "apacheReleases"
+          url = uri("https://repository.apache.org/service/local/staging/deploy/maven2/")
+          credentials {
+            username = System.getenv("APACHE_USERNAME")
+            password = System.getenv("APACHE_PASSWORD")
+          }
         }
-      }
-      maven {
-        name = "apacheReleases"
-        url = uri("https://repository.apache.org/service/local/staging/deploy/maven2/")
-        credentials {
-          username = System.getenv("APACHE_USERNAME")
-          password = System.getenv("APACHE_PASSWORD")
+      } else {
+        maven {
+          name = "apacheSnapshots"
+          url = uri("https://repository.apache.org/content/repositories/snapshots/")
+          credentials {
+            username = System.getenv("APACHE_USERNAME")
+            password = System.getenv("APACHE_PASSWORD")
+          }
         }
       }
     }
