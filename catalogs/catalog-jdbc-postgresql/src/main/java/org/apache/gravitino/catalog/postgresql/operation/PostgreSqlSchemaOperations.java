@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
+import static org.apache.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations.PG_QUOTE;
+
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -117,11 +119,13 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
           "PostgreSQL does not support properties on database create.");
     }
 
-    StringBuilder sqlBuilder = new StringBuilder("CREATE SCHEMA " + schema + ";");
+    StringBuilder sqlBuilder = new StringBuilder("CREATE SCHEMA \"" + schema + "\";");
     if (StringUtils.isNotEmpty(comment)) {
       sqlBuilder
           .append("COMMENT ON SCHEMA ")
+          .append(PG_QUOTE)
           .append(schema)
+          .append(PG_QUOTE)
           .append(" IS '")
           .append(comment)
           .append("'");
@@ -167,7 +171,11 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   }
 
   private String getShowSchemaCommentSql(String schema) {
-    return String.format("SELECT obj_description('%s'::regnamespace) as comment", schema);
+    return String.format(
+        "SELECT obj_description(n.oid, 'pg_namespace') AS comment\n"
+            + "FROM pg_catalog.pg_namespace n\n"
+            + "WHERE n.nspname = '%s';\n",
+        schema);
   }
 
   private String getSchemaComment(String schema, Connection connection) throws SQLException {

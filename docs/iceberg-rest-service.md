@@ -18,12 +18,9 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
   - multi table transaction
   - pagination
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
-- Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 - Supports HDFS and S3 storage.
-
-:::info
-Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
-:::
+- Supports OAuth2 and HTTPS.
+- Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 
 ## Server management
 
@@ -83,23 +80,44 @@ Please note that, it only takes affect in `gravitino.conf`, you don't need to sp
 The filter in `customFilters` should be a standard javax servlet filter.
 You can also specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
 
-### Apache Iceberg metrics store configuration
+### Security
 
-Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `org.apache.gravitino.catalog.lakehouse.iceberg.web.metrics` and add the corresponding jar file to the Iceberg REST service classpath directory.
+Gravitino Iceberg REST server supports OAuth2 and HTTPS, please refer to [Security](./security.md) for more details.
 
+### Storage
 
-| Configuration item                              | Description                                                                                                                         | Default value | Required | Since Version |
-|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.metricsStore`           | The Iceberg metrics storage class name.                                                                                             | (none)        | No       | 0.4.0         |
-| `gravitino.iceberg-rest.metricsStoreRetainDays` | The days to retain Iceberg metrics in store, the value not greater than 0 means retain forever.                                     | -1            | No       | 0.4.0         |
-| `gravitino.iceberg-rest.metricsQueueCapacity`   | The size of queue to store metrics temporally before storing to the persistent storage. Metrics will be dropped when queue is full. | 1000          | No       | 0.4.0         |
+Gravitino Iceberg REST server supports S3 and HDFS for storage.
 
+#### S3 configuration
+
+Gravitino Iceberg REST service supports using static access-key-id and secret-access-key to access S3 data.
+
+| Configuration item                            | Description                                                                                                                                                                                                         | Default value | Required | Since Version |
+|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.io-impl`              | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aws.s3.S3FileIO` for S3.                                                                                                                     | (none)        | No       | 0.6.0         |
+| `gravitino.iceberg-rest.s3-access-key-id`     | The static access key ID used to access S3 data.                                                                                                                                                                    | (none)        | No       | 0.6.0         |
+| `gravitino.iceberg-rest.s3-secret-access-key` | The static secret access key used to access S3 data.                                                                                                                                                                | (none)        | No       | 0.6.0         |
+| `gravitino.iceberg-rest.s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)        | No       | 0.6.0         |
+| `gravitino.iceberg-rest.s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)        | No       | 0.6.0         |
+
+For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
+
+:::info
+Please set `gravitino.iceberg-rest.warehouse` to `s3://{bucket_name}/${prefix_name}` for Jdbc catalog backend, `s3a://{bucket_name}/${prefix_name}` for Hive catalog backend.
+:::
+
+#### HDFS configuration
+
+You should place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
+
+:::info
+Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
+:::
 
 ### Apache Gravitino Iceberg catalog backend configuration
 
 :::info
-The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can 
-specify a Hive or JDBC catalog backend for production environment.
+The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can specify a Hive or JDBC catalog backend for production environment.
 :::
 
 #### Apache Hive backend configuration
@@ -110,7 +128,6 @@ specify a Hive or JDBC catalog backend for production environment.
 | `gravitino.iceberg-rest.uri`                  | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                                                                | (none)                                                                        | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.warehouse`            | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                                                           | (none)                                                                        | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.catalog-backend-name` | The catalog backend name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables. | `hive` for Hive backend, `jdbc` for JDBC backend, `memory` for memory backend | No       | 0.5.2         |
-
 
 #### JDBC backend configuration
 
@@ -148,27 +165,15 @@ The `clients` property for example:
 `catalog-impl` has no effect.
 :::
 
-### S3 configuration
+### Apache Iceberg metrics store configuration
 
-Gravitino Iceberg REST service supports using static access-key-id and secret-access-key to access S3 data.
+Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `org.apache.gravitino.catalog.lakehouse.iceberg.web.metrics` and add the corresponding jar file to the Iceberg REST service classpath directory.
 
-| Configuration item                            | Description                                                                                                                                                                                                         | Default value | Required | Since Version |
-|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.io-impl`              | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aws.s3.S3FileIO` for S3.                                                                                                                     | (none)        | No       | 0.6.0         |
-| `gravitino.iceberg-rest.s3-access-key-id`     | The static access key ID used to access S3 data.                                                                                                                                                                    | (none)        | No       | 0.6.0         |
-| `gravitino.iceberg-rest.s3-secret-access-key` | The static secret access key used to access S3 data.                                                                                                                                                                | (none)        | No       | 0.6.0         |
-| `gravitino.iceberg-rest.s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)        | No       | 0.6.0         |
-| `gravitino.iceberg-rest.s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)        | No       | 0.6.0         |
-
-For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
-
-:::info
-Please set `gravitino.iceberg-rest.warehouse` to `s3://{bucket_name}/${prefix_name}` for Jdbc catalog backend, `s3a://{bucket_name}/${prefix_name}` for Hive catalog backend. 
-:::
-
-### HDFS configuration
-
-You should place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
+| Configuration item                              | Description                                                                                                                         | Default value | Required | Since Version |
+|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.metricsStore`           | The Iceberg metrics storage class name.                                                                                             | (none)        | No       | 0.4.0         |
+| `gravitino.iceberg-rest.metricsStoreRetainDays` | The days to retain Iceberg metrics in store, the value not greater than 0 means retain forever.                                     | -1            | No       | 0.4.0         |
+| `gravitino.iceberg-rest.metricsQueueCapacity`   | The size of queue to store metrics temporally before storing to the persistent storage. Metrics will be dropped when queue is full. | 1000          | No       | 0.4.0         |
 
 ## Starting the Iceberg REST server
 
@@ -228,6 +233,20 @@ CREATE TABLE dml.test (id bigint COMMENT 'unique id') using iceberg;
 DESCRIBE TABLE EXTENDED dml.test;
 INSERT INTO dml.test VALUES (1), (2);
 SELECT * FROM dml.test;
+```
+
+## Docker instructions
+
+You could run Gravitino server though docker container:
+
+```shell
+docker run -d -p 9001:9001 datastrato/iceberg-rest-server:0.6
+```
+
+Or build it manually to add custom logics:
+
+```shell
+sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image datastrato/iceberg-rest-server --tag 0.6
 ```
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-iceberg-rest-service).
