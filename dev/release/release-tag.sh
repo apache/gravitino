@@ -108,7 +108,7 @@ if ! is_dry_run; then
   fi
 
   cd ..
-  rm -rf gravitino
+  mv gravitino gravitino-tag
 else
   cd ..
   mv gravitino gravitino-tag

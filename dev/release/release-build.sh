@@ -89,9 +89,6 @@ RELEASE_STAGING_LOCATION="https://dist.apache.org/repos/dist/dev/incubator/gravi
 RELEASE_LOCATION="https://dist.apache.org/repos/dist/release/incubator/gravitino"
 
 GPG="gpg -u $GPG_KEY --no-tty --batch --pinentry-mode loopback"
-NEXUS_ROOT=https://repository.apache.org/service/local/staging
-NEXUS_PROFILE=d63f592e7eac0 # TODO. Profile for Gravitino staging uploads, needs to update
-BASE_DIR=$(pwd)
 
 init_java
 init_gradle
