@@ -589,7 +589,6 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     Assertions.assertEquals(0, tableIdentifiers.size());
   }
 
-
   @Test
   public void testAlterIcebergTable() {
     Column[] columns = createColumns();
