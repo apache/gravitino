@@ -208,27 +208,6 @@ allprojects {
   extra["initIntegrationTest"] = setIntegrationTestEnvironment
 }
 
-nexusPublishing {
-  repositories {
-    sonatype {
-      nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-      snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
-
-      val sonatypeUser =
-        System.getenv("SONATYPE_USER").takeUnless { it.isNullOrEmpty() }
-          ?: extra["SONATYPE_USER"].toString()
-      val sonatypePassword =
-        System.getenv("SONATYPE_PASSWORD").takeUnless { it.isNullOrEmpty() }
-          ?: extra["SONATYPE_PASSWORD"].toString()
-
-      username.set(sonatypeUser)
-      password.set(sonatypePassword)
-    }
-  }
-
-  packageGroup.set("org.apache.gravitino")
-}
-
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
@@ -390,6 +369,25 @@ subprojects {
             url.set("https://github.com/apache/gravitino")
             connection.set("scm:git:git://github.com/apache/gravitino.git")
           }
+        }
+      }
+    }
+
+    repositories {
+      maven {
+        name = "apacheSnapshots"
+        url = uri("https://repository.apache.org/content/repositories/snapshots/")
+        credentials {
+          username = System.getenv("APACHE_USERNAME")
+          password = System.getenv("APACHE_PASSWORD")
+        }
+      }
+      maven {
+        name = "apacheReleases"
+        url = uri("https://repository.apache.org/service/local/staging/deploy/maven2/")
+        credentials {
+          username = System.getenv("APACHE_USERNAME")
+          password = System.getenv("APACHE_PASSWORD")
         }
       }
     }
