@@ -17,11 +17,10 @@
 # under the License.
 
 #
-version: '3.0'
 services:
 
   hive:
-    image: datastrato/gravitino-ci-hive:0.1.12
+    image: datastrato/gravitino-ci-hive:0.1.13
     networks:
       - trino-net
     container_name: trino-ci-hive
@@ -30,8 +29,6 @@ services:
     entrypoint:  /bin/bash /tmp/hive/init.sh
     volumes:
       - ./init/hive:/tmp/hive
-      - ../build/trino-ci-container-log/hive:/tmp/root
-      - ../build/trino-ci-container-log/hdfs:/usr/local/hadoop/logs
     healthcheck:
       test: ["CMD", "/tmp/check-status.sh"]
       interval: 10s

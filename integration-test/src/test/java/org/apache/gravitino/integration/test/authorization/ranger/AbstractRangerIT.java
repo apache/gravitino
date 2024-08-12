@@ -36,8 +36,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class RangerIT {
-  private static final Logger LOG = LoggerFactory.getLogger(RangerIT.class);
+public abstract class AbstractRangerIT {
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractRangerIT.class);
   protected static final String RANGER_TRINO_REPO_NAME = "trinoDev";
   private static final String RANGER_TRINO_TYPE = "trino";
   protected static final String RANGER_HIVE_REPO_NAME = "hiveDev";

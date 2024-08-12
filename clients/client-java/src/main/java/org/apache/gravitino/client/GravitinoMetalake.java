@@ -843,6 +843,20 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     }
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof GravitinoMetalake)) {
+      return false;
+    }
+
+    GravitinoMetalake that = (GravitinoMetalake) o;
+    return super.equals(that);
+  }
+
   /** @return the builder for creating a new instance of GravitinoMetaLake. */
   public static Builder builder() {
     return new Builder();
