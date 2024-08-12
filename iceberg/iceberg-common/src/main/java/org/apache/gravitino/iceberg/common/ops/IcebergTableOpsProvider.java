@@ -21,7 +21,7 @@ package org.apache.gravitino.iceberg.common.ops;
 import java.util.Map;
 
 /**
- * IcebergTableOpsProvider is an interface defining how Iceberg REST catalog server gets iceberg
+ * IcebergTableOpsProvider is an interface defining how Iceberg REST catalog server gets Iceberg
  * catalogs.
  */
 public interface IcebergTableOpsProvider {

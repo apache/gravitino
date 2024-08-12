@@ -20,9 +20,11 @@ package org.apache.gravitino.iceberg.common.ops;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,10 +52,9 @@ public class IcebergTableOpsManager implements AutoCloseable {
 
   private String getCatalogName(String rawPrefix) {
     String prefix = shelling(rawPrefix);
-    if (IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(prefix)) {
-      throw new RuntimeException(
-          String.format("%s is conflict with reserved key, please replace it", prefix));
-    }
+    Preconditions.checkArgument(
+        !IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(prefix),
+        String.format("%s is conflict with reserved key, please replace it", prefix));
     if (StringUtils.isBlank(prefix)) {
       return IcebergConstants.GRAVITINO_DEFAULT_CATALOG;
     }
@@ -63,9 +64,7 @@ public class IcebergTableOpsManager implements AutoCloseable {
   private IcebergTableOpsProvider createProvider(Map<String, String> properties) {
     try {
       String className =
-          properties.getOrDefault(
-              IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-              ConfigBasedIcebergTableOpsProvider.class.getName());
+          (new IcebergConfig(properties)).get(IcebergConfig.ICEBERG_REST_CATALOG_PROVIDER);
       Class<?> providerClz = Class.forName(className);
       return (IcebergTableOpsProvider) providerClz.getDeclaredConstructor().newInstance();
     } catch (Exception e) {
@@ -76,10 +75,10 @@ public class IcebergTableOpsManager implements AutoCloseable {
   private String shelling(String rawPrefix) {
     if (StringUtils.isBlank(rawPrefix)) {
       return rawPrefix;
-    } else if (!rawPrefix.endsWith("/")) {
-      throw new RuntimeException(String.format("rawPrefix %s is illegal", rawPrefix));
     } else {
       // rawPrefix is a string matching ([^/]*/) which end with /
+      Preconditions.checkArgument(
+          rawPrefix.endsWith("/"), String.format("rawPrefix %s format is illegal", rawPrefix));
       return rawPrefix.substring(0, rawPrefix.length() - 1);
     }
   }

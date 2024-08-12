@@ -22,6 +22,9 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.iceberg.hive.HiveCatalog;
+import org.apache.iceberg.inmemory.InMemoryCatalog;
+import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -61,6 +64,13 @@ public class TestConfigBasedIcebergTableOpsProvider {
     IcebergTableOps ops = provider.getIcebergTableOps(catalogName);
 
     Assertions.assertEquals(catalogName, ops.catalog.name());
+    if ("hive_backend".equals(catalogName)) {
+      Assertions.assertTrue(ops.catalog instanceof HiveCatalog);
+    } else if ("jdbc_backend".equals(catalogName)) {
+      Assertions.assertTrue(ops.catalog instanceof JdbcCatalog);
+    } else if (IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(catalogName)) {
+      Assertions.assertTrue(ops.catalog instanceof InMemoryCatalog);
+    }
   }
 
   @ParameterizedTest

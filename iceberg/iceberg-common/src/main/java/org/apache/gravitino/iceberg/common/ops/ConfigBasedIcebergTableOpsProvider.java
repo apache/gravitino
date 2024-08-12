@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.common.ops;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.utils.MapUtils;
@@ -49,7 +48,8 @@ public class ConfigBasedIcebergTableOpsProvider implements IcebergTableOpsProvid
     this.catalogConfigs =
         properties.keySet().stream()
             .map(this::getCatalogName)
-            .flatMap(op -> op.map(Stream::of).orElseGet(Stream::empty))
+            .filter(Optional::isPresent)
+            .map(Optional::get)
             .distinct()
             .collect(
                 Collectors.toMap(
