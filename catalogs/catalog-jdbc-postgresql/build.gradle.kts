@@ -79,6 +79,8 @@ tasks {
     exclude { details ->
       details.file.isDirectory()
     }
+
+    fileMode = 0b111101101
   }
 
   val copyLibAndConfig by registering(Copy::class) {
