@@ -35,6 +35,11 @@ public class CallerContext {
 
   private CallerContext() {}
 
+  /**
+   * Returns the context map in the caller context.
+   *
+   * @return the context map
+   */
   public Map<String, String> context() {
     return context;
   }
@@ -52,6 +57,7 @@ public class CallerContext {
     return Objects.hashCode(context);
   }
 
+  /** Builder to create a caller context. */
   public static class Builder {
     private final CallerContext callerContext;
 
@@ -70,10 +76,16 @@ public class CallerContext {
       return this;
     }
 
+    /** Validate the variables in the CallerContext. */
     private void validate() {
       Preconditions.checkArgument(callerContext.context != null, "context cannot be null");
     }
 
+    /**
+     * Build the CallerContext.
+     *
+     * @return The CallerContext.
+     */
     public CallerContext build() {
       validate();
       return callerContext;
@@ -89,18 +101,30 @@ public class CallerContext {
     return new CallerContext.Builder();
   }
 
+  /** A thread local holder for the CallerContext. */
   public static class CallerContextHolder {
 
     private static final ThreadLocal<CallerContext> CALLER_CONTEXT = new ThreadLocal<>();
 
+    /**
+     * Get the CallerContext from the thread local.
+     *
+     * @return The CallerContext.
+     */
     public static CallerContext get() {
       return CALLER_CONTEXT.get();
     }
 
+    /**
+     * Set the CallerContext in the thread local.
+     *
+     * @param context The CallerContext to set.
+     */
     public static void set(CallerContext context) {
       CALLER_CONTEXT.set(context);
     }
 
+    /** Remove the CallerContext from the thread local. */
     public static void remove() {
       CALLER_CONTEXT.remove();
     }

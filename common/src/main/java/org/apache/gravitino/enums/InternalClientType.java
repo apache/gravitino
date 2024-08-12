@@ -34,6 +34,12 @@ public enum InternalClientType {
   /** The client type is unknown. */
   UNKNOWN;
 
+  /**
+   * Check if the client type is valid.
+   *
+   * @param clientType the client type
+   * @return true if the client type is valid, false otherwise
+   */
   public static boolean checkValid(String clientType) {
     try {
       InternalClientType.valueOf(clientType);

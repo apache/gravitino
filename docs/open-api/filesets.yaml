@@ -451,7 +451,6 @@ components:
       value: {
         "code": 0,
         "fileLocation": "hdfs://host/user/fileset/schema/fileset1/test.parquet"
-        }
       }
 
     FilesetAlreadyExistsException:

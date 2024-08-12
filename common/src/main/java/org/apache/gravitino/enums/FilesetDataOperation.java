@@ -46,6 +46,12 @@ public enum FilesetDataOperation {
   /** This data operation means that it is an unknown data operation. */
   UNKNOWN;
 
+  /**
+   * Check if the operation is valid.
+   *
+   * @param operation the operation to check
+   * @return true if the operation is valid, false otherwise
+   */
   public static boolean checkValid(String operation) {
     try {
       FilesetDataOperation.valueOf(operation);
