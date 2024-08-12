@@ -30,10 +30,8 @@ import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-test")
 public class AuditIT extends AbstractIT {
 
   private static final String expectUser = System.getProperty("user.name");
@@ -47,7 +45,7 @@ public class AuditIT extends AbstractIT {
   }
 
   @Test
-  public void testAuditMetalake() throws Exception {
+  public void testAuditMetalake() {
     String metalakeAuditName = RandomNameUtils.genRandomName("metalakeAudit");
     String newName = RandomNameUtils.genRandomName("newmetaname");
 

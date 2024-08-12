@@ -49,6 +49,10 @@ if [ "${GITHUB_ACTIONS}" = "true" ]; then
   sudo rm -rf /opt/hostedtoolcache/PyPy || :
   # 376MB
   sudo rm -rf /opt/hostedtoolcache/node || :
+  # Free at least 10G, android is useless for Gravitino CI.
+  sudo rm -rf /usr/local/lib/android || :
+  # Free at lease 5G, .ghcup is installed by Haskell CI and useless for Gravitino CI.
+  sudo rm -rf /usr/local/.ghcup || :
   # Remove Web browser packages
   if dpkg-query -l firefox;then
     sudo apt purge -y firefox
