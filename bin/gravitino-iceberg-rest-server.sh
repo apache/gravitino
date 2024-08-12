@@ -116,8 +116,6 @@ function start() {
   if [[ -z "${pid}" ]]; then
     echo "GravitinoIcebergRESTServer start error!"
     return 1;
-  else
-    echo "GravitinoIcebergRESTServer start success!"
   fi
 
   sleep 2
