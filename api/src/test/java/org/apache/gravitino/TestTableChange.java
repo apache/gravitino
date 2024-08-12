@@ -43,6 +43,7 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestTableChange {
@@ -172,11 +173,11 @@ public class TestTableChange {
   public void testDoesNotAllowDefaultInColumnPosition() {
     String[] fieldName = {"Name", "Last Name"};
     ColumnPosition newPosition = TableChange.ColumnPosition.defaultPos();
-    try {
-      TableChange.updateColumnPosition(fieldName, newPosition);
-    } catch (Exception e) {
-      assertEquals("Position cannot be DEFAULT", e.getMessage());
-    }
+    Exception exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () -> TableChange.updateColumnPosition(fieldName, newPosition));
+    assertEquals("Position cannot be DEFAULT", exception.getMessage());
   }
 
   @Test
