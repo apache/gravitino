@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 public class IcebergTableOpsManager implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergTableOpsManager.class);
 
-  public static final String DEFAULT_CATALOG = "default_catalog";
   private final Cache<String, IcebergTableOps> icebergTableOpsCache;
   private final IcebergTableOpsProvider provider;
 
@@ -45,17 +44,20 @@ public class IcebergTableOpsManager implements AutoCloseable {
    * @return the instance of IcebergTableOps.
    */
   public IcebergTableOps getOps(String rawPrefix) {
+    String catalogName = getCatalogName(rawPrefix);
+    return icebergTableOpsCache.get(catalogName, k -> provider.getIcebergTableOps(catalogName));
+  }
+
+  private String getCatalogName(String rawPrefix) {
     String prefix = shelling(rawPrefix);
-    String cacheKey = prefix;
-    if (DEFAULT_CATALOG.equals(prefix)) {
+    if (IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(prefix)) {
       throw new RuntimeException(
           String.format("%s is conflict with reserved key, please replace it", prefix));
     }
     if (StringUtils.isBlank(prefix)) {
-      LOG.debug("prefix is empty, return default iceberg catalog");
-      cacheKey = DEFAULT_CATALOG;
+      return IcebergConstants.GRAVITINO_DEFAULT_CATALOG;
     }
-    return icebergTableOpsCache.get(cacheKey, k -> provider.getIcebergTableOps(prefix));
+    return prefix;
   }
 
   private IcebergTableOpsProvider createProvider(Map<String, String> properties) {
@@ -63,7 +65,7 @@ public class IcebergTableOpsManager implements AutoCloseable {
       String className =
           properties.getOrDefault(
               IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-              ConfigIcebergTableOpsProvider.class.getName());
+              ConfigBasedIcebergTableOpsProvider.class.getName());
       Class<?> providerClz = Class.forName(className);
       return (IcebergTableOpsProvider) providerClz.getDeclaredConstructor().newInstance();
     } catch (Exception e) {

@@ -18,11 +18,12 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
-import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
-import org.apache.commons.lang.StringUtils;
+import java.util.stream.Stream;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.utils.MapUtils;
 import org.slf4j.Logger;
@@ -38,8 +39,9 @@ import org.slf4j.LoggerFactory;
  * gravitino.iceberg-rest.catalog.hive_proxy.catalog-backend = hive
  * gravitino.iceberg-rest.catalog.hive_proxy.uri = thrift://{host}:{port} ...
  */
-public class ConfigIcebergTableOpsProvider implements IcebergTableOpsProvider {
-  public static final Logger LOG = LoggerFactory.getLogger(ConfigIcebergTableOpsProvider.class);
+public class ConfigBasedIcebergTableOpsProvider implements IcebergTableOpsProvider {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(ConfigBasedIcebergTableOpsProvider.class);
 
   private Map<String, String> properties;
 
@@ -47,40 +49,43 @@ public class ConfigIcebergTableOpsProvider implements IcebergTableOpsProvider {
 
   @Override
   public void initialize(Map<String, String> properties) {
-    Map<String, Boolean> catalogs = Maps.newHashMap();
-    for (String key : properties.keySet()) {
-      if (!key.startsWith("catalog.")) {
-        continue;
-      }
-      if (key.split("\\.").length < 3) {
-        throw new RuntimeException(String.format("%s format is illegal", key));
-      }
-      catalogs.put(key.split("\\.")[1], true);
-    }
-    this.catalogNames = catalogs.keySet().stream().sorted().collect(Collectors.toList());
+    this.catalogNames =
+        properties.keySet().stream()
+            .map(this::getCatalogName)
+            .flatMap(op -> op.map(Stream::of).orElseGet(Stream::empty))
+            .distinct()
+            .collect(Collectors.toList());
     this.properties = properties;
   }
 
   @Override
-  public IcebergTableOps getIcebergTableOps(String prefix) {
-    if (StringUtils.isBlank(prefix)) {
+  public IcebergTableOps getIcebergTableOps(String catalogName) {
+    if (IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(catalogName)) {
       return new IcebergTableOps(new IcebergConfig(properties));
     }
-    if (!catalogNames.contains(prefix)) {
-      String errorMsg = String.format("%s can not match any catalog", prefix);
-      LOG.error(errorMsg);
+    if (!catalogNames.contains(catalogName)) {
+      String errorMsg = String.format("%s can not match any catalog", catalogName);
+      LOG.warn(errorMsg);
       throw new RuntimeException(errorMsg);
     }
-    return new IcebergTableOps(getCatalogConfig(prefix));
+    return new IcebergTableOps(getCatalogConfig(catalogName));
   }
 
-  private IcebergConfig getCatalogConfig(String catalog) {
-    Map<String, String> base = Maps.newHashMap(this.properties);
-    Map<String, String> merge =
-        MapUtils.getPrefixMap(this.properties, String.format("catalog.%s.", catalog));
-    for (String key : merge.keySet()) {
-      base.put(key, merge.get(key));
-    }
+  private IcebergConfig getCatalogConfig(String catalogName) {
+    Map<String, String> base =
+        MapUtils.getPrefixMap(this.properties, String.format("catalog.%s.", catalogName));
     return new IcebergConfig(base);
+  }
+
+  private Optional<String> getCatalogName(String catalogConfigKey) {
+    if (!catalogConfigKey.startsWith("catalog.")) {
+      return Optional.empty();
+    }
+    // The catalogConfigKey's format is catalog.<catalog_name>.<param_name>
+    if (catalogConfigKey.split("\\.").length < 3) {
+      LOG.warn("{} format is illegal", catalogConfigKey);
+      return Optional.empty();
+    }
+    return Optional.of(catalogConfigKey.split("\\.")[1]);
   }
 }

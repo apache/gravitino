@@ -73,7 +73,7 @@ public class IcebergRestTestUtil {
       catalogConf.put(String.format("catalog.%s.catalog-backend-name", PREFIX), PREFIX);
       catalogConf.put(
           IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-          ConfigIcebergTableOpsProviderForTest.class.getName());
+          ConfigBasedIcebergTableOpsProviderForTest.class.getName());
       IcebergTableOpsManager icebergTableOpsManager = new IcebergTableOpsManager(catalogConf);
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());

@@ -28,6 +28,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIcebergTableOpsManager {
 
+  private static final String DEFAULT_CATALOG = "memory";
+
   @ParameterizedTest
   @ValueSource(strings = {"", "hello/", "\\\n\t\\\'/", "\u0024/", "\100/", "[_~/"})
   public void testValidGetOps(String rawPrefix) {
@@ -39,25 +41,26 @@ public class TestIcebergTableOpsManager {
     config.put(String.format("catalog.%s.catalog-backend-name", prefix), prefix);
     config.put(
         IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-        ConfigIcebergTableOpsProvider.class.getName());
+        ConfigBasedIcebergTableOpsProvider.class.getName());
     IcebergTableOpsManager manager = new IcebergTableOpsManager(config);
 
     IcebergTableOps ops = manager.getOps(rawPrefix);
 
     if (StringUtils.isBlank(prefix)) {
-      Assertions.assertEquals(ops.catalog.name(), "memory");
+      Assertions.assertEquals(ops.catalog.name(), DEFAULT_CATALOG);
     } else {
       Assertions.assertEquals(ops.catalog.name(), prefix);
     }
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"hello", "\\\n\t\\\'", "\u0024", "\100", "[_~", "default_catalog/"})
+  @ValueSource(
+      strings = {"hello", "\\\n\t\\\'", "\u0024", "\100", "[_~", "__gravitino_default_catalog/"})
   public void testInvalidGetOps(String rawPrefix) {
     Map<String, String> config = Maps.newHashMap();
     config.put(
         IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-        ConfigIcebergTableOpsProvider.class.getName());
+        ConfigBasedIcebergTableOpsProvider.class.getName());
     IcebergTableOpsManager manager = new IcebergTableOpsManager(config);
 
     Assertions.assertThrowsExactly(RuntimeException.class, () -> manager.getOps(rawPrefix));

@@ -26,12 +26,15 @@ import java.util.Map;
  */
 public interface IcebergTableOpsProvider {
 
-  /** @param properties The configuration parameters for creating Provider. */
+  /**
+   * @param properties The parameters for creating Provider which from configurations whose prefix
+   *     is 'gravitino.iceberg-rest.'
+   */
   void initialize(Map<String, String> properties);
 
   /**
-   * @param prefix the path param send by clients.
+   * @param catalogName a param send by clients.
    * @return the instance of IcebergTableOps.
    */
-  IcebergTableOps getIcebergTableOps(String prefix);
+  IcebergTableOps getIcebergTableOps(String catalogName);
 }
