@@ -89,8 +89,8 @@ jobs:
 
       - name: Build with Scala2.13
         run: |
-          ./gradlew -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false :spark-connector:spark-3.4:test
-          ./gradlew -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false :spark-connector:spark-3.5:test
+          ./gradlew :spark-connector:spark-3.4:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false
+          ./gradlew :spark-connector:spark-3.5:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false
 
       - name: Upload unit tests report
         uses: actions/upload-artifact@v3
