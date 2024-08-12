@@ -57,7 +57,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-it")
+@Tag("gravitino-docker-test")
 public class TestDorisTablePartitionOperations extends TestDoris {
   private static final String databaseName = GravitinoITUtils.genRandomName("doris_test_db");
   private static final Integer DEFAULT_BUCKET_SIZE = 1;
