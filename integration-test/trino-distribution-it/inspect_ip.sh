@@ -17,6 +17,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+set -e
+
 output=$(docker inspect --format='{{.Name}}:{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q) | grep "/trino-ci-" | sed 's/\/trino-ci-//g')
 
 TRINO=127.0.0.1

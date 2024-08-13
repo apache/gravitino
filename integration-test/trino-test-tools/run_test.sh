@@ -17,6 +17,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+set -e
+
 cd "$(dirname "$0")"
 
 export GRAVITINO_SERVER_HOME=../../distribution/package
@@ -27,6 +29,10 @@ export TRINO_TEST_PARAMS=
 
 if [ -f .env ]; then  
     source .env
+fi
+
+if [ ! -z "$1" ]; then
+    GRAVITINO_SERVER_HOME=$1
 fi
 
 if [ ! -d "$GRAVITINO_SERVER_HOME" ]; then

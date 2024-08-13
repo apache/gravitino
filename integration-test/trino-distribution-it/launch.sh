@@ -17,22 +17,28 @@
 # specific language governing permissions and limitations
 # under the License.
 
-#set -ex
+set -e
+
 cd "$(dirname "${BASH_SOURCE-$0}")"
 
 playground_dir=$(pwd)
-
-if ! command -v docker &>/dev/null; then
-  echo "ERROR: No docker service environment found, please install Docker first."
-  exit 1
-fi
 
 if [ -z "${GRAVITINO_SERVER_HOME}" ]; then
     GRAVITINO_SERVER_HOME=`realpath ../../distribution/package`
 fi
 
+if [ ! -z "$1" ]; then
+    GRAVITINO_SERVER_HOME=$1
+fi
+
 if [ ! -d "$GRAVITINO_SERVER_HOME" ]; then
   echo "Error: Gravitino server directory '$GRAVITINO_SERVER_HOME' does not exist."
+  exit 1
+fi
+
+
+if ! command -v docker &>/dev/null; then
+  echo "ERROR: No docker service environment found, please install Docker first."
   exit 1
 fi
 
