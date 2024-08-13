@@ -140,7 +140,7 @@ For more details, please refer to the definition of the plugin.
 
 ### Security configuration
 
-Refer to [security](security.md) for HTTPS and authentication configurations.
+Refer to [security](security/security.md) for HTTPS and authentication configurations.
 
 ### Metrics configuration
 

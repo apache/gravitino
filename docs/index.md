@@ -144,7 +144,7 @@ Gravitino provides a Flink connector to manage metadata in a unified way. To use
 
 Gravitino provides several ways to configure and manage the Gravitino server. See:
 
-* [Security](./security.md): provides security configurations for Gravitino, including HTTPS
+* [Security](security/security.md): provides security configurations for Gravitino, including HTTPS
   and OAuth2 configurations.
 * [Gravitino metrics](./metrics.md): provides metrics configurations and detailed a metrics list
   of the Gravitino server.
