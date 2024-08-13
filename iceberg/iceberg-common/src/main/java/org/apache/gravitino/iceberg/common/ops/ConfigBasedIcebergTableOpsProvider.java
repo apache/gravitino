@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.common.ops;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -41,7 +42,7 @@ public class ConfigBasedIcebergTableOpsProvider implements IcebergTableOpsProvid
   public static final Logger LOG =
       LoggerFactory.getLogger(ConfigBasedIcebergTableOpsProvider.class);
 
-  private Map<String, IcebergConfig> catalogConfigs;
+  @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
 
   @Override
   public void initialize(Map<String, String> properties) {

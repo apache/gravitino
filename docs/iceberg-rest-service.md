@@ -148,15 +148,16 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 :::
 
 #### Multi catalog support
+
+Gravitino Iceberg REST server supports multiple catalogs. Users can enable it by setting configuration entries in the style `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
+
 | Configuration item                               | Description                                                                                                      | Default value                                                                   | Required | Since Version |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|----------|---------------|
 | `gravitino.iceberg-rest.catalog-provider-impl`   | The implementation of IcebergTableOpsProvider defines how the Iceberg REST catalog server gets Iceberg catalogs. | `org.apache.gravitino.iceberg.common.ops.ConfigBasedIcebergTableOpsProvider`    | No       | 0.7.0         |
 
-You can also specify catalog parameters by setting configuration entries in the style `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
-
 Using `ConfigBasedIcebergTableOpsProvider`, the default value, could be backward compatible with configurations without catalog names. It constructs a default catalog using those configurations for clients not setting `prefix`.
 
-For instance, we can configure three different catalogs simultaneously, which one is anonymous and the others named `hive_backend` and `jdbc_backend`: 
+For instance, we can configure three different catalogs, which one is anonymous and the others named `hive_backend` and `jdbc_backend`: 
 
 ```text
 gravitino.iceberg-rest.catalog-backend = jdbc
