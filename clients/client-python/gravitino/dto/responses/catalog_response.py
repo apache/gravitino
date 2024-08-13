@@ -42,7 +42,7 @@ class CatalogResponse(BaseResponse):
 
         if self._catalog is None:
             raise IllegalArgumentException("catalog must not be null")
-        if self._catalog.name() is None or not self._catalog.name().strip():
+        if self._catalog.name() is None:
             raise IllegalArgumentException("catalog 'name' must not be null and empty")
         if self._catalog.type() is None:
             raise IllegalArgumentException("catalog 'type' must not be null")

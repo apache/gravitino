@@ -45,7 +45,7 @@ class MetalakeResponse(BaseResponse):
         if self._metalake is None:
             raise IllegalArgumentException("Metalake must not be null")
 
-        if self._metalake.name() is None or not self._metalake.name().strip():
+        if self._metalake.name() is None:
             raise IllegalArgumentException("Metalake 'name' must not be null and empty")
 
         if self._metalake.audit_info() is None:
