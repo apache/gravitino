@@ -56,12 +56,11 @@ The top container is the metalake. You can understand that metalake a customer o
 
 Catalogs are under the metalake. Catalogs represent different kinds of data sources.
 
-Gravitino supports Hive, Iceberg, MySQL, PostgreSQL, Hadoop, and Kafka catalogs.
-
 Schemas are under the catalog.
 
 There are tables, topics, or filesets under the schema.
 
+![object_image](../assets/object.png)
 
 The relationship of the concepts is as below.
 
@@ -190,8 +189,7 @@ The privilege supports two condition: `allow` and `deny`. `allow` means that you
 
 `deny` means that you aren't able to use the privilege.
 
-`deny` condition is prior to `allow` condition. If a role has the `allow` condition and `deny` condition at the same time.
-
+`deny` condition is prior to `allow` condition. If a role has the `allow` condition and `deny` condition at the same time. 
 The user won't be able to use the privilege.
 
 If parent securable object has the same privilege name with different condition, the parent securable privilege will still take effect.
@@ -484,7 +482,6 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     roleNames: ["role1"]
 }'http://localhost:8090/api/metalakes/test/permissions/users/user1/grant
-
 ```
 
 </TabItem>
@@ -510,7 +507,6 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     roleNames: ["role1"]
 }'http://localhost:8090/api/metalakes/test/permissions/users/user1/revoke
-
 ```
 
 </TabItem>
@@ -537,7 +533,6 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     roleNames: ["role1"]
 }'http://localhost:8090/api/metalakes/test/permissions/groups/group1/grant
-
 ```
 
 </TabItem>
@@ -563,7 +558,6 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     roleNames: ["role1"]
 }'http://localhost:8090/api/metalakes/test/permissions/groups/group1/revoke
-
 ```
 
 </TabItem>
@@ -589,7 +583,6 @@ You can get the owner of a metadata object.
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/owners/table/catalog1.schema1.table1
-
 ```
 
 </TabItem>
@@ -620,7 +613,6 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
     name: "user1",
     type: "USER"
 }'http://localhost:8090/api/metalakes/test/owners/table/catalog1.schema1.table1
-
 ```
 
 </TabItem>
