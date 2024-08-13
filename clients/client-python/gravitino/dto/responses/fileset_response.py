@@ -23,6 +23,7 @@ from dataclasses_json import config
 
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
@@ -41,11 +42,16 @@ class FilesetResponse(BaseResponse):
             IllegalArgumentException if catalog identifiers are not set.
         """
         super().validate()
-        assert self._fileset is not None, "fileset must not be null"
-        assert self._fileset.name, "fileset 'name' must not be null and empty"
-        assert (
-            self._fileset.storage_location
-        ), "fileset 'storageLocation' must not be null and empty"
-        assert (
-            self._fileset.type is not None
-        ), "fileset 'type' must not be null and empty"
+        if self._fileset is None:
+            raise IllegalArgumentException("fileset must not be null")
+        if not self._fileset.name() or not self._fileset.name.strip():
+            raise IllegalArgumentException("fileset 'name' must not be null and empty")
+        if (
+            not self._fileset.storage_location
+            or not self._fileset.storage_location.strip()
+        ):
+            raise IllegalArgumentException(
+                "fileset 'storageLocation' must not be null and empty"
+            )
+        if self._fileset.type is None:
+            raise IllegalArgumentException("fileset 'type' must not be null and empty")

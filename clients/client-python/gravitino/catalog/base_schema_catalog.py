@@ -36,6 +36,7 @@ from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HAND
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 from gravitino.rest.rest_utils import encode_string
+from gravitino.exceptions.base import IllegalArgumentException
 
 logger = logging.getLogger(__name__)
 
@@ -238,12 +239,13 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             f"Catalog namespace must be non-null and have 1 level, the input namespace is {self._catalog_namespace}",
         )
 
-        assert self.rest_client is not None, "restClient must be set"
-        assert (
-            self.name() is not None and len(self.name().strip()) > 0
-        ), "name must not be blank"
-        assert self.type() is not None, "type must not be None"
-        assert (
-            self.provider() is not None and len(self.provider().strip()) > 0
-        ), "provider must not be blank"
-        assert self.audit_info() is not None, "audit must not be None"
+        if self.rest_client is None:
+            raise IllegalArgumentException("restClient must be set")
+        if not (self.name() and len(self.name().strip()) > 0):
+            raise IllegalArgumentException("name must not be blank")
+        if self.type() is None:
+            raise IllegalArgumentException("type must not be None")
+        if not (self.provider() and len(self.provider().strip()) > 0):
+            raise IllegalArgumentException("provider must not be blank")
+        if self.audit_info() is None:
+            raise IllegalArgumentException("audit must not be None")

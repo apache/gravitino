@@ -27,6 +27,7 @@ from docker import types as tp
 from docker.errors import NotFound
 
 from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.exceptions.base import InternalError
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,8 @@ async def check_hdfs_container_status(hdfs_container):
         result = await asyncio.wait_for(
             check_hdfs_status(hdfs_container), timeout=timeout_sec
         )
-        assert result is True, "HDFS container startup failed!"
+        if not result:
+            raise InternalError("HDFS container startup failed!")
     except asyncio.TimeoutError as e:
         raise GravitinoRuntimeException(
             "Timeout occurred while waiting for checking HDFS container status."

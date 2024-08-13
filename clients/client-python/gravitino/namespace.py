@@ -40,9 +40,10 @@ class Namespace:
 
     @classmethod
     def from_json(cls, levels):
-        assert levels is not None and isinstance(
-            levels, list
-        ), f"Cannot parse name identifier from invalid JSON: {levels}"
+        if levels is None or not isinstance(levels, list):
+            raise IllegalNamespaceException(
+                f"Cannot parse name identifier from invalid JSON: {levels}"
+            )
         return cls(levels)
 
     @staticmethod
