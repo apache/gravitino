@@ -375,6 +375,13 @@ public class JDBCBackend implements RelationalBackend {
             .getOwner(nameIdentifier, identType)
             .ifPresent(e -> list.add((E) e));
         return list;
+      case METADATA_OBJECT_ROLE_REL:
+        return RoleMetaService.getInstance()
+            .listRolesByMetadataObjectIdentAndType(nameIdentifier, identType);
+      case ROLE_GROUP_REL:
+        return GroupMetaService.getInstance().listGroupsByRoleIdent(nameIdentifier);
+      case ROLE_USER_REL:
+        return UserMetaService.getInstance().listUsersByRoleIdent(nameIdentifier);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

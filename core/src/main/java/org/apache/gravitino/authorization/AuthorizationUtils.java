@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization;
 
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
@@ -29,6 +30,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -45,6 +47,15 @@ public class AuthorizationUtils {
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
+
+  private static final List<Privilege.Name> pluginNotSupportsPrivileges =
+      Lists.newArrayList(
+          Privilege.Name.CREATE_CATALOG,
+          Privilege.Name.USE_CATALOG,
+          Privilege.Name.MANAGE_GRANTS,
+          Privilege.Name.MANAGE_USERS,
+          Privilege.Name.MANAGE_GROUPS,
+          Privilege.Name.CREATE_ROLE);
 
   private AuthorizationUtils() {}
 
@@ -132,28 +143,60 @@ public class AuthorizationUtils {
   public static void callAuthorizationPlugin(
       String metalake,
       List<SecurableObject> securableObjects,
-      Set<NameIdentifier> catalogsAlreadySet,
-      Consumer<AuthorizationPlugin> consumer) {
+      Set<String> catalogsAlreadySet,
+      Consumer<AuthorizationPlugin> consumer,
+      boolean grant) {
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
     for (SecurableObject securableObject : securableObjects) {
-      if (supportsAuthorizationPlugin(securableObject.type())) {
+      if (supportsAllAuthorizationPlugin(securableObject)) {
+        Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
+        for (Catalog catalog : catalogs) {
+          callAuthorizationPluginImpl(catalogsAlreadySet, consumer, catalog);
+        }
+
+        if (grant) {
+
+        } else {
+
+        }
+      } else if (supportsAuthorizationPlugin(securableObject.type())) {
         NameIdentifier catalogIdent =
             NameIdentifierUtil.getCatalogIdentifier(
                 MetadataObjectUtil.toEntityIdent(metalake, securableObject));
-        if (!catalogsAlreadySet.contains(catalogIdent)) {
-          catalogsAlreadySet.add(catalogIdent);
-          Catalog catalog = GravitinoEnv.getInstance().catalogManager().loadCatalog(catalogIdent);
-          if (catalog instanceof BaseCatalog) {
-            BaseCatalog baseCatalog = (BaseCatalog) catalog;
-            if (baseCatalog.getAuthorizationPlugin() != null) {
-              consumer.accept(baseCatalog.getAuthorizationPlugin());
-            }
-          }
+        Catalog catalog = catalogManager.loadCatalog(catalogIdent);
+        callAuthorizationPluginImpl(catalogsAlreadySet, consumer, catalog);
+      }
+    }
+  }
+
+  private static void callAuthorizationPluginImpl(
+      Set<String> catalogsAlreadySet, Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
+    if (!catalogsAlreadySet.contains(catalog.name())) {
+      catalogsAlreadySet.add(catalog.name());
+
+      if (catalog instanceof BaseCatalog) {
+        BaseCatalog baseCatalog = (BaseCatalog) catalog;
+        if (baseCatalog.getAuthorizationPlugin() != null) {
+          consumer.accept(baseCatalog.getAuthorizationPlugin());
         }
       }
     }
   }
 
+  private static boolean supportsAllAuthorizationPlugin(SecurableObject securableObject) {
+    // TODO: Add supportsSecurableObjects method for every privilege to simplify this code
+    if (securableObject.type() == MetadataObject.Type.METALAKE) {
+      List<Privilege> privileges = securableObject.privileges();
+      for (Privilege privilege : privileges) {
+        if (!pluginNotSupportsPrivileges.contains(privilege.name())) {
+          return true;
+        }
+      }
+    }
+    return true;
+  }
+
   private static boolean supportsAuthorizationPlugin(MetadataObject.Type type) {
-    return type != MetadataObject.Type.METALAKE && type != MetadataObject.Type.ROLE;
+    return type != MetadataObject.Type.ROLE;
   }
 }

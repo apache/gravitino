@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -38,6 +39,7 @@ import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +88,18 @@ public class RoleMetaService {
   public List<RolePO> listRolesByUserId(Long userId) {
     return SessionUtils.getWithoutCommit(
         RoleMetaMapper.class, mapper -> mapper.listRolesByUserId(userId));
+  }
+
+  public <E extends Entity & HasIdentifier> List<E> listRolesByMetadataObjectIdentAndType(
+      NameIdentifier metadataObjectIdent, Entity.EntityType metadataObjectType) {
+    long metalakeId =
+        MetalakeMetaService.getInstance()
+            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(metadataObjectIdent));
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(metadataObjectIdent, metadataObjectType);
+    long metadataObjectId = MetadataObjectService.getMetadataObjectId(metalakeId, metadataObject.fullName(), metadataObject.type());
+    return SessionUtils.getWithoutCommit(
+        RoleMetaMapper.class, mapper -> mapper.listRolesByMetadataObjectIdAndType(metadataObjectId, metadataObject.type().name()));
   }
 
   public List<RolePO> listRolesByGroupId(Long groupId) {

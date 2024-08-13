@@ -94,6 +94,11 @@ public class GroupMetaService {
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
   }
 
+  public <E extends Entity & HasIdentifier> List<E> listGroupsByRoleIdent(
+      NameIdentifier groupIdent) {
+    return null;
+  }
+
   public void insertGroup(GroupEntity groupEntity, boolean overwritten) throws IOException {
     try {
       AuthorizationUtils.checkGroup(groupEntity.nameIdentifier());

@@ -94,6 +94,10 @@ public class UserMetaService {
     return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
   }
 
+  public <E extends Entity & HasIdentifier> List<E> listUsersByRoleIdent(NameIdentifier roleIdent) {
+    return null;
+  }
+
   public void insertUser(UserEntity userEntity, boolean overwritten) throws IOException {
     try {
       AuthorizationUtils.checkUser(userEntity.nameIdentifier());

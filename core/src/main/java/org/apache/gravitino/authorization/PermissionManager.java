@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -111,7 +110,7 @@ class PermissionManager {
                     .build();
               });
 
-      Set<NameIdentifier> catalogs = Sets.newHashSet();
+      Set<String> catalogs = Sets.newHashSet();
       for (Role grantedRole : roleEntitiesToGrant) {
         AuthorizationUtils.callAuthorizationPlugin(
             metalake,
@@ -119,7 +118,8 @@ class PermissionManager {
             catalogs,
             authorizationPlugin ->
                 authorizationPlugin.onGrantedRolesToUser(
-                    Lists.newArrayList(roleEntitiesToGrant), updatedUser));
+                    Lists.newArrayList(roleEntitiesToGrant), updatedUser),
+            false);
       }
 
       return updatedUser;
@@ -190,7 +190,7 @@ class PermissionManager {
                     .build();
               });
 
-      Set<NameIdentifier> catalogs = Sets.newHashSet();
+      Set<String> catalogs = Sets.newHashSet();
       for (Role grantedRole : roleEntitiesToGrant) {
         AuthorizationUtils.callAuthorizationPlugin(
             metalake,
@@ -198,7 +198,8 @@ class PermissionManager {
             catalogs,
             authorizationPlugin ->
                 authorizationPlugin.onGrantedRolesToGroup(
-                    Lists.newArrayList(roleEntitiesToGrant), updatedGroup));
+                    Lists.newArrayList(roleEntitiesToGrant), updatedGroup),
+            false);
       }
 
       return updatedGroup;
@@ -268,7 +269,7 @@ class PermissionManager {
                     .build();
               });
 
-      Set<NameIdentifier> catalogs = Sets.newHashSet();
+      Set<String> catalogs = Sets.newHashSet();
       for (Role grantedRole : roleEntitiesToRevoke) {
         AuthorizationUtils.callAuthorizationPlugin(
             metalake,
@@ -276,7 +277,8 @@ class PermissionManager {
             catalogs,
             authorizationPlugin ->
                 authorizationPlugin.onRevokedRolesFromGroup(
-                    Lists.newArrayList(roleEntitiesToRevoke), updatedGroup));
+                    Lists.newArrayList(roleEntitiesToRevoke), updatedGroup),
+            false);
       }
 
       return updatedGroup;
@@ -348,7 +350,7 @@ class PermissionManager {
                     .build();
               });
 
-      Set<NameIdentifier> catalogs = Sets.newHashSet();
+      Set<String> catalogs = Sets.newHashSet();
       for (Role grantedRole : roleEntitiesToRevoke) {
         AuthorizationUtils.callAuthorizationPlugin(
             metalake,
@@ -356,7 +358,8 @@ class PermissionManager {
             catalogs,
             authorizationPlugin ->
                 authorizationPlugin.onRevokedRolesFromUser(
-                    Lists.newArrayList(roleEntitiesToRevoke), updatedUser));
+                    Lists.newArrayList(roleEntitiesToRevoke), updatedUser),
+            false);
       }
 
       return updatedUser;
