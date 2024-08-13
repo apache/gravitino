@@ -65,7 +65,6 @@ class CatalogUpdateRequest:
             if not self._new_name:
                 raise ValueError('"newName" field is required and cannot be empty')
 
-
     @dataclass
     class UpdateCatalogCommentRequest(CatalogUpdateRequestBase):
         """Request to update the comment of a catalog."""
@@ -83,7 +82,6 @@ class CatalogUpdateRequest:
         def validate(self):
             if not self._new_comment:
                 raise ValueError('"newComment" field is required and cannot be empty')
-
 
     @dataclass
     class SetCatalogPropertyRequest(CatalogUpdateRequestBase):
