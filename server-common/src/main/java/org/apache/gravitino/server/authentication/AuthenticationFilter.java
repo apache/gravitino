@@ -68,6 +68,7 @@ public class AuthenticationFilter implements Filter {
         authData = headerData.nextElement().getBytes(StandardCharsets.UTF_8);
       }
 
+      // If token is supported by multiple authenticators, use the first by default.
       Principal principal = null;
       for (Authenticator authenticator : authenticators) {
         if (authenticator.supportsToken(authData) && authenticator.isDataFromToken()) {
