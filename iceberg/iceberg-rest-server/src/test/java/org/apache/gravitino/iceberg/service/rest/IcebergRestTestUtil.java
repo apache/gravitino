@@ -23,7 +23,6 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
@@ -71,10 +70,9 @@ public class IcebergRestTestUtil {
     if (bindIcebergTableOps) {
       Map<String, String> catalogConf = Maps.newHashMap();
       catalogConf.put(String.format("catalog.%s.catalog-backend-name", PREFIX), PREFIX);
-      catalogConf.put(
-          IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-          ConfigBasedIcebergTableOpsProviderForTest.class.getName());
       IcebergTableOpsManager icebergTableOpsManager = new IcebergTableOpsManager(catalogConf);
+      icebergTableOpsManager.setIcebergTableOpsProvider(
+          new ConfigBasedIcebergTableOpsProviderForTest());
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(

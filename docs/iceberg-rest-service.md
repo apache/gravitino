@@ -149,15 +149,15 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 
 #### Multi catalog support
 
-Gravitino Iceberg REST server supports multiple catalogs. Users can enable it by setting configuration entries in the style `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
+The Gravitino Iceberg REST server supports multiple catalogs and offers a configuration-based catalog management system.
 
-| Configuration item                               | Description                                                                                                      | Default value                                                                   | Required | Since Version |
-|--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|----------|---------------|
-| `gravitino.iceberg-rest.catalog-provider-impl`   | The implementation of IcebergTableOpsProvider defines how the Iceberg REST catalog server gets Iceberg catalogs. | `org.apache.gravitino.iceberg.common.ops.ConfigBasedIcebergTableOpsProvider`    | No       | 0.7.0         |
+| Configuration item                           | Description                                                                                                      | Default value               | Required | Since Version |
+|----------------------------------------------|------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-provider`    | The implementation of IcebergTableOpsProvider defines how the Iceberg REST catalog server gets Iceberg catalogs. | `config-based-provider`     | No       | 0.7.0         |
 
-Using `ConfigBasedIcebergTableOpsProvider`, the default value, could be backward compatible with configurations without catalog names. It constructs a default catalog using those configurations for clients not setting `prefix`.
+When using a config-based catalog provider, you can configure the default catalog with gravitino.iceberg-rest.catalog.<param name>=<value>. For specific catalogs, use the format gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>.
 
-For instance, we can configure three different catalogs, which one is anonymous and the others named `hive_backend` and `jdbc_backend`: 
+For instance, you can configure three different catalogs, the default catalog and the specific hive_backend and jdbc_backend catalogs separately.
 
 ```text
 gravitino.iceberg-rest.catalog-backend = jdbc
@@ -174,7 +174,7 @@ gravitino.iceberg-rest.catalog.jdbc_backend.warehouse = hdfs://127.0.0.1:9000/us
 ...
 ```
 
-Then we can set `prefix` in client config to use those catalogs. Take Spark SQL as an example:
+You can access different catalogs by setting the prefix to the specific catalog name in the Iceberg REST client configuration. The default catalog will be used if you do not specify a prefix. For instance, consider the case of SparkSQL.
 
 ```shell
 ./bin/spark-sql -v \

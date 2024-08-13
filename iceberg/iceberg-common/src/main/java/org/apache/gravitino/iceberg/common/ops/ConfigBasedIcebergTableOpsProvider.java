@@ -42,6 +42,8 @@ public class ConfigBasedIcebergTableOpsProvider implements IcebergTableOpsProvid
   public static final Logger LOG =
       LoggerFactory.getLogger(ConfigBasedIcebergTableOpsProvider.class);
 
+  public static final String CONFIG_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME = "config-based-provider";
+
   @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
 
   @Override
