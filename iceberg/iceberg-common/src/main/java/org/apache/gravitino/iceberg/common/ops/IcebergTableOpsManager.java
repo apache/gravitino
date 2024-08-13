@@ -80,7 +80,8 @@ public class IcebergTableOpsManager implements AutoCloseable {
     String className = ICEBERG_TABLE_OPS_PROVIDER_NAMES.get(providerName);
 
     Preconditions.checkArgument(
-        StringUtils.isNotEmpty(className), String.format("%s can not match any provider", providerName));
+        StringUtils.isNotEmpty(className),
+        String.format("%s can not match any provider", providerName));
     LOG.info("Load Iceberg catalog provider: {}.", className);
 
     try {
