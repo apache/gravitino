@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.iceberg.service.rest;
 
+import com.google.common.collect.Maps;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
@@ -66,13 +69,19 @@ public class IcebergRestTestUtil {
     }
 
     if (bindIcebergTableOps) {
-      IcebergTableOps icebergTableOps = new IcebergTableOpsForTest();
+      Map<String, String> catalogConf = Maps.newHashMap();
+      catalogConf.put(String.format("catalog.%s.catalog-backend-name", PREFIX), PREFIX);
+      catalogConf.put(
+          IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
+          ConfigBasedIcebergTableOpsProviderForTest.class.getName());
+      IcebergTableOpsManager icebergTableOpsManager = new IcebergTableOpsManager(catalogConf);
+
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(
           new AbstractBinder() {
             @Override
             protected void configure() {
-              bind(icebergTableOps).to(IcebergTableOps.class).ranked(2);
+              bind(icebergTableOpsManager).to(IcebergTableOpsManager.class).ranked(2);
               bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(2);
             }
           });
