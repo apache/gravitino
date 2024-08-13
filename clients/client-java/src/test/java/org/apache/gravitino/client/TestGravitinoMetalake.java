@@ -69,6 +69,8 @@ public class TestGravitinoMetalake extends TestBase {
 
   private static final String provider = "test";
 
+  private static final Instant testStartTime = Instant.now();
+
   protected static GravitinoClient gravitinoClient;
 
   @BeforeAll
@@ -701,14 +703,37 @@ public class TestGravitinoMetalake extends TestBase {
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
   }
 
+  @Test
+  public void testEquals() throws JsonProcessingException {
+    GravitinoMetalake metalake1 = createMetalake(client, "test", true);
+    GravitinoMetalake metalake2 = createMetalake(client, "test", true);
+    GravitinoMetalake metalake3 = createMetalake(client, "another-test", true);
+    GravitinoMetalake metalake4 = createMetalake(client, "test");
+    Assertions.assertEquals(metalake1, metalake1);
+    Assertions.assertEquals(metalake1, metalake2);
+    Assertions.assertNotEquals(metalake1, metalake3);
+    Assertions.assertNotEquals(metalake1, metalake4);
+    Assertions.assertNotEquals(metalake1, null);
+    Assertions.assertNotEquals(metalake1, new Object());
+  }
+
   static GravitinoMetalake createMetalake(GravitinoAdminClient client, String metalakeName)
+      throws JsonProcessingException {
+    return createMetalake(client, metalakeName, false);
+  }
+
+  static GravitinoMetalake createMetalake(
+      GravitinoAdminClient client, String metalakeName, boolean fixedAudit)
       throws JsonProcessingException {
     MetalakeDTO mockMetalake =
         MetalakeDTO.builder()
             .withName(metalakeName)
             .withComment("comment")
             .withAudit(
-                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+                AuditDTO.builder()
+                    .withCreator("creator")
+                    .withCreateTime(fixedAudit ? testStartTime : Instant.now())
+                    .build())
             .build();
     MetalakeCreateRequest req =
         new MetalakeCreateRequest(metalakeName, "comment", Collections.emptyMap());

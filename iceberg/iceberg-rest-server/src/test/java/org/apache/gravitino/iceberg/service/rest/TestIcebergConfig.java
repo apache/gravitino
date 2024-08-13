@@ -32,13 +32,13 @@ public class TestIcebergConfig extends IcebergTestBase {
 
   @Override
   protected Application configure() {
-    return IcebergRestTestUtil.getIcebergResourceConfig(IcebergConfigOperations.class, false);
+    return IcebergRestTestUtil.getIcebergResourceConfig(IcebergConfigOperations.class);
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testConfig(boolean withPrefix) {
-    setUrlPathWithPrefix(withPrefix);
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  public void testConfig(String prefix) {
+    setUrlPathWithPrefix(prefix);
     Response resp = getConfigClientBuilder().get();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());

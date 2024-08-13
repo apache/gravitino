@@ -114,6 +114,8 @@ tasks {
         original
       }
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyConfigsToStandalonePackage", Copy::class) {
@@ -130,6 +132,8 @@ tasks {
         original
       }
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyLibAndConfigs", Copy::class) {
