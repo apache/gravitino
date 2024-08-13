@@ -12,7 +12,7 @@ The Gravitino connector uses the [Trino dynamic catalog managed mechanism](https
 When the Gravitino connector retrieves catalogs from the Gravitino server, it generates a `CREATE CATAGLOG` statement and executes 
 the statement on the current Trino server to register the catalogs with Trino
 
-:::node
+:::note
 Once metadata such as catalogs are changed in Gravitino, Trino can update itself through Gravitino, this process usually takes 
 about 3~10 seconds. 
 :::

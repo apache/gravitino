@@ -25,7 +25,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.hook.DispatcherHooks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,11 +115,5 @@ public class AuthorizationUtils {
         namespace != null && namespace.length() == 3,
         "Role namespace must have 3 levels, the input namespace is %s",
         namespace);
-  }
-
-  // Install some post hooks used for owner. The owner will have the all privileges
-  // of securable objects, users, groups, roles.
-  public static <T> void prepareAuthorizationHooks(T manager, DispatcherHooks hooks) {
-    // TODO: Refactor the post hook by adding new dispatcher
   }
 }

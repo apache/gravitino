@@ -63,7 +63,8 @@ class CatalogUpdateRequest:
                 IllegalArgumentException if the new name is not set.
             """
             if not self._new_name:
-                raise ValueError('"new_name" field is required and cannot be empty')
+                raise ValueError('"newName" field is required and cannot be empty')
+
 
     @dataclass
     class UpdateCatalogCommentRequest(CatalogUpdateRequestBase):
@@ -81,7 +82,8 @@ class CatalogUpdateRequest:
 
         def validate(self):
             if not self._new_comment:
-                raise ValueError('"new_comment" field is required and cannot be empty')
+                raise ValueError('"newComment" field is required and cannot be empty')
+
 
     @dataclass
     class SetCatalogPropertyRequest(CatalogUpdateRequestBase):

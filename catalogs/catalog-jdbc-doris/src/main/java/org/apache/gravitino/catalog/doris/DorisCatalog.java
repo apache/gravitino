@@ -32,10 +32,14 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 
 /** Implementation of an Apache Doris catalog in Apache Gravitino. */
 public class DorisCatalog extends JdbcCatalog {
+
+  public static final DorisTablePropertiesMetadata DORIS_TABLE_PROPERTIES_META =
+      new DorisTablePropertiesMetadata();
 
   @Override
   public String shortName() {
@@ -81,5 +85,10 @@ public class DorisCatalog extends JdbcCatalog {
   @Override
   protected JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter() {
     return new DorisColumnDefaultValueConverter();
+  }
+
+  @Override
+  public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
+    return DORIS_TABLE_PROPERTIES_META;
   }
 }

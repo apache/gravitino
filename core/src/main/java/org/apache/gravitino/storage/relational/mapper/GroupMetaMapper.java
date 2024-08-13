@@ -60,18 +60,6 @@ public interface GroupMetaMapper {
   GroupPO selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
 
-  @Select(
-      "SELECT group_id as groupId, group_name as groupName,"
-          + " metalake_id as metalakeId,"
-          + " audit_info as auditInfo,"
-          + " current_version as currentVersion, last_version as lastVersion,"
-          + " deleted_at as deletedAt"
-          + " FROM "
-          + GROUP_TABLE_NAME
-          + " WHERE group_id = #{groupId}"
-          + " AND deleted_at = 0")
-  GroupPO selectGroupMetaById(@Param("groupId") Long groupId);
-
   @Insert(
       "INSERT INTO "
           + GROUP_TABLE_NAME

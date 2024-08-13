@@ -19,6 +19,6 @@
 #
 
 IP=$(hostname -I | awk '{print $1}')
-sed -i "s|<value>hdfs://localhost:9000|<value>hdfs://${IP}:9000|g" /usr/local/hive/conf/hive-site.xml
+sed -i "s|<value>hdfs://__REPLACE__HOST_NAME:9000|<value>hdfs://${IP}:9000|g" ${HIVE_TMP_CONF_DIR}/hive-site.xml
 
 /bin/bash /usr/local/sbin/start.sh
