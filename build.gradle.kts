@@ -545,6 +545,13 @@ tasks {
         rename { fileName ->
           fileName.replace(".template", "")
         }
+        eachFile {
+          if (name == "gravitino-env.sh") {
+            filter { line ->
+              line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
+            }
+          }
+        }
         fileMode = 0b111101101
       }
       copy {
@@ -571,7 +578,7 @@ tasks {
     doLast {
       copy {
         from(projectDir.dir("conf")) {
-          include("${rootProject.name}-iceberg-rest-server.conf.template", "log4j2.properties.template")
+          include("${rootProject.name}-iceberg-rest-server.conf.template", "${rootProject.name}-env.sh.template", "log4j2.properties.template")
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
         from(projectDir.dir("bin")) {
@@ -581,6 +588,13 @@ tasks {
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")
+        }
+        eachFile {
+          if (name == "gravitino-env.sh") {
+            filter { line ->
+              line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
+            }
+          }
         }
         fileMode = 0b111101101
       }

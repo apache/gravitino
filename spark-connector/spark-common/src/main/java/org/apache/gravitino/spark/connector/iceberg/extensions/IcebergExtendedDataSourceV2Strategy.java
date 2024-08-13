@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.spark.connector.iceberg.extensions;
 
+import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.toJavaList;
+
 import java.util.Collections;
 import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
 import org.apache.iceberg.spark.Spark3Util;
@@ -51,7 +53,7 @@ import org.apache.spark.sql.execution.datasources.v2.SetWriteDistributionAndOrde
 import scala.Option;
 import scala.Some;
 import scala.collection.JavaConverters;
-import scala.collection.Seq;
+import scala.collection.immutable.Seq;
 
 public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Strategy {
 
@@ -66,7 +68,8 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
   public Seq<SparkPlan> apply(LogicalPlan plan) {
     if (plan instanceof AddPartitionField) {
       AddPartitionField addPartitionField = (AddPartitionField) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, addPartitionField.table())
+      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
+              spark, addPartitionField.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
                 AddPartitionFieldExec addPartitionFieldExec =
@@ -81,7 +84,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     } else if (plan instanceof CreateOrReplaceBranch) {
       CreateOrReplaceBranch createOrReplaceBranch = (CreateOrReplaceBranch) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, createOrReplaceBranch.table())
+              spark, createOrReplaceBranch.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
                 CreateOrReplaceBranchExec createOrReplaceBranchExec =
@@ -99,7 +102,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     } else if (plan instanceof CreateOrReplaceTag) {
       CreateOrReplaceTag createOrReplaceTag = (CreateOrReplaceTag) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, createOrReplaceTag.table())
+              spark, createOrReplaceTag.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
                 CreateOrReplaceTagExec createOrReplaceTagExec =
@@ -116,7 +119,8 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
           .get();
     } else if (plan instanceof DropBranch) {
       DropBranch dropBranch = (DropBranch) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, dropBranch.table())
+      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
+              spark, dropBranch.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
                 DropBranchExec dropBranchExec =
@@ -130,7 +134,8 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
           .get();
     } else if (plan instanceof DropTag) {
       DropTag dropTag = (DropTag) plan;
-      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(spark, dropTag.table())
+      return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
+              spark, dropTag.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
                 DropTagExec dropTagExec =
@@ -145,7 +150,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     } else if (plan instanceof DropPartitionField) {
       DropPartitionField dropPartitionField = (DropPartitionField) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, dropPartitionField.table())
+              spark, dropPartitionField.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
                 DropPartitionFieldExec dropPartitionFieldExec =
@@ -159,7 +164,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     } else if (plan instanceof ReplacePartitionField) {
       ReplacePartitionField replacePartitionField = (ReplacePartitionField) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, replacePartitionField.table())
+              spark, replacePartitionField.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
                 ReplacePartitionFieldExec replacePartitionFieldExec =
@@ -175,7 +180,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     } else if (plan instanceof SetIdentifierFields) {
       SetIdentifierFields setIdentifierFields = (SetIdentifierFields) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, setIdentifierFields.table())
+              spark, setIdentifierFields.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
                 SetIdentifierFieldsExec setIdentifierFieldsExec =
@@ -189,7 +194,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     } else if (plan instanceof DropIdentifierFields) {
       DropIdentifierFields dropIdentifierFields = (DropIdentifierFields) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, dropIdentifierFields.table())
+              spark, dropIdentifierFields.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
                 DropIdentifierFieldsExec dropIdentifierFieldsExec =
@@ -204,7 +209,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
       SetWriteDistributionAndOrdering setWriteDistributionAndOrdering =
           (SetWriteDistributionAndOrdering) plan;
       return IcebergCatalogAndIdentifier.buildCatalogAndIdentifier(
-              spark, setWriteDistributionAndOrdering.table())
+              spark, setWriteDistributionAndOrdering.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
                 SetWriteDistributionAndOrderingExec setWriteDistributionAndOrderingExec =
@@ -217,14 +222,18 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               })
           .get();
     } else {
-      return super.apply(plan);
+      scala.collection.Seq<SparkPlan> sparkPlans = super.apply(plan);
+      if (sparkPlans != null) {
+        return sparkPlans.toIndexedSeq();
+      }
+      return null;
     }
   }
 
   private Seq<SparkPlan> toSeq(SparkPlan plan) {
     return JavaConverters.asScalaIteratorConverter(Collections.singletonList(plan).listIterator())
         .asScala()
-        .toSeq();
+        .toIndexedSeq();
   }
 
   static class IcebergCatalogAndIdentifier {
@@ -244,7 +253,7 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     static Option<IcebergCatalogAndIdentifier> buildCatalogAndIdentifier(
         SparkSession spark, Seq<String> identifiers) {
       Spark3Util.CatalogAndIdentifier catalogAndIdentifier =
-          Spark3Util.catalogAndIdentifier(spark, JavaConverters.<String>seqAsJavaList(identifiers));
+          Spark3Util.catalogAndIdentifier(spark, toJavaList(identifiers));
       CatalogPlugin catalog = catalogAndIdentifier.catalog();
       if (catalog instanceof GravitinoIcebergCatalog) {
         return new Some<>(

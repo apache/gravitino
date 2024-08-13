@@ -40,11 +40,9 @@ import org.apache.hadoop.minikdc.KerberosSecurityTestcase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
-@Tag("gravitino-docker-test")
 public class KerberosOperationsIT extends AbstractIT {
 
   private static final KerberosSecurityTestcase kdc =
