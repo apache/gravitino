@@ -18,13 +18,17 @@
 # under the License.
 
 output=$(docker inspect --format='{{.Name}}:{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q) | grep "/trino-ci-" | sed 's/\/trino-ci-//g')
-echo "$output"
+
+TRINO=127.0.0.1
+HIVE=127.0.0.1
+MYSQL=127.0.0.1
+PGSQL=127.0.0.1
 
 while IFS= read -r line; do
     name=$(echo "$line" | cut -d':' -f1)
     ip=$(echo "$line" | cut -d':' -f2)
     case $name in
-        trino)
+        trino-coordinator)
             TRINO=$ip
             ;;
         hive)
@@ -39,7 +43,6 @@ while IFS= read -r line; do
     esac
 done <<< "$output"
 
-echo 
 echo --trino_uri=http://${TRINO}:8080 --hive_uri=thrift://${HIVE}:9083 \
     --mysql_uri=jdbc:mysql://${MYSQL}:3306 --hdfs_uri=hdfs://${HIVE}:9000 \
     --postgresql_uri=jdbc:postgresql://${PGSQL} --gravitino_uri=http://${TRINO}:8090

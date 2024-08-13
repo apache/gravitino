@@ -108,7 +108,7 @@ services:
     volumes:
       - ./init/trino-coordinator:/tmp/trino
       - ../../trino-connector/build/libs:/usr/lib/trino/plugin/gravitino
-      - $GRAVITINO_SERVER_HOME:/usr/local/gravitino-server
+      - ${GRAVITINO_SERVER_HOME:-../../distribution/package}:/usr/local/gravitino-server
 
     extra_hosts:
       - "host.docker.internal:host-gateway"

@@ -19,6 +19,23 @@
 
 cd "$(dirname "$0")"
 
+export GRAVITINO_SERVER_HOME=../../distribution/package
+export TRINO_TEST_DOCKER_HOME=../trino-distribution-it
+export TRINO_TEST_SETS_DIR=../src/test/resources/trino-ci-testset/testsets
+export TRINO_TEST_ARGS="--test_set=jdbc-mysql"
+export TRINO_TEST_PARAMS=
+
+if [ -f .env ]; then  
+    source .env
+fi
+
+if [ ! -d "$GRAVITINO_SERVER_HOME" ]; then
+  echo "Error: Gravitino server directory '$GRAVITINO_SERVER_HOME' does not exist."
+  exit 1
+fi
+
+TRINO_TEST_SETS_DIR=`realpath $TRINO_TEST_SETS_DIR`
+
 # Download mysql driver
 MYSQL_VERSION="8.0.26"
 MYSQL_DIVER_FILE_NAME="mysql-connector-java-$MYSQL_VERSION.jar"
@@ -38,35 +55,35 @@ POSTGRESQL_DIVER_FILE_NAME="postgresql-$POSTGRESQL_VERSION.jar"
 POSTGRESQL_DIVER_DOWNLOAD_URL="https://jdbc.postgresql.org/download/$POSTGRESQL_DIVER_FILE_NAME"
 
 if [ ! -f "$GRAVITINO_SERVER_HOME/catalogs/jdbc-postgresql/libs/$POSTGRESQL_DIVER_FILE_NAME" ]; then
-  curl -L -o "$GRAVITINO_SERVER_HOME/catalogs/jdbc-mysql/libs/$POSTGRESQL_DIVER_FILE_NAME" $POSTGRESQL_DIVER_DOWNLOAD_URL
+  curl -L -o "$GRAVITINO_SERVER_HOME/catalogs/jdbc-postgresql/libs/$POSTGRESQL_DIVER_FILE_NAME" $POSTGRESQL_DIVER_DOWNLOAD_URL
   if [ $? -ne 0 ]; then
       echo "download faild"
       exit 1
   fi
 fi
 
-rm -rf ../../distribution/package/data/*
-
+#clean the Gravitino server data
+rm -rf $GRAVITINO_SERVER_HOME/data/*
 
 # start test dockers
-../trino-distribution-it/launch.sh
+$TRINO_TEST_DOCKER_HOME/launch.sh
 
 # resolve docker ip address
-uris=$(../trino-distribution-it/inspect_ip.sh)
+uris=$($TRINO_TEST_DOCKER_HOME/inspect_ip.sh)
 
-args="--auto=none --test_sets_dir=$(realpath ../../integration-test/src/test/resources/trino-ci-testset/testsets) $uris --params=trino_remote_jdbc_uri,jdbc:trino://trino-remote:8080"
+args="--auto=none --test_sets_dir=$(realpath $TRINO_TEST_SETS_DIR) $uris $TRINO_TEST_ARGS --params=$TRINO_TEST_PARAMS"
 
 # execute test
 echo "The args: $args"
-../../integration-test/trino-test-tools/trino_test.sh $args
+./trino_test.sh $args
 
   if [ $? -ne 0 ]; then
       echo "Test failed"
       # clean up
-      ../trino-distribution-it/shutdown.sh
+      $TRINO_TEST_DOCKER_HOME/shutdown.sh
       exit 1
   fi
 
 echo "Test success"
 # clean up
-../trino-distribution-it/shutdown.sh
+$TRINO_TEST_DOCKER_HOME/shutdown.sh
