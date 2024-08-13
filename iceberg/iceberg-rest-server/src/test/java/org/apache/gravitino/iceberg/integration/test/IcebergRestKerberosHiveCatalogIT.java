@@ -23,17 +23,21 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
+@EnabledIf("isEmbedded")
 public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
 
   private static final String HIVE_METASTORE_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
@@ -143,5 +147,14 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
                 containerSuite.getKerberosHiveContainer().getContainerIpAddress(),
                 HiveContainer.HDFS_DEFAULTFS_PORT)));
     return configMap;
+  }
+
+  private static boolean isEmbedded() {
+    String mode =
+        System.getProperty(ITUtils.TEST_MODE) == null
+            ? ITUtils.EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
+
+    return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
   }
 }
