@@ -151,9 +151,9 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 
 The Gravitino Iceberg REST server supports multiple catalogs and offers a configuration-based catalog management system.
 
-| Configuration item                           | Description                                                                                                      | Default value               | Required | Since Version |
-|----------------------------------------------|------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|---------------|
-| `gravitino.iceberg-rest.catalog-provider`    | The implementation of IcebergTableOpsProvider defines how the Iceberg REST catalog server gets Iceberg catalogs. | `config-based-provider`     | No       | 0.7.0         |
+| Configuration item                           | Description                                                                                                                                                                          | Default value               | Required | Since Version |
+|----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-provider`    | Catalog provider class name, you can develop a class that implements `IcebergTableOpsProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.   | `config-based-provider`     | No       | 0.7.0         |
 
 When using a config-based catalog provider, you can configure the default catalog with `gravitino.iceberg-rest.catalog.<param name>=<value>`. For specific catalogs, use the format `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
 
