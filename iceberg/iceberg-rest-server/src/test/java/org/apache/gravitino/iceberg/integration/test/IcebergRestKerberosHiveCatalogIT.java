@@ -74,12 +74,27 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
       LOG.info("Kerberos kdc config:\n{}, path: {}", content, krb5Path);
       System.setProperty("java.security.krb5.conf", krb5Path);
       System.setProperty("sun.security.krb5.debug", "true");
+      System.setProperty("java.security.krb5.realm", "HADOOPKRB");
+      System.setProperty("java.security.krb5.kdc", ip);
+
+      sun.security.krb5.Config.refresh();
+      resetDefaultRealm();
 
       // Give cli@HADOOPKRB permission to access the hdfs
       containerSuite
           .getKerberosHiveContainer()
           .executeInContainer("hadoop", "fs", "-chown", "-R", "cli", "/user/hive/");
 
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  void resetDefaultRealm() {
+    try {
+      String kerberosNameClass = "org.apache.hadoop.security.authentication.util.KerberosName";
+      Class<?> cl = Class.forName(kerberosNameClass);
+      cl.getMethod("resetDefaultRealm").invoke(null);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
