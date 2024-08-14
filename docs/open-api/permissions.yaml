@@ -54,6 +54,39 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    /metalakes/{metalake}/permissions/users/{user}/revoke:
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/metalake"
+        - $ref: "./openapi.yaml#/components/parameters/user"
+
+      put:
+        tags:
+          - access control
+        summary: Revoke roles to a user
+        operationId: revokeRoleFromUser
+        requestBody:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleRevokeRequest"
+              examples:
+                RoleRevokeRequest:
+                  $ref: "#/components/examples/RoleRevokeRequest"
+
+        responses:
+          "200":
+            description: Returns the revoked user object
+            content:
+              application/vnd.gravitino.v1+json:
+                schema:
+                  $ref: "#/components/responses/UserResponse"
+                examples:
+                  UserResponse:
+                    $ref: "#/components/examples/UserResponse"
+
+          "5xx":
+            $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
     /metalakes/{metalake}/permissions/groups/{group}/grant:
       parameters:
         - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -87,6 +120,38 @@ paths:
           "5xx":
             $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/permissions/groups/{group}/revoke:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/group"
+
+    put:
+      tags:
+        - access control
+      summary: Revoke roles to a group
+      operationId: revokeRoleFromGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleRevokeRequest"
+            examples:
+              RoleRevokeRequest:
+                $ref: "#/components/examples/RoleRevokeRequest"
+
+      responses:
+        "200":
+          description: Returns the revoked group object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./groups.yaml#/components/responses/GroupResponse"
+              examples:
+                GroupResponse:
+                  $ref: "./groups.yaml#/examples/GroupResponse""
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
 
@@ -105,60 +170,37 @@ components:
             type: string
           description: The roles of the user
 
-    UserAddRequest:
+    RoleGrantRequest:
       type: object
       required:
-        - name
+        - roleNames
       properties:
-        name:
-          type: string
-          description: The name of the user
+        roleNames:
+          type: array
+          description: The role names need to grant
+          items:
+            type: string
 
-  responses:
-    UserResponse:
+    RoleRevokeRequest:
       type: object
+      required:
+        - roleNames
       properties:
-        code:
-          type: integer
-          format: int32
-          description: Status code of the response
-          enum:
-            - 0
-        user:
-          $ref: "#/components/schemas/User"
+        roleNames:
+          type: array
+          description: The role names need to revoke
+          items:
+            type: string
+
 
   examples:
-    UserAddRequest:
+
+    RoleGrantRequest:
       value: {
-        "name": "user1",
+        "roleNames": ["role1"],
       }
 
-    UserResponse:
+    RoleRevokeRequest:
       value: {
-        "code": 0,
-        "user": {
-          "name": "user1",
-          "roles": [],
-        }
-      }
-
-    UserAlreadyExistsException:
-      value: {
-        "code": 1004,
-        "type": "UserAlreadyExistsException",
-        "message": "User already exists",
-        "stack": [
-          "org.apache.gravitino.exceptions.UserAlreadyExistsException: User already exists: user1"
-        ]
-      }
-
-    NoSuchUserException:
-      value: {
-        "code": 1003,
-        "type": "NoSuchUserException",
-        "message": "User does not exist",
-        "stack": [
-          "org.apache.gravitino.exceptions.NoSuchUserException: User does not exist",
-          "..."
-        ]
+        "roleNames": [ "role1" ],
       }
