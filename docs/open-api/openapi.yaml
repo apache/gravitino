@@ -71,7 +71,10 @@ paths:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1%7Btag%7D"
 
   /metalakes/{metalake}/users:
-    $ref: "./users.yaml#/paths"
+    $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~users"
+
+  /metalakes/{metalake}/users/{user}:
+    $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~users~1%7Buser%7D"
 
   /metalakes/{metalake}/catalogs:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs"
@@ -257,6 +260,23 @@ components:
                 type: boolean
                 description: Whether the drop operation was successful
 
+    RemoveResponse:
+      description: Represents a response for a remove operation
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              dropped:
+                type: boolean
+                description: Whether the remove operation was successful
+
   parameters:
     metalake:
       name: metalake
@@ -314,6 +334,14 @@ components:
       schema:
         type: string
 
+    user:
+      name: user
+      in: path
+      description: The name of the user
+      required: true
+      schema:
+        type: string
+
     metadataObjectType:
       name: metadataObjectType
       in: path
@@ -327,6 +355,8 @@ components:
           - "table"
           - "fileset"
           - "topic"
+          - "role"
+          - "metalake"
 
     metadataObjectFullName:
       name: metadataObjectFullName
