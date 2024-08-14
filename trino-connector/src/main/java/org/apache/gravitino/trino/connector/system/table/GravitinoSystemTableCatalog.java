@@ -66,9 +66,8 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
         .forEach(
             (metalakeName) -> {
               GravitinoMetalake metalake = catalogConnectorManager.getMetalake(metalakeName);
-              String[] catalogNames = metalake.listCatalogs();
-              for (String catalogName : catalogNames) {
-                Catalog catalog = metalake.loadCatalog(catalogName);
+              Catalog[] catalogs = metalake.listCatalogsInfo();
+              for (Catalog catalog : catalogs) {
                 if (catalog.type() == Catalog.Type.RELATIONAL) {
                   gravitinoCatalogs.add(new GravitinoCatalog(metalakeName, catalog));
                 }
