@@ -76,6 +76,8 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 dropTable will delete the table location directly, similar with purgeTable.
 ```
 - Supporting Column default value through table properties, such as `fields.{columnName}.default-value`, not column expression.
+ 
+- Doesn't support table distribution and sort orders.
 
 :::info
 Paimon does not support auto increment column.
@@ -89,19 +91,10 @@ Paimon does not support auto increment column.
 - UpdateColumnComment
 - UpdateColumnNullability
 - UpdateColumnPosition
-```
-UpdateColumnPosition only supports update a column position with first, after position, cannot use default position.
-```
 - UpdateColumnType
 - UpdateComment
 - SetProperty
-```
-SetProperty cannot update table comment, please use UpdateComment instead.
-```
 - RemoveProperty
-```
-RemoveProperty cannot remove table comment.
-```
 
 #### Table partitions
 
@@ -115,7 +108,7 @@ Please refer to [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spa
 
 ### Table distributions
 
-- Only supporting `NoneDistribution` now.
+- Doesn't support table distributions.
 
 ### Table indexes
 
