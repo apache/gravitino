@@ -58,7 +58,7 @@ public class TestMysql extends TestJdbc {
         Collections.emptyMap());
   }
 
-  private static Map<String, String> getMySQLCatalogProperties() throws SQLException {
+  protected static Map<String, String> getMySQLCatalogProperties() throws SQLException {
     Map<String, String> catalogProperties = Maps.newHashMap();
 
     MySQLContainer mySQLContainer = containerSuite.getMySQLContainer();

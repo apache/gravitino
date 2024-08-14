@@ -16,23 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.integration.test.web.rest;
+package org.apache.gravitino.catalog.mysql.operation;
 
-import org.apache.gravitino.client.GravitinoVersion;
-import org.apache.gravitino.integration.test.util.AbstractIT;
-import org.apache.gravitino.integration.test.util.ITUtils;
-import org.junit.jupiter.api.Assertions;
+import java.sql.SQLException;
+import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
+import org.apache.gravitino.catalog.mysql.MysqlCatalog;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-public class VersionOperationsIT extends AbstractIT {
+@Tag("gravitino-docker-test")
+public class TestMysqlCatalogOperations extends TestMysql {
+
   @Test
-  public void testGetVersion() {
-    GravitinoVersion gravitinoVersion = client.serverVersion();
-    Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion.version());
-    Assertions.assertFalse(gravitinoVersion.compileDate().isEmpty());
-    if (testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
-      final String gitCommitId = readGitCommitIdFromGitFile();
-      Assertions.assertEquals(gitCommitId, gravitinoVersion.gitCommit());
-    }
+  public void testCheckJDBCDriver() throws SQLException {
+    MySQLProtocolCompatibleCatalogOperations catalogOperations =
+        new MySQLProtocolCompatibleCatalogOperations(
+            null, null, DATABASE_OPERATIONS, TABLE_OPERATIONS, null);
+    catalogOperations.initialize(getMySQLCatalogProperties(), null, new MysqlCatalog());
   }
 }
