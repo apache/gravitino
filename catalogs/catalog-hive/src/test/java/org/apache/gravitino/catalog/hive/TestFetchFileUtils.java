@@ -20,15 +20,18 @@
 package org.apache.gravitino.catalog.hive;
 
 import java.io.File;
+import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestFetchFileUtils {
 
+  private static final int MAX_RETRIES = 3;
+  private static final long RETRY_DELAY_MS = 1000; // 1 second
+
   @Test
   public void testLinkLocalFile() throws Exception {
-
     File srcFile = new File("test");
     File destFile = new File("dest");
 
@@ -43,9 +46,29 @@ public class TestFetchFileUtils {
   @Test
   public void testDownloadFromHTTP() throws Exception {
     File destFile = new File("dest");
-    FetchFileUtils.fetchFileFromUri(
-        "https://downloads.apache.org/hadoop/common/KEYS", destFile, 10, new Configuration());
-    Assertions.assertTrue(destFile.exists());
+    String fileUrl = "https://downloads.apache.org/hadoop/common/KEYS";
+    Configuration conf = new Configuration();
+
+    boolean success = false;
+    int attempts = 0;
+
+    while (!success && attempts < MAX_RETRIES) {
+      try {
+        FetchFileUtils.fetchFileFromUri(fileUrl, destFile, 10, conf);
+        success = true;
+      } catch (IOException e) {
+        attempts++;
+        if (attempts < MAX_RETRIES) {
+          System.out.println(
+              "Attempt " + attempts + " failed. Retrying in " + RETRY_DELAY_MS + "ms.");
+          Thread.sleep(RETRY_DELAY_MS);
+        } else {
+          throw new AssertionError("Failed to download file after " + MAX_RETRIES + " attempts", e);
+        }
+      }
+    }
+
+    Assertions.assertTrue(destFile.exists(), "File should exist after successful download");
     destFile.delete();
   }
 }
