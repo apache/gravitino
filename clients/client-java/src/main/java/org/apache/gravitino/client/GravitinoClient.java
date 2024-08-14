@@ -242,11 +242,12 @@ public class GravitinoClient extends GravitinoClientBase
    * @return The created Role instance.
    * @throws RoleAlreadyExistsException If a Role with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If securable object doesn't exist
    * @throws RuntimeException If creating the Role encounters storage issues.
    */
   public Role createRole(
       String role, Map<String, String> properties, List<SecurableObject> securableObjects)
-      throws RoleAlreadyExistsException, NoSuchMetalakeException {
+      throws RoleAlreadyExistsException, NoSuchMetalakeException, NoSuchMetadataObjectException {
     return getMetalake().createRole(role, properties, securableObjects);
   }
   /**
