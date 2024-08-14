@@ -124,7 +124,6 @@ You can also create a dedicated role for your business by API or the client.
 `USE_CATALOG` is needed for a user to interact with any object within the catalog. 
 
 For example, to select data from a table, users need to have the SELECT_TABLE privilege on that table and
-
 `USE CATALOG` privileges on its parent catalog as well as `USE SCHEMA` privileges on its parent schema.
 
 :::
@@ -142,7 +141,6 @@ For example, to select data from a table, users need to have the SELECT_TABLE pr
 `UseSchema`is needed for a user to interact with any object within the schema. 
 
 For example, to select data from a table, users need to have the `SELECT_TABLE` privilege on that table
-
 and `USE SCHEMA` privileges on its parent schema.
 
 :::
@@ -176,11 +174,9 @@ and `USE SCHEMA` privileges on its parent schema.
 Securable objects in Gravitino are hierarchical and privileges are inherited downward.
 
 This means that granting a privilege on a metalake, catalog or schema automatically grants
-
 the privilege to all current and future objects within the metalake, catalog or schema.
 
 For example, if you give a use that `SELECT_TABLE` privilege on a catalog, then that the user
-
 will be able to select(read) all tables in that catalog.
 
 ## Privilege Condition
@@ -194,9 +190,9 @@ The user won't be able to use the privilege.
 
 If parent securable object has the same privilege name with different condition, the parent securable privilege will still take effect.
 
-For example, securable metalake object allows to use the catalog, but securable catalog denys to use the catalog, the user isn't able to use the catalog.
+For example, securable metalake object allows to use the catalog, but securable catalog denies to use the catalog, the user isn't able to use the catalog.
 
-If securable metalake object denys to use the catalog, but securable catalog allows to use the catalog, the user isn't able to use the catalog, too.
+If securable metalake object denies to use the catalog, but securable catalog allows to use the catalog, the user isn't able to use the catalog, too.
 
 ![privileg_image](../assets/privilege.png)
 
