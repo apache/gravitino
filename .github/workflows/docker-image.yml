@@ -39,38 +39,38 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.image }}" == "gravitino-ci:hive" ]; then
             echo "image_type=hive" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci" >> $GITHUB_ENV
             echo "tag_name=hive" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:kerberos-hive" ]; then
             echo "image_type=kerberos-hive" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci" >> $GITHUB_ENV
             echo "tag_name=kerberos-hive" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci" >> $GITHUB_ENV
             echo "tag_name=trino" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:doris" ]; then
             echo "image_type=doris" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci" >> $GITHUB_ENV
             echo "tag_name=doris" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:ranger" ]; then
             echo "image_type=ranger" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-ci" >> $GITHUB_ENV
             echo "tag_name=ranger" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
             echo "image_type=gravitino" >> $GITHUB_ENV
-            # `apache/gravitino` is the default image name, didn't need to tag alias name
+            # `datastrato/gravitino` is the default image name, didn't need to tag alias name
           elif [ "${{ github.event.inputs.image }}" == "gravitino-playground:trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-playground" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-playground" >> $GITHUB_ENV
             echo "tag_name=trino" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-playground:hive" ]; then
             echo "image_type=hive" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-playground" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-playground" >> $GITHUB_ENV
             echo "tag_name=hive" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-playground:ranger" ]; then
             echo "image_type=ranger" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-playground" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-playground" >> $GITHUB_ENV
             echo "tag_name=ranger" >> $GITHUB_ENV
           fi
 
@@ -108,5 +108,5 @@ jobs:
             # Only build the latest image for gravitino
             ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag "${tag_name}-${{ github.event.inputs.version }}" --latest          
           else
-            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image apache/gravitino --tag ${{ github.event.inputs.version }}
+            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image datastrato/gravitino --tag ${{ github.event.inputs.version }}
           fi
