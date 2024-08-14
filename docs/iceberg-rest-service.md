@@ -162,7 +162,6 @@ If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to
 You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 :::
 
-
 #### Multi catalog support
 
 The Gravitino Iceberg REST server supports multiple catalogs and offers a configuration-based catalog management system.
