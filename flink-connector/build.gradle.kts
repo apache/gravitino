@@ -34,7 +34,7 @@ val flinkVersion: String = libs.versions.flink.get()
 // https://issues.apache.org/jira/browse/FLINK-20845,
 // https://issues.apache.org/jira/browse/FLINK-13414.
 val scalaVersion: String = "2.12"
-val artifactName = "gravitino-${project.name}-$scalaVersion"
+val artifactName = "gravitino-${project.name}_$scalaVersion"
 
 dependencies {
   implementation(project(":api"))

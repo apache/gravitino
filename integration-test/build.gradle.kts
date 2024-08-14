@@ -158,6 +158,9 @@ tasks.test {
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
 
+    // Frontend tests depend on the web page, so we need to build the web module first.
+    dependsOn(":web:build")
+
     doFirst {
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")

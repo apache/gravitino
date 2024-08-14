@@ -209,9 +209,9 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testListNamespace(boolean withPrefix) {
-    setUrlPathWithPrefix(withPrefix);
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  void testListNamespace(String prefix) {
+    setUrlPathWithPrefix(prefix);
     dropAllExistingNamespace();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList());
 

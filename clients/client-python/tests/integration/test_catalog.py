@@ -26,6 +26,11 @@ from gravitino import (
     GravitinoClient,
     Catalog,
 )
+from gravitino.api.catalog_change import CatalogChange
+from gravitino.exceptions.base import (
+    CatalogAlreadyExistsException,
+    NoSuchCatalogException,
+)
 
 from tests.integration.integration_test_env import IntegrationTestEnv
 
@@ -36,6 +41,7 @@ class TestCatalog(IntegrationTestEnv):
     metalake_name: str = "TestSchema_metalake" + str(randint(1, 10000))
 
     catalog_name: str = "testCatalog"
+    catalog_comment: str = "catalogComment"
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
     catalog_provider: str = "hadoop"
 
@@ -59,11 +65,13 @@ class TestCatalog(IntegrationTestEnv):
         self.gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=self.metalake_name
         )
-        self.gravitino_client.create_catalog(
-            name=self.catalog_name,
+
+    def create_catalog(self, catalog_name) -> Catalog:
+        return self.gravitino_client.create_catalog(
+            name=catalog_name,
             catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
-            comment="",
+            comment=self.catalog_comment,
             properties={self.catalog_location_prop: "/tmp/test_schema"},
         )
 
@@ -86,5 +94,67 @@ class TestCatalog(IntegrationTestEnv):
             logger.error("Clean test data failed: %s", e)
 
     def test_list_catalogs(self):
+        self.create_catalog(self.catalog_name)
         catalog_names = self.gravitino_client.list_catalogs()
         self.assertTrue(self.catalog_name in catalog_names)
+
+    def test_create_catalog(self):
+        catalog = self.create_catalog(self.catalog_name)
+        self.assertEqual(catalog.name(), self.catalog_name)
+        self.assertEqual(
+            catalog.properties(), {self.catalog_location_prop: "/tmp/test_schema"}
+        )
+
+    def test_failed_create_catalog(self):
+        self.create_catalog(self.catalog_name)
+        with self.assertRaises(CatalogAlreadyExistsException):
+            _ = self.create_catalog(self.catalog_name)
+
+    def test_alter_catalog(self):
+        catalog = self.create_catalog(self.catalog_name)
+
+        catalog_new_name = self.catalog_name + "_new"
+        catalog_new_comment = self.catalog_comment + "_new"
+        catalog_properties_new_value = self.catalog_location_prop + "_new"
+        catalog_properties_new_key: str = "catalog_properties_new_key"
+
+        changes = (
+            CatalogChange.rename(catalog_new_name),
+            CatalogChange.update_comment(catalog_new_comment),
+            CatalogChange.set_property(
+                catalog_properties_new_key, catalog_properties_new_value
+            ),
+        )
+
+        catalog = self.gravitino_client.alter_catalog(self.catalog_name, *changes)
+        self.assertEqual(catalog.name(), catalog_new_name)
+        self.assertEqual(catalog.comment(), catalog_new_comment)
+        self.assertEqual(
+            catalog.properties().get(catalog_properties_new_key),
+            catalog_properties_new_value,
+        )
+        self.catalog_name = self.catalog_name + "_new"
+
+    def test_drop_catalog(self):
+        self.create_catalog(self.catalog_name)
+        self.assertTrue(self.gravitino_client.drop_catalog(name=self.catalog_name))
+
+    def test_list_catalogs_info(self):
+        self.create_catalog(self.catalog_name)
+        catalogs_info = self.gravitino_client.list_catalogs_info()
+        self.assertTrue(any(item.name() == self.catalog_name for item in catalogs_info))
+
+    def test_load_catalog(self):
+        self.create_catalog(self.catalog_name)
+        catalog = self.gravitino_client.load_catalog(self.catalog_name)
+        self.assertIsNotNone(catalog)
+        self.assertEqual(catalog.name(), self.catalog_name)
+        self.assertEqual(catalog.comment(), self.catalog_comment)
+        self.assertEqual(
+            catalog.properties(), {self.catalog_location_prop: "/tmp/test_schema"}
+        )
+        self.assertEqual(catalog.audit_info().creator(), "anonymous")
+
+    def test_failed_load_catalog(self):
+        with self.assertRaises(NoSuchCatalogException):
+            self.gravitino_client.load_catalog(self.catalog_name)

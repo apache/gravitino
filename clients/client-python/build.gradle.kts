@@ -135,13 +135,13 @@ fun generatePypiProjectHomePage() {
     }
 
     // Use regular expression to match the `![](./a/b/c.png)` link in the content
-    // Convert `![](./a/b/c.png)` to `[](https://raw.githubusercontent.org/apache/gravitino/main/docs/a/b/c.png)`
-    val assertUrl = "https://raw.githubusercontent.org/apache/gravitino/main/docs"
+    // Convert `![](./a/b/c.png)` to `[](https://github.com/apache/gravitino/blob/main/docs/a/b/c.png?raw=true)`
+    val assertUrl = "https://github.com/apache/gravitino/blob/main/docs"
     val patternImage = """!\[([^\]]+)]\(\./assets/([^)]+)\)""".toRegex()
     val contentUpdateImage = patternImage.replace(contentUpdateDocs) { matchResult ->
       val altText = matchResult.groupValues[1]
       val fileName = matchResult.groupValues[2]
-      "![${altText}]($assertUrl/assets/$fileName)"
+      "![${altText}]($assertUrl/assets/$fileName?raw=true)"
     }
 
     val readmeFile = file("README.md")

@@ -76,6 +76,8 @@ tasks {
     exclude { details ->
       details.file.isDirectory()
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyLibAndConfig", Copy::class) {
