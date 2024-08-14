@@ -21,69 +21,69 @@
 
 paths:
 
-  /metalakes/{metalake}/users:
+  /metalakes/{metalake}/groups:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
 
     post:
       tags:
         - access control
-      summary: Add user
-      operationId: addUser
+      summary: Add group
+      operationId: addGroup
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UserAddRequest"
+              $ref: "#/components/schemas/GroupAddRequest"
             examples:
-              UserAddRequest:
-                $ref: "#/components/examples/UserAddRequest"
+              GroupAddRequest:
+                $ref: "#/components/examples/GroupAddRequest"
 
       responses:
         "200":
-          description: Returns the added user object
+          description: Returns the added group object
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/UserResponse"
+                $ref: "#/components/responses/GroupResponse"
               examples:
-                UserResponse:
-                  $ref: "#/components/examples/UserResponse"
+                GroupResponse:
+                  $ref: "#/components/examples/GroupResponse"
         "409":
-          description: Conflict - The target user already exists in the specified metalake
+          description: Conflict - The target group already exists in the specified metalake
           content:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
-                UserAlreadyExistsException:
-                  $ref: "#/components/examples/UserAlreadyExistsException"
+                GroupAlreadyExistsException:
+                  $ref: "#/components/examples/GroupAlreadyExistsException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-  /metalakes/{metalake}/users/{user}:
+  /metalakes/{metalake}/groups/{group}:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/user"
+      - $ref: "./openapi.yaml#/components/parameters/group"
 
     get:
       tags:
         - access control
-      summary: Get user
-      operationId: getUser
-      description: Returns the specified user information in the specified metalake
+      summary: Get group
+      operationId: getGroup
+      description: Returns the specified group information in the specified metalake
       responses:
         "200":
-          description: Returns the user object
+          description: Returns the group object
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/UserResponse"
+                $ref: "#/components/responses/GroupResponse"
                 examples:
-                  UserResponse:
-                    $ref: "#/components/examples/UserResponse"
+                  GroupResponse:
+                    $ref: "#/components/examples/GroupResponse"
         "404":
-          description: Not Found - The specified user does not exist in the specified metalake
+          description: Not Found - The specified group does not exist in the specified metalake
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -91,16 +91,16 @@ paths:
               examples:
                 NoSuchMetalakeException:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-                NoSuchUserException:
-                  $ref: "#/components/examples/NoSuchUserException"
+                NoSuchGroupException:
+                  $ref: "#/components/examples/NoSuchGroupException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     delete:
       tags:
         - access control
-      summary: Remove user
-      operationId: removeUser
+      summary: Remove group
+      operationId: removeGroup
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/RemoveResponse"
@@ -112,31 +112,31 @@ paths:
 components:
 
   schemas:
-    User:
+    Group:
       type: object
       required:
         - name
       properties:
         name:
           type: string
-          description: The name of the user
+          description: The name of the group
         roles:
           type: array
           items:
             type: string
-          description: The roles of the user
+          description: The roles of the group
 
-    UserAddRequest:
+    GroupAddRequest:
       type: object
       required:
         - name
       properties:
         name:
           type: string
-          description: The name of the user
+          description: The name of the group
 
   responses:
-    UserResponse:
+    GroupResponse:
       type: object
       properties:
         code:
@@ -145,41 +145,41 @@ components:
           description: Status code of the response
           enum:
             - 0
-        user:
-          $ref: "#/components/schemas/User"
+        group:
+          $ref: "#/components/schemas/Group"
 
   examples:
-    UserAddRequest:
+    GroupAddRequest:
       value: {
-        "name": "user1",
+        "name": "group1",
       }
 
-    UserResponse:
+    GroupResponse:
       value: {
         "code": 0,
-        "user": {
-          "name": "user1",
+        "group": {
+          "name": "group1",
           "roles": [],
         }
       }
 
-    UserAlreadyExistsException:
+    GroupAlreadyExistsException:
       value: {
         "code": 1004,
-        "type": "UserAlreadyExistsException",
-        "message": "User already exists",
+        "type": "GroupAlreadyExistsException",
+        "message": "Group already exists",
         "stack": [
-          "org.apache.gravitino.exceptions.UserAlreadyExistsException: User already exists: user1"
+          "org.apache.gravitino.exceptions.GroupAlreadyExistsException: Group already exists: group1"
         ]
       }
 
-    NoSuchUserException:
+    NoSuchGroupException:
       value: {
         "code": 1003,
-        "type": "NoSuchUserException",
-        "message": "User does not exist",
+        "type": "NoSuchGroupException",
+        "message": "Group does not exist",
         "stack": [
-          "org.apache.gravitino.exceptions.NoSuchUserException: User does not exist",
+          "org.apache.gravitino.exceptions.NoSuchGroupException: Group does not exist",
           "..."
         ]
       }

@@ -71,10 +71,25 @@ paths:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1%7Btag%7D"
 
   /metalakes/{metalake}/users:
-    $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~users"
+    $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1users"
 
   /metalakes/{metalake}/users/{user}:
-    $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~users~1%7Buser%7D"
+    $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1users~1%7Buser%7D"
+
+  /metalakes/{metalake}/groups:
+    $ref: "./groups.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1groups"
+
+  /metalakes/{metalake}/groups/{group}:
+    $ref: "./groups.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1groups~1%7Bgroup%7D"
+
+  /metalakes/{metalake}/roles:
+    $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1roles"
+
+  /metalakes/{metalake}/roles/{role}:
+    $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1roles~1%7Brole%7D"
+
+  /metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectFullName}:
+    $ref: "./owners.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1owners~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D"
 
   /metalakes/{metalake}/catalogs:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs"
@@ -273,9 +288,43 @@ components:
                 description: Status code of the response
                 enum:
                   - 0
-              dropped:
+              removed:
                 type: boolean
                 description: Whether the remove operation was successful
+
+    DeleteResponse:
+      description: Represents a response for a delete operation
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              deleted:
+                type: boolean
+                description: Whether the delete operation was successful
+
+    SetResponse:
+      description: Represents a response for a set operation
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              set:
+                type: boolean
+                description: Whether the set operation was successful
 
   parameters:
     metalake:
@@ -338,6 +387,21 @@ components:
       name: user
       in: path
       description: The name of the user
+      required: true
+      schema:
+        type: string
+
+    group:
+      name: group
+      in: path
+      description: The name of the group
+      required: true
+      schema:
+          type: string
+    role:
+      name: role
+      in: path
+      description: The name of the role
       required: true
       schema:
         type: string

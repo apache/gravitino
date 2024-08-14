@@ -21,27 +21,28 @@
 
 paths:
 
-  /metalakes/{metalake}/users:
+  /metalakes/{metalake}/permissions/users/{user}/grant:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/user"
 
-    post:
+    put:
       tags:
         - access control
-      summary: Add user
-      operationId: addUser
+      summary: Grant roles to a user
+      operationId: grantRoleToUser
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UserAddRequest"
+              $ref: "#/components/schemas/RoleGrantRequest"
             examples:
-              UserAddRequest:
-                $ref: "#/components/examples/UserAddRequest"
+              RoleGrantRequest:
+                $ref: "#/components/examples/RoleGrantRequest"
 
       responses:
         "200":
-          description: Returns the added user object
+          description: Returns the granted user object
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -49,65 +50,43 @@ paths:
               examples:
                 UserResponse:
                   $ref: "#/components/examples/UserResponse"
-        "409":
-          description: Conflict - The target user already exists in the specified metalake
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                UserAlreadyExistsException:
-                  $ref: "#/components/examples/UserAlreadyExistsException"
+
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-  /metalakes/{metalake}/users/{user}:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/user"
+    /metalakes/{metalake}/permissions/groups/{group}/grant:
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/metalake"
+        - $ref: "./openapi.yaml#/components/parameters/group"
 
-    get:
-      tags:
-        - access control
-      summary: Get user
-      operationId: getUser
-      description: Returns the specified user information in the specified metalake
-      responses:
-        "200":
-          description: Returns the user object
+      put:
+        tags:
+          - access control
+        summary: Grant roles to a group
+        operationId: grantRoleToGroup
+        requestBody:
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
-                $ref: "#/components/responses/UserResponse"
+                $ref: "#/components/schemas/RoleGrantRequest"
+              examples:
+                RoleGrantRequest:
+                  $ref: "#/components/examples/RoleGrantRequest"
+
+        responses:
+          "200":
+            description: Returns the granted group object
+            content:
+              application/vnd.gravitino.v1+json:
+                schema:
+                  $ref: "./groups.yaml#/components/responses/GroupResponse"
                 examples:
-                  UserResponse:
-                    $ref: "#/components/examples/UserResponse"
-        "404":
-          description: Not Found - The specified user does not exist in the specified metalake
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchMetalakeException:
-                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-                NoSuchUserException:
-                  $ref: "#/components/examples/NoSuchUserException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+                  GroupResponse:
+                    $ref: "./groups.yaml#/examples/GroupResponse""
 
-    delete:
-      tags:
-        - access control
-      summary: Remove user
-      operationId: removeUser
-      responses:
-        "200":
-          $ref: "./openapi.yaml#/components/responses/RemoveResponse"
-        "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          "5xx":
+            $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 
 components:
 
