@@ -47,6 +47,7 @@ function check_process_status() {
   if [[ -z "${pid}" ]]; then
     echo "Gravitino Server is not running"
   else
+    printArt
     echo "Gravitino Server is running[PID:$pid]"
   fi
 }

@@ -23,7 +23,7 @@ import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
@@ -48,7 +48,7 @@ public class RESTService implements GravitinoAuxiliaryService {
   public static final String SERVICE_NAME = "iceberg-rest";
   public static final String ICEBERG_SPEC = "/iceberg/*";
 
-  private IcebergTableOps icebergTableOps;
+  private IcebergTableOpsManager icebergTableOpsManager;
   private IcebergMetricsManager icebergMetricsManager;
 
   private void initServer(IcebergConfig icebergConfig) {
@@ -66,13 +66,13 @@ public class RESTService implements GravitinoAuxiliaryService {
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);
 
-    icebergTableOps = new IcebergTableOps(icebergConfig);
+    icebergTableOpsManager = new IcebergTableOpsManager(icebergConfig.getAllConfig());
     icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
     config.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(icebergTableOps).to(IcebergTableOps.class).ranked(1);
+            bind(icebergTableOpsManager).to(IcebergTableOpsManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
           }
         });
@@ -114,8 +114,8 @@ public class RESTService implements GravitinoAuxiliaryService {
       server.stop();
       LOG.info("Iceberg REST service stopped");
     }
-    if (icebergTableOps != null) {
-      icebergTableOps.close();
+    if (icebergTableOpsManager != null) {
+      icebergTableOpsManager.close();
     }
     if (icebergMetricsManager != null) {
       icebergMetricsManager.close();
