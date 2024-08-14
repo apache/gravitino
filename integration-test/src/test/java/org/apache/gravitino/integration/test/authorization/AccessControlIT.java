@@ -34,6 +34,7 @@ import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
@@ -124,6 +125,15 @@ public class AccessControlIT extends AbstractIT {
     Privilege createdPrivilege = createdObject.privileges().get(0);
     Assertions.assertEquals(createdPrivilege.name(), Privilege.Name.CREATE_CATALOG);
     Assertions.assertEquals(createdPrivilege.condition(), Privilege.Condition.ALLOW);
+
+    // Test a not-existed metadata object
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(
+            "not-existed", Lists.newArrayList(Privileges.UseCatalog.allow()));
+
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> metalake.createRole("not-existed", properties, Lists.newArrayList(catalogObject)));
 
     // Get a role
     role = metalake.getRole(roleName);

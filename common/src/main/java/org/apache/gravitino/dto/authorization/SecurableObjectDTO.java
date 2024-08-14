@@ -37,6 +37,12 @@ public class SecurableObjectDTO implements SecurableObject {
   @JsonProperty("privileges")
   private PrivilegeDTO[] privileges;
 
+  private String parent;
+  private String name;
+
+  /** Default constructor for Jackson deserialization. */
+  protected SecurableObjectDTO() {}
+
   /** @return The full name of the securable object. */
   @JsonProperty("fullName")
   public String getFullName() {
@@ -59,12 +65,6 @@ public class SecurableObjectDTO implements SecurableObject {
       name = fullName.substring(index + 1);
     }
   }
-
-  private String parent;
-  private String name;
-
-  /** Default constructor for Jackson deserialization. */
-  protected SecurableObjectDTO() {}
 
   @Nullable
   @Override
