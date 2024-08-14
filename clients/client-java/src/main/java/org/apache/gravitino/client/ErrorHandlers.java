@@ -627,6 +627,10 @@ public class ErrorHandlers {
             throw new NoSuchMetalakeException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
             throw new NoSuchRoleException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
           } else {
             throw new NotFoundException(errorMessage);
           }
