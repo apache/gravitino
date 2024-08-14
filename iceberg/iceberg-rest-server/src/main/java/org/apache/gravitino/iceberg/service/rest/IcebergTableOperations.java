@@ -70,7 +70,6 @@ public class IcebergTableOperations {
   public IcebergTableOperations(
       IcebergTableOpsManager icebergTableOpsManager, IcebergMetricsManager icebergMetricsManager) {
     this.icebergTableOpsManager = icebergTableOpsManager;
-
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
     this.icebergMetricsManager = icebergMetricsManager;
   }
