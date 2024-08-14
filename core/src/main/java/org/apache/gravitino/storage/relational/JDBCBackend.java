@@ -126,37 +126,27 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException, IOException {
-    EntityType entityType;
+    EntityType entityType = e.type();
     if (e instanceof BaseMetalake) {
       MetalakeMetaService.getInstance().insertMetalake((BaseMetalake) e, overwritten);
-      entityType = EntityType.METALAKE;
     } else if (e instanceof CatalogEntity) {
       CatalogMetaService.getInstance().insertCatalog((CatalogEntity) e, overwritten);
-      entityType = EntityType.CATALOG;
     } else if (e instanceof SchemaEntity) {
       SchemaMetaService.getInstance().insertSchema((SchemaEntity) e, overwritten);
-      entityType = EntityType.SCHEMA;
     } else if (e instanceof TableEntity) {
       TableMetaService.getInstance().insertTable((TableEntity) e, overwritten);
-      entityType = EntityType.TABLE;
     } else if (e instanceof FilesetEntity) {
       FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
-      entityType = EntityType.FILESET;
     } else if (e instanceof TopicEntity) {
       TopicMetaService.getInstance().insertTopic((TopicEntity) e, overwritten);
-      entityType = EntityType.TOPIC;
     } else if (e instanceof UserEntity) {
       UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
-      entityType = EntityType.USER;
     } else if (e instanceof RoleEntity) {
       RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
-      entityType = EntityType.ROLE;
     } else if (e instanceof GroupEntity) {
       GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
-      entityType = EntityType.GROUP;
     } else if (e instanceof TagEntity) {
       TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
-      entityType = EntityType.TAG;
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());

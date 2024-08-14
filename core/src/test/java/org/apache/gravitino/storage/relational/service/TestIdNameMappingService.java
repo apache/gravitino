@@ -31,23 +31,23 @@ public class TestIdNameMappingService {
   public void testGetInstance() throws IOException {
     NameIdMappingService instance = NameIdMappingService.getInstance();
 
-    EntityIdentifier makeLakeIdent1 =
+    EntityIdentifier metalakeIdent1 =
         EntityIdentifier.of(NameIdentifier.of("m1"), EntityType.METALAKE);
-    EntityIdentifier makeLakeIdent2 =
+    EntityIdentifier metalakeIdent2 =
         EntityIdentifier.of(NameIdentifier.of("m2"), EntityType.METALAKE);
 
-    instance.put(makeLakeIdent1, 1L);
-    Assertions.assertEquals(1L, instance.get(makeLakeIdent1, (EntityIdentifier key) -> 1L));
+    instance.put(metalakeIdent1, 1L);
+    Assertions.assertEquals(1L, instance.get(metalakeIdent1, (EntityIdentifier key) -> 1L));
 
-    instance.put(makeLakeIdent2, 2L);
-    Assertions.assertEquals(2L, instance.get(makeLakeIdent2));
+    instance.put(metalakeIdent2, 2L);
+    Assertions.assertEquals(2L, instance.get(metalakeIdent2));
 
-    instance.invalidate(makeLakeIdent2);
-    Assertions.assertNull(instance.get(makeLakeIdent2));
+    instance.invalidate(metalakeIdent2);
+    Assertions.assertNull(instance.get(metalakeIdent2));
 
-    Assertions.assertEquals(makeLakeIdent1, instance.getById(1L));
+    Assertions.assertEquals(metalakeIdent1, instance.getById(1L));
 
-    Assertions.assertEquals(makeLakeIdent2, instance.getById(2L, (Long value) -> makeLakeIdent2));
+    Assertions.assertEquals(metalakeIdent2, instance.getById(2L, (Long value) -> metalakeIdent2));
 
     instance.close();
   }
