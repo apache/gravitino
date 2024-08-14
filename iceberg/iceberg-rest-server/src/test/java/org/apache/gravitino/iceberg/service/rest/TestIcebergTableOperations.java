@@ -260,9 +260,9 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testListTables(boolean withPrefix) {
-    setUrlPathWithPrefix(withPrefix);
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  void testListTables(String prefix) {
+    setUrlPathWithPrefix(prefix);
     verifyListTableFail(404);
 
     verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
@@ -283,9 +283,9 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testRenameTable(boolean withPrefix) {
-    setUrlPathWithPrefix(withPrefix);
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  void testRenameTable(String prefix) {
+    setUrlPathWithPrefix(prefix);
     // namespace not exits
     verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
 

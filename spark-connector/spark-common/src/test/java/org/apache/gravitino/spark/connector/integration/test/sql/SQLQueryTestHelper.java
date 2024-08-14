@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.sql;
 
+import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.toJavaList;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -31,7 +33,6 @@ import org.apache.spark.sql.execution.HiveResult;
 import org.apache.spark.sql.execution.SQLExecution;
 import org.apache.spark.sql.types.StructType;
 import scala.Option;
-import scala.collection.JavaConverters;
 
 public class SQLQueryTestHelper {
   private static final String notIncludedMsg = "[not included in comparison]";
@@ -62,8 +63,9 @@ public class SQLQueryTestHelper {
             df.queryExecution(),
             Option.apply(""),
             () ->
-                JavaConverters.seqAsJavaList(
-                        HiveResult.hiveResultString(df.queryExecution().executedPlan()))
+                toJavaList(
+                        HiveResult.hiveResultString(df.queryExecution().executedPlan())
+                            .toIndexedSeq())
                     .stream()
                     .map(s -> replaceNotIncludedMsg(s))
                     .filter(s -> !s.isEmpty())
