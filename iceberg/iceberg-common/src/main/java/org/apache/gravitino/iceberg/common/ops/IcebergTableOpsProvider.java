@@ -16,20 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.hook;
+package org.apache.gravitino.iceberg.common.ops;
 
-import java.lang.reflect.Proxy;
+import java.util.Map;
 
-/** The class is a helper class of dispatcher hooks */
-public class DispatcherHookHelper {
+/**
+ * IcebergTableOpsProvider is an interface defining how Iceberg REST catalog server gets Iceberg
+ * catalogs.
+ */
+public interface IcebergTableOpsProvider {
 
-  private DispatcherHookHelper() {}
+  /**
+   * @param properties The parameters for creating Provider which from configurations whose prefix
+   *     is 'gravitino.iceberg-rest.'
+   */
+  void initialize(Map<String, String> properties);
 
-  public static <T> T installHooks(T dispatcher, DispatcherHooks hooks) {
-    return (T)
-        Proxy.newProxyInstance(
-            dispatcher.getClass().getClassLoader(),
-            dispatcher.getClass().getInterfaces(),
-            new DispatcherHookProxy<T>(dispatcher, hooks));
-  }
+  /**
+   * @param catalogName a param send by clients.
+   * @return the instance of IcebergTableOps.
+   */
+  IcebergTableOps getIcebergTableOps(String catalogName);
 }

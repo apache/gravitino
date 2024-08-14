@@ -24,14 +24,18 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsCatalogs;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
@@ -42,6 +46,7 @@ import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
+import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
@@ -57,8 +62,10 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
+import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
@@ -66,10 +73,12 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
@@ -88,6 +97,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
+  private static final String API_METALAKES_OWNERS_PATH = "api/metalakes/%s/owners/%s";
   private static final String BLANK_PLACE_HOLDER = "";
 
   private static final String API_METALAKES_TAGS_PATH = "api/metalakes/%s/tags";
@@ -762,6 +772,55 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     return resp.getGroup();
   }
 
+  /**
+   * Get the owner of a metadata object.
+   *
+   * @param object The metadata object
+   * @return The owner of the metadata object. If the metadata object doesn't set the owner, it will
+   *     return Optional.empty().
+   * @throws NoSuchMetadataObjectException If the metadata object is not found.
+   */
+  public Optional<Owner> getOwner(MetadataObject object) throws NoSuchMetadataObjectException {
+    OwnerResponse resp =
+        restClient.get(
+            String.format(
+                API_METALAKES_OWNERS_PATH,
+                this.name(),
+                String.format(
+                    "%s/%s", object.type().name().toLowerCase(Locale.ROOT), object.fullName())),
+            OwnerResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.ownerErrorHandler());
+    resp.validate();
+    return Optional.ofNullable(resp.getOwner());
+  }
+
+  /**
+   * Set the owner of a metadata object.
+   *
+   * @param object The metadata object.
+   * @param ownerName The name of the owner
+   * @param ownerType The type of the owner, The owner can be a user or a group.
+   * @throws NotFoundException If the metadata object isn't found or the owner doesn't exist.
+   */
+  public void setOwner(MetadataObject object, String ownerName, Owner.Type ownerType)
+      throws NotFoundException {
+    OwnerSetRequest request = new OwnerSetRequest(ownerName, ownerType);
+    request.validate();
+    SetResponse resp =
+        restClient.put(
+            String.format(
+                API_METALAKES_OWNERS_PATH,
+                this.name(),
+                String.format(
+                    "%s/%s", object.type().name().toLowerCase(Locale.ROOT), object.fullName())),
+            request,
+            SetResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.ownerErrorHandler());
+    resp.validate();
+  }
+
   static class Builder extends MetalakeDTO.Builder<Builder> {
     private RESTClient restClient;
 
@@ -782,6 +841,20 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
       return new GravitinoMetalake(name, comment, properties, audit, restClient);
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof GravitinoMetalake)) {
+      return false;
+    }
+
+    GravitinoMetalake that = (GravitinoMetalake) o;
+    return super.equals(that);
   }
 
   /** @return the builder for creating a new instance of GravitinoMetaLake. */

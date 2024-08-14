@@ -18,13 +18,17 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -44,28 +48,33 @@ public class OwnerMetaService {
     String metalakeName = getMetalake(identifier);
     Long entityId = getEntityId(metalakeName, identifier, type);
 
-    OwnerRelPO ownerRelPO =
+    UserPO userPO =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class,
-            mapper -> mapper.selectOwnerMetaByMetadataObjectIdAndType(entityId, type.name()));
+            mapper -> mapper.selectUserOwnerMetaByMetadataObjectIdAndType(entityId, type.name()));
 
-    if (ownerRelPO == null) {
-      return Optional.empty();
+    if (userPO != null) {
+      return Optional.of(
+          POConverters.fromUserPO(
+              userPO,
+              Collections.emptyList(),
+              AuthorizationUtils.ofUserNamespace(getMetalake(identifier))));
     }
 
-    switch (Entity.EntityType.valueOf(ownerRelPO.getOwnerType())) {
-      case USER:
-        return Optional.of(
-            UserMetaService.getInstance()
-                .getUserById(getMetalake(identifier), ownerRelPO.getOwnerId()));
-      case GROUP:
-        return Optional.of(
-            GroupMetaService.getInstance()
-                .getGroupById(getMetalake(identifier), ownerRelPO.getOwnerId()));
-      default:
-        throw new IllegalArgumentException(
-            String.format("Owner type doesn't support %s", ownerRelPO.getOwnerType()));
+    GroupPO groupPO =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class,
+            mapper -> mapper.selectGroupOwnerMetaByMetadataObjectIdAndType(entityId, type.name()));
+
+    if (groupPO != null) {
+      return Optional.of(
+          POConverters.fromGroupPO(
+              groupPO,
+              Collections.emptyList(),
+              AuthorizationUtils.ofGroupNamespace(getMetalake(identifier))));
     }
+
+    return Optional.empty();
   }
 
   public void setOwner(

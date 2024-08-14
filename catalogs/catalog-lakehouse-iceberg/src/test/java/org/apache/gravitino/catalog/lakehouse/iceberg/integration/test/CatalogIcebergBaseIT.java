@@ -590,43 +590,6 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   }
 
   @Test
-  public void testUpdateIcebergColumnDefaultPosition() {
-    Column col1 = Column.of("name", Types.StringType.get(), "comment");
-    Column col2 = Column.of("address", Types.StringType.get(), "comment");
-    Column col3 = Column.of("date_of_birth", Types.StringType.get(), "comment");
-    Column[] newColumns = new Column[] {col1, col2, col3};
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("CatalogIcebergIT_table"));
-    catalog
-        .asTableCatalog()
-        .createTable(
-            tableIdentifier,
-            newColumns,
-            table_comment,
-            ImmutableMap.of(),
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE,
-            new SortOrder[0]);
-
-    catalog
-        .asTableCatalog()
-        .alterTable(
-            tableIdentifier,
-            TableChange.updateColumnPosition(
-                new String[] {col1.name()}, TableChange.ColumnPosition.defaultPos()));
-
-    Table updateColumnPositionTable = catalog.asTableCatalog().loadTable(tableIdentifier);
-
-    Column[] updateCols = updateColumnPositionTable.columns();
-    Assertions.assertEquals(3, updateCols.length);
-    Assertions.assertEquals(col2.name(), updateCols[0].name());
-    Assertions.assertEquals(col3.name(), updateCols[1].name());
-    Assertions.assertEquals(col1.name(), updateCols[2].name());
-
-    catalog.asTableCatalog().dropTable(tableIdentifier);
-  }
-
-  @Test
   public void testAlterIcebergTable() {
     Column[] columns = createColumns();
     Table table =

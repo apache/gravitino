@@ -33,15 +33,19 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 @NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/owners")
@@ -105,7 +109,14 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            ownerManager.setOwner(metalake, object, request.getName(), request.getType());
+            NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, object);
+            TreeLockUtils.doWithTreeLock(
+                objectIdent,
+                LockType.READ,
+                () -> {
+                  ownerManager.setOwner(metalake, object, request.getName(), request.getType());
+                  return null;
+                });
             return Utils.ok(new SetResponse(true));
           });
     } catch (Exception e) {

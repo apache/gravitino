@@ -16,29 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.hook;
+package org.apache.gravitino.iceberg.service.rest;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.util.List;
-import java.util.function.BiConsumer;
+import org.apache.gravitino.iceberg.common.ops.ConfigBasedIcebergTableOpsProvider;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
 
-class DispatcherHookProxy<T> implements InvocationHandler {
-  private final DispatcherHooks hooks;
-  private final T dispatcher;
-
-  DispatcherHookProxy(T dispatcher, DispatcherHooks hooks) {
-    this.hooks = hooks;
-    this.dispatcher = dispatcher;
-  }
-
+public class ConfigBasedIcebergTableOpsProviderForTest extends ConfigBasedIcebergTableOpsProvider {
   @Override
-  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    Object result = method.invoke(dispatcher, args);
-    List<BiConsumer> postHooks = hooks.getPostHooks(method.getName());
-    for (BiConsumer hook : postHooks) {
-      hook.accept(args, result);
-    }
-    return result;
+  public IcebergTableOps getIcebergTableOps(String prefix) {
+    return new IcebergTableOpsForTest();
   }
 }

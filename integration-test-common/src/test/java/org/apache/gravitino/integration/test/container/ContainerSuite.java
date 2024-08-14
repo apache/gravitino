@@ -45,6 +45,7 @@ import org.testcontainers.containers.Network;
 public class ContainerSuite implements Closeable {
   public static final Logger LOG = LoggerFactory.getLogger(ContainerSuite.class);
   private static volatile ContainerSuite instance = null;
+  private static volatile boolean initialized = false;
 
   // The subnet must match the configuration in
   // `dev/docker/tools/mac-docker-connector.conf`
@@ -72,7 +73,11 @@ public class ContainerSuite implements Closeable {
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
-  private static void init() {
+  private static void initIfNecessary() {
+    if (initialized) {
+      return;
+    }
+
     try {
       // Check if docker is available and you should never close the global DockerClient!
       DockerClient dockerClient = DockerClientFactory.instance().client();
@@ -82,16 +87,20 @@ public class ContainerSuite implements Closeable {
       if ("true".equalsIgnoreCase(System.getenv("NEED_CREATE_DOCKER_NETWORK"))) {
         network = createDockerNetwork();
       }
+      initialized = true;
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize ContainerSuite", e);
     }
+  }
+
+  public static boolean initialized() {
+    return initialized;
   }
 
   public static ContainerSuite getInstance() {
     if (instance == null) {
       synchronized (ContainerSuite.class) {
         if (instance == null) {
-          init();
           instance = new ContainerSuite();
         }
       }
@@ -107,6 +116,7 @@ public class ContainerSuite implements Closeable {
     if (hiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainer == null) {
+          initIfNecessary();
           // Start Hive container
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
@@ -167,6 +177,7 @@ public class ContainerSuite implements Closeable {
     if (kerberosHiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kerberosHiveContainer == null) {
+          initIfNecessary();
           // Start Hive container
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
@@ -189,6 +200,7 @@ public class ContainerSuite implements Closeable {
     if (trinoContainer == null) {
       synchronized (ContainerSuite.class) {
         if (trinoContainer == null) {
+          initIfNecessary();
           // Start Trino container
           String hiveContainerIp = hiveContainer.getContainerIpAddress();
           TrinoContainer.Builder trinoBuilder =
@@ -229,6 +241,7 @@ public class ContainerSuite implements Closeable {
     if (dorisContainer == null) {
       synchronized (ContainerSuite.class) {
         if (dorisContainer == null) {
+          initIfNecessary();
           // Start Doris container
           DorisContainer.Builder dorisBuilder =
               DorisContainer.builder().withHostName("gravitino-ci-doris").withNetwork(network);
@@ -244,6 +257,7 @@ public class ContainerSuite implements Closeable {
     if (mySQLContainer == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLContainer == null) {
+          initIfNecessary();
           // Start MySQL container
           MySQLContainer.Builder mysqlBuilder =
               MySQLContainer.builder()
@@ -270,6 +284,7 @@ public class ContainerSuite implements Closeable {
     if (mySQLVersion5Container == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLVersion5Container == null) {
+          initIfNecessary();
           // Start MySQL container
           MySQLContainer.Builder mysqlBuilder =
               MySQLContainer.builder()
@@ -297,6 +312,7 @@ public class ContainerSuite implements Closeable {
     if (!pgContainerMap.containsKey(pgImageName)) {
       synchronized (ContainerSuite.class) {
         if (!pgContainerMap.containsKey(pgImageName)) {
+          initIfNecessary();
           // Start PostgreSQL container
           PostgreSQLContainer.Builder pgBuilder =
               PostgreSQLContainer.builder()
@@ -330,6 +346,7 @@ public class ContainerSuite implements Closeable {
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kafkaContainer == null) {
+          initIfNecessary();
           KafkaContainer.Builder builder = KafkaContainer.builder().withNetwork(network);
           KafkaContainer container = closer.register(builder.build());
           try {
@@ -372,6 +389,7 @@ public class ContainerSuite implements Closeable {
     if (rangerContainer == null) {
       synchronized (ContainerSuite.class) {
         if (rangerContainer == null) {
+          initIfNecessary();
           // Start Ranger container
           RangerContainer.Builder rangerBuilder = RangerContainer.builder().withNetwork(network);
           RangerContainer container = closer.register(rangerBuilder.build());
