@@ -50,7 +50,7 @@ TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build(
 
 3. Execute the Flink SQL query. 
 
-Suppose there is only one hive catalog with the name hive in the metalake test.
+Suppose there is only one hive catalog with the name `hive` in the metalake `test`.
 
 ```sql
 // use hive catalog
