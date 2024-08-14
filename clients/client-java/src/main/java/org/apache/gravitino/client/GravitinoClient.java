@@ -247,7 +247,7 @@ public class GravitinoClient extends GravitinoClientBase
    */
   public Role createRole(
       String role, Map<String, String> properties, List<SecurableObject> securableObjects)
-      throws RoleAlreadyExistsException, NoSuchMetalakeException {
+      throws RoleAlreadyExistsException, NoSuchMetalakeException, NoSuchMetadataObjectException {
     return getMetalake().createRole(role, properties, securableObjects);
   }
   /**
