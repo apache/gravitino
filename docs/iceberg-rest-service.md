@@ -60,7 +60,7 @@ Starting with version `0.6.0`, the prefix `gravitino.auxService.iceberg-rest.` f
 
 Please note that, it only takes affect in `gravitino.conf`, you don't need to specify the above configurations if start as a standalone server.
 
-### REST catalog server configuration
+### HTTP server configuration
 
 | Configuration item                               | Description                                                                                                                                                                                                                                          | Default value                                                                | Required | Since Version |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
@@ -113,13 +113,13 @@ You should place HDFS configuration file to the classpath of the Iceberg REST se
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
 :::
 
-### Apache Gravitino Iceberg catalog backend configuration
+### Catalog backend configuration
 
 :::info
 The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can specify a Hive or JDBC catalog backend for production environment.
 :::
 
-#### Apache Hive backend configuration
+#### Hive backend configuration
 
 | Configuration item                            | Description                                                                                                                                  | Default value                                                                 | Required | Since Version |
 |-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|----------|---------------|
@@ -207,7 +207,7 @@ The `clients` property for example:
 
 ### Apache Iceberg metrics store configuration
 
-Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `org.apache.gravitino.catalog.lakehouse.iceberg.web.metrics` and add the corresponding jar file to the Iceberg REST service classpath directory.
+Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `org.apache.gravitino.iceberg.service.metrics.IcebergMetricsStore` and add the corresponding jar file to the Iceberg REST service classpath directory.
 
 | Configuration item                              | Description                                                                                                                         | Default value | Required | Since Version |
 |-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -277,7 +277,7 @@ SELECT * FROM dml.test;
 
 ## Docker instructions
 
-You could run Gravitino server though docker container:
+You could run Gravitino Iceberg REST server though docker container:
 
 ```shell
 docker run -d -p 9001:9001 datastrato/iceberg-rest-server:0.6
