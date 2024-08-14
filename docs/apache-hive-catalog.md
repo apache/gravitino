@@ -16,7 +16,8 @@ Apache Gravitino offers the capability to utilize [Apache Hive](https://hive.apa
 * Gravitino must have network access to the Hive metastore service using the Thrift protocol.
 
 :::note
-The Hive catalog is available for Apache Hive **2.x** only. Support for Apache Hive 3.x is under development.
+Although the Hive catalog uses the Hive2 metastore client, it can be compatible with the Hive3 metastore service because the called HMS APIs are still available in Hive3.
+If there is any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
 :::
 
 ## Catalog

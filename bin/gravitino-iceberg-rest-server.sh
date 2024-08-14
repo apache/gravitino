@@ -47,6 +47,7 @@ function check_process_status() {
   if [[ -z "${pid}" ]]; then
     echo "GravitinoIcebergRESTServer is not running"
   else
+    printArt
     echo "GravitinoIcebergRESTServer is running[PID:$pid]"
   fi
 }
@@ -116,8 +117,6 @@ function start() {
   if [[ -z "${pid}" ]]; then
     echo "GravitinoIcebergRESTServer start error!"
     return 1;
-  else
-    echo "GravitinoIcebergRESTServer start success!"
   fi
 
   sleep 2

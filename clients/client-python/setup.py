@@ -24,23 +24,33 @@ try:
     with open("README.md") as f:
         long_description = f.read()
 except FileNotFoundError:
-    long_description = "Gravitino Python client"
+    long_description = "Apache Gravitino Python client"
 
 setup(
-    name="gravitino",
-    description="Python lib/client for Gravitino",
-    version="0.7.0.dev",
+    name="apache-gravitino",
+    description="Python lib/client for Apache Gravitino",
+    version="0.7.0.dev0",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/apache/gravitino",
-    author="gravitino",
+    author="Apache Software Foundation",
     author_email="dev@gravitino.apache.org",
+    maintainer="Apache Gravitino Community",
+    maintainer_email="dev@gravitino.apache.org",
+    license="Apache-2.0",
+    url="https://github.com/apache/gravitino",
     python_requires=">=3.8",
+    keywords="Data, AI, metadata, catalog",
     packages=find_packages(exclude=["tests*", "scripts*"]),
+    project_urls={
+        "Homepage": "https://gravitino.apache.org/",
+        "Source Code": "https://github.com/apache/gravitino",
+        "Documentation": "https://gravitino.apache.org/docs/overview",
+        "Bug Tracker": "https://github.com/apache/gravitino/issues",
+        "Slack Chat": "https://the-asf.slack.com/archives/C078RESTT19",
+    },
     classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
         "License :: OSI Approved :: Apache Software License",
+        "Operating System :: OS Independent",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",

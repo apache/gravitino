@@ -17,6 +17,10 @@
 # under the License.
 #
 
+# In build.gradle.kts, we would automatic replace GRAVITINO_VERSION to the current version of Gravitino
+# when running `./gradlew compileDistribution` or `./gradlew compileIcebergRESTServer` command.
+GRAVITINO_VERSION=GRAVITINO_VERSION_PLACEHOLDER
+
 # Debug Gravitino server
 # export GRAVITINO_DEBUG_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=8000 -Dlog4j2.debug=true"
 

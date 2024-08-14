@@ -19,11 +19,14 @@
 
 package org.apache.gravitino.spark.connector.utils;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
+import scala.collection.immutable.Seq;
 
 public class ConnectorUtil {
 
@@ -36,5 +39,14 @@ public class ConnectorUtil {
     return uniqueElements.stream()
         .reduce((element1, element2) -> element1 + ConnectorConstants.COMMA + element2)
         .orElse("");
+  }
+
+  public static List<String> toJavaList(Seq<String> seq) {
+    List<String> javaList = new ArrayList<>();
+    if (seq == null || seq.isEmpty()) {
+      return javaList;
+    }
+    seq.foreach(javaList::add);
+    return javaList;
   }
 }
