@@ -26,10 +26,18 @@ plugins {
 
 dependencies {
 
-  implementation(project(":api"))
-  implementation(project(":catalogs:catalog-jdbc-common"))
-  implementation(project(":common"))
-  implementation(project(":core"))
+  implementation(project(":api")) {
+    exclude(group = "*")
+  }
+  implementation(project(":catalogs:catalog-jdbc-common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":core")) {
+    exclude(group = "*")
+  }
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
@@ -43,14 +51,10 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
-  testImplementation(libs.bundles.log4j)
-  testImplementation(libs.commons.lang3)
-  testImplementation(libs.guava)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
-  testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
