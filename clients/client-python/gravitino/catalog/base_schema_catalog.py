@@ -241,11 +241,11 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
 
         if self.rest_client is None:
             raise IllegalArgumentException("restClient must be set")
-        if not (self.name() and len(self.name().strip()) > 0):
+        if not self.name() or not self.name().strip():
             raise IllegalArgumentException("name must not be blank")
         if self.type() is None:
             raise IllegalArgumentException("type must not be None")
-        if not (self.provider() and len(self.provider().strip()) > 0):
+        if not self.provider() or not self.provider().strip():
             raise IllegalArgumentException("provider must not be blank")
         if self.audit_info() is None:
             raise IllegalArgumentException("audit must not be None")
