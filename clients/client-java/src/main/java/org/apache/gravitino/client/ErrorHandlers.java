@@ -35,6 +35,7 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -186,6 +187,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> tagErrorHandler() {
     return TagErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Owner operations.
+   *
+   * @return A Consumer representing the Owner error handler.
+   */
+  public static Consumer<ErrorResponse> ownerErrorHandler() {
+    return OwnerErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -617,6 +627,10 @@ public class ErrorHandlers {
             throw new NoSuchMetalakeException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
             throw new NoSuchRoleException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
           } else {
             throw new NotFoundException(errorMessage);
           }
@@ -702,6 +716,36 @@ public class ErrorHandlers {
             throw new TagAlreadyAssociatedException(errorMessage);
           } else {
             throw new AlreadyExistsException(errorMessage);
+          }
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Owner operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class OwnerErrorHandler extends RestErrorHandler {
+
+    private static final OwnerErrorHandler INSTANCE = new OwnerErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
           }
 
         case ErrorConstants.INTERNAL_ERROR_CODE:

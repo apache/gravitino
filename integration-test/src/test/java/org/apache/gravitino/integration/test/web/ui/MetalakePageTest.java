@@ -23,11 +23,11 @@ import org.apache.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 
-@Tag("gravitino-docker-test")
+@DisabledIfSystemProperty(named = "testMode", matches = "embedded")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class MetalakePageTest extends AbstractWebIT {
   private static final String WEB_TITLE = "Gravitino";

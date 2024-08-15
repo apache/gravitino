@@ -5,7 +5,7 @@ date: 2024-05-09
 keyword: Gravitino Python client
 license: This software is licensed under the Apache License version 2.
 ---
-## Introduction
+# Apache Gravitino Python client
 
 Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake.
 It manages the metadata directly in different sources, types, and regions, also provides users
@@ -26,7 +26,7 @@ install it in your local.
 ### Apache Gravitino Python client API
 
 ```shell
-pip install gravitino
+pip install apache-gravitino
 ```
 
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
@@ -36,7 +36,7 @@ pip install gravitino
 
 We offer a playground environment to help you quickly understand how to use Gravitino Python
 client to manage non-tabular data on HDFS via Fileset in Gravitino. You can refer to the
-document [How to use the playground#Launch AI components of playground](./how-to-use-the-playground.md#launch-ai-components-of-playground)
+document [How to use the playground](./how-to-use-the-playground.md)
 to launch a Gravitino server, HDFS and Jupyter notebook environment in you local Docker environment.
 
 Waiting for the playground Docker environment to start, you can directly open
@@ -111,7 +111,7 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
     ./gradlew :clients:client-python:distribution
     ```
 
-6. Deploy the Gravitino Python client to https://pypi.org/project/gravitino/
+6. Deploy the Gravitino Python client to https://pypi.org/project/apache-gravitino/
 
     ```shell
     ./gradlew :clients:client-python:deploy
@@ -119,9 +119,21 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 
 ## Resources
 
-+ Official website https://gravitino.apache.org/ (coming soon)
++ Official website https://gravitino.apache.org/
 + Project home on GitHub: https://github.com/apache/gravitino/
 + Playground with Docker: https://github.com/apache/gravitino-playground
 + User documentation: https://datastrato.ai/docs/
 + Videos on Youtube: https://www.youtube.com/@Datastrato
-+ Slack Community: [https://the-asf.slack.com
++ Slack Community: [https://the-asf.slack.com#gravitino](https://the-asf.slack.com/archives/C078RESTT19)
+
+## License
+
+Gravitino is under the Apache License Version 2.0, See the [LICENSE](https://github.com/apache/gravitino/blob/main/LICENSE) for the details.
+
+## ASF Incubator disclaimer
+
+Apache Gravitino is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. 
+Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, 
+and decision making process have stabilized in a manner consistent with other successful ASF projects. 
+While incubation status is not necessarily a reflection of the completeness or stability of the code, 
+it does indicate that the project has yet to be fully endorsed by the ASF.

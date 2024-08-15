@@ -362,7 +362,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
    You can get it by [pip](https://pip.pypa.io/en/stable/installation/):
 
     ```shell
-    pip install gravitino
+    pip install apache-gravitino
     ```
 
 2. Configuring the Hadoop environment.

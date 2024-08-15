@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -34,6 +33,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -150,22 +150,14 @@ public class UserMetaService {
                 UserMetaMapper.class, mapper -> mapper.softDeleteUserMetaByUserId(userId)),
         () ->
             SessionUtils.doWithoutCommit(
-                UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)));
+                UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByOwnerIdAndType(
+                        userId, Entity.EntityType.USER.name())));
     return true;
-  }
-
-  public UserEntity getUserById(String metalake, Long userId) {
-    UserPO userPO =
-        SessionUtils.getWithoutCommit(
-            UserMetaMapper.class, mapper -> mapper.selectUserMetaById(userId));
-    if (userPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.USER.name().toLowerCase(),
-          String.valueOf(userId));
-    }
-    return POConverters.fromUserPO(
-        userPO, Collections.emptyList(), AuthorizationUtils.ofUserNamespace(metalake));
   }
 
   public <E extends Entity & HasIdentifier> UserEntity updateUser(

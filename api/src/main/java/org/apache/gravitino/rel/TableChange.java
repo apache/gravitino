@@ -20,6 +20,7 @@
 
 package org.apache.gravitino.rel;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
@@ -1353,6 +1354,8 @@ public interface TableChange {
     private final ColumnPosition position;
 
     private UpdateColumnPosition(String[] fieldName, ColumnPosition position) {
+      Preconditions.checkArgument(
+          position != ColumnPosition.defaultPos(), "Position cannot be DEFAULT");
       this.fieldName = fieldName;
       this.position = position;
     }

@@ -24,14 +24,18 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsCatalogs;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
@@ -42,6 +46,7 @@ import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
+import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
@@ -57,8 +62,10 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
+import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
@@ -66,13 +73,16 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -88,6 +98,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
+  private static final String API_METALAKES_OWNERS_PATH = "api/metalakes/%s/owners/%s";
   private static final String BLANK_PLACE_HOLDER = "";
 
   private static final String API_METALAKES_TAGS_PATH = "api/metalakes/%s/tags";
@@ -474,7 +485,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public boolean removeUser(String user) throws NoSuchMetalakeException {
     RemoveResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_USERS_PATH, this.name(), user),
+            String.format(API_METALAKES_USERS_PATH, this.name(), RESTUtils.encodeString(user)),
             RemoveResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
@@ -495,7 +506,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public User getUser(String user) throws NoSuchUserException, NoSuchMetalakeException {
     UserResponse resp =
         restClient.get(
-            String.format(API_METALAKES_USERS_PATH, this.name(), user),
+            String.format(API_METALAKES_USERS_PATH, this.name(), RESTUtils.encodeString(user)),
             UserResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
@@ -541,7 +552,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public boolean removeGroup(String group) throws NoSuchMetalakeException {
     RemoveResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_GROUPS_PATH, this.name(), group),
+            String.format(API_METALAKES_GROUPS_PATH, this.name(), RESTUtils.encodeString(group)),
             RemoveResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.groupErrorHandler());
@@ -562,7 +573,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public Group getGroup(String group) throws NoSuchGroupException, NoSuchMetalakeException {
     GroupResponse resp =
         restClient.get(
-            String.format(API_METALAKES_GROUPS_PATH, this.name(), group),
+            String.format(API_METALAKES_GROUPS_PATH, this.name(), RESTUtils.encodeString(group)),
             GroupResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.groupErrorHandler());
@@ -583,7 +594,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public Role getRole(String role) throws NoSuchRoleException, NoSuchMetalakeException {
     RoleResponse resp =
         restClient.get(
-            String.format(API_METALAKES_ROLES_PATH, this.name(), role),
+            String.format(API_METALAKES_ROLES_PATH, this.name(), RESTUtils.encodeString(role)),
             RoleResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
@@ -604,7 +615,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public boolean deleteRole(String role) throws NoSuchMetalakeException {
     DeleteResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_ROLES_PATH, this.name(), role),
+            String.format(API_METALAKES_ROLES_PATH, this.name(), RESTUtils.encodeString(role)),
             DeleteResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
@@ -622,11 +633,12 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
    * @return The created Role instance.
    * @throws RoleAlreadyExistsException If a Role with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the securable object doesn't exist
    * @throws RuntimeException If creating the Role encounters storage issues.
    */
   public Role createRole(
       String role, Map<String, String> properties, List<SecurableObject> securableObjects)
-      throws RoleAlreadyExistsException, NoSuchMetalakeException {
+      throws RoleAlreadyExistsException, NoSuchMetalakeException, NoSuchMetadataObjectException {
     RoleCreateRequest req =
         new RoleCreateRequest(
             role,
@@ -666,7 +678,10 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
     UserResponse resp =
         restClient.put(
-            String.format(API_PERMISSION_PATH, this.name(), String.format("users/%s/grant", user)),
+            String.format(
+                API_PERMISSION_PATH,
+                this.name(),
+                String.format("users/%s/grant", RESTUtils.encodeString(user))),
             request,
             UserResponse.class,
             Collections.emptyMap(),
@@ -695,7 +710,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     GroupResponse resp =
         restClient.put(
             String.format(
-                API_PERMISSION_PATH, this.name(), String.format("groups/%s/grant", group)),
+                API_PERMISSION_PATH,
+                this.name(),
+                String.format("groups/%s/grant", RESTUtils.encodeString(group))),
             request,
             GroupResponse.class,
             Collections.emptyMap(),
@@ -723,7 +740,10 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
     UserResponse resp =
         restClient.put(
-            String.format(API_PERMISSION_PATH, this.name(), String.format("users/%s/revoke", user)),
+            String.format(
+                API_PERMISSION_PATH,
+                this.name(),
+                String.format("users/%s/revoke", RESTUtils.encodeString(user))),
             request,
             UserResponse.class,
             Collections.emptyMap(),
@@ -752,7 +772,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     GroupResponse resp =
         restClient.put(
             String.format(
-                API_PERMISSION_PATH, this.name(), String.format("groups/%s/revoke", group)),
+                API_PERMISSION_PATH,
+                this.name(),
+                String.format("groups/%s/revoke", RESTUtils.encodeString(group))),
             request,
             GroupResponse.class,
             Collections.emptyMap(),
@@ -760,6 +782,59 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     resp.validate();
 
     return resp.getGroup();
+  }
+
+  /**
+   * Get the owner of a metadata object.
+   *
+   * @param object The metadata object
+   * @return The owner of the metadata object. If the metadata object doesn't set the owner, it will
+   *     return Optional.empty().
+   * @throws NoSuchMetadataObjectException If the metadata object is not found.
+   */
+  public Optional<Owner> getOwner(MetadataObject object) throws NoSuchMetadataObjectException {
+    OwnerResponse resp =
+        restClient.get(
+            String.format(
+                API_METALAKES_OWNERS_PATH,
+                this.name(),
+                String.format(
+                    "%s/%s",
+                    object.type().name().toLowerCase(Locale.ROOT),
+                    RESTUtils.encodeString(object.fullName()))),
+            OwnerResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.ownerErrorHandler());
+    resp.validate();
+    return Optional.ofNullable(resp.getOwner());
+  }
+
+  /**
+   * Set the owner of a metadata object.
+   *
+   * @param object The metadata object.
+   * @param ownerName The name of the owner
+   * @param ownerType The type of the owner, The owner can be a user or a group.
+   * @throws NotFoundException If the metadata object isn't found or the owner doesn't exist.
+   */
+  public void setOwner(MetadataObject object, String ownerName, Owner.Type ownerType)
+      throws NotFoundException {
+    OwnerSetRequest request = new OwnerSetRequest(ownerName, ownerType);
+    request.validate();
+    SetResponse resp =
+        restClient.put(
+            String.format(
+                API_METALAKES_OWNERS_PATH,
+                this.name(),
+                String.format(
+                    "%s/%s",
+                    object.type().name().toLowerCase(Locale.ROOT),
+                    RESTUtils.encodeString(object.fullName()))),
+            request,
+            SetResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.ownerErrorHandler());
+    resp.validate();
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {
@@ -782,6 +857,20 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
       return new GravitinoMetalake(name, comment, properties, audit, restClient);
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+
+    if (!(o instanceof GravitinoMetalake)) {
+      return false;
+    }
+
+    GravitinoMetalake that = (GravitinoMetalake) o;
+    return super.equals(that);
   }
 
   /** @return the builder for creating a new instance of GravitinoMetaLake. */

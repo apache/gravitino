@@ -60,7 +60,7 @@ Starting with version `0.6.0`, the prefix `gravitino.auxService.iceberg-rest.` f
 
 Please note that, it only takes affect in `gravitino.conf`, you don't need to specify the above configurations if start as a standalone server.
 
-### REST catalog server configuration
+### HTTP server configuration
 
 | Configuration item                               | Description                                                                                                                                                                                                                                          | Default value                                                                | Required | Since Version |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
@@ -82,6 +82,21 @@ You can also specify filter parameters by setting configuration entries in the s
 ### Security
 
 Gravitino Iceberg REST server supports OAuth2 and HTTPS, please refer to [Security](security/security.md) for more details.
+
+#### Backend authentication
+
+For JDBC backend, you can use the `gravitino.iceberg-rest.jdbc.user` and `gravitino.iceberg-rest.jdbc.password` to authenticate the JDBC connection. For Hive backend, you can use the `gravitino.iceberg-rest.authentication.type` to specify the authentication type, and use the `gravitino.iceberg-rest.authentication.kerberos.principal` and `gravitino.iceberg-rest.authentication.kerberos.keytab-uri` to authenticate the Kerberos connection.
+The detailed configuration items are as follows:
+
+| Configuration item                                                        | Description                                                                                                                                                                                                                                           | Default value | Required                                                                           | Since Version |
+|---------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------------------------------------------------------------|---------------|
+| `gravitino.iceberg-rest.authentication.type`                              | The type of authentication for Iceberg rest catalog backend. This configuration only applicable for for Hive backend, and only supports `Kerberos`, `simple` currently. As for JDBC backend, only username/password authentication was supported now. | `simple`      | No                                                                                 | 0.6.0         |
+| `gravitino.iceberg-rest.authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                                                                               | `false`       | No                                                                                 | 0.6.0         |
+| `gravitino.iceberg-rest.authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                                                          | (none)        | required if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.6.0         |
+| `gravitino.iceberg-rest.authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                                                                | (none)        | required if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.6.0         |
+| `gravitino.iceberg-rest.authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                        | 60            | No                                                                                 | 0.6.0         |
+| `gravitino.iceberg-rest.authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                            | 60            | No                                                                                 | 0.6.0         |
+
 
 ### Storage
 
@@ -113,39 +128,84 @@ You should place HDFS configuration file to the classpath of the Iceberg REST se
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
 :::
 
-### Apache Gravitino Iceberg catalog backend configuration
+### Catalog backend configuration
 
 :::info
 The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can specify a Hive or JDBC catalog backend for production environment.
 :::
 
-#### Apache Hive backend configuration
+#### Hive backend configuration
 
-| Configuration item                            | Description                                                                                                                                  | Default value                                                                 | Required | Since Version |
-|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|----------|---------------|
-| `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`hive`** for a Hive catalog.                              | `memory`                                                                      | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.uri`                  | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                                                                | (none)                                                                        | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.warehouse`            | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                                                           | (none)                                                                        | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.catalog-backend-name` | The catalog backend name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables. | `hive` for Hive backend, `jdbc` for JDBC backend, `memory` for memory backend | No       | 0.5.2         |
+| Configuration item                                                        | Description                                                                                                                                  | Default value                                                                  | Required | Since Version |
+|---------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend`                                  | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`hive`** for a Hive catalog.                              | `memory`                                                                       | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.uri`                                              | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                                                                | (none)                                                                         | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.warehouse`                                        | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                                                           | (none)                                                                         | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.catalog-backend-name`                             | The catalog backend name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables. | `hive` for Hive backend, `jdbc` for JDBC backend, `memory` for memory backend  | No       | 0.5.2         |
 
 #### JDBC backend configuration
 
-| Configuration item                            | Description                                                                                                                          | Default value           | Required | Since Version |
-|-----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
-| `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for a JDBC catalog.                      | `memory`                | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.uri`                  | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.   | (none)                  | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.warehouse `           | The warehouse directory of JDBC catalog. Set the HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc` | (none)                  | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables. | `jdbc` for JDBC backend | No       | 0.5.2         |
-| `gravitino.iceberg-rest.jdbc.user`            | The username of the JDBC connection.                                                                                                 | (none)                  | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.jdbc.password`        | The password of the JDBC connection.                                                                                                 | (none)                  | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.jdbc-initialize`      | Whether to initialize the meta tables when creating the JDBC catalog.                                                                | `true`                  | No       | 0.2.0         |
-| `gravitino.iceberg-rest.jdbc-driver`          | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                             | (none)                  | Yes      | 0.3.0         |
+| Configuration item                                                        | Description                                                                                                                           | Default value            | Required | Since Version |
+|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|--------------------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend`                                  | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for a JDBC catalog.                       | `memory`                 | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.uri`                                              | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.    | (none)                   | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.warehouse `                                       | The warehouse directory of JDBC catalog. Set the HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc`  | (none)                   | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.catalog-backend-name`                             | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.  | `jdbc` for JDBC backend  | No       | 0.5.2         |
+| `gravitino.iceberg-rest.jdbc.user`                                        | The username of the JDBC connection.                                                                                                  | (none)                   | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.jdbc.password`                                    | The password of the JDBC connection.                                                                                                  | (none)                   | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.jdbc-initialize`                                  | Whether to initialize the meta tables when creating the JDBC catalog.                                                                 | `true`                   | No       | 0.2.0         |
+| `gravitino.iceberg-rest.jdbc-driver`                                      | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                              | (none)                   | Yes      | 0.3.0         |
 
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
 :::caution
 You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 :::
+
+#### Multi catalog support
+
+The Gravitino Iceberg REST server supports multiple catalogs and offers a configuration-based catalog management system.
+
+| Configuration item                           | Description                                                                                                                                                                          | Default value               | Required | Since Version |
+|----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-provider`    | Catalog provider class name, you can develop a class that implements `IcebergTableOpsProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.   | `config-based-provider`     | No       | 0.7.0         |
+
+When using a config-based catalog provider, you can configure the default catalog with `gravitino.iceberg-rest.catalog.<param name>=<value>`. For specific catalogs, use the format `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
+
+For instance, you can configure three different catalogs, the default catalog and the specific `hive_backend` and `jdbc_backend` catalogs separately.
+
+```text
+gravitino.iceberg-rest.catalog-backend = jdbc
+gravitino.iceberg-rest.uri = jdbc:postgresql://127.0.0.1:5432
+gravitino.iceberg-rest.warehouse = hdfs://127.0.0.1:9000/user/hive/warehouse-postgresql
+...
+gravitino.iceberg-rest.catalog.hive_backend.catalog-backend = hive
+gravitino.iceberg-rest.catalog.hive_backend.uri = thrift://127.0.0.1:9084
+gravitino.iceberg-rest.catalog.hive_backend.warehouse = /user/hive/warehouse-hive/
+...
+gravitino.iceberg-rest.catalog.jdbc_backend.catalog-backend = jdbc
+gravitino.iceberg-rest.catalog.jdbc_backend.uri = jdbc:mysql://127.0.0.1:3306/
+gravitino.iceberg-rest.catalog.jdbc_backend.warehouse = hdfs://127.0.0.1:9000/user/hive/warehouse-mysql
+...
+```
+
+You can access different catalogs by setting the `prefix` to the specific catalog name in the Iceberg REST client configuration. The default catalog will be used if you do not specify a `prefix`. For instance, consider the case of SparkSQL.
+
+```shell
+./bin/spark-sql -v \
+...
+--conf spark.sql.catalog.default_rest_catalog.type=rest  \
+--conf spark.sql.catalog.default_rest_catalog.uri=http://127.0.0.1:9001/iceberg/ \
+...
+--conf spark.sql.catalog.hive_backend_catalog.type=rest  \
+--conf spark.sql.catalog.hive_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.hive_backend_catalog.prefix=hive_backend \
+...
+--conf spark.sql.catalog.jdbc_backend_catalog.type=rest  \
+--conf spark.sql.catalog.jdbc_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.jdbc_backend_catalog.prefix=jdbc_backend \
+...
+```
 
 ### Other Apache Iceberg catalog properties
 
@@ -162,7 +222,7 @@ The `clients` property for example:
 
 ### Apache Iceberg metrics store configuration
 
-Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `org.apache.gravitino.catalog.lakehouse.iceberg.web.metrics` and add the corresponding jar file to the Iceberg REST service classpath directory.
+Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `org.apache.gravitino.iceberg.service.metrics.IcebergMetricsStore` and add the corresponding jar file to the Iceberg REST service classpath directory.
 
 | Configuration item                              | Description                                                                                                                         | Default value | Required | Since Version |
 |-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -232,7 +292,7 @@ SELECT * FROM dml.test;
 
 ## Docker instructions
 
-You could run Gravitino server though docker container:
+You could run Gravitino Iceberg REST server though docker container:
 
 ```shell
 docker run -d -p 9001:9001 datastrato/iceberg-rest-server:0.6
