@@ -1,0 +1,191 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/groups:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Add group
+      operationId: addGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupAddRequest"
+            examples:
+              GroupAddRequest:
+                $ref: "#/components/examples/GroupAddRequest"
+
+      responses:
+        "200":
+          description: Returns the added group object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/GroupResponse"
+              examples:
+                GroupResponse:
+                  $ref: "#/components/examples/GroupResponse"
+        "409":
+          description: Conflict - The target group already exists in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                GroupAlreadyExistsException:
+                  $ref: "#/components/examples/GroupAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/groups/{group}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/group"
+
+    get:
+      tags:
+        - access control
+      summary: Get group
+      operationId: getGroup
+      description: Returns the specified group information in the specified metalake
+      responses:
+        "200":
+          description: Returns the group object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/GroupResponse"
+                examples:
+                  GroupResponse:
+                    $ref: "#/components/examples/GroupResponse"
+        "404":
+          description: Not Found - The specified group does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchGroupException:
+                  $ref: "#/components/examples/NoSuchGroupException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - access control
+      summary: Remove group
+      operationId: removeGroup
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/RemoveResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  schemas:
+    Group:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the group
+        roles:
+          type: array
+          items:
+            type: string
+          description: The roles of the group
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
+
+    GroupAddRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the group
+
+  responses:
+    GroupResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        group:
+          $ref: "#/components/schemas/Group"
+
+  examples:
+    GroupAddRequest:
+      value: {
+        "name": "group1",
+      }
+
+    GroupResponse:
+      value: {
+        "code": 0,
+        "group": {
+          "name": "group1",
+          "roles": [],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          },
+        }
+      }
+
+    GroupAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "GroupAlreadyExistsException",
+        "message": "Group already exists",
+        "stack": [
+          "org.apache.gravitino.exceptions.GroupAlreadyExistsException: Group already exists: group1"
+        ]
+      }
+
+    NoSuchGroupException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchGroupException",
+        "message": "Group does not exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchGroupException: Group does not exist",
+          "..."
+        ]
+      }
