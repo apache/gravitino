@@ -156,14 +156,9 @@ Gravitino provides several ways to configure and manage the Gravitino server. Se
 
 ### Programming guides
 
-* [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
-  Gravitino.
-<<<<<<< HEAD
-* [Gravitino Javadoc](pathname:///docs/0.6.0-incubating/api/java/index.html): provides the Javadoc for the Gravitino API.
-=======
+* [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of Gravitino.
 * [Gravitino Java doc](pathname:///docs/0.6.0-incubating/api/java/index.html): provides the Javadoc for the Gravitino API.
 * [Gravitino Python doc](pathname:///docs/0.6.0-incubating/api/python/gravitino.html) provides the Pydoc for the Gravitino API.
->>>>>>> d05c7258 (Polish the doc)
 
 ### Development guides
 
