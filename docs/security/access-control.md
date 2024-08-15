@@ -51,7 +51,7 @@ object has a name "catalog1.schema1.table1" with type "TABLE". `METALAKE` object
 
 A metadata object to which access can be granted. Unless allowed by a grant, access is denied. 
 Every securable object resides within a logical container in a hierarchy of containers.
-The top container is the metalake. You can understand that metalake a customer organization.
+The top container is the metalake. 
 Catalogs are under the metalake. Catalogs represent different kinds of data sources.
 Schemas are under the catalog. There are tables, topics, or filesets under the schema.
 
@@ -59,7 +59,7 @@ Schemas are under the catalog. There are tables, topics, or filesets under the s
 
 The relationship of the concepts is as below.
 
-![user_group_relationshi_image](../assets/user-group.png)
+![user_group_relationship_image](../assets/user-group.png)
 ![concept_relationship_image](../assets/role.png)
 
 ### Ownership
@@ -85,7 +85,6 @@ You can also create a dedicated role for your business by API or the client.
 | Name        | Supports Securable Object | Operation           |
 |-------------|---------------------------|---------------------|
 | ManageUsers | Metalake                  | Add or remove users |
-
 
 ### Group privileges
 
@@ -120,7 +119,6 @@ For example, to select data from a table, users need to have the SELECT_TABLE pr
 `USE CATALOG` privileges on its parent catalog as well as `USE SCHEMA` privileges on its parent schema.
 
 :::
-
 
 ### Schema privileges
 
@@ -275,7 +273,6 @@ boolean deleted =
 </Tabs>
 
 ## Group Operation
-
 
 ### Add a Group
 
