@@ -30,9 +30,15 @@ val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val paimonVersion: String = libs.versions.paimon.get()
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":common"))
-  implementation(project(":core"))
+  implementation(project(":api")) {
+    exclude("*")
+  }
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
+  implementation(project(":core")) {
+    exclude("*")
+  }
   implementation(libs.bundles.paimon) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
@@ -123,6 +129,26 @@ tasks {
   }
 }
 
+// run  ./gradlew :catalogs:catalog-lakehouse-paimon:calculateDependenciesSize at the root of the project
+tasks.register("calculateDependenciesSize") {
+  group = "verification"
+  description = "Calculates the total size of all dependencies in the runtimeClasspath configuration for :catalogs:catalog-lakehouse-paimon"
+
+  doLast {
+    val runtimeClasspath = configurations.runtimeClasspath.get()
+    var totalSize: Long = 0
+
+    runtimeClasspath.forEach { file ->
+      if (file.exists()) {
+        totalSize += file.length()
+      } else {
+        println("File not found: ${file.absolutePath}")
+      }
+    }
+
+    println("Total size of dependencies: ${totalSize / (1024 * 1024)} MB")
+  }
+}
 tasks.test {
   val skipUTs = project.hasProperty("skipTests")
   if (skipUTs) {
