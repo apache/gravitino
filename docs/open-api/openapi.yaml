@@ -132,16 +132,16 @@ paths:
     $ref: "./owners.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1owners~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D"
 
   /metalakes/{metalake}/permissions/users/{user}/grant:
-    $ref: "./user_permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1users~1%7Buser%7D~1grant"
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1users~1%7Buser%7D~1grant"
 
   /metalakes/{metalake}/permissions/users/{user}/revoke:
-    $ref: "./user_permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1users~1%7Buser%7D~1revoke"
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1users~1%7Buser%7D~1revoke"
 
   /metalakes/{metalake}/permissions/groups/{group}/grant:
-    $ref: "./users_permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1grant"
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1grant"
 
   /metalakes/{metalake}/permissions/groups/{group}/revoke:
-    $ref: "./users_permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1revoke"
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1revoke"
 
 components:
 
