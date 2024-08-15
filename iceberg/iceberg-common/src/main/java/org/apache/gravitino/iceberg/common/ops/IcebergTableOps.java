@@ -36,6 +36,8 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.MapUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
@@ -66,6 +68,7 @@ public class IcebergTableOps implements AutoCloseable {
   private final IcebergCatalogBackend catalogBackend;
   private String catalogUri = null;
   private Map<String, String> catalogConfigToClients;
+  private Map<String, String> catalogPropertiesMap;
   private static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
           IcebergConstants.IO_IMPL,
@@ -91,6 +94,8 @@ public class IcebergTableOps implements AutoCloseable {
         MapUtils.getFilteredMap(
             icebergConfig.getIcebergCatalogProperties(),
             key -> catalogPropertiesToClientKeys.contains(key));
+
+    this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
   }
 
   public IcebergTableOps() {
@@ -137,6 +142,19 @@ public class IcebergTableOps implements AutoCloseable {
 
   public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
     return CatalogHandlers.registerTable(catalog, namespace, request);
+  }
+
+  /**
+   * Reload hadoop configuration, this is useful when the hadoop configuration UserGroupInformation
+   * is shared by multiple threads. UserGroupInformation#authenticationMethod was first initialized
+   * in KerberosClient, however, when switching to iceberg-rest thead,
+   * UserGroupInformation#authenticationMethod will be reset to the default value; we need to
+   * reinitialize it again.
+   */
+  public void reloadHadoopConf() {
+    Configuration configuration = new Configuration();
+    this.catalogPropertiesMap.forEach(configuration::set);
+    UserGroupInformation.setConfiguration(configuration);
   }
 
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
