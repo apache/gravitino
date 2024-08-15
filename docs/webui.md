@@ -18,7 +18,7 @@ Currently, you can integrate [OAuth settings](./security.md) to view, add, modif
 
 The web UI homepage displayed in Gravitino depends on the configuration parameter for OAuth mode, see the details in [Security](./security.md).
 
-Set parameter for `gravitino.authenticator`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode). Simple mode is the default authentication option.
+Set parameter for `gravitino.authenticators`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode). Simple mode is the default authentication option. If multiple authenticators are set, the first one is taken by default.
 
 :::tip
 After changing the configuration, make sure to restart the Gravitino server.
@@ -29,10 +29,10 @@ After changing the configuration, make sure to restart the Gravitino server.
 ### Simple mode
 
 ```text
-gravitino.authenticator = simple
+gravitino.authenticators = simple
 ```
 
-Set the configuration parameter `gravitino.authenticator` to `simple`, and the web UI displays the homepage (Metalakes).
+Set the configuration parameter `gravitino.authenticators` to `simple`, and the web UI displays the homepage (Metalakes).
 
 ![webui-metalakes-simple](./assets/webui/metalakes-simple.png)
 
@@ -43,10 +43,10 @@ The main content displays the existing metalake list.
 ### Oauth mode
 
 ```text
-gravitino.authenticator = oauth
+gravitino.authenticators = oauth
 ```
 
-Set the configuration parameter `gravitino.authenticator` to `oauth`, and the web UI displays the login page.
+Set the configuration parameter `gravitino.authenticators` to `oauth`, and the web UI displays the login page.
 
 :::caution
 If both `OAuth` and `HTTPS` are set, due to the different security permission rules of various browsers, to avoid cross-domain errors,
