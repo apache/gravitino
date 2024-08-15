@@ -61,6 +61,7 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
   @Override
   public Page loadPageData() {
     List<GravitinoCatalog> gravitinoCatalogs = new ArrayList<>();
+    // retrieve catalogs form the Gravitino server with the configuration metalakes
     catalogConnectorManager
         .getUsedMetalakes()
         .forEach(
