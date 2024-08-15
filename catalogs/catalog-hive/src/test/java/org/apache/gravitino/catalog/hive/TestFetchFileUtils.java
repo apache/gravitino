@@ -17,7 +17,6 @@
  * under the License.
  */
 
-
 package org.apache.gravitino.catalog.hive;
 
 import java.io.File;
@@ -62,7 +61,7 @@ public class TestFetchFileUtils {
       } catch (IOException e) {
         attempts++;
         if (attempts < MAX_RETRIES) {
-          long retryDelay = INITIAL_RETRY_DELAY_MS * (1L << (attempts - 1)); // Exponential backoff
+          long retryDelay = INITIAL_RETRY_DELAY_MS * (1L << (attempts - 1));
           logger.warn("Attempt " + attempts + " failed. Retrying in " + retryDelay + "ms.");
           Thread.sleep(retryDelay);
         } else {
