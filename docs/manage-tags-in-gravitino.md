@@ -83,7 +83,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/metalakes/test/tags
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags?detailed=true
+http://localhost:8090/api/metalakes/test/tags?details=true
 ```
 
 </TabItem>
