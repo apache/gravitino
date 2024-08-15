@@ -33,7 +33,7 @@ A defined level of access to an object. Multiple distinct privileges may be used
 
 ### User
 
-A user identity recognized by Gravitino.  External user system instead of Gravitino manages users. 
+A user identity recognized by Gravitino. External user system instead of Gravitino manages users. 
 
 ### Group
 
@@ -45,7 +45,7 @@ Metadata objects are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
 `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, `ROLE`, `METALAKE`. A metadata object is combined by a `type` and a
 comma-separated `name`. For example, a `CATAGLOG` object has a name "catalog1" with type
 "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
-object has a name "catalog1.schema1.table1" with type "TABLE". `METALAKE` object has a name "metalake1".
+object has a name "catalog1.schema1.table1" with type "TABLE". A `METALAKE` object has a name "metalake1".
 
 ### Securable objects
 
@@ -64,9 +64,8 @@ The relationship of the concepts is as below.
 
 ### Ownership
 
-Every metadata object has an owner. The owner could be a user or group.
-The owner have all the privileges of the metadata object.
-The owner could be transferred to another user or group.
+Every metadata object has an owner. The owner could be a user or group, and has all the privileges of the metadata object.
+Meanwhile, you can transfer the ownership of securable object to another user or group.
 
 ## The types of roles
 
