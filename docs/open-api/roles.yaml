@@ -49,6 +49,17 @@ paths:
               examples:
                 RoleResponse:
                   $ref: "#/components/examples/RoleResponse"
+
+        "404":
+          description: Not Found - The specified securable object does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+
         "409":
           description: Conflict - The target role already exists in the specified metalake
           content:
@@ -284,6 +295,17 @@ components:
         "message": "Role does not exist",
         "stack": [
           "org.apache.gravitino.exceptions.NoSuchRoleException: Role does not exist",
+          "..."
+        ]
+      }
+
+    NoSuchMetadataObjectException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchMetadataObjectException",
+        "message": "Metadata object does not exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchUserException: Metadata object does not exist",
           "..."
         ]
       }

@@ -46,10 +46,24 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/UserResponse"
+                $ref: "./users.yaml#/components/responses/UserResponse"
               examples:
                 UserResponse:
-                  $ref: "#/components/examples/UserResponse"
+                  $ref: "./users.yaml#/components/examples/UserResponse"
+
+        "404":
+          description: Not Found - The specified user or role does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchUserException:
+                  $ref: "./users.yaml#/components/examples/NoSuchUserException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
 
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
@@ -79,10 +93,24 @@ paths:
             content:
               application/vnd.gravitino.v1+json:
                 schema:
-                  $ref: "#/components/responses/UserResponse"
+                  $ref: "./users.yaml#/components/responses/UserResponse"
                 examples:
                   UserResponse:
-                    $ref: "#/components/examples/UserResponse"
+                    $ref: "./users.yaml#/components/examples/UserResponse"
+
+          "404":
+            description: Not Found - The specified user or role does not exist in the specified metalake
+            content:
+              application/vnd.gravitino.v1+json:
+                schema:
+                  $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                examples:
+                  NoSuchMetalakeException:
+                    $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                  NoSuchUserException:
+                    $ref: "./users.yaml#/components/examples/NoSuchUserException"
+                  NoSuchRoleException:
+                    $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
 
           "5xx":
             $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
@@ -115,7 +143,21 @@ paths:
                   $ref: "./groups.yaml#/components/responses/GroupResponse"
                 examples:
                   GroupResponse:
-                    $ref: "./groups.yaml#/examples/GroupResponse""
+                    $ref: "./groups.yaml#/components/examples/GroupResponse"
+
+          "404":
+            description: Not Found - The specified group or role does not exist in the specified metalake
+            content:
+              application/vnd.gravitino.v1+json:
+                schema:
+                  $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                examples:
+                  NoSuchMetalakeException:
+                    $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                  NoSuchGroupException:
+                    $ref: "./groups.yaml#/components/examples/NoSuchGroupException"
+                  NoSuchRoleException:
+                    $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
 
           "5xx":
             $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
@@ -148,7 +190,21 @@ paths:
                 $ref: "./groups.yaml#/components/responses/GroupResponse"
               examples:
                 GroupResponse:
-                  $ref: "./groups.yaml#/examples/GroupResponse""
+                  $ref: "./groups.yaml#/components/examples/GroupResponse"
+
+        "404":
+          description: Not Found - The specified group or role does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchGroupException:
+                  $ref: "./groups.yaml#/components/examples/NoSuchGroupException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
 
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
