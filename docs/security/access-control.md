@@ -199,7 +199,6 @@ The related configuration is as follows.
 
 ### Add a user
 
-The external systems like LDAP, Scim and etc manage the user.
 You should add the user to your metalake before you use the authorization.
 
 <Tabs groupId='language' queryString>
@@ -276,7 +275,6 @@ boolean deleted =
 
 ### Add a Group
 
-The external systems like LDAP, Scim and etc manage the group.
 You should add the group to your metalake before you use the authorization.
 
 <Tabs groupId='language' queryString>
