@@ -81,7 +81,7 @@ You can also specify filter parameters by setting configuration entries in the s
 
 ### Security
 
-Gravitino Iceberg REST server supports OAuth2 and HTTPS, please refer to [Security](./security.md) for more details.
+Gravitino Iceberg REST server supports OAuth2 and HTTPS, please refer to [Security](security/security.md) for more details.
 
 ### Storage
 
