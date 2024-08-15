@@ -22,13 +22,14 @@ package org.apache.gravitino.catalog.hive;
 import java.io.File;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.log4j.Logger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestFetchFileUtils {
 
-  private static final Logger logger = Logger.getLogger(TestFetchFileUtils.class);
+  Logger LOG = LoggerFactory.getLogger(TestFetchFileUtils.class);
   private static final int MAX_RETRIES = 3;
   private static final long INITIAL_RETRY_DELAY_MS = 1000;
 
@@ -62,7 +63,7 @@ public class TestFetchFileUtils {
         attempts++;
         if (attempts < MAX_RETRIES) {
           long retryDelay = INITIAL_RETRY_DELAY_MS * (1L << (attempts - 1));
-          logger.warn("Attempt " + attempts + " failed. Retrying in " + retryDelay + "ms.");
+          LOG.warn("Attempt " + attempts + " failed. Retrying in " + retryDelay + "ms.");
           Thread.sleep(retryDelay);
         } else {
           throw new AssertionError("Failed to download file after " + MAX_RETRIES + " attempts", e);
