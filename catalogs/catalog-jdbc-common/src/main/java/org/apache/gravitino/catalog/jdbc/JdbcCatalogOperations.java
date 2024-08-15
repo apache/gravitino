@@ -22,6 +22,8 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -54,6 +56,7 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -97,6 +100,20 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   private DataSource dataSource;
 
   private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
+
+  public static class JDBCDriverInfo {
+    public String name;
+    public String version;
+    public int majorVersion;
+    public int minorVersion;
+
+    public JDBCDriverInfo(String driverName, String version, int majorVersion, int minorVersion) {
+      this.name = driverName;
+      this.version = version;
+      this.majorVersion = majorVersion;
+      this.minorVersion = minorVersion;
+    }
+  }
 
   /**
    * Constructs a new instance of JdbcCatalogOperations.
@@ -148,6 +165,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
     JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
+
+    checkJDBCDriverVersion();
     this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
     this.tableOperation.initialize(
         dataSource, exceptionConverter, jdbcTypeConverter, columnDefaultValueConverter, resultConf);
@@ -484,6 +503,35 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
     tableOperation.rename(databaseName, tableIdent.name(), renameTable.getNewName());
     return loadTable(NameIdentifier.of(tableIdent.namespace(), renameTable.getNewName()));
+  }
+
+  /**
+   * Get the JDBC driver name and version
+   *
+   * @return Returns the JDBC driver info
+   */
+  public JDBCDriverInfo getDiverInfo() {
+    try (Connection conn = dataSource.getConnection()) {
+      DatabaseMetaData metaData = conn.getMetaData();
+      return new JDBCDriverInfo(
+          metaData.getDriverName(),
+          metaData.getDriverVersion(),
+          metaData.getDriverMajorVersion(),
+          metaData.getDriverMinorVersion());
+    } catch (final SQLException se) {
+      throw new GravitinoRuntimeException(
+          se, "Failed to get JDBC driver information %s: ", se.getMessage());
+    }
+  }
+
+  /**
+   * Check the version of JDBC driver can supported.
+   *
+   * @return Returns the result of checking the jdbc driver version. If success return true,
+   *     otherwise throw a RuntimeException
+   */
+  public boolean checkJDBCDriverVersion() {
+    return true;
   }
 
   private Table internalAlterTable(NameIdentifier tableIdent, TableChange... changes)

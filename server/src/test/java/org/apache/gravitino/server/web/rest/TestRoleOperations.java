@@ -56,6 +56,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
@@ -199,10 +200,10 @@ public class TestRoleOperations extends JerseyTest {
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), respNotExist.getStatus());
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respNotExist.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, respNotExist.getMediaType());
     ErrorResponse notExistResponse = respNotExist.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, notExistResponse.getCode());
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, notExistResponse.getCode());
 
     // Test to throw NoSuchMetalakeException
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
@@ -402,7 +403,7 @@ public class TestRoleOperations extends JerseyTest {
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(catalog)));
     when(catalogDispatcher.catalogExists(any())).thenReturn(false);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        NoSuchMetadataObjectException.class,
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(catalog)));
 
     // check the schema
@@ -414,7 +415,7 @@ public class TestRoleOperations extends JerseyTest {
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(schema)));
     when(schemaDispatcher.schemaExists(any())).thenReturn(false);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        NoSuchMetadataObjectException.class,
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(schema)));
 
     // check the table
@@ -426,7 +427,7 @@ public class TestRoleOperations extends JerseyTest {
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(table)));
     when(tableDispatcher.tableExists(any())).thenReturn(false);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        NoSuchMetadataObjectException.class,
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(table)));
 
     // check the topic
@@ -438,7 +439,7 @@ public class TestRoleOperations extends JerseyTest {
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(topic)));
     when(topicDispatcher.topicExists(any())).thenReturn(false);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        NoSuchMetadataObjectException.class,
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(topic)));
 
     // check the fileset
@@ -450,7 +451,7 @@ public class TestRoleOperations extends JerseyTest {
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(fileset)));
     when(filesetDispatcher.filesetExists(any())).thenReturn(false);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        NoSuchMetadataObjectException.class,
         () -> RoleOperations.checkSecurableObject("metalake", DTOConverters.toDTO(fileset)));
   }
 }
