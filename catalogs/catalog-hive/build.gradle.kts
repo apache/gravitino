@@ -30,9 +30,15 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":catalogs:catalog-common"))
-  implementation(project(":core"))
+  implementation(project(":api")) {
+    exclude("*")
+  }
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
+  implementation(project(":core")) {
+    exclude("*")
+  }
 
   implementation(libs.caffeine)
   implementation(libs.guava)
