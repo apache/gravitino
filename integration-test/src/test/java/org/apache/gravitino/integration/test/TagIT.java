@@ -251,8 +251,9 @@ public class TagIT extends AbstractIT {
     TagChange setProperty4 = TagChange.setProperty("k5", "v5");
     TagChange removeProperty3 = TagChange.removeProperty("k4");
 
-    Tag alteredTag5 = metalake.alterTag(
-        tagName1, rename1, updateComment1, setProperty3, setProperty4, removeProperty3);
+    Tag alteredTag5 =
+        metalake.alterTag(
+            tagName1, rename1, updateComment1, setProperty3, setProperty4, removeProperty3);
     Assertions.assertEquals(newTagName1, alteredTag5.name());
     Assertions.assertEquals("new comment1", alteredTag5.comment());
     Assertions.assertEquals(ImmutableMap.of("k5", "v5"), alteredTag5.properties());
