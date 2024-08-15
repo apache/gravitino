@@ -82,6 +82,7 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -484,7 +485,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public boolean removeUser(String user) throws NoSuchMetalakeException {
     RemoveResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_USERS_PATH, this.name(), user),
+            String.format(API_METALAKES_USERS_PATH, this.name(), RESTUtils.encodeString(user)),
             RemoveResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
@@ -505,7 +506,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public User getUser(String user) throws NoSuchUserException, NoSuchMetalakeException {
     UserResponse resp =
         restClient.get(
-            String.format(API_METALAKES_USERS_PATH, this.name(), user),
+            String.format(API_METALAKES_USERS_PATH, this.name(), RESTUtils.encodeString(user)),
             UserResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
@@ -551,7 +552,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public boolean removeGroup(String group) throws NoSuchMetalakeException {
     RemoveResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_GROUPS_PATH, this.name(), group),
+            String.format(API_METALAKES_GROUPS_PATH, this.name(), RESTUtils.encodeString(group)),
             RemoveResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.groupErrorHandler());
@@ -572,7 +573,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public Group getGroup(String group) throws NoSuchGroupException, NoSuchMetalakeException {
     GroupResponse resp =
         restClient.get(
-            String.format(API_METALAKES_GROUPS_PATH, this.name(), group),
+            String.format(API_METALAKES_GROUPS_PATH, this.name(), RESTUtils.encodeString(group)),
             GroupResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.groupErrorHandler());
@@ -593,7 +594,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public Role getRole(String role) throws NoSuchRoleException, NoSuchMetalakeException {
     RoleResponse resp =
         restClient.get(
-            String.format(API_METALAKES_ROLES_PATH, this.name(), role),
+            String.format(API_METALAKES_ROLES_PATH, this.name(), RESTUtils.encodeString(role)),
             RoleResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
@@ -614,7 +615,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public boolean deleteRole(String role) throws NoSuchMetalakeException {
     DeleteResponse resp =
         restClient.delete(
-            String.format(API_METALAKES_ROLES_PATH, this.name(), role),
+            String.format(API_METALAKES_ROLES_PATH, this.name(), RESTUtils.encodeString(role)),
             DeleteResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
@@ -632,11 +633,12 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
    * @return The created Role instance.
    * @throws RoleAlreadyExistsException If a Role with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the securable object doesn't exist
    * @throws RuntimeException If creating the Role encounters storage issues.
    */
   public Role createRole(
       String role, Map<String, String> properties, List<SecurableObject> securableObjects)
-      throws RoleAlreadyExistsException, NoSuchMetalakeException {
+      throws RoleAlreadyExistsException, NoSuchMetalakeException, NoSuchMetadataObjectException {
     RoleCreateRequest req =
         new RoleCreateRequest(
             role,
@@ -676,7 +678,10 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
     UserResponse resp =
         restClient.put(
-            String.format(API_PERMISSION_PATH, this.name(), String.format("users/%s/grant", user)),
+            String.format(
+                API_PERMISSION_PATH,
+                this.name(),
+                String.format("users/%s/grant", RESTUtils.encodeString(user))),
             request,
             UserResponse.class,
             Collections.emptyMap(),
@@ -705,7 +710,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     GroupResponse resp =
         restClient.put(
             String.format(
-                API_PERMISSION_PATH, this.name(), String.format("groups/%s/grant", group)),
+                API_PERMISSION_PATH,
+                this.name(),
+                String.format("groups/%s/grant", RESTUtils.encodeString(group))),
             request,
             GroupResponse.class,
             Collections.emptyMap(),
@@ -733,7 +740,10 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
     UserResponse resp =
         restClient.put(
-            String.format(API_PERMISSION_PATH, this.name(), String.format("users/%s/revoke", user)),
+            String.format(
+                API_PERMISSION_PATH,
+                this.name(),
+                String.format("users/%s/revoke", RESTUtils.encodeString(user))),
             request,
             UserResponse.class,
             Collections.emptyMap(),
@@ -762,7 +772,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     GroupResponse resp =
         restClient.put(
             String.format(
-                API_PERMISSION_PATH, this.name(), String.format("groups/%s/revoke", group)),
+                API_PERMISSION_PATH,
+                this.name(),
+                String.format("groups/%s/revoke", RESTUtils.encodeString(group))),
             request,
             GroupResponse.class,
             Collections.emptyMap(),
@@ -787,7 +799,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
                 API_METALAKES_OWNERS_PATH,
                 this.name(),
                 String.format(
-                    "%s/%s", object.type().name().toLowerCase(Locale.ROOT), object.fullName())),
+                    "%s/%s",
+                    object.type().name().toLowerCase(Locale.ROOT),
+                    RESTUtils.encodeString(object.fullName()))),
             OwnerResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.ownerErrorHandler());
@@ -813,7 +827,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
                 API_METALAKES_OWNERS_PATH,
                 this.name(),
                 String.format(
-                    "%s/%s", object.type().name().toLowerCase(Locale.ROOT), object.fullName())),
+                    "%s/%s",
+                    object.type().name().toLowerCase(Locale.ROOT),
+                    RESTUtils.encodeString(object.fullName()))),
             request,
             SetResponse.class,
             Collections.emptyMap(),
