@@ -125,6 +125,8 @@ components:
           items:
             type: string
           description: The roles of the group
+        audit:
+          $ref: "./openapi.yaml#/components/schemas/Audit"
 
     GroupAddRequest:
       type: object
@@ -160,6 +162,10 @@ components:
         "group": {
           "name": "group1",
           "roles": [],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          },
         }
       }
 
