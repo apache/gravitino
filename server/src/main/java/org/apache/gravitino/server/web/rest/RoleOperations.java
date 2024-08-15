@@ -180,6 +180,8 @@ public class RoleOperations {
       identifier = NameIdentifier.parse(String.format("%s.%s", metalake, object.fullName()));
     }
 
+    NameIdentifier i
+
     String existErrMsg = "Securable object %s doesn't exist";
 
     TreeLockUtils.doWithTreeLock(
