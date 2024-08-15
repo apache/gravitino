@@ -89,17 +89,16 @@ tasks.test {
     // Only run integration tests
     include("**/integration/**")
   }
-  environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
+
+  val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
+  init(this)
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {

@@ -20,7 +20,7 @@
 services:
 
   hive:
-    image: datastrato/gravitino-ci:hive-0.1.13
+    image: apache/gravitino-ci:hive-0.1.13
     networks:
       - trino-net
     container_name: trino-ci-hive
