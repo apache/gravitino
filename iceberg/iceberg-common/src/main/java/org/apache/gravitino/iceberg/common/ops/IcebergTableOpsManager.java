@@ -54,7 +54,12 @@ public class IcebergTableOpsManager implements AutoCloseable {
    */
   public IcebergTableOps getOps(String rawPrefix) {
     String catalogName = getCatalogName(rawPrefix);
-    return icebergTableOpsCache.get(catalogName, k -> provider.getIcebergTableOps(catalogName));
+    IcebergTableOps tableOps =
+        icebergTableOpsCache.get(catalogName, k -> provider.getIcebergTableOps(catalogName));
+    // Reload conf to reset UserGroupInformation or icebergTableOps will always use
+    // Simple auth.
+    tableOps.reloadHadoopConf();
+    return tableOps;
   }
 
   private String getCatalogName(String rawPrefix) {

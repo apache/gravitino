@@ -32,7 +32,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
 public class IcebergRESTHiveCatalogIT extends IcebergRESTServiceIT {
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   public IcebergRESTHiveCatalogIT() {
     catalogType = IcebergCatalogBackend.HIVE;
