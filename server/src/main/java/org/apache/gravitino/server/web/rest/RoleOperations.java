@@ -46,6 +46,7 @@ import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
@@ -179,7 +180,7 @@ public class RoleOperations {
       identifier = NameIdentifier.parse(String.format("%s.%s", metalake, object.fullName()));
     }
 
-    String existErrMsg = "Securable object % doesn't exist";
+    String existErrMsg = "Securable object %s doesn't exist";
 
     TreeLockUtils.doWithTreeLock(
         identifier,
@@ -188,41 +189,41 @@ public class RoleOperations {
           switch (object.type()) {
             case METALAKE:
               if (!GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
               }
 
               break;
 
             case CATALOG:
               if (!GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
               }
 
               break;
 
             case SCHEMA:
               if (!GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
               }
 
               break;
 
             case FILESET:
               if (!GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
               }
 
               break;
             case TABLE:
               if (!GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
               }
 
               break;
 
             case TOPIC:
               if (!GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
+                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
               }
 
               break;
