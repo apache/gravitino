@@ -63,4 +63,8 @@ public class IcebergConstants {
   public static final String ICEBERG_METRICS_QUEUE_CAPACITY = "metricsQueueCapacity";
 
   public static final String GRAVITINO_ICEBERG_REST_SERVICE_NAME = "iceberg-rest";
+
+  public static final String ICEBERG_REST_CATALOG_PROVIDER = "catalog-provider";
+
+  public static final String GRAVITINO_DEFAULT_CATALOG = "__gravitino_default_catalog";
 }

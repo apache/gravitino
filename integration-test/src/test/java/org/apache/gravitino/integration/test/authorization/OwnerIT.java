@@ -33,6 +33,8 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -50,9 +52,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class OwnerPostHookIT extends AbstractIT {
+public class OwnerIT extends AbstractIT {
 
-  private static final Logger LOG = LoggerFactory.getLogger(OwnerPostHookIT.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OwnerIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static String hmsUri;
@@ -116,10 +118,24 @@ public class OwnerPostHookIT extends AbstractIT {
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
+    // Set another owner
+    String anotherUser = "another";
+    metalake.addUser(anotherUser);
+    metalake.setOwner(metalakeObject, anotherUser, Owner.Type.USER);
+    owner = metalake.getOwner(metalakeObject).get();
+    Assertions.assertEquals(anotherUser, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
     MetadataObject catalogObject =
         MetadataObjects.of(Lists.newArrayList(catalogNameA), MetadataObject.Type.CATALOG);
     owner = metalake.getOwner(catalogObject).get();
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
+    // Set another owner
+    metalake.setOwner(catalogObject, anotherUser, Owner.Type.USER);
+    owner = metalake.getOwner(catalogObject).get();
+    Assertions.assertEquals(anotherUser, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
     MetadataObject schemaObject =
@@ -129,12 +145,24 @@ public class OwnerPostHookIT extends AbstractIT {
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
+    // Set another owner
+    metalake.setOwner(schemaObject, anotherUser, Owner.Type.USER);
+    owner = metalake.getOwner(schemaObject).get();
+    Assertions.assertEquals(anotherUser, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
     MetadataObject filesetObject =
         MetadataObjects.of(
             Lists.newArrayList(catalogNameA, "schema_owner", "fileset_owner"),
             MetadataObject.Type.FILESET);
     owner = metalake.getOwner(filesetObject).get();
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
+    // Set another owner
+    metalake.setOwner(filesetObject, anotherUser, Owner.Type.USER);
+    owner = metalake.getOwner(catalogObject).get();
+    Assertions.assertEquals(anotherUser, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
     // Clean up
@@ -181,6 +209,14 @@ public class OwnerPostHookIT extends AbstractIT {
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
+    // Set another owner
+    String anotherUser = "another";
+    metalake.addUser(anotherUser);
+    metalake.setOwner(topicObject, anotherUser, Owner.Type.USER);
+    owner = metalake.getOwner(topicObject).get();
+    Assertions.assertEquals(anotherUser, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
     // Clean up
     catalogB.asTopicCatalog().dropTopic(topicIdent);
     metalake.dropCatalog(catalogNameB);
@@ -207,6 +243,14 @@ public class OwnerPostHookIT extends AbstractIT {
     MetadataObject roleObject = MetadataObjects.of(null, "role_owner", MetadataObject.Type.ROLE);
     owner = metalake.getOwner(roleObject).get();
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
+    // Set another owner
+    String anotherUser = "another";
+    metalake.addUser(anotherUser);
+    metalake.setOwner(roleObject, anotherUser, Owner.Type.USER);
+    owner = metalake.getOwner(roleObject).get();
+    Assertions.assertEquals(anotherUser, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
     // Clean up
@@ -265,10 +309,49 @@ public class OwnerPostHookIT extends AbstractIT {
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
     Assertions.assertEquals(Owner.Type.USER, owner.type());
 
+    // Set another owner
+    String anotherUser = "another";
+    metalake.addUser(anotherUser);
+    metalake.setOwner(tableObject, anotherUser, Owner.Type.USER);
+    owner = metalake.getOwner(tableObject).get();
+    Assertions.assertEquals(anotherUser, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
     // Clean up
     catalog.asTableCatalog().dropTable(tableIdent);
     catalog.asSchemas().dropSchema("schema_owner", true);
     metalake.dropCatalog(catalogNameD);
     client.dropMetalake(metalakeNameD);
+  }
+
+  @Test
+  public void testOwnerWithException() {
+    String metalakeNameE = RandomNameUtils.genRandomName("metalakeE");
+    String catalogNameE = RandomNameUtils.genRandomName("catalogE");
+    GravitinoMetalake metalake =
+        client.createMetalake(metalakeNameE, "metalake E comment", Collections.emptyMap());
+
+    MetadataObject metalakeObject =
+        MetadataObjects.of(Lists.newArrayList(metalakeNameE), MetadataObject.Type.METALAKE);
+
+    MetadataObject catalogObject =
+        MetadataObjects.of(Lists.newArrayList(catalogNameE), MetadataObject.Type.CATALOG);
+
+    // Get a not-existed catalog
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class, () -> metalake.getOwner(catalogObject));
+
+    // Set a not-existed catalog
+    Assertions.assertThrows(
+        NotFoundException.class,
+        () -> metalake.setOwner(catalogObject, AuthConstants.ANONYMOUS_USER, Owner.Type.USER));
+
+    // Set a not-existed user
+    Assertions.assertThrows(
+        NotFoundException.class,
+        () -> metalake.setOwner(metalakeObject, "not-existed", Owner.Type.USER));
+
+    // Cleanup
+    client.dropMetalake(metalakeNameE);
   }
 }
