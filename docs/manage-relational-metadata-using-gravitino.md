@@ -21,7 +21,7 @@ For more details, please refer to the related doc.
 - [**Apache Hive**](./apache-hive-catalog.md)
 - [**MySQL**](./jdbc-mysql-catalog.md)
 - [**PostgreSQL**](./jdbc-postgresql-catalog.md)
-- [**Doris**](./jdbc-doris-catalog.md)
+- [**Apache Doris**](./jdbc-doris-catalog.md)
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
 
 Assuming:
