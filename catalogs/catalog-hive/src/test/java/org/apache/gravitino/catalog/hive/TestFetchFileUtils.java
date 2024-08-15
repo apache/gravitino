@@ -17,18 +17,21 @@
  * under the License.
  */
 
+
 package org.apache.gravitino.catalog.hive;
 
 import java.io.File;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.log4j.Logger;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestFetchFileUtils {
 
+  private static final Logger logger = Logger.getLogger(TestFetchFileUtils.class);
   private static final int MAX_RETRIES = 3;
-  private static final long RETRY_DELAY_MS = 1000; // 1 second
+  private static final long INITIAL_RETRY_DELAY_MS = 1000;
 
   @Test
   public void testLinkLocalFile() throws Exception {
@@ -59,9 +62,9 @@ public class TestFetchFileUtils {
       } catch (IOException e) {
         attempts++;
         if (attempts < MAX_RETRIES) {
-          System.out.println(
-              "Attempt " + attempts + " failed. Retrying in " + RETRY_DELAY_MS + "ms.");
-          Thread.sleep(RETRY_DELAY_MS);
+          long retryDelay = INITIAL_RETRY_DELAY_MS * (1L << (attempts - 1)); // Exponential backoff
+          logger.warn("Attempt " + attempts + " failed. Retrying in " + retryDelay + "ms.");
+          Thread.sleep(retryDelay);
         } else {
           throw new AssertionError("Failed to download file after " + MAX_RETRIES + " attempts", e);
         }
