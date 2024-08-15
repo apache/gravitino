@@ -115,99 +115,99 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-    /metalakes/{metalake}/permissions/groups/{group}/grant:
-      parameters:
-        - $ref: "./openapi.yaml#/components/parameters/metalake"
-        - $ref: "./openapi.yaml#/components/parameters/group"
+  /metalakes/{metalake}/permissions/groups/{group}/grant:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/group"
 
-      put:
-        tags:
-          - access control
-        summary: Grant roles to a group
-        operationId: grantRoleToGroup
-        requestBody:
+    put:
+      tags:
+        - access control
+      summary: Grant roles to a group
+      operationId: grantRoleToGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleGrantRequest"
+            examples:
+              RoleGrantRequest:
+                $ref: "#/components/examples/RoleGrantRequest"
+
+      responses:
+        "200":
+          description: Returns the granted group object
           content:
-            application/json:
+            application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/schemas/RoleGrantRequest"
+                $ref: "./groups.yaml#/components/responses/GroupResponse"
               examples:
-                RoleGrantRequest:
-                  $ref: "#/components/examples/RoleGrantRequest"
+                GroupResponse:
+                  $ref: "./groups.yaml#/components/examples/GroupResponse"
 
-        responses:
-          "200":
-            description: Returns the granted group object
-            content:
-              application/vnd.gravitino.v1+json:
-                schema:
-                  $ref: "./groups.yaml#/components/responses/GroupResponse"
-                examples:
-                  GroupResponse:
-                    $ref: "./groups.yaml#/components/examples/GroupResponse"
-
-          "404":
-            description: Not Found - The specified group or role does not exist in the specified metalake
-            content:
-              application/vnd.gravitino.v1+json:
-                schema:
-                  $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-                examples:
-                  NoSuchMetalakeException:
-                    $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-                  NoSuchGroupException:
-                    $ref: "./groups.yaml#/components/examples/NoSuchGroupException"
-                  NoSuchRoleException:
-                    $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
-
-          "5xx":
-            $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-    /metalakes/{metalake}/permissions/groups/{group}/revoke:
-      parameters:
-        - $ref: "./openapi.yaml#/components/parameters/metalake"
-        - $ref: "./openapi.yaml#/components/parameters/group"
-
-      put:
-        tags:
-          - access control
-        summary: Revoke roles to a group
-        operationId: revokeRoleFromGroup
-        requestBody:
+        "404":
+          description: Not Found - The specified group or role does not exist in the specified metalake
           content:
-            application/json:
+            application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/schemas/RoleRevokeRequest"
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
-                RoleRevokeRequest:
-                  $ref: "#/components/examples/RoleRevokeRequest"
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchGroupException:
+                  $ref: "./groups.yaml#/components/examples/NoSuchGroupException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
 
-        responses:
-          "200":
-            description: Returns the revoked group object
-            content:
-              application/vnd.gravitino.v1+json:
-                schema:
-                  $ref: "./groups.yaml#/components/responses/GroupResponse"
-                examples:
-                  GroupResponse:
-                    $ref: "./groups.yaml#/components/examples/GroupResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-          "404":
-            description: Not Found - The specified group or role does not exist in the specified metalake
-            content:
-              application/vnd.gravitino.v1+json:
-                schema:
-                  $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-                examples:
-                  NoSuchMetalakeException:
-                    $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-                  NoSuchGroupException:
-                    $ref: "./groups.yaml#/components/examples/NoSuchGroupException"
-                  NoSuchRoleException:
-                    $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
+  /metalakes/{metalake}/permissions/groups/{group}/revoke:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/group"
 
-          "5xx":
-            $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+    put:
+      tags:
+        - access control
+      summary: Revoke roles to a group
+      operationId: revokeRoleFromGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleRevokeRequest"
+            examples:
+              RoleRevokeRequest:
+                $ref: "#/components/examples/RoleRevokeRequest"
+
+      responses:
+        "200":
+          description: Returns the revoked group object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./groups.yaml#/components/responses/GroupResponse"
+              examples:
+                GroupResponse:
+                  $ref: "./groups.yaml#/components/examples/GroupResponse"
+
+        "404":
+          description: Not Found - The specified group or role does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchGroupException:
+                  $ref: "./groups.yaml#/components/examples/NoSuchGroupException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
 
