@@ -116,7 +116,7 @@ jobs:
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           
           if [[ "${image_type}" == "gravitino" || "{image_type}" == "gravitino-iceberg-rest-server" ]]; then
-            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.version }}
+            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.version }} --latest
           else
-            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag "${tag_name}-${{ github.event.inputs.version }}" --latest
+            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag "${tag_name}-${{ github.event.inputs.version }}"
           fi
