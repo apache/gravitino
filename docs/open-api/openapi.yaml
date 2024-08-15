@@ -138,10 +138,10 @@ paths:
     $ref: "./user_permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1users~1%7Buser%7D~1revoke"
 
   /metalakes/{metalake}/permissions/groups/{group}/grant:
-    $ref: "./group_permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1grant"
+    $ref: "./users_permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1grant"
 
   /metalakes/{metalake}/permissions/groups/{group}/revoke:
-    $ref: "./group_permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1revoke"
+    $ref: "./users_permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1revoke"
 
 components:
 
