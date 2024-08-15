@@ -88,14 +88,14 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider    | Catalog property                                                               |
-|---------------------|--------------------------------------------------------------------------------|
-| `hive`              | [Hive catalog property](./apache-hive-catalog.md#catalog-properties)           |
-| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog.md#catalog-properties)  |
-| `lakehouse-paimon`  | [Paimon catalog property](./lakehouse-paimon-catalog.md#catalog-properties)   |
-| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog.md#catalog-properties)           |
-| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties) |
-| `jdbc-doris`        | [Doris catalog property](./jdbc-doris-catalog.md#catalog-properties)           |
+| Catalog provider    | Catalog property                                                                |
+|---------------------|---------------------------------------------------------------------------------|
+| `hive`              | [Hive catalog property](./apache-hive-catalog.md#catalog-properties)            |
+| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog.md#catalog-properties)   |
+| `lakehouse-paimon`  | [Paimon catalog property](./lakehouse-paimon-catalog.md#catalog-properties)     |
+| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog.md#catalog-properties)            |
+| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties)  |
+| `jdbc-doris`        | [Doris catalog property](./jdbc-doris-catalog.md#catalog-properties)            |
 
 ### Load a catalog
 
@@ -809,10 +809,6 @@ The following is a table of the column default value that Gravitino supports for
 | `lakehouse-paimon`  | &#10008;                |
 | `jdbc-mysql`        | &#10004;                |
 | `jdbc-postgresql`   | &#10004;                |
-
-:::info
-lakehouse-paimon does not support literals or expressions as column default values, but does support setting a column default value by specifying a table property, such as 'fields.item_id.default-value'='0'.
-:::
 
 #### Table column auto-increment
 
