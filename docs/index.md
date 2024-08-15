@@ -154,6 +154,7 @@ Gravitino provides security configurations for Gravitino, including HTTPS, authe
 * [HTTPS](./security/how-to-use-https.md): provides HTTPS configurations.
 * [Authentication](./security/how-to-authenticate.md): provides authentication configurations including simple, OAuth, Kerberos.
 * [Access Control](./security/access-control.md): provides access control configurations.
+* [CORS](./security/how-to-use-cors.md): provides CORS configurations.
 
 ### Programming guides
 

@@ -183,7 +183,7 @@ If parent securable object has the same privilege name with different condition,
 For example, securable metalake object allows to use the catalog, but securable catalog denies to use the catalog, the user isn't able to use the catalog.
 If securable metalake object denies to use the catalog, but securable catalog allows to use the catalog, the user isn't able to use the catalog, too.
 
-![privileg_image](../assets/privilege.png)
+![privilege_image](../assets/privilege.png)
 
 ## Server Configuration
 
@@ -364,16 +364,16 @@ You can create a role by given properties.
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-   name: "role1",
-   properties: {"k1", "v1"}
-   securableObjects: [
+   "name": "role1",
+   "properties": {"k1", "v1"}
+   "securableObjects": [
           {
-             fullName: "catalog1.schema1.table1",
-             type: "TABLE",
-             privileges: [
+             "fullName": "catalog1.schema1.table1",
+             "type": "TABLE",
+             "privileges": [
                     {
-                         name: "SELECT_TABLE",
-                         condition: "ALLOW"
+                         "name": "SELECT_TABLE",
+                         "condition": "ALLOW"
                     }
              ]    
           }
@@ -463,7 +463,7 @@ You can grant specific roles to a user.
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-    roleNames: ["role1"]
+    "roleNames": ["role1"]
 }'http://localhost:8090/api/metalakes/test/permissions/users/user1/grant
 ```
 
@@ -488,7 +488,7 @@ You can revoke specific roles from a user.
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-    roleNames: ["role1"]
+    "roleNames": ["role1"]
 }'http://localhost:8090/api/metalakes/test/permissions/users/user1/revoke
 ```
 
@@ -514,7 +514,7 @@ You can grant specific roles to a group.
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-    roleNames: ["role1"]
+    "roleNames": ["role1"]
 }'http://localhost:8090/api/metalakes/test/permissions/groups/group1/grant
 ```
 
@@ -539,7 +539,7 @@ You can revoke specific roles from a group.
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-    roleNames: ["role1"]
+    "roleNames": ["role1"]
 }'http://localhost:8090/api/metalakes/test/permissions/groups/group1/revoke
 ```
 
@@ -593,8 +593,8 @@ You can set the owner of a metadata object.
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-    name: "user1",
-    type: "USER"
+    "name": "user1",
+    "type": "USER"
 }'http://localhost:8090/api/metalakes/test/owners/table/catalog1.schema1.table1
 ```
 

@@ -16,3 +16,5 @@ Gravitino provides features that ensure the highest levels of security for you.
 ### Supports [HTTPS](how-to-use-https.md)
 
 ### Supports [Access Control](access-control.md)
+
+### Supports [CORS](how-to-use-cors.md)
