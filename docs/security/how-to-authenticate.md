@@ -7,17 +7,14 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Authentication
 
-Apache Gravitino supports three kinds of authentication mechanisms: simple,OAuth and Kerberos.
+Apache Gravitino supports three kinds of authentication mechanisms: simple, OAuth and Kerberos.
+If you don't enable authentication for your client and server explicitly, you will use anonymous to access the server.
 
 ### Simple mode
 
-Simple mode is the default authentication option of the server.
-
-For the client side, if it doesn't set the authentication explicitly, it will use anonymous to access the server.
-
 If the client sets the simple mode,  it will use the environment variable `GRAVITINO_USER` as the user.
 
-If the environment variable `GRAVITINO_USER` isn't set, the client uses the user of the machine that sends requests.
+If the environment variable `GRAVITINO_USER` in the client isn't set, the client uses the user logging in the machine that sends requests.
 
 For the client side, users can enable `simple` mode by the following code:
 

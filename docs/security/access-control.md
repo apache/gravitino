@@ -15,7 +15,8 @@ Discretionary Access Control(DAC): Each metadata object has an owner, who can in
 
 :::info
 
-Gravitino only supports authorization and doesn't support metadata authentication.
+Gravitino only supports authorization for secureable objects, when it comes to authentication.
+Gravitino doesn't support metadata authentication.
 
 :::
 
@@ -44,21 +45,15 @@ Metadata objects are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
 `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, `ROLE`, `METALAKE`. A metadata object is combined by a `type` and a
 comma-separated `name`. For example, a `CATAGLOG` object has a name "catalog1" with type
 "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
-object has a name "catalog1.schema1.table1" with type "TABLE".
+object has a name "catalog1.schema1.table1" with type "TABLE". `METALAKE` object has a name "metalake1".
 
 ### Securable objects
 
-A metadata object to which access can be granted. Unless allowed by a grant, access is denied.
-
+A metadata object to which access can be granted. Unless allowed by a grant, access is denied. 
 Every securable object resides within a logical container in a hierarchy of containers.
-
 The top container is the metalake. You can understand that metalake a customer organization.
-
 Catalogs are under the metalake. Catalogs represent different kinds of data sources.
-
-Schemas are under the catalog.
-
-There are tables, topics, or filesets under the schema.
+Schemas are under the catalog. There are tables, topics, or filesets under the schema.
 
 ![object_image](../assets/object.png)
 
@@ -70,9 +65,7 @@ The relationship of the concepts is as below.
 ### Ownership
 
 Every metadata object has an owner. The owner could be a user or group.
-
 The owner have all the privileges of the metadata object.
-
 The owner could be transferred to another user or group.
 
 ## The types of roles
@@ -182,16 +175,12 @@ will be able to select(read) all tables in that catalog.
 ## Privilege Condition
 
 The privilege supports two condition: `allow` and `deny`. `allow` means that you are able to use the privilege,
-
 `deny` means that you aren't able to use the privilege.
-
 `deny` condition is prior to `allow` condition. If a role has the `allow` condition and `deny` condition at the same time. 
 The user won't be able to use the privilege.
 
-If parent securable object has the same privilege name with different condition, the parent securable privilege will still take effect.
-
+If parent securable object has the same privilege name with different condition, the securable object won't override the parent object privilege.
 For example, securable metalake object allows to use the catalog, but securable catalog denies to use the catalog, the user isn't able to use the catalog.
-
 If securable metalake object denies to use the catalog, but securable catalog allows to use the catalog, the user isn't able to use the catalog, too.
 
 ![privileg_image](../assets/privilege.png)
@@ -202,18 +191,17 @@ If you want to enable the access control, you should enable the authorization.
 
 The related configuration is as follows.
 
-| Configuration item                       | Description                                           | Default value | Required                         | Since Version |
-|------------------------------------------|-------------------------------------------------------|---------------|----------------------------------|---------------|
-| `gravitino.authorization.enable`         | Enable the authorization                              | false         | No                               | 0.5.0         |
-| `gravitino.authorization.serviceAdmins`  | The admins of Gravitino service, is spitted by comma. |               | Yes if enables the authorization | 0.5.0         |
+| Configuration item                       | Description                                                            | Default value | Required                         | Since Version |
+|------------------------------------------|------------------------------------------------------------------------|---------------|----------------------------------|---------------|
+| `gravitino.authorization.enable`         | Whether Gravitino enable authorization or not.                         | false         | No                               | 0.5.0         |
+| `gravitino.authorization.serviceAdmins`  | The admins of Gravitino service, Multiple admins are spitted by comma. | (none)        | Yes if enables the authorization | 0.5.0         |
 
 
 ## User Operation
 
 ### Add a user
 
-The external systems like LDAP, Scim and etc manage the user. 
-
+The external systems like LDAP, Scim and etc manage the user.
 You should add the user to your metalake before you use the authorization.
 
 <Tabs groupId='language' queryString>
@@ -292,7 +280,6 @@ boolean deleted =
 ### Add a Group
 
 The external systems like LDAP, Scim and etc manage the group.
-
 You should add the group to your metalake before you use the authorization.
 
 <Tabs groupId='language' queryString>
