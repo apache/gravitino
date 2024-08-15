@@ -23,6 +23,7 @@ For more details, please refer to the related doc.
 - [**PostgreSQL**](./jdbc-postgresql-catalog.md)
 - [**Doris**](./jdbc-doris-catalog.md)
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
+- [**Apache Paimon**](./lakehouse-paimon-catalog.md)
 
 Assuming:
 
