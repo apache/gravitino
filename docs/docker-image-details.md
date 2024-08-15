@@ -19,8 +19,8 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino
 
 Changelog
 
-- apache/gravitino:0.6.0 (Switch to Apache official DockerHub repository)
-  - Use latest Gravitino version 0.6.0 source code to build the image.
+- apache/gravitino:0.6.0-incubating (Switch to Apache official DockerHub repository)
+  - Use the latest Gravitino version 0.6.0 source code to build the image.
 
 - datastrato/gravitino:0.5.1
   - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
@@ -53,7 +53,7 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest-server:0.6.0
 
 Changelog
 
-- apache/gravitino-iceberg-rest-server:0.6.0 (Switch to Apache official DockerHub repository)
+- apache/gravitino-iceberg-rest-server:0.6.0-incubating (Switch to Apache official DockerHub repository)
   - Use `datastrato/gravitino-iceberg-rest-server:0.6.0` Dockerfile to rebuild the image.
 
 - datastrato/gravitino-iceberg-rest-server:0.6.0
