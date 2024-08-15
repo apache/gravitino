@@ -15,8 +15,8 @@ Discretionary Access Control(DAC): Each metadata object has an owner, who can in
 
 :::info
 
-Gravitino only supports authorization for secureable objects, when it comes to authentication.
-Gravitino doesn't support metadata authentication.
+Gravitino only supports authorization for securable objects, when Gravitino supports to pass the privileges to underlying authorization plugin.
+Gravitino doesn't support metadata authentication. It means that Gravitino won't check the privileges when Gravitino receives the requests.
 
 :::
 
