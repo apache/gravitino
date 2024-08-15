@@ -25,11 +25,17 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":core"))
-  implementation(project(":common"))
+  implementation(project(":api")) {
+    exclude(group = "*")
+  }
 
-  implementation(libs.guava)
+  implementation(project(":core")) {
+    exclude(group = "*")
+  }
+  implementation(project(":common")) {
+    exclude(group = "*")
+  }
+
   implementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
@@ -38,8 +44,15 @@ dependencies {
   implementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
+    exclude("com.google.guava", "guava")
+    exclude("commons-io", "commons-io")
   }
-  implementation(libs.hadoop3.client)
+  implementation(libs.hadoop3.client) {
+    exclude("org.apache.hadoop", "hadoop-mapreduce-client-core")
+    exclude("org.apache.hadoop", "hadoop-mapreduce-client-jobclient")
+    exclude("org.apache.hadoop", "hadoop-yarn-api")
+    exclude("org.apache.hadoop", "hadoop-yarn-client")
+  }
 
   implementation(libs.slf4j.api)
 
