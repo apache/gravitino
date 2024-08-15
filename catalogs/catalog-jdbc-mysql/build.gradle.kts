@@ -45,7 +45,6 @@ dependencies {
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.jsqlparser)
 
   testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
   testImplementation(project(":clients:client-java"))
