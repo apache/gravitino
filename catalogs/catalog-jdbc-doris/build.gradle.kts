@@ -89,7 +89,7 @@ tasks.test {
     // Only run integration tests
     include("**/integration/**")
   }
-  environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci:doris-0.1.5")
+  environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests

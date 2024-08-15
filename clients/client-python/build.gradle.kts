@@ -222,7 +222,7 @@ tasks {
       "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
       "START_EXTERNAL_GRAVITINO" to "true",
       "DOCKER_TEST" to dockerTest.toString(),
-      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "datastrato/gravitino-ci:hive-0.1.13",
+      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "apache/gravitino-ci:hive-0.1.13",
       // Set the PYTHONPATH to the client-python directory, make sure the tests can import the
       // modules from the client-python directory.
       "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
