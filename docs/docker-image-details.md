@@ -48,12 +48,12 @@ You can deploy the standalone Gravitino Iceberg REST server with the Docker imag
 Container startup commands
 
 ```shell
-docker run --rm -d -p 9001:9001 apache/gravitino:iceberg-rest-server-0.6.0
+docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest-server:0.6.0
 ```
 
 Changelog
 
-- apache/gravitino:iceberg-rest-server-0.6.0 (Switch to Apache official DockerHub repository)
+- apache/gravitino-iceberg-rest-server:0.6.0 (Switch to Apache official DockerHub repository)
   - Use `datastrato/gravitino-iceberg-rest-server:0.6.0` Dockerfile to rebuild the image.
 
 - datastrato/gravitino-iceberg-rest-server:0.6.0
@@ -74,7 +74,7 @@ The Docker images of the playground have suitable configurations for users to ex
 
 Changelog
 
-- apache/gravitino:playground-hive-2.7.3 (Switch to Apache official DockerHub repository)
+- apache/gravitino-playground:hive-2.7.3 (Switch to Apache official DockerHub repository)
   - Use `datastrato/hive:2.7.3-no-yarn` Dockerfile to rebuild the image.
 
 - datastrato/hive:2.7.3-no-yarn
@@ -87,7 +87,7 @@ Changelog
 
 Changelog
 
-- apache/gravitino:playground-trino-435-gravitino-0.5.1 (Switch to Apache official DockerHub repository)
+- apache/gravitino-playground:trino-435-gravitino-0.5.1 (Switch to Apache official DockerHub repository)
   - Use `datastrato/trino:435-gravitino-0.5.1` Dockerfile to rebuild the image.
 
 - datastrato/trino:435-gravitino-0.5.1
@@ -117,7 +117,7 @@ You can use this kind of image to test the catalog of Apache Hive with kerberos 
 
 Changelog
 
-- apache/gravitino:ci-kerberos-hive-0.1.5 (Switch to Apache official DockerHub repository)
+- apache/gravitino-ci:kerberos-hive-0.1.5 (Switch to Apache official DockerHub repository)
   - Use `datastrato/gravitino-ci-kerberos-hive:0.1.5` Dockerfile to rebuild the image.
 
 - datastrato/gravitino-ci-kerberos-hive:0.1.5
@@ -151,7 +151,7 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
-- apache/gravitino:ci-hive-0.1.13 (Switch to Apache official DockerHub repository)
+- apache/gravitino-ci:hive-0.1.13 (Switch to Apache official DockerHub repository)
   - Use `datastrato/gravitino-ci-hive:0.1.13` Dockerfile to rebuild the image.
 
 - datastrato/gravitino-ci-hive:0.1.13
@@ -239,7 +239,7 @@ You can use this image to test Trino.
 
 Changelog
 
-- apache/gravitino:ci-trino-0.1.6 (Switch to Apache official DockerHub repository)
+- apache/gravitino-ci:trino-0.1.6 (Switch to Apache official DockerHub repository)
   - Use `datastrato/gravitino-ci-trino:0.1.6` Dockerfile to rebuild the image.
 
 - datastrato/gravitino-ci-trino:0.1.6
@@ -269,7 +269,7 @@ You can use this image to test Apache Doris.
 
 Changelog
 
-- apache/gravitino:ci-doris-0.1.5 (Switch to Apache official DockerHub repository)
+- apache/gravitino-ci:doris-0.1.5 (Switch to Apache official DockerHub repository)
   - Use `datastrato/gravitino-ci-doris:0.1.5` Dockerfile to rebuild the image.
 
 - datastrato/gravitino-ci-doris:0.1.5
@@ -303,7 +303,7 @@ You can use this image to control Trino's permissions.
 
 Changelog
 
-- apache/gravitino:ci-ranger-0.1.1 (Switch to Apache official DockerHub repository)
+- apache/gravitino-ci:ranger-0.1.1 (Switch to Apache official DockerHub repository)
   - Use `datastrato/gravitino-ci-ranger:0.1.1` Dockerfile to rebuild the image.
 
 - datastrato/gravitino-ci-ranger:0.1.1
