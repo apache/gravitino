@@ -137,15 +137,15 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 
 3. Open [the JWK URL of the Authorization server](http://localhost:8177/oauth2/jwks) in the browser and you can get the JWK.
 
-   ![jks_response_image](assets/jks.png)
+   ![jks_response_image](../assets/jks.png)
 
 4. Convert the JWK to PEM. You can use the [online tool](https://8gwifi.org/jwkconvertfunctions.jsp#google_vignette) or other tools.
 
-   ![pem_convert_result_image](assets/pem.png)
+   ![pem_convert_result_image](../assets/pem.png)
 
 5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
 
-6. You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
+6. You can refer to the [Configurations](../gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 
 ```text
 gravitino.authenticators = oauth
@@ -157,7 +157,7 @@ gravitino.authenticator.oauth.serverUri = http://localhost:8177
 
 7. Open [the URL of Gravitino server](http://localhost:8090) and login in with clientId `test`, clientSecret `test`, and scope `test`.
 
-   ![oauth_login_image](assets/oauth.png)
+   ![oauth_login_image](../assets/oauth.png)
 
 8. You can also use the curl command to access Gravitino.
 
