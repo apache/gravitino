@@ -27,6 +27,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
@@ -354,6 +355,46 @@ class TestRoleMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         group1.name(), groupMetaService.getGroupByIdentifier(group1.nameIdentifier()).name());
     Assertions.assertTrue(groupRoleRels.isEmpty());
+  }
+
+  @Test
+  void listRolesBySecurableObject() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo,
+            "catalog");
+
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo,
+            "catalog");
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    roleMetaService.insertRole(role1, false);
+    roleMetaService.insertRole(role2, false);
+
+    List<RoleEntity> roleEntities =
+        roleMetaService.listRolesByMetadataObjectIdentAndType(
+            catalog.nameIdentifier(), catalog.type());
+    roleEntities.sort(Comparator.comparing(RoleEntity::name));
+    Assertions.assertEquals(Lists.newArrayList(role1, role2), roleEntities);
   }
 
   @Test

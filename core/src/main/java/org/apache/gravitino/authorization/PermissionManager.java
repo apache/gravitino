@@ -118,8 +118,7 @@ class PermissionManager {
             catalogs,
             authorizationPlugin ->
                 authorizationPlugin.onGrantedRolesToUser(
-                    Lists.newArrayList(roleEntitiesToGrant), updatedUser),
-            false);
+                    Lists.newArrayList(roleEntitiesToGrant), updatedUser));
       }
 
       return updatedUser;
@@ -198,8 +197,7 @@ class PermissionManager {
             catalogs,
             authorizationPlugin ->
                 authorizationPlugin.onGrantedRolesToGroup(
-                    Lists.newArrayList(roleEntitiesToGrant), updatedGroup),
-            false);
+                    Lists.newArrayList(roleEntitiesToGrant), updatedGroup));
       }
 
       return updatedGroup;
@@ -277,8 +275,7 @@ class PermissionManager {
             catalogs,
             authorizationPlugin ->
                 authorizationPlugin.onRevokedRolesFromGroup(
-                    Lists.newArrayList(roleEntitiesToRevoke), updatedGroup),
-            false);
+                    Lists.newArrayList(roleEntitiesToRevoke), updatedGroup));
       }
 
       return updatedGroup;
@@ -358,8 +355,7 @@ class PermissionManager {
             catalogs,
             authorizationPlugin ->
                 authorizationPlugin.onRevokedRolesFromUser(
-                    Lists.newArrayList(roleEntitiesToRevoke), updatedUser),
-            false);
+                    Lists.newArrayList(roleEntitiesToRevoke), updatedUser));
       }
 
       return updatedUser;

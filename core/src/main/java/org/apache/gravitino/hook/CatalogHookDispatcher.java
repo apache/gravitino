@@ -25,9 +25,11 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -80,6 +82,14 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }
+
+    // Apply the metalake securable object privileges to authorization plugin
+    FutureGrantManager futureGrantManager = GravitinoEnv.getInstance().futureGrantManager();
+    if (futureGrantManager != null && catalog instanceof BaseCatalog) {
+      futureGrantManager.grantNewlyCreatedCatalog(
+          ident.namespace().level(0), (BaseCatalog) catalog);
+    }
+
     return catalog;
   }
 

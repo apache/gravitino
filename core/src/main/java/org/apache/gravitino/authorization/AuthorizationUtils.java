@@ -144,22 +144,16 @@ public class AuthorizationUtils {
       String metalake,
       List<SecurableObject> securableObjects,
       Set<String> catalogsAlreadySet,
-      Consumer<AuthorizationPlugin> consumer,
-      boolean grant) {
+      Consumer<AuthorizationPlugin> consumer) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
     for (SecurableObject securableObject : securableObjects) {
-      if (supportsAllAuthorizationPlugin(securableObject)) {
+      if (needApplyAllAuthorizationPlugin(securableObject)) {
         Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
         for (Catalog catalog : catalogs) {
           callAuthorizationPluginImpl(catalogsAlreadySet, consumer, catalog);
         }
 
-        if (grant) {
-
-        } else {
-
-        }
-      } else if (supportsAuthorizationPlugin(securableObject.type())) {
+      } else if (supportsSingleAuthorizationPlugin(securableObject.type())) {
         NameIdentifier catalogIdent =
             NameIdentifierUtil.getCatalogIdentifier(
                 MetadataObjectUtil.toEntityIdent(metalake, securableObject));
@@ -183,7 +177,7 @@ public class AuthorizationUtils {
     }
   }
 
-  private static boolean supportsAllAuthorizationPlugin(SecurableObject securableObject) {
+  public static boolean needApplyAllAuthorizationPlugin(SecurableObject securableObject) {
     // TODO: Add supportsSecurableObjects method for every privilege to simplify this code
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
@@ -193,10 +187,10 @@ public class AuthorizationUtils {
         }
       }
     }
-    return true;
+    return false;
   }
 
-  private static boolean supportsAuthorizationPlugin(MetadataObject.Type type) {
-    return type != MetadataObject.Type.ROLE;
+  private static boolean supportsSingleAuthorizationPlugin(MetadataObject.Type type) {
+    return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
   }
 }
