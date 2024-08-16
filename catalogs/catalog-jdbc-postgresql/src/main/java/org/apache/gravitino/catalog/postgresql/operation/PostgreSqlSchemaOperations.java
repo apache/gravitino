@@ -151,7 +151,8 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
 
   @Override
   public String generateDropDatabaseSql(String schema, boolean cascade) {
-    StringBuilder sqlBuilder = new StringBuilder(String.format("DROP SCHEMA %s", schema));
+    StringBuilder sqlBuilder =
+        new StringBuilder(String.format("DROP SCHEMA %s%s%s", PG_QUOTE, schema, PG_QUOTE));
     if (cascade) {
       sqlBuilder.append(" CASCADE");
     }
