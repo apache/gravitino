@@ -16,8 +16,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-#
-
 IP=$(hostname -I | awk '{print $1}')
 sed -i "s|<value>hdfs://__REPLACE__HOST_NAME:9000|<value>hdfs://${IP}:9000|g" ${HIVE_TMP_CONF_DIR}/hive-site.xml
 
