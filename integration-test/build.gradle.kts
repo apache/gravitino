@@ -140,6 +140,9 @@ dependencies {
 }
 
 tasks.test {
+  val init = project.extra.get("initTestParam") as (Test) -> Unit
+  init(this)
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")
@@ -189,9 +192,6 @@ tasks.test {
         }
       }
     }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

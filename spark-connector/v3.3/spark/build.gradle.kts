@@ -136,6 +136,9 @@ dependencies {
 }
 
 tasks.test {
+  val init = project.extra.get("initTestParam") as (Test) -> Unit
+  init(this)
+
   val skipUTs = project.hasProperty("skipTests")
   if (skipUTs) {
     // Only run integration tests
@@ -156,9 +159,6 @@ tasks.test {
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")
     dependsOn(":iceberg:iceberg-rest-server:jar")
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

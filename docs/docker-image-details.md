@@ -14,7 +14,7 @@ You can deploy the service with the Gravitino Docker image.
 Container startup commands
 
 ```shell
-docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino
+docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.6.0-incubating
 ```
 
 Changelog
@@ -48,7 +48,7 @@ You can deploy the standalone Gravitino Iceberg REST server with the Docker imag
 Container startup commands
 
 ```shell
-docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest-server:0.6.0
+docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest-server:0.6.0-incubating
 ```
 
 Changelog

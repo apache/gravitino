@@ -89,6 +89,9 @@ tasks {
 }
 
 tasks.test {
+  val init = project.extra.get("initTestParam") as (Test) -> Unit
+  init(this)
+
   val skipUTs = project.hasProperty("skipTests")
   if (skipUTs) {
     // Only run integration tests
@@ -103,9 +106,6 @@ tasks.test {
     // PG will use project jdbc-mysql/build/libs directory, so we add the task dependency here.
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
     dependsOn(tasks.jar)
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

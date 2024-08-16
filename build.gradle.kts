@@ -156,7 +156,7 @@ allprojects {
     }
   }
 
-  val setIntegrationTestEnvironment: (Test) -> Unit = { param ->
+  val setTestEnvironment: (Test) -> Unit = { param ->
     param.doFirst {
       param.jvmArgs(project.property("extraJvmArgs") as List<*>)
 
@@ -213,7 +213,7 @@ allprojects {
     }
   }
 
-  extra["initIntegrationTest"] = setIntegrationTestEnvironment
+  extra["initTestParam"] = setTestEnvironment
 }
 
 nexusPublishing {
