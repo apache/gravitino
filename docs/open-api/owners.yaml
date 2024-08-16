@@ -72,9 +72,9 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/responses/OwnerResponse"
-                examples:
-                  OwnerResponse:
-                    $ref: "#/components/examples/OwnerResponse"
+              examples:
+                OwnerResponse:
+                  $ref: "#/components/examples/OwnerResponse"
         "404":
           description: Not Found - The specified owner does not exist in the specified metalake
           content:
