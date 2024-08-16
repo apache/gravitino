@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino connector - MySQL catalog"
+title: "Apache Gravitino Trino connector - MySQL catalog"
 slug: /trino-connector/catalog-mysql
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
@@ -16,10 +16,9 @@ To connect to MySQL, you need:
 
 ## Create table
 
-At present, the Apache Gravitino connector only supports basic MySQL table creation statements, which involve fields, null allowances, and comments. 
-However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
+At present, the Apache Gravitino Trino connector only supports basic MySQL table creation statements, which involve fields, null allowances, and comments. However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
 
-The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
 ## Alter table
 
@@ -32,7 +31,7 @@ Support for the following alter table operations:
 
 ## Select
 
-The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
+The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as indexes and pushdowns.
 
 ## Table and Schema properties
