@@ -53,11 +53,7 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest-server:0.6.0-incub
 
 Changelog
 
-- apache/gravitino-iceberg-rest-server:0.6.0-incubating (Switch to Apache official DockerHub repository)
-  - Use `datastrato/gravitino-iceberg-rest-server:0.6.0` Dockerfile to rebuild the image.
-
-- datastrato/gravitino-iceberg-rest-server:0.6.0
-  - Docker image `datastrato/gravitino-iceberg-rest-server:0.6.0`
+- apache/gravitino-iceberg-rest-server:0.6.0-incubating.
   - Gravitino Iceberg REST Server with memory catalog backend.
   - Expose ports:
     - `9001` Iceberg REST service
