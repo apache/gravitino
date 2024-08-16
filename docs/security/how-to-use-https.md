@@ -87,7 +87,7 @@ bin/keytool -export -alias localhost -keystore localhost.jks -file  localhost.cr
 bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file localhost.crt -storepass changeit -noprompt
 ```
 
-5. You can refer to the [Configurations](gravitino-server-config.md) and append the configuration to the conf/gravitino.conf.
+5. You can refer to the [Configurations](../gravitino-server-config.md) and append the configuration to the conf/gravitino.conf.
    Configuration doesn't support resolving environment variables, so you should replace `${JAVA_HOME}` with the actual value.
    Then, You can start the Gravitino server.
 
