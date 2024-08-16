@@ -128,9 +128,6 @@ dependencies {
 }
 
 tasks.test {
-  val init = project.extra.get("initTestParam") as (Test) -> Unit
-  init(this)
-
   val skipUTs = project.hasProperty("skipTests")
   if (skipUTs) {
     // Only run integration tests

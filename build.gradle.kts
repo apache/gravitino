@@ -417,6 +417,8 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
+    val initTest = project.extra.get("initTestParam") as (Test) -> Unit
+    initTest(this)
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
       showExceptions = true
