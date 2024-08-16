@@ -11,10 +11,12 @@ Gravitino provides features that ensure the highest levels of security for you.
 
 ## Capabilities
 
-### Supports [Authentication](how-to-authenticate.md)
+Gravitino has supported the following security features:
 
-### Supports [HTTPS](how-to-use-https.md)
+### [Authentication](how-to-authenticate.md)
 
-### Supports [Access Control](access-control.md)
+### [HTTPS](how-to-use-https.md)
 
-### Supports [CORS](how-to-use-cors.md)
+### [Access Control](access-control.md)
+
+### [CORS](how-to-use-cors.md)
