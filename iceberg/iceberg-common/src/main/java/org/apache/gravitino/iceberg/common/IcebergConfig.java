@@ -46,7 +46,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> CATALOG_BACKEND_IMPL =
       new ConfigBuilder(IcebergConstants.CATALOG_BACKEND_IMPL)
           .doc(
-              "The fully-qualified class name of a custom catalog implementation. Must be set if `catalog-backend` is `custom`")
+              "The fully-qualified class name of a custom catalog implementation, only worked if `catalog-backend` is `custom`")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
