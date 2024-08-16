@@ -67,7 +67,7 @@ RUN mkdir /tmp/gravitino
 COPY --chown=trino:trino packages/gravitino-trino-connector /tmp/gravitino
 
 ARG IMAGE_NAME
-RUN if [ "$IMAGE_NAME" = "datastrato/trino" ] ; then \
+RUN if [ "$IMAGE_NAME" = "apache/gravitino-*:trino-*" ] ; then \
     mv /tmp/gravitino /usr/lib/trino/plugin/; \
     else echo "Copying files for other images"; \
     fi

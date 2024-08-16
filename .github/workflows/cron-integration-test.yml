@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   changes:
-    if: github.repository == 'datastrato/gravitino'
+    if: github.repository == 'apache/gravitino'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
