@@ -7,8 +7,9 @@ license: "This software is licensed under the Apache License version 2."
 
 ## HTTPS
 
-Users would better use HTTPS instead of HTTP if users choose OAuth 2.0 as the authenticator as HTTPS protects the header of the request from smuggling, making it safer.
-Gravitino can't support HTTP and HTTPS at the same time in a single Gravitino server instance, if users choose to enable HTTPS, Gravitino won't provide the ability of HTTP service.
+For users choosing OAuth 2.0 as the authentication method, it is recommended to use HTTPS instead of HTTP. HTTPS encrypts the request headers, offering better protection against smuggling attacks.
+
+Note that Gravitino cannot simultaneously support both HTTP and HTTPS within a single server instance. If HTTPS is enabled, Gravitino will no longer provide HTTP service.
 
 Currently, both the Gravitino server and Iceberg REST service can configure and support HTTPS.
 
