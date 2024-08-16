@@ -48,12 +48,12 @@ You can deploy the standalone Gravitino Iceberg REST server with the Docker imag
 Container startup commands
 
 ```shell
-docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest-server:0.6.0-incubating
+docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.6.0-incubating
 ```
 
 Changelog
 
-- apache/gravitino-iceberg-rest-server:0.6.0-incubating.
+- apache/gravitino-iceberg-rest:0.6.0-incubating.
   - Gravitino Iceberg REST Server with memory catalog backend.
   - Expose ports:
     - `9001` Iceberg REST service

@@ -81,7 +81,7 @@ jobs:
             echo "tag_name=ranger" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-iceberg-rest-server" ]; then
             echo "image_type=iceberg-rest-server" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-iceberg-rest-server" >> $GITHUB_ENV
+            echo "image_name=apache/gravitino-iceberg-rest" >> $GITHUB_ENV
           fi
 
       - name: Check publish Docker token
@@ -115,7 +115,7 @@ jobs:
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           
-          if [[ "${image_type}" == "gravitino" || "{image_type}" == "gravitino-iceberg-rest-server" ]]; then
+          if [[ "${image_type}" == "gravitino" || "{image_type}" == "iceberg-rest-server" ]]; then
             ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.version }} --latest
           else
             ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag "${tag_name}-${{ github.event.inputs.version }}"
