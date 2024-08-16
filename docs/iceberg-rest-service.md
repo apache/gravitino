@@ -162,6 +162,14 @@ If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to
 You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 :::
 
+#### Custom backend configuration
+| Configuration item                             | Description                                                                                                         | Default value    | Required | Since Version |
+|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|------------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend`       | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`custom`** for a Custom catalog. | `memory`         | Yes      | 0.7.0         |
+| `gravitino.iceberg-rest.catalog-backend-impl`  | The fully-qualified class name of a custom catalog implementation. Must be set if `catalog-backend` is `custom`.    | (none)           | No       | 0.7.0         |
+
+If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a corresponding jar file to the classpath and load a custom Iceberg Catalog implementation by specifying the `catalog-backend-impl` property.
+
 #### Multi catalog support
 
 The Gravitino Iceberg REST server supports multiple catalogs and offers a configuration-based catalog management system.

@@ -39,6 +39,7 @@ import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosClien
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
@@ -149,6 +150,16 @@ public class IcebergCatalogUtil {
     return restCatalog;
   }
 
+  private static Catalog loadCustomCatalog(IcebergConfig icebergConfig) {
+    String customCatalogName = icebergConfig.getCatalogBackendName("custom");
+    String className = icebergConfig.get(IcebergConfig.CATALOG_BACKEND_IMPL);
+    return CatalogUtil.loadCatalog(
+        className,
+        customCatalogName,
+        icebergConfig.getIcebergCatalogProperties(),
+        new HdfsConfiguration());
+  }
+
   @VisibleForTesting
   static Catalog loadCatalogBackend(String catalogType) {
     return loadCatalogBackend(
@@ -168,6 +179,8 @@ public class IcebergCatalogUtil {
         return loadJdbcCatalog(icebergConfig);
       case REST:
         return loadRestCatalog(icebergConfig);
+      case CUSTOM:
+        return loadCustomCatalog(icebergConfig);
       default:
         throw new RuntimeException(
             catalogBackend
