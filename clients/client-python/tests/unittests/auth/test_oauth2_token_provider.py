@@ -22,7 +22,11 @@ from unittest.mock import patch
 
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
-from gravitino.exceptions.base import BadRequestException, UnauthorizedException
+from gravitino.exceptions.base import (
+    BadRequestException,
+    IllegalArgumentException,
+    UnauthorizedException,
+)
 from tests.unittests.auth import mock_base
 
 OAUTH_PORT = 1082
@@ -32,13 +36,13 @@ class TestOAuth2TokenProvider(unittest.TestCase):
 
     def test_provider_init_exception(self):
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(IllegalArgumentException):
             _ = DefaultOAuth2TokenProvider(uri="test")
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(IllegalArgumentException):
             _ = DefaultOAuth2TokenProvider(uri="test", credential="xx")
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(IllegalArgumentException):
             _ = DefaultOAuth2TokenProvider(uri="test", credential="xx", scope="test")
 
     @patch(
@@ -75,7 +79,7 @@ class TestOAuth2TokenProvider(unittest.TestCase):
     )
     def test_authentication_with_error_authentication_type(self, *mock_methods):
 
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(IllegalArgumentException):
             _ = DefaultOAuth2TokenProvider(
                 uri=f"http://127.0.0.1:{OAUTH_PORT}",
                 credential="yy:xx",

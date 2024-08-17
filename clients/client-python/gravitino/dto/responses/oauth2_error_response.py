@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from dataclasses_json import config
 
 from gravitino.dto.responses.error_response import ErrorResponse
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
@@ -37,4 +38,5 @@ class OAuth2ErrorResponse(ErrorResponse):
         return self._message
 
     def validate(self):
-        assert self._type is not None, "OAuthErrorResponse should contain type"
+        if self._type is None:
+            raise IllegalArgumentException("OAuthErrorResponse should contain type")
