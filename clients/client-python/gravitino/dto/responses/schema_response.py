@@ -23,6 +23,7 @@ from dataclasses_json import DataClassJsonMixin, config
 
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.schema_dto import SchemaDTO
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
@@ -44,8 +45,11 @@ class SchemaResponse(BaseResponse, DataClassJsonMixin):
         """
         super().validate()
 
-        assert self._schema is not None, "schema must be non-null"
-        assert (
-            self._schema.name() is not None
-        ), "schema 'name' must not be null and empty"
-        assert self._schema.audit_info() is not None, "schema 'audit' must not be null"
+        if self._schema is None:
+            raise IllegalArgumentException("Schema must be non-null")
+
+        if self._schema.name() is None:
+            raise IllegalArgumentException("Schema 'name' must not be null and empty")
+
+        if self._schema.audit_info() is None:
+            raise IllegalArgumentException("Schema 'audit' must not be null")
