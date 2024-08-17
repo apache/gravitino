@@ -83,7 +83,7 @@ Changelog
 
 Changelog
 
-- apache/gravitino-playground:trino-435-gravitino-0.5.1 (Switch to Apache official DockerHub repository)
+- apache/gravitino-playground:trino-435-gravitino-0.6.0-incubating (Switch to Apache official DockerHub repository)
   - Use `datastrato/trino:435-gravitino-0.5.1` Dockerfile to rebuild the image.
 
 - datastrato/trino:435-gravitino-0.5.1
