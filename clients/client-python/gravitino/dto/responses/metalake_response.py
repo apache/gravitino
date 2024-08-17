@@ -24,6 +24,7 @@ from dataclasses_json import config
 
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
@@ -41,10 +42,11 @@ class MetalakeResponse(BaseResponse):
         """
         super().validate()
 
-        assert self._metalake is not None, "metalake must not be null"
-        assert (
-            self._metalake.name() is not None
-        ), "metalake 'name' must not be null and empty"
-        assert (
-            self._metalake.audit_info() is not None
-        ), "metalake 'audit' must not be null"
+        if self._metalake is None:
+            raise IllegalArgumentException("Metalake must not be null")
+
+        if self._metalake.name() is None:
+            raise IllegalArgumentException("Metalake 'name' must not be null and empty")
+
+        if self._metalake.audit_info() is None:
+            raise IllegalArgumentException("Metalake 'audit' must not be null")
