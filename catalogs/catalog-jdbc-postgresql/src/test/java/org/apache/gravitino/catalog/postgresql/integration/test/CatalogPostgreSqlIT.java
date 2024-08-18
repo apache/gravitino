@@ -324,6 +324,17 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Optional<Column> column =
         Arrays.stream(t.columns()).filter(c -> c.name().equals("binary")).findFirst();
     Assertions.assertTrue(column.isPresent());
+
+    boolean result = tableCatalog.dropTable(tableIdentifier);
+    Assertions.assertTrue(result);
+
+    Assertions.assertThrows(Exception.class, () -> tableCatalog.loadTable(tableIdentifier));
+
+    // Test drop schema with upper-case name
+    result = catalog.asSchemas().dropSchema(schemaN, false);
+
+    // Test whether drop the schema succussfully.
+    Assertions.assertTrue(result);
   }
 
   private Map<String, String> createProperties() {

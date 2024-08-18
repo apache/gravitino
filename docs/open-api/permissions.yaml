@@ -1,0 +1,262 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/permissions/users/{user}/grant:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/user"
+
+    put:
+      tags:
+        - access control
+      summary: Grant roles to a user
+      operationId: grantRoleToUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleGrantRequest"
+            examples:
+              RoleGrantRequest:
+                $ref: "#/components/examples/RoleGrantRequest"
+
+      responses:
+        "200":
+          description: Returns the granted user object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./users.yaml#/components/responses/UserResponse"
+              examples:
+                UserResponse:
+                  $ref: "./users.yaml#/components/examples/UserResponse"
+
+        "404":
+          description: Not Found - The specified user or role does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchUserException:
+                  $ref: "./users.yaml#/components/examples/NoSuchUserException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/permissions/users/{user}/revoke:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/user"
+
+    put:
+      tags:
+        - access control
+      summary: Revoke roles to a user
+      operationId: revokeRoleFromUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleRevokeRequest"
+            examples:
+              RoleRevokeRequest:
+                $ref: "#/components/examples/RoleRevokeRequest"
+
+      responses:
+        "200":
+          description: Returns the revoked user object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./users.yaml#/components/responses/UserResponse"
+              examples:
+                UserResponse:
+                  $ref: "./users.yaml#/components/examples/UserResponse"
+
+        "404":
+          description: Not Found - The specified user or role does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchUserException:
+                  $ref: "./users.yaml#/components/examples/NoSuchUserException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/permissions/groups/{group}/grant:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/group"
+
+    put:
+      tags:
+        - access control
+      summary: Grant roles to a group
+      operationId: grantRoleToGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleGrantRequest"
+            examples:
+              RoleGrantRequest:
+                $ref: "#/components/examples/RoleGrantRequest"
+
+      responses:
+        "200":
+          description: Returns the granted group object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./groups.yaml#/components/responses/GroupResponse"
+              examples:
+                GroupResponse:
+                  $ref: "./groups.yaml#/components/examples/GroupResponse"
+
+        "404":
+          description: Not Found - The specified group or role does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchGroupException:
+                  $ref: "./groups.yaml#/components/examples/NoSuchGroupException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/permissions/groups/{group}/revoke:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/group"
+
+    put:
+      tags:
+        - access control
+      summary: Revoke roles to a group
+      operationId: revokeRoleFromGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleRevokeRequest"
+            examples:
+              RoleRevokeRequest:
+                $ref: "#/components/examples/RoleRevokeRequest"
+
+      responses:
+        "200":
+          description: Returns the revoked group object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./groups.yaml#/components/responses/GroupResponse"
+              examples:
+                GroupResponse:
+                  $ref: "./groups.yaml#/components/examples/GroupResponse"
+
+        "404":
+          description: Not Found - The specified group or role does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchGroupException:
+                  $ref: "./groups.yaml#/components/examples/NoSuchGroupException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  schemas:
+    User:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the user
+        roles:
+          type: array
+          items:
+            type: string
+          description: The roles of the user
+
+    RoleGrantRequest:
+      type: object
+      required:
+        - roleNames
+      properties:
+        roleNames:
+          type: array
+          description: The role names need to grant
+          items:
+            type: string
+
+    RoleRevokeRequest:
+      type: object
+      required:
+        - roleNames
+      properties:
+        roleNames:
+          type: array
+          description: The role names need to revoke
+          items:
+            type: string
+
+
+  examples:
+
+    RoleGrantRequest:
+      value: {
+        "roleNames": ["role1"],
+      }
+
+    RoleRevokeRequest:
+      value: {
+        "roleNames": [ "role1" ],
+      }

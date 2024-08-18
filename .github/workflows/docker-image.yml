@@ -15,6 +15,7 @@ on:
           - 'gravitino-ci-trino'
           - 'gravitino-ci-doris'
           - 'gravitino-ci-ranger'
+          - 'gravitino-iceberg-rest-server'
           - 'trino'
           - 'hive'
           - 'ranger'
@@ -64,6 +65,9 @@ jobs:
           elif [ "${{ github.event.inputs.image }}" == "ranger" ]; then
             echo "image_type=ranger" >> $GITHUB_ENV
             echo "image_name=datastrato/ranger" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-iceberg-rest-server" ]; then
+            echo "image_type=iceberg-rest-server" >> $GITHUB_ENV
+            echo "image_name=datastrato/gravitino-iceberg-rest-server" >> $GITHUB_ENV
           fi
 
       - name: Check publish Docker token

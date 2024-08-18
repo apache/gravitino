@@ -20,6 +20,7 @@ under the License.
 from dataclasses import dataclass, field
 
 from dataclasses_json import config
+from gravitino.exceptions.base import IllegalArgumentException
 
 from gravitino.rest.rest_message import RESTResponse
 
@@ -37,4 +38,5 @@ class BaseResponse(RESTResponse):
         """Validates the response code.
         @throws IllegalArgumentException if code value is negative.
         """
-        assert self._code >= 0, "code must be >= 0"
+        if self._code < 0:
+            raise IllegalArgumentException("code must be >= 0")

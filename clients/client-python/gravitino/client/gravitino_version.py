@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from gravitino.dto.version_dto import VersionDTO
-from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.exceptions.base import BadRequestException, GravitinoRuntimeException
 
 
 class Version(Enum):
@@ -51,7 +51,8 @@ class GravitinoVersion(VersionDTO):
 
         m = re.match(VERSION_PATTERN, self.version())
 
-        assert m is not None, "Invalid version string " + self.version()
+        if m is None:
+            raise BadRequestException(f"Invalid version string: {self.version()}")
 
         self.major = int(m.group(Version.MAJOR.value))
         self.minor = int(m.group(Version.MINOR.value))

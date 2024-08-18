@@ -14,7 +14,7 @@ metadata access for data and AI assets.
 
 ## Downloading
 
-You can get Gravitino from the [GitHub release page](https://github.com/apache/gravitino/releases),
+You can get Gravitino from the [download page](https://gravitino.apache.org/downloads),
 or you can build Gravitino from source code. See [How to build Gravitino](./how-to-build.md).
 
 Gravitino runs on both Linux and macOS platforms, and it requires the installation of Java 8, Java 11, or Java 17. Gravitino trino-connector runs with
@@ -58,8 +58,9 @@ REST API and the Java SDK. You can use either to manage metadata. See
   messaging metadata.
 
 Also, you can find the complete REST API definition in
-[Gravitino Open API](./api/rest/gravitino-rest-api), and the
-Java SDK definition in [Gravitino Javadoc](pathname:///docs/0.5.1/api/java/index.html).
+[Gravitino Open API](./api/rest/gravitino-rest-api),
+Java SDK definition in [Gravitino Java doc](pathname:///docs/0.6.0-incubating/api/java/index.html),
+and Python SDK definition in [Gravitino Python doc](pathname:///docs/0.6.0-incubating/api/python/gravitino.html).
 
 Gravitino provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`. See [Gravitino web UI](./webui.md) for details.
 
@@ -81,9 +82,6 @@ Gravitino currently supports the following catalogs:
 **Messaging catalogs:**
 
 * [**Kafka catalog**](./kafka-catalog.md)
-
-Gravitino also provides an Iceberg REST catalog service for the Iceberg table format. See the
-[Iceberg REST catalog service](./iceberg-rest-service.md) for details.
 
 ## Apache Gravitino playground
 
@@ -115,6 +113,13 @@ Gravitino supports different catalogs to manage the metadata in different source
   using Hadoop Compatible File System (HCFS).
 * [Kafka catalog](./kafka-catalog.md): a complete guide to using Gravitino to manage Kafka topics metadata.
 
+### Governance
+
+Gravitino provides governance features to manage metadata in a unified way. See:
+
+* [Manage tags in Gravitino](./manage-tags-in-gravitino.md): a complete guide to using Gravitino
+  to manage tags.
+
 ### Gravitino Iceberg REST catalog service
 
 * [Iceberg REST catalog service](./iceberg-rest-service.md): a complete guide to using Gravitino as an Apache Iceberg REST catalog service.
@@ -144,16 +149,23 @@ Gravitino provides a Flink connector to manage metadata in a unified way. To use
 
 Gravitino provides several ways to configure and manage the Gravitino server. See:
 
-* [Security](./security.md): provides security configurations for Gravitino, including HTTPS
-  and OAuth2 configurations.
 * [Gravitino metrics](./metrics.md): provides metrics configurations and detailed a metrics list
   of the Gravitino server.
 
+### Security
+
+Gravitino provides security configurations for Gravitino, including HTTPS, authentication and access control configurations.
+
+* [HTTPS](./security/how-to-use-https.md): provides HTTPS configurations.
+* [Authentication](./security/how-to-authenticate.md): provides authentication configurations including simple, OAuth, Kerberos.
+* [Access Control](./security/access-control.md): provides access control configurations.
+* [CORS](./security/how-to-use-cors.md): provides CORS configurations.
+
 ### Programming guides
 
-* [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of
-  Gravitino.
-* [Gravitino Javadoc](pathname:///docs/0.5.1/api/java/index.html): provides the Javadoc for the Gravitino API.
+* [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of Gravitino.
+* [Gravitino Java doc](pathname:///docs/0.6.0-incubating/api/java/index.html): provides the Javadoc for the Gravitino API.
+* [Gravitino Python doc](pathname:///docs/0.6.0-incubating/api/python/gravitino.html) provides the Pydoc for the Gravitino API.
 
 ### Development guides
 

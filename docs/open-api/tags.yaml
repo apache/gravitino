@@ -188,7 +188,7 @@ paths:
     get:
       tags:
         - tag
-      summary: List tags (names) associated with the specified metadata object
+      summary: List tags (names) for metadata object
       operationId: listObjectTags
       parameters:
         - $ref: "#/components/parameters/details"
@@ -214,7 +214,7 @@ paths:
     post:
       tags:
         - tag
-      summary: Associate tags with the specified metadata object
+      summary: Associate tags with metadata object
       operationId: associateTags
       requestBody:
         content:
@@ -256,7 +256,7 @@ paths:
     get:
       tags:
         - tag
-      summary: get associated tag for metadata object with specified tag name
+      summary: Get tag for metadata object
       operationId: getObjectTag
       parameters:
         - $ref: "#/components/parameters/details"

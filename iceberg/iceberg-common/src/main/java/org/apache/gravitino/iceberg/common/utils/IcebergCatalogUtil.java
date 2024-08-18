@@ -99,8 +99,11 @@ public class IcebergCatalogUtil {
       Map<String, String> properties, Configuration conf) {
     try {
       KerberosClient kerberosClient = new KerberosClient(properties, conf);
-      File keytabFile =
-          kerberosClient.saveKeyTabFileFromUri(Long.valueOf(properties.get("catalog_uuid")));
+
+      // For Iceberg rest server, we haven't set the catalog_uuid, so we set it to 0 as there is
+      // only one catalog in the rest server, so it's okay to set it to 0.
+      String catalogUUID = properties.getOrDefault("catalog_uuid", "0");
+      File keytabFile = kerberosClient.saveKeyTabFileFromUri(Long.valueOf(catalogUUID));
       kerberosClient.login(keytabFile.getAbsolutePath());
       return kerberosClient;
     } catch (IOException e) {
