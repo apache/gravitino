@@ -33,7 +33,7 @@ dependencies {
   implementation(project(":api")) {
     exclude("*")
   }
-  implementation(project(":catalogs:catalog-common")) {
+  implementation(project(":common")) {
     exclude("*")
   }
   implementation(project(":core")) {
@@ -131,8 +131,8 @@ tasks {
   }
 }
 
-// run  ./gradlew :catalogs:catalog-lakehouse-paimon:calculateDependenciesSize at the root of the project
-tasks.register("calculateDependenciesSize") {
+// run  ./gradlew :catalogs:catalog-lakehouse-paimon:calcDepsSize at the root of the project
+tasks.register("calcDepsSize") {
   group = "verification"
   description = "Calculates the total size of all dependencies in the runtimeClasspath configuration for :catalogs:catalog-lakehouse-paimon"
 
