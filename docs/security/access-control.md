@@ -55,12 +55,12 @@ The top container is the metalake.
 Catalogs are under the metalake. Catalogs represent different kinds of data sources.
 Schemas are under the catalog. There are tables, topics, or filesets under the schema.
 
-![object_image](../assets/object.png)
+![object_image](../assets/security/object.png)
 
 The relationship of the concepts is as below.
 
-![user_group_relationship_image](../assets/user-group.png)
-![concept_relationship_image](../assets/role.png)
+![user_group_relationship_image](../assets/security/user-group.png)
+![concept_relationship_image](../assets/security/role.png)
 
 ### Ownership
 
@@ -180,7 +180,7 @@ If parent securable object has the same privilege name with different condition,
 For example, securable metalake object allows to use the catalog, but securable catalog denies to use the catalog, the user isn't able to use the catalog.
 If securable metalake object denies to use the catalog, but securable catalog allows to use the catalog, the user isn't able to use the catalog, too.
 
-![privilege_image](../assets/privilege.png)
+![privilege_image](../assets/security/privilege.png)
 
 ## Server Configuration
 
@@ -611,7 +611,7 @@ client.setOwner(table, "user1", "USER");
 
 You can follow the steps to achieve the authorization of Gravitino.
 
-![concept_workflow_image](../assets/workflow.png)
+![concept_workflow_image](../assets/security/workflow.png)
 
 1. Service admin configures the Gravitino server to enable authorization and creates a metalake.
 
