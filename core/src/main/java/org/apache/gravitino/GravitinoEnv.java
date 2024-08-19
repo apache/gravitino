@@ -289,10 +289,20 @@ public class GravitinoEnv {
     return tagManager;
   }
 
+  /**
+   * Get the OwnerManager associated with the Gravitino environment.
+   *
+   * @return The OwnerManager instance.
+   */
   public OwnerManager ownerManager() {
     return ownerManager;
   }
 
+  /**
+   * Get the FutureGrantManager associated with the Gravitino environment.
+   *
+   * @return The FutureGrantManager instance.
+   */
   public FutureGrantManager futureGrantManager() {
     return futureGrantManager;
   }
