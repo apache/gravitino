@@ -256,9 +256,12 @@ components:
           enum:
             - hive
             - lakehouse-iceberg
+            - lakehouse-paimon
             - jdbc-mysql
             - jdbc-postgresql
+            - jdbc-doris
             - hadoop
+            - kafka
         comment:
           type: string
           description: A comment about the catalog

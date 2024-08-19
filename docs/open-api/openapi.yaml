@@ -70,6 +70,9 @@ paths:
   /metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectFullName}/{tag}:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1%7Btag%7D"
 
+  /metalakes/{metalake}/tags/{tag}/objects:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D~1objects"
+
   /metalakes/{metalake}/catalogs:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs"
 
@@ -427,13 +430,13 @@ components:
       schema:
         type: string
         enum:
-          - "catalog"
-          - "schema"
-          - "table"
-          - "fileset"
-          - "topic"
-          - "role"
-          - "metalake"
+          - "CATALOG"
+          - "SCHEMA"
+          - "TABLE"
+          - "FILESET"
+          - "TOPIC"
+          - "ROLE"
+          - "METALAKE"
 
     metadataObjectFullName:
       name: metadataObjectFullName
