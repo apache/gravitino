@@ -19,6 +19,9 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 datastrato/gravitino
 
 Changelog
 
+- gravitino:0.6.0
+  - Based on Gravitino 0.6.0, you can know more information from 0.6.0 release notes.
+
 - gravitino:0.5.1
   - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
 
