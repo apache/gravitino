@@ -84,7 +84,7 @@ Changelog
 Changelog
 
 - apache/gravitino-playground:trino-435-gravitino-0.6.0-incubating (Switch to Apache official DockerHub repository)
-  - Use `datastrato/trino:435-gravitino-0.5.1` Dockerfile to rebuild the image.
+  - Use Gravitino release 0.6.0 Dockerfile to build the image.
 
 - datastrato/trino:435-gravitino-0.5.1
   - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
@@ -114,7 +114,7 @@ You can use this kind of image to test the catalog of Apache Hive with kerberos 
 Changelog
 
 - apache/gravitino-ci:kerberos-hive-0.1.5 (Switch to Apache official DockerHub repository)
-  - Use `datastrato/gravitino-ci-kerberos-hive:0.1.5` Dockerfile to rebuild the image.
+  - Use Gravitino release 0.6.0 Dockerfile to build the image.
 
 - datastrato/gravitino-ci-kerberos-hive:0.1.5
   - Start another HMS for the Hive cluster in the container with port 19083. This is to test whether Kerberos authentication works for a Kerberos-enabled Hive cluster with multiple HMS.
@@ -148,7 +148,7 @@ You can use this kind of image to test the catalog of Apache Hive.
 Changelog
 
 - apache/gravitino-ci:hive-0.1.13 (Switch to Apache official DockerHub repository)
-  - Use `datastrato/gravitino-ci-hive:0.1.13` Dockerfile to rebuild the image.
+  - Use Gravitino release 0.6.0 Dockerfile to build the image.
 
 - datastrato/gravitino-ci-hive:0.1.13
   - Support Hive 2.3.9 and HDFS 2.7.3
@@ -236,7 +236,7 @@ You can use this image to test Trino.
 Changelog
 
 - apache/gravitino-ci:trino-0.1.6 (Switch to Apache official DockerHub repository)
-  - Use `datastrato/gravitino-ci-trino:0.1.6` Dockerfile to rebuild the image.
+  - Use Gravitino release 0.6.0 Dockerfile to build the image.
 
 - datastrato/gravitino-ci-trino:0.1.6
   - Upgrade trino:426 to trino:435
@@ -266,7 +266,7 @@ You can use this image to test Apache Doris.
 Changelog
 
 - apache/gravitino-ci:doris-0.1.5 (Switch to Apache official DockerHub repository)
-  - Use `datastrato/gravitino-ci-doris:0.1.5` Dockerfile to rebuild the image.
+  - Use Gravitino release 0.6.0 Dockerfile to build the image.
 
 - datastrato/gravitino-ci-doris:0.1.5
   - Remove the chmod command in the Dockerfile to decrease the size of the Docker image.
@@ -300,7 +300,7 @@ You can use this image to control Trino's permissions.
 Changelog
 
 - apache/gravitino-ci:ranger-0.1.1 (Switch to Apache official DockerHub repository)
-  - Use `datastrato/gravitino-ci-ranger:0.1.1` Dockerfile to rebuild the image.
+  - Use Gravitino release 0.6.0 Dockerfile to build the image.
 
 - datastrato/gravitino-ci-ranger:0.1.1
   - Docker image datastrato/gravitino-ci-ranger:0.1.1
