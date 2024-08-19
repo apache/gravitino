@@ -383,13 +383,15 @@ public class JDBCBackend implements RelationalBackend {
         if (identType == Entity.EntityType.ROLE) {
           return (List<E>) GroupMetaService.getInstance().listGroupsByRoleIdent(nameIdentifier);
         } else {
-          throw new IllegalArgumentException("");
+          throw new IllegalArgumentException(
+              String.format("ROLE_GROUP_REL doesn't support type %s", identType.name()));
         }
       case ROLE_USER_REL:
         if (identType == Entity.EntityType.ROLE) {
           return (List<E>) UserMetaService.getInstance().listUsersByRoleIdent(nameIdentifier);
         } else {
-          throw new IllegalArgumentException("");
+          throw new IllegalArgumentException(
+              String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
         }
       default:
         throw new IllegalArgumentException(
