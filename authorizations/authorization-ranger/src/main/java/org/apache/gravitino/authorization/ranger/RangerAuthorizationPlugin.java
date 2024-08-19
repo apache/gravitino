@@ -180,14 +180,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
   @Override
   public Boolean onRoleAcquired(Role role) throws RuntimeException {
     try {
-      return role.securableObjects().stream()
-              .filter(
-                  securableObject -> {
-                    RangerPolicy policy = findManagedPolicy(securableObject);
-                    return policy != null;
-                  })
-              .count()
-          == role.securableObjects().size();
+      return role.securableObjects().stream().allMatch(object -> findManagedPolicy(object) != null);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -346,7 +339,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
    */
   @Override
   public Boolean onGrantedRolesToUser(List<Role> roles, User user) throws RuntimeException {
-    // If the user is not exist, then create it.
+    // If the user does not exist, then create it.
     onUserAdded(user);
 
     AtomicReference<Boolean> execResult = new AtomicReference<>(Boolean.TRUE);
@@ -360,6 +353,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
                 rangerClient.grantRole(rangerServiceName, grantRevokeRoleRequest);
               } catch (RangerServiceException e) {
                 // ignore exception, support idempotent operation
+                LOG.warn("Grant role to user failed!", e);
               }
 
               role.securableObjects().stream()
@@ -392,6 +386,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
                                                                       .getType()
                                                                       .equals(
                                                                           rangerPrivilegeName))) {
+                                                        // Find match policy item and set the role
                                                         if (!policyItem
                                                             .getRoles()
                                                             .contains(role.name())) {
@@ -409,7 +404,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
                       });
             });
 
-    return Boolean.TRUE;
+    return execResult.get();
   }
 
   /**
@@ -507,11 +502,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
                                 });
                       });
             });
-    if (!execResult.get()) {
-      return Boolean.FALSE;
-    }
-
-    return Boolean.TRUE;
+    return execResult.get();
   }
 
   @Override
@@ -574,7 +565,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
   public Boolean onGroupRemoved(Group group) throws RuntimeException {
     VXGroupList list = rangerClient.searchGroup(ImmutableMap.of("name", group.name()));
     if (list.getListSize() == 0) {
-      LOG.warn("The group({}) is not exist in the Ranger!", group);
+      LOG.warn("The group({}) is not exists in the Ranger!", group);
       return Boolean.FALSE;
     }
     return rangerClient.deleteGroup(list.getList().get(0).getId());
@@ -584,7 +575,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
   public Boolean onGroupAcquired(Group group) {
     VXGroupList vxGroupList = rangerClient.searchGroup(ImmutableMap.of("name", group.name()));
     if (vxGroupList.getListSize() == 0) {
-      LOG.warn("The group({}) is not exist in the Ranger!", group);
+      LOG.warn("The group({}) is not exists in the Ranger!", group);
       return Boolean.FALSE;
     }
     return Boolean.TRUE;
@@ -707,7 +698,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
   }
 
   /**
-   * For easy manage, each privilege will create a RangerPolicyItemAccess in the policy.
+   * For easy management, each privilege will create one RangerPolicyItemAccess in the policy.
    *
    * @param policyItem The policy item to check
    * @throws AuthorizationPluginException If the policy item contains more than one access type
@@ -725,7 +716,8 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
             access -> {
               if (mapAccesses.containsKey(access.getType()) && mapAccesses.get(access.getType())) {
                 throw new AuthorizationPluginException(
-                    "Contain duplicate privilege in the delegate Gravitino management policy ");
+                    "Contain duplicate privilege(%s) in the delegate Gravitino management policy ",
+                    access.getType());
               }
               mapAccesses.put(access.getType(), true);
             });
@@ -734,11 +726,11 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
   /**
    * Add the securable object's privilege to the policy. <br>
    * 1. Find the policy base the metadata object. <br>
-   * 2. If the policy is exist and have same privilege, because support idempotent operation, so
+   * 2. If the policy exists and has the same privilege, because support idempotent operation, so
    * return true. <br>
-   * 3. If the policy is exist but have different privilege, also return true. Because one Ranger
+   * 3. If the policy exists but has different privileges, also return true. Because one Ranger
    * policy maybe contain multiple Gravitino securable object <br>
-   * 4. If the policy is not exist, then create a new policy. <br>
+   * 4. If the policy does not exist, then create a new policy. <br>
    */
   private boolean doAddSecurableObject(RoleChange.AddSecurableObject change) {
     RangerPolicy policy = findManagedPolicy(change.getSecurableObject());

@@ -28,7 +28,9 @@ dependencies {
   implementation(project(":api")) {
     exclude(group = "*")
   }
-  implementation(project(":core"))
+  implementation(project(":core")) {
+    exclude(group = "*")
+  }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)

@@ -212,7 +212,7 @@ public interface RoleChange {
       }
       if (securableObject.privileges().containsAll(newSecurableObject.privileges())) {
         throw new IllegalArgumentException(
-            "The updated securable object's privilege must be different as new securable object's privilege.");
+            "The updated securable object's privileges are just a part of that of old one.");
       }
       this.roleName = roleName;
       this.securableObject = securableObject;
