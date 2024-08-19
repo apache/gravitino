@@ -206,7 +206,7 @@ const DetailsDrawer = props => {
                         data-refer={`details-props-value-${item.value}`}
                         data-prev-refer={`details-props-key-${item.key}`}
                       >
-                        {item.value}
+                        {item.key === 'jdbc-password' ? '[HIDDEN]' : item.value}
                       </TableCell>
                     </TableRow>
                   )
