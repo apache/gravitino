@@ -23,7 +23,7 @@ from dataclasses_json import config
 
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.constants.error import ErrorConstants, EXCEPTION_MAPPING
-from gravitino.exceptions.base import UnknownError
+from gravitino.exceptions.base import BadRequestException, UnknownError
 
 
 @dataclass
@@ -46,12 +46,11 @@ class ErrorResponse(BaseResponse):
     def validate(self):
         super().validate()
 
-        assert (
-            self._type is not None and len(self._type) != 0
-        ), "type cannot be None or empty"
-        assert (
-            self._message is not None and len(self._message) != 0
-        ), "message cannot be None or empty"
+        if self._type is None or not self._type.strip():
+            raise BadRequestException("Type cannot be None or empty")
+
+        if self._message is None or not self._message.strip():
+            raise BadRequestException("Message cannot be None or empty")
 
     def __repr__(self) -> str:
         return (

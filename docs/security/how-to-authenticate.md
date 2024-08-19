@@ -8,12 +8,11 @@ license: "This software is licensed under the Apache License version 2."
 ## Authentication
 
 Apache Gravitino supports three kinds of authentication mechanisms: simple, OAuth and Kerberos.
-If you don't enable authentication for your client and server explicitly, you will use anonymous to access the server.
+If you don't enable authentication for your client and server explicitly, you will use user `anonymous` to access the server.
 
 ### Simple mode
 
-If the client sets the simple mode,  it will use the environment variable `GRAVITINO_USER` as the user.
-
+If the client sets the simple mode, it will use the value of environment variable `GRAVITINO_USER` as the user.
 If the environment variable `GRAVITINO_USER` in the client isn't set, the client uses the user logging in the machine that sends requests.
 
 For the client side, users can enable `simple` mode by the following code:
@@ -27,15 +26,14 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 ### OAuth mode
 
-Gravitino only supports external OAuth 2.0 servers.
+Gravitino only supports external OAuth 2.0 servers. To enable OAuth mode, users should follow the steps below.
 
-First, users need to guarantee that the external correctly configured OAuth 2.0 server supports Bearer JWT.
+- First, users need to guarantee that the external correctly configured OAuth 2.0 server supports Bearer JWT.
 
-Then, on the server side, users should set `gravitino.authenticators` as `oauth` and give
+- Then, on the server side, users should set `gravitino.authenticators` as `oauth` and give
 `gravitino.authenticator.oauth.defaultSignKey`, `gravitino.authenticator.oauth.serverUri` and
 `gravitino.authenticator.oauth.tokenPath`  a proper value.
-
-Next, for the client side, users can enable `OAuth` mode by the following code:
+- Next, for the client side, users can enable `OAuth` mode by the following code:
 
 ```java
 DefaultOAuth2TokenProvider authDataProvider = DefaultOAuth2TokenProvider.builder()
@@ -53,12 +51,8 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 ### Kerberos mode
 
-Gravitino supports Kerberos mode.
-
-For the server side, users should set `gravitino.authenticators` as `kerberos` and give
-`gravitino.authenticator.kerberos.principal` and `gravitino.authenticator.kerberos.keytab` a proper value.
-
-For the client side, users can enable `kerberos` mode by the following code:
+To enable Kerberos mode, users need to guarantee that the server and client have the correct Kerberos configuration. In the server side, users should set `gravitino.authenticators` as `kerberos` and give
+`gravitino.authenticator.kerberos.principal` and `gravitino.authenticator.kerberos.keytab` a proper value. For the client side, users can enable `kerberos` mode by the following code:
 
 ```java
 // Use keytab to create KerberosTokenProvider
@@ -125,11 +119,8 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 
 2. Set up an external OAuth 2.0 server
 
-   There is a sample-authorization-server based on [spring-authorization-server](https://github.com/spring-projects/spring-authorization-server/tree/1.0.3).
-
-   The image has registered client information in the external OAuth 2.0 server.
-
-   Its clientId is `test`. Its secret is `test`. Its scope is `test`.
+   There is a sample-authorization-server based on [spring-authorization-server](https://github.com/spring-projects/spring-authorization-server/tree/1.0.3). The image has registered client information in the external OAuth 2.0 server
+   and its clientId is `test`, secret is `test`, scope is `test`.
 
 ```shell
  docker run -p 8177:8177 --name sample-auth-server -d datastrato/sample-authorization-server:0.3.0
@@ -137,15 +128,15 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 
 3. Open [the JWK URL of the Authorization server](http://localhost:8177/oauth2/jwks) in the browser and you can get the JWK.
 
-   ![jks_response_image](assets/jks.png)
+   ![jks_response_image](../assets/jks.png)
 
 4. Convert the JWK to PEM. You can use the [online tool](https://8gwifi.org/jwkconvertfunctions.jsp#google_vignette) or other tools.
 
-   ![pem_convert_result_image](assets/pem.png)
+   ![pem_convert_result_image](../assets/pem.png)
 
 5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
 
-6. You can refer to the [Configurations](gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
+6. You can refer to the [Configurations](../gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 
 ```text
 gravitino.authenticators = oauth
@@ -157,7 +148,7 @@ gravitino.authenticator.oauth.serverUri = http://localhost:8177
 
 7. Open [the URL of Gravitino server](http://localhost:8090) and login in with clientId `test`, clientSecret `test`, and scope `test`.
 
-   ![oauth_login_image](assets/oauth.png)
+   ![oauth_login_image](../assets/oauth.png)
 
 8. You can also use the curl command to access Gravitino.
 
