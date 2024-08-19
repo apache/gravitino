@@ -284,6 +284,41 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+
+  /metalakes/{metalake}/tags/{tag}/objects:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/tag"
+    get:
+      tags:
+        - tag
+      summary: list metadata objects associated with tag
+      operationId: listTagObjects
+      responses:
+        "200":
+          description: Returns the list of metadata objects associated with specified tag
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/MetadataObjectListResponse"
+              examples:
+                TagResponse:
+                  $ref: "#/components/examples/MetadataObjectListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified tag does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchTagException:
+                  $ref: "#/components/examples/NoSuchTagException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
 components:
   parameters:
     details:
@@ -323,6 +358,25 @@ components:
           type: boolean
           description: Whether the tag is inherited from the parent metadata object
           nullable: true
+
+    MetadataObject:
+      type: object
+      description: A metadata object
+      properties:
+        fullName:
+          type: string
+          description: The name of the metadata object, separated by dots
+        type:
+          type: string
+          description: The type of the metadata object
+          enum:
+            - "CATALOG"
+            - "SCHEMA"
+            - "TABLE"
+            - "FILESET"
+            - "TOPIC"
+            - "ROLE"
+            - "METALAKE"
 
 
   requests:
@@ -507,6 +561,21 @@ components:
         tag:
           $ref: "#/components/schemas/Tag"
 
+    MetadataObjectListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        metadataObjects:
+          type: array
+          description: A list of metadata objects
+          items:
+            $ref: "#/components/schemas/MetadataObject"
+
   examples:
     NameListResponse:
       value: {
@@ -578,6 +647,25 @@ components:
           },
           "inherited": false
         }
+      }
+
+    MetadataObjectListResponse:
+      value: {
+        "code": 0,
+        "metadataObjects": [
+          {
+            "type": "CATALOG",
+            "fullName":"my_catalog",
+          },
+          {
+            "type": "SCHEMA",
+            "fullName":"my_catalog.my_schema",
+          },
+          {
+            "type": "TABLE",
+            "fullName":"my_catalog.my_schema.my_table",
+          }
+        ]
       }
 
     TagAlreadyExistsException:

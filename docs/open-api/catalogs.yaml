@@ -256,8 +256,10 @@ components:
           enum:
             - hive
             - lakehouse-iceberg
+            - lakehouse-paimon
             - jdbc-mysql
             - jdbc-postgresql
+            - jdbc-doris
             - hadoop
         comment:
           type: string
