@@ -539,9 +539,12 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // those names we can obtain metadata for each individual table and get the type we needed.
       List<String> allTables = clientPool.run(c -> c.getAllTables(schemaIdent.name()));
       if (!listAllTables) {
-        // The reason for using the listTableNamesByFilter function is that the getTableObjectiesByName
-        // function has poor performance. Currently, we only focus on the iceberg table. In the future,
-        // if necessary, we will need to filter out other tables such as hudi. In addition, the current
+        // The reason for using the listTableNamesByFilter function is that the
+        // getTableObjectiesByName
+        // function has poor performance. Currently, we only focus on the iceberg table. In the
+        // future,
+        // if necessary, we will need to filter out other tables such as hudi. In addition, the
+        // current
         // return also includes tables of type VIRTUAL-VIEW.
         String filter =
             String.format(
