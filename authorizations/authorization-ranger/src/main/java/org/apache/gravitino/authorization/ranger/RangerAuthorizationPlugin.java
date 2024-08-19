@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -50,6 +51,10 @@ import org.apache.gravitino.authorization.ranger.defines.VXUserList;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerRole;
@@ -248,6 +253,35 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
     // 2. Transfer the ownership from preOwner to newOwner of the metadata object
     check(newOwner != null, "The newOwner must be not null");
 
+    if (newOwner != null) {
+      AuditInfo auditInfo =
+          AuditInfo.builder()
+              .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+              .withCreateTime(Instant.now())
+              .build();
+      if (newOwner.type() == Owner.Type.USER) {
+        UserEntity userEntity =
+            UserEntity.builder()
+                .withId(1L)
+                .withName(newOwner.name())
+                .withRoleNames(Collections.emptyList())
+                .withRoleIds(Collections.emptyList())
+                .withAuditInfo(auditInfo)
+                .build();
+        onUserAdded(userEntity);
+      } else {
+        GroupEntity groupEntity =
+            GroupEntity.builder()
+                .withId(1L)
+                .withName(newOwner.name())
+                .withRoleNames(Collections.emptyList())
+                .withRoleIds(Collections.emptyList())
+                .withAuditInfo(auditInfo)
+                .build();
+        onGroupAdded(groupEntity);
+      }
+    }
+
     RangerPolicy policy = findManagedPolicy(metadataObject);
     if (policy != null) {
       policy.getPolicyItems().stream()
@@ -342,7 +376,6 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
     // If the user does not exist, then create it.
     onUserAdded(user);
 
-    AtomicReference<Boolean> execResult = new AtomicReference<>(Boolean.TRUE);
     roles.stream()
         .forEach(
             role -> {
@@ -355,56 +388,9 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
                 // ignore exception, support idempotent operation
                 LOG.warn("Grant role to user failed!", e);
               }
-
-              role.securableObjects().stream()
-                  .forEach(
-                      securableObject -> {
-                        RangerPolicy policy = findManagedPolicy(securableObject);
-                        if (policy == null) {
-                          LOG.warn(
-                              "The policy does not exist for the securable object({})",
-                              securableObject);
-                          execResult.set(Boolean.FALSE);
-                          return;
-                        }
-
-                        securableObject.privileges().stream()
-                            .forEach(
-                                privilege -> {
-                                  mapPrivileges
-                                      .getOrDefault(privilege.name(), Collections.emptySet())
-                                      .stream()
-                                      .forEach(
-                                          rangerPrivilegeName -> {
-                                            policy.getPolicyItems().stream()
-                                                .forEach(
-                                                    policyItem -> {
-                                                      if (policyItem.getAccesses().stream()
-                                                          .anyMatch(
-                                                              policyItemAccess ->
-                                                                  policyItemAccess
-                                                                      .getType()
-                                                                      .equals(
-                                                                          rangerPrivilegeName))) {
-                                                        // Find match policy item and set the role
-                                                        if (!policyItem
-                                                            .getRoles()
-                                                            .contains(role.name())) {
-                                                          policyItem.getRoles().add(role.name());
-                                                        }
-                                                      }
-                                                    });
-                                            try {
-                                              rangerClient.updatePolicy(policy.getId(), policy);
-                                            } catch (RangerServiceException e) {
-                                              throw new RuntimeException(e);
-                                            }
-                                          });
-                                });
-                      });
             });
 
-    return execResult.get();
+    return Boolean.TRUE;
   }
 
   /**
@@ -413,6 +399,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
    */
   @Override
   public Boolean onRevokedRolesFromUser(List<Role> roles, User user) throws RuntimeException {
+    onUserAdded(user);
     roles.stream()
         .forEach(
             role -> {
@@ -507,6 +494,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public Boolean onRevokedRolesFromGroup(List<Role> roles, Group group) throws RuntimeException {
+    onGroupAdded(group);
     roles.stream()
         .forEach(
             role -> {
@@ -919,7 +907,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
               translatePrivilege(gravitinoPrivilege.name())
                   .forEach(
                       mappedPrivilege -> {
-                        // Find the policy item that match access and role
+                        // Find the policy item that matches access and role
                         boolean exist =
                             policy.getPolicyItems().stream()
                                 .anyMatch(
