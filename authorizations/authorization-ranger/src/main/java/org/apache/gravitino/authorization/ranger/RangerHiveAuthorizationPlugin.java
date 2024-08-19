@@ -45,7 +45,7 @@ public class RangerHiveAuthorizationPlugin extends RangerAuthorizationPlugin {
         ImmutableMap.<Privilege.Name, Set<String>>builder()
             .put(
                 Privilege.Name.CREATE_SCHEMA,
-                ImmutableSet.of(RangerDefines.ACCESS_TYPE_HIVE_SELECT))
+                ImmutableSet.of(RangerDefines.ACCESS_TYPE_HIVE_CREATE))
             .put(
                 Privilege.Name.CREATE_TABLE, ImmutableSet.of(RangerDefines.ACCESS_TYPE_HIVE_CREATE))
             .put(

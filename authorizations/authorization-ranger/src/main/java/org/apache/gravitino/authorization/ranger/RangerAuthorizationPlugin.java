@@ -63,7 +63,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
 
   protected String catalogProvider;
-  protected RangerClientExt rangerClient;
+  protected RangerClientExtend rangerClient;
   protected String rangerServiceName;
   /** Mapping Gravitino privilege name to the underlying authorization system privileges. */
   protected Map<Privilege.Name, Set<String>> mapPrivileges = null;
@@ -100,7 +100,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
     check(password != null, "Ranger password is required");
     check(rangerServiceName != null, "Ranger service name is required");
 
-    rangerClient = new RangerClientExt(rangerUrl, authType, username, password);
+    rangerClient = new RangerClientExtend(rangerUrl, authType, username, password);
 
     initMapPrivileges();
     initOwnerPrivileges();

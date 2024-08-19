@@ -210,9 +210,9 @@ public interface RoleChange {
         throw new IllegalArgumentException(
             "The securable object's metadata entity must be same as new securable object's metadata entity.");
       }
-      if (securableObject.privileges().containsAll(newSecurableObject.privileges())) {
+      if (securableObject.privileges().equals(newSecurableObject.privileges())) {
         throw new IllegalArgumentException(
-            "The updated securable object's privileges are just a part of that of old one.");
+            "The securable object's privilege must be different as new securable object's privilege.");
       }
       this.roleName = roleName;
       this.securableObject = securableObject;
