@@ -43,6 +43,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,6 +108,13 @@ class RoleManager {
     try {
       store.put(roleEntity, false /* overwritten */);
       cache.put(roleEntity.nameIdentifier(), roleEntity);
+
+      AuthorizationUtils.callAuthorizationPlugin(
+          metalake,
+          roleEntity.securableObjects(),
+          Sets.newHashSet(),
+          authorizationPlugin -> authorizationPlugin.onRoleCreated(roleEntity));
+
       return roleEntity;
     } catch (EntityAlreadyExistsException e) {
       LOG.warn("Role {} in the metalake {} already exists", role, metalake, e);
@@ -134,6 +142,17 @@ class RoleManager {
       AuthorizationUtils.checkMetalakeExists(metalake);
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);
       cache.invalidate(ident);
+
+      try {
+        RoleEntity roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
+        AuthorizationUtils.callAuthorizationPlugin(
+            metalake,
+            roleEntity.securableObjects(),
+            Sets.newHashSet(),
+            authorizationPlugin -> authorizationPlugin.onRoleDeleted(roleEntity));
+      } catch (NoSuchEntityException nse) {
+        // ignore, because the role may have been deleted.
+      }
 
       return store.delete(ident, Entity.EntityType.ROLE);
     } catch (IOException ioe) {

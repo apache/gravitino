@@ -88,6 +88,23 @@ public interface RoleMetaMapper {
           + " AND ro.deleted_at = 0 AND ge.deleted_at = 0")
   List<RolePO> listRolesByGroupId(Long groupId);
 
+  @Select(
+      "SELECT DISTINCT ro.role_id as roleId, ro.role_name as roleName,"
+          + " ro.metalake_id as metalakeId, ro.properties as properties,"
+          + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
+          + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
+          + " FROM "
+          + ROLE_TABLE_NAME
+          + " ro JOIN "
+          + SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME
+          + " se ON ro.role_id = se.role_id"
+          + " WHERE se.entity_id = #{metadataObjectId}"
+          + " AND se.type = #{metadataObjectType}"
+          + " AND ro.deleted_at = 0 AND se.deleted_at = 0")
+  List<RolePO> listRolesByMetadataObjectIdAndType(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
   @Insert(
       "INSERT INTO "
           + ROLE_TABLE_NAME
