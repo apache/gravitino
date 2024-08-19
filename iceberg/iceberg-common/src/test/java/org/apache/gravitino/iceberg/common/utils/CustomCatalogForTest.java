@@ -16,12 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common;
 
-public enum IcebergCatalogBackend {
-  HIVE,
-  JDBC,
-  MEMORY,
-  REST,
-  CUSTOM
+package org.apache.gravitino.iceberg.common.utils;
+
+import java.util.List;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+
+public class CustomCatalogForTest implements Catalog {
+  @Override
+  public List<TableIdentifier> listTables(Namespace namespace) {
+    return null;
+  }
+
+  @Override
+  public boolean dropTable(TableIdentifier identifier, boolean purge) {
+    return false;
+  }
+
+  @Override
+  public void renameTable(TableIdentifier from, TableIdentifier to) {}
+
+  @Override
+  public Table loadTable(TableIdentifier identifier) {
+    return null;
+  }
 }
