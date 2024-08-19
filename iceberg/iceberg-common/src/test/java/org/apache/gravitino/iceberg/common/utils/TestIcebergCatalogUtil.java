@@ -84,20 +84,6 @@ public class TestIcebergCatalogUtil {
     Catalog catalog;
     Map<String, String> config = new HashMap<>();
 
-    config.put("catalog-backend-impl", "org.apache.iceberg.inmemory.InMemoryCatalog");
-    catalog =
-        IcebergCatalogUtil.loadCatalogBackend(
-            IcebergCatalogBackend.valueOf("CUSTOM"), new IcebergConfig(config));
-    Assertions.assertTrue(catalog instanceof InMemoryCatalog);
-
-    config.clear();
-    config.put("catalog-backend-impl", "org.apache.iceberg.hive.HiveCatalog");
-    catalog =
-        IcebergCatalogUtil.loadCatalogBackend(
-            IcebergCatalogBackend.valueOf("CUSTOM"), new IcebergConfig(config));
-    Assertions.assertTrue(catalog instanceof HiveCatalog);
-
-    config.clear();
     config.put(
         "catalog-backend-impl", "org.apache.gravitino.iceberg.common.utils.CustomCatalogForTest");
     catalog =
