@@ -292,7 +292,7 @@ paths:
     get:
       tags:
         - tag
-      summary: list metadata objects associated with tag
+      summary: list metadata objects for tag
       operationId: listTagObjects
       responses:
         "200":
