@@ -68,7 +68,7 @@ public interface MetalakeMetaMapper {
           + " deleted_at as deletedAt"
           + " FROM "
           + TABLE_NAME
-          + " WHERE metalake_id = #{metalaId} and deleted_at = 0")
+          + " WHERE metalake_id = #{metalakeId} and deleted_at = 0")
   MetalakePO selectMetalakeMetaById(@Param("metalakeId") Long metalakeId);
 
   @Select(

@@ -285,4 +285,18 @@ public class NameIdentifierUtil {
             "Entity type " + entityType + " is not supported to convert to MetadataObject");
     }
   }
+
+  /**
+   * Get the metalake name of the given {@link NameIdentifier}.
+   *
+   * @param identifier The name identifier of the entity
+   * @return metalake name
+   */
+  public static String getMetalake(NameIdentifier identifier) {
+    if (identifier.hasNamespace()) {
+      return identifier.namespace().level(0);
+    } else {
+      return identifier.name();
+    }
+  }
 }
