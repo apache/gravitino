@@ -169,7 +169,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
    */
   @Override
   public Boolean onRoleCreated(Role role) throws RuntimeException {
-    createRangerRole(role.name());
+    createRangerRoleIfNotExists(role.name());
     return onRoleUpdated(
         role,
         role.securableObjects().stream()
@@ -179,22 +179,18 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public Boolean onRoleAcquired(Role role) throws RuntimeException {
-    Boolean findAll;
     try {
-      findAll =
-          role.securableObjects().stream()
-                  .filter(
-                      securableObject -> {
-                        RangerPolicy policy = findManagedPolicy(securableObject);
-                        return policy != null;
-                      })
-                  .count()
-              == role.securableObjects().size();
+      return role.securableObjects().stream()
+              .filter(
+                  securableObject -> {
+                    RangerPolicy policy = findManagedPolicy(securableObject);
+                    return policy != null;
+                  })
+              .count()
+          == role.securableObjects().size();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-
-    return findAll;
   }
 
   /**
@@ -203,7 +199,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
    */
   @Override
   public Boolean onRoleDeleted(Role role) throws RuntimeException {
-    // First remove the role in the Ranger policy
+    // First, remove the role in the Ranger policy
     onRoleUpdated(
         role,
         role.securableObjects().stream()
@@ -357,7 +353,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
     roles.stream()
         .forEach(
             role -> {
-              createRangerRole(role.name());
+              createRangerRoleIfNotExists(role.name());
               GrantRevokeRoleRequest grantRevokeRoleRequest =
                   createGrantRevokeRoleRequest(role.name(), user.name(), null);
               try {
@@ -457,7 +453,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
     roles.stream()
         .forEach(
             role -> {
-              createRangerRole(role.name());
+              createRangerRoleIfNotExists(role.name());
               GrantRevokeRoleRequest grantRevokeRoleRequest =
                   createGrantRevokeRoleRequest(role.name(), null, group.name());
               try {
@@ -626,13 +622,13 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
     return roleRequest;
   }
 
-  /** Create a Ranger role if the role is not exist. */
-  private RangerRole createRangerRole(String roleName) {
+  /** Create a Ranger role if the role does not exist. */
+  private RangerRole createRangerRoleIfNotExists(String roleName) {
     RangerRole rangerRole = null;
     try {
       rangerRole = rangerClient.getRole(roleName, RANGER_ADMIN_NAME, rangerServiceName);
     } catch (RangerServiceException e) {
-      // ignore exception, If the role is not exist, then create it.
+      // ignore exception, If the role does not exist, then create it.
     }
     try {
       if (rangerRole == null) {
