@@ -27,6 +27,8 @@ public final class ConfigConstants {
   /** The value of messages used to indicate that the configuration is not set. */
   public static final String NOT_BLANK_ERROR_MSG = "The value can't be blank";
 
+  public static final String JDBC_URL_INVALID_ERROR_MSG = "The value must be a valid JDBC URL";
+
   /** The value of messages used to indicate that the configuration should be a positive number. */
   public static final String POSITIVE_NUMBER_ERROR_MSG = "The value must be a positive number";
 
