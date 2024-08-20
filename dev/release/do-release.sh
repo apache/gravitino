@@ -33,6 +33,19 @@ done
 DRY_RUN=${DRY_RUN:-0}
 export DRY_RUN
 
+cmds=("git" "gpg" "svn" "twine" "shasum" "sha1sum" "jq")
+for cmd in "${cmds[@]}"; do
+  if ! command -v $cmd &> /dev/null; then
+    echo "$cmd is required to run this script."
+    exit 1
+  fi
+done
+
+if ! command -v md5 &> /dev/null && ! command -v md5sum &> /dev/null; then
+  echo "md5 or md5sum is required to run this script."
+  exit 1
+fi
+
 . "$SELF/release-util.sh"
 
 if [ "$RUNNING_IN_DOCKER" = "1" ]; then
