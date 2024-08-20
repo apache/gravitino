@@ -446,6 +446,27 @@ public class TestGvfsBase extends GravitinoMockServerBase {
               .replaceFirst(
                   GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
                   FileSystemTestUtils.localRootPrefix()));
+
+      // test get file status with storageLocation end with "/"
+      String fName = "test_location_with_slash";
+      String tmpPathString =
+          String.format(
+              "%s/%s/%s/%s",
+              FileSystemTestUtils.localRootPrefix(), catalogName, schemaName, fName + "/");
+      Path tempPath = new Path(tmpPathString);
+
+      mockFilesetDTO(
+          metalakeName, catalogName, schemaName, fName, Fileset.Type.MANAGED, tmpPathString);
+      Path fPath = FileSystemTestUtils.createFilesetPath(catalogName, schemaName, fName, true);
+      localFileSystem.mkdirs(tempPath);
+      assertTrue(localFileSystem.exists(tempPath));
+      Path subDir = new Path(tempPath + "/sub_dir");
+      localFileSystem.mkdirs(subDir);
+      assertTrue(localFileSystem.exists(tempPath));
+
+      Path subDirVirtualPath = new Path(fPath + "/sub_dir");
+      FileStatus subDirStatus = gravitinoFileSystem.getFileStatus(subDirVirtualPath);
+      assertEquals(fPath + "/sub_dir", subDirStatus.getPath().toString());
     }
   }
 
@@ -490,6 +511,26 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                     FileSystemTestUtils.localRootPrefix()));
         gravitinoFileSystem.delete(gravitinoStatuses.get(i).getPath(), true);
       }
+
+      // test list file status with storageLocation end with "/"
+      String fName = "test_list_location_with_slash";
+      String tmpPathString =
+          String.format(
+              "%s/%s/%s/%s",
+              FileSystemTestUtils.localRootPrefix(), catalogName, schemaName, fName + "/");
+      Path tempPath = new Path(tmpPathString);
+
+      mockFilesetDTO(
+          metalakeName, catalogName, schemaName, fName, Fileset.Type.MANAGED, tmpPathString);
+      Path fPath = FileSystemTestUtils.createFilesetPath(catalogName, schemaName, fName, true);
+      localFileSystem.mkdirs(tempPath);
+      assertTrue(localFileSystem.exists(tempPath));
+      Path subDir = new Path(tempPath + "/sub_dir");
+      localFileSystem.mkdirs(subDir);
+      assertTrue(localFileSystem.exists(tempPath));
+
+      FileStatus[] subDirStatus = gravitinoFileSystem.listStatus(fPath);
+      assertEquals(fPath + "/sub_dir", subDirStatus[0].getPath().toString());
     }
   }
 
@@ -605,6 +646,22 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     try (GravitinoVirtualFileSystem fs =
         (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
       assertEquals(32 * 1024 * 1024, fs.getDefaultBlockSize(managedFilesetPath));
+    }
+  }
+
+  @Test
+  public void testConvertFileStatusPathPrefix() throws IOException {
+    try (GravitinoVirtualFileSystem fs =
+        (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
+      FileStatus fileStatus =
+          new FileStatus(1024, false, 1, 32 * 1024 * 1024, 1024, new Path("hdfs://hive:9000/test"));
+      // storage location end with "/"
+      String storageLocation = "hdfs://hive:9000/";
+      String virtualLocation = "gvfs://fileset/test_catalog/tmp/test_fileset";
+      FileStatus convertedStatus =
+          fs.convertFileStatusPathPrefix(fileStatus, storageLocation, virtualLocation);
+      Path expectedPath = new Path("gvfs://fileset/test_catalog/tmp/test_fileset/test");
+      assertEquals(expectedPath, convertedStatus.getPath());
     }
   }
 }

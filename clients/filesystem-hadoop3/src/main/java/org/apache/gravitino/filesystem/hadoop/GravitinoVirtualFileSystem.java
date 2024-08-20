@@ -320,7 +320,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     }
   }
 
-  private FileStatus convertFileStatusPathPrefix(
+  @VisibleForTesting
+  FileStatus convertFileStatusPathPrefix(
       FileStatus fileStatus, String actualPrefix, String virtualPrefix) {
     String filePath = fileStatus.getPath().toString();
     Preconditions.checkArgument(
@@ -328,6 +329,11 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         "Path %s doesn't start with prefix \"%s\".",
         filePath,
         actualPrefix);
+    // if the storage location is end with "/",
+    // we should fill virtual prefix end with "/"
+    if (actualPrefix.endsWith("/") && !virtualPrefix.endsWith("/")) {
+      virtualPrefix += "/";
+    }
     Path path = new Path(filePath.replaceFirst(actualPrefix, virtualPrefix));
     fileStatus.setPath(path);
 
@@ -491,7 +497,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     FileStatus fileStatus = context.getFileSystem().getFileStatus(context.getActualPath());
     return convertFileStatusPathPrefix(
         fileStatus,
-        context.getFileset().storageLocation(),
+        new Path(context.getFileset().storageLocation()).toString(),
         getVirtualLocation(context.getIdentifier(), true));
   }
 
