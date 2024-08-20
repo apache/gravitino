@@ -121,7 +121,7 @@ else
   exit 1
 fi
 
-build_args="${build_args} --build-arg IMAGE_NAME=${image_name}"
+build_args="${build_args} --build-arg IMAGE_NAME=${image_name} --build-arg TAG_NAME=${tag_name}"
 
 # Create multi-arch builder
 BUILDER_NAME="gravitino-builder"
