@@ -30,7 +30,7 @@ Creates build deliverables from a Apache Gravitino commit.
 
 Top level targets are
   package: Create binary packages and commit them to dist.apache.org/repos/dist/dev/incubator/gravitino/
-  docs: Build docs and commit them to dist.apache.org/repos/dist/dev/incubator/gravitino/
+  docs: Build the Java and Python docs, and copy them to a local path.
   publish-release: Publish a release to Apache release repo
   finalize: Finalize the release after an RC passes vote
 
@@ -110,7 +110,7 @@ if [[ "$1" == "finalize" ]]; then
     echo "v$RELEASE_VERSION already exists. Skip creating it."
   else
     rm -rf gravitino
-    git clone "https://$ASF_USERNAME:$ASF_PASSWORD@$ASF_GRAVITINO_REPO" -b master
+    git clone "https://$ASF_USERNAME:$ASF_PASSWORD@$ASF_GRAVITINO_REPO" -b main
     cd gravitino
     git tag "v$RELEASE_VERSION" "$RELEASE_TAG"
     git push origin "v$RELEASE_VERSION"
