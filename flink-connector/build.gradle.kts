@@ -157,13 +157,6 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-hive:jar")
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 
