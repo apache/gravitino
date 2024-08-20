@@ -52,7 +52,6 @@ public class RangerHiveAuthorizationPlugin extends RangerAuthorizationPlugin {
                 Privilege.Name.MODIFY_TABLE,
                 ImmutableSet.of(
                     RangerDefines.ACCESS_TYPE_HIVE_UPDATE,
-                    RangerDefines.ACCESS_TYPE_HIVE_DROP,
                     RangerDefines.ACCESS_TYPE_HIVE_ALTER,
                     RangerDefines.ACCESS_TYPE_HIVE_WRITE))
             .put(
