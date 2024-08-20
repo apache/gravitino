@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
@@ -242,8 +241,8 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
    *
    * @param metadataObject The metadata object to set the owner.
    * @param preOwner The previous owner of the metadata object. If the metadata object doesn't have
-   *     owner, then the preOwner will be null and newOwner will be not null.
-   * @param newOwner The new owner of the metadata object. If the metadata object already have
+   *     an owner, then the preOwner will be null and newOwner will be not null.
+   * @param newOwner The new owner of the metadata object. If the metadata object already has an
    *     owner, then the preOwner and newOwner will not be null.
    */
   @Override
@@ -254,6 +253,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
     check(newOwner != null, "The newOwner must be not null");
 
     if (newOwner != null) {
+      // Add the user or group to the Ranger
       AuditInfo auditInfo =
           AuditInfo.builder()
               .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -284,24 +284,62 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
 
     RangerPolicy policy = findManagedPolicy(metadataObject);
     if (policy != null) {
-      policy.getPolicyItems().stream()
+      // Find matching policy items based on the owner's privileges
+      List<RangerPolicy.RangerPolicyItem> matchPolicyItmes =
+          policy.getPolicyItems().stream()
+              .filter(
+                  policyItem -> {
+                    return policyItem.getAccesses().stream()
+                        .allMatch(
+                            policyItemAccess -> {
+                              return ownerPrivileges.contains(policyItemAccess.getType());
+                            });
+                  })
+              .collect(Collectors.toList());
+      // Add or remove the owner in the policy item
+      matchPolicyItmes.forEach(
+          policyItem -> {
+            if (preOwner != null) {
+              if (preOwner.type() == Owner.Type.USER) {
+                policyItem.getUsers().removeIf(preOwner.name()::equals);
+              } else {
+                policyItem.getGroups().removeIf(preOwner.name()::equals);
+              }
+            }
+            if (newOwner != null) {
+              if (newOwner.type() == Owner.Type.USER) {
+                if (!policyItem.getUsers().contains(newOwner.name())) {
+                  policyItem.getUsers().add(newOwner.name());
+                }
+              } else {
+                if (!policyItem.getGroups().contains(newOwner.name())) {
+                  policyItem.getGroups().add(newOwner.name());
+                }
+              }
+            }
+          });
+      // If the policy item is not equal to owner's privileges, then update the policy
+      RangerPolicy finalPolicy = policy;
+      ownerPrivileges.stream()
           .filter(
-              policyItem -> {
-                return policyItem.getAccesses().stream()
-                    .allMatch(
-                        policyItemAccess -> {
-                          return ownerPrivileges.contains(policyItemAccess.getType());
+              ownerPrivilege -> {
+                return matchPolicyItmes.stream()
+                    .noneMatch(
+                        policyItem -> {
+                          return policyItem.getAccesses().stream()
+                              .anyMatch(
+                                  policyItemAccess -> {
+                                    return ownerPrivilege.equals(policyItemAccess.getType());
+                                  });
                         });
               })
           .forEach(
-              policyItem -> {
-                if (preOwner != null) {
-                  if (preOwner.type() == Owner.Type.USER) {
-                    policyItem.getUsers().removeIf(preOwner.name()::equals);
-                  } else {
-                    policyItem.getGroups().removeIf(preOwner.name()::equals);
-                  }
-                }
+              // Add lose owner's privilege to the policy
+              ownerPrivilege -> {
+                RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+                policyItem
+                    .getAccesses()
+                    .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege));
                 if (newOwner != null) {
                   if (newOwner.type() == Owner.Type.USER) {
                     policyItem.getUsers().add(newOwner.name());
@@ -309,6 +347,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
                     policyItem.getGroups().add(newOwner.name());
                   }
                 }
+                finalPolicy.getPolicyItems().add(policyItem);
               });
     } else {
       policy = new RangerPolicy();
@@ -340,6 +379,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
       ownerPrivileges.stream()
           .forEach(
               ownerPrivilege -> {
+                // Each owner's privilege will create one RangerPolicyItemAccess in the policy
                 RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
                 policyItem
                     .getAccesses()
@@ -428,10 +468,9 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
    */
   @Override
   public Boolean onGrantedRolesToGroup(List<Role> roles, Group group) throws RuntimeException {
-    // If the group is not exist, then create it.
+    // If the group does not exist, then create it.
     onGroupAdded(group);
 
-    AtomicReference<Boolean> execResult = new AtomicReference<>(Boolean.TRUE);
     roles.stream()
         .forEach(
             role -> {
@@ -443,53 +482,8 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
               } catch (RangerServiceException e) {
                 // Ignore exception to support idempotent operation
               }
-
-              role.securableObjects().stream()
-                  .forEach(
-                      securableObject -> {
-                        RangerPolicy policy = findManagedPolicy(securableObject);
-                        if (policy == null) {
-                          LOG.warn(
-                              "The policy is not exist for the securable object({})",
-                              securableObject);
-                          execResult.set(Boolean.FALSE);
-                          return;
-                        }
-
-                        securableObject.privileges().stream()
-                            .forEach(
-                                privilege -> {
-                                  mapPrivileges
-                                      .getOrDefault(privilege.name(), Collections.emptySet())
-                                      .stream()
-                                      .forEach(
-                                          rangerPrivilege -> {
-                                            policy.getPolicyItems().stream()
-                                                .forEach(
-                                                    policyItem -> {
-                                                      if (policyItem.getAccesses().stream()
-                                                          .anyMatch(
-                                                              policyItemAccess ->
-                                                                  policyItemAccess
-                                                                      .getType()
-                                                                      .equals(rangerPrivilege))) {
-                                                        if (!policyItem
-                                                            .getRoles()
-                                                            .contains(role.name())) {
-                                                          policyItem.getRoles().add(role.name());
-                                                        }
-                                                      }
-                                                    });
-                                            try {
-                                              rangerClient.updatePolicy(policy.getId(), policy);
-                                            } catch (RangerServiceException e) {
-                                              throw new RuntimeException(e);
-                                            }
-                                          });
-                                });
-                      });
             });
-    return execResult.get();
+    return Boolean.TRUE;
   }
 
   @Override
@@ -903,36 +897,45 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
         .privileges()
         .forEach(
             gravitinoPrivilege -> {
-              // Translate the Gravitino privilege to mapped Ranger privilege
+              // Translate the Gravitino privilege to map Ranger privilege
               translatePrivilege(gravitinoPrivilege.name())
                   .forEach(
                       mappedPrivilege -> {
-                        // Find the policy item that matches access and role
-                        boolean exist =
+                        // Find the policy item that matches Gravitino privilege
+                        List<RangerPolicy.RangerPolicyItem> matchPolicyItems =
                             policy.getPolicyItems().stream()
-                                .anyMatch(
+                                .filter(
                                     policyItem -> {
-                                      return policyItem.getRoles().contains(roleName)
-                                          && policyItem.getAccesses().stream()
-                                              .anyMatch(
-                                                  access ->
-                                                      access.getType().equals(mappedPrivilege));
-                                    });
-                        if (exist) {
-                          return;
-                        }
+                                      return policyItem.getAccesses().stream()
+                                          .anyMatch(
+                                              access -> access.getType().equals(mappedPrivilege));
+                                    })
+                                .collect(Collectors.toList());
 
-                        RangerPolicy.RangerPolicyItem policyItem =
-                            new RangerPolicy.RangerPolicyItem();
-                        RangerPolicy.RangerPolicyItemAccess access =
-                            new RangerPolicy.RangerPolicyItemAccess();
-                        access.setType(mappedPrivilege);
-                        policyItem.getAccesses().add(access);
-                        policyItem.getRoles().add(roleName);
-                        if (Privilege.Condition.ALLOW == gravitinoPrivilege.condition()) {
-                          policy.getPolicyItems().add(policyItem);
+                        if (matchPolicyItems.size() == 0) {
+                          // If the policy item does not exist, then create a new policy item
+                          RangerPolicy.RangerPolicyItem policyItem =
+                              new RangerPolicy.RangerPolicyItem();
+                          RangerPolicy.RangerPolicyItemAccess access =
+                              new RangerPolicy.RangerPolicyItemAccess();
+                          access.setType(mappedPrivilege);
+                          policyItem.getAccesses().add(access);
+                          policyItem.getRoles().add(roleName);
+                          if (Privilege.Condition.ALLOW == gravitinoPrivilege.condition()) {
+                            policy.getPolicyItems().add(policyItem);
+                          } else {
+                            policy.getDenyPolicyItems().add(policyItem);
+                          }
                         } else {
-                          policy.getDenyPolicyItems().add(policyItem);
+                          // If the policy item exists, then add the role to the policy item
+                          matchPolicyItems.stream()
+                              .forEach(
+                                  policyItem -> {
+                                    // If the role is not in the policy item, then add it
+                                    if (!policyItem.getRoles().contains(roleName)) {
+                                      policyItem.getRoles().add(roleName);
+                                    }
+                                  });
                         }
                       });
             });
