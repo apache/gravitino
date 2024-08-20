@@ -338,31 +338,19 @@ public class CatalogMysqlIT extends AbstractIT {
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            sortOrders);
-    Assertions.assertEquals(createdTable.name(), tableName);
-    Map<String, String> resultProp = createdTable.properties();
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
-      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
-    }
-    Assertions.assertEquals(createdTable.columns().length, columns.length);
-
-    for (int i = 0; i < columns.length; i++) {
-      ITUtils.assertColumn(columns[i], createdTable.columns()[i]);
-    }
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals(tableName, loadTable.name());
     Assertions.assertEquals(table_comment, loadTable.comment());
-    resultProp = loadTable.properties();
+    Map<String, String> resultProp = loadTable.properties();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
       Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
@@ -450,15 +438,10 @@ public class CatalogMysqlIT extends AbstractIT {
 
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5};
 
-    Table createdTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("mysql_it_table")),
-                newColumns,
-                null,
-                ImmutableMap.of());
-
+    NameIdentifier tableIdent =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("mysql_it_table"));
+    catalog.asTableCatalog().createTable(tableIdent, newColumns, null, ImmutableMap.of());
+    Table createdTable = catalog.asTableCatalog().loadTable(tableIdent);
     Assertions.assertEquals(
         UnparsedExpression.of("rand()"), createdTable.columns()[0].defaultValue());
     Assertions.assertEquals(
@@ -972,22 +955,22 @@ public class CatalogMysqlIT extends AbstractIT {
             illegalArgumentException.getMessage(),
             "Index does not support complex fields in MySQL"));
 
-    table =
-        tableCatalog.createTable(
-            NameIdentifier.of(schemaName, "test_null_key"),
-            newColumns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE,
-            new SortOrder[0],
-            new Index[] {
-              Indexes.of(
-                  Index.IndexType.UNIQUE_KEY,
-                  null,
-                  new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
-              Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
-            });
+    NameIdentifier tableIdent = NameIdentifier.of(schemaName, "test_null_key");
+    tableCatalog.createTable(
+        tableIdent,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
+          Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
+        });
+    table = tableCatalog.loadTable(tableIdent);
+
     Assertions.assertEquals(2, table.index().length);
     Assertions.assertNotNull(table.index()[0].name());
     Assertions.assertNotNull(table.index()[1].name());

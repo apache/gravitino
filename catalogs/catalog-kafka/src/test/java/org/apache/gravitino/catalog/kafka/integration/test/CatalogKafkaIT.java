@@ -348,13 +348,13 @@ public class CatalogKafkaIT extends AbstractIT {
 
     // alter topic
     Topic alteredTopic =
-    catalog
-        .asTopicCatalog()
-        .alterTopic(
-            NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName),
-            TopicChange.updateComment("new comment"),
-            TopicChange.setProperty(PARTITION_COUNT, "3"),
-            TopicChange.removeProperty(TopicConfig.RETENTION_MS_CONFIG));
+        catalog
+            .asTopicCatalog()
+            .alterTopic(
+                NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName),
+                TopicChange.updateComment("new comment"),
+                TopicChange.setProperty(PARTITION_COUNT, "3"),
+                TopicChange.removeProperty(TopicConfig.RETENTION_MS_CONFIG));
     Topic loadedTopic =
         catalog.asTopicCatalog().loadTopic(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName));
 
