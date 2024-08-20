@@ -70,14 +70,14 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
   protected RangerClientExtend rangerClient;
   protected String rangerServiceName;
   /** Mapping Gravitino privilege name to the underlying authorization system privileges. */
-  protected Map<Privilege.Name, Set<String>> mapPrivileges = null;
+  protected Map<Privilege.Name, Set<String>> privilegesMapping = null;
   // The owner privileges, the owner can do anything on the metadata object
   protected Set<String> ownerPrivileges = null;
 
   /**
    * Because Ranger doesn't support the precise filter, Ranger will return the policy meets the
    * wildcard(*,?) conditions, just like `*.*.*` policy will match `db1.table1.column1` So we need
-   * to manual precise filter the policies.
+   * to manually precisely filter the policies.
    */
   // Search Ranger policy filter keys
   protected List<String> policyFilterKeys = null;
@@ -136,7 +136,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
    * @return The corresponding privilege name in the underlying permission system
    */
   public Set<String> translatePrivilege(Privilege.Name name) {
-    return mapPrivileges.get(name);
+    return privilegesMapping.get(name);
   }
 
   /**
@@ -146,7 +146,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
    * @return true if the privilege is supported, otherwise false
    */
   protected boolean checkPrivilege(Privilege.Name name) {
-    return mapPrivileges.containsKey(name);
+    return privilegesMapping.containsKey(name);
   }
 
   @FormatMethod

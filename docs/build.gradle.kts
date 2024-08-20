@@ -26,6 +26,6 @@ tasks {
   }
 
   build {
-//    dependsOn(lintOpenAPI)
+    dependsOn(lintOpenAPI)
   }
 }

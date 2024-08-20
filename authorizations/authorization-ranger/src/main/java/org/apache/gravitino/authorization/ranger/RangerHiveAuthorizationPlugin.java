@@ -41,7 +41,7 @@ public class RangerHiveAuthorizationPlugin extends RangerAuthorizationPlugin {
    */
   @Override
   protected void initMapPrivileges() {
-    mapPrivileges =
+    privilegesMapping =
         ImmutableMap.<Privilege.Name, Set<String>>builder()
             .put(
                 Privilege.Name.CREATE_SCHEMA,
