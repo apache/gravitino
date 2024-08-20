@@ -35,7 +35,9 @@ public class IcebergTableOpsManager implements AutoCloseable {
   private static final ImmutableMap<String, String> ICEBERG_TABLE_OPS_PROVIDER_NAMES =
       ImmutableMap.of(
           ConfigBasedIcebergTableOpsProvider.CONFIG_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
-          ConfigBasedIcebergTableOpsProvider.class.getCanonicalName());
+          ConfigBasedIcebergTableOpsProvider.class.getCanonicalName(),
+          GravitinoBasedIcebergTableOpsProvider.GRAVITINO_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
+          GravitinoBasedIcebergTableOpsProvider.class.getCanonicalName());
 
   private final Cache<String, IcebergTableOps> icebergTableOpsCache;
 

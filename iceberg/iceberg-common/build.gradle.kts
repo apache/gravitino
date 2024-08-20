@@ -25,7 +25,9 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
+  implementation(project(":clients:client-java"))
   implementation(project(":core"))
   implementation(project(":common"))
   implementation(project(":server-common"))
@@ -85,6 +87,7 @@ dependencies {
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.sqlite.jdbc)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

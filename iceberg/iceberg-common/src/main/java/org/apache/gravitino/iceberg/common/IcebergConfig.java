@@ -174,6 +174,21 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault("config-based-provider");
 
+  public static final ConfigEntry<String> GRAVITINO_URI =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_URI)
+          .doc(
+              "The uri of Gravitino server address, only worked if `catalog-provider` is `gravitino-based-provider`.")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> GRAVITINO_METALAKE =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_METALAKE)
+          .doc("The metalake name that `gravitino-based-provider` used to request to Gravitino.")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }
