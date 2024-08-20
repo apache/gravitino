@@ -23,10 +23,13 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -45,13 +48,25 @@ import org.glassfish.jersey.internal.guava.Sets;
  */
 public class FutureGrantManager {
   EntityStore entityStore;
+  OwnerManager ownerManager;
 
-  public FutureGrantManager(EntityStore entityStore) {
+  public FutureGrantManager(EntityStore entityStore, OwnerManager ownerManager) {
     this.entityStore = entityStore;
+    this.ownerManager = ownerManager;
   }
 
   public void grantNewlyCreatedCatalog(String metalake, BaseCatalog catalog) {
     try {
+      MetadataObject metalakeObject =
+          MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE);
+      Optional<Owner> ownerOptional = ownerManager.getOwner(metalake, metalakeObject);
+      ownerOptional.ifPresent(
+          owner -> {
+            AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+            if (authorizationPlugin != null) {
+              authorizationPlugin.onOwnerSet(metalakeObject, null, owner);
+            }
+          });
 
       Map<UserEntity, Set<RoleEntity>> userGrantRoles = Maps.newHashMap();
       Map<GroupEntity, Set<RoleEntity>> groupGrantRoles = Maps.newHashMap();

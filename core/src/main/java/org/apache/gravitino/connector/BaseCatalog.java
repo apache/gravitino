@@ -196,7 +196,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private BaseAuthorization<?> createAuthorizationPluginInstance() {
     String authorizationProvider =
-        (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER);
+        catalogPropertiesMetadata().containsProperty(AUTHORIZATION_PROVIDER)
+            ? (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER)
+            : null;
+
     if (authorizationProvider == null) {
       LOG.info("Authorization provider is not set!");
       return null;

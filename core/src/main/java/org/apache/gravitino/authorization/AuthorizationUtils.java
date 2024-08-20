@@ -140,7 +140,7 @@ public class AuthorizationUtils {
   // Every catalog has one authorization plugin, we should avoid calling
   // underlying authorization repeatedly. So we use a set to record which
   // catalog has been called the authorization plugin.
-  public static void callAuthorizationPlugin(
+  public static void callAuthorizationPluginForSecurableObjects(
       String metalake,
       List<SecurableObject> securableObjects,
       Set<String> catalogsAlreadySet,
@@ -150,7 +150,7 @@ public class AuthorizationUtils {
       if (needApplyAllAuthorizationPlugin(securableObject)) {
         Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
         for (Catalog catalog : catalogs) {
-          callAuthorizationPluginImpl(catalogsAlreadySet, consumer, catalog);
+          callAuthorizationPluginImpl(consumer, catalog);
         }
 
       } else if (supportsSingleAuthorizationPlugin(securableObject.type())) {
@@ -158,21 +158,38 @@ public class AuthorizationUtils {
             NameIdentifierUtil.getCatalogIdentifier(
                 MetadataObjectUtil.toEntityIdent(metalake, securableObject));
         Catalog catalog = catalogManager.loadCatalog(catalogIdent);
-        callAuthorizationPluginImpl(catalogsAlreadySet, consumer, catalog);
+        if (!catalogsAlreadySet.contains(catalog.name())) {
+          catalogsAlreadySet.add(catalog.name());
+          callAuthorizationPluginImpl(consumer, catalog);
+        }
       }
     }
   }
 
-  private static void callAuthorizationPluginImpl(
-      Set<String> catalogsAlreadySet, Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
-    if (!catalogsAlreadySet.contains(catalog.name())) {
-      catalogsAlreadySet.add(catalog.name());
+  public static void callAuthorizationPluginForMetadataObject(
+      String metalake, MetadataObject metadataObject, Consumer<AuthorizationPlugin> consumer) {
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    if (needApplyAuthorizationPluginSetOwner(metadataObject.type())) {
+      Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
+      for (Catalog catalog : catalogs) {
+        callAuthorizationPluginImpl(consumer, catalog);
+      }
+    } else if (supportsSingleAuthorizationPlugin(metadataObject.type())) {
+      NameIdentifier catalogIdent =
+          NameIdentifierUtil.getCatalogIdentifier(
+              MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
+      Catalog catalog = catalogManager.loadCatalog(catalogIdent);
+      callAuthorizationPluginImpl(consumer, catalog);
+    }
+  }
 
-      if (catalog instanceof BaseCatalog) {
-        BaseCatalog baseCatalog = (BaseCatalog) catalog;
-        if (baseCatalog.getAuthorizationPlugin() != null) {
-          consumer.accept(baseCatalog.getAuthorizationPlugin());
-        }
+  private static void callAuthorizationPluginImpl(
+      Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
+
+    if (catalog instanceof BaseCatalog) {
+      BaseCatalog baseCatalog = (BaseCatalog) catalog;
+      if (baseCatalog.getAuthorizationPlugin() != null) {
+        consumer.accept(baseCatalog.getAuthorizationPlugin());
       }
     }
   }
@@ -188,6 +205,10 @@ public class AuthorizationUtils {
       }
     }
     return false;
+  }
+
+  private static boolean needApplyAuthorizationPluginSetOwner(MetadataObject.Type type) {
+    return type == MetadataObject.Type.METALAKE;
   }
 
   private static boolean supportsSingleAuthorizationPlugin(MetadataObject.Type type) {
