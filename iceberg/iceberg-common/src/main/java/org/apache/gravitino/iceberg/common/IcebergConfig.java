@@ -136,6 +136,27 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .create();
 
+  public static final ConfigEntry<String> OSS_ENDPOINT =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_OSS_ENDPOINT)
+          .doc("The endpoint of Aliyun OSS service")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> OSS_ACCESS_KEY_ID =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_ID)
+          .doc("The static access key ID used to access OSS data")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> OSS_ACCESS_KEY_SECRET =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_SECRET)
+          .doc("The static secret access key used to access OSS data")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
+
   public static final ConfigEntry<String> ICEBERG_METRICS_STORE =
       new ConfigBuilder(IcebergConstants.ICEBERG_METRICS_STORE)
           .doc("The store to save Iceberg metrics")
