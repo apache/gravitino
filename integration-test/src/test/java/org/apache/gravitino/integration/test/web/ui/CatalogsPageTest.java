@@ -392,6 +392,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(8)
   public void testViewCatalogDetails() throws InterruptedException {
     catalogsPage.clickViewCatalogBtn(HIVE_CATALOG_NAME);
+    mouseMoveTo(By.xpath(".//*[@data-prev-refer='details-props-key-metastore.uris']"));
     Assertions.assertTrue(
         catalogsPage.verifyShowCatalogDetails(HIVE_CATALOG_NAME, hiveMetastoreUri));
   }
