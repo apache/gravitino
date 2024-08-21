@@ -16,58 +16,43 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger.defines;
+package org.apache.gravitino.authorization.ranger.reference;
 
-import java.util.Collection;
 import org.codehaus.jackson.annotate.JsonAutoDetect;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
 
-// apache/ranger/security-admin/src/main/java/org/apache/ranger/view/VXUser.java
+// apache/ranger/security-admin/src/main/java/org/apache/ranger/view/VXGroup.java
 @JsonAutoDetect(
     getterVisibility = JsonAutoDetect.Visibility.NONE,
     setterVisibility = JsonAutoDetect.Visibility.NONE,
     fieldVisibility = JsonAutoDetect.Visibility.ANY)
 @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class VXUser extends VXDataObject implements java.io.Serializable {
+public class VXGroup extends VXDataObject implements java.io.Serializable {
   private static final long serialVersionUID = 1L;
 
-  /** Name. */
+  /** Name */
   protected String name;
-  /** First Name. */
-  protected String firstName;
-  /** Last Name. */
-  protected String lastName;
-  /** Email address. */
-  protected String emailAddress;
-  /** Password. */
-  protected String password = "rangerR0cks!";
   /** Description */
   protected String description;
+  /** Type of group This attribute is of type enum CommonEnums::XAGroupType */
+  protected int groupType = 0;
+
+  protected int groupSource = RangerCommonEnums.GROUP_INTERNAL;
   /** Id of the credential store */
   protected Long credStoreId;
-  /** List of group ids for this user. */
-  protected Collection<Long> groupIdList;
-
-  protected Collection<String> groupNameList;
-  protected int status = RangerCommonEnums.STATUS_ENABLED;
-  protected Integer isVisible = RangerCommonEnums.IS_VISIBLE;
-  protected int userSource;
-  /** List of roles for this user */
-  protected Collection<String> userRoleList;
+  /** Group visibility */
+  protected Integer isVisible;
   /** Additional store attributes. */
   protected String otherAttributes;
-  /** Sync Source */
+  /** Sync Source Attribute */
   protected String syncSource;
 
   /** Default constructor. This will set all the attributes to default value. */
-  public VXUser() {
+  public VXGroup() {
+    groupType = 0;
     isVisible = RangerCommonEnums.IS_VISIBLE;
-  }
-
-  public String getName() {
-    return name;
   }
 
   /**
@@ -76,18 +61,14 @@ public class VXUser extends VXDataObject implements java.io.Serializable {
    * @return formatedStr
    */
   public String toString() {
-    String str = "VXUser={";
+    String str = "VXGroup={";
     str += super.toString();
     str += "name={" + name + "} ";
-    str += "firstName={" + firstName + "} ";
-    str += "lastName={" + lastName + "} ";
-    str += "emailAddress={" + emailAddress + "} ";
     str += "description={" + description + "} ";
+    str += "groupType={" + groupType + "} ";
     str += "credStoreId={" + credStoreId + "} ";
     str += "isVisible={" + isVisible + "} ";
-    str += "groupIdList={" + groupIdList + "} ";
-    str += "groupNameList={" + groupNameList + "} ";
-    str += "roleList={" + userRoleList + "} ";
+    str += "groupSrc={" + groupSource + "} ";
     str += "otherAttributes={" + otherAttributes + "} ";
     str += "syncSource={" + syncSource + "} ";
     str += "}";
@@ -99,24 +80,19 @@ public class VXUser extends VXDataObject implements java.io.Serializable {
   }
 
   public static class Builder {
-    private final VXUser vxUser;
+    private final VXGroup vxGroup;
 
     public Builder() {
-      this.vxUser = new VXUser();
+      this.vxGroup = new VXGroup();
     }
 
     public Builder withName(String name) {
-      vxUser.name = name;
+      vxGroup.name = name;
       return this;
     }
 
-    public Builder withDescription(String description) {
-      vxUser.description = description;
-      return this;
-    }
-
-    public VXUser build() {
-      return vxUser;
+    public VXGroup build() {
+      return vxGroup;
     }
   }
 }

@@ -18,15 +18,14 @@
  */
 package org.apache.gravitino.authorization.ranger.integration.test;
 
-import static org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin.MANAGED_BY_GRAVITINO;
-
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.gravitino.authorization.ranger.RangerDefines;
+import org.apache.gravitino.authorization.ranger.RangerHelper;
+import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.TrinoContainer;
@@ -232,7 +231,7 @@ public class RangerITEnv {
     Map<String, String> resourceFilter = new HashMap<>(); // use to match the precise policy
     Map<String, String> policyFilter = new HashMap<>();
     policyFilter.put(RangerDefines.SEARCH_FILTER_SERVICE_NAME, serviceName);
-    policyFilter.put(SearchFilter.POLICY_LABELS_PARTIAL, MANAGED_BY_GRAVITINO);
+    policyFilter.put(SearchFilter.POLICY_LABELS_PARTIAL, RangerHelper.MANAGED_BY_GRAVITINO);
     final int[] index = {0};
     policyResourceMap.forEach(
         (k, v) -> {
@@ -285,7 +284,7 @@ public class RangerITEnv {
         policy.setServiceType(type);
         policy.setService(serviceName);
         policy.setName(policyName);
-        policy.setPolicyLabels(Lists.newArrayList(MANAGED_BY_GRAVITINO));
+        policy.setPolicyLabels(Lists.newArrayList(RangerHelper.MANAGED_BY_GRAVITINO));
         policy.setResources(policyResourceMap);
         policy.setPolicyItems(policyItems);
         rangerClient.createPolicy(policy);

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization.ranger.reference;
 
 import org.apache.ranger.plugin.util.SearchFilter;
 

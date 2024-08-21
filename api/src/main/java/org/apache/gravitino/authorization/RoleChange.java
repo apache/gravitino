@@ -29,7 +29,7 @@ public interface RoleChange {
    *
    * @param roleName The role name.
    * @param securableObject The securable object.
-   * @return return a RoleChange for the add securable object.
+   * @return return a RoleChange for the added securable object.
    */
   static RoleChange addSecurableObject(String roleName, SecurableObject securableObject) {
     return new AddSecurableObject(roleName, securableObject);
@@ -40,7 +40,7 @@ public interface RoleChange {
    *
    * @param roleName The role name.
    * @param securableObject The securable object.
-   * @return return a RoleChange for the add securable object.
+   * @return return a RoleChange for the added securable object.
    */
   static RoleChange removeSecurableObject(String roleName, SecurableObject securableObject) {
     return new RemoveSecurableObject(roleName, securableObject);
@@ -59,7 +59,7 @@ public interface RoleChange {
     return new UpdateSecurableObject(roleName, securableObject, newSecurableObject);
   }
 
-  /** A AddSecurableObject to add securable object to role. */
+  /** A AddSecurableObject to add a securable object to a role. */
   final class AddSecurableObject implements RoleChange {
     private final String roleName;
     private final SecurableObject securableObject;
@@ -89,7 +89,7 @@ public interface RoleChange {
 
     /**
      * Compares this AddSecurableObject instance with another object for equality. The comparison is
-     * based on the add securable object to role.
+     * based on the added securable object to a role.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same as the add securable object; false
@@ -126,7 +126,7 @@ public interface RoleChange {
     }
   }
 
-  /** A RemoveSecurableObject to remove securable object from role. */
+  /** A RemoveSecurableObject to remove a securable object from a role. */
   final class RemoveSecurableObject implements RoleChange {
     private final String roleName;
     private final SecurableObject securableObject;
@@ -156,7 +156,7 @@ public interface RoleChange {
 
     /**
      * Compares this RemoveSecurableObject instance with another object for equality. The comparison
-     * is based on the add securable object to role.
+     * is based on the added securable object to a role.
      *
      * @param o The object to compare with this instance.
      * @return true if the given object represents the same as remove securable object; false
@@ -172,9 +172,9 @@ public interface RoleChange {
 
     /**
      * Generates a hash code for this RemoveSecurableObject instance. The hash code is based on the
-     * add securable object.
+     * added securable object.
      *
-     * @return A hash code value for this add securable object operation.
+     * @return A hash code value for this adds securable object operation.
      */
     @Override
     public int hashCode() {
@@ -194,10 +194,10 @@ public interface RoleChange {
   }
 
   /**
-   * A UpdateSecurableObject is to update securable object's privilege from role. <br>
+   * A UpdateSecurableObject is to update securable object's privilege from a role. <br>
    * The securable object's metadata entity must be the same as new securable object's metadata
    * entity. <br>
-   * The securable object's privilege must be different as new securable object's privilege. <br>
+   * The securable object's privilege must be different from new securable object's privilege. <br>
    */
   final class UpdateSecurableObject implements RoleChange {
     private final String roleName;

@@ -26,10 +26,10 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.authorization.ranger.defines.VXGroup;
-import org.apache.gravitino.authorization.ranger.defines.VXGroupList;
-import org.apache.gravitino.authorization.ranger.defines.VXUser;
-import org.apache.gravitino.authorization.ranger.defines.VXUserList;
+import org.apache.gravitino.authorization.ranger.reference.VXGroup;
+import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
+import org.apache.gravitino.authorization.ranger.reference.VXUser;
+import org.apache.gravitino.authorization.ranger.reference.VXUserList;
 import org.apache.ranger.RangerClient;
 import org.apache.ranger.RangerServiceException;
 import org.slf4j.Logger;
@@ -60,8 +60,6 @@ public class RangerClientExtend extends RangerClient {
       new API(URI_GROUP_BASE, HttpMethod.POST, Response.Status.OK);
   private static final API SEARCH_GROUP =
       new API(URI_GROUP_BASE, HttpMethod.GET, Response.Status.OK);
-  //  private static final API GET_GROUP = new API(URI_GROUP_BY_ID, HttpMethod.GET,
-  // Response.Status.OK);
   private static final API DELETE_GROUP =
       new API(URI_GROUP_BY_ID, HttpMethod.DELETE, Response.Status.NO_CONTENT);
 
@@ -113,10 +111,10 @@ public class RangerClientExtend extends RangerClient {
             (com.sun.jersey.api.client.UniformInterfaceException) cause;
         int statusCode = uniformException.getResponse().getStatus();
         if (statusCode == 204) {
-          // Because Ranger use asynchronous create user, so the response status is 204, research
+          // Because Ranger use asynchronously create user, so the response status is 204, research
           // the user to check if it is created
           VXUserList userList = searchUser(ImmutableMap.of("name", user.getName()));
-          if (userList.getPageSize() == 0) {
+          if (userList.getListSize() == 0) {
             throw new RuntimeException("Failed to create user: " + user.getName(), cause);
           } else {
             return Boolean.TRUE;

@@ -31,12 +31,6 @@ public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> 
 
   @Override
   protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
-    switch (catalogProvider) {
-      case "hive":
-        return new RangerHiveAuthorizationPlugin(catalogProvider, config);
-      default:
-        throw new IllegalArgumentException(
-            "Authorization plugin unsupported catalog provider: " + catalogProvider);
-    }
+    return new RangerAuthorizationPlugin(catalogProvider, config);
   }
 }

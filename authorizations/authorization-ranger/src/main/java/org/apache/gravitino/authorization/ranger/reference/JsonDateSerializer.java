@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger.defines;
+package org.apache.gravitino.authorization.ranger.reference;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
