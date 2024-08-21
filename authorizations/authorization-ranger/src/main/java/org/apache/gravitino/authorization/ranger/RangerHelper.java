@@ -300,6 +300,10 @@ public class RangerHelper {
       throws AuthorizationPluginException {
     List<String> nsMetadataObj =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
+    if (nsMetadataObj.size() > 4) {
+      // The max level of the securable object is `catalog.db.table.column`
+      throw new RuntimeException("The securable object than 4");
+    }
     nsMetadataObj.remove(0); // skip `catalog`
     Map<String, String> searchFilters = new HashMap<>();
     Map<String, String> preciseFilters = new HashMap<>();
