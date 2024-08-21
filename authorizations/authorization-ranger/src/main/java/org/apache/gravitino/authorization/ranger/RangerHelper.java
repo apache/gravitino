@@ -55,8 +55,8 @@ import org.slf4j.LoggerFactory;
  */
 public class RangerHelper {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHelper.class);
-  public static final String MANAGED_BY_GRAVITINO = "MANAGED_BY_GRAVITINO";
 
+  public static final String MANAGED_BY_GRAVITINO = "MANAGED_BY_GRAVITINO";
   RangerAuthorizationPlugin rangerAuthorizationPlugin;
 
   /** Mapping Gravitino privilege name to the underlying authorization system privileges. */
@@ -253,7 +253,7 @@ public class RangerHelper {
                         if (matchPrivilege
                             && !policyItem.getUsers().isEmpty()
                             && !policyItem.getGroups().isEmpty()) {
-                          // Not ownership policy item, then remove the role
+                          // We can only remove this policy item if there are no users or groups
                           policyItem.getRoles().removeIf(roleName::equals);
                         }
                       });
@@ -301,19 +301,19 @@ public class RangerHelper {
     List<String> nsMetadataObj =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
     nsMetadataObj.remove(0); // skip `catalog`
-    Map<String, String> policyFilter = new HashMap<>();
-    Map<String, String> preciseFilterKeysFilter = new HashMap<>();
-    policyFilter.put(
+    Map<String, String> searchFilters = new HashMap<>();
+    Map<String, String> preciseFilters = new HashMap<>();
+    searchFilters.put(
         RangerDefines.SEARCH_FILTER_SERVICE_NAME, rangerAuthorizationPlugin.rangerServiceName);
-    policyFilter.put(SearchFilter.POLICY_LABELS_PARTIAL, MANAGED_BY_GRAVITINO);
+    searchFilters.put(SearchFilter.POLICY_LABELS_PARTIAL, MANAGED_BY_GRAVITINO);
     for (int i = 0; i < nsMetadataObj.size(); i++) {
-      policyFilter.put(policySearchKeys.get(i), nsMetadataObj.get(i));
-      preciseFilterKeysFilter.put(policyPreciseFilterKeys.get(i), nsMetadataObj.get(i));
+      searchFilters.put(policySearchKeys.get(i), nsMetadataObj.get(i));
+      preciseFilters.put(policyPreciseFilterKeys.get(i), nsMetadataObj.get(i));
     }
 
     try {
       List<RangerPolicy> policies =
-          rangerAuthorizationPlugin.rangerClient.findPolicies(policyFilter);
+          rangerAuthorizationPlugin.rangerClient.findPolicies(searchFilters);
 
       if (!policies.isEmpty()) {
         /**
@@ -329,12 +329,12 @@ public class RangerHelper {
                         policy.getResources().entrySet().stream()
                             .allMatch(
                                 entry ->
-                                    preciseFilterKeysFilter.containsKey(entry.getKey())
+                                    preciseFilters.containsKey(entry.getKey())
                                         && entry.getValue().getValues().size() == 1
                                         && entry
                                             .getValue()
                                             .getValues()
-                                            .contains(preciseFilterKeysFilter.get(entry.getKey()))))
+                                            .contains(preciseFilters.get(entry.getKey()))))
                 .collect(Collectors.toList());
       }
 
@@ -344,14 +344,15 @@ public class RangerHelper {
             "Each metadata object only have one Gravitino management enable policies.");
       }
 
-      RangerPolicy policy = policies.size() == 1 ? policies.get(0) : null;
-      // Delegating Gravitino management policies cannot contain duplicate privilege
-      if (policy != null) {
-        policy.getPolicyItems().forEach(this::checkPolicyItemAccess);
-        policy.getDenyPolicyItems().forEach(this::checkPolicyItemAccess);
-        policy.getRowFilterPolicyItems().forEach(this::checkPolicyItemAccess);
-        policy.getDataMaskPolicyItems().forEach(this::checkPolicyItemAccess);
+      if (policies.isEmpty()) {
+        return null;
       }
+      RangerPolicy policy = policies.get(0);
+      // Delegating Gravitino management policies cannot contain duplicate privilege
+      policy.getPolicyItems().forEach(this::checkPolicyItemAccess);
+      policy.getDenyPolicyItems().forEach(this::checkPolicyItemAccess);
+      policy.getRowFilterPolicyItems().forEach(this::checkPolicyItemAccess);
+      policy.getDataMaskPolicyItems().forEach(this::checkPolicyItemAccess);
 
       return policy;
     } catch (RangerServiceException e) {
@@ -481,7 +482,7 @@ public class RangerHelper {
             });
   }
 
-  protected RangerPolicy addOwnerToNewPolicy(MetadataObject metadataObject, Owner newOwner) {
+  protected RangerPolicy createPolicyAddResources(MetadataObject metadataObject) {
     RangerPolicy policy = new RangerPolicy();
     policy.setService(rangerAuthorizationPlugin.rangerServiceName);
     policy.setName(metadataObject.fullName());
@@ -494,7 +495,7 @@ public class RangerHelper {
       throw new RuntimeException("The securable object than 4");
     }
 
-    List<String> rangerDefinesList =
+    List<String> rangerResourceDefs =
         Lists.newArrayList(
             RangerDefines.RESOURCE_DATABASE,
             RangerDefines.RESOURCE_TABLE,
@@ -503,8 +504,13 @@ public class RangerHelper {
     for (int i = 0; i < nsMetadataObject.size(); i++) {
       RangerPolicy.RangerPolicyResource policyResource =
           new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
-      policy.getResources().put(rangerDefinesList.get(i), policyResource);
+      policy.getResources().put(rangerResourceDefs.get(i), policyResource);
     }
+    return policy;
+  }
+
+  protected RangerPolicy addOwnerToNewPolicy(MetadataObject metadataObject, Owner newOwner) {
+    RangerPolicy policy = createPolicyAddResources(metadataObject);
 
     ownerPrivileges.stream()
         .forEach(
