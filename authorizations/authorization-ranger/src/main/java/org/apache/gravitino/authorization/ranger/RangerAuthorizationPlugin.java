@@ -737,7 +737,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
             "The privilege({}) already added to Ranger policy({})!",
             policy.getName(),
             change.getSecurableObject().fullName());
-        // If exist policy and have same privilege then directly return true, because support
+        // If it exists policy with the same privilege, then directly return true, because support
         // idempotent operation.
         return true;
       }
