@@ -296,13 +296,7 @@ public class RangerHelper {
    */
   public RangerPolicy findManagedPolicy(MetadataObject metadataObject)
       throws AuthorizationPluginException {
-    List<String> nsMetadataObj =
-        Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
-    if (nsMetadataObj.size() > 4) {
-      // The max level of the securable object is `catalog.db.table.column`
-      throw new RuntimeException("The securable object than 4");
-    }
-    nsMetadataObj.remove(0); // skip `catalog`
+    List<String> nsMetadataObj = getMetadataObjectNames(metadataObject);
 
     Map<String, String> searchFilters = new HashMap<>();
     Map<String, String> preciseFilters = new HashMap<>();
@@ -344,12 +338,13 @@ public class RangerHelper {
       // Only return the policies that are managed by Gravitino.
       if (policies.size() > 1) {
         throw new AuthorizationPluginException(
-            "Each metadata object only have one Gravitino management enable policies.");
+            "Every metadata object has only a Gravitino managed policy.");
       }
 
       if (policies.isEmpty()) {
         return null;
       }
+
       RangerPolicy policy = policies.get(0);
       // Delegating Gravitino management policies cannot contain duplicate privilege
       policy.getPolicyItems().forEach(this::checkPolicyItemAccess);
@@ -481,29 +476,29 @@ public class RangerHelper {
             });
   }
 
+  private List<String> getMetadataObjectNames(MetadataObject metadataObject) {
+    List<String> nsMetadataObject =
+        Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
+    if (nsMetadataObject.size() > 4) {
+      // The max level of the securable object is `catalog.db.table.column`
+      throw new RuntimeException("The length of the securable object should not be greater than 4");
+    }
+    nsMetadataObject.remove(0); // remove `catalog`
+    return nsMetadataObject;
+  }
+
   protected RangerPolicy createPolicyAddResources(MetadataObject metadataObject) {
     RangerPolicy policy = new RangerPolicy();
     policy.setService(rangerAuthorizationPlugin.rangerServiceName);
     policy.setName(metadataObject.fullName());
     policy.setPolicyLabels(Lists.newArrayList(RangerHelper.MANAGED_BY_GRAVITINO));
 
-    List<String> nsMetadataObject =
-        Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
-    if (nsMetadataObject.size() > 4) {
-      // The max level of the securable object is `catalog.db.table.column`
-      throw new RuntimeException("The securable object than 4");
-    }
+    List<String> nsMetadataObject = getMetadataObjectNames(metadataObject);
 
-    List<String> rangerResourceDefs =
-        Lists.newArrayList(
-            RangerDefines.RESOURCE_DATABASE,
-            RangerDefines.RESOURCE_TABLE,
-            RangerDefines.RESOURCE_COLUMN);
-    nsMetadataObject.remove(0); // remove `catalog`
     for (int i = 0; i < nsMetadataObject.size(); i++) {
       RangerPolicy.RangerPolicyResource policyResource =
           new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
-      policy.getResources().put(rangerResourceDefs.get(i), policyResource);
+      policy.getResources().put(policyPreciseFilterKeys.get(i), policyResource);
     }
     return policy;
   }
@@ -511,21 +506,20 @@ public class RangerHelper {
   protected RangerPolicy addOwnerToNewPolicy(MetadataObject metadataObject, Owner newOwner) {
     RangerPolicy policy = createPolicyAddResources(metadataObject);
 
-    ownerPrivileges.stream()
-        .forEach(
-            ownerPrivilege -> {
-              // Each owner's privilege will create one RangerPolicyItemAccess in the policy
-              RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-              policyItem.getAccesses().add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege));
-              if (newOwner != null) {
-                if (newOwner.type() == Owner.Type.USER) {
-                  policyItem.getUsers().add(newOwner.name());
-                } else {
-                  policyItem.getGroups().add(newOwner.name());
-                }
-              }
-              policy.getPolicyItems().add(policyItem);
-            });
+    ownerPrivileges.forEach(
+        ownerPrivilege -> {
+          // Each owner's privilege will create one RangerPolicyItemAccess in the policy
+          RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+          policyItem.getAccesses().add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege));
+          if (newOwner != null) {
+            if (newOwner.type() == Owner.Type.USER) {
+              policyItem.getUsers().add(newOwner.name());
+            } else {
+              policyItem.getGroups().add(newOwner.name());
+            }
+          }
+          policy.getPolicyItems().add(policyItem);
+        });
     return policy;
   }
 
