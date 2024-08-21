@@ -19,7 +19,9 @@
 package org.apache.gravitino.iceberg.common.ops;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -43,36 +45,47 @@ public class GravitinoBasedIcebergTableOpsProvider implements IcebergTableOpsPro
 
   public static final String GRAVITINO_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME =
       "gravitino-based-provider";
-  private GravitinoMetalake metalake;
+  private final AtomicReference<GravitinoMetalake> metalakeWrapper = new AtomicReference<>();
+
+  private String gravitinoUri;
+
+  private String gravitinoMetalake;
 
   @Override
   public void initialize(Map<String, String> properties) {
-    this.metalake =
-        GravitinoAdminClient.builder(properties.get(IcebergConstants.GRAVITINO_URI))
-            .build()
-            .loadMetalake(properties.get(IcebergConstants.GRAVITINO_METALAKE));
-    ;
+    this.gravitinoUri = properties.get(IcebergConstants.GRAVITINO_URI);
+    this.gravitinoMetalake = properties.get(IcebergConstants.GRAVITINO_METALAKE);
   }
 
   @Override
   public IcebergTableOps getIcebergTableOps(String catalogName) {
-    if (StringUtils.isBlank(catalogName)) {
-      throw new RuntimeException("blank catalogName is illegal");
-    }
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(catalogName), "blank catalogName is illegal");
+    Preconditions.checkArgument(
+        !IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(catalogName),
+        IcebergConstants.GRAVITINO_DEFAULT_CATALOG + " is illegal in gravitino-based-provider");
 
-    Catalog catalog = metalake.loadCatalog(catalogName);
-    if (!"lakehouse-iceberg".equals(catalog.provider())) {
-      throw new RuntimeException(
-          String.format("%s.%s is not iceberg catalog", metalake, catalogName));
-    }
+    Catalog catalog = getMetalake().loadCatalog(catalogName);
+
+    Preconditions.checkArgument(
+        "lakehouse-iceberg".equals(catalog.provider()),
+        String.format("%s.%s is not iceberg catalog", getMetalake(), catalogName));
 
     Map<String, String> properties =
         IcebergPropertiesUtils.toIcebergCatalogProperties(catalog.properties());
     return new IcebergTableOps(new IcebergConfig(properties));
   }
 
+  public GravitinoMetalake getMetalake() {
+    if (metalakeWrapper.get() == null) {
+      metalakeWrapper.compareAndSet(
+          null, GravitinoAdminClient.builder(gravitinoUri).build().loadMetalake(gravitinoMetalake));
+    }
+    return metalakeWrapper.get();
+  }
+
   @VisibleForTesting
   void setGravitinoMetalake(GravitinoMetalake metalake) {
-    this.metalake = metalake;
+    this.metalakeWrapper.compareAndSet(null, metalake);
   }
 }

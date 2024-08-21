@@ -219,7 +219,7 @@ You can access different catalogs by setting the `prefix` to the specific catalo
 
 ##### gravitino-based catalog provider
 
-WWhen using a gravitino-based catalog provider, you can leverage Gravitino to support dynamic catalog management for the Iceberg REST server.
+When using a gravitino-based catalog provider, you can leverage Gravitino to support dynamic catalog management for the Iceberg REST server.
 
 | Configuration item                           | Description                                                                                           | Default value | Required | Since Version |
 |----------------------------------------------|-------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -227,6 +227,7 @@ WWhen using a gravitino-based catalog provider, you can leverage Gravitino to su
 | `gravitino.iceberg-rest.gravitino-metalake`  | The metalake name that `gravitino-based-provider` used to request to Gravitino.                       | (none)        | No       | 0.7.0         |
 
 ```text
+gravitino.iceberg-rest.catalog-provider = gravitino-based-provider
 gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
 gravitino.iceberg-rest.gravitino-metalake = test
 ...
