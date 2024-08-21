@@ -35,9 +35,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
-import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
@@ -185,34 +183,32 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
       throws RuntimeException {
     RangerHelper.check(newOwner != null, "The newOwner must be not null");
 
-    if (newOwner != null) {
-      // Add the user or group to the Ranger
-      AuditInfo auditInfo =
-          AuditInfo.builder()
-              .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-              .withCreateTime(Instant.now())
+    // Add the user or group to the Ranger
+    AuditInfo auditInfo =
+        AuditInfo.builder()
+            .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+            .withCreateTime(Instant.now())
+            .build();
+    if (newOwner.type() == Owner.Type.USER) {
+      UserEntity userEntity =
+          UserEntity.builder()
+              .withId(1L)
+              .withName(newOwner.name())
+              .withRoleNames(Collections.emptyList())
+              .withRoleIds(Collections.emptyList())
+              .withAuditInfo(auditInfo)
               .build();
-      if (newOwner.type() == Owner.Type.USER) {
-        UserEntity userEntity =
-            UserEntity.builder()
-                .withId(1L)
-                .withName(newOwner.name())
-                .withRoleNames(Collections.emptyList())
-                .withRoleIds(Collections.emptyList())
-                .withAuditInfo(auditInfo)
-                .build();
-        onUserAdded(userEntity);
-      } else {
-        GroupEntity groupEntity =
-            GroupEntity.builder()
-                .withId(1L)
-                .withName(newOwner.name())
-                .withRoleNames(Collections.emptyList())
-                .withRoleIds(Collections.emptyList())
-                .withAuditInfo(auditInfo)
-                .build();
-        onGroupAdded(groupEntity);
-      }
+      onUserAdded(userEntity);
+    } else {
+      GroupEntity groupEntity =
+          GroupEntity.builder()
+              .withId(1L)
+              .withName(newOwner.name())
+              .withRoleNames(Collections.emptyList())
+              .withRoleIds(Collections.emptyList())
+              .withAuditInfo(auditInfo)
+              .build();
+      onGroupAdded(groupEntity);
     }
 
     RangerPolicy policy = rangerHelper.findManagedPolicy(metadataObject);
@@ -444,30 +440,7 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
         return true;
       }
     } else {
-      policy = new RangerPolicy();
-      policy.setService(rangerServiceName);
-      policy.setName(change.getSecurableObject().fullName());
-      policy.setPolicyLabels(Lists.newArrayList(RangerHelper.MANAGED_BY_GRAVITINO));
-
-      List<String> nsMetadataObject =
-          Lists.newArrayList(
-              SecurableObjects.DOT_SPLITTER.splitToList(change.getSecurableObject().fullName()));
-      if (nsMetadataObject.size() > 4) {
-        // The max level of the securable object is `catalog.db.table.column`
-        throw new RuntimeException("The securable object than 4");
-      }
-      nsMetadataObject.remove(0); // remove `catalog`
-
-      List<String> rangerDefinesList =
-          Lists.newArrayList(
-              RangerDefines.RESOURCE_DATABASE,
-              RangerDefines.RESOURCE_TABLE,
-              RangerDefines.RESOURCE_COLUMN);
-      for (int i = 0; i < nsMetadataObject.size(); i++) {
-        RangerPolicy.RangerPolicyResource policyResource =
-            new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
-        policy.getResources().put(rangerDefinesList.get(i), policyResource);
-      }
+      policy = rangerHelper.createPolicyAddResources(change.getSecurableObject());
     }
 
     rangerHelper.addPolicyItem(policy, change.getRoleName(), change.getSecurableObject());
