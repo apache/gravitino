@@ -16,23 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.storage.relational.mapper;
 
-import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.TABLE_NAME;
-
-import org.apache.ibatis.annotations.Param;
-
-public class CatalogMetaSQLProvider {
-
-  public String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "SELECT catalog_id as catalogId, catalog_name as catalogName,"
-        + " metalake_id as metalakeId, type, provider,"
-        + " catalog_comment as catalogComment, properties, audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
-        + " FROM "
-        + TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-  }
-}
+public class CatalogMetaPGProvider extends CatalogMetaMySQLProvider {}

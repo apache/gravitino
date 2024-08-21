@@ -19,25 +19,4 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
-import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
-
-public class MapperSQLProvider {
-
-  private CatalogMetaSQLProvider getSqlProvider() {
-    String databaseId =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getDatabaseId();
-    @SuppressWarnings("unused")
-    JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-
-    //    CatalogMetaSQLProvider sqlProvider = jdbcBackendTypeMap.get(jdbcBackendType);
-    //    if (sqlProvider == null) {
-    //      throw new RuntimeException("Unsupported JDBC backend type: " + jdbcBackendType);
-    //    }
-    //    return sqlProvider;
-    return null;
-  }
-}
+public class CatalogMetaH2Provider extends CatalogMetaMySQLProvider {}
