@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.shaded.org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -52,6 +54,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 public class TestGvfsBase extends GravitinoMockServerBase {
   protected static final String GVFS_IMPL_CLASS = GravitinoVirtualFileSystem.class.getName();
@@ -662,6 +665,38 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           fs.convertFileStatusPathPrefix(fileStatus, storageLocation, virtualLocation);
       Path expectedPath = new Path("gvfs://fileset/test_catalog/tmp/test_fileset/test");
       assertEquals(expectedPath, convertedStatus.getPath());
+    }
+  }
+
+  @Test
+  public void testGetActualPathByIdentifier() throws IOException {
+    try (GravitinoVirtualFileSystem fs =
+        (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
+      // test storage location end with "/"
+      NameIdentifier ident1 =
+          NameIdentifier.of("test_metalake", "catalog", "schema", "testGetActualPath");
+      Fileset mockFileset1 = Mockito.mock(Fileset.class);
+      Mockito.when(mockFileset1.storageLocation()).thenReturn("file:/tmp/test/123/");
+      FileSystem mockFs1 = Mockito.mock(FileSystem.class);
+      FileStatus mockFileStatus1 = Mockito.mock(FileStatus.class);
+      Mockito.when(mockFileStatus1.isFile()).thenReturn(false);
+      Mockito.when(mockFs1.getFileStatus(any())).thenReturn(mockFileStatus1);
+      // test virtual path sub dir with "/"
+      Path virtualPath1 =
+          new Path("gvfs://fileset/catalog/schema/testGetActualPath/sub_dir/1.parquet");
+      Path actualPath1 =
+          fs.getActualPathByIdentifier(ident1, Pair.of(mockFileset1, mockFs1), virtualPath1);
+      assertEquals(
+          String.format("%ssub_dir/1.parquet", mockFileset1.storageLocation()),
+          actualPath1.toString());
+
+      // test virtual path sub dir without "/"
+      Path virtualPath2 = new Path("gvfs://fileset/catalog/schema/testGetActualPath");
+      Path actualPath2 =
+          fs.getActualPathByIdentifier(ident1, Pair.of(mockFileset1, mockFs1), virtualPath2);
+      assertEquals(
+          mockFileset1.storageLocation().substring(0, mockFileset1.storageLocation().length() - 1),
+          actualPath2.toString());
     }
   }
 }

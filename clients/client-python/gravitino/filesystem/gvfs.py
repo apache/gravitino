@@ -93,6 +93,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     # Override the parent variable
     protocol = PROTOCOL_NAME
     _identifier_pattern = re.compile("^fileset/([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$")
+    SLASH = "/"
 
     def __init__(
         self,
@@ -500,6 +501,12 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 f"Path {path} does not start with valid prefix {actual_prefix}."
             )
         virtual_location = self._get_virtual_location(context.get_name_identifier())
+        # if the storage location is end with "/",
+        # we should truncate this to avoid replace issues.
+        if actual_prefix.endswith(self.SLASH) and not virtual_location.endswith(
+            self.SLASH
+        ):
+            return f"{path.replace(actual_prefix[:-1], virtual_location)}"
         return f"{path.replace(actual_prefix, virtual_location)}"
 
     def _convert_actual_info(self, entry: Dict, context: FilesetContext):
@@ -645,6 +652,22 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                     " when the fileset only mounts a single file."
                 )
             return storage_location
+        # if the storage location ends with "/",
+        # we should handle the conversion specially
+        if storage_location.endswith(self.SLASH):
+            sub_path = virtual_path[len(virtual_location) :]
+            # For example, if the virtual path is `gvfs://fileset/catalog/schema/test_fileset/ttt`,
+            # and the storage location is `hdfs://cluster:8020/user/`,
+            # we should replace `gvfs://fileset/catalog/schema/test_fileset` with `hdfs://localhost:8020/`.
+            # If the storage location is `hdfs://cluster:8020/user`,
+            # we can replace `gvfs://fileset/catalog/schema/test_fileset` with `hdfs://localhost:8020` directly.
+            if sub_path.startswith(self.SLASH):
+                new_storage_location = storage_location[:-1]
+            else:
+                new_storage_location = storage_location
+
+            # Replace virtual_location with the adjusted storage_location
+            return virtual_path.replace(virtual_location, new_storage_location, 1)
         return virtual_path.replace(virtual_location, storage_location, 1)
 
     @staticmethod
