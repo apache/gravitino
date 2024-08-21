@@ -72,7 +72,7 @@ public class MetalakeMetaSQLProvider {
     return provider.softDeleteMetalakeMetaByMetalakeId(metalakeId);
   }
 
-  public String softDeleteMetalakeMetaByMetalakeName(
+  public String deleteMetalakeMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return provider.deleteMetalakeMetasByLegacyTimeline(legacyTimeline, limit);
   }
