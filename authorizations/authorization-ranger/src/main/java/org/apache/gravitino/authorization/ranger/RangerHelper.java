@@ -361,14 +361,10 @@ public class RangerHelper {
 
   protected boolean checkRangerRole(String roleName) throws AuthorizationPluginException {
     try {
-      RangerRole role =
-          rangerAuthorizationPlugin.rangerClient.getRole(
-              roleName,
-              rangerAuthorizationPlugin.rangerAdminName,
-              rangerAuthorizationPlugin.rangerServiceName);
-      if (role == null) {
-        return false;
-      }
+      rangerAuthorizationPlugin.rangerClient.getRole(
+          roleName,
+          rangerAuthorizationPlugin.rangerAdminName,
+          rangerAuthorizationPlugin.rangerServiceName);
     } catch (RangerServiceException e) {
       throw new AuthorizationPluginException(e);
     }
