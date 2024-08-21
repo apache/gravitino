@@ -52,7 +52,8 @@ public class MetalakeMetaBaseProvider {
 
   public String listMetalakePOs() {
     return "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
-        + " metalake_comment as metalakeComment, properties, audit_info as auditInfo,"
+        + " metalake_comment as metalakeComment, properties,"
+        + " audit_info as auditInfo, schema_version as schemaVersion,"
         + " current_version as currentVersion, last_version as lastVersion,"
         + " deleted_at as deletedAt"
         + " FROM "
@@ -62,7 +63,8 @@ public class MetalakeMetaBaseProvider {
 
   public String selectMetalakeMetaByName(@Param("metalakeName") String metalakeName) {
     return "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
-        + " metalake_comment as metalakeComment, properties, audit_info as auditInfo,"
+        + " metalake_comment as metalakeComment, properties,"
+        + " audit_info as auditInfo, schema_version as schemaVersion,"
         + " current_version as currentVersion, last_version as lastVersion,"
         + " deleted_at as deletedAt"
         + " FROM "
@@ -72,7 +74,8 @@ public class MetalakeMetaBaseProvider {
 
   public String selectMetalakeMetaById(@Param("metalakeId") Long metalakeId) {
     return "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
-        + " metalake_comment as metalakeComment, properties, audit_info as auditInfo,"
+        + " metalake_comment as metalakeComment, properties,"
+        + " audit_info as auditInfo, schema_version as schemaVersion,"
         + " current_version as currentVersion, last_version as lastVersion,"
         + " deleted_at as deletedAt"
         + " FROM "
