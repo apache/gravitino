@@ -20,7 +20,6 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaSQLProvider.MetalakeMetaMySQLProvider;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -51,7 +50,7 @@ public interface MetalakeMetaMapper {
   @SelectProvider(type = MetalakeMetaSQLProvider.class, method = "selectMetalakeIdMetaByName")
   Long selectMetalakeIdMetaByName(@Param("metalakeName") String name);
 
-  @InsertProvider(type = MetalakeMetaMySQLProvider.class, method = "insertMetalakeMeta")
+  @InsertProvider(type = MetalakeMetaSQLProvider.class, method = "insertMetalakeMeta")
   void insertMetalakeMeta(@Param("metalakeMeta") MetalakePO metalakePO);
 
   @InsertProvider(
