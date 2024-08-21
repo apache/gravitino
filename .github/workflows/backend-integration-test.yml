@@ -95,10 +95,10 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Backend Integration Test
+      - name: Backend Integration Test(JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
         id: integrationTest
         run: >
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -P${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
+          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
           -x :web:test -x :clients:client-python:test -x :flink-connector:test -x :spark-connector:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
@@ -164,10 +164,10 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Backend Integration Test
+      - name: Backend Integration Test(JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
         id: integrationTest
         run: >
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -P${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
+          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
           -x :web:test -x :clients:client-python:test -x :flink-connector:test -x :spark-connector:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
