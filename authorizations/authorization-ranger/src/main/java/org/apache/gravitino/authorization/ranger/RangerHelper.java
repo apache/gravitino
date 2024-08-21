@@ -298,6 +298,10 @@ public class RangerHelper {
       throws AuthorizationPluginException {
     List<String> nsMetadataObj =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
+    if (nsMetadataObj.size() > 4) {
+      // The max level of the securable object is `catalog.db.table.column`
+      throw new RuntimeException("The securable object than 4");
+    }
     nsMetadataObj.remove(0); // skip `catalog`
 
     Map<String, String> searchFilters = new HashMap<>();
@@ -397,7 +401,7 @@ public class RangerHelper {
               rangerAuthorizationPlugin.rangerServiceName);
     } catch (RangerServiceException e) {
       // ignore exception, If the role does not exist, then create it.
-      LOG.warn("The role({}) is not exist in the Ranger!", roleName);
+      LOG.warn("The role({}) does not exist in the Ranger!", roleName);
     }
     try {
       if (rangerRole == null) {
