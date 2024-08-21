@@ -23,20 +23,20 @@ import java.util.Map;
 
 public class AuthorizationPropertiesMeta {
   /** Ranger admin web URIs */
-  public static final String RANGER_ADMIN_URL = "ranger.admin.url";
+  public static final String RANGER_ADMIN_URL = "authorization.ranger.admin.url";
   /** Ranger authentication type kerberos or simple */
-  public static final String RANGER_AUTH_TYPE = "ranger.auth.type";
+  public static final String RANGER_AUTH_TYPE = "authorization.ranger.auth.type";
   /**
    * Ranger admin web login username(auth_type=simple), or kerberos principal(auth_type=kerberos)
    */
-  public static final String RANGER_USERNAME = "ranger.username";
+  public static final String RANGER_USERNAME = "authorization.ranger.username";
   /**
    * Ranger admin web login user password(auth_type=simple), or path of the keytab
    * file(auth_type=kerberos)
    */
-  public static final String RANGER_PASSWORD = "ranger.password";
+  public static final String RANGER_PASSWORD = "authorization.ranger.password";
   /** Ranger service name */
-  public static final String RANGER_SERVICE_NAME = "ranger.service.name";
+  public static final String RANGER_SERVICE_NAME = "authorization.ranger.service.name";
 
   public static final Map<String, PropertyEntry<?>> RANGER_AUTHORIZATION_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -54,7 +54,7 @@ public class AuthorizationPropertiesMeta {
                   RANGER_AUTH_TYPE,
                   "The Ranger admin web auth type (kerberos/simple)",
                   true,
-                  null,
+                  "simple",
                   false))
           .put(
               RANGER_USERNAME,
