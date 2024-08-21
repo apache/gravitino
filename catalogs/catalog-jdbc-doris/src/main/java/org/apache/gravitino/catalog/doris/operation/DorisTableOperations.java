@@ -175,31 +175,32 @@ public class DorisTableOperations extends JdbcTableOperations {
       resultMap = new HashMap<>();
     } else {
       resultMap = new HashMap<>(properties);
-    }
 
-    // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
-    // set the property 'replication_num' to 1 explicitly.
-    if (!properties.containsKey(REPLICATION_FACTOR)) {
-      // Try to check the number of backend servers.
-      String query = "select count(*) from information_schema.backends where Alive = 'true'";
+      // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE
+      // (3), we need to
+      // set the property 'replication_num' to 1 explicitly.
+      if (!properties.containsKey(REPLICATION_FACTOR)) {
+        // Try to check the number of backend servers.
+        String query = "select count(*) from information_schema.backends where Alive = 'true'";
 
-      try (Connection connection = dataSource.getConnection();
-          Statement statement = connection.createStatement();
-          ResultSet resultSet = statement.executeQuery(query)) {
-        while (resultSet.next()) {
-          int backendCount = resultSet.getInt(1);
-          if (backendCount < DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE) {
-            resultMap.put(
-                REPLICATION_FACTOR,
-                DORIS_TABLE_PROPERTIES_META
-                    .propertyEntries()
-                    .get(REPLICATION_FACTOR)
-                    .getDefaultValue()
-                    .toString());
+        try (Connection connection = dataSource.getConnection();
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery(query)) {
+          while (resultSet.next()) {
+            int backendCount = resultSet.getInt(1);
+            if (backendCount < DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE) {
+              resultMap.put(
+                  REPLICATION_FACTOR,
+                  DORIS_TABLE_PROPERTIES_META
+                      .propertyEntries()
+                      .get(REPLICATION_FACTOR)
+                      .getDefaultValue()
+                      .toString());
+            }
           }
+        } catch (Exception e) {
+          throw new RuntimeException("Failed to get the number of backend servers", e);
         }
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to get the number of backend servers", e);
       }
     }
 
@@ -208,8 +209,8 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   private static void validateIncrementCol(JdbcColumn[] columns) {
     // Get all auto increment column
-    List<JdbcColumn> autoIncrementCols =
-        Arrays.stream(columns).filter(Column::autoIncrement).collect(Collectors.toList());
+    List<JdbcColumn> autoIncrementCols = Arrays.stream(columns).filter(Column::autoIncrement)
+        .collect(Collectors.toList());
 
     // Doris does not support auto increment column before version 2.1.0
     Preconditions.checkArgument(
@@ -227,14 +228,13 @@ public class DorisTableOperations extends JdbcTableOperations {
       // Check if the distribution column exists
       Arrays.stream(distribution.expressions())
           .forEach(
-              expression ->
-                  Preconditions.checkArgument(
-                      Arrays.stream(columns)
-                          .anyMatch(
-                              column -> column.name().equalsIgnoreCase(expression.toString())),
-                      "Distribution column "
-                          + expression
-                          + " does not exist in the table columns"));
+              expression -> Preconditions.checkArgument(
+                  Arrays.stream(columns)
+                      .anyMatch(
+                          column -> column.name().equalsIgnoreCase(expression.toString())),
+                  "Distribution column "
+                      + expression
+                      + " does not exist in the table columns"));
     }
   }
 
@@ -252,10 +252,9 @@ public class DorisTableOperations extends JdbcTableOperations {
               }
             });
 
-    String indexSql =
-        Arrays.stream(indexes)
-            .map(index -> String.format("INDEX %s (%s)", index.name(), index.fieldNames()[0][0]))
-            .collect(Collectors.joining(",\n"));
+    String indexSql = Arrays.stream(indexes)
+        .map(index -> String.format("INDEX %s (%s)", index.name(), index.fieldNames()[0][0]))
+        .collect(Collectors.joining(",\n"));
 
     sqlBuilder.append(",").append(NEW_LINE).append(indexSql);
   }
@@ -269,8 +268,7 @@ public class DorisTableOperations extends JdbcTableOperations {
         partitioning.length == 1, "Composite partition type is not supported");
 
     StringBuilder partitionSqlBuilder;
-    Set<String> columnNames =
-        Arrays.stream(columns).map(JdbcColumn::name).collect(Collectors.toSet());
+    Set<String> columnNames = Arrays.stream(columns).map(JdbcColumn::name).collect(Collectors.toSet());
 
     if (partitioning[0] instanceof Transforms.RangeTransform) {
       // We do not support multi-column range partitioning in doris for now
@@ -295,17 +293,15 @@ public class DorisTableOperations extends JdbcTableOperations {
         "The partition field must be one of the columns");
 
     StringBuilder partitionSqlBuilder = new StringBuilder(NEW_LINE);
-    String partitionDefinition =
-        String.format(" PARTITION BY RANGE(`%s`)", rangePartition.fieldName()[0]);
+    String partitionDefinition = String.format(" PARTITION BY RANGE(`%s`)", rangePartition.fieldName()[0]);
     partitionSqlBuilder.append(partitionDefinition).append(NEW_LINE).append("(");
 
     // Assign range partitions
     RangePartition[] assignments = rangePartition.assignments();
     if (!ArrayUtils.isEmpty(assignments)) {
-      String partitionSqlFragments =
-          Arrays.stream(assignments)
-              .map(DorisUtils::generatePartitionSqlFragment)
-              .collect(Collectors.joining("," + NEW_LINE));
+      String partitionSqlFragments = Arrays.stream(assignments)
+          .map(DorisUtils::generatePartitionSqlFragment)
+          .collect(Collectors.joining("," + NEW_LINE));
       partitionSqlBuilder.append(NEW_LINE).append(partitionSqlFragments);
     }
 
@@ -325,8 +321,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
       partitionColumnsBuilder.add(BACK_QUOTE + filedName[0] + BACK_QUOTE);
     }
-    String partitionColumns =
-        partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
+    String partitionColumns = partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
 
     StringBuilder partitionSqlBuilder = new StringBuilder(NEW_LINE);
     String partitionDefinition = String.format(" PARTITION BY LIST(%s)", partitionColumns);
@@ -398,7 +393,7 @@ public class DorisTableOperations extends JdbcTableOperations {
         String indexName = resultSet.getString("Key_name");
         String columnName = resultSet.getString("Column_name");
         indexes.add(
-            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] {{columnName}}));
+            Indexes.of(Index.IndexType.PRIMARY_KEY, indexName, new String[][] { { columnName } }));
       }
       return indexes;
     } catch (SQLException e) {
@@ -416,9 +411,8 @@ public class DorisTableOperations extends JdbcTableOperations {
       if (result.next()) {
         createTableSql.append(result.getString("Create Table"));
       }
-      Optional<Transform> transform =
-          DorisUtils.extractPartitionInfoFromSql(createTableSql.toString());
-      return transform.map(t -> new Transform[] {t}).orElse(Transforms.EMPTY_TRANSFORM);
+      Optional<Transform> transform = DorisUtils.extractPartitionInfoFromSql(createTableSql.toString());
+      return transform.map(t -> new Transform[] { t }).orElse(Transforms.EMPTY_TRANSFORM);
     }
   }
 
@@ -432,8 +426,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // Doris Cannot get comment from JDBC 8.x, so we need to get comment from sql
     StringBuilder comment = new StringBuilder();
-    String sql =
-        "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
+    String sql = "SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
       preparedStatement.setString(1, databaseName);
       preparedStatement.setString(2, tableName);
@@ -453,12 +446,12 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   protected void getTableStatus(Connection connection, String databaseName, String tableName) {
     // sql is `SHOW ALTER TABLE COLUMN WHERE TableName = 'test_table'`
-    // database name must be specified in connection, so the SQL do not need to specify database
+    // database name must be specified in connection, so the SQL do not need to
+    // specify database
     // name
-    String sql =
-        String.format(
-            "SHOW ALTER TABLE COLUMN WHERE TableName = '%s' ORDER BY JobId DESC limit 1",
-            tableName);
+    String sql = String.format(
+        "SHOW ALTER TABLE COLUMN WHERE TableName = '%s' ORDER BY JobId DESC limit 1",
+        tableName);
 
     // Just print each column name and type from resultSet
     // TODO: add to table properties or other fields
@@ -509,13 +502,18 @@ public class DorisTableOperations extends JdbcTableOperations {
       String databaseName, String tableName, TableChange... changes) {
     /*
      * NOTICE:
-     * As described in the Doris documentation, the creation of Schema Change is an asynchronous process.
-     * If you load the table immediately after altering it, you might get the old schema.
-     * You can see in: https://doris.apache.org/docs/1.2/advanced/alter-table/schema-change/#create-job
+     * As described in the Doris documentation, the creation of Schema Change is an
+     * asynchronous process.
+     * If you load the table immediately after altering it, you might get the old
+     * schema.
+     * You can see in:
+     * https://doris.apache.org/docs/1.2/advanced/alter-table/schema-change/#create-
+     * job
      * TODO: return state of the operation to user
-     * */
+     */
 
-    // Not all operations require the original table information, so lazy loading is used here
+    // Not all operations require the original table information, so lazy loading is
+    // used here
     JdbcTable lazyLoadTable = null;
     TableChange.UpdateComment updateComment = null;
     List<TableChange.SetProperty> setProperties = new ArrayList<>();
@@ -541,13 +539,11 @@ public class DorisTableOperations extends JdbcTableOperations {
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
         alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnComment) {
-        TableChange.UpdateColumnComment updateColumnComment =
-            (TableChange.UpdateColumnComment) change;
+        TableChange.UpdateColumnComment updateColumnComment = (TableChange.UpdateColumnComment) change;
         alterSql.add(updateColumnCommentFieldDefinition(updateColumnComment));
       } else if (change instanceof TableChange.UpdateColumnPosition) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        TableChange.UpdateColumnPosition updateColumnPosition =
-            (TableChange.UpdateColumnPosition) change;
+        TableChange.UpdateColumnPosition updateColumnPosition = (TableChange.UpdateColumnPosition) change;
         alterSql.add(updateColumnPositionFieldDefinition(updateColumnPosition, lazyLoadTable));
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn deleteColumn = (TableChange.DeleteColumn) change;
@@ -607,15 +603,14 @@ public class DorisTableOperations extends JdbcTableOperations {
     validateUpdateColumnNullable(change, table);
     String col = change.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(table, col);
-    JdbcColumn updateColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withDefaultValue(column.defaultValue())
-            .withNullable(change.nullable())
-            .withType(column.dataType())
-            .withComment(column.comment())
-            .withAutoIncrement(column.autoIncrement())
-            .build();
+    JdbcColumn updateColumn = JdbcColumn.builder()
+        .withName(col)
+        .withDefaultValue(column.defaultValue())
+        .withNullable(change.nullable())
+        .withType(column.dataType())
+        .withComment(column.comment())
+        .withAutoIncrement(column.autoIncrement())
+        .build();
     return "MODIFY COLUMN "
         + BACK_QUOTE
         + col
@@ -626,8 +621,7 @@ public class DorisTableOperations extends JdbcTableOperations {
   private String generateTableProperties(List<TableChange.SetProperty> setProperties) {
     return setProperties.stream()
         .map(
-            setProperty ->
-                String.format("\"%s\" = \"%s\"", setProperty.getProperty(), setProperty.getValue()))
+            setProperty -> String.format("\"%s\" = \"%s\"", setProperty.getProperty(), setProperty.getValue()))
         .collect(Collectors.joining(",\n"));
   }
 
@@ -749,15 +743,14 @@ public class DorisTableOperations extends JdbcTableOperations {
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + BACK_QUOTE + col + BACK_QUOTE);
-    JdbcColumn newColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withType(updateColumnType.getNewDataType())
-            .withComment(column.comment())
-            .withDefaultValue(DEFAULT_VALUE_NOT_SET)
-            .withNullable(column.nullable())
-            .withAutoIncrement(column.autoIncrement())
-            .build();
+    JdbcColumn newColumn = JdbcColumn.builder()
+        .withName(col)
+        .withType(updateColumnType.getNewDataType())
+        .withComment(column.comment())
+        .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+        .withNullable(column.nullable())
+        .withAutoIncrement(column.autoIncrement())
+        .build();
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
 
