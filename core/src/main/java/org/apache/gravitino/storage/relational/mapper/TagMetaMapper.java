@@ -167,7 +167,7 @@ public interface TagMetaMapper {
           + " AND audit_info = #{oldTagMeta.auditInfo}"
           + " AND current_version = #{oldTagMeta.currentVersion}"
           + " AND last_version = #{oldTagMeta.lastVersion}"
-          + "AND deleted_at = 0")
+          + " AND deleted_at = 0")
   Integer updateTagMeta(@Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO);
 
   @Update(
