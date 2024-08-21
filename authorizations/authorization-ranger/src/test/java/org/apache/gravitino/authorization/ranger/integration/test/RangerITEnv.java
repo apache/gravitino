@@ -257,7 +257,7 @@ public class RangerITEnv {
       if (!policies.isEmpty()) {
         // Because Ranger user the wildcard filter, Ranger will return the policy meets
         // the wildcard(*,?) conditions, just like `*.*.*` policy will match `db1.table1.column1`
-        // So we need to manual precise filter the policies.
+        // So we need to manually precise filter the policies.
         policies =
             policies.stream()
                 .filter(
@@ -315,9 +315,7 @@ public class RangerITEnv {
     }
   }
 
-  /**
-   * Didn't call this function in the Lambda function body, It will return a random function name
-   */
+  /** Don't call this function in the Lambda function body, It will return a random function name */
   public static String currentFunName() {
     return Thread.currentThread().getStackTrace()[2].getMethodName();
   }

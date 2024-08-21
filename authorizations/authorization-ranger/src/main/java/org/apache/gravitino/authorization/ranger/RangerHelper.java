@@ -164,7 +164,7 @@ public class RangerHelper {
 
   /**
    * Add policy item access items base the securable object's privileges. <br>
-   * We didn't clean the policy items because one Ranger policy maybe contains multiple Gravitino
+   * We cannot clean the policy items because one Ranger policy maybe contains multiple Gravitino
    * securable objects. <br>
    */
   void addPolicyItem(RangerPolicy policy, String roleName, SecurableObject securableObject) {
@@ -223,7 +223,7 @@ public class RangerHelper {
 
   /**
    * Remove policy item base the securable object's privileges and role name. <br>
-   * We didn't directly clean the policy items, because one Ranger policy maybe contains multiple
+   * We cannot directly clean the policy items because one Ranger policy maybe contains multiple
    * Gravitino privilege objects. <br>
    */
   void removePolicyItem(RangerPolicy policy, String roleName, SecurableObject securableObject) {
@@ -345,7 +345,7 @@ public class RangerHelper {
       }
 
       RangerPolicy policy = policies.size() == 1 ? policies.get(0) : null;
-      // Didn't contain duplicate privilege in the delegate Gravitino management policy
+      // Delegating Gravitino management policies cannot contain duplicate privilege
       if (policy != null) {
         policy.getPolicyItems().forEach(this::checkPolicyItemAccess);
         policy.getDenyPolicyItems().forEach(this::checkPolicyItemAccess);

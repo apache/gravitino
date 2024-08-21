@@ -489,7 +489,7 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
    * 1. Find the policy base the metadata object. <br>
    * 2. If the policy exists and has the same privilege, then remove role name in the policy items.
    * <br>
-   * 3. If policy didn't have any policy item, then delete this policy. <br>
+   * 3. If policy does not contain any policy item, then delete this policy. <br>
    */
   private boolean doRemoveSecurableObject(RoleChange.RemoveSecurableObject change) {
     RangerPolicy policy = rangerHelper.findManagedPolicy(change.getSecurableObject());
