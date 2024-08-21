@@ -220,6 +220,10 @@
    ./api/src/main/java/org/apache/gravitino/rel/expressions/Expression.java
    ./api/src/main/java/org/apache/gravitino/rel/expressions/NamedReference.java
    ./spark-connector/spark-connector/src/test/java/org/apache/gravitino/spark/connector/integration/test/util/SparkUtilIT.java
+   ./dev/release/do-release.sh
+   ./dev/release/release-build.sh
+   ./dev/release/release-tag.sh
+   ./dev/release/release-util.sh
 
    Apache Iceberg
    ./api/src/main/java/org/apache/gravitino/exceptions/RESTException.java
