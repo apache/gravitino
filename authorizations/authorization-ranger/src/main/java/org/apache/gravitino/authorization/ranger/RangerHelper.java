@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -295,12 +294,12 @@ public class RangerHelper {
    * @param metadataObject The metadata object to find the managed policy.
    * @return The managed policy for the metadata object.
    */
-  @VisibleForTesting
   public RangerPolicy findManagedPolicy(MetadataObject metadataObject)
       throws AuthorizationPluginException {
     List<String> nsMetadataObj =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
     nsMetadataObj.remove(0); // skip `catalog`
+
     Map<String, String> searchFilters = new HashMap<>();
     Map<String, String> preciseFilters = new HashMap<>();
     searchFilters.put(

@@ -250,7 +250,7 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
               try {
                 rangerClient.grantRole(rangerServiceName, grantRevokeRoleRequest);
               } catch (RangerServiceException e) {
-                // ignore exception, support idempotent operation
+                // Ignore exception, support idempotent operation
                 LOG.warn("Grant role: {} to user: {} failed!", role, user, e);
               }
             });
@@ -509,7 +509,7 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
                     && policyItem.getGroups().isEmpty());
 
     try {
-      if (policy.getPolicyItems().size() == 0) {
+      if (policy.getPolicyItems().isEmpty()) {
         rangerClient.deletePolicy(policy.getId());
       } else {
         rangerClient.updatePolicy(policy.getId(), policy);
