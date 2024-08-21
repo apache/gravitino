@@ -25,6 +25,7 @@ import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.Update;
 
 /**
@@ -38,15 +39,20 @@ import org.apache.ibatis.annotations.Update;
 public interface CatalogMetaMapper {
   String TABLE_NAME = "catalog_meta";
 
-  @Select(
-      "SELECT catalog_id as catalogId, catalog_name as catalogName,"
-          + " metalake_id as metalakeId, type, provider,"
-          + " catalog_comment as catalogComment, properties, audit_info as auditInfo,"
-          + " current_version as currentVersion, last_version as lastVersion,"
-          + " deleted_at as deletedAt"
-          + " FROM "
-          + TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
+  @SelectProvider.List({
+    @SelectProvider(
+        type = CatalogMetaSQLProvider.class,
+        method = "listCatalogPOsByMetalakeId",
+        databaseId = "mysql"),
+    @SelectProvider(
+        type = CatalogMetaSQLProvider.class,
+        method = "listCatalogPOsByMetalakeId",
+        databaseId = "h2"),
+    @SelectProvider(
+        type = CatalogMetaSQLProvider.class,
+        method = "listCatalogPOsByMetalakeId",
+        databaseId = "sqlite"),
+  })
   List<CatalogPO> listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Select(

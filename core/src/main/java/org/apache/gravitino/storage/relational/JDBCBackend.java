@@ -417,9 +417,10 @@ public class JDBCBackend implements RelationalBackend {
     }
   }
 
-  enum JDBCBackendType {
+  public enum JDBCBackendType {
     H2(true),
-    MYSQL(false);
+    MYSQL(false),
+    PG(false);
 
     private final boolean embedded;
 
@@ -434,6 +435,19 @@ public class JDBCBackend implements RelationalBackend {
         return JDBCBackendType.MYSQL;
       } else {
         throw new IllegalArgumentException("Unknown JDBC URI: " + jdbcURI);
+      }
+    }
+
+    public static JDBCBackendType fromString(String jdbcType) {
+      switch (jdbcType) {
+        case "h2":
+          return JDBCBackendType.H2;
+        case "mysql":
+          return JDBCBackendType.MYSQL;
+        case "postgresql":
+          return JDBCBackendType.PG;
+        default:
+          throw new IllegalArgumentException("Unknown JDBC type: " + jdbcType);
       }
     }
   }
