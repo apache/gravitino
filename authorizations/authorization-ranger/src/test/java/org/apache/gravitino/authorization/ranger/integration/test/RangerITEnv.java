@@ -255,9 +255,10 @@ public class RangerITEnv {
     try {
       List<RangerPolicy> policies = rangerClient.findPolicies(policyFilter);
       if (!policies.isEmpty()) {
-        // Because Ranger user the wildcard filter, Ranger will return the policy meets
-        // the wildcard(*,?) conditions, just like `*.*.*` policy will match `db1.table1.column1`
-        // So we need to manually precise filter the policies.
+        // Because Ranger doesn't support the precise search, Ranger will return the policy meets
+        // the wildcard(*,?) conditions, If you use `db.table` condition to search policy, the
+        // Ranger will match `db1.table1`, `db1.table2`, `db*.table*`, So we need to manually
+        // precisely filter this research results.
         policies =
             policies.stream()
                 .filter(
