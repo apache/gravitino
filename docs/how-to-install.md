@@ -170,3 +170,5 @@ you want to experience the whole Gravitino system with other components, use the
 For the details, review the
 [Gravitino playground repository](https://github.com/apache/gravitino-playground) and
 [playground example](./how-to-use-the-playground.md).
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&url=%2Fdocs%2Fhow-to-install.md&action_name=HowToInstall" style="border:0;" alt="" />
