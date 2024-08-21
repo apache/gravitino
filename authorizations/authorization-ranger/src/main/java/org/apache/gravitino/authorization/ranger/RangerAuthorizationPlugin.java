@@ -356,7 +356,7 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
   public Boolean onUserAdded(User user) throws RuntimeException {
     VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
     if (list.getListSize() > 0) {
-      LOG.warn("The user({}) is already exist in the Ranger!", user.name());
+      LOG.warn("The user({}) already exists in the Ranger!", user.name());
       return Boolean.FALSE;
     }
 
@@ -368,7 +368,7 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
   public Boolean onUserRemoved(User user) throws RuntimeException {
     VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
     if (list.getListSize() == 0) {
-      LOG.warn("The user({}) is not exist in the Ranger!", user);
+      LOG.warn("The user({}) doesn't exist in the Ranger!", user);
       return Boolean.FALSE;
     }
     rangerClient.deleteUser(list.getList().get(0).getId());
@@ -379,7 +379,7 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
   public Boolean onUserAcquired(User user) throws RuntimeException {
     VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
     if (list.getListSize() == 0) {
-      LOG.warn("The user({}) is not exist in the Ranger!", user);
+      LOG.warn("The user({}) doesn't exist in the Ranger!", user);
       return Boolean.FALSE;
     }
     return Boolean.TRUE;
@@ -394,7 +394,7 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
   public Boolean onGroupRemoved(Group group) throws RuntimeException {
     VXGroupList list = rangerClient.searchGroup(ImmutableMap.of("name", group.name()));
     if (list.getListSize() == 0) {
-      LOG.warn("The group({}) is not exists in the Ranger!", group);
+      LOG.warn("The group({}) doesn't exist in the Ranger!", group);
       return Boolean.FALSE;
     }
     return rangerClient.deleteGroup(list.getList().get(0).getId());
@@ -404,7 +404,7 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
   public Boolean onGroupAcquired(Group group) {
     VXGroupList vxGroupList = rangerClient.searchGroup(ImmutableMap.of("name", group.name()));
     if (vxGroupList.getListSize() == 0) {
-      LOG.warn("The group({}) is not exists in the Ranger!", group);
+      LOG.warn("The group({}) doesn't exist in the Ranger!", group);
       return Boolean.FALSE;
     }
     return Boolean.TRUE;
