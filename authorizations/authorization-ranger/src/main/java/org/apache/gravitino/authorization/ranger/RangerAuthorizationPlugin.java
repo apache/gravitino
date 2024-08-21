@@ -162,7 +162,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
   }
 
   /**
-   * Because Ranger does not have Role concept, Each metadata object will have a unique Ranger
+   * Because Ranger does not have a Role concept, Each metadata object will have a unique Ranger
    * policy. we can use one or more Ranger policy to simulate the role. <br>
    * 1. Create a policy for each metadata object. <br>
    * 2. Save role name in the Policy properties. <br>
@@ -434,7 +434,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
   }
 
   /**
-   * Because one Ranger policy maybe contain multiple Gravitino securable objects, <br>
+   * Because one Ranger policy maybe contains multiple Gravitino securable objects, <br>
    * So we need to find the corresponding policy item mapping to remove the user.
    */
   @Override
@@ -458,8 +458,8 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
 
   /**
    * Grant the roles to the group. <br>
-   * 1. Create a group in the Ranger if the group is not exist. <br>
-   * 2. Create a role in the Ranger if the role is not exist. <br>
+   * 1. Create a group in the Ranger if the group does not exist. <br>
+   * 2. Create a role in the Ranger if the role does not exist. <br>
    * 3. Add this group to the role. <br>
    * 4. Add the role to the policy item base the metadata object. <br>
    *
@@ -641,7 +641,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
       if (!policies.isEmpty()) {
         // Because Ranger doesn't support the precise filter, Ranger will return the policy meets
         // the wildcard(*,?) conditions, just like `*.*.*` policy will match `db1.table1.column1`
-        // So we need to manual precise filter the policies.
+        // So we need to manually precisely filter the policies.
         policies =
             policies.stream()
                 .filter(
@@ -658,7 +658,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
                 .collect(Collectors.toList());
       }
 
-      // Only return the policies that are delegate Gravitino management
+      // Only return the policies that are managed by Gravitino.
       if (policies.size() > 1) {
         throw new AuthorizationPluginException(
             "Each metadata object only have one Gravitino management enable policies.");
@@ -718,7 +718,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
     RangerPolicy policy = findManagedPolicy(change.getSecurableObject());
 
     if (policy != null) {
-      // Check the policy item's accesses and roles equal the Gravition securable object's privilege
+      // Check the policy item's accesses and roles equal the Gravitino securable object's privilege
       // and roleName
       Set<String> policyPrivileges =
           policy.getPolicyItems().stream()
@@ -756,16 +756,15 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
       }
       nsMetadataObject.remove(0); // remove `catalog`
 
+      List<String> rangerDefinesList =
+          Lists.newArrayList(
+              RangerDefines.RESOURCE_DATABASE,
+              RangerDefines.RESOURCE_TABLE,
+              RangerDefines.RESOURCE_COLUMN);
       for (int i = 0; i < nsMetadataObject.size(); i++) {
         RangerPolicy.RangerPolicyResource policyResource =
             new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
-        policy
-            .getResources()
-            .put(
-                i == 0
-                    ? RangerDefines.RESOURCE_DATABASE
-                    : i == 1 ? RangerDefines.RESOURCE_TABLE : RangerDefines.RESOURCE_COLUMN,
-                policyResource);
+        policy.getResources().put(rangerDefinesList.get(i), policyResource);
       }
     }
 
@@ -785,11 +784,12 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
 
   /**
    * Remove the securable object's privilege from the policy. <br>
-   * Because Ranger use unique metadata to location Ranger policy and manage the all privileges, So
-   * one Ranger policy maybe contain multiple Gravitino privilege objects. <br>
+   * Because Ranger uses unique metadata to location Ranger policy and manages all the privileges,
+   * So A Ranger policy maybe contains multiple Gravitino privilege objects. <br>
    * Remove Ranger policy item condition is: <br>
-   * 1. This Ranger policy item's accesses equal the Gravition securable object's privilege. <br>
-   * 2. This Ranger policy item's users and groups is empty. <br>
+   * 1. This Ranger policy item's accesses are equal the Gravitino securable object's privilege.
+   * <br>
+   * 2. This Ranger policy item's users and groups are empty. <br>
    * If policy didn't have any policy item, then delete this policy: <br>
    */
   private boolean doRemoveSecurableObject(
@@ -853,8 +853,8 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
 
   /**
    * 1. Find the policy base securable object. <br>
-   * 2. If the policy is exist, then user new securable object's privilege to update. <br>
-   * 3. If the policy is not exist return false. <br>
+   * 2. If the policy exists, then user new securable object's privilege to update. <br>
+   * 3. If the policy does not exist, return false. <br>
    */
   private boolean doUpdateSecurableObject(
       String roleName, RoleChange.UpdateSecurableObject change) {
@@ -884,7 +884,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
 
   /**
    * Add policy item access items base the securable object's privileges. <br>
-   * We didn't clean the policy items, because one Ranger policy maybe contain multiple Gravitino
+   * We didn't clean the policy items because one Ranger policy maybe contains multiple Gravitino
    * securable objects. <br>
    */
   private void addPolicyItem(
@@ -943,7 +943,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
 
   /**
    * Remove policy item base the securable object's privileges and role name. <br>
-   * We didn't directly clean the policy items, because one Ranger policy maybe contain multiple
+   * We didn't directly clean the policy items, because one Ranger policy maybe contains multiple
    * Gravitino privilege objects. <br>
    */
   private void removePolicyItem(
@@ -977,7 +977,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
                       });
             });
 
-    // Delete the policy items if the roles is empty and not ownership policy item
+    // Delete the policy items if the roles are empty and not ownership policy item
     policy
         .getPolicyItems()
         .removeIf(
