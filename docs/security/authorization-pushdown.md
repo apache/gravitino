@@ -1,6 +1,6 @@
 ---
-title: "Permission System"
-slug: /security/permission-system
+title: "Authorization Push-down"
+slug: /security/authorization-push-down
 keyword: security
 license: "This software is licensed under the Apache License version 2."
 ---
@@ -16,7 +16,7 @@ On top of this, Gravitino manages different underlying data sources through Cata
 When a user performs an authorization operation on the data in a Catalog, Gravitino will call the interface of the Authorization Plugin module in the respective Catalog to translate the Gravitino authorization model into the underlying data source's permission rules of the underlying data source.
 Permission is then pushed down to the underlying permission system through the client of the underlying data source (JDBC or Apache Ranger client, etc.).
 
-### Authorization Ranger Hive Plugin properties
+### Authorization Hive with Ranger properties
 
 The Authorization Ranger Hive Plugin extends the following properties in the [Apache Hive catalog properties](../apache-hive-catalog.md#catalog-properties):
 
@@ -29,13 +29,13 @@ The Authorization Ranger Hive Plugin extends the following properties in the [Ap
 | `authorization.ranger.password`     | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)        | No       | 0.6.0         |
 | `authorization.ranger.service.name` | The Apache Ranger service name.                                                                                                                      | (none)        | No       | 0.6.0         |
 
-Once you have used the correct configuration, you can perform authorization operations by calling Gravitino's [authorization RESTful API](https://datastrato.ai/docs/latest/api/rest/grant-roles-to-a-user).
+Once you have used the correct configuration, you can perform authorization operations by calling Gravitino's [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-roles-to-a-user).
 
 #### Example of using the Authorization Ranger Hive Plugin
 
-Suppose you have an Apache Hive service in your datacenter, and you have created a `hiveRepo` in Apache Ranger to manage the permissions of this Apache Hive service.
-Assume that the service IP address and port of this Apache Ranger is `172.0.0.100:6080`, and the username with Ranger administrator privileges is `Jack` and the password is `PWD123`.
-First, you need to add this Hive service to Gravitino using hive catalog, and you need to configure the following parameters.
+Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions. 
+The Ranger service is accessible at `172.0.0.100:6080`, with the username `Jack` and the password `PWD123`. 
+To add this Hive service to Gravitino using the Hive catalog, you'll need to configure the following parameters.
 
 ```properties
 authorization-provider=ranger

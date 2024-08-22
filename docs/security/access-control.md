@@ -9,13 +9,13 @@ license: "This software is licensed under the Apache License version 2."
 
 Apache Gravitino(incubating) is a technical data catalog that uses a unified metadata paradigm to manage multiple data sources while still allowing multiple engines like Spark, Trino, and Flink, or Python to connect to these data sources for data processing through Gravitino.
 
-Because each underlying data source will have its own permission system, it can be difficult to plug in data engines with the intent of querying multiple of these sources at once.
+Because each underlying data source will have its own access control system, it can be difficult to plug in data engines with the intent of querying multiple of these data at once.
 This is especially important for data governance practitioners who have to worry about data access restrictions and data compliance issues, but this is streamlined through Gravitino.
 Therefore, in the hopes of solving this big data issue, Gravitino plans to implement a universal set of permissions models and paradigms.
 With this, users will be able to manage all of their data sources on a single access plane, regardless of whether the data source is a database, or a message queue or an object storage system.
 
 After authorizing these data sources within Gravitino’s metadata lake, authentication can then be performed in Spark, Trino, and Flink Engines, as well as our Python client.
-This abstraction allows users to control access to data and make compliant use of the data without having to obstruct other teams and worrying about the tedious work of individual permission systems.
+This abstraction allows users to control access to data and make compliant use of the data without having to obstruct other teams and worrying about the tedious work of individual access control systems.
 
 ### Gravitino Permission Model
 
@@ -23,11 +23,11 @@ Gravitino’s unified management model allows for each data source to have its o
 We may not be able to properly set permissions to the underlying system, so when a given user tries to access this data, the underlying authorization system may result in permission inconsistencies and cause issues for external access.
 To mitigate this issue, Gravitino aims to provide a unified authorization model and accompanying methods that sit on top of all the data sources instead, making it much easier to manage access rights.
 
-It is important to note that Gravitino’s authorization model will not merge the permission systems of the underlying data sources to form a large and unwieldy set of permissions.
-Instead, We will summarize the usage of the permissions currently in use within the data system, and offer a set of Gravitino-native permission models that accurately reflect it.
+It is important to note that Gravitino’s authorization model will not merge the access control systems of the underlying data sources to form a large and unwieldy set of privileges.
+Instead, We will summarize the usage of the privileges currently in use within the data system, and offer a set of Gravitino-native permission models that accurately reflect it.
 
-This is so that when users and data engines use Gravitino for data processing, this permission model is used to address the complexity of managing permissions for different data sources.
-This set of permission models is meant to keep everything within the Gravitino system while still managing the permission settings of different data sources separately.
+This is so that when users and data engines use Gravitino for data processing, this permission model is used to address the complexity of managing access control for different data sources.
+This set of permission models is meant to keep everything within the Gravitino system while still managing the access control settings of different data sources separately.
 
 Gravitino adopts RBAC and DAC. 
 
@@ -47,64 +47,34 @@ Gravitino doesn't support metadata authentication. It means that Gravitino won't
 ### Authorization
 
 Gravitino also provides a set of authorization frameworks to interact with different underlying data source
-authorization systems (e.g., MySQL's own permission management and the Apache Ranger permission management system for big data)
+authorization systems (e.g., MySQL's own access control management and the Apache Ranger access control management system for big data)
 in accordance with its own authorization model and methodology.
-More information you can see [Authorization push down](authorization-pushdown.md).
+More information you can see the [Authorization push down](authorization-pushdown.md).
 
 ### Authentication
 
-As mentioned above, Gravitino uses Ownership to control the rights of resources in the management category and uses Role to control the permissions of operations in the operation category,
+As mentioned above, Gravitino uses Ownership to control the rights of securable object in the management category and uses Role to control access securable objects,
 so when a user performs a specific operation on a specified resource,
 Gravitino will perform a composite authentication on the Ownership and Role to which the resource belongs.
-When a user has more than one Role, Gravitino will use the user's current Role for authentication, and the user can switch the current Role to access different resources.
-
-#### Permission fuzzy matching
-
-Gravitino uses the resource's ENTITY ID (long type) to preserve permission relationships.
-So Gravitino can't directly support fuzzy matching of resource names (string type), such as wildcards like (*) and (%).
-Gravitino uses the resource parent node to express support for all resource (*) wildcards for child resources, for example,
-if we need to set read permissions for all table resources, we can set it to `{catalog1.schema1, READ_TABLE_PRIVILEGE}`,
-which stands for having access to `catalog1.schema1.*` read access to all tables.
-
-### Storage of authority data
-
-A key requirement of Gravitino should be to display permission information and perform operations such as grant and revoke, along with push-down of the permission information to the underlying data source system.
-It also needs to be able to translate that information to the corresponding permissions within the underlying system in order to achieve permission control over the data in the data source.
-
-If Gravitino does not store privilege information itself and only push-down permission to the underlying data source system,
-it would be very difficult for Gravitino to translate Gravitino's privilege model back from the different privilege systems of the underlying data source.
-
-Gravitino currently stores all the permission information (Privilege, SecurableObject, Role, User and Group) itself,
-and when there is a discrepancy between the permissions of the underlying data source and the permissions stored in Gravitino, Gravitino’s permission system will be trusted.
-
-Additionally, Gravitino provides a mechanism to ensure fault tolerance in the privilege data storage and push-down to the underlying data source privilege system.
-As a result of this, Gravitino’s push-downs to the underlying permission system operations are required to be idempotent operation,
-meaning that each kind of privilege push-down operation can be repeated without causing conflicts and will always achieve the same output.
+When a user has more than one Role, Gravitino will use the user's current Role for authentication, and the user can switch the current Role to access a different securable object.
 
 ### Role
 
 The traditional rights system generally uses RBAC (Role-Based Access Control) for rights management,
-where each Role contains a collection of different operating privileges for different resources.
+where each Role contains a collection of different operating privileges for a different securable object.
 When the system adds a new user or user group, you can select the Roles which they are expected to be granted to,
-so that the user can quickly start using it, without waiting for the administrator to gradually set up the access rights to resources for him.
+so that the user can quickly start using it, without waiting for the administrator to gradually set up the access rights to securable object for him.
 
 Roles also employ the concept of ownership – the owner of a Role is by default the creator of the Role,
-implying the owner has all the permissions to operate the Role, including deleting the Role.
-
-Gravitino introduces the concept of the “Current” Role, where a user can own multiple Roles at the same time,
-but is restricted to using a Current Role at one moment. When the user in the resource operation is in the Current Role's permissions.
-At that moment, the user will be able to display the Current Role in the list of resources with access rights.
-Users are able to switch to the Current Role to perform system operations with different roles they have access to.
-The functional design of the Current Role is to allow users to clearly define and interpret the resources and permissions owned by the Current Role,
-instead of all their roles put together.
+implying the owner has all the access control to operate the Role, including deleting the Role.
 
 ### Privilege
 
-Privilege is a specific operation method for resources, if you need to control fine-grained privileges on resources in the system,
+Privilege is a specific operation method for securable object, if you need to control fine-grained privileges on a securable object in the system,
 then you need to design many different Privileges, however, too many Privileges will cause too complicated settings in the authorization.
 
-If you only need to carry out coarse-grained privilege control on the resources in the system, then you only need to design a small number of Privileges,
-but it will result in too weak control ability when the authentication. Therefore, the design of Privilege is an important trade-off in the permission system.
+If you only need to carry out coarse-grained privilege control on the securable object in the system, then you only need to design a small number of Privileges,
+but it will result in too weak control ability when the authentication. Therefore, the design of Privilege is an important trade-off in the access control system.
 We know that Privilege is generally divided into two types, one is the management category of Privilege, such as the `CREATE`, `DELETE` resource privilege,
 and the other is the operation category of Privilege, such as the `READ` and `WRITE` resource privilege.
 
@@ -124,8 +94,8 @@ If a resource needs to be managed by more than one person at the same time, the 
 Users are generally granted one or multiple Roles, and users have different operating privileges depending on their Role.
 
 ### Group
-To make it easier to grant a single permission to multiple users, we can add users to a user group, and then grant one or multiple Roles to that user group.
-This process allows all users belonging to that user group to have the permissions in those Roles.
+To make it easier to grant a single access control to multiple users, we can add users to a user group, and then grant one or multiple Roles to that user group.
+This process allows all users belonging to that user group to have the access control in those Roles.
 
 ### Metadata objects
 
