@@ -658,9 +658,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             sub_path = virtual_path[len(virtual_location) :]
             # For example, if the virtual path is `gvfs://fileset/catalog/schema/test_fileset/ttt`,
             # and the storage location is `hdfs://cluster:8020/user/`,
-            # we should replace `gvfs://fileset/catalog/schema/test_fileset` with `hdfs://localhost:8020/`.
+            # we should replace `gvfs://fileset/catalog/schema/test_fileset`
+            # with `hdfs://localhost:8020/user` which truncates the tailing slash.
             # If the storage location is `hdfs://cluster:8020/user`,
-            # we can replace `gvfs://fileset/catalog/schema/test_fileset` with `hdfs://localhost:8020` directly.
+            # we can replace `gvfs://fileset/catalog/schema/test_fileset`
+            # with `hdfs://localhost:8020/user` directly.
             if sub_path.startswith(self.SLASH):
                 new_storage_location = storage_location[:-1]
             else:

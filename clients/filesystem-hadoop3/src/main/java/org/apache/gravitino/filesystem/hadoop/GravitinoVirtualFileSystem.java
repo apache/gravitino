@@ -303,10 +303,10 @@ public class GravitinoVirtualFileSystem extends FileSystem {
           // For example, if the virtual path is `gvfs://fileset/catalog/schema/test_fileset/ttt`,
           // and the storage location is `hdfs://cluster:8020/user/`,
           // we should replace `gvfs://fileset/catalog/schema/test_fileset` with
-          // `hdfs://localhost:8020/`.
+          // `hdfs://localhost:8020/user` which truncates the tailing slash.
           // If the storage location is `hdfs://cluster:8020/user`,
           // we can replace `gvfs://fileset/catalog/schema/test_fileset` with
-          // `hdfs://localhost:8020` directly.
+          // `hdfs://localhost:8020/user` directly.
           if (subPath.startsWith(SLASH)) {
             return new Path(
                 virtualPath.replaceFirst(
