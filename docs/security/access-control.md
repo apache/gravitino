@@ -53,7 +53,7 @@ More information you can see the [Authorization push down](authorization-pushdow
 
 ### Authentication
 
-As mentioned above, Gravitino uses Ownership to control the rights of securable object in the management category and uses Role to control access securable objects,
+As mentioned above, Gravitino uses Ownership to control the privileges of securable object in the management category and uses Role to control access securable objects,
 so when a user performs a specific operation on a specified resource,
 Gravitino will perform a composite authentication on the Ownership and Role to which the resource belongs.
 When a user has more than one Role, Gravitino will use the user's current Role for authentication, and the user can switch the current Role to access a different securable object.
