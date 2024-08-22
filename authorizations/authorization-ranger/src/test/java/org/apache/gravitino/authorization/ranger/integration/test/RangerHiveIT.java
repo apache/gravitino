@@ -147,7 +147,7 @@ public class RangerHiveIT extends RangerITEnv {
    * 2. catalog.db1.tab2 with SELECT_TABLE privilege. <br>
    * 3. catalog.db1.tab3 with MODIFY_TABLE privilege. <br>
    *
-   * @param roleName The name of the role, must be unique in this test class
+   * @param roleName The name of the role must be unique in this test class
    */
   public RoleEntity mock3TableRole(String roleName) {
     SecurableObject securableObject1 =
@@ -187,7 +187,7 @@ public class RangerHiveIT extends RangerITEnv {
 
   @Test
   public void testOnRoleDeleted() {
-    // prepare create a role
+    // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role));
 
@@ -202,7 +202,7 @@ public class RangerHiveIT extends RangerITEnv {
 
   @Test
   public void testOnRoleDeleted2() {
-    // prepare create a role
+    // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     // Set metadata object owner
     role.securableObjects().stream()
@@ -320,7 +320,7 @@ public class RangerHiveIT extends RangerITEnv {
             mockCatalogRole,
             RoleChange.addSecurableObject(mockCatalogRole.name(), securableObject1)));
 
-    // construct a verify role to check if the role and Ranger policy is created correctly
+    // construct a verified role to check if the role and Ranger policy is created correctly
     RoleEntity verifyRole1 =
         RoleEntity.builder()
             .withId(1L)
@@ -338,7 +338,7 @@ public class RangerHiveIT extends RangerITEnv {
             RoleChange.addSecurableObject(mockCatalogRole.name(), securableObject1)));
     verifyRoleInRanger(verifyRole1);
 
-    // 3. Add a same metadata but have different privilege to the role
+    // 3. Add the same metadata but have different privileges to the role
     SecurableObject securableObject3 =
         SecurableObjects.parse(
             securableObject1.fullName(),
@@ -368,7 +368,7 @@ public class RangerHiveIT extends RangerITEnv {
               RoleChange.removeSecurableObject(mockCatalogRole.name(), removeSecurableObject)));
 
       if (!securableObjects.isEmpty()) {
-        // Doesn't vrify the last securable object, because the role is empty
+        // Doesn't verify the last securable object, because the role is empty
         RoleEntity verifyRole =
             RoleEntity.builder()
                 .withId(1L)
@@ -385,7 +385,7 @@ public class RangerHiveIT extends RangerITEnv {
   public void testRoleChangeUpdateSecurableObject() {
     SecurableObject oldSecurableObject =
         SecurableObjects.parse(
-            "catalog.db4.tab1",
+            String.format("catalog.%s.tab1", currentFunName()),
             MetadataObject.Type.TABLE,
             Lists.newArrayList(Privileges.CreateTable.allow()));
     RoleEntity role =
@@ -398,7 +398,7 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role));
 
     Role mockCatalogRole = mockCatalogRole(currentFunName());
-    // Keep same matedata namespace and type, but change privileges
+    // Keep the same matedata namespace and type, but change privileges
     SecurableObject newSecurableObject =
         SecurableObjects.parse(
             oldSecurableObject.fullName(),
@@ -410,7 +410,7 @@ public class RangerHiveIT extends RangerITEnv {
             RoleChange.updateSecurableObject(
                 mockCatalogRole.name(), oldSecurableObject, newSecurableObject)));
 
-    // construct a verify role to check if the role and Ranger policy is created correctly
+    // construct a verified role to check if the role and Ranger policy are created correctly
     RoleEntity verifyRole =
         RoleEntity.builder()
             .withId(1L)
@@ -422,12 +422,69 @@ public class RangerHiveIT extends RangerITEnv {
   }
 
   @Test
+  public void testRoleChangeCombinedOperation() {
+    MetadataObject oldMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog.%s.tab1", currentFunName()), MetadataObject.Type.TABLE);
+    String userName = "user1";
+    rangerAuthPlugin.onOwnerSet(oldMetadataObject, null, new MockOwner(userName, Owner.Type.USER));
+
+    SecurableObject oldSecurableObject =
+        SecurableObjects.parse(
+            oldMetadataObject.fullName(),
+            MetadataObject.Type.TABLE,
+            Lists.newArrayList(Privileges.CreateTable.allow()));
+
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName())
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(oldSecurableObject))
+            .build();
+    Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role));
+
+    Role mockCatalogRole = mockCatalogRole(currentFunName());
+    // Keep the same matedata namespace and type, but change privileges
+    SecurableObject newSecurableObject =
+        SecurableObjects.parse(
+            oldSecurableObject.fullName(),
+            oldSecurableObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    Assertions.assertTrue(
+        rangerAuthPlugin.onRoleUpdated(
+            mockCatalogRole,
+            RoleChange.updateSecurableObject(
+                mockCatalogRole.name(), oldSecurableObject, newSecurableObject)));
+
+    // construct a verified role to check if the role and Ranger policy are created correctly
+    RoleEntity verifyRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName())
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(newSecurableObject))
+            .build();
+    verifyRoleInRanger(verifyRole);
+    verifyOwnerInRanger(oldMetadataObject, Lists.newArrayList(userName));
+
+    // Delete the role
+    Assertions.assertTrue(rangerAuthPlugin.onRoleDeleted(verifyRole));
+    // Because these metaobjects have an owner, so the policy will not be deleted.
+    role.securableObjects().stream()
+        .forEach(
+            securableObject ->
+                Assertions.assertNotNull(rangerPolicyHelper.findManagedPolicy(securableObject)));
+    verifyOwnerInRanger(oldMetadataObject, Lists.newArrayList(userName));
+  }
+
+  @Test
   public void testOnGrantedRolesToUser() {
-    // prepare create a role
+    // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role));
 
-    // granted role to the user1
+    // granted a role to the user1
     String userName1 = "user1";
     UserEntity userEntity1 =
         UserEntity.builder()
@@ -446,7 +503,7 @@ public class RangerHiveIT extends RangerITEnv {
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role), userEntity1));
     verifyRoleInRanger(role, Lists.newArrayList(userName1));
 
-    // granted role to the user2
+    // granted a role to the user2
     String userName2 = "user2";
     UserEntity userEntity2 =
         UserEntity.builder()
@@ -465,11 +522,11 @@ public class RangerHiveIT extends RangerITEnv {
 
   @Test
   public void testOnRevokedRolesFromUser() {
-    // prepare create a role
+    // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role));
 
-    // granted role to the user1
+    // granted a role to the user1
     String userName1 = "user1";
     UserEntity userEntity1 =
         UserEntity.builder()
@@ -495,11 +552,11 @@ public class RangerHiveIT extends RangerITEnv {
 
   @Test
   public void testOnGrantedRolesToGroup() {
-    // prepare create a role
+    // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role));
 
-    // granted role to the group1
+    // granted a role to the group1
     String groupName1 = "group1";
     GroupEntity groupEntity1 =
         GroupEntity.builder()
@@ -513,12 +570,12 @@ public class RangerHiveIT extends RangerITEnv {
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role), groupEntity1));
     verifyRoleInRanger(role, null, null, Lists.newArrayList(groupName1));
 
-    // multi-call to granted role to the group1 test idempotent operation
+    // multi-call to grant a role to the group1 test idempotent operation
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role), groupEntity1));
     verifyRoleInRanger(role, null, null, Lists.newArrayList(groupName1));
 
-    // granted role to the group2
+    // granted a role to the group2
     String groupName2 = "group2";
     GroupEntity groupEntity2 =
         GroupEntity.builder()
@@ -537,11 +594,11 @@ public class RangerHiveIT extends RangerITEnv {
 
   @Test
   public void testOnRevokedRolesFromGroup() {
-    // prepare create a role
+    // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role));
 
-    // granted role to the group1
+    // granted a role to the group1
     String groupName1 = "group1";
     GroupEntity groupEntity1 =
         GroupEntity.builder()
@@ -559,7 +616,7 @@ public class RangerHiveIT extends RangerITEnv {
         rangerAuthPlugin.onRevokedRolesFromGroup(Lists.newArrayList(role), groupEntity1));
     verifyRoleInRanger(role, null, null, null, Lists.newArrayList(groupName1));
 
-    // multi-call to revoked to the group1
+    // multi-call to revoke from the group1
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromGroup(Lists.newArrayList(role), groupEntity1));
     verifyRoleInRanger(role, null, null, null, Lists.newArrayList(groupName1));
@@ -724,7 +781,7 @@ public class RangerHiveIT extends RangerITEnv {
             .build();
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role1), userEntity1));
-    // multiple call to granted role1 to the user1 to test idempotent operation
+    // multiple call to grant role1 to the user1 to test idempotent operation
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role1), userEntity1));
     verifyRoleInRanger(role1, Lists.newArrayList(userName1));
@@ -996,7 +1053,7 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(rangerAuthPlugin.onRoleDeleted(role1));
     Assertions.assertTrue(rangerAuthPlugin.onRoleDeleted(role2));
     Assertions.assertTrue(rangerAuthPlugin.onRoleDeleted(role3));
-    // Because these metaobject have owner, so the policy will not be deleted.
+    // Because these metaobjects have owner, so the policy will not be deleted.
     role1.securableObjects().stream()
         .forEach(
             securableObject ->
@@ -1192,6 +1249,14 @@ public class RangerHiveIT extends RangerITEnv {
               }
               return true;
             });
+  }
+
+  private void verifyOwnerInRanger(MetadataObject metadataObject) {
+    verifyOwnerInRanger(metadataObject, null, null, null, null);
+  }
+
+  private void verifyOwnerInRanger(MetadataObject metadataObject, List<String> includeUsers) {
+    verifyOwnerInRanger(metadataObject, includeUsers, null, null, null);
   }
 
   private void verifyRoleInRanger(Role role) {

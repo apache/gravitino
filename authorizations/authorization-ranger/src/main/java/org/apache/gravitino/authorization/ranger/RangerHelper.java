@@ -249,10 +249,7 @@ public class RangerHelper {
                                     privilege -> {
                                       return access.getType().equals(privilege);
                                     });
-                        if (matchPrivilege
-                            && !policyItem.getUsers().isEmpty()
-                            && !policyItem.getGroups().isEmpty()) {
-                          // We can only remove this policy item if there are no users or groups
+                        if (matchPrivilege) {
                           policyItem.getRoles().removeIf(roleName::equals);
                         }
                       });
