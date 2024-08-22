@@ -31,7 +31,7 @@ import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.OverwriteDefaultConfig;
-import org.apache.gravitino.utils.TypeValid;
+import org.apache.gravitino.utils.TypeValidator;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
@@ -65,7 +65,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .doc("The uri config of the Iceberg catalog")
           .version(ConfigConstants.VERSION_0_2_0)
           .stringConf()
-          .checkValue(TypeValid::isJdbcURL, ConfigConstants.JDBC_URL_INVALID_ERROR_MSG)
+          .checkValue(TypeValidator::isJdbcURL, ConfigConstants.JDBC_URL_INVALID_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> JDBC_USER =

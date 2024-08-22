@@ -1,6 +1,6 @@
 package org.apache.gravitino.utils;
 
-public class TypeValid {
+public class TypeValidator {
 
   public static final String JDBC_REGEX = "^jdbc:([a-z_A-Z-]+):[^\\s]+$";
 
