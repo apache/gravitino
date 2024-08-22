@@ -723,6 +723,7 @@ tasks {
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
       "catalogs:catalog-kafka:copyLibAndConfig"
     )
