@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.ops;
+package org.apache.gravitino.iceberg.provider;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
@@ -94,13 +95,13 @@ public class TestConfigBasedIcebergTableOpsProvider {
     Assertions.assertEquals("memory", defaultIcebergConfig.get(IcebergConfig.CATALOG_BACKEND));
     Assertions.assertEquals("/tmp/", defaultIcebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE));
 
-    Assertions.assertEquals(hiveCatalogName, hiveOps.catalog.name());
-    Assertions.assertEquals(jdbcCatalogName, jdbcOps.catalog.name());
-    Assertions.assertEquals(defaultCatalogName, defaultOps.catalog.name());
+    Assertions.assertEquals(hiveCatalogName, hiveOps.getCatalog().name());
+    Assertions.assertEquals(jdbcCatalogName, jdbcOps.getCatalog().name());
+    Assertions.assertEquals(defaultCatalogName, defaultOps.getCatalog().name());
 
-    Assertions.assertTrue(hiveOps.catalog instanceof HiveCatalog);
-    Assertions.assertTrue(jdbcOps.catalog instanceof JdbcCatalog);
-    Assertions.assertTrue(defaultOps.catalog instanceof InMemoryCatalog);
+    Assertions.assertTrue(hiveOps.getCatalog() instanceof HiveCatalog);
+    Assertions.assertTrue(jdbcOps.getCatalog() instanceof JdbcCatalog);
+    Assertions.assertTrue(defaultOps.getCatalog() instanceof InMemoryCatalog);
   }
 
   @ParameterizedTest

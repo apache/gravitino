@@ -16,13 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.ops;
+package org.apache.gravitino.iceberg.provider;
 
 import java.util.HashMap;
 import java.util.UUID;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -81,11 +82,11 @@ public class TestGravitinoBasedIcebergTableOpsProvider {
     IcebergTableOps hiveOps = provider.getIcebergTableOps(hiveCatalogName);
     IcebergTableOps jdbcOps = provider.getIcebergTableOps(jdbcCatalogName);
 
-    Assertions.assertEquals(hiveCatalogName, hiveOps.catalog.name());
-    Assertions.assertEquals(jdbcCatalogName, jdbcOps.catalog.name());
+    Assertions.assertEquals(hiveCatalogName, hiveOps.getCatalog().name());
+    Assertions.assertEquals(jdbcCatalogName, jdbcOps.getCatalog().name());
 
-    Assertions.assertTrue(hiveOps.catalog instanceof HiveCatalog);
-    Assertions.assertTrue(jdbcOps.catalog instanceof JdbcCatalog);
+    Assertions.assertTrue(hiveOps.getCatalog() instanceof HiveCatalog);
+    Assertions.assertTrue(jdbcOps.getCatalog() instanceof JdbcCatalog);
   }
 
   @Test
