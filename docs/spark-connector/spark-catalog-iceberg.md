@@ -97,12 +97,7 @@ DESC EXTENDED employee;
 
 For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/1.5.2/spark-procedures/#spark-procedures) in Iceberg official document. 
 
-## Apache Iceberg catalog backend support
-- HiveCatalog
-- JdbcCatalog
-- RESTCatalog
-
-### Catalog properties
+## Catalog properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Iceberg connector configuration.
 
@@ -117,8 +112,7 @@ Gravitino spark connector will transform below property names which are defined 
 | `s3-endpoint`                   | `s3.endpoint`                         | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | 0.6.0         | 
 | `s3-region`                     | `client.region`                       | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | 0.6.0         |
 
-
-Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Iceberg connector. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector.
+Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Iceberg connector. For example, using `spark.bypass.clients` to pass the `clients` to the Spark Iceberg connector.
 
 :::info
 Iceberg catalog property `cache-enabled` is setting to `false` internally and not allowed to change.
