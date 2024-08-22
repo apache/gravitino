@@ -38,18 +38,28 @@ public final class ConfigConstants {
 
   /** The version number for the 0.1.0 release. */
   public static final String VERSION_0_1_0 = "0.1.0";
+
   /** The version number for the 0.2.0 release. */
   public static final String VERSION_0_2_0 = "0.2.0";
+
   /** The version number for the 0.3.0 release. */
   public static final String VERSION_0_3_0 = "0.3.0";
+
   /** The version number for the 0.4.0 release. */
   public static final String VERSION_0_4_0 = "0.4.0";
+
   /** The version number for the 0.5.0 release. */
   public static final String VERSION_0_5_0 = "0.5.0";
+
   /** The version number for the 0.5.1 release. */
   public static final String VERSION_0_5_1 = "0.5.1";
+
   /** The version number for the 0.5.2 release. */
   public static final String VERSION_0_5_2 = "0.5.2";
+
   /** The version number for the 0.6.0 release. */
   public static final String VERSION_0_6_0 = "0.6.0";
+
+  /** The version number for the 0.7.0 release. */
+  public static final String VERSION_0_7_0 = "0.7.0";
 }

@@ -123,7 +123,6 @@ public abstract class IcebergRESTServerManager {
         String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
 
     configMap.putAll(customConfigs);
-
     ITUtils.rewriteConfigFile(configTempFileName, configFileName, configMap);
   }
 

@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.rel;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import lombok.EqualsAndHashCode;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.rel.indexes.IndexDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
@@ -32,6 +33,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 
 /** Represents a Table DTO (Data Transfer Object). */
+@EqualsAndHashCode
 public class TableDTO implements Table {
 
   @JsonProperty("name")
@@ -293,8 +295,6 @@ public class TableDTO implements Table {
      */
     public TableDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
-      Preconditions.checkArgument(
-          columns != null && columns.length > 0, "columns cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
       return new TableDTO(

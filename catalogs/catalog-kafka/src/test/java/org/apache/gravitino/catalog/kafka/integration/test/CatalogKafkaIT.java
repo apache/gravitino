@@ -358,12 +358,15 @@ public class CatalogKafkaIT extends AbstractIT {
     Topic loadedTopic =
         catalog.asTopicCatalog().loadTopic(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName));
 
-    Assertions.assertEquals(alteredTopic, loadedTopic);
     Assertions.assertEquals("new comment", alteredTopic.comment());
     Assertions.assertEquals("3", alteredTopic.properties().get(PARTITION_COUNT));
+    Assertions.assertNull(alteredTopic.properties().get(TopicConfig.RETENTION_MS_CONFIG));
+
+    Assertions.assertEquals("new comment", loadedTopic.comment());
+    Assertions.assertEquals("3", loadedTopic.properties().get(PARTITION_COUNT));
     // retention.ms overridden was removed, so it should be the default value
     Assertions.assertEquals(
-        "604800000", alteredTopic.properties().get(TopicConfig.RETENTION_MS_CONFIG));
+        "604800000", loadedTopic.properties().get(TopicConfig.RETENTION_MS_CONFIG));
     checkTopicReadWrite(topicName);
   }
 
@@ -434,6 +437,28 @@ public class CatalogKafkaIT extends AbstractIT {
 
     Assertions.assertTrue(catalog.asTopicCatalog().dropTopic(ident));
     Assertions.assertFalse(catalog.asTopicCatalog().topicExists(ident));
+  }
+
+  @Test
+  void testAlterCatalogProperties() {
+
+    String catalogName1 = GravitinoITUtils.genRandomName("test_catalog");
+    Catalog catalog1 =
+        metalake.createCatalog(
+            catalogName1,
+            Catalog.Type.MESSAGING,
+            PROVIDER,
+            "comment",
+            ImmutableMap.of(BOOTSTRAP_SERVERS, "wrong_address"));
+    Assertions.assertEquals("wrong_address", catalog1.properties().get(BOOTSTRAP_SERVERS));
+
+    // alter catalog properties
+    Catalog alteredCatalog =
+        metalake.alterCatalog(
+            catalogName1, CatalogChange.setProperty(BOOTSTRAP_SERVERS, "right_address"));
+
+    Assertions.assertEquals("right_address", alteredCatalog.properties().get(BOOTSTRAP_SERVERS));
+    Assertions.assertTrue(alteredCatalog.properties().containsKey(BOOTSTRAP_SERVERS));
   }
 
   private void assertTopicWithKafka(Topic createdTopic)

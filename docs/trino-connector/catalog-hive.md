@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino connector - Hive catalog"
+title: "Apache Gravitino Trino connector - Hive catalog"
 slug: /trino-connector/catalog-hive
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
@@ -50,8 +50,8 @@ CREATE SCHEMA catalog.schema_name
 
 ### Create table
 
-The Gravitino connector currently supports basic Hive table creation statements, such as defining fields,
-allowing null values, and adding comments. The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+The Gravitino Trino connector currently supports basic Hive table creation statements, such as defining fields,
+allowing null values, and adding comments. The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
 The following example shows how to create a table in the Hive catalog:
 
@@ -77,7 +77,7 @@ Support for the following alter table operations:
 
 ### Select
 
-The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
+The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
 ## Schema and table properties
@@ -290,9 +290,9 @@ DROP TABLE hive_test.database_01.table_01;
 
 ## HDFS config and permissions
 
-For basic setups, Gravitino connector configures the HDFS client automatically and does not require any configuration
+For basic setups, Gravitino Trino connector configures the HDFS client automatically and does not require any configuration
 files.
-Gravitino connector is not support user to config the `hdfs-site.xml` and `core-site.xml` files to the HDFS client.
+Gravitino Trino connector is not support user to config the `hdfs-site.xml` and `core-site.xml` files to the HDFS client.
 
 Before running any `Insert` statements for Hive tables in Trino,
 you must check that the user Trino is using to access HDFS has access to the Hive warehouse directory.

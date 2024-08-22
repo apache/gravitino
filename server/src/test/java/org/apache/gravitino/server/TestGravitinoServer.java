@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -76,7 +77,7 @@ public class TestGravitinoServer {
     } catch (Exception e) {
       // Ignore
     }
-    gravitinoServer = new GravitinoServer(spyServerConfig);
+    gravitinoServer = new GravitinoServer(spyServerConfig, GravitinoEnv.getInstance());
   }
 
   @AfterAll

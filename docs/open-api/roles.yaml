@@ -1,0 +1,311 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/roles:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Create role
+      operationId: createRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleCreateRequest"
+            examples:
+              RoleCreateRequest:
+                $ref: "#/components/examples/RoleCreateRequest"
+
+      responses:
+        "200":
+          description: Returns the created role object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/RoleResponse"
+              examples:
+                RoleResponse:
+                  $ref: "#/components/examples/RoleResponse"
+
+        "404":
+          description: Not Found - The specified securable object does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+
+        "409":
+          description: Conflict - The target role already exists in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                RoleAlreadyExistsException:
+                  $ref: "#/components/examples/RoleAlreadyExistsException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/roles/{role}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/role"
+
+    get:
+      tags:
+        - access control
+      summary: Get Role
+      operationId: getRole
+      description: Returns the specified role information in the specified metalake
+      responses:
+        "200":
+          description: Returns the role object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/RoleResponse"
+                examples:
+                  RoleResponse:
+                    $ref: "#/components/examples/RoleResponse"
+        "404":
+          description: Not Found - The specified role does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchRoleException:
+                  $ref: "#/components/examples/NoSuchRoleException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    delete:
+      tags:
+        - access control
+      summary: Delete role
+      operationId: deleteRole
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/DeleteResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  schemas:
+
+    Privilege:
+      type: object
+      required:
+        - name
+        - condition
+      properties:
+        name:
+          type: string
+          enum:
+            - CREATE_CATALOG
+            - USE_CATALOG
+            - CREATE_SCHEMA
+            - USE_SCHEMA
+            - CREATE_TABLE
+            - MODIFY_TABLE
+            - SELECT_TABLE
+            - CREATE_FILESET
+            - WRITE_FILESET
+            - READ_FILESET
+            - CREATE_TOPIC
+            - PRODUCE_TOPIC
+            - CONSUME_TOPIC
+            - MANAGE_USERS
+            - MANAGE_GROUPS
+            - CREATE_ROLE
+            - MANAGE_GRANTS
+          description: The name of the privilege
+        condition:
+          type: string
+          enum:
+            - ALLOW
+            - DENY
+          description: The condition of the privilege, `ALLOW` or `DENY`
+
+    SecurableObject:
+      type: object
+      required:
+        - fullName
+        - type
+      properties:
+        fullName:
+          type: string
+          description: The full name of the securable object
+        type:
+          type: string
+          enum:
+            - "CATALOG"
+            - "SCHEMA"
+            - "TABLE"
+            - "FILESET"
+            - "TOPIC"
+            - "METALAKE"
+          description: The type of the securable object
+        privileges:
+          type: array
+          description: A list of privileges
+          items:
+            $ref: "#/components/schemas/Privilege"
+
+    Role:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the role
+        properties:
+          type: object
+          description: A map of properties for the role
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string
+        securableObjects:
+          type: array
+          description: A list of securable objects
+          items:
+            $ref: "#/components/schemas/SecurableObject"
+
+    RoleCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the role
+        properties:
+          type: object
+          description: A map of properties for the role
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string
+        securableObjects:
+          type: array
+          description: A list of securable objects
+          items:
+            $ref: "#/components/schemas/SecurableObject"
+
+  responses:
+    RoleResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        role:
+          $ref: "#/components/schemas/Role"
+
+  examples:
+    RoleCreateRequest:
+      value: {
+        "name": "role1",
+        "properties": {"k1": "v1"},
+        "securableObjects": [
+          {
+            "fullName" : "catalog1.schema1.table1",
+            "type": "TABLE",
+            "privileges": [
+              {
+                "name": "SELECT_TABLE",
+                "condition": "ALLOW"
+              }
+            ]
+          }
+        ]
+      }
+
+    RoleResponse:
+      value: {
+        "code": 0,
+        "role": {
+          "name": "role1",
+          "properties" : { "k1": "v1" },
+          "securableObjects": [
+            {
+              "fullName": "catalog1.schema1.table1",
+              "type": "TABLE",
+              "privileges": [
+                {
+                    name: "SELECT_TABLE",
+                    condition: "ALLOW"
+                }
+              ]
+            }
+          ]
+        }
+      }
+
+    RoleAlreadyExistsException:
+      value: {
+        "code": 1004,
+        "type": "RoleAlreadyExistsException",
+        "message": "Role already exists",
+        "stack": [
+          "org.apache.gravitino.exceptions.RoleAlreadyExistsException: Role already exists: role1"
+        ]
+      }
+
+    NoSuchRoleException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchRoleException",
+        "message": "Role does not exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchRoleException: Role does not exist",
+          "..."
+        ]
+      }
+
+    NoSuchMetadataObjectException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchMetadataObjectException",
+        "message": "Metadata object does not exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchUserException: Metadata object does not exist",
+          "..."
+        ]
+      }

@@ -32,16 +32,19 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
+import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -50,11 +53,30 @@ import org.junit.jupiter.api.Test;
 public class TestRole extends TestBase {
 
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
-  protected static final String metalakeName = "testMetalake";
+  private static final String metalakeName = "testMetalake";
+  private static GravitinoClient gravitinoClient;
 
   @BeforeAll
   public static void setUp() throws Exception {
     TestBase.setUp();
+
+    TestGravitinoMetalake.createMetalake(client, metalakeName);
+
+    MetalakeDTO mockMetalake =
+        MetalakeDTO.builder()
+            .withName(metalakeName)
+            .withComment("comment")
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    MetalakeResponse resp = new MetalakeResponse(mockMetalake);
+    buildMockResource(Method.GET, "/api/metalakes/" + metalakeName, null, resp, HttpStatus.SC_OK);
+
+    gravitinoClient =
+        GravitinoClient.builder("http://127.0.0.1:" + mockServer.getLocalPort())
+            .withMetalake(metalakeName)
+            .withVersionCheckDisabled()
+            .build();
   }
 
   @Test
@@ -81,11 +103,8 @@ public class TestRole extends TestBase {
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     Role createdRole =
-        client.createRole(
-            metalakeName,
-            roleName,
-            ImmutableMap.of("k1", "v1"),
-            Lists.newArrayList(securableObject));
+        gravitinoClient.createRole(
+            roleName, ImmutableMap.of("k1", "v1"), Lists.newArrayList(securableObject));
     Assertions.assertEquals(1L, Privileges.CreateCatalog.allow().name().getLowBits());
     Assertions.assertEquals(0L, Privileges.CreateCatalog.allow().name().getHighBits());
     Assertions.assertNotNull(createdRole);
@@ -100,11 +119,8 @@ public class TestRole extends TestBase {
         Assertions.assertThrows(
             RoleAlreadyExistsException.class,
             () ->
-                client.createRole(
-                    metalakeName,
-                    roleName,
-                    ImmutableMap.of("k1", "v1"),
-                    Lists.newArrayList(securableObject)));
+                gravitinoClient.createRole(
+                    roleName, ImmutableMap.of("k1", "v1"), Lists.newArrayList(securableObject)));
     Assertions.assertEquals("role already exists", ex.getMessage());
 
     // test NoSuchMetalakeException
@@ -115,11 +131,8 @@ public class TestRole extends TestBase {
         Assertions.assertThrows(
             NoSuchMetalakeException.class,
             () ->
-                client.createRole(
-                    metalakeName,
-                    roleName,
-                    ImmutableMap.of("k1", "v1"),
-                    Lists.newArrayList(securableObject)));
+                gravitinoClient.createRole(
+                    roleName, ImmutableMap.of("k1", "v1"), Lists.newArrayList(securableObject)));
     Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // test RuntimeException
@@ -128,11 +141,8 @@ public class TestRole extends TestBase {
     Assertions.assertThrows(
         RuntimeException.class,
         () ->
-            client.createRole(
-                metalakeName,
-                roleName,
-                ImmutableMap.of("k1", "v1"),
-                Lists.newArrayList(securableObject)),
+            gravitinoClient.createRole(
+                roleName, ImmutableMap.of("k1", "v1"), Lists.newArrayList(securableObject)),
         "internal error");
   }
 
@@ -145,7 +155,7 @@ public class TestRole extends TestBase {
     RoleResponse roleResponse = new RoleResponse(mockRole);
     buildMockResource(Method.GET, rolePath, null, roleResponse, SC_OK);
 
-    Role loadedRole = client.getRole(metalakeName, roleName);
+    Role loadedRole = gravitinoClient.getRole(roleName);
     Assertions.assertNotNull(loadedRole);
     assertRole(mockRole, loadedRole);
 
@@ -154,8 +164,7 @@ public class TestRole extends TestBase {
         ErrorResponse.notFound(NoSuchRoleException.class.getSimpleName(), "role not found");
     buildMockResource(Method.GET, rolePath, null, errResp1, SC_NOT_FOUND);
     Exception ex =
-        Assertions.assertThrows(
-            NoSuchRoleException.class, () -> client.getRole(metalakeName, roleName));
+        Assertions.assertThrows(NoSuchRoleException.class, () -> gravitinoClient.getRole(roleName));
     Assertions.assertEquals("role not found", ex.getMessage());
 
     // test NoSuchMetalakeException
@@ -164,14 +173,14 @@ public class TestRole extends TestBase {
     buildMockResource(Method.GET, rolePath, null, errResp2, SC_NOT_FOUND);
     ex =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> client.getRole(metalakeName, roleName));
+            NoSuchMetalakeException.class, () -> gravitinoClient.getRole(roleName));
     Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // test RuntimeException
     ErrorResponse errResp3 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.GET, rolePath, null, errResp3, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.getRole(metalakeName, roleName), "internal error");
+        RuntimeException.class, () -> gravitinoClient.getRole(roleName), "internal error");
 
     // test SecurableDTO use parent method
     Role testParentRole = mockHasParentRoleDTO("test");
@@ -190,17 +199,16 @@ public class TestRole extends TestBase {
     DeleteResponse deleteResponse = new DeleteResponse(true);
     buildMockResource(Method.DELETE, rolePath, null, deleteResponse, SC_OK);
 
-    Assertions.assertTrue(client.deleteRole(metalakeName, roleName));
+    Assertions.assertTrue(gravitinoClient.deleteRole(roleName));
 
     deleteResponse = new DeleteResponse(false);
     buildMockResource(Method.DELETE, rolePath, null, deleteResponse, SC_OK);
-    Assertions.assertFalse(client.deleteRole(metalakeName, roleName));
+    Assertions.assertFalse(gravitinoClient.deleteRole(roleName));
 
     // test RuntimeException
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, rolePath, null, errResp, SC_SERVER_ERROR);
-    Assertions.assertThrows(
-        RuntimeException.class, () -> client.deleteRole(metalakeName, roleName));
+    Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.deleteRole(roleName));
   }
 
   private RoleDTO mockRoleDTO(String name) {

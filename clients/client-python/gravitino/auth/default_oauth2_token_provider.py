@@ -26,7 +26,11 @@ from gravitino.dto.responses.oauth2_token_response import OAuth2TokenResponse
 from gravitino.dto.requests.oauth2_client_credential_request import (
     OAuth2ClientCredentialRequest,
 )
-from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.exceptions.base import (
+    GravitinoRuntimeException,
+    IllegalArgumentException,
+)
+from gravitino.exceptions.handlers.oauth_error_handler import OAUTH_ERROR_HANDLER
 
 CLIENT_CREDENTIALS = "client_credentials"
 CREDENTIAL_SPLITTER = ":"
@@ -60,11 +64,14 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         self._token = self._fetch_token()
 
     def validate(self):
-        assert (
-            self._credential and self._credential.strip()
-        ), "OAuth2TokenProvider must set credential"
-        assert self._scope and self._scope.strip(), "OAuth2TokenProvider must set scope"
-        assert self._path and self._path.strip(), "OAuth2TokenProvider must set path"
+        if not self._credential or not self._credential.strip():
+            raise IllegalArgumentException("OAuth2TokenProvider must set credential")
+
+        if not self._scope or not self._scope.strip():
+            raise IllegalArgumentException("OAuth2TokenProvider must set scope")
+
+        if not self._path or not self._path.strip():
+            raise IllegalArgumentException("OAuth2TokenProvider must set path")
 
     def _get_access_token(self) -> Optional[str]:
 
@@ -80,7 +87,8 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         return self._token
 
     def _parse_credential(self):
-        assert self._credential is not None, "Invalid credential: None"
+        if self._credential is None:
+            raise ValueError("Invalid credential: None")
 
         credential_info = self._credential.split(CREDENTIAL_SPLITTER, maxsplit=1)
         client_id = None
@@ -107,7 +115,9 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         )
 
         resp = self._client.post_form(
-            self._path, data=client_credential_request.to_dict()
+            self._path,
+            data=client_credential_request,
+            error_handler=OAUTH_ERROR_HANDLER,
         )
         oauth2_resp = OAuth2TokenResponse.from_json(resp.body, infer_missing=True)
         oauth2_resp.validate()

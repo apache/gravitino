@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.connector;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -63,7 +62,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   // Gravitino.
   // You can use your own object to replace the default catalog operation.
   // The object you used is not stable, don't use it unless you know what you are doing.
-  @VisibleForTesting public static final String CATALOG_OPERATION_IMPL = "ops-impl";
+  public static final String CATALOG_OPERATION_IMPL = "ops-impl";
 
   // Underlying access control system plugin for this catalog.
   private volatile BaseAuthorization<?> authorization;
@@ -192,7 +191,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         }
       }
     }
-    return authorization.plugin();
+    return authorization.plugin(provider(), this.conf);
   }
 
   private BaseAuthorization<?> createAuthorizationPluginInstance() {

@@ -165,6 +165,14 @@ license: "This software is licensed under the Apache License version 2."
    `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory. You 
    can uncompress and deploy it to Trino to use the Gravitino Trino connector.
 
+6. Assemble the Gravitino Iceberg REST server package
+
+   ```shell
+    ./gradlew assembleIcebergRESTServer
+    ```
+
+   This creates `gravitino-iceberg-rest-server-{version}.tar.gz` and `gravitino-iceberg-rest-server-{version}.tar.gz.sha256` under the `distribution` directory. You can uncompress and deploy it to use the Gravitino Iceberg REST server.
+
 ## How to Build Apache Gravitino on Windows (Using WSL)
 
 ### Download WSL (Ubuntu)
@@ -259,4 +267,6 @@ Access [http://localhost:8090](http://localhost:8090)
 
 Building the Gravitino project compiles the necessary components, and starting the server allows you to access the application in your browser.
 
-For instructions on how to run the project using VSCode or IntelliJ on Windows, please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
+For instructions on how to run the project using VSCode or IntelliJ on Windows, please refer to [CONTRIBUTING.md](https://github.com/apache/gravitino/blob/main/CONTRIBUTING.md).
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&url=%2Fdocs%2Fhow-to-build.md&action_name=HowToBuild" style="border:0;" alt="" />

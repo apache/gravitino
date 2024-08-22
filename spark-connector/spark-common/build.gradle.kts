@@ -141,18 +141,19 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 
 tasks.clean {
   delete("spark-warehouse")
+}
+
+sourceSets {
+  named("test") {
+    resources {
+      exclude("**/*")
+    }
+  }
 }
 
 val testJar by tasks.registering(Jar::class) {

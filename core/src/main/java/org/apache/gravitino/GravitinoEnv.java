@@ -19,7 +19,10 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.FutureGrantManager;
+import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -39,11 +42,19 @@ import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
+import org.apache.gravitino.hook.AccessControlHookDispatcher;
+import org.apache.gravitino.hook.CatalogHookDispatcher;
+import org.apache.gravitino.hook.FilesetHookDispatcher;
+import org.apache.gravitino.hook.MetalakeHookDispatcher;
+import org.apache.gravitino.hook.SchemaHookDispatcher;
+import org.apache.gravitino.hook.TableHookDispatcher;
+import org.apache.gravitino.hook.TopicHookDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
+import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
@@ -86,7 +97,7 @@ public class GravitinoEnv {
 
   private MetalakeDispatcher metalakeDispatcher;
 
-  private AccessControlManager accessControlManager;
+  private AccessControlDispatcher accessControlDispatcher;
 
   private IdGenerator idGenerator;
 
@@ -100,8 +111,10 @@ public class GravitinoEnv {
 
   private TagManager tagManager;
   private EventBus eventBus;
+  private OwnerManager ownerManager;
+  private FutureGrantManager futureGrantManager;
 
-  private GravitinoEnv() {}
+  protected GravitinoEnv() {}
 
   private static class InstanceHolder {
     private static final GravitinoEnv INSTANCE = new GravitinoEnv();
@@ -180,6 +193,11 @@ public class GravitinoEnv {
     return tableDispatcher;
   }
 
+  /**
+   * Get the PartitionDispatcher associated with the Gravitino environment.
+   *
+   * @return The PartitionDispatcher instance.
+   */
   public PartitionDispatcher partitionDispatcher() {
     return partitionDispatcher;
   }
@@ -221,6 +239,26 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the CatalogManager associated with the Gravitino environment.
+   *
+   * @return The CatalogManager instance.
+   */
+  public CatalogManager catalogManager() {
+    Preconditions.checkArgument(catalogManager != null, "GravitinoEnv is not initialized.");
+    return catalogManager;
+  }
+
+  /**
+   * Get the EventBus associated with the Gravitino environment.
+   *
+   * @return The EventBus instance.
+   */
+  public EventBus eventBus() {
+    Preconditions.checkArgument(eventBus != null, "GravitinoEnv is not initialized.");
+    return eventBus;
+  }
+
+  /**
    * Get the MetricsSystem associated with the Gravitino environment.
    *
    * @return The MetricsSystem instance.
@@ -229,17 +267,17 @@ public class GravitinoEnv {
     return metricsSystem;
   }
 
-  public LockManager getLockManager() {
+  public LockManager lockManager() {
     return lockManager;
   }
 
   /**
-   * Get the AccessControlManager associated with the Gravitino environment.
+   * Get the AccessControlDispatcher associated with the Gravitino environment.
    *
-   * @return The AccessControlManager instance.
+   * @return The AccessControlDispatcher instance.
    */
-  public AccessControlManager accessControlManager() {
-    return accessControlManager;
+  public AccessControlDispatcher accessControlDispatcher() {
+    return accessControlDispatcher;
   }
 
   /**
@@ -249,6 +287,24 @@ public class GravitinoEnv {
    */
   public TagManager tagManager() {
     return tagManager;
+  }
+
+  /**
+   * Get the OwnerManager associated with the Gravitino environment.
+   *
+   * @return The OwnerManager instance.
+   */
+  public OwnerManager ownerManager() {
+    return ownerManager;
+  }
+
+  /**
+   * Get the FutureGrantManager associated with the Gravitino environment.
+   *
+   * @return The FutureGrantManager instance.
+   */
+  public FutureGrantManager futureGrantManager() {
+    return futureGrantManager;
   }
 
   public void start() {
@@ -311,53 +367,70 @@ public class GravitinoEnv {
     this.idGenerator = new RandomIdGenerator();
 
     // Create and initialize metalake related modules
-    MetalakeManager metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    MetalakeDispatcher metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    MetalakeHookDispatcher metalakeHookDispatcher = new MetalakeHookDispatcher(metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
-        new MetalakeNormalizeDispatcher(metalakeManager);
+        new MetalakeNormalizeDispatcher(metalakeHookDispatcher);
     this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
 
     // Create and initialize Catalog related modules
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    CatalogHookDispatcher catalogHookDispatcher = new CatalogHookDispatcher(catalogManager);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
-        new CatalogNormalizeDispatcher(catalogManager);
+        new CatalogNormalizeDispatcher(catalogHookDispatcher);
     this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+    SchemaHookDispatcher schemaHookDispatcher = new SchemaHookDispatcher(schemaOperationDispatcher);
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
-        new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
+        new SchemaNormalizeDispatcher(schemaHookDispatcher, catalogManager);
     this.schemaDispatcher = new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
 
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+    TableHookDispatcher tableHookDispatcher = new TableHookDispatcher(tableOperationDispatcher);
     TableNormalizeDispatcher tableNormalizeDispatcher =
-        new TableNormalizeDispatcher(tableOperationDispatcher, catalogManager);
+        new TableNormalizeDispatcher(tableHookDispatcher, catalogManager);
     this.tableDispatcher = new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
 
+    // TODO: We can install hooks when we need, we only supports ownership post hook,
+    //  partition doesn't have ownership, so we don't need it now.
     PartitionOperationDispatcher partitionOperationDispatcher =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
-    // todo: support PartitionEventDispatcher
-    this.partitionDispatcher =
+    PartitionNormalizeDispatcher partitionNormalizeDispatcher =
         new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
+    this.partitionDispatcher = new PartitionEventDispatcher(eventBus, partitionNormalizeDispatcher);
 
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+    FilesetHookDispatcher filesetHookDispatcher =
+        new FilesetHookDispatcher(filesetOperationDispatcher);
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
-        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
+        new FilesetNormalizeDispatcher(filesetHookDispatcher, catalogManager);
     this.filesetDispatcher = new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+    TopicHookDispatcher topicHookDispatcher = new TopicHookDispatcher(topicOperationDispatcher);
     TopicNormalizeDispatcher topicNormalizeDispatcher =
-        new TopicNormalizeDispatcher(topicOperationDispatcher, catalogManager);
+        new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
-      this.accessControlManager = new AccessControlManager(entityStore, idGenerator, config);
+      AccessControlHookDispatcher accessControlHookDispatcher =
+          new AccessControlHookDispatcher(
+              new AccessControlManager(entityStore, idGenerator, config));
+
+      this.accessControlDispatcher = accessControlHookDispatcher;
+      this.ownerManager = new OwnerManager(entityStore);
+      this.futureGrantManager = new FutureGrantManager(entityStore);
     } else {
-      this.accessControlManager = null;
+      this.accessControlDispatcher = null;
+      this.ownerManager = null;
+      this.futureGrantManager = null;
     }
 
     this.auxServiceManager = new AuxiliaryServiceManager();

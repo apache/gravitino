@@ -34,6 +34,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
@@ -46,7 +47,8 @@ import org.slf4j.LoggerFactory;
  * MySQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
  * RelationalBackend} interface
  */
-public class RelationalEntityStore implements EntityStore, SupportsTagOperations {
+public class RelationalEntityStore
+    implements EntityStore, SupportsTagOperations, SupportsRelationOperations {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -142,6 +144,11 @@ public class RelationalEntityStore implements EntityStore, SupportsTagOperations
   }
 
   @Override
+  public SupportsRelationOperations relationOperations() {
+    return this;
+  }
+
+  @Override
   public List<MetadataObject> listAssociatedMetadataObjectsForTag(NameIdentifier tagIdent)
       throws IOException {
     return backend.listAssociatedMetadataObjectsForTag(tagIdent);
@@ -170,5 +177,26 @@ public class RelationalEntityStore implements EntityStore, SupportsTagOperations
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
     return backend.associateTagsWithMetadataObject(
         objectIdent, objectType, tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType)
+      throws IOException {
+    return backend.listEntitiesByRelation(relType, nameIdentifier, identType);
+  }
+
+  @Override
+  public void insertRelation(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier srcIdentifier,
+      Entity.EntityType srcType,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType,
+      boolean override)
+      throws IOException {
+    backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, true);
   }
 }

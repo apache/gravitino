@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.iceberg;
 public class IcebergConstants {
   // Iceberg catalog properties constants
   public static final String CATALOG_BACKEND = "catalog-backend";
+  public static final String CATALOG_BACKEND_IMPL = "catalog-backend-impl";
 
   public static final String GRAVITINO_JDBC_USER = "jdbc-user";
   public static final String ICEBERG_JDBC_USER = "jdbc.user";
@@ -33,6 +34,17 @@ public class IcebergConstants {
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
   public static final String CATALOG_BACKEND_NAME = "catalog-backend-name";
+
+  // IO properties
+  public static final String IO_IMPL = "io-impl";
+  public static final String GRAVITINO_S3_ENDPOINT = "s3-endpoint";
+  public static final String ICEBERG_S3_ENDPOINT = "s3.endpoint";
+  public static final String GRAVITINO_S3_ACCESS_KEY_ID = "s3-access-key-id";
+  public static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
+  public static final String GRAVITINO_S3_SECRET_ACCESS_KEY = "s3-secret-access-key";
+  public static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
+  public static final String GRAVITINO_S3_REGION = "s3-region";
+  public static final String AWS_S3_REGION = "client.region";
 
   // Iceberg Table properties constants
 
@@ -52,4 +64,8 @@ public class IcebergConstants {
   public static final String ICEBERG_METRICS_QUEUE_CAPACITY = "metricsQueueCapacity";
 
   public static final String GRAVITINO_ICEBERG_REST_SERVICE_NAME = "iceberg-rest";
+
+  public static final String ICEBERG_REST_CATALOG_PROVIDER = "catalog-provider";
+
+  public static final String GRAVITINO_DEFAULT_CATALOG = "__gravitino_default_catalog";
 }

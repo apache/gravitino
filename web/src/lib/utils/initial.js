@@ -41,7 +41,7 @@ export const messagingProviders = [
         key: 'bootstrap.servers',
         value: '',
         required: true,
-        description: 'The Apache Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them'
+        description: 'The Apache Kafka brokers to connect to, allowing for multiple brokers separated by commas'
       }
     ]
   }

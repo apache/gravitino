@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.common.utils;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.catalog.Catalog;
@@ -60,13 +61,15 @@ public class TestIcebergCatalogUtil {
         });
 
     Map<String, String> properties = new HashMap<>();
-    properties.put(CatalogProperties.URI, "jdbc://0.0.0.0:3306");
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
     properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
     properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
     properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
     properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
     properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "false");
-    catalog = IcebergCatalogUtil.loadCatalogBackend("jdbc", properties);
+    catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
     Assertions.assertTrue(catalog instanceof JdbcCatalog);
 
     Assertions.assertThrowsExactly(
@@ -74,5 +77,39 @@ public class TestIcebergCatalogUtil {
         () -> {
           IcebergCatalogUtil.loadCatalogBackend("other");
         });
+  }
+
+  @Test
+  void testValidLoadCustomCatalog() {
+    Catalog catalog;
+    Map<String, String> config = new HashMap<>();
+
+    config.put(
+        "catalog-backend-impl", "org.apache.gravitino.iceberg.common.utils.CustomCatalogForTest");
+    catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.valueOf("CUSTOM"), new IcebergConfig(config));
+    Assertions.assertTrue(catalog instanceof CustomCatalogForTest);
+  }
+
+  @Test
+  void testInvalidLoadCustomCatalog() {
+    Assertions.assertThrowsExactly(
+        NullPointerException.class,
+        () ->
+            IcebergCatalogUtil.loadCatalogBackend(
+                IcebergCatalogBackend.valueOf("CUSTOM"), new IcebergConfig(new HashMap<>())));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () ->
+            IcebergCatalogUtil.loadCatalogBackend(
+                IcebergCatalogBackend.valueOf("CUSTOM"),
+                new IcebergConfig(
+                    new HashMap<String, String>() {
+                      {
+                        put("catalog-backend-impl", "org.apache.");
+                      }
+                    })));
   }
 }

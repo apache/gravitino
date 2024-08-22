@@ -114,6 +114,8 @@ tasks {
         original
       }
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyConfigsToStandalonePackage", Copy::class) {
@@ -130,6 +132,8 @@ tasks {
         original
       }
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyLibAndConfigs", Copy::class) {
@@ -154,14 +158,6 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
-      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.3")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

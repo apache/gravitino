@@ -1,0 +1,176 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+---
+
+paths:
+
+  /metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectFullName}:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+
+    put:
+      tags:
+        - access control
+      summary: Set owner
+      operationId: setOwner
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerSetRequest"
+            examples:
+              OwnerSetRequest:
+                $ref: "#/components/examples/OwnerSetRequest"
+
+      responses:
+        "200":
+          description: Returns the set operation result
+          $ref: "./openapi.yaml#/components/responses/SetResponse"
+
+        "404":
+          description: Not Found - The specified owner or metadata object does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NotFoundException:
+                  $ref: "#/components/examples/NotFoundException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    get:
+      tags:
+        - access control
+      summary: Get owner
+      operationId: getOwner
+      description: Returns the specified owner information in the specified metalake
+      responses:
+        "200":
+          description: Returns the owner object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/responses/OwnerResponse"
+              examples:
+                OwnerResponse:
+                  $ref: "#/components/examples/OwnerResponse"
+        "404":
+          description: Not Found - The specified owner does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
+components:
+
+  schemas:
+    Owner:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          description: The name of the owner
+        type:
+          type: string
+          enum:
+            - USER
+            - GROUP
+          description: The type of the owner
+
+    OwnerSetRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The name of the owner
+        type:
+          type: string
+          enum:
+            - USER
+            - GROUP
+          description: The type of the owner
+
+  responses:
+    OwnerResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        owner:
+          $ref: "#/components/schemas/Owner"
+
+  examples:
+    OwnerSetRequest:
+      value: {
+        "name": "user1",
+        "type": "USER"
+      }
+
+    OwnerResponse:
+      value: {
+        "code": 0,
+        "owner": {
+          "name": "user1",
+          "type": "USER",
+        }
+      }
+
+
+    NoSuchMetadataObjectException:
+      value: {
+        "code": 1003,
+        "type": "NoSuchMetadataObjectException",
+        "message": "Metadata object does not exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.NoSuchUserException: Metadata object does not exist",
+          "..."
+        ]
+      }
+
+    NotFoundException:
+      value: {
+        "code": 1003,
+        "type": "NotFoundException",
+        "message": "Metadata object or owner does not exist",
+        "stack": [
+          "org.apache.gravitino.exceptions.NotFoundException: Metadata object or owner does not exist",
+          "..."
+        ]
+      }

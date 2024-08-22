@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -54,6 +55,7 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -114,7 +116,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   private String catalogName = GravitinoITUtils.genRandomName("iceberg_it_catalog");
   private String schemaName = GravitinoITUtils.genRandomName("iceberg_it_schema");
   private String tableName = GravitinoITUtils.genRandomName("iceberg_it_table");
-  private GravitinoMetalake metalake;
+  protected GravitinoMetalake metalake;
   private Catalog catalog;
   private org.apache.iceberg.catalog.Catalog icebergCatalog;
   private org.apache.iceberg.catalog.SupportsNamespaces icebergSupportsNamespaces;
@@ -219,7 +221,10 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     icebergCatalogProperties.put(
         IcebergConfig.CATALOG_BACKEND_NAME.getKey(), icebergCatalogBackendName);
 
-    icebergCatalog = IcebergCatalogUtil.loadCatalogBackend(TYPE, icebergCatalogProperties);
+    icebergCatalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.valueOf(TYPE.toUpperCase(Locale.ROOT)),
+            new IcebergConfig(icebergCatalogProperties));
     if (icebergCatalog instanceof SupportsNamespaces) {
       icebergSupportsNamespaces = (org.apache.iceberg.catalog.SupportsNamespaces) icebergCatalog;
     }
