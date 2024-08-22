@@ -375,6 +375,24 @@ public class JDBCBackend implements RelationalBackend {
             .getOwner(nameIdentifier, identType)
             .ifPresent(e -> list.add((E) e));
         return list;
+      case METADATA_OBJECT_ROLE_REL:
+        return (List<E>)
+            RoleMetaService.getInstance()
+                .listRolesByMetadataObjectIdentAndType(nameIdentifier, identType);
+      case ROLE_GROUP_REL:
+        if (identType == Entity.EntityType.ROLE) {
+          return (List<E>) GroupMetaService.getInstance().listGroupsByRoleIdent(nameIdentifier);
+        } else {
+          throw new IllegalArgumentException(
+              String.format("ROLE_GROUP_REL doesn't support type %s", identType.name()));
+        }
+      case ROLE_USER_REL:
+        if (identType == Entity.EntityType.ROLE) {
+          return (List<E>) UserMetaService.getInstance().listUsersByRoleIdent(nameIdentifier);
+        } else {
+          throw new IllegalArgumentException(
+              String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
+        }
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

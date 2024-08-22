@@ -22,17 +22,20 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -92,6 +95,21 @@ public class GroupMetaService {
     List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
 
     return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
+  }
+
+  public List<GroupEntity> listGroupsByRoleIdent(NameIdentifier roleIdent) {
+    RoleEntity roleEntity = RoleMetaService.getInstance().getRoleByIdentifier(roleIdent);
+    List<GroupPO> groupPOs =
+        SessionUtils.getWithoutCommit(
+            GroupMetaMapper.class, mapper -> mapper.listGroupsByRoleId(roleEntity.id()));
+    return groupPOs.stream()
+        .map(
+            po ->
+                POConverters.fromGroupPO(
+                    po,
+                    Collections.emptyList(),
+                    AuthorizationUtils.ofGroupNamespace(roleIdent.namespace().level(0))))
+        .collect(Collectors.toList());
   }
 
   public void insertGroup(GroupEntity groupEntity, boolean overwritten) throws IOException {
