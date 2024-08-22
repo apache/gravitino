@@ -84,7 +84,7 @@ public class FutureGrantManager {
 
         boolean supportsFutureGrant = false;
         for (SecurableObject object : role.securableObjects()) {
-          if (AuthorizationUtils.needApplyAllAuthorizationPlugin(object)) {
+          if (AuthorizationUtils.needApplyAuthorizationPluginAllCatalogs(object)) {
             supportsFutureGrant = true;
             break;
           }

@@ -147,7 +147,7 @@ public class AuthorizationUtils {
       Consumer<AuthorizationPlugin> consumer) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
     for (SecurableObject securableObject : securableObjects) {
-      if (needApplyAllAuthorizationPlugin(securableObject)) {
+      if (needApplyAuthorizationPluginAllCatalogs(securableObject)) {
         Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
         for (Catalog catalog : catalogs) {
           callAuthorizationPluginImpl(consumer, catalog);
@@ -194,8 +194,8 @@ public class AuthorizationUtils {
     }
   }
 
-  public static boolean needApplyAllAuthorizationPlugin(SecurableObject securableObject) {
-    // TODO: Add supportsSecurableObjects method for every privilege to simplify this code
+  public static boolean needApplyAuthorizationPluginAllCatalogs(SecurableObject securableObject) {
+    // TODO: Add `supportsSecurableObjects` method for every privilege to simplify this code
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
       for (Privilege privilege : privileges) {
