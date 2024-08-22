@@ -98,7 +98,7 @@ public interface RoleMetaMapper {
           + " ro JOIN "
           + SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME
           + " se ON ro.role_id = se.role_id"
-          + " WHERE se.entity_id = #{metadataObjectId}"
+          + " WHERE se.metadata_object_id = #{metadataObjectId}"
           + " AND se.type = #{metadataObjectType}"
           + " AND ro.deleted_at = 0 AND se.deleted_at = 0")
   List<RolePO> listRolesByMetadataObjectIdAndType(

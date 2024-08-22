@@ -24,7 +24,7 @@ ALTER TABLE `role_meta` MODIFY COLUMN `privilege_conditions` VARCHAR(64) NOT NUL
 CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     `id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'securable object id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
-    `entity_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'The entity id of securable object',
+    `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'The entity id of securable object',
     `type`  VARCHAR(128) NOT NULL COMMENT 'securable object type',
     `privilege_names` VARCHAR(256) NOT NULL COMMENT 'securable object privilege names',
     `privilege_conditions` VARCHAR(256) NOT NULL COMMENT 'securable object privilege conditions',
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'securable object deleted at',
     PRIMARY KEY (`id`),
     KEY `idx_obj_rid` (`role_id`),
-    KEY `idx_obj_eid` (`entity_id`)
+    KEY `idx_obj_eid` (`metadata_object_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'securable object meta';
 
 CREATE TABLE IF NOT EXISTS `tag_meta` (
