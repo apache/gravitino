@@ -16,12 +16,19 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
-
+import atexit
+import errno
+import os
+import subprocess
+import sys
+import threading
 from enum import Enum
 from pathlib import PurePosixPath
+from time import sleep
 from typing import Dict, Tuple
 import re
 import fsspec
+from fsspec import fuse
 
 from cachetools import TTLCache
 from fsspec import AbstractFileSystem
@@ -474,6 +481,92 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             lpath,
             **kwargs,
         )
+
+    def mount(self, path: str, mount_point=None, base_dir=None):
+        assert path is not None
+        if mount_point is None:
+            if path.startswith("gvfs://"):
+                mount_point = path.replace("gvfs:/", "", 1)
+            elif not path.startswith("/"):
+                mount_point = "/" + path
+
+        if base_dir is not None:
+            if mount_point.startswith("/"):
+                mount_point = base_dir + mount_point
+            else:
+                mount_point = base_dir + "/" + mount_point
+
+        # try to umount the mount point first and ignore all exceptions.
+        self._try_to_umount(mount_point)
+
+        # create the directory first.
+        if not os.path.exists(mount_point):
+            os.makedirs(mount_point)
+
+        atexit.register(self._try_to_umount, mount_point)
+        self._mount_path(
+            path,
+            mount_point,
+            self,
+        )
+
+        sleep(1)
+        while True:
+            try:
+                if os.path.exists(mount_point) and os.path.ismount(mount_point):
+                    print(f"Mount {mount_point} successfully!")
+                    break
+            except OSError as e:
+                if e.errno == errno.ENOTCONN:
+                    print(f"waiting {mount_point} mount...")
+                    sleep(1)
+                    pass
+                else:
+                    sys.exit(f"An error occurred: {e}")
+
+    def umount(self, mount_point: str):
+        try:
+            subprocess.check_call(["fusermount", "-uz", mount_point])
+            print(f"Successfully unmounted {mount_point}")
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to unmount {mount_point}: {e}")
+
+    def _not_empty(self, path):
+        try:
+            with os.scandir(path) as entries:
+                return not any(entries)
+        except FileNotFoundError:
+            print(f"waiting {path} mount...")
+            return False
+        except KeyboardInterrupt:
+            print("Interrupted")
+            return True
+
+    def _mount_path_thread(
+            self, path: str, mount_point: str, fs: fsspec.AbstractFileSystem
+    ):
+        print(f"Try to use {fs} to mount {path} to {mount_point}")
+        fsspec.fuse.run(fs, path, mount_point)
+
+    def _try_to_umount(self, mount_point: str):
+        try:
+            print(f"Try to umount {mount_point}")
+            self.umount(mount_point)
+        except OSError as e:
+            if e.errno == errno.ENOTCONN:
+                self.umount(mount_point)
+            else:
+                sys.exit(f"An error occurred: {e}")
+        except Exception as e:
+            print(f"An other error occurred: {e}")
+
+    def _mount_path(self, path: str, mount_point: str, fs: fsspec.AbstractFileSystem):
+        threading.Thread(
+            target=self._mount_path_thread,
+            args=(path, mount_point, fs),
+            daemon=True,
+            name=f"Mount {path} to {mount_point}",
+        ).start()
 
     def _convert_actual_path(self, path, context: FilesetContext):
         """Convert an actual path to a virtual path.
