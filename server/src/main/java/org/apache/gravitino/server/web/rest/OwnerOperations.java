@@ -78,7 +78,10 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Optional<Owner> owner = ownerManager.getOwner(metalake, object);
+            NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, object);
+            Optional<Owner> owner =
+                TreeLockUtils.doWithTreeLock(
+                    ident, LockType.READ, () -> ownerManager.getOwner(metalake, object));
             if (owner.isPresent()) {
               return Utils.ok(new OwnerResponse(DTOConverters.toDTO(owner.get())));
             } else {

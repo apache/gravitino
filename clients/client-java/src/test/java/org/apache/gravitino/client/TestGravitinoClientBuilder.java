@@ -41,11 +41,30 @@ public class TestGravitinoClientBuilder {
       Assertions.assertEquals(ImmutableMap.of(), client1.getHeaders());
     }
   }
+
+  @Test
+  public void testGravitinoClientSimpleAuthWithUserName() {
+    String userName = "test_user";
+    try (MockGravitinoClient client =
+        MockGravitinoClient.builder("http://127.0.0.1").withSimpleAuth(userName).build()) {
+      Assertions.assertArrayEquals(
+          new SimpleTokenProvider(userName).getTokenData(),
+          client.getAuthDataProvider().getTokenData());
+    }
+
+    try (MockGravitinoClient client =
+        MockGravitinoClient.builder("http://127.0.0.1").withSimpleAuth().build()) {
+      Assertions.assertArrayEquals(
+          new SimpleTokenProvider().getTokenData(), client.getAuthDataProvider().getTokenData());
+    }
+  }
 }
 
 class MockGravitinoClient extends GravitinoClientBase {
 
   private Map<String, String> headers;
+
+  private AuthDataProvider authDataProvider;
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -58,10 +77,15 @@ class MockGravitinoClient extends GravitinoClientBase {
       String uri, AuthDataProvider authDataProvider, Map<String, String> headers) {
     super(uri, authDataProvider, false, headers);
     this.headers = headers;
+    this.authDataProvider = authDataProvider;
   }
 
   Map<String, String> getHeaders() {
     return headers;
+  }
+
+  AuthDataProvider getAuthDataProvider() {
+    return authDataProvider;
   }
 
   /**

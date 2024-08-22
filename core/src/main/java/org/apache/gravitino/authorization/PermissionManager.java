@@ -112,7 +112,7 @@ class PermissionManager {
 
       Set<String> catalogs = Sets.newHashSet();
       for (Role grantedRole : roleEntitiesToGrant) {
-        AuthorizationUtils.callAuthorizationPlugin(
+        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
             metalake,
             grantedRole.securableObjects(),
             catalogs,
@@ -191,7 +191,7 @@ class PermissionManager {
 
       Set<String> catalogs = Sets.newHashSet();
       for (Role grantedRole : roleEntitiesToGrant) {
-        AuthorizationUtils.callAuthorizationPlugin(
+        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
             metalake,
             grantedRole.securableObjects(),
             catalogs,
@@ -269,7 +269,7 @@ class PermissionManager {
 
       Set<String> catalogs = Sets.newHashSet();
       for (Role grantedRole : roleEntitiesToRevoke) {
-        AuthorizationUtils.callAuthorizationPlugin(
+        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
             metalake,
             grantedRole.securableObjects(),
             catalogs,
@@ -349,7 +349,7 @@ class PermissionManager {
 
       Set<String> catalogs = Sets.newHashSet();
       for (Role grantedRole : roleEntitiesToRevoke) {
-        AuthorizationUtils.callAuthorizationPlugin(
+        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
             metalake,
             grantedRole.securableObjects(),
             catalogs,
