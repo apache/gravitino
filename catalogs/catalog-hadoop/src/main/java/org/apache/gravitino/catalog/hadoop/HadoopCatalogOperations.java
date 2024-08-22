@@ -376,7 +376,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       fileLocation = storageLocation;
     } else {
       fileLocation =
-          subPath.startsWith("/")
+          processedSubPath.startsWith("/")
               ? String.format("%s%s", storageLocation, processedSubPath)
               : String.format("%s/%s", storageLocation, processedSubPath);
     }
