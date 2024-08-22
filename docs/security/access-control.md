@@ -95,7 +95,7 @@ Users are generally granted one or multiple Roles, and users have different oper
 
 ### Group
 To make it easier to grant a single access control to multiple users, we can add users to a user group, and then grant one or multiple roles to that user group.
-This process allows all users belonging to that user group to have the access control in those Roles.
+This process allows all users belonging to that user group to have the access control in those roles.
 
 ### Metadata objects
 
