@@ -80,7 +80,7 @@ Supports using static access-key-id and secret-access-key to access S3 data.
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
 :::info
-Please set `gravitino.iceberg-rest.warehouse` to `s3://{bucket_name}/${prefix_name}` for JDBC catalog backend, `s3a://{bucket_name}/${prefix_name}` for Hive catalog backend.
+Please set `warehouse` to `s3://{bucket_name}/${prefix_name}` for JDBC catalog backend, `s3a://{bucket_name}/${prefix_name}` for Hive catalog backend and download [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
 :::
 
 #### Catalog backend security
