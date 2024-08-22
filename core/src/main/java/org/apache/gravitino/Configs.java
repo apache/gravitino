@@ -26,7 +26,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.utils.TypeValid;
 
 public class Configs {
 
@@ -130,7 +129,7 @@ public class Configs {
           .doc("Connection URL of `JDBCBackend`")
           .version(ConfigConstants.VERSION_0_5_0)
           .stringConf()
-          .checkValue(TypeValid::isJdbcURL, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_URL);
 
   public static final ConfigEntry<String> ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER =
