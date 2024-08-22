@@ -60,7 +60,7 @@ When a user has more than one Role, Gravitino will use the user's current Role f
 
 ### Role
 
-The traditional rights system generally uses RBAC (Role-Based Access Control) for rights management,
+The traditional access control system generally uses RBAC (Role-Based Access Control) for access control management,
 where each Role contains a collection of different operating privileges for a different securable object.
 When the system adds a new user or user group, you can select the Roles which they are expected to be granted to,
 so that the user can quickly start using it, without waiting for the administrator to gradually set up the access rights to securable object for him.
