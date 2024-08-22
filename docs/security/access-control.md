@@ -86,7 +86,7 @@ To enforce this, we’ll introduce the concept of Ownership as a complete replac
 ### Ownership
 
 When you create a resource (Gravitino Service, Metalake, Catalog, and any other entity) in Gravitino, each entity has an Owner field that defines the user (or group) to which the resource belongs.
-The owner of each entity has implicit administrative class privilege, for example, to delete that resource.
+The owner of each entity has implicit administrative class privilege, for example, to delete that securable object.
 Only the Owner of a resource can fully manage that resource.
 If a resource needs to be managed by more than one person at the same time, the owner is assigned to a user group.
 
