@@ -153,7 +153,7 @@ public class AuthorizationUtils {
           callAuthorizationPluginImpl(consumer, catalog);
         }
 
-      } else if (supportsPushdownAuthorizationPlugin(securableObject.type())) {
+      } else if (needApplyAuthorization(securableObject.type())) {
         NameIdentifier catalogIdent =
             NameIdentifierUtil.getCatalogIdentifier(
                 MetadataObjectUtil.toEntityIdent(metalake, securableObject));
@@ -169,12 +169,12 @@ public class AuthorizationUtils {
   public static void callAuthorizationPluginForMetadataObject(
       String metalake, MetadataObject metadataObject, Consumer<AuthorizationPlugin> consumer) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    if (needApplyAllAuthorizationPlugins(metadataObject.type())) {
+    if (needApplyAuthorizationPluginAllCatalogs(metadataObject.type())) {
       Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
       for (Catalog catalog : catalogs) {
         callAuthorizationPluginImpl(consumer, catalog);
       }
-    } else if (supportsPushdownAuthorizationPlugin(metadataObject.type())) {
+    } else if (needApplyAuthorization(metadataObject.type())) {
       NameIdentifier catalogIdent =
           NameIdentifierUtil.getCatalogIdentifier(
               MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
@@ -207,11 +207,11 @@ public class AuthorizationUtils {
     return false;
   }
 
-  private static boolean needApplyAllAuthorizationPlugins(MetadataObject.Type type) {
+  private static boolean needApplyAuthorizationPluginAllCatalogs(MetadataObject.Type type) {
     return type == MetadataObject.Type.METALAKE;
   }
 
-  private static boolean supportsPushdownAuthorizationPlugin(MetadataObject.Type type) {
+  private static boolean needApplyAuthorization(MetadataObject.Type type) {
     return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
   }
 }
