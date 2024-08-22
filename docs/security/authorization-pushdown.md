@@ -9,16 +9,13 @@ license: "This software is licensed under the Apache License version 2."
 
 ![authorization push down](../assets/security/authorization-pushdown.png)
 
-Gravitino also provides a set of authorization frameworks to interact with different underlying data source
-permission systems (e.g., MySQL's own permission management and the Apache Ranger permission management system for big data)
-in accordance with its own authorization model and methodology.
-On top of this, Gravitino manages different underlying data sources through Catalogs.
-When a user performs an authorization operation on the data in a Catalog, Gravitino will call the interface of the Authorization Plugin module in the respective Catalog to translate the Gravitino authorization model into the underlying data source's permission rules of the underlying data source.
-Permission is then pushed down to the underlying permission system through the client of the underlying data source (JDBC or Apache Ranger client, etc.).
+Gravitino offers a set of authorization frameworks that integrate with various underlying data source permission systems, such as MySQL's native permission management and Apache Ranger for big data. These frameworks align with Gravitino's own authorization model and methodology.
+Gravitino manages different data sources through Catalogs, and when a user performs an authorization operation on data within a Catalog, Gravitino invokes the Authorization Plugin module for that Catalog.
+This module translates Gravitino's authorization model into the permission rules of the underlying data source. The permissions are then enforced by the underlying permission system via the respective client, such as JDBC or the Apache Ranger client.
 
 ### Authorization Hive with Ranger properties
 
-The Authorization Ranger Hive Plugin extends the following properties in the [Apache Hive catalog properties](../apache-hive-catalog.md#catalog-properties):
+In order to use the Authorization Ranger Hive Plugin, you need to configure the following properties and [Apache Hive catalog properties](../apache-hive-catalog.md#catalog-properties):
 
 | Property Name                       | Description                                                                                                                                          | Default Value | Required | Since Version |
 |-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -29,7 +26,7 @@ The Authorization Ranger Hive Plugin extends the following properties in the [Ap
 | `authorization.ranger.password`     | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)        | No       | 0.6.0         |
 | `authorization.ranger.service.name` | The Apache Ranger service name.                                                                                                                      | (none)        | No       | 0.6.0         |
 
-Once you have used the correct configuration, you can perform authorization operations by calling Gravitino's [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-roles-to-a-user).
+Once you have used the correct configuration, you can perform authorization operations by calling Gravitino [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-roles-to-a-user).
 
 #### Example of using the Authorization Ranger Hive Plugin
 
@@ -47,5 +44,5 @@ authorization.ranger.service.name=hiveRepo
 ```
 
 :::caution
-The Gravitino 0.6.0 version only supports the authorization Apache Ranger Hive service. We plan to support more data source authorization in the future.
+Gravitino 0.6.0 only supports the authorization Apache Ranger Hive service and more data source authorization is under development.
 :::
