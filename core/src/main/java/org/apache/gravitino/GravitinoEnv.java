@@ -426,7 +426,7 @@ public class GravitinoEnv {
 
       this.accessControlDispatcher = accessControlHookDispatcher;
       this.ownerManager = new OwnerManager(entityStore);
-      this.futureGrantManager = new FutureGrantManager(entityStore);
+      this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
       this.accessControlDispatcher = null;
       this.ownerManager = null;
