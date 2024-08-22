@@ -557,43 +557,39 @@ public class CatalogHiveIT extends AbstractIT {
     Column[] columns = createColumns();
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
     // test default properties
-    Table createdTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                nameIdentifier,
-                columns,
-                TABLE_COMMENT,
-                ImmutableMap.of(),
-                Transforms.EMPTY_TRANSFORM);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            nameIdentifier, columns, TABLE_COMMENT, ImmutableMap.of(), Transforms.EMPTY_TRANSFORM);
+    Table loadedTable1 = catalog.asTableCatalog().loadTable(nameIdentifier);
     HiveTablePropertiesMetadata tablePropertiesMetadata = new HiveTablePropertiesMetadata();
     org.apache.hadoop.hive.metastore.api.Table actualTable =
         hiveClientPool.run(client -> client.getTable(schemaName, tableName));
-    assertDefaultTableProperties(createdTable, actualTable);
+    assertDefaultTableProperties(loadedTable1, actualTable);
     checkTableReadWrite(actualTable);
 
     // test set properties
     String table2 = GravitinoITUtils.genRandomName(TABLE_PREFIX);
-    Table createdTable2 =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                NameIdentifier.of(schemaName, table2),
-                columns,
-                TABLE_COMMENT,
-                ImmutableMap.of(
-                    TABLE_TYPE,
-                    "external_table",
-                    LOCATION,
-                    String.format(
-                        "hdfs://%s:%d/tmp",
-                        containerSuite.getHiveContainer().getContainerIpAddress(),
-                        HiveContainer.HDFS_DEFAULTFS_PORT),
-                    FORMAT,
-                    "textfile",
-                    SERDE_LIB,
-                    HiveStorageConstants.OPENCSV_SERDE_CLASS),
-                Transforms.EMPTY_TRANSFORM);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, table2),
+            columns,
+            TABLE_COMMENT,
+            ImmutableMap.of(
+                TABLE_TYPE,
+                "external_table",
+                LOCATION,
+                String.format(
+                    "hdfs://%s:%d/tmp",
+                    containerSuite.getHiveContainer().getContainerIpAddress(),
+                    HiveContainer.HDFS_DEFAULTFS_PORT),
+                FORMAT,
+                "textfile",
+                SERDE_LIB,
+                HiveStorageConstants.OPENCSV_SERDE_CLASS),
+            Transforms.EMPTY_TRANSFORM);
+    Table loadedTable2 = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, table2));
     org.apache.hadoop.hive.metastore.api.Table actualTable2 =
         hiveClientPool.run(client -> client.getTable(schemaName, table2));
 
@@ -612,9 +608,9 @@ public class CatalogHiveIT extends AbstractIT {
         ((Boolean) tablePropertiesMetadata.getDefaultValue(EXTERNAL)).toString().toUpperCase(),
         actualTable.getParameters().get(EXTERNAL));
     Assertions.assertTrue(actualTable2.getSd().getLocation().endsWith("/tmp"));
-    Assertions.assertNotNull(createdTable2.properties().get(TRANSIENT_LAST_DDL_TIME));
-    Assertions.assertNotNull(createdTable2.properties().get(NUM_FILES));
-    Assertions.assertNotNull(createdTable2.properties().get(TOTAL_SIZE));
+    Assertions.assertNotNull(loadedTable2.properties().get(TRANSIENT_LAST_DDL_TIME));
+    Assertions.assertNotNull(loadedTable2.properties().get(NUM_FILES));
+    Assertions.assertNotNull(loadedTable2.properties().get(TOTAL_SIZE));
     checkTableReadWrite(actualTable2);
 
     // test alter properties exception

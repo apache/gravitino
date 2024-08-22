@@ -199,14 +199,27 @@ const DetailsDrawer = props => {
                   return (
                     <TableRow key={index} data-refer={`details-props-index-${index}`}>
                       <TableCell className={'twc-py-[0.7rem]'} data-refer={`details-props-key-${item.key}`}>
-                        {item.key}
+                        <Tooltip
+                          title={<span data-refer={`tip-details-props-key-${item.key}`}>{item.key}</span>}
+                          placement='bottom'
+                        >
+                          {item.key.length > 22 ? `${item.key.substring(0, 22)}...` : item.key}
+                        </Tooltip>
                       </TableCell>
                       <TableCell
                         className={'twc-py-[0.7rem]'}
                         data-refer={`details-props-value-${item.value}`}
                         data-prev-refer={`details-props-key-${item.key}`}
                       >
-                        {item.key === 'jdbc-password' ? '[HIDDEN]' : item.value}
+                        {item.key === 'jdbc-password' && '[HIDDEN]'}
+                        {item.key !== 'jdbc-password' && (
+                          <Tooltip
+                            title={<span data-prev-refer={`tip-details-props-key-${item.key}`}>{item.value}</span>}
+                            placement='bottom'
+                          >
+                            {item.value.length > 22 ? `${item.value.substring(0, 22)}...` : item.value}
+                          </Tooltip>
+                        )}
                       </TableCell>
                     </TableRow>
                   )

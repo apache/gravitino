@@ -21,6 +21,7 @@ package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.errorprone.annotations.InlineMe;
 import java.io.Closeable;
@@ -28,6 +29,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Version;
@@ -223,6 +225,18 @@ public abstract class GravitinoClientBase implements Closeable {
      */
     public Builder<T> withSimpleAuth() {
       this.authDataProvider = new SimpleTokenProvider();
+      return this;
+    }
+
+    /**
+     * Sets the simple mode authentication for Gravitino with a specific username
+     *
+     * @param userName The username of the user.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withSimpleAuth(String userName) {
+      Preconditions.checkArgument(StringUtils.isNotBlank(userName), "userName can't be blank");
+      this.authDataProvider = new SimpleTokenProvider(userName);
       return this;
     }
 
