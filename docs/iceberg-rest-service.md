@@ -117,7 +117,7 @@ Gravitino Iceberg REST service supports using static access-key-id and secret-ac
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
 
 :::info
-Please set `gravitino.iceberg-rest.warehouse` to `s3://{bucket_name}/${prefix_name}` for Jdbc catalog backend, `s3a://{bucket_name}/${prefix_name}` for Hive catalog backend and download [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it to the classpath of Iceberg REST server.
+To configure the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
 #### HDFS configuration
