@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -54,7 +55,6 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.authentication.OAuthConfig;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
-import org.apache.gravitino.shaded.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hc.core5.http.HttpStatus;
