@@ -24,6 +24,7 @@ from gravitino import GravitinoAdminClient, GravitinoMetalake, MetalakeChange
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
 from gravitino.exceptions.base import (
+    GravitinoRuntimeException,
     NoSuchMetalakeException,
     MetalakeAlreadyExistsException,
 )
@@ -54,16 +55,23 @@ class TestMetalake(IntegrationTestEnv):
         self.clean_test_data()
 
     def clean_test_data(self):
-        logger.info(
-            "Drop metalake %s[%s]",
-            self.metalake_name,
-            self.drop_metalake(self.metalake_name),
-        )
-        logger.info(
-            "Drop metalake %s[%s]",
-            self.metalake_new_name,
-            self.drop_metalake(self.metalake_new_name),
-        )
+        try:
+            logger.info(
+                "Drop metalake %s[%s]",
+                self.metalake_name,
+                self.drop_metalake(self.metalake_name),
+            )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop metalake %s", self.metalake_name)
+
+        try:
+            logger.info(
+                "Drop metalake %s[%s]",
+                self.metalake_new_name,
+                self.drop_metalake(self.metalake_new_name),
+            )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop metalake %s", self.metalake_new_name)
 
     def test_create_metalake(self):
         metalake = self.create_metalake(self.metalake_name)
