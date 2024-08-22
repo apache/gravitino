@@ -120,7 +120,7 @@ public class RoleMetaService {
     for (SecurableObjectPO securableObjectPO : securableObjectPOs) {
       String fullName =
           MetadataObjectService.getMetadataObjectFullName(
-              securableObjectPO.getType(), securableObjectPO.getEntityId());
+              securableObjectPO.getType(), securableObjectPO.getMetadataObjectId());
       if (fullName != null) {
         securableObjects.add(
             POConverters.fromSecurableObjectPO(
@@ -128,7 +128,7 @@ public class RoleMetaService {
       } else {
         LOG.info(
             "The securable object {} {} may be deleted",
-            securableObjectPO.getEntityId(),
+            securableObjectPO.getMetadataObjectId(),
             securableObjectPO.getType());
       }
     }
@@ -154,7 +154,7 @@ public class RoleMetaService {
         SecurableObjectPO.Builder objectBuilder =
             POConverters.initializeSecurablePOBuilderWithVersion(
                 roleEntity.id(), object, getEntityType(object));
-        objectBuilder.withEntityId(
+        objectBuilder.withMetadataObjectId(
             MetadataObjectService.getMetadataObjectId(
                 metalakeId, object.fullName(), object.type()));
         securableObjectPOs.add(objectBuilder.build());

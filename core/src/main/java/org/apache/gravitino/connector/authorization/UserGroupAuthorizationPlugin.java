@@ -18,9 +18,9 @@
  */
 package org.apache.gravitino.connector.authorization;
 
-import java.util.List;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
-import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.User;
 
 /**
@@ -98,46 +98,15 @@ interface UserGroupAuthorizationPlugin {
   Boolean onGroupAcquired(Group group) throws RuntimeException;
 
   /**
-   * After granting roles to a user from Gravitino, this method is called to grant roles to the user
-   * in the underlying system. <br>
+   * After set a Owner to Gravitino, this method is called to set the Owner to the underlying
+   * system. <br>
    *
-   * @param user The entity of the User.
-   * @param roles The entities of the Roles.
-   * @return True if the Grant was successful, false if the Grant was failed.
-   * @throws RuntimeException If granting roles to a user encounters storage issues.
+   * @param metadataObject The metadata entity.
+   * @param preOwner The previous owner.
+   * @param newOwner The new owner.
+   * @return True if the set Owner was successfully set, false if the set Owner failed.
+   * @throws RuntimeException If adding the Group encounters storage issues.
    */
-  Boolean onGrantedRolesToUser(List<Role> roles, User user) throws RuntimeException;
-
-  /**
-   * After revoking roles from a user from Gravitino, this method is called to revoke roles from the
-   * user in the underlying system. <br>
-   *
-   * @param user The entity of the User.
-   * @param roles The entities of the Roles.
-   * @return True if the revoke was successfully removed, false if the revoke failed.
-   * @throws RuntimeException If revoking roles from a user encounters storage issues.
-   */
-  Boolean onRevokedRolesFromUser(List<Role> roles, User user) throws RuntimeException;
-
-  /**
-   * After granting roles to a group from Gravitino, this method is called to grant roles to the
-   * group in the underlying system. <br>
-   *
-   * @param group The entity of the Group.
-   * @param roles The entities of the Roles.
-   * @return True if the revoke was successfully removed, False if the revoke failed.
-   * @throws RuntimeException If granting roles to a group encounters storage issues.
-   */
-  Boolean onGrantedRolesToGroup(List<Role> roles, Group group) throws RuntimeException;
-
-  /**
-   * After revoking roles from a group from Gravitino, this method is called to revoke roles from
-   * the group in the underlying system. <br>
-   *
-   * @param group The entity of the Group.
-   * @param roles The entities of the Roles.
-   * @return True if the revoke was successfully removed, False if the revoke failed.
-   * @throws RuntimeException If revoking roles from a group encounters storage issues.
-   */
-  Boolean onRevokedRolesFromGroup(List<Role> roles, Group group) throws RuntimeException;
+  Boolean onOwnerSet(MetadataObject metadataObject, Owner preOwner, Owner newOwner)
+      throws RuntimeException;
 }

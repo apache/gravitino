@@ -140,45 +140,62 @@ public class AuthorizationUtils {
   // Every catalog has one authorization plugin, we should avoid calling
   // underlying authorization repeatedly. So we use a set to record which
   // catalog has been called the authorization plugin.
-  public static void callAuthorizationPlugin(
+  public static void callAuthorizationPluginForSecurableObjects(
       String metalake,
       List<SecurableObject> securableObjects,
       Set<String> catalogsAlreadySet,
       Consumer<AuthorizationPlugin> consumer) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
     for (SecurableObject securableObject : securableObjects) {
-      if (needApplyAllAuthorizationPlugin(securableObject)) {
+      if (needApplyAuthorizationPluginAllCatalogs(securableObject)) {
         Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
         for (Catalog catalog : catalogs) {
-          callAuthorizationPluginImpl(catalogsAlreadySet, consumer, catalog);
+          callAuthorizationPluginImpl(consumer, catalog);
         }
 
-      } else if (supportsSingleAuthorizationPlugin(securableObject.type())) {
+      } else if (needApplyAuthorization(securableObject.type())) {
         NameIdentifier catalogIdent =
             NameIdentifierUtil.getCatalogIdentifier(
                 MetadataObjectUtil.toEntityIdent(metalake, securableObject));
         Catalog catalog = catalogManager.loadCatalog(catalogIdent);
-        callAuthorizationPluginImpl(catalogsAlreadySet, consumer, catalog);
-      }
-    }
-  }
-
-  private static void callAuthorizationPluginImpl(
-      Set<String> catalogsAlreadySet, Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
-    if (!catalogsAlreadySet.contains(catalog.name())) {
-      catalogsAlreadySet.add(catalog.name());
-
-      if (catalog instanceof BaseCatalog) {
-        BaseCatalog baseCatalog = (BaseCatalog) catalog;
-        if (baseCatalog.getAuthorizationPlugin() != null) {
-          consumer.accept(baseCatalog.getAuthorizationPlugin());
+        if (!catalogsAlreadySet.contains(catalog.name())) {
+          catalogsAlreadySet.add(catalog.name());
+          callAuthorizationPluginImpl(consumer, catalog);
         }
       }
     }
   }
 
-  public static boolean needApplyAllAuthorizationPlugin(SecurableObject securableObject) {
-    // TODO: Add supportsSecurableObjects method for every privilege to simplify this code
+  public static void callAuthorizationPluginForMetadataObject(
+      String metalake, MetadataObject metadataObject, Consumer<AuthorizationPlugin> consumer) {
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    if (needApplyAuthorizationPluginAllCatalogs(metadataObject.type())) {
+      Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
+      for (Catalog catalog : catalogs) {
+        callAuthorizationPluginImpl(consumer, catalog);
+      }
+    } else if (needApplyAuthorization(metadataObject.type())) {
+      NameIdentifier catalogIdent =
+          NameIdentifierUtil.getCatalogIdentifier(
+              MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
+      Catalog catalog = catalogManager.loadCatalog(catalogIdent);
+      callAuthorizationPluginImpl(consumer, catalog);
+    }
+  }
+
+  private static void callAuthorizationPluginImpl(
+      Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
+
+    if (catalog instanceof BaseCatalog) {
+      BaseCatalog baseCatalog = (BaseCatalog) catalog;
+      if (baseCatalog.getAuthorizationPlugin() != null) {
+        consumer.accept(baseCatalog.getAuthorizationPlugin());
+      }
+    }
+  }
+
+  public static boolean needApplyAuthorizationPluginAllCatalogs(SecurableObject securableObject) {
+    // TODO: Add `supportsSecurableObjects` method for every privilege to simplify this code
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
       for (Privilege privilege : privileges) {
@@ -190,7 +207,11 @@ public class AuthorizationUtils {
     return false;
   }
 
-  private static boolean supportsSingleAuthorizationPlugin(MetadataObject.Type type) {
+  private static boolean needApplyAuthorizationPluginAllCatalogs(MetadataObject.Type type) {
+    return type == MetadataObject.Type.METALAKE;
+  }
+
+  private static boolean needApplyAuthorization(MetadataObject.Type type) {
     return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
   }
 }

@@ -22,6 +22,7 @@ package org.apache.gravitino.catalog.hive;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -128,6 +129,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   false /* hidden */,
                   false /* reserved */))
           .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
+          .putAll(AuthorizationPropertiesMeta.RANGER_AUTHORIZATION_PROPERTY_ENTRIES)
           .build();
 
   @Override
