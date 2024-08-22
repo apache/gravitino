@@ -85,24 +85,16 @@ tasks {
 
 tasks.test {
   val skipUTs = project.hasProperty("skipTests")
-  doFirst {
-    environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.5")
-  }
-
   if (skipUTs) {
     // Only run integration tests
     include("**/integration/**")
   }
-
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

@@ -68,7 +68,11 @@ public class OwnerManager {
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
     try {
+      Optional<Owner> originOwner = getOwner(metalake, metadataObject);
+
       NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+      OwnerImpl newOwner = new OwnerImpl();
+
       if (ownerType == Owner.Type.USER) {
         NameIdentifier ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
         TreeLockUtils.doWithTreeLock(
@@ -86,6 +90,9 @@ public class OwnerManager {
                       true);
               return null;
             });
+
+        newOwner.name = ownerName;
+        newOwner.type = Owner.Type.USER;
       } else if (ownerType == Owner.Type.GROUP) {
         NameIdentifier ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
         TreeLockUtils.doWithTreeLock(
@@ -103,7 +110,16 @@ public class OwnerManager {
                       true);
               return null;
             });
+
+        newOwner.name = ownerName;
+        newOwner.type = Owner.Type.GROUP;
       }
+
+      AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+          metalake,
+          metadataObject,
+          authorizationPlugin ->
+              authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
     } catch (NoSuchEntityException nse) {
       LOG.warn(
           "Metadata object {} or owner {} is not found", metadataObject.fullName(), ownerName, nse);
@@ -124,16 +140,12 @@ public class OwnerManager {
       OwnerImpl owner = new OwnerImpl();
       NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       List<? extends Entity> entities =
-          TreeLockUtils.doWithTreeLock(
-              ident,
-              LockType.READ,
-              () ->
-                  store
-                      .relationOperations()
-                      .listEntitiesByRelation(
-                          SupportsRelationOperations.Type.OWNER_REL,
-                          ident,
-                          MetadataObjectUtil.toEntityType(metadataObject)));
+          store
+              .relationOperations()
+              .listEntitiesByRelation(
+                  SupportsRelationOperations.Type.OWNER_REL,
+                  ident,
+                  MetadataObjectUtil.toEntityType(metadataObject));
 
       if (entities.isEmpty()) {
         return Optional.empty();

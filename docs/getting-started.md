@@ -195,7 +195,7 @@ Installing and configuring Hive can be a little complex. If you don't already ha
 Follow these instructions for setting up [Docker on Ubuntu](https://docs.docker.com/engine/install/ubuntu/).
 
 ```shell
-sudo docker run --name gravitino-container -d -p 9000:9000 -p 8088:8088 -p 50010:50010 -p 50070:50070 -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 -p 9083:9083 -p 8022:22 datastrato/hive:2.7.3-no-yarn
+sudo docker run --name gravitino-container -d -p 9000:9000 -p 8088:8088 -p 50010:50010 -p 50070:50070 -p 50075:50075 -p 10000:10000 -p 10002:10002 -p 8888:8888 -p 9083:9083 -p 8022:22 apache/gravitino-playground:hive:2.7.3
 ```
 
 Once Docker is installed, you can start the container with the command:

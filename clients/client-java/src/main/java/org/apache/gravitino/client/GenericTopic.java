@@ -109,4 +109,9 @@ class GenericTopic implements Topic, SupportsTags {
   public int hashCode() {
     return topicDTO.hashCode();
   }
+
+  @Override
+  public String toString() {
+    return "GenericTopic{" + "topicDTO=" + topicDTO.toString() + '}';
+  }
 }

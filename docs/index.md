@@ -24,7 +24,7 @@ your system `PATH`, or the `JAVA_HOME` environment variable pointing to a Java i
 
 See [How to install Gravitino](./how-to-install.md) to learn how to install the Gravitino server.
 
-Gravitino provides Docker images on [Docker Hub](https://hub.docker.com/u/datastrato).
+Gravitino provides Docker images on [Docker Hub](https://hub.docker.com/u/apache).
 Pull the image and run it. For details of the Gravitino Docker image, see
 [Docker image details](./docker-image-details.md).
 

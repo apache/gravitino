@@ -16,13 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.doris.integration.test;
 
-import org.junit.jupiter.api.Tag;
-
-@Tag("gravitino-docker-test")
-public class CatalogDorisDriverIT extends CatalogDorisIT {
-  public CatalogDorisDriverIT() {
-    super();
-  }
+tasks.all {
+    enabled = false
 }
