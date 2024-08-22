@@ -45,7 +45,7 @@ public class TrinoITContainers implements AutoCloseable {
       throw new RuntimeException("GRAVITINO_ROOT_DIR is not set");
     }
 
-    dockerComposeDir = ITUtils.joinPath(dir, "integration-test", "trino-it");
+    dockerComposeDir = ITUtils.joinPath(dir, "integration-test-common", "docker-script");
   }
 
   public void launch(int gravitinoServerPort) throws Exception {

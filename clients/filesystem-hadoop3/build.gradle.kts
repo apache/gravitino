@@ -24,15 +24,35 @@ plugins {
 }
 
 dependencies {
+  compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly(libs.hadoop3.common)
-  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(libs.caffeine)
 
+  testImplementation(project(":api"))
   testImplementation(project(":core"))
+  testImplementation(project(":common"))
+  testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(libs.awaitility)
+  testImplementation(libs.bundles.jetty)
+  testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
-  testImplementation(libs.hadoop3.common)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.guava)
+  testImplementation(libs.hadoop3.common) {
+    exclude("*")
+  }
+  testImplementation(libs.hadoop3.hdfs) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet", "servlet-api")
+    exclude("io.netty")
+  }
+  testImplementation(libs.httpclient5)
+  testImplementation(libs.javax.jaxb.api) {
+    exclude("*")
+  }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.minikdc)
@@ -47,8 +67,21 @@ tasks.build {
   dependsOn("javadoc")
 }
 
+tasks.test {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
+  }
+}
+
 tasks.javadoc {
   dependsOn(":clients:client-java-runtime:javadoc")
   source = sourceSets["main"].allJava +
     project(":clients:client-java-runtime").sourceSets["main"].allJava
+}
+
+tasks.clean {
+  delete("target")
 }
