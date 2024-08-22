@@ -24,7 +24,7 @@ We may not be able to properly set permissions to the underlying system, so when
 To mitigate this issue, Gravitino aims to provide a unified authorization model and accompanying methods that sit on top of all the data sources instead, making it much easier to manage access privileges.
 
 It is important to note that Gravitino’s authorization model will not merge the access control systems of the underlying data sources to form a large and unwieldy set of privileges.
-Instead, We will summarize the usage of the privileges currently in use within the data system, and offer a set of Gravitino-native permission models that accurately reflect it.
+Instead, We will summarize the usage of the privileges currently in use within the data system, and offer a set of Gravitino-native privilege models that accurately reflect it.
 
 This is so that when users and data engines use Gravitino for data processing, this permission model is used to address the complexity of managing access control for different data sources.
 This set of permission models is meant to keep everything within the Gravitino system while still managing the access control settings of different data sources separately.
