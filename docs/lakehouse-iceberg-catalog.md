@@ -109,7 +109,7 @@ Supports using google credential file to access GCS data.
 
 | Configuration item     | Description                                                                                        | Default value | Required | Since Version |
 |------------------------|----------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `io-impl`              | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.gcp.gcs.GCSFileIO` for GCS. | (none)        | No       | 0.7.0         |
+| `io-impl`              | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.gcp.gcs.GCSFileIO` for GCS. | (none)        | No       | 0.6.0         |
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.bypass.gcs.project-id`.
 
