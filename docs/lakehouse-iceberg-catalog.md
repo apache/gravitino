@@ -103,6 +103,22 @@ For other Iceberg OSS properties not managed by Gravitino like `client.security-
 Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
+#### GCS
+
+Supports using google credential file to access GCS data.
+
+| Configuration item     | Description                                                                                        | Default value | Required | Since Version |
+|------------------------|----------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `io-impl`              | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.gcp.gcs.GCSFileIO` for GCS. | (none)        | No       | 0.7.0         |
+
+For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.bypass.gcs.project-id`.
+
+Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino server is started.
+
+:::info
+Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+:::
+
 #### Catalog backend security
 
 Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
