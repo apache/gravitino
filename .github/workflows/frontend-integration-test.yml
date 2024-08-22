@@ -89,8 +89,8 @@ jobs:
       - name: Frontend Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :integration-test:test --tests "org.apache.gravitino.integration.test.web.ui.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :integration-test:test --tests "org.apache.gravitino.integration.test.web.ui.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :web:integration-test:test --tests "org.apache.gravitino.integration.test.web.ui.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :web:integration-test:test --tests "org.apache.gravitino.integration.test.web.ui.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
@@ -99,9 +99,10 @@ jobs:
           name: integrate-test-reports-${{ matrix.java-version }}
           path: |
             build/reports
-            integration-test/build/integration-test-integration-test.log
-            integration-test/build/*.tar
+            integration-test-common/build/integration-test-integration-test.log
+            integration-test-common/build/*.tar
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
             catalogs/**/*.tar
+            web/integration-test/build/*.log
