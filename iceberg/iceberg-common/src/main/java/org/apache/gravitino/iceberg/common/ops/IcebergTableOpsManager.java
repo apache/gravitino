@@ -20,9 +20,13 @@ package org.apache.gravitino.iceberg.common.ops;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Map;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -44,9 +48,32 @@ public class IcebergTableOpsManager implements AutoCloseable {
   private final IcebergTableOpsProvider provider;
 
   public IcebergTableOpsManager(Map<String, String> properties) {
-    this.icebergTableOpsCache = Caffeine.newBuilder().build();
     this.provider = createProvider(properties);
     this.provider.initialize(properties);
+    this.icebergTableOpsCache =
+        Caffeine.newBuilder()
+            .expireAfterWrite(
+                (new IcebergConfig(properties))
+                    .get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL),
+                TimeUnit.MILLISECONDS)
+            .removalListener(
+                (k, v, c) -> {
+                  LOG.info("Remove IcebergTableOps cache {}.", k);
+                  try {
+                    ((IcebergTableOps) v).close();
+                  } catch (Exception ex) {
+                    throw new RuntimeException(ex);
+                  }
+                })
+            .scheduler(
+                Scheduler.forScheduledExecutorService(
+                    new ScheduledThreadPoolExecutor(
+                        1,
+                        new ThreadFactoryBuilder()
+                            .setDaemon(true)
+                            .setNameFormat("table-ops-cleaner-%d")
+                            .build())))
+            .build();
   }
 
   /**

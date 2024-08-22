@@ -166,6 +166,13 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .create();
 
+  public static final ConfigEntry<Long> ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL =
+      new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL)
+          .doc("Catalog cache eviction interval.")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .longConf()
+          .createWithDefault(Long.MAX_VALUE);
+
   public static final ConfigEntry<String> ICEBERG_REST_CATALOG_PROVIDER =
       new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER)
           .doc(
@@ -184,7 +191,8 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<String> GRAVITINO_METALAKE =
       new ConfigBuilder(IcebergConstants.GRAVITINO_METALAKE)
-          .doc("The metalake name that `gravitino-based-provider` used to request to Gravitino.")
+          .doc(
+              "The metalake name that `gravitino-based-provider` used to request to Gravitino, only worked if `catalog-provider` is `gravitino-based-provider`.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
