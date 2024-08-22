@@ -218,33 +218,28 @@ public class CatalogRegister {
   }
 
   private void executeSql(String sql) {
-    int retries = EXECUTE_QUERY_MAX_RETRIES;
-    Exception failedException = null;
-
-    while (retries-- > 0) {
-      try (Statement statement = connection.createStatement()) {
-        // check the catalog is already created
-        statement.execute(sql);
-        return;
-      } catch (Exception e) {
-        failedException = e;
-        LOG.warn("Execute command failed: {}, retrying... ({} retries left)", sql, retries, e);
-        try {
-          Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
-        } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt(); // Preserve interrupt status
-          throw new TrinoException(
+    try {
+      int retries = EXECUTE_QUERY_MAX_RETRIES;
+      Exception failedException =
+          new TrinoException(
               GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
-              "Thread was interrupted while executing query: " + sql,
-              ie);
+              "Initial placeholder exception - this should be replaced with a real exception if retries fail.");
+      while (retries-- > 0) {
+        try (Statement statement = connection.createStatement()) {
+          // check the catalog is already created
+          statement.execute(sql);
+          return;
+        } catch (Exception e) {
+          failedException = e;
+          LOG.warn("Execute command failed: {}, ", sql, e);
+          Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
         }
       }
+      throw failedException;
+    } catch (Exception e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to execute query: " + sql, e);
     }
-
-    throw new TrinoException(
-        GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
-        "Failed to execute query after " + EXECUTE_QUERY_MAX_RETRIES + " retries: " + sql,
-        failedException);
   }
 
   public void unregisterCatalog(String name) {
