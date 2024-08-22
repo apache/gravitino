@@ -29,7 +29,11 @@ import io.trino.spi.block.BlockBuilder;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeMap;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -56,21 +60,36 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
 
   @Override
   public Page loadPageData() {
-    List<GravitinoCatalog> catalogs = catalogConnectorManager.getCatalogs();
-    int size = catalogs.size();
+    List<GravitinoCatalog> gravitinoCatalogs = new ArrayList<>();
+    // retrieve catalogs form the Gravitino server with the configuration metalakes,
+    // the catalogConnectorManager does not manager catalogs in worker nodes
+    catalogConnectorManager
+        .getUsedMetalakes()
+        .forEach(
+            (metalakeName) -> {
+              GravitinoMetalake metalake = catalogConnectorManager.getMetalake(metalakeName);
+              Catalog[] catalogs = metalake.listCatalogsInfo();
+              for (Catalog catalog : catalogs) {
+                if (catalog.type() == Catalog.Type.RELATIONAL) {
+                  gravitinoCatalogs.add(new GravitinoCatalog(metalakeName, catalog));
+                }
+              }
+            });
+    int size = gravitinoCatalogs.size();
 
     BlockBuilder nameColumnBuilder = VARCHAR.createBlockBuilder(null, size);
     BlockBuilder providerColumnBuilder = VARCHAR.createBlockBuilder(null, size);
     BlockBuilder propertyColumnBuilder = VARCHAR.createBlockBuilder(null, size);
 
-    for (GravitinoCatalog catalog : catalogs) {
+    for (GravitinoCatalog catalog : gravitinoCatalogs) {
       Preconditions.checkNotNull(catalog, "catalog should not be null");
 
       VARCHAR.writeString(nameColumnBuilder, catalog.getName());
       VARCHAR.writeString(providerColumnBuilder, catalog.getProvider());
       try {
         VARCHAR.writeString(
-            propertyColumnBuilder, new ObjectMapper().writeValueAsString(catalog.getProperties()));
+            propertyColumnBuilder,
+            new ObjectMapper().writeValueAsString(new TreeMap<>(catalog.getProperties())));
       } catch (JsonProcessingException e) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT, "Invalid property format", e); //

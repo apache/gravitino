@@ -43,6 +43,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault("memory");
 
+  public static final ConfigEntry<String> CATALOG_BACKEND_IMPL =
+      new ConfigBuilder(IcebergConstants.CATALOG_BACKEND_IMPL)
+          .doc(
+              "The fully-qualified class name of a custom catalog implementation, only worked if `catalog-backend` is `custom`")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
+
   public static final ConfigEntry<String> CATALOG_WAREHOUSE =
       new ConfigBuilder(IcebergConstants.WAREHOUSE)
           .doc("Warehouse directory of catalog")
@@ -157,6 +165,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .version(ConfigConstants.VERSION_0_5_2)
           .stringConf()
           .create();
+
+  public static final ConfigEntry<String> ICEBERG_REST_CATALOG_PROVIDER =
+      new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER)
+          .doc(
+              "Catalog provider class name, you can develop a class that implements `IcebergTableOpsProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .createWithDefault("config-based-provider");
 
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);

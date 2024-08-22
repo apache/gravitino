@@ -91,7 +91,6 @@ public class TestDorisTableOperations extends TestDoris {
 
   private static Map<String, String> createProperties() {
     Map<String, String> properties = Maps.newHashMap();
-    properties.put("replication_allocation", "tag.location.default: 1");
     return properties;
   }
 

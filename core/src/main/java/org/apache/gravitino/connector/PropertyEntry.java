@@ -300,6 +300,11 @@ public final class PropertyEntry<T> {
     return stringPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);
   }
 
+  public static PropertyEntry<String> stringMutablePropertyEntry(
+      String name, String description, boolean required, String defaultValue, boolean hidden) {
+    return stringPropertyEntry(name, description, required, false, defaultValue, hidden, false);
+  }
+
   public static PropertyEntry<Short> shortOptionalPropertyEntry(
       String name, String description, boolean immutable, Short defaultValue, boolean hidden) {
     return shortPropertyEntry(name, description, false, immutable, defaultValue, hidden, false);

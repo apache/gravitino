@@ -205,9 +205,7 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private Map<String, String> createTableProperties() {
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("replication_allocation", "tag.location.default: 1");
-    return properties;
+    return ImmutableMap.of();
   }
 
   private Distribution createDistribution() {
@@ -334,25 +332,15 @@ public class CatalogDorisIT extends AbstractIT {
 
     Map<String, String> properties = createTableProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            distribution,
-            null,
-            indexes);
-
-    ITUtils.assertionsTableInfo(
-        tableName,
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
         table_comment,
-        Arrays.asList(columns),
         properties,
-        indexes,
         Transforms.EMPTY_TRANSFORM,
-        createdTable);
+        distribution,
+        null,
+        indexes);
 
     // load table
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -491,16 +479,16 @@ public class CatalogDorisIT extends AbstractIT {
 
     Map<String, String> properties = createTableProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            distribution,
-            null,
-            indexes);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        distribution,
+        null,
+        indexes);
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
 
     ITUtils.assertionsTableInfo(
         tableName,
@@ -509,7 +497,7 @@ public class CatalogDorisIT extends AbstractIT {
         properties,
         indexes,
         Transforms.EMPTY_TRANSFORM,
-        createdTable);
+        loadedTable);
 
     // Alter column type
     tableCatalog.alterTable(
@@ -643,24 +631,15 @@ public class CatalogDorisIT extends AbstractIT {
     Map<String, String> properties = createTableProperties();
     Transform[] partitioning = {Transforms.list(new String[][] {{DORIS_COL_NAME1}})};
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            null,
-            indexes);
-    ITUtils.assertionsTableInfo(
-        tableName,
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
         table_comment,
-        Arrays.asList(columns),
         properties,
-        indexes,
         partitioning,
-        createdTable);
+        distribution,
+        null,
+        indexes);
 
     // load table
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -874,24 +853,15 @@ public class CatalogDorisIT extends AbstractIT {
     Map<String, String> properties = createTableProperties();
     Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            null,
-            indexes);
-    ITUtils.assertionsTableInfo(
-        tableName,
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
         table_comment,
-        Arrays.asList(columns),
         properties,
-        indexes,
         partitioning,
-        createdTable);
+        distribution,
+        null,
+        indexes);
 
     // load table
     Table loadTable = tableCatalog.loadTable(tableIdentifier);

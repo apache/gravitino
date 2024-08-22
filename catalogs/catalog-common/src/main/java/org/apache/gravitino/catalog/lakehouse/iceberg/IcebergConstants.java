@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.iceberg;
 public class IcebergConstants {
   // Iceberg catalog properties constants
   public static final String CATALOG_BACKEND = "catalog-backend";
+  public static final String CATALOG_BACKEND_IMPL = "catalog-backend-impl";
 
   public static final String GRAVITINO_JDBC_USER = "jdbc-user";
   public static final String ICEBERG_JDBC_USER = "jdbc.user";
@@ -63,4 +64,8 @@ public class IcebergConstants {
   public static final String ICEBERG_METRICS_QUEUE_CAPACITY = "metricsQueueCapacity";
 
   public static final String GRAVITINO_ICEBERG_REST_SERVICE_NAME = "iceberg-rest";
+
+  public static final String ICEBERG_REST_CATALOG_PROVIDER = "catalog-provider";
+
+  public static final String GRAVITINO_DEFAULT_CATALOG = "__gravitino_default_catalog";
 }

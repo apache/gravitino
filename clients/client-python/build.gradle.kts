@@ -135,13 +135,13 @@ fun generatePypiProjectHomePage() {
     }
 
     // Use regular expression to match the `![](./a/b/c.png)` link in the content
-    // Convert `![](./a/b/c.png)` to `[](https://raw.githubusercontent.org/apache/gravitino/main/docs/a/b/c.png)`
-    val assertUrl = "https://raw.githubusercontent.org/apache/gravitino/main/docs"
+    // Convert `![](./a/b/c.png)` to `[](https://github.com/apache/gravitino/blob/main/docs/a/b/c.png?raw=true)`
+    val assertUrl = "https://github.com/apache/gravitino/blob/main/docs"
     val patternImage = """!\[([^\]]+)]\(\./assets/([^)]+)\)""".toRegex()
     val contentUpdateImage = patternImage.replace(contentUpdateDocs) { matchResult ->
       val altText = matchResult.groupValues[1]
       val fileName = matchResult.groupValues[2]
-      "![${altText}]($assertUrl/assets/$fileName)"
+      "![${altText}]($assertUrl/assets/$fileName?raw=true)"
     }
 
     val readmeFile = file("README.md")
@@ -222,7 +222,7 @@ tasks {
       "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
       "START_EXTERNAL_GRAVITINO" to "true",
       "DOCKER_TEST" to dockerTest.toString(),
-      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "datastrato/gravitino-ci-hive:0.1.13",
+      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "apache/gravitino-ci:hive-0.1.13",
       // Set the PYTHONPATH to the client-python directory, make sure the tests can import the
       // modules from the client-python directory.
       "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"

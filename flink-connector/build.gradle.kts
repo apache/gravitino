@@ -34,7 +34,7 @@ val flinkVersion: String = libs.versions.flink.get()
 // https://issues.apache.org/jira/browse/FLINK-20845,
 // https://issues.apache.org/jira/browse/FLINK-13414.
 val scalaVersion: String = "2.12"
-val artifactName = "gravitino-${project.name}-$scalaVersion"
+val artifactName = "gravitino-${project.name}_$scalaVersion"
 
 dependencies {
   implementation(project(":api"))
@@ -157,13 +157,6 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-hive:jar")
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

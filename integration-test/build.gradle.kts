@@ -126,16 +126,6 @@ dependencies {
     exclude("jakarta.annotation")
   }
   testImplementation(libs.trino.jdbc)
-  testImplementation(libs.ranger.intg) {
-    exclude("org.apache.hadoop", "hadoop-common")
-    exclude("org.apache.hive", "hive-storage-api")
-    exclude("org.apache.lucene")
-    exclude("org.apache.solr")
-    exclude("org.apache.kafka")
-    exclude("org.elasticsearch")
-    exclude("org.elasticsearch.client")
-    exclude("org.elasticsearch.plugin")
-  }
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -159,14 +149,10 @@ tasks.test {
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
 
-    doFirst {
-      // Gravitino CI Docker image
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
-      environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "datastrato/gravitino-ci-trino:0.1.5")
-      environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
-      environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "datastrato/gravitino-ci-doris:0.1.5")
-      environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "datastrato/gravitino-ci-ranger:0.1.1")
+    // Frontend tests depend on the web page, so we need to build the web module first.
+    dependsOn(":web:build")
 
+    doFirst {
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")
         into("build/trino-conf")
@@ -194,9 +180,6 @@ tasks.test {
         }
       }
     }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

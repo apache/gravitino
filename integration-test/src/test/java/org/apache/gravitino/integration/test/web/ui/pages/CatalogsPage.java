@@ -395,7 +395,7 @@ public class CatalogsPage extends AbstractWebIT {
       boolean isHiveURIS =
           waitShowText(
               hiveMetastoreUris,
-              By.xpath(".//*[@data-prev-refer='details-props-key-metastore.uris']"));
+              By.xpath(".//*[@data-prev-refer='tip-details-props-key-metastore.uris']"));
       boolean isShowCheck =
           waitShowText(
               "false",

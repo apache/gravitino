@@ -24,7 +24,6 @@ import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Map;
@@ -46,7 +45,6 @@ public class CatalogUtils {
 
   private CatalogUtils() {}
 
-  @VisibleForTesting
   public static PaimonBackendCatalogWrapper loadCatalogBackend(PaimonConfig paimonConfig) {
     Map<String, String> allConfig = paimonConfig.getAllConfig();
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(allConfig);

@@ -33,12 +33,13 @@ public class CloseContainerExtension implements BeforeAllCallback {
   @Override
   public void beforeAll(ExtensionContext extensionContext) {
     // Ensure that the container suite is initialized before closing it
-    ContainerSuite.getInstance();
-    synchronized (CloseContainerExtension.class) {
-      extensionContext
-          .getRoot()
-          .getStore(ExtensionContext.Namespace.GLOBAL)
-          .getOrComputeIfAbsent(CloseableContainer.class);
+    if (ContainerSuite.initialized()) {
+      synchronized (CloseContainerExtension.class) {
+        extensionContext
+            .getRoot()
+            .getStore(ExtensionContext.Namespace.GLOBAL)
+            .getOrComputeIfAbsent(CloseableContainer.class);
+      }
     }
   }
 

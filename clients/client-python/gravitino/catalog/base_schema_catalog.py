@@ -32,9 +32,11 @@ from gravitino.dto.requests.schema_updates_request import SchemaUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.schema_response import SchemaResponse
+from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HANDLER
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 from gravitino.rest.rest_utils import encode_string
+from gravitino.exceptions.base import IllegalArgumentException
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +91,8 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
              A list of schema names under the given catalog namespace.
         """
         resp = self.rest_client.get(
-            BaseSchemaCatalog.format_schema_request_path(self._schema_namespace())
+            BaseSchemaCatalog.format_schema_request_path(self._schema_namespace()),
+            error_handler=SCHEMA_ERROR_HANDLER,
         )
         entity_list_response = EntityListResponse.from_json(
             resp.body, infer_missing=True
@@ -124,6 +127,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         resp = self.rest_client.post(
             BaseSchemaCatalog.format_schema_request_path(self._schema_namespace()),
             json=req,
+            error_handler=SCHEMA_ERROR_HANDLER,
         )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
@@ -145,7 +149,8 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         resp = self.rest_client.get(
             BaseSchemaCatalog.format_schema_request_path(self._schema_namespace())
             + "/"
-            + encode_string(schema_name)
+            + encode_string(schema_name),
+            error_handler=SCHEMA_ERROR_HANDLER,
         )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
@@ -175,6 +180,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             + "/"
             + encode_string(schema_name),
             updates_request,
+            error_handler=SCHEMA_ERROR_HANDLER,
         )
         schema_response = SchemaResponse.from_json(resp.body, infer_missing=True)
         schema_response.validate()
@@ -200,6 +206,7 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
                 + "/"
                 + encode_string(schema_name),
                 params=params,
+                error_handler=SCHEMA_ERROR_HANDLER,
             )
             drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
             drop_resp.validate()
@@ -232,12 +239,13 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
             f"Catalog namespace must be non-null and have 1 level, the input namespace is {self._catalog_namespace}",
         )
 
-        assert self.rest_client is not None, "restClient must be set"
-        assert (
-            self.name() is not None and len(self.name().strip()) > 0
-        ), "name must not be blank"
-        assert self.type() is not None, "type must not be None"
-        assert (
-            self.provider() is not None and len(self.provider().strip()) > 0
-        ), "provider must not be blank"
-        assert self.audit_info() is not None, "audit must not be None"
+        if self.rest_client is None:
+            raise IllegalArgumentException("restClient must be set")
+        if not self.name() or not self.name().strip():
+            raise IllegalArgumentException("name must not be blank")
+        if self.type() is None:
+            raise IllegalArgumentException("type must not be None")
+        if not self.provider() or not self.provider().strip():
+            raise IllegalArgumentException("provider must not be blank")
+        if self.audit_info() is None:
+            raise IllegalArgumentException("audit must not be None")

@@ -48,6 +48,7 @@ include(
 )
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
+include("authorizations:authorization-ranger")
 include("trino-connector")
 include("spark-connector:spark-common")
 // kyuubi hive connector doesn't support 2.13 for Spark3.3

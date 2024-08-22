@@ -27,12 +27,14 @@ import java.time.Instant;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.GroupDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
+import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -40,6 +42,7 @@ import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,11 +52,30 @@ public class TestUserGroup extends TestBase {
 
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
-  protected static final String metalakeName = "testMetalake";
+  private static GravitinoClient gravitinoClient;
+  private static final String metalakeName = "testMetalake";
 
   @BeforeAll
   public static void setUp() throws Exception {
     TestBase.setUp();
+
+    TestGravitinoMetalake.createMetalake(client, metalakeName);
+
+    MetalakeDTO mockMetalake =
+        MetalakeDTO.builder()
+            .withName(metalakeName)
+            .withComment("comment")
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    MetalakeResponse resp = new MetalakeResponse(mockMetalake);
+    buildMockResource(Method.GET, "/api/metalakes/" + metalakeName, null, resp, HttpStatus.SC_OK);
+
+    gravitinoClient =
+        GravitinoClient.builder("http://127.0.0.1:" + mockServer.getLocalPort())
+            .withMetalake(metalakeName)
+            .withVersionCheckDisabled()
+            .build();
   }
 
   @Test
@@ -66,7 +88,7 @@ public class TestUserGroup extends TestBase {
     UserResponse userResponse = new UserResponse(mockUser);
     buildMockResource(Method.POST, userPath, request, userResponse, SC_OK);
 
-    User addedUser = client.addUser(metalakeName, username);
+    User addedUser = gravitinoClient.addUser(username);
     Assertions.assertNotNull(addedUser);
     assertUser(addedUser, mockUser);
 
@@ -77,7 +99,7 @@ public class TestUserGroup extends TestBase {
     buildMockResource(Method.POST, userPath, request, errResp1, SC_CONFLICT);
     Exception ex =
         Assertions.assertThrows(
-            UserAlreadyExistsException.class, () -> client.addUser(metalakeName, username));
+            UserAlreadyExistsException.class, () -> gravitinoClient.addUser(username));
     Assertions.assertEquals("user already exists", ex.getMessage());
 
     // test NoSuchMetalakeException
@@ -86,14 +108,14 @@ public class TestUserGroup extends TestBase {
     buildMockResource(Method.POST, userPath, request, errResp2, SC_NOT_FOUND);
     ex =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> client.addUser(metalakeName, username));
+            NoSuchMetalakeException.class, () -> gravitinoClient.addUser(username));
     Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // test RuntimeException
     ErrorResponse errResp3 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.POST, userPath, request, errResp3, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.addUser(metalakeName, username), "internal error");
+        RuntimeException.class, () -> gravitinoClient.addUser(username), "internal error");
   }
 
   @Test
@@ -105,7 +127,7 @@ public class TestUserGroup extends TestBase {
     UserResponse userResponse = new UserResponse(mockUser);
     buildMockResource(Method.GET, userPath, null, userResponse, SC_OK);
 
-    User loadedUser = client.getUser(metalakeName, username);
+    User loadedUser = gravitinoClient.getUser(username);
     Assertions.assertNotNull(loadedUser);
     assertUser(mockUser, loadedUser);
 
@@ -114,8 +136,7 @@ public class TestUserGroup extends TestBase {
         ErrorResponse.notFound(NoSuchUserException.class.getSimpleName(), "user not found");
     buildMockResource(Method.GET, userPath, null, errResp1, SC_NOT_FOUND);
     Exception ex =
-        Assertions.assertThrows(
-            NoSuchUserException.class, () -> client.getUser(metalakeName, username));
+        Assertions.assertThrows(NoSuchUserException.class, () -> gravitinoClient.getUser(username));
     Assertions.assertEquals("user not found", ex.getMessage());
 
     // test NoSuchMetalakeException
@@ -124,14 +145,14 @@ public class TestUserGroup extends TestBase {
     buildMockResource(Method.GET, userPath, null, errResp2, SC_NOT_FOUND);
     ex =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> client.getUser(metalakeName, username));
+            NoSuchMetalakeException.class, () -> gravitinoClient.getUser(username));
     Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // test RuntimeException
     ErrorResponse errResp3 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.GET, userPath, null, errResp3, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.getUser(metalakeName, username), "internal error");
+        RuntimeException.class, () -> gravitinoClient.getUser(username), "internal error");
   }
 
   @Test
@@ -142,17 +163,16 @@ public class TestUserGroup extends TestBase {
     RemoveResponse removeResponse = new RemoveResponse(true);
     buildMockResource(Method.DELETE, userPath, null, removeResponse, SC_OK);
 
-    Assertions.assertTrue(client.removeUser(metalakeName, username));
+    Assertions.assertTrue(gravitinoClient.removeUser(username));
 
     removeResponse = new RemoveResponse(false);
     buildMockResource(Method.DELETE, userPath, null, removeResponse, SC_OK);
-    Assertions.assertFalse(client.removeUser(metalakeName, username));
+    Assertions.assertFalse(gravitinoClient.removeUser(username));
 
     // test RuntimeException
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, userPath, null, errResp, SC_SERVER_ERROR);
-    Assertions.assertThrows(
-        RuntimeException.class, () -> client.removeUser(metalakeName, username));
+    Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.removeUser(username));
   }
 
   @Test
@@ -165,7 +185,7 @@ public class TestUserGroup extends TestBase {
     GroupResponse groupResponse = new GroupResponse(mockGroup);
     buildMockResource(Method.POST, groupPath, request, groupResponse, SC_OK);
 
-    Group addedGroup = client.addGroup(metalakeName, groupName);
+    Group addedGroup = gravitinoClient.addGroup(groupName);
     Assertions.assertNotNull(addedGroup);
     assertGroup(addedGroup, mockGroup);
 
@@ -176,7 +196,7 @@ public class TestUserGroup extends TestBase {
     buildMockResource(Method.POST, groupPath, request, errResp1, SC_CONFLICT);
     Exception ex =
         Assertions.assertThrows(
-            GroupAlreadyExistsException.class, () -> client.addGroup(metalakeName, groupName));
+            GroupAlreadyExistsException.class, () -> gravitinoClient.addGroup(groupName));
     Assertions.assertEquals("group already exists", ex.getMessage());
 
     // test NoSuchMetalakeException
@@ -185,14 +205,14 @@ public class TestUserGroup extends TestBase {
     buildMockResource(Method.POST, groupPath, request, errResp2, SC_NOT_FOUND);
     ex =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> client.addGroup(metalakeName, groupName));
+            NoSuchMetalakeException.class, () -> gravitinoClient.addGroup(groupName));
     Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // test RuntimeException
     ErrorResponse errResp3 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.POST, groupPath, request, errResp3, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.addGroup(metalakeName, groupName), "internal error");
+        RuntimeException.class, () -> gravitinoClient.addGroup(groupName), "internal error");
   }
 
   @Test
@@ -204,7 +224,7 @@ public class TestUserGroup extends TestBase {
     GroupResponse groupResponse = new GroupResponse(mockGroup);
     buildMockResource(Method.GET, groupPath, null, groupResponse, SC_OK);
 
-    Group loadedGroup = client.getGroup(metalakeName, groupName);
+    Group loadedGroup = gravitinoClient.getGroup(groupName);
     Assertions.assertNotNull(loadedGroup);
     assertGroup(mockGroup, loadedGroup);
 
@@ -214,7 +234,7 @@ public class TestUserGroup extends TestBase {
     buildMockResource(Method.GET, groupPath, null, errResp1, SC_NOT_FOUND);
     Exception ex =
         Assertions.assertThrows(
-            NoSuchGroupException.class, () -> client.getGroup(metalakeName, groupName));
+            NoSuchGroupException.class, () -> gravitinoClient.getGroup(groupName));
     Assertions.assertEquals("group not found", ex.getMessage());
 
     // test NoSuchMetalakeException
@@ -223,14 +243,14 @@ public class TestUserGroup extends TestBase {
     buildMockResource(Method.GET, groupPath, null, errResp2, SC_NOT_FOUND);
     ex =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class, () -> client.getGroup(metalakeName, groupName));
+            NoSuchMetalakeException.class, () -> gravitinoClient.getGroup(groupName));
     Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // test RuntimeException
     ErrorResponse errResp3 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.GET, groupPath, null, errResp3, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.getGroup(metalakeName, groupName), "internal error");
+        RuntimeException.class, () -> gravitinoClient.getGroup(groupName), "internal error");
   }
 
   @Test
@@ -241,17 +261,16 @@ public class TestUserGroup extends TestBase {
     RemoveResponse removeResponse = new RemoveResponse(true);
     buildMockResource(Method.DELETE, groupPath, null, removeResponse, SC_OK);
 
-    Assertions.assertTrue(client.removeGroup(metalakeName, groupName));
+    Assertions.assertTrue(gravitinoClient.removeGroup(groupName));
 
     removeResponse = new RemoveResponse(false);
     buildMockResource(Method.DELETE, groupPath, null, removeResponse, SC_OK);
-    Assertions.assertFalse(client.removeGroup(metalakeName, groupName));
+    Assertions.assertFalse(gravitinoClient.removeGroup(groupName));
 
     // test RuntimeException
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, groupPath, null, errResp, SC_SERVER_ERROR);
-    Assertions.assertThrows(
-        RuntimeException.class, () -> client.removeGroup(metalakeName, groupName));
+    Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.removeGroup(groupName));
   }
 
   private UserDTO mockUserDTO(String name) {

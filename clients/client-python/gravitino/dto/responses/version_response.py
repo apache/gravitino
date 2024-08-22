@@ -22,6 +22,7 @@ from dataclasses_json import config
 
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.version_dto import VersionDTO
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
@@ -41,13 +42,20 @@ class VersionResponse(BaseResponse):
         """
         super().validate()
 
-        assert self._version is not None, "version must be non-null"
-        assert (
-            self._version.version() is not None
-        ), "version 'version' must not be null and empty"
-        assert (
-            self._version.compile_date() is not None
-        ), "version 'compile_date' must not be null and empty"
-        assert (
-            self._version.git_commit() is not None
-        ), "version 'git_commit' must not be null and empty"
+        if self._version is None:
+            raise IllegalArgumentException("Version must be non-null")
+
+        if self._version.version() is None:
+            raise IllegalArgumentException(
+                "Version 'version' must not be null or empty"
+            )
+
+        if self._version.compile_date() is None:
+            raise IllegalArgumentException(
+                "Version 'compile_date' must not be null or empty"
+            )
+
+        if self._version.git_commit() is None:
+            raise IllegalArgumentException(
+                "Version 'git_commit' must not be null or empty"
+            )

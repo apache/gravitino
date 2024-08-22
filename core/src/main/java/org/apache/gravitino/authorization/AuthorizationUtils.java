@@ -18,20 +18,24 @@
  */
 package org.apache.gravitino.authorization;
 
+import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Consumer;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SupportsCatalogs;
-import org.apache.gravitino.SupportsMetalakes;
-import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.file.FilesetCatalog;
-import org.apache.gravitino.hook.DispatcherHooks;
-import org.apache.gravitino.messaging.TopicCatalog;
-import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +47,15 @@ public class AuthorizationUtils {
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
+
+  private static final List<Privilege.Name> pluginNotSupportsPrivileges =
+      Lists.newArrayList(
+          Privilege.Name.CREATE_CATALOG,
+          Privilege.Name.USE_CATALOG,
+          Privilege.Name.MANAGE_GRANTS,
+          Privilege.Name.MANAGE_USERS,
+          Privilege.Name.MANAGE_GROUPS,
+          Privilege.Name.CREATE_ROLE);
 
   private AuthorizationUtils() {}
 
@@ -124,66 +137,60 @@ public class AuthorizationUtils {
         namespace);
   }
 
-  // Install some post hooks used for ownership. The ownership will have the all privileges
-  // of securable objects, users, groups, roles.
-  public static <T> void prepareAuthorizationHooks(T manager, DispatcherHooks hooks) {
-    if (manager instanceof SupportsMetalakes) {
-      hooks.addPostHook(
-          "createMetalake",
-          (args, metalake) -> {
-            // TODO: Add the logic of setting the owner
-          });
+  // Every catalog has one authorization plugin, we should avoid calling
+  // underlying authorization repeatedly. So we use a set to record which
+  // catalog has been called the authorization plugin.
+  public static void callAuthorizationPlugin(
+      String metalake,
+      List<SecurableObject> securableObjects,
+      Set<String> catalogsAlreadySet,
+      Consumer<AuthorizationPlugin> consumer) {
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    for (SecurableObject securableObject : securableObjects) {
+      if (needApplyAllAuthorizationPlugin(securableObject)) {
+        Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
+        for (Catalog catalog : catalogs) {
+          callAuthorizationPluginImpl(catalogsAlreadySet, consumer, catalog);
+        }
 
-    } else if (manager instanceof SupportsCatalogs) {
-      hooks.addPostHook(
-          "createCatalog",
-          (args, catalog) -> {
-            // TODO: Add the logic of setting the owner
-          });
-
-    } else if (manager instanceof SupportsSchemas) {
-      hooks.addPostHook(
-          "createSchema",
-          (args, schema) -> {
-            // TODO: Add the logic of setting the owner
-          });
-
-    } else if (manager instanceof TableCatalog) {
-      hooks.addPostHook(
-          "createTable",
-          (args, schema) -> {
-            // TODO: Add the logic of setting the owner
-          });
-
-    } else if (manager instanceof TopicCatalog) {
-      hooks.addPostHook(
-          "createTopic",
-          (args, schema) -> {
-            // TODO: Add the logic of setting the owner
-          });
-
-    } else if (manager instanceof FilesetCatalog) {
-      hooks.addPostHook(
-          "createFileset",
-          (args, schema) -> {
-            // TODO: Add the logic of setting the owner
-          });
-    } else if (manager instanceof AccessControlManager) {
-      hooks.addPostHook(
-          "addUser",
-          (args, user) -> {
-            // TODO: Add the logic of setting the owner
-          });
-      hooks.addPostHook(
-          "addGroup",
-          (args, group) -> {
-            // TODO: Add the logic of setting the owner
-          });
-      hooks.addPostHook(
-          "createRole",
-          (args, role) -> {
-            // TODO: Add the logic of setting the owner
-          });
+      } else if (supportsSingleAuthorizationPlugin(securableObject.type())) {
+        NameIdentifier catalogIdent =
+            NameIdentifierUtil.getCatalogIdentifier(
+                MetadataObjectUtil.toEntityIdent(metalake, securableObject));
+        Catalog catalog = catalogManager.loadCatalog(catalogIdent);
+        callAuthorizationPluginImpl(catalogsAlreadySet, consumer, catalog);
+      }
     }
+  }
+
+  private static void callAuthorizationPluginImpl(
+      Set<String> catalogsAlreadySet, Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
+    if (!catalogsAlreadySet.contains(catalog.name())) {
+      catalogsAlreadySet.add(catalog.name());
+
+      if (catalog instanceof BaseCatalog) {
+        BaseCatalog baseCatalog = (BaseCatalog) catalog;
+        if (baseCatalog.getAuthorizationPlugin() != null) {
+          consumer.accept(baseCatalog.getAuthorizationPlugin());
+        }
+      }
+    }
+  }
+
+  public static boolean needApplyAllAuthorizationPlugin(SecurableObject securableObject) {
+    // TODO: Add supportsSecurableObjects method for every privilege to simplify this code
+    if (securableObject.type() == MetadataObject.Type.METALAKE) {
+      List<Privilege> privileges = securableObject.privileges();
+      for (Privilege privilege : privileges) {
+        if (!pluginNotSupportsPrivileges.contains(privilege.name())) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static boolean supportsSingleAuthorizationPlugin(MetadataObject.Type type) {
+    return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
   }
 }

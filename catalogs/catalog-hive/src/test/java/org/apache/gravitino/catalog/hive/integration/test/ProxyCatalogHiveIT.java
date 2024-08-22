@@ -181,15 +181,11 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     String comment = "comment";
     createSchema(schemaName, comment);
 
-    Table createdTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                nameIdentifier,
-                columns,
-                comment,
-                ImmutableMap.of(),
-                Partitioning.EMPTY_PARTITIONING);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            nameIdentifier, columns, comment, ImmutableMap.of(), Partitioning.EMPTY_PARTITIONING);
+    Table createdTable = catalog.asTableCatalog().loadTable(nameIdentifier);
     String location = createdTable.properties().get("location");
     Assertions.assertEquals(EXPECT_USER, hdfs.getFileStatus(new Path(location)).getOwner());
     org.apache.hadoop.hive.metastore.api.Table hiveTab =

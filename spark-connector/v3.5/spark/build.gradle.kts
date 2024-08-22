@@ -146,6 +146,10 @@ tasks.test {
 
   val skipITs = project.hasProperty("skipITs")
   val skipSparkITs = project.hasProperty("skipSparkITs")
+  val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
+  if (!enableSparkSQLITs) {
+    exclude("**/integration/test/sql/**")
+  }
   if (skipITs || skipSparkITs) {
     // Exclude integration tests
     exclude("**/integration/**")
@@ -154,13 +158,6 @@ tasks.test {
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")
     dependsOn(":iceberg:iceberg-rest-server:jar")
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

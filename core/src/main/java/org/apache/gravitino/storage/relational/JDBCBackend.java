@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -52,6 +54,7 @@ import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
+import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -358,6 +361,60 @@ public class JDBCBackend implements RelationalBackend {
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
     return TagMetaService.getInstance()
         .associateTagsWithMetadataObject(objectIdent, objectType, tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType) {
+    switch (relType) {
+      case OWNER_REL:
+        List<E> list = Lists.newArrayList();
+        OwnerMetaService.getInstance()
+            .getOwner(nameIdentifier, identType)
+            .ifPresent(e -> list.add((E) e));
+        return list;
+      case METADATA_OBJECT_ROLE_REL:
+        return (List<E>)
+            RoleMetaService.getInstance()
+                .listRolesByMetadataObjectIdentAndType(nameIdentifier, identType);
+      case ROLE_GROUP_REL:
+        if (identType == Entity.EntityType.ROLE) {
+          return (List<E>) GroupMetaService.getInstance().listGroupsByRoleIdent(nameIdentifier);
+        } else {
+          throw new IllegalArgumentException(
+              String.format("ROLE_GROUP_REL doesn't support type %s", identType.name()));
+        }
+      case ROLE_USER_REL:
+        if (identType == Entity.EntityType.ROLE) {
+          return (List<E>) UserMetaService.getInstance().listUsersByRoleIdent(nameIdentifier);
+        } else {
+          throw new IllegalArgumentException(
+              String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
+        }
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  @Override
+  public void insertRelation(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier srcIdentifier,
+      Entity.EntityType srcType,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType,
+      boolean override) {
+    switch (relType) {
+      case OWNER_REL:
+        OwnerMetaService.getInstance().setOwner(srcIdentifier, srcType, dstIdentifier, dstType);
+        break;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
   }
 
   enum JDBCBackendType {

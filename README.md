@@ -108,6 +108,10 @@ Alternatively, to run the Gravitino server in frontend, please run:
 
 And press `CTRL+C` to stop the Gravitino server.
 
+### Gravitino Iceberg REST catalog service
+
+Gravitino provides Iceberg REST catalog service to manage Iceberg, please refer to [Gravitino Iceberg REST catalog service](docs/iceberg-rest-service.md) for more details.
+
 ### Using Trino with Apache Gravitino
 
 Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-connector/index.md).
@@ -127,3 +131,5 @@ Gravitino is under the Apache License Version 2.0, See the [LICENSE](LICENSE) fo
 Apache Gravitino is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
 
 <sub>Apache®, Apache Gravitino&trade;, Apache Hadoop&reg;, Apache Hive&trade;, Apache Iceberg&trade;, Apache Kafka&reg;, Apache Spark&trade;, Apache Submarine&trade;, Apache Thrift&trade; and Apache Zeppelin&trade; are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&url=%2Freadme.md&action_name=ReadMe" style="border:0;" alt="" />
