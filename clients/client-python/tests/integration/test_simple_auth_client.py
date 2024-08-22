@@ -30,6 +30,7 @@ from gravitino import (
     Fileset,
 )
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
+from gravitino.exceptions.base import GravitinoRuntimeException
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
@@ -98,7 +99,7 @@ class TestSimpleAuthClient(IntegrationTestEnv):
                 self.metalake_name,
                 self.gravitino_admin_client.drop_metalake(self.metalake_name),
             )
-        except Exception as e:
+        except GravitinoRuntimeException as e:
             logger.error("Clean test data failed: %s", e)
         finally:
             os.environ["GRAVITINO_USER"] = ""

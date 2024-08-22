@@ -29,7 +29,7 @@ from gravitino import (
     Fileset,
     FilesetChange,
 )
-from gravitino.exceptions.base import NoSuchFilesetException
+from gravitino.exceptions.base import NoSuchFilesetException, GravitinoRuntimeException
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
                 self.metalake_name,
                 self.gravitino_admin_client.drop_metalake(self.metalake_name),
             )
-        except Exception as e:
+        except GravitinoRuntimeException as e:
             logger.error("Clean test data failed: %s", e)
 
     def init_test_env(self):

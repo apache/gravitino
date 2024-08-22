@@ -187,7 +187,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
                 cls.metalake_name,
                 cls.gravitino_admin_client.drop_metalake(cls.metalake_name),
             )
-        except Exception as e:
+        except GravitinoRuntimeException as e:
             logger.error("Clean test data failed: %s", e)
 
     def test_simple_auth(self):

@@ -91,6 +91,10 @@ class NotEmptyException(GravitinoRuntimeException):
     """Base class for all exceptions thrown when a resource is not empty."""
 
 
+class NonEmptySchemaException(GravitinoRuntimeException):
+    """Exception thrown when a namespace is not empty."""
+
+
 class UnsupportedOperationException(GravitinoRuntimeException):
     """Base class for all exceptions thrown when an operation is unsupported"""
 
