@@ -191,7 +191,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         }
       }
     }
-    return authorization.plugin();
+    return authorization.plugin(provider(), this.conf);
   }
 
   private BaseAuthorization<?> createAuthorizationPluginInstance() {

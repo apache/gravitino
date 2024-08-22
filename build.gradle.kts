@@ -506,7 +506,6 @@ tasks.rat {
     "clients/client-python/.pytest_cache/*",
     "clients/client-python/.venv/*",
     "clients/client-python/apache_gravitino.egg-info/*",
-    "clients/client-python/gravitino/utils/exceptions.py",
     "clients/client-python/gravitino/utils/http_client.py",
     "clients/client-python/tests/unittests/htmlcov/*",
     "clients/client-python/tests/integration/htmlcov/*"
@@ -731,11 +730,16 @@ tasks {
         !it.name.startsWith("spark") &&
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("integration-test") &&
+        it.name != "authorizations" &&
         it.name != "trino-connector" &&
         it.name != "bundled-catalog" &&
         it.name != "flink-connector"
       ) {
-        dependsOn("${it.name}:build")
+        if (it.name.startsWith("authorization-")) {
+          dependsOn(":authorizations:${it.name}:build")
+        } else {
+          dependsOn("${it.name}:build")
+        }
         from("${it.name}/build/libs")
         into("distribution/package/libs")
         include("*.jar")

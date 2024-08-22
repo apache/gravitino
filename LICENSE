@@ -297,3 +297,13 @@
    Kyligence/kylinpy
    ./clients/client-python/gravitino/utils/exceptions.py
    ./clients/client-python/gravitino/utils/http_client.py
+
+   Apache Ranger
+   ./security-admin/src/main/java/org/apache/ranger/defines/JsonDateSerializer.java
+   ./security-admin/src/main/java/org/apache/ranger/defines/RangerCommonEnums.java
+   ./security-admin/src/main/java/org/apache/ranger/view/VList.java
+   ./security-admin/src/main/java/org/apache/ranger/view/VXDataObject.java
+   ./security-admin/src/main/java/org/apache/ranger/view/VXGroup.java
+   ./security-admin/src/main/java/org/apache/ranger/view/VXGroupList.java
+   ./security-admin/src/main/java/org/apache/ranger/view/VXUser.java
+   ./security-admin/src/main/java/org/apache/ranger/view/VXUserList.java

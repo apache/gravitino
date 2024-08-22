@@ -16,23 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.mysql;
+package org.apache.gravitino.authorization.ranger;
 
 import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
-public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthorization> {
-
-  public TestMySQLAuthorization() {}
-
+/** Implementation of a Ranger authorization in Gravitino. */
+public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> {
   @Override
   public String shortName() {
-    return "mysql";
+    return "ranger";
   }
 
   @Override
   protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
-    return new TestMySQLAuthorizationPlugin();
+    return new RangerAuthorizationPlugin(catalogProvider, config);
   }
 }
