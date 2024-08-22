@@ -16,23 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.mysql;
 
-import java.util.Map;
-import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.BaseAuthorization;
-
-public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthorization> {
-
-  public TestMySQLAuthorization() {}
-
-  @Override
-  public String shortName() {
-    return "mysql";
-  }
-
-  @Override
-  protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
-    return new TestMySQLAuthorizationPlugin();
-  }
+tasks.all {
+    enabled = false
 }

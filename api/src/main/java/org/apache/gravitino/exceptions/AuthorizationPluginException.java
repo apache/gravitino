@@ -16,23 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.mysql;
+package org.apache.gravitino.exceptions;
 
-import java.util.Map;
-import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.BaseAuthorization;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 
-public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthorization> {
+/** An exception thrown when an authorization plugin operation failed. */
+public class AuthorizationPluginException extends IllegalArgumentException {
 
-  public TestMySQLAuthorization() {}
-
-  @Override
-  public String shortName() {
-    return "mysql";
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public AuthorizationPluginException(@FormatString String message, Object... args) {
+    super(String.format(message, args));
   }
 
-  @Override
-  protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
-    return new TestMySQLAuthorizationPlugin();
+  /**
+   * Constructs a new exception with the specified cause.
+   *
+   * @param cause the cause.
+   */
+  public AuthorizationPluginException(Throwable cause) {
+    super(cause);
   }
 }
