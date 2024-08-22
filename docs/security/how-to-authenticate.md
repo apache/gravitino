@@ -24,6 +24,15 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
+Additionally, the username can be directly used as a parameter to create a client.
+
+```java
+GravitinoClient client = GravitinoClient.builder(uri)
+    .withMetalake("metalake")
+    .withSimpleAuth("test_user_name")
+    .build();
+```
+
 ### OAuth mode
 
 Gravitino only supports external OAuth 2.0 servers. To enable OAuth mode, users should follow the steps below.
