@@ -94,7 +94,7 @@ If a resource needs to be managed by more than one person at the same time, the 
 Users are generally granted one or multiple Roles, and users have different operating privileges depending on their Role.
 
 ### Group
-To make it easier to grant a single access control to multiple users, we can add users to a user group, and then grant one or multiple Roles to that user group.
+To make it easier to grant a single access control to multiple users, we can add users to a user group, and then grant one or multiple roles to that user group.
 This process allows all users belonging to that user group to have the access control in those Roles.
 
 ### Metadata objects
