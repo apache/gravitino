@@ -14,6 +14,8 @@ class TypeValidTest {
         TypeValid.isJdbcURL(
             "jdbc:redshift://examplecluster.abc123xyz789.us-west-2.redshift.amazonaws.com:5439/dev"));
     assertTrue(TypeValid.isJdbcURL("jdbc:mysql://mysql:3306/db"));
+    assertTrue(TypeValid.isJdbcURL("jdbc:sqlite:/path/to/db"));
+    assertTrue(TypeValid.isJdbcURL("jdbc:hsqldb:mem:myDb"));
   }
 
   @Test
