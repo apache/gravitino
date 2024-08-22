@@ -21,7 +21,7 @@ This abstraction allows users to control access to data and make compliant use o
 
 Gravitino’s unified management model allows for each data source to have its own authorization features. However, each data source may come with its own dedicated authorization model and methods.
 We may not be able to properly set permissions to the underlying system, so when a given user tries to access this data, the underlying authorization system may result in permission inconsistencies and cause issues for external access.
-To mitigate this issue, Gravitino aims to provide a unified authorization model and accompanying methods that sit on top of all the data sources instead, making it much easier to manage access rights.
+To mitigate this issue, Gravitino aims to provide a unified authorization model and accompanying methods that sit on top of all the data sources instead, making it much easier to manage access privileges.
 
 It is important to note that Gravitino’s authorization model will not merge the access control systems of the underlying data sources to form a large and unwieldy set of privileges.
 Instead, We will summarize the usage of the privileges currently in use within the data system, and offer a set of Gravitino-native permission models that accurately reflect it.
