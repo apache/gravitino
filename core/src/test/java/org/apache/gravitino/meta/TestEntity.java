@@ -21,10 +21,14 @@ package org.apache.gravitino.meta;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.file.Fileset;
 import org.junit.jupiter.api.Assertions;
@@ -244,12 +248,46 @@ public class TestEntity {
     Assertions.assertEquals(userId, fields.get(UserEntity.ID));
     Assertions.assertEquals(userName, fields.get(UserEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(UserEntity.AUDIT_INFO));
-    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(UserEntity.ROLE_NAMES));
+    Assertions.assertEquals(
+        Lists.newArrayList("role"),
+        ((Supplier<List<String>>) fields.get(UserEntity.ROLE_NAMES_SUPPLIER)).get());
 
     UserEntity testUserEntityWithoutFields =
         UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
 
     Assertions.assertNull(testUserEntityWithoutFields.roles());
+
+    // Test lazily loading
+    AtomicBoolean hasCallRoleIdsSupplier = new AtomicBoolean(false);
+    AtomicBoolean hasCallRoleNamesSupplier = new AtomicBoolean(false);
+
+    UserEntity userWithSupplier =
+        UserEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withRoleIdsSupplier(
+                () -> {
+                  hasCallRoleIdsSupplier.set(true);
+                  return null;
+                })
+            .withRoleNamesSupplier(
+                () -> {
+                  hasCallRoleNamesSupplier.set(true);
+                  return null;
+                })
+            .build();
+
+    Assertions.assertFalse(hasCallRoleIdsSupplier.get());
+    Assertions.assertFalse(hasCallRoleNamesSupplier.get());
+
+    userWithSupplier.roleIds();
+    Assertions.assertTrue(hasCallRoleIdsSupplier.get());
+    Assertions.assertFalse(hasCallRoleNamesSupplier.get());
+
+    userWithSupplier.roleNames();
+    Assertions.assertTrue(hasCallRoleIdsSupplier.get());
+    Assertions.assertTrue(hasCallRoleNamesSupplier.get());
   }
 
   @Test
@@ -265,12 +303,46 @@ public class TestEntity {
     Assertions.assertEquals(groupId, fields.get(GroupEntity.ID));
     Assertions.assertEquals(groupName, fields.get(GroupEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(GroupEntity.AUDIT_INFO));
-    Assertions.assertEquals(Lists.newArrayList("role"), fields.get(GroupEntity.ROLE_NAMES));
+    Assertions.assertEquals(
+        Lists.newArrayList("role"),
+        ((Supplier<List<String>>) fields.get(GroupEntity.ROLE_NAMES_SUPPLIER)).get());
 
     GroupEntity groupWithoutFields =
         GroupEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
 
     Assertions.assertNull(groupWithoutFields.roles());
+
+    AtomicBoolean hasCallRoleIdsSupplier = new AtomicBoolean(false);
+    AtomicBoolean hasCallRoleNamesSupplier = new AtomicBoolean(false);
+
+    // Test lazily loading
+    GroupEntity groupWithSupplier =
+        GroupEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withRoleIdsSupplier(
+                () -> {
+                  hasCallRoleIdsSupplier.set(true);
+                  return null;
+                })
+            .withRoleNamesSupplier(
+                () -> {
+                  hasCallRoleNamesSupplier.set(true);
+                  return null;
+                })
+            .build();
+
+    Assertions.assertFalse(hasCallRoleIdsSupplier.get());
+    Assertions.assertFalse(hasCallRoleNamesSupplier.get());
+
+    groupWithSupplier.roleIds();
+    Assertions.assertTrue(hasCallRoleIdsSupplier.get());
+    Assertions.assertFalse(hasCallRoleNamesSupplier.get());
+
+    groupWithSupplier.roleNames();
+    Assertions.assertTrue(hasCallRoleIdsSupplier.get());
+    Assertions.assertTrue(hasCallRoleNamesSupplier.get());
   }
 
   @Test
@@ -296,7 +368,8 @@ public class TestEntity {
         Lists.newArrayList(
             SecurableObjects.ofCatalog(
                 catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()))),
-        fields.get(RoleEntity.SECURABLE_OBJECT));
+        ((Supplier<List<SecurableObject>>) fields.get(RoleEntity.SECURABLE_OBJECTS_SUPPLIER))
+            .get());
 
     RoleEntity roleWithoutFields =
         RoleEntity.builder()
@@ -309,6 +382,26 @@ public class TestEntity {
                         catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()))))
             .build();
     Assertions.assertNull(roleWithoutFields.properties());
+
+    // Test lazily loading
+    AtomicBoolean hasCallSecurableObjectsSupplier = new AtomicBoolean(false);
+
+    RoleEntity roleWithSupplier =
+        RoleEntity.builder()
+            .withId(userId)
+            .withName(userName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjectsSupplier(
+                () -> {
+                  hasCallSecurableObjectsSupplier.set(true);
+                  return null;
+                })
+            .build();
+
+    Assertions.assertFalse(hasCallSecurableObjectsSupplier.get());
+
+    roleWithSupplier.securableObjects();
+    Assertions.assertTrue(hasCallSecurableObjectsSupplier.get());
   }
 
   @Test

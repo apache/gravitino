@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -41,10 +40,10 @@ import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
-import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.storage.relational.utils.SupplierUtils;
 
 /** The service class for group metadata. It provides the basic database operations for group. */
 public class GroupMetaService {
@@ -92,9 +91,9 @@ public class GroupMetaService {
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
 
-    return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
+    return POConverters.fromGroupPO(
+        groupPO, SupplierUtils.createRolePOsSupplier(groupPO), identifier.namespace());
   }
 
   public List<GroupEntity> listGroupsByRoleIdent(NameIdentifier roleIdent) {
@@ -107,7 +106,7 @@ public class GroupMetaService {
             po ->
                 POConverters.fromGroupPO(
                     po,
-                    Collections.emptyList(),
+                    SupplierUtils.createRolePOsSupplier(po),
                     AuthorizationUtils.ofGroupNamespace(roleIdent.namespace().level(0))))
         .collect(Collectors.toList());
   }
@@ -186,10 +185,10 @@ public class GroupMetaService {
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs =
-        RoleMetaService.getInstance().listRolesByGroupId(oldGroupPO.getGroupId());
+
     GroupEntity oldGroupEntity =
-        POConverters.fromGroupPO(oldGroupPO, rolePOs, identifier.namespace());
+        POConverters.fromGroupPO(
+            oldGroupPO, SupplierUtils.createRolePOsSupplier(oldGroupPO), identifier.namespace());
 
     GroupEntity newEntity = (GroupEntity) updater.apply((E) oldGroupEntity);
     Preconditions.checkArgument(

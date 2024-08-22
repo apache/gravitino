@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -39,12 +38,12 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
-import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.storage.relational.utils.SupplierUtils;
 
 /** The service class for user metadata. It provides the basic database operations for user. */
 public class UserMetaService {
@@ -92,9 +91,9 @@ public class UserMetaService {
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
 
-    return POConverters.fromUserPO(userPO, rolePOs, identifier.namespace());
+    return POConverters.fromUserPO(
+        userPO, SupplierUtils.createRolePOsSupplier(userPO), identifier.namespace());
   }
 
   public List<UserEntity> listUsersByRoleIdent(NameIdentifier roleIdent) {
@@ -107,7 +106,7 @@ public class UserMetaService {
             po ->
                 POConverters.fromUserPO(
                     po,
-                    Collections.emptyList(),
+                    SupplierUtils.createRolePOsSupplier(po),
                     AuthorizationUtils.ofUserNamespace(roleIdent.namespace().level(0))))
         .collect(Collectors.toList());
   }
@@ -185,8 +184,9 @@ public class UserMetaService {
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     UserPO oldUserPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
-    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
-    UserEntity oldUserEntity = POConverters.fromUserPO(oldUserPO, rolePOs, identifier.namespace());
+    UserEntity oldUserEntity =
+        POConverters.fromUserPO(
+            oldUserPO, SupplierUtils.createRolePOsSupplier(oldUserPO), identifier.namespace());
 
     UserEntity newEntity = (UserEntity) updater.apply((E) oldUserEntity);
     Preconditions.checkArgument(
