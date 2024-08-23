@@ -109,3 +109,5 @@ version of Gravitino. This is accomplished by repeating steps (3) and
 upgraded schema, e.g. if you upgraded the schema to Gravitino 0.8.0 then
 you will want to compare your schema dump against the contents of
 `schema-0.8.0-<type>.sql`
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToUpgrade" style="border:0;" alt="" />
