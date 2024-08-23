@@ -160,16 +160,21 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
     @classmethod
     def _clean_test_data(cls):
+        cls.gravitino_client = GravitinoClient(
+            uri="http://localhost:8090", metalake_name=cls.metalake_name
+        )
+        catalog = cls.gravitino_client.load_catalog(name=cls.catalog_name)
+
         try:
-            cls.gravitino_client = GravitinoClient(
-                uri="http://localhost:8090", metalake_name=cls.metalake_name
-            )
-            catalog = cls.gravitino_client.load_catalog(name=cls.catalog_name)
             logger.info(
                 "Drop fileset %s[%s]",
                 cls.fileset_ident,
                 catalog.as_fileset_catalog().drop_fileset(ident=cls.fileset_ident),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop fileset %s", cls.fileset_ident)
+
+        try:
             logger.info(
                 "Drop schema %s[%s]",
                 cls.schema_ident,
@@ -177,18 +182,26 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
                     schema_name=cls.schema_name, cascade=True
                 ),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop schema %s", cls.schema_name)
+
+        try:
             logger.info(
                 "Drop catalog %s[%s]",
                 cls.catalog_name,
                 cls.gravitino_client.drop_catalog(name=cls.catalog_name),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop catalog %s", cls.catalog_name)
+
+        try:
             logger.info(
                 "Drop metalake %s[%s]",
                 cls.metalake_name,
                 cls.gravitino_admin_client.drop_metalake(cls.metalake_name),
             )
-        except Exception as e:
-            logger.error("Clean test data failed: %s", e)
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop metalake %s", cls.metalake_name)
 
     def test_simple_auth(self):
         options = {"auth_type": "simple"}

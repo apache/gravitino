@@ -223,22 +223,18 @@ class FilesetCatalog(BaseSchemaCatalog):
         Returns:
              true If the fileset is dropped, false the fileset did not exist.
         """
-        try:
-            self.check_fileset_name_identifier(ident)
+        self.check_fileset_name_identifier(ident)
 
-            full_namespace = self._get_fileset_full_namespace(ident.namespace())
+        full_namespace = self._get_fileset_full_namespace(ident.namespace())
 
-            resp = self.rest_client.delete(
-                f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}",
-                error_handler=FILESET_ERROR_HANDLER,
-            )
-            drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
-            drop_resp.validate()
+        resp = self.rest_client.delete(
+            f"{self.format_fileset_request_path(full_namespace)}/{ident.name()}",
+            error_handler=FILESET_ERROR_HANDLER,
+        )
+        drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
+        drop_resp.validate()
 
-            return drop_resp.dropped()
-        except Exception as e:
-            logger.warning("Failed to drop fileset %s: %s", ident, e)
-            return False
+        return drop_resp.dropped()
 
     @staticmethod
     def check_fileset_namespace(namespace: Namespace):

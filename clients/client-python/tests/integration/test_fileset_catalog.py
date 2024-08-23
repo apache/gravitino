@@ -29,7 +29,7 @@ from gravitino import (
     Fileset,
     FilesetChange,
 )
-from gravitino.exceptions.base import NoSuchFilesetException
+from gravitino.exceptions.base import NoSuchFilesetException, GravitinoRuntimeException
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
@@ -77,21 +77,30 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.clean_test_data()
 
     def clean_test_data(self):
+
+        self.gravitino_client = GravitinoClient(
+            uri="http://localhost:8090", metalake_name=self.metalake_name
+        )
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         try:
-            self.gravitino_client = GravitinoClient(
-                uri="http://localhost:8090", metalake_name=self.metalake_name
-            )
-            catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
             logger.info(
                 "Drop fileset %s[%s]",
                 self.fileset_ident,
                 catalog.as_fileset_catalog().drop_fileset(ident=self.fileset_ident),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop fileset %s", self.fileset_ident)
+
+        try:
             logger.info(
                 "Drop fileset %s[%s]",
                 self.fileset_new_ident,
                 catalog.as_fileset_catalog().drop_fileset(ident=self.fileset_new_ident),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop fileset %s", self.fileset_new_ident)
+
+        try:
             logger.info(
                 "Drop schema %s[%s]",
                 self.schema_ident,
@@ -99,18 +108,26 @@ class TestFilesetCatalog(IntegrationTestEnv):
                     schema_name=self.schema_name, cascade=True
                 ),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop schema %s", self.schema_name)
+
+        try:
             logger.info(
                 "Drop catalog %s[%s]",
                 self.catalog_ident,
                 self.gravitino_client.drop_catalog(name=self.catalog_name),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop catalog %s", self.catalog_name)
+
+        try:
             logger.info(
                 "Drop metalake %s[%s]",
                 self.metalake_name,
                 self.gravitino_admin_client.drop_metalake(self.metalake_name),
             )
-        except Exception as e:
-            logger.error("Clean test data failed: %s", e)
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop metalake %s", self.metalake_name)
 
     def init_test_env(self):
         self.gravitino_admin_client.create_metalake(
