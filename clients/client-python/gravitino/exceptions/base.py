@@ -81,3 +81,9 @@ class UnsupportedOperationException(GravitinoRuntimeException):
 
 class UnknownError(RuntimeError):
     """An exception thrown when other unknown exception is thrown"""
+
+class TableAlreadyExistsException(AlreadyExistException):
+    """An exception thrown when a table already exists."""
+
+class NoSuchTableException(NotFoundException):
+    """An exception thrown when a table is not found."""
