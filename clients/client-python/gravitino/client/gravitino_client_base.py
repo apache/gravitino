@@ -138,10 +138,7 @@ class GravitinoClientBase:
     def close(self):
         """Closes the GravitinoClient and releases any underlying resources."""
         if self._rest_client is not None:
-            try:
-                self._rest_client.close()
-            except Exception as e:
-                logger.warning("Failed to close the HTTP REST client: %s", e)
+            self._rest_client.close()
 
     def check_metalake_name(self, metalake_name: str):
         identifier = NameIdentifier.parse(metalake_name)

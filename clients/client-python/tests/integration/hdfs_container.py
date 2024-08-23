@@ -24,7 +24,7 @@ import time
 
 import docker
 from docker import types as tp
-from docker.errors import NotFound
+from docker.errors import NotFound, DockerException
 
 from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.exceptions.base import InternalError
@@ -50,7 +50,7 @@ async def check_hdfs_status(hdfs_container):
             else:
                 logger.info("HDFS startup successfully!")
                 return True
-        except Exception as e:
+        except DockerException as e:
             logger.error(
                 "Exception occurred while checking HDFS container status: %s", e
             )
