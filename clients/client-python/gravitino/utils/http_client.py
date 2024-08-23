@@ -198,6 +198,7 @@ class HTTPClient:
                 AuthConstants.HTTP_HEADER_AUTHORIZATION,
                 self.auth_data_provider.get_token_data().decode("utf-8"),
             )
+            logger.info(self.auth_data_provider.get_token_data().decode("utf-8"))
         request.get_method = lambda: method
         is_success, resp = self._make_request(opener, request, timeout=timeout)
 
