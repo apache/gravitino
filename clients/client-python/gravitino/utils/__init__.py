@@ -18,3 +18,4 @@ under the License.
 """
 
 from gravitino.utils.http_client import Response, HTTPClient, unpack
+from gravitino.utils.check_argument import check_argument
