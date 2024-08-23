@@ -91,6 +91,8 @@ public class GravitinoBasedIcebergTableOpsProvider
 
   @Override
   public void close() throws Exception {
-    client.close();
+    if (client != null) {
+      client.close();
+    }
   }
 }
