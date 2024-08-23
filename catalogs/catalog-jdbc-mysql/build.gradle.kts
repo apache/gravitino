@@ -76,6 +76,8 @@ tasks {
     exclude { details ->
       details.file.isDirectory()
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyLibAndConfig", Copy::class) {
@@ -96,9 +98,6 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

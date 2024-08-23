@@ -392,6 +392,7 @@ public class CatalogsPageTest extends AbstractWebIT {
   @Order(8)
   public void testViewCatalogDetails() throws InterruptedException {
     catalogsPage.clickViewCatalogBtn(HIVE_CATALOG_NAME);
+    mouseMoveTo(By.xpath(".//*[@data-prev-refer='details-props-key-metastore.uris']"));
     Assertions.assertTrue(
         catalogsPage.verifyShowCatalogDetails(HIVE_CATALOG_NAME, hiveMetastoreUri));
   }
@@ -581,7 +582,7 @@ public class CatalogsPageTest extends AbstractWebIT {
 
   @Test
   @Order(19)
-  public void testOtherRelationaCatalogTreeNode() throws InterruptedException {
+  public void testOtherRelationalCatalogTreeNode() throws InterruptedException {
     String icebergNode =
         String.format(
             "{{%s}}{{%s}}{{%s}}", METALAKE_NAME, ICEBERG_CATALOG_NAME, CATALOG_TYPE_RELATIONAL);

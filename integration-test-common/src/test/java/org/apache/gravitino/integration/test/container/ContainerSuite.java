@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.integration.test.container;
 
+import static org.apache.gravitino.integration.test.container.RangerContainer.DOCKER_ENV_RANGER_SERVER_URL;
+
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.RemoveNetworkCmd;
 import com.github.dockerjava.api.model.Info;
@@ -32,6 +34,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import org.apache.gravitino.integration.test.util.CloseableGroup;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.slf4j.Logger;
@@ -42,6 +45,7 @@ import org.testcontainers.containers.Network;
 public class ContainerSuite implements Closeable {
   public static final Logger LOG = LoggerFactory.getLogger(ContainerSuite.class);
   private static volatile ContainerSuite instance = null;
+  private static volatile boolean initialized = false;
 
   // The subnet must match the configuration in
   // `dev/docker/tools/mac-docker-connector.conf`
@@ -52,6 +56,9 @@ public class ContainerSuite implements Closeable {
 
   private static Network network = null;
   private static volatile HiveContainer hiveContainer;
+
+  // Enable the Ranger plugin in the Hive container
+  private static volatile HiveContainer hiveRangerContainer;
   private static volatile TrinoContainer trinoContainer;
   private static volatile TrinoITContainers trinoITContainers;
   private static volatile RangerContainer rangerContainer;
@@ -66,7 +73,11 @@ public class ContainerSuite implements Closeable {
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
-  private static void init() {
+  private static void initIfNecessary() {
+    if (initialized) {
+      return;
+    }
+
     try {
       // Check if docker is available and you should never close the global DockerClient!
       DockerClient dockerClient = DockerClientFactory.instance().client();
@@ -76,16 +87,20 @@ public class ContainerSuite implements Closeable {
       if ("true".equalsIgnoreCase(System.getenv("NEED_CREATE_DOCKER_NETWORK"))) {
         network = createDockerNetwork();
       }
+      initialized = true;
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize ContainerSuite", e);
     }
+  }
+
+  public static boolean initialized() {
+    return initialized;
   }
 
   public static ContainerSuite getInstance() {
     if (instance == null) {
       synchronized (ContainerSuite.class) {
         if (instance == null) {
-          init();
           instance = new ContainerSuite();
         }
       }
@@ -98,25 +113,18 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startHiveContainer() {
-    startHiveContainer(
-        ImmutableMap.<String, String>builder().put("HADOOP_USER_NAME", "anonymous").build());
-  }
-
-  /**
-   * To start the Hive container, you can to specify environment variables: HIVE_RUNTIME_VERSION:
-   * Hive version, currently support `hive2`(default) and `hive3` DOCKER_ENV_RANGER_SERVER_URL:
-   * Ranger server URL DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME: Ranger Hive repository name
-   * DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME: Ranger HDFS repository name
-   */
-  public void startHiveContainer(Map<String, String> envVars) {
     if (hiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainer == null) {
+          initIfNecessary();
           // Start Hive container
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
                   .withHostName("gravitino-ci-hive")
-                  .withEnvVars(envVars)
+                  .withEnvVars(
+                      ImmutableMap.<String, String>builder()
+                          .put("HADOOP_USER_NAME", "anonymous")
+                          .build())
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
@@ -126,10 +134,50 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  /**
+   * To start and enable Ranger plugin in Hive container, <br>
+   * you can specify environment variables: <br>
+   * 1. HIVE_RUNTIME_VERSION: Hive version, currently only support `hive3`, We can support `hive2`
+   * in the future <br>
+   * 2. DOCKER_ENV_RANGER_SERVER_URL: Ranger server URL <br>
+   * 3. DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME: Ranger Hive repository name <br>
+   * 4. DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME: Ranger HDFS repository name <br>
+   */
+  public void startHiveRangerContainer(Map<String, String> envVars) {
+    // If you want to enable Hive Ranger plugin, you need both set the `RANGER_SERVER_URL` and
+    // `RANGER_HIVE_REPOSITORY_NAME` environment variables.
+    // If you want to enable HDFS Ranger plugin, you need both set the `RANGER_SERVER_URL` and
+    // `RANGER_HDFS_REPOSITORY_NAME` environment variables.
+    if (envVars == null
+        || (!Objects.equals(envVars.get(HiveContainer.HIVE_RUNTIME_VERSION), HiveContainer.HIVE3))
+        || (!envVars.containsKey(DOCKER_ENV_RANGER_SERVER_URL)
+            || (!envVars.containsKey(RangerContainer.DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME)
+                && !envVars.containsKey(RangerContainer.DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME)))) {
+      throw new IllegalArgumentException("Error environment variables for Hive Ranger container");
+    }
+
+    if (hiveRangerContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (hiveRangerContainer == null) {
+          // Start Hive container
+          HiveContainer.Builder hiveBuilder =
+              HiveContainer.builder()
+                  .withHostName("gravitino-ci-hive-ranger")
+                  .withEnvVars(envVars)
+                  .withNetwork(network);
+          HiveContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          hiveRangerContainer = container;
+        }
+      }
+    }
+  }
+
   public void startKerberosHiveContainer() {
     if (kerberosHiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kerberosHiveContainer == null) {
+          initIfNecessary();
           // Start Hive container
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
@@ -152,6 +200,7 @@ public class ContainerSuite implements Closeable {
     if (trinoContainer == null) {
       synchronized (ContainerSuite.class) {
         if (trinoContainer == null) {
+          initIfNecessary();
           // Start Trino container
           String hiveContainerIp = hiveContainer.getContainerIpAddress();
           TrinoContainer.Builder trinoBuilder =
@@ -192,6 +241,7 @@ public class ContainerSuite implements Closeable {
     if (dorisContainer == null) {
       synchronized (ContainerSuite.class) {
         if (dorisContainer == null) {
+          initIfNecessary();
           // Start Doris container
           DorisContainer.Builder dorisBuilder =
               DorisContainer.builder().withHostName("gravitino-ci-doris").withNetwork(network);
@@ -207,6 +257,7 @@ public class ContainerSuite implements Closeable {
     if (mySQLContainer == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLContainer == null) {
+          initIfNecessary();
           // Start MySQL container
           MySQLContainer.Builder mysqlBuilder =
               MySQLContainer.builder()
@@ -233,6 +284,7 @@ public class ContainerSuite implements Closeable {
     if (mySQLVersion5Container == null) {
       synchronized (ContainerSuite.class) {
         if (mySQLVersion5Container == null) {
+          initIfNecessary();
           // Start MySQL container
           MySQLContainer.Builder mysqlBuilder =
               MySQLContainer.builder()
@@ -260,6 +312,7 @@ public class ContainerSuite implements Closeable {
     if (!pgContainerMap.containsKey(pgImageName)) {
       synchronized (ContainerSuite.class) {
         if (!pgContainerMap.containsKey(pgImageName)) {
+          initIfNecessary();
           // Start PostgreSQL container
           PostgreSQLContainer.Builder pgBuilder =
               PostgreSQLContainer.builder()
@@ -293,6 +346,7 @@ public class ContainerSuite implements Closeable {
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
         if (kafkaContainer == null) {
+          initIfNecessary();
           KafkaContainer.Builder builder = KafkaContainer.builder().withNetwork(network);
           KafkaContainer container = closer.register(builder.build());
           try {
@@ -327,10 +381,15 @@ public class ContainerSuite implements Closeable {
     return hiveContainer;
   }
 
+  public HiveContainer getHiveRangerContainer() {
+    return hiveRangerContainer;
+  }
+
   public void startRangerContainer() {
     if (rangerContainer == null) {
       synchronized (ContainerSuite.class) {
         if (rangerContainer == null) {
+          initIfNecessary();
           // Start Ranger container
           RangerContainer.Builder rangerBuilder = RangerContainer.builder().withNetwork(network);
           RangerContainer container = closer.register(rangerBuilder.build());

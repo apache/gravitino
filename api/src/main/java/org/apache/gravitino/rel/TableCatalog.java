@@ -75,13 +75,17 @@ public interface TableCatalog {
   }
 
   /**
-   * Create a table in the catalog.
+   * Create a table in the catalog based on the provided details.
+   *
+   * <p>This method returns the table as defined by the user without applying all defaults. If you
+   * need the table with default values applied, use the {@link #loadTable(NameIdentifier)} method
+   * after creation.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
    * @param properties The table properties.
-   * @return The created table metadata.
+   * @return The table as defined by the caller, without all default values.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TableAlreadyExistsException If the table already exists.
    */
@@ -202,7 +206,7 @@ public interface TableCatalog {
    * @param distribution The distribution of the table
    * @param sortOrders The sort orders of the table
    * @param partitions The table partitioning.
-   * @return Fhe created table metadata.
+   * @return The created table metadata.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TableAlreadyExistsException If the table already exists.
    */

@@ -28,7 +28,9 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -229,7 +231,7 @@ class TestGroupMetaService extends TestJDBCBackend {
         Sets.newHashSet(role1.name(), role2.name()),
         Sets.newHashSet(actualOverwriteGroup2.roleNames()));
 
-    // insert overwrite user with 1 roles
+    // insert overwrite user with 1 role
     RoleEntity role3 =
         createRoleEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -283,6 +285,7 @@ class TestGroupMetaService extends TestJDBCBackend {
 
     GroupMetaService groupMetaService = GroupMetaService.getInstance();
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    OwnerMetaService ownerMetaService = OwnerMetaService.getInstance();
 
     // delete group
     GroupEntity group1 =
@@ -296,10 +299,24 @@ class TestGroupMetaService extends TestJDBCBackend {
         () -> groupMetaService.getGroupByIdentifier(group1.nameIdentifier()));
     Assertions.assertDoesNotThrow(() -> groupMetaService.insertGroup(group1, false));
     Assertions.assertEquals(group1, groupMetaService.getGroupByIdentifier(group1.nameIdentifier()));
+
+    // Set the owner of the metalake
+    ownerMetaService.setOwner(
+        metalake.nameIdentifier(), metalake.type(), group1.nameIdentifier(), group1.type());
+    Optional<Entity> entity = ownerMetaService.getOwner(metalake.nameIdentifier(), metalake.type());
+    Assertions.assertTrue(entity.isPresent());
+    Assertions.assertEquals(group1, entity.get());
+
+    // Delete the group
     Assertions.assertTrue(groupMetaService.deleteGroup(group1.nameIdentifier()));
+
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> groupMetaService.getGroupByIdentifier(group1.nameIdentifier()));
+
+    // Test owner deletion
+    entity = ownerMetaService.getOwner(metalake.nameIdentifier(), metalake.type());
+    Assertions.assertFalse(entity.isPresent());
 
     // delete group with roles
     RoleEntity role1 =

@@ -31,6 +31,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 
@@ -275,9 +276,27 @@ public class NameIdentifierUtil {
         String topicParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(topicParent, ident.name(), MetadataObject.Type.TOPIC);
 
+      case ROLE:
+        AuthorizationUtils.checkRole(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ROLE);
+
       default:
         throw new IllegalArgumentException(
             "Entity type " + entityType + " is not supported to convert to MetadataObject");
+    }
+  }
+
+  /**
+   * Get the metalake name of the given {@link NameIdentifier}.
+   *
+   * @param identifier The name identifier of the entity
+   * @return metalake name
+   */
+  public static String getMetalake(NameIdentifier identifier) {
+    if (identifier.hasNamespace()) {
+      return identifier.namespace().level(0);
+    } else {
+      return identifier.name();
     }
   }
 }

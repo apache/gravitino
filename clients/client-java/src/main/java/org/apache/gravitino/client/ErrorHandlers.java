@@ -25,6 +25,7 @@ import java.util.function.Consumer;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.OAuth2ErrorResponse;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -34,11 +35,13 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -48,6 +51,8 @@ import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
@@ -173,6 +178,24 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> permissionOperationErrorHandler() {
     return PermissionOperationErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Tag operations.
+   *
+   * @return A Consumer representing the Tag error handler.
+   */
+  public static Consumer<ErrorResponse> tagErrorHandler() {
+    return TagErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Owner operations.
+   *
+   * @return A Consumer representing the Owner error handler.
+   */
+  public static Consumer<ErrorResponse> ownerErrorHandler() {
+    return OwnerErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -604,6 +627,10 @@ public class ErrorHandlers {
             throw new NoSuchMetalakeException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
             throw new NoSuchRoleException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
           } else {
             throw new NotFoundException(errorMessage);
           }
@@ -644,6 +671,79 @@ public class ErrorHandlers {
             throw new NoSuchGroupException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchRoleException.class.getSimpleName())) {
             throw new NoSuchRoleException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Tag operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class TagErrorHandler extends RestErrorHandler {
+
+    private static final TagErrorHandler INSTANCE = new TagErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchTagException.class.getSimpleName())) {
+            throw new NoSuchTagException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (errorResponse.getType().equals(TagAlreadyExistsException.class.getSimpleName())) {
+            throw new TagAlreadyExistsException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(TagAlreadyAssociatedException.class.getSimpleName())) {
+            throw new TagAlreadyAssociatedException(errorMessage);
+          } else {
+            throw new AlreadyExistsException(errorMessage);
+          }
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Owner operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class OwnerErrorHandler extends RestErrorHandler {
+
+    private static final OwnerErrorHandler INSTANCE = new OwnerErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+            throw new NoSuchMetadataObjectException(errorMessage);
           } else {
             throw new NotFoundException(errorMessage);
           }

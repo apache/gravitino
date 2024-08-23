@@ -27,6 +27,7 @@ import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -38,7 +39,7 @@ public class IcebergTestBase extends JerseyTest {
     return new ResourceConfig();
   }
 
-  private boolean urlPathWithPrefix = false;
+  private String urlPathPrefix = "";
 
   public Invocation.Builder getRenameTableClientBuilder() {
     return getIcebergClientBuilder(IcebergRestTestUtil.RENAME_TABLE_PATH, Optional.empty());
@@ -63,19 +64,24 @@ public class IcebergTestBase extends JerseyTest {
   }
 
   public Invocation.Builder getNamespaceClientBuilder() {
-    return getNamespaceClientBuilder(Optional.empty(), Optional.empty());
+    return getNamespaceClientBuilder(Optional.empty(), Optional.empty(), Optional.empty());
   }
 
   public Invocation.Builder getNamespaceClientBuilder(Optional<String> namespace) {
-    return getNamespaceClientBuilder(namespace, Optional.empty());
+    return getNamespaceClientBuilder(namespace, Optional.empty(), Optional.empty());
   }
 
   public Invocation.Builder getNamespaceClientBuilder(
-      Optional<String> namespace, Optional<Map<String, String>> queryParams) {
+      Optional<String> namespace,
+      Optional<String> extraPath,
+      Optional<Map<String, String>> queryParams) {
     String path =
         Joiner.on("/")
             .skipNulls()
-            .join(IcebergRestTestUtil.NAMESPACE_PATH, namespace.orElseGet(() -> null));
+            .join(
+                IcebergRestTestUtil.NAMESPACE_PATH,
+                namespace.orElseGet(() -> null),
+                extraPath.orElseGet(() -> null));
     return getIcebergClientBuilder(path, queryParams);
   }
 
@@ -104,8 +110,8 @@ public class IcebergTestBase extends JerseyTest {
 
   public Invocation.Builder getIcebergClientBuilder(
       String path, Optional<Map<String, String>> queryParam) {
-    if (urlPathWithPrefix) {
-      path = injectPrefixToPath(path, IcebergRestTestUtil.PREFIX);
+    if (!StringUtils.isBlank(urlPathPrefix)) {
+      path = injectPrefixToPath(path, urlPathPrefix);
     }
     WebTarget target = target(path);
     if (queryParam.isPresent()) {
@@ -121,7 +127,7 @@ public class IcebergTestBase extends JerseyTest {
         .accept(MediaType.APPLICATION_JSON_TYPE);
   }
 
-  public void setUrlPathWithPrefix(boolean urlPathWithPrefix) {
-    this.urlPathWithPrefix = urlPathWithPrefix;
+  public void setUrlPathWithPrefix(String urlPathPrefix) {
+    this.urlPathPrefix = urlPathPrefix;
   }
 }

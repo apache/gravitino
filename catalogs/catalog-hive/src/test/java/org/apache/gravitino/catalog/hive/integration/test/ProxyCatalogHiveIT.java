@@ -94,7 +94,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     System.setProperty("user.name", "datastrato");
 
     Map<String, String> configs = Maps.newHashMap();
-    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
     containerSuite.startHiveContainer();
@@ -181,15 +181,11 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     String comment = "comment";
     createSchema(schemaName, comment);
 
-    Table createdTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                nameIdentifier,
-                columns,
-                comment,
-                ImmutableMap.of(),
-                Partitioning.EMPTY_PARTITIONING);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            nameIdentifier, columns, comment, ImmutableMap.of(), Partitioning.EMPTY_PARTITIONING);
+    Table createdTable = catalog.asTableCatalog().loadTable(nameIdentifier);
     String location = createdTable.properties().get("location");
     Assertions.assertEquals(EXPECT_USER, hdfs.getFileStatus(new Path(location)).getOwner());
     org.apache.hadoop.hive.metastore.api.Table hiveTab =

@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.ErrorHandlers;
 import org.apache.gravitino.client.HTTPClient;
@@ -256,7 +257,7 @@ public class TestOauth2Client extends TestGvfsBase {
     // 3. test expired token
     Config config = new Config(false) {};
     config.set(
-        new ConfigBuilder("gravitino.authenticator").stringConf().createWithDefault("simple"),
+        new ConfigBuilder(Configs.AUTHENTICATORS.getKey()).stringConf().createWithDefault("simple"),
         "oauth");
     config.set(OAuthConfig.SERVICE_AUDIENCE, "service1");
     config.set(OAuthConfig.DEFAULT_SIGN_KEY, publicKey);
@@ -310,7 +311,9 @@ public class TestOauth2Client extends TestGvfsBase {
                       header.getValues().get(0).getValue().getBytes(StandardCharsets.UTF_8);
                   // should throw an UnauthorizedException here
                   try {
-                    authenticator.authenticator().authenticateToken(tokenValue);
+                    authenticator.authenticators().stream()
+                        .filter(i -> i.supportsToken(tokenValue))
+                        .forEach(i -> i.authenticateToken(tokenValue));
                   } catch (UnauthorizedException e) {
                     assertTrue(e.getMessage().contains("JWT parse error"));
                     throw e;

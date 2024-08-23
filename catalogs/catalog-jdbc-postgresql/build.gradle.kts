@@ -79,6 +79,8 @@ tasks {
     exclude { details ->
       details.file.isDirectory()
     }
+
+    fileMode = 0b111101101
   }
 
   val copyLibAndConfig by registering(Copy::class) {
@@ -101,9 +103,6 @@ tasks.test {
     // PG will use project jdbc-mysql/build/libs directory, so we add the task dependency here.
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
     dependsOn(tasks.jar)
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

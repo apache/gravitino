@@ -28,6 +28,12 @@ from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
 
+from gravitino.dto.responses.oauth2_error_response import OAuth2ErrorResponse
+from gravitino.exceptions.handlers.oauth_error_handler import (
+    INVALID_CLIENT_ERROR,
+    INVALID_GRANT_ERROR,
+)
+
 
 @dataclass
 class TestResponse:
@@ -59,6 +65,26 @@ def generate_private_key():
 
 JWT_PRIVATE_KEY = generate_private_key()
 GENERATED_TIME = int(time.time())
+
+
+def mock_authentication_invalid_client_error():
+    return (
+        False,
+        OAuth2ErrorResponse.from_json(
+            json.dumps({"error": INVALID_CLIENT_ERROR, "error_description": "invalid"}),
+            infer_missing=True,
+        ),
+    )
+
+
+def mock_authentication_invalid_grant_error():
+    return (
+        False,
+        OAuth2ErrorResponse.from_json(
+            json.dumps({"error": INVALID_GRANT_ERROR, "error_description": "invalid"}),
+            infer_missing=True,
+        ),
+    )
 
 
 def mock_authentication_with_error_authentication_type():

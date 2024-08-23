@@ -1,4 +1,5 @@
 /*
+ * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
@@ -74,21 +75,16 @@ public class CatalogMysqlVersion5IT extends CatalogMysqlIT {
 
     Column[] newColumns = new Column[] {col1, col2, col3, col4};
 
-    Table createdTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("mysql_it_table")),
-                newColumns,
-                null,
-                ImmutableMap.of());
+    NameIdentifier tableIdent =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("mysql_it_table"));
+    catalog.asTableCatalog().createTable(tableIdent, newColumns, null, ImmutableMap.of());
+    Table loadedTable = catalog.asTableCatalog().loadTable(tableIdent);
 
     Assertions.assertEquals(
-        DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, createdTable.columns()[0].defaultValue());
-    Assertions.assertEquals(Literals.NULL, createdTable.columns()[1].defaultValue());
-    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[2].defaultValue());
+        DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, loadedTable.columns()[0].defaultValue());
+    Assertions.assertEquals(Literals.NULL, loadedTable.columns()[1].defaultValue());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, loadedTable.columns()[2].defaultValue());
     Assertions.assertEquals(
-        Literals.varcharLiteral(255, "current_timestamp"),
-        createdTable.columns()[3].defaultValue());
+        Literals.varcharLiteral(255, "current_timestamp"), loadedTable.columns()[3].defaultValue());
   }
 }

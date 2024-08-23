@@ -156,7 +156,7 @@ allprojects {
     }
   }
 
-  val setIntegrationTestEnvironment: (Test) -> Unit = { param ->
+  val setTestEnvironment: (Test) -> Unit = { param ->
     param.doFirst {
       param.jvmArgs(project.property("extraJvmArgs") as List<*>)
 
@@ -166,6 +166,14 @@ allprojects {
       param.environment("HADOOP_USER_NAME", "anonymous")
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
+
+      // Gravitino CI Docker image
+      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.13")
+      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.5")
+      param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
+      param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
+      param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.1")
+      param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
 
       val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
       val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
@@ -205,7 +213,7 @@ allprojects {
     }
   }
 
-  extra["initIntegrationTest"] = setIntegrationTestEnvironment
+  extra["initTestParam"] = setTestEnvironment
 }
 
 nexusPublishing {
@@ -409,6 +417,11 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
+    if (project.name != "server-common") {
+      val initTest = project.extra.get("initTestParam") as (Test) -> Unit
+      initTest(this)
+    }
+
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
       showExceptions = true
@@ -466,11 +479,14 @@ tasks.rat {
     "dev/docker/**/*.conf",
     "dev/docker/kerberos-hive/kadm5.acl",
     "**/*.log",
+    "**/*.out",
+    "**/testsets",
     "**/licenses/*.txt",
     "**/licenses/*.md",
     "integration-test/**/*.sql",
     "integration-test/**/*.txt",
     "docs/**/*.md",
+    "spark-connector/spark-common/src/test/resources/**",
     "web/.**",
     "web/next-env.d.ts",
     "web/dist/**/*",
@@ -489,8 +505,7 @@ tasks.rat {
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
     "clients/client-python/.venv/*",
-    "clients/client-python/gravitino.egg-info/*",
-    "clients/client-python/gravitino/utils/exceptions.py",
+    "clients/client-python/apache_gravitino.egg-info/*",
     "clients/client-python/gravitino/utils/http_client.py",
     "clients/client-python/tests/unittests/htmlcov/*",
     "clients/client-python/tests/integration/htmlcov/*"
@@ -542,6 +557,13 @@ tasks {
         rename { fileName ->
           fileName.replace(".template", "")
         }
+        eachFile {
+          if (name == "gravitino-env.sh") {
+            filter { line ->
+              line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
+            }
+          }
+        }
         fileMode = 0b111101101
       }
       copy {
@@ -568,7 +590,7 @@ tasks {
     doLast {
       copy {
         from(projectDir.dir("conf")) {
-          include("${rootProject.name}-iceberg-rest-server.conf.template", "log4j2.properties.template")
+          include("${rootProject.name}-iceberg-rest-server.conf.template", "${rootProject.name}-env.sh.template", "log4j2.properties.template")
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
         from(projectDir.dir("bin")) {
@@ -578,6 +600,13 @@ tasks {
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")
+        }
+        eachFile {
+          if (name == "gravitino-env.sh") {
+            filter { line ->
+              line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
+            }
+          }
         }
         fileMode = 0b111101101
       }
@@ -700,12 +729,17 @@ tasks {
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("iceberg") &&
+        !it.name.startsWith("integration-test") &&
+        it.name != "authorizations" &&
         it.name != "trino-connector" &&
-        it.name != "integration-test" &&
         it.name != "bundled-catalog" &&
         it.name != "flink-connector"
       ) {
-        dependsOn("${it.name}:build")
+        if (it.name.startsWith("authorization-")) {
+          dependsOn(":authorizations:${it.name}:build")
+        } else {
+          dependsOn("${it.name}:build")
+        }
         from("${it.name}/build/libs")
         into("distribution/package/libs")
         include("*.jar")
@@ -771,10 +805,10 @@ fun printDockerCheckInfo() {
   }
 
   println("------------------ Check Docker environment ---------------------")
-  println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
+  println("Docker server status ............................................ [${if (dockerRunning) "running" else "\u001B[31mstop\u001B[0m"}]")
   if (OperatingSystem.current().isMacOsX()) {
-    println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "stop"}]")
-    println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "no"}]")
+    println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "\u001B[31mstop\u001B[0m"}]")
+    println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "\u001B[31mno\u001B[0m"}]")
   }
 
   val dockerTest = project.extra["dockerTest"] as? Boolean ?: false

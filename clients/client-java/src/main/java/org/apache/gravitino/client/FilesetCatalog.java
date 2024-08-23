@@ -49,8 +49,7 @@ import org.apache.gravitino.rest.RESTUtils;
  * example, schemas and filesets list, creation, update and deletion. A Fileset catalog is under the
  * metalake.
  */
-public class FilesetCatalog extends BaseSchemaCatalog
-    implements org.apache.gravitino.file.FilesetCatalog {
+class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.file.FilesetCatalog {
 
   FilesetCatalog(
       Namespace namespace,
@@ -116,7 +115,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
             ErrorHandlers.filesetErrorHandler());
     resp.validate();
 
-    return resp.getFileset();
+    return new GenericFileset(resp.getFileset(), restClient, fullNamespace);
   }
 
   /**
@@ -165,7 +164,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
             ErrorHandlers.filesetErrorHandler());
     resp.validate();
 
-    return resp.getFileset();
+    return new GenericFileset(resp.getFileset(), restClient, fullNamespace);
   }
 
   /**
@@ -199,7 +198,7 @@ public class FilesetCatalog extends BaseSchemaCatalog
             ErrorHandlers.filesetErrorHandler());
     resp.validate();
 
-    return resp.getFileset();
+    return new GenericFileset(resp.getFileset(), restClient, fullNamespace);
   }
 
   /**

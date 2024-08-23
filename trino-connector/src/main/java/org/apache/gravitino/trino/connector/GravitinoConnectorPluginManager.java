@@ -39,7 +39,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.sonatype.aether.artifact.Artifact;
@@ -51,12 +50,6 @@ public class GravitinoConnectorPluginManager {
 
   public static final String APP_CLASS_LOADER_NAME = "app";
 
-  public static final String CONNECTOR_HIVE = "hive";
-  public static final String CONNECTOR_ICEBERG = "iceberg";
-  public static final String CONNECTOR_MYSQL = "mysql";
-  public static final String CONNECTOR_POSTGRESQL = "postgresql";
-  public static final String CONNECTOR_MEMORY = "memory";
-
   private static final String PLUGIN_NAME_PREFIX = "gravitino-";
   private static final String PLUGIN_CLASSLOADER_CLASS_NAME = "io.trino.server.PluginClassLoader";
 
@@ -64,18 +57,10 @@ public class GravitinoConnectorPluginManager {
 
   private Class<?> pluginLoaderClass;
 
-  private static final Set<String> usePlugins =
-      Set.of(
-          CONNECTOR_HIVE,
-          CONNECTOR_ICEBERG,
-          CONNECTOR_MYSQL,
-          CONNECTOR_POSTGRESQL,
-          CONNECTOR_MEMORY);
-
   private final Map<String, Plugin> connectorPlugins = new HashMap<>();
   private final ClassLoader appClassloader;
 
-  public GravitinoConnectorPluginManager(ClassLoader classLoader) {
+  private GravitinoConnectorPluginManager(ClassLoader classLoader) {
     this.appClassloader = classLoader;
 
     try {
@@ -132,11 +117,12 @@ public class GravitinoConnectorPluginManager {
               .getPath();
       String pluginDir = Paths.get(jarPath).getParent().getParent().toString();
 
-      // Load all plugins
-      for (String pluginName : usePlugins) {
-        loadPlugin(pluginDir, pluginName);
-        LOG.info("Load plugin {}/{} successful", pluginDir, pluginName);
-      }
+      Arrays.stream(new File(pluginDir).listFiles())
+          .forEach(
+              file -> {
+                loadPlugin(pluginDir, file.getName());
+                LOG.info("Load plugin {}/{} successful", pluginDir, file.getName());
+              });
     } catch (Exception e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Error while loading plugins from file", e);
@@ -146,16 +132,10 @@ public class GravitinoConnectorPluginManager {
   private void loadPlugin(String pluginPath, String pluginName) {
     String dirName = pluginPath + "/" + pluginName;
     File directory = new File(dirName);
-    if (!directory.exists()) {
-      LOG.warn("Can not found plugin {} in directory {}", pluginName, dirName);
-      return;
-    }
-
     File[] pluginFiles = directory.listFiles();
     if (pluginFiles == null || pluginFiles.length == 0) {
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
-          "Can not found any files plugin directory " + dirName);
+      LOG.warn("Can not load plugin {} from empty directory {}", pluginName, dirName);
+      return;
     }
     List<URL> files =
         Arrays.stream(pluginFiles)
@@ -196,24 +176,20 @@ public class GravitinoConnectorPluginManager {
           ServiceLoader.load(Plugin.class, (ClassLoader) pluginClassLoader);
       List<Plugin> pluginList = ImmutableList.copyOf(serviceLoader);
       if (pluginList.isEmpty()) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR,
-            String.format("The %s plugin does not found connector SIP interface", pluginName));
+        LOG.warn("The {} plugin directory does not found connector SIP interface", pluginName);
+        return;
       }
       Plugin plugin = pluginList.get(0);
       if (plugin.getConnectorFactories() == null
           || !plugin.getConnectorFactories().iterator().hasNext()) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR,
-            String.format("The %s plugin does not contains any ConnectorFactories", pluginName));
+        LOG.warn("The {} plugin does not contains any ConnectorFactories ", pluginName);
+        return;
       }
       connectorPlugins.put(pluginName, pluginList.get(0));
 
     } catch (Exception e) {
       throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
-          "Failed to create Plugin class loader " + pluginName,
-          e);
+          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to load Plugin " + pluginName, e);
     }
   }
 
@@ -228,7 +204,8 @@ public class GravitinoConnectorPluginManager {
 
     String value = GravitinoConfig.trinoConfig.getProperty(TRINO_PLUGIN_BUNDLES);
     Splitter splitter = Splitter.on(',').omitEmptyStrings().trimResults();
-    splitter.splitToList(value).stream()
+    splitter
+        .splitToList(value)
         .forEach(
             v -> {
               int start = v.indexOf("trino-");
@@ -240,10 +217,11 @@ public class GravitinoConnectorPluginManager {
                 return;
               }
               String key = v.substring(start, end).replace("trino-", "");
-              if (!usePlugins.contains(key)) {
-                return;
+              try {
+                loadPluginByPom(artifactResolver.resolvePom(new File(v)), key);
+              } catch (Throwable t) {
+                LOG.error("Fatal error in load plugin by {}", v, t);
               }
-              loadPluginByPom(artifactResolver.resolvePom(new File(v)), key);
             });
   }
 

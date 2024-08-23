@@ -47,6 +47,7 @@ function check_process_status() {
   if [[ -z "${pid}" ]]; then
     echo "GravitinoIcebergRESTServer is not running"
   else
+    printArt
     echo "GravitinoIcebergRESTServer is running[PID:$pid]"
   fi
 }
@@ -116,8 +117,6 @@ function start() {
   if [[ -z "${pid}" ]]; then
     echo "GravitinoIcebergRESTServer start error!"
     return 1;
-  else
-    echo "GravitinoIcebergRESTServer start success!"
   fi
 
   sleep 2
@@ -176,10 +175,11 @@ if [ "$JVM_VERSION" -eq 17 ]; then
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 fi
 
-#JAVA_OPTS+=" -Djava.securit.krb5.conf=/etc/krb5.conf"
+#JAVA_OPTS+=" -Djava.security.krb5.conf=/etc/krb5.conf"
 
 if [ -d "${GRAVITINO_HOME}/iceberg-rest-server/libs" ]; then
   addJarInDir "${GRAVITINO_HOME}/iceberg-rest-server/libs"
+  addDirToClasspath "${GRAVITINO_HOME}/iceberg-rest-server/conf"
 else
   addJarInDir "${GRAVITINO_HOME}/libs"
 fi

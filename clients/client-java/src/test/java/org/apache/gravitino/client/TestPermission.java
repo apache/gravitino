@@ -27,13 +27,16 @@ import java.util.List;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.GroupDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
+import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
+import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -43,10 +46,29 @@ public class TestPermission extends TestBase {
 
   private static final String metalakeName = "testMetalake";
   private static final String API_PERMISSION_PATH = "/api/metalakes/%s/permissions/%s";
+  private static GravitinoClient gravitinoClient;
 
   @BeforeAll
   public static void setUp() throws Exception {
     TestBase.setUp();
+
+    TestGravitinoMetalake.createMetalake(client, metalakeName);
+
+    MetalakeDTO mockMetalake =
+        MetalakeDTO.builder()
+            .withName(metalakeName)
+            .withComment("comment")
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    MetalakeResponse resp = new MetalakeResponse(mockMetalake);
+    buildMockResource(Method.GET, "/api/metalakes/" + metalakeName, null, resp, HttpStatus.SC_OK);
+
+    gravitinoClient =
+        GravitinoClient.builder("http://127.0.0.1:" + mockServer.getLocalPort())
+            .withMetalake(metalakeName)
+            .withVersionCheckDisabled()
+            .build();
   }
 
   @Test
@@ -65,7 +87,7 @@ public class TestPermission extends TestBase {
     UserResponse response = new UserResponse(userDTO);
 
     buildMockResource(Method.PUT, userPath, request, response, SC_OK);
-    User grantedUser = client.grantRolesToUser(metalakeName, roles, user);
+    User grantedUser = gravitinoClient.grantRolesToUser(roles, user);
     Assertions.assertEquals(grantedUser.roles(), userDTO.roles());
     Assertions.assertEquals(grantedUser.name(), userDTO.name());
 
@@ -73,7 +95,7 @@ public class TestPermission extends TestBase {
     ErrorResponse errResp2 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.PUT, userPath, request, errResp2, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.grantRolesToUser(metalakeName, roles, user));
+        RuntimeException.class, () -> gravitinoClient.grantRolesToUser(roles, user));
   }
 
   @Test
@@ -92,7 +114,7 @@ public class TestPermission extends TestBase {
     RoleRevokeRequest request = new RoleRevokeRequest(roles);
 
     buildMockResource(Method.PUT, userPath, request, response, SC_OK);
-    User revokedUser = client.revokeRolesFromUser(metalakeName, roles, user);
+    User revokedUser = gravitinoClient.revokeRolesFromUser(roles, user);
     Assertions.assertEquals(revokedUser.roles(), userDTO.roles());
     Assertions.assertEquals(revokedUser.name(), userDTO.name());
 
@@ -100,7 +122,7 @@ public class TestPermission extends TestBase {
     ErrorResponse errResp2 = ErrorResponse.internalError("internal error");
     buildMockResource(Method.PUT, userPath, null, errResp2, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.revokeRolesFromUser(metalakeName, roles, user));
+        RuntimeException.class, () -> gravitinoClient.revokeRolesFromUser(roles, user));
   }
 
   @Test
@@ -119,7 +141,7 @@ public class TestPermission extends TestBase {
     GroupResponse response = new GroupResponse(groupDTO);
 
     buildMockResource(Method.PUT, groupPath, request, response, SC_OK);
-    Group grantedGroup = client.grantRolesToGroup(metalakeName, roles, group);
+    Group grantedGroup = gravitinoClient.grantRolesToGroup(roles, group);
     Assertions.assertEquals(grantedGroup.roles(), groupDTO.roles());
     Assertions.assertEquals(grantedGroup.name(), groupDTO.name());
 
@@ -127,7 +149,7 @@ public class TestPermission extends TestBase {
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.POST, groupPath, request, errResp, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.grantRolesToGroup(metalakeName, roles, group));
+        RuntimeException.class, () -> gravitinoClient.grantRolesToGroup(roles, group));
   }
 
   @Test
@@ -146,7 +168,7 @@ public class TestPermission extends TestBase {
     RoleRevokeRequest request = new RoleRevokeRequest(roles);
 
     buildMockResource(Method.PUT, groupPath, request, response, SC_OK);
-    Group revokedGroup = client.revokeRolesFromGroup(metalakeName, roles, group);
+    Group revokedGroup = gravitinoClient.revokeRolesFromGroup(roles, group);
     Assertions.assertEquals(revokedGroup.roles(), groupDTO.roles());
     Assertions.assertEquals(revokedGroup.name(), groupDTO.name());
 
@@ -154,6 +176,6 @@ public class TestPermission extends TestBase {
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, groupPath, null, errResp, SC_SERVER_ERROR);
     Assertions.assertThrows(
-        RuntimeException.class, () -> client.revokeRolesFromGroup(metalakeName, roles, group));
+        RuntimeException.class, () -> gravitinoClient.revokeRolesFromGroup(roles, group));
   }
 }

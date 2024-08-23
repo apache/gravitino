@@ -22,10 +22,8 @@ import org.apache.gravitino.client.GravitinoVersion;
 import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-@Tag("gravitino-docker-test")
 public class VersionOperationsIT extends AbstractIT {
   @Test
   public void testGetVersion() {

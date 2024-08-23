@@ -52,7 +52,7 @@ public enum TestDatabaseName {
   /** Represents the MySQL database for MysqlAbstractIT and its subclasses. */
   MYSQL_MYSQL_ABSTRACT_IT,
 
-  /** Represents the MySQL database for AudtCatalogMysqlIT. */
+  /** Represents the MySQL database for AuditCatalogMysqlIT. */
   MYSQL_AUDIT_CATALOG_MYSQL_IT,
 
   /** Represents the MySQL database used for testing the catalog integration with MySQL. */

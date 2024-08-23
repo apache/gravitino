@@ -78,7 +78,7 @@ public class UserDTO implements User {
   }
 
   /**
-   * Creates a new Builder for constructing an User DTO.
+   * Creates a new Builder for constructing a User DTO.
    *
    * @return A new Builder instance.
    */

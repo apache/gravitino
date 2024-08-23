@@ -29,6 +29,10 @@ from gravitino import (
     SchemaChange,
     Schema,
 )
+from gravitino.exceptions.base import (
+    NoSuchSchemaException,
+    SchemaAlreadyExistsException,
+)
 
 from tests.integration.integration_test_env import IntegrationTestEnv
 
@@ -133,6 +137,11 @@ class TestSchema(IntegrationTestEnv):
         self.assertEqual(schema.properties(), self.schema_properties)
         self.assertEqual(schema.audit_info().creator(), "anonymous")
 
+    def test_failed_create_schema(self):
+        self.create_schema()
+        with self.assertRaises(SchemaAlreadyExistsException):
+            _ = self.create_schema()
+
     def test_drop_schema(self):
         self.create_schema()
         catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
@@ -158,20 +167,25 @@ class TestSchema(IntegrationTestEnv):
         self.assertEqual(schema.properties(), self.schema_properties)
         self.assertEqual(schema.audit_info().creator(), "anonymous")
 
+    def test_failed_load_schema(self):
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
+        with self.assertRaises(NoSuchSchemaException):
+            _ = catalog.as_schemas().load_schema(schema_name=self.schema_name)
+
     def test_alter_schema(self):
         self.create_schema()
-        schema_propertie_new_value = self.schema_properties_value2 + "_new"
+        schema_properties_new_value = self.schema_properties_value2 + "_new"
 
         changes = (
             SchemaChange.remove_property(self.schema_properties_key1),
             SchemaChange.set_property(
-                self.schema_properties_key2, schema_propertie_new_value
+                self.schema_properties_key2, schema_properties_new_value
             ),
         )
         catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         schema_new = catalog.as_schemas().alter_schema(self.schema_name, *changes)
         self.assertEqual(
             schema_new.properties().get(self.schema_properties_key2),
-            schema_propertie_new_value,
+            schema_properties_new_value,
         )
         self.assertTrue(self.schema_properties_key1 not in schema_new.properties())

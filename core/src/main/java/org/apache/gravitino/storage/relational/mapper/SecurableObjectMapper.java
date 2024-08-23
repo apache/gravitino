@@ -43,12 +43,12 @@ public interface SecurableObjectMapper {
     "<script>",
     "INSERT INTO "
         + SECURABLE_OBJECT_TABLE_NAME
-        + "(role_id, entity_id, type, privilege_names, privilege_conditions, "
+        + "(role_id, metadata_object_id, type, privilege_names, privilege_conditions, "
         + " current_version, last_version, deleted_at)"
         + " VALUES ",
     "<foreach collection='securableObjects' item='item' separator=','>",
     "(#{item.roleId},"
-        + " #{item.entityId},"
+        + " #{item.metadataObjectId},"
         + " #{item.type},"
         + " #{item.privilegeNames},"
         + " #{item.privilegeConditions},"
@@ -74,14 +74,14 @@ public interface SecurableObjectMapper {
           + SECURABLE_OBJECT_TABLE_NAME
           + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
           + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " where exists ( select * from "
+          + " WHERE exists (SELECT * from "
           + ROLE_TABLE_NAME
           + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
           + " AND ro.deleted_at = 0) AND ob.deleted_at = 0")
   void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Select(
-      "SELECT role_id as roleId, entity_id as entityId,"
+      "SELECT role_id as roleId, metadata_object_id as metadataObjectId,"
           + " type as type, privilege_names as privilegeNames,"
           + " privilege_conditions as privilegeConditions, current_version as currentVersion,"
           + " last_version as lastVersion, deleted_at as deletedAt"

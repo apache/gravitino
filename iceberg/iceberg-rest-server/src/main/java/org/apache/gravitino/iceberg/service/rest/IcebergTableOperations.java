@@ -37,7 +37,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
@@ -57,7 +57,7 @@ public class IcebergTableOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperations.class);
 
-  private IcebergTableOps icebergTableOps;
+  private IcebergTableOpsManager icebergTableOpsManager;
   private IcebergMetricsManager icebergMetricsManager;
 
   private ObjectMapper icebergObjectMapper;
@@ -68,8 +68,8 @@ public class IcebergTableOperations {
 
   @Inject
   public IcebergTableOperations(
-      IcebergTableOps icebergTableOps, IcebergMetricsManager icebergMetricsManager) {
-    this.icebergTableOps = icebergTableOps;
+      IcebergTableOpsManager icebergTableOpsManager, IcebergMetricsManager icebergMetricsManager) {
+    this.icebergTableOpsManager = icebergTableOpsManager;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
     this.icebergMetricsManager = icebergMetricsManager;
   }
@@ -78,8 +78,10 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-table", absolute = true)
-  public Response listTable(@PathParam("namespace") String namespace) {
-    return IcebergRestUtils.ok(icebergTableOps.listTable(RESTUtil.decodeNamespace(namespace)));
+  public Response listTable(
+      @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
+    return IcebergRestUtils.ok(
+        icebergTableOpsManager.getOps(prefix).listTable(RESTUtil.decodeNamespace(namespace)));
   }
 
   @POST
@@ -87,13 +89,17 @@ public class IcebergTableOperations {
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
   public Response createTable(
-      @PathParam("namespace") String namespace, CreateTableRequest createTableRequest) {
+      @PathParam("prefix") String prefix,
+      @PathParam("namespace") String namespace,
+      CreateTableRequest createTableRequest) {
     LOG.info(
         "Create Iceberg table, namespace: {}, create table request: {}",
         namespace,
         createTableRequest);
     return IcebergRestUtils.ok(
-        icebergTableOps.createTable(RESTUtil.decodeNamespace(namespace), createTableRequest));
+        icebergTableOpsManager
+            .getOps(prefix)
+            .createTable(RESTUtil.decodeNamespace(namespace), createTableRequest));
   }
 
   @POST
@@ -102,6 +108,7 @@ public class IcebergTableOperations {
   @Timed(name = "update-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-table", absolute = true)
   public Response updateTable(
+      @PathParam("prefix") String prefix,
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       UpdateTableRequest updateTableRequest) {
@@ -114,7 +121,8 @@ public class IcebergTableOperations {
     }
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    return IcebergRestUtils.ok(icebergTableOps.updateTable(tableIdentifier, updateTableRequest));
+    return IcebergRestUtils.ok(
+        icebergTableOpsManager.getOps(prefix).updateTable(tableIdentifier, updateTableRequest));
   }
 
   @DELETE
@@ -123,6 +131,7 @@ public class IcebergTableOperations {
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
   public Response dropTable(
+      @PathParam("prefix") String prefix,
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested) {
@@ -134,9 +143,9 @@ public class IcebergTableOperations {
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
     if (purgeRequested) {
-      icebergTableOps.purgeTable(tableIdentifier);
+      icebergTableOpsManager.getOps(prefix).purgeTable(tableIdentifier);
     } else {
-      icebergTableOps.dropTable(tableIdentifier);
+      icebergTableOpsManager.getOps(prefix).dropTable(tableIdentifier);
     }
     return IcebergRestUtils.noContent();
   }
@@ -147,13 +156,14 @@ public class IcebergTableOperations {
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
   public Response loadTable(
+      @PathParam("prefix") String prefix,
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       @DefaultValue("all") @QueryParam("snapshots") String snapshots) {
     // todo support snapshots
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    return IcebergRestUtils.ok(icebergTableOps.loadTable(tableIdentifier));
+    return IcebergRestUtils.ok(icebergTableOpsManager.getOps(prefix).loadTable(tableIdentifier));
   }
 
   @HEAD
@@ -162,10 +172,12 @@ public class IcebergTableOperations {
   @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "table-exits", absolute = true)
   public Response tableExists(
-      @PathParam("namespace") String namespace, @PathParam("table") String table) {
+      @PathParam("prefix") String prefix,
+      @PathParam("namespace") String namespace,
+      @PathParam("table") String table) {
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    if (icebergTableOps.tableExists(tableIdentifier)) {
+    if (icebergTableOpsManager.getOps(prefix).tableExists(tableIdentifier)) {
       return IcebergRestUtils.okWithoutContent();
     } else {
       return IcebergRestUtils.notExists();
@@ -178,6 +190,7 @@ public class IcebergTableOperations {
   @Timed(name = "report-table-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "report-table-metrics", absolute = true)
   public Response reportTableMetrics(
+      @PathParam("prefix") String prefix,
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       ReportMetricsRequest request) {

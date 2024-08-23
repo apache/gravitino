@@ -23,6 +23,7 @@ from typing import List
 from dataclasses_json import config
 
 from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.name_identifier import NameIdentifier
 
 
@@ -43,4 +44,5 @@ class EntityListResponse(BaseResponse):
         """
         super().validate()
 
-        assert self._idents is not None, "identifiers must not be null"
+        if self._idents is None:
+            raise IllegalArgumentException("identifiers must not be null")

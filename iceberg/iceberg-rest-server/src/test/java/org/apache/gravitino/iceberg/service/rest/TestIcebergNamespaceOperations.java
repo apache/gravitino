@@ -31,6 +31,8 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
@@ -61,12 +63,20 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
+  private Response doRegisterTable(String tableName) {
+    RegisterTableRequest request =
+        ImmutableRegisterTableRequest.builder().name(tableName).metadataLocation("mock").build();
+    return getNamespaceClientBuilder(
+            Optional.of("register_ns"), Optional.of("register"), Optional.empty())
+        .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
   private Response doListNamespace(Optional<String> parent) {
     Optional<Map<String, String>> queryParam =
         parent.isPresent()
             ? Optional.of(ImmutableMap.of("parent", parent.get()))
             : Optional.empty();
-    return getNamespaceClientBuilder(Optional.empty(), queryParam).get();
+    return getNamespaceClientBuilder(Optional.empty(), Optional.empty(), queryParam).get();
   }
 
   private Response doUpdateNamespace(String name) {
@@ -121,6 +131,16 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
     Assertions.assertEquals(namespaceResponse.properties(), properties);
   }
 
+  private void verifyRegisterTableSucc(String tableName) {
+    Response response = doRegisterTable(tableName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  private void verifyRegisterTableFail(int statusCode, String tableName) {
+    Response response = doRegisterTable(tableName);
+    Assertions.assertEquals(statusCode, response.getStatus());
+  }
+
   private void verifyCreateNamespaceFail(int statusCode, String... name) {
     Response response = doCreateNamespace(name);
     Assertions.assertEquals(statusCode, response.getStatus());
@@ -159,6 +179,13 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
     verifyDropNamespaceFail(500, "");
   }
 
+  @Test
+  void testRegisterTable() {
+    verifyRegisterTableSucc("register_foo1");
+    // Iceberg REST service will throw AlreadyExistsException in test if table name contains 'fail'
+    verifyRegisterTableFail(409, "fail_register_foo1");
+  }
+
   private void dropAllExistingNamespace() {
     Response response = doListNamespace(Optional.empty());
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
@@ -182,9 +209,9 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  void testListNamespace(boolean withPrefix) {
-    setUrlPathWithPrefix(withPrefix);
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  void testListNamespace(String prefix) {
+    setUrlPathWithPrefix(prefix);
     dropAllExistingNamespace();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList());
 

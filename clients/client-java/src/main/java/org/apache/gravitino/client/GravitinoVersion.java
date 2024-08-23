@@ -30,8 +30,8 @@ public class GravitinoVersion extends VersionDTO implements Comparable {
   private static final int VERSION_PART_NUMBER = 3;
 
   @VisibleForTesting
-  GravitinoVersion(String version, String compoileDate, String gitCommit) {
-    super(version, compoileDate, gitCommit);
+  GravitinoVersion(String version, String compileDate, String gitCommit) {
+    super(version, compileDate, gitCommit);
   }
 
   GravitinoVersion(VersionDTO versionDTO) {
@@ -41,7 +41,7 @@ public class GravitinoVersion extends VersionDTO implements Comparable {
   @VisibleForTesting
   /** @return parse the version number for a version string */
   int[] getVersionNumber() {
-    Pattern pattern = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)(-\\w+)?");
+    Pattern pattern = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)([-\\w]+)?");
     Matcher matcher = pattern.matcher(version());
     if (matcher.matches()) {
       int[] versionNumbers = new int[VERSION_PART_NUMBER];

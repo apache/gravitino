@@ -30,6 +30,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -39,6 +40,7 @@ import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.SchemaDTO;
 import org.apache.gravitino.dto.authorization.GroupDTO;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
@@ -116,6 +118,16 @@ public class DTOConverters {
         .withLastModifier(audit.lastModifier())
         .withLastModifiedTime(audit.lastModifiedTime())
         .build();
+  }
+
+  /**
+   * Converts a {@link Owner} to a {@link OwnerDTO}.
+   *
+   * @param owner The owner.
+   * @return The owner DTO.
+   */
+  public static OwnerDTO toDTO(Owner owner) {
+    return OwnerDTO.builder().withName(owner.name()).withType(owner.type()).build();
   }
 
   /**
@@ -504,7 +516,7 @@ public class DTOConverters {
   }
 
   /**
-   * Converts a Expression to an FunctionArg DTO.
+   * Converts an Expression to an FunctionArg DTO.
    *
    * @param expression The expression to be converted.
    * @return The expression DTO.
@@ -736,15 +748,15 @@ public class DTOConverters {
   /**
    * Converts an array of IndexDTOs to an array of Indexes.
    *
-   * @param indexDTOS The Index DTOs to be converted.
+   * @param indexDTOs The Index DTOs to be converted.
    * @return The array of Indexes.
    */
-  public static Index[] fromDTOs(IndexDTO[] indexDTOS) {
-    if (ArrayUtils.isEmpty(indexDTOS)) {
+  public static Index[] fromDTOs(IndexDTO[] indexDTOs) {
+    if (ArrayUtils.isEmpty(indexDTOs)) {
       return Indexes.EMPTY_INDEXES;
     }
 
-    return Arrays.stream(indexDTOS).map(DTOConverters::fromDTO).toArray(Index[]::new);
+    return Arrays.stream(indexDTOs).map(DTOConverters::fromDTO).toArray(Index[]::new);
   }
 
   /**

@@ -40,11 +40,9 @@ import org.apache.hadoop.minikdc.KerberosSecurityTestcase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
-@Tag("gravitino-docker-test")
 public class KerberosOperationsIT extends AbstractIT {
 
   private static final KerberosSecurityTestcase kdc =
@@ -72,7 +70,7 @@ public class KerberosOperationsIT extends AbstractIT {
     initKeyTab();
 
     Map<String, String> configs = Maps.newHashMap();
-    configs.put(Configs.AUTHENTICATOR.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());
+    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.KERBEROS.name().toLowerCase());
     configs.put(PRINCIPAL.getKey(), serverPrincipal);
     configs.put(KEYTAB.getKey(), keytabFile);
     configs.put("client.kerberos.principal", clientPrincipal);

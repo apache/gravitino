@@ -12,7 +12,9 @@ The Apache Gravitino Spark connector offers the capability to read and write Ice
 #### Support DML and DDL operations:
 
 - `CREATE TABLE`
-  - `Supports basic create table clause including table schema, properties, partition, does not support distribution and sort orders.`
+
+Doesn't support distribution and sort orders.
+
 - `DROP TABLE`
 - `ALTER TABLE`
 - `INSERT INTO&OVERWRITE`
@@ -29,7 +31,7 @@ The Apache Gravitino Spark connector offers the capability to read and write Ice
 - View operations.
 - Metadata tables, like:
   - `{iceberg_catalog}.{iceberg_database}.{iceberg_table}.snapshots`
-- Other Iceberg extension SQL, like:
+- Other Iceberg extension SQLs, like:
   - `ALTER TABLE prod.db.sample ADD PARTITION FIELD xx`
   - `ALTER TABLE ... WRITE ORDERED BY`
   - `ALTER TABLE prod.db.sample CREATE BRANCH branchName`
@@ -93,9 +95,9 @@ SELECT * FROM employee FOR SYSTEM_TIME AS OF '2024-05-27 01:01:00';
 DESC EXTENDED employee;
 ```
 
-For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/latest/spark-procedures/#spark-procedures) in Iceberg official document. 
+For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/1.5.2/spark-procedures/#spark-procedures) in Iceberg official document. 
 
-## Apache Iceberg backend-catalog support
+## Apache Iceberg catalog backend support
 - HiveCatalog
 - JdbcCatalog
 - RESTCatalog

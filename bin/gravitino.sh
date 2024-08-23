@@ -47,6 +47,7 @@ function check_process_status() {
   if [[ -z "${pid}" ]]; then
     echo "Gravitino Server is not running"
   else
+    printArt
     echo "Gravitino Server is running[PID:$pid]"
   fi
 }
@@ -116,8 +117,6 @@ function start() {
   if [[ -z "${pid}" ]]; then
     echo "Gravitino Server start error!"
     return 1;
-  else
-    echo "Gravitino Server start success!"
   fi
 
   sleep 2
@@ -176,7 +175,7 @@ if [ "$JVM_VERSION" -eq 17 ]; then
   JAVA_OPTS+=" --add-opens java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 fi
 
-#JAVA_OPTS+=" -Djava.securit.krb5.conf=/etc/krb5.conf"
+#JAVA_OPTS+=" -Djava.security.krb5.conf=/etc/krb5.conf"
 
 addJarInDir "${GRAVITINO_HOME}/libs"
 

@@ -67,7 +67,11 @@ public interface TopicCatalog {
   }
 
   /**
-   * Create a topic in the catalog.
+   * Create a topic in the catalog based on the provided details.
+   *
+   * <p>This method returns the topic as defined by the user without applying all defaults. If you
+   * need the topic with default values applied, use the {@link #loadTopic(NameIdentifier)} method
+   * after creation.
    *
    * @param ident A topic identifier.
    * @param comment The comment of the topic object. Null is set if no comment is specified.
@@ -75,7 +79,7 @@ public interface TopicCatalog {
    *     supported yet.
    * @param properties The properties of the topic object. Empty map is set if no properties are
    *     specified.
-   * @return The topic metadata.
+   * @return The topic as defined by the caller, without all default values.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws TopicAlreadyExistsException If the topic already exists.
    */
