@@ -20,8 +20,7 @@ under the License.
 from abc import ABC, abstractmethod
 from typing import List
 
-from gravitino.api.rel.expressions.expression import Expression
-from gravitino.api.rel.expressions.distributions.strategy import Strategy
+from gravitino.api import Expression, Strategy
 
 class Distribution(Expression, ABC):
     """

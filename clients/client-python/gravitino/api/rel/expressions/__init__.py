@@ -16,3 +16,10 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
+
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.expressions.named_reference import NamedReference
+from gravitino.api.rel.expressions.distributions.distribution import Distribution
+from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
+from gravitino.api.rel.expressions.transforms.transform import Transform
+from gravitino.api.rel.expressions.distributions.strategy import Strategy

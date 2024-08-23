@@ -18,10 +18,12 @@ under the License.
 """
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional
 
-from gravitino.api.rel.types.type import Type
-from gravitino.api.rel.expressions.expression import Expression
+from dataclasses_json import config
+
+from gravitino.api import Type, Expression
 
 @dataclass
 class Column(ABC):

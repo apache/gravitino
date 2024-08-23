@@ -19,7 +19,7 @@ under the License.
 
 import json
 from typing import List, ClassVar
-from gravitino.exceptions.base import IllegalNamespaceException
+from gravitino.exceptions import IllegalNamespaceException
 
 
 class Namespace:

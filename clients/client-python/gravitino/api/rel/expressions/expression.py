@@ -18,7 +18,6 @@ under the License.
 """
 from abc import ABC, abstractmethod
 from typing import List, Set
-from gravitino.api.rel.expressions.named_reference import NamedReference
 
 class Expression(ABC):
     """
@@ -42,12 +41,12 @@ class Expression(ABC):
         """
         pass
 
-    def references(self) -> List[NamedReference]:
+    def references(self) -> List['NamedReference']:
         """
         Returns a list of fields or columns that are referenced by this expression.
         This is a default implementation that can be overridden if necessary.
         """
-        set_references: Set[NamedReference] = set()
+        set_references: Set['NamedReference'] = set()
         for child in self.children():
             set_references.update(child.references())
         return list(set_references)

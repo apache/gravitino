@@ -16,3 +16,20 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
+
+from gravitino.api.catalog import Catalog
+from gravitino.api.catalog_change import CatalogChange
+from gravitino.api.metalake_change import MetalakeChange
+from gravitino.api.table import Table
+from gravitino.api.audit import Audit
+from gravitino.api.rel import (
+    Index,
+    Column,
+    TableCatalog,
+    Expression,
+    Distribution,
+    SortOrder,
+    Transform,
+    Type,
+    Strategy,
+)

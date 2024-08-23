@@ -18,14 +18,11 @@ under the License.
 """
 
 from typing import ClassVar
-
 from dataclasses import dataclass, field
 
 from dataclasses_json import DataClassJsonMixin, config
 
-from gravitino.exceptions.base import (
-    IllegalNameIdentifierException,
-)
+from gravitino.exceptions import IllegalNameIdentifierException
 from gravitino.namespace import Namespace
 
 

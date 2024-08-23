@@ -17,15 +17,12 @@ specific language governing permissions and limitations
 under the License.
 """
 
-from gravitino.api.catalog import Catalog
-from gravitino.api.catalog_change import CatalogChange
-from gravitino.catalog.fileset_catalog import FilesetCatalog
-from gravitino.dto.catalog_dto import CatalogDTO
-from gravitino.dto.requests.catalog_update_request import CatalogUpdateRequest
-from gravitino.dto.requests.metalake_update_request import MetalakeUpdateRequest
-from gravitino.api.metalake_change import MetalakeChange
+from gravitino import Namespace
+from gravitino.api import Catalog, CatalogChange
+from gravitino.catalog import FilesetCatalog, RelationalCatalog
+from gravitino.dto import CatalogDTO, CatalogUpdateRequest, MetalakeUpdateRequest
+from gravitino.api import MetalakeChange
 from gravitino.utils import HTTPClient
-from gravitino.namespace import Namespace
 
 
 class DTOConverters:

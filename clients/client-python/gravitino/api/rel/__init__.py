@@ -16,3 +16,15 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
+
+from gravitino.api.rel.expressions import (
+    Expression,
+    Distribution,
+    SortOrder,
+    Transform,
+    Strategy,
+)
+from gravitino.api.rel.types import Type
+from gravitino.api.rel.indexes import Index
+from gravitino.api.rel.column import Column
+from gravitino.api.rel.table_catalog import TableCatalog
