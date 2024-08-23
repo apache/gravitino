@@ -34,7 +34,7 @@ class BaseContainer:
     _container = None
     _network = None
     _ip = ""
-    _network_name = "python_net"
+    _network_name = "python-net"
     _container_name: str
 
     def __init__(
