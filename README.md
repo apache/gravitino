@@ -132,4 +132,4 @@ Apache Gravitino is an effort undergoing incubation at The Apache Software Found
 
 <sub>Apache®, Apache Gravitino&trade;, Apache Hadoop&reg;, Apache Hive&trade;, Apache Iceberg&trade;, Apache Kafka&reg;, Apache Spark&trade;, Apache Submarine&trade;, Apache Thrift&trade; and Apache Zeppelin&trade; are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>
 
-<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&url=%2Freadme.md&action_name=ReadMe" style="border:0;" alt="" />
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=ReadMe" style="border:0;" alt="" />

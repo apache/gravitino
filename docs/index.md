@@ -178,3 +178,5 @@ Gravitino provides security configurations for Gravitino, including HTTPS, authe
 * [Publish Docker images](./publish-docker-images.md): a guide to publishing Gravitino Docker images;
   also lists the change logs of Gravitino CI Docker images and release images.
 * [How to upgrade Gravitino](./how-to-upgrade.md): a guide to upgrading the schema of Gravitino storage backend from one release version to another.
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=Overview" style="border:0;" alt="" />
