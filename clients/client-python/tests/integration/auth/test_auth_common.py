@@ -29,15 +29,17 @@ from gravitino import (
     Catalog,
     Fileset,
 )
-from gravitino.auth.simple_auth_provider import SimpleAuthProvider
 from gravitino.exceptions.base import GravitinoRuntimeException
-from tests.integration.integration_test_env import IntegrationTestEnv
 
 logger = logging.getLogger(__name__)
 
 
-class TestSimpleAuthClient(IntegrationTestEnv):
-    creator: str = "test_client"
+class TestCommonAuth:
+    """
+    A common test set for AuthProvider Integration Tests
+    """
+
+    creator: str = "test"
     metalake_name: str = "TestClient_metalake" + str(randint(1, 10000))
     catalog_name: str = "fileset_catalog"
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
@@ -63,16 +65,8 @@ class TestSimpleAuthClient(IntegrationTestEnv):
         metalake_name, catalog_name, schema_name
     )
     fileset_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_name)
-
-    def setUp(self):
-        os.environ["GRAVITINO_USER"] = self.creator
-        self.gravitino_admin_client = GravitinoAdminClient(
-            uri="http://localhost:8090", auth_data_provider=SimpleAuthProvider()
-        )
-        self.init_test_env()
-
-    def tearDown(self):
-        self.clean_test_data()
+    gravitino_admin_client: GravitinoAdminClient
+    gravitino_client: GravitinoClient
 
     def clean_test_data(self):
         catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
@@ -117,14 +111,7 @@ class TestSimpleAuthClient(IntegrationTestEnv):
         os.environ["GRAVITINO_USER"] = ""
 
     def init_test_env(self):
-        self.gravitino_admin_client.create_metalake(
-            self.metalake_name, comment="", properties={}
-        )
-        self.gravitino_client = GravitinoClient(
-            uri="http://localhost:8090",
-            metalake_name=self.metalake_name,
-            auth_data_provider=SimpleAuthProvider(),
-        )
+
         catalog = self.gravitino_client.create_catalog(
             name=self.catalog_name,
             catalog_type=Catalog.Type.FILESET,
