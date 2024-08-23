@@ -178,7 +178,7 @@ The Gravitino Iceberg REST server supports multiple catalogs and offers a config
 |----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|---------------|
 | `gravitino.iceberg-rest.catalog-provider`    | Catalog provider class name, you can develop a class that implements `IcebergTableOpsProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.   | `config-based-provider`     | No       | 0.7.0         |
 
-##### config-based catalog provider
+##### Configuration based catalog provider
 
 When using a config-based catalog provider, you can configure the default catalog with `gravitino.iceberg-rest.catalog.<param name>=<value>`. For specific catalogs, use the format `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
 
@@ -217,7 +217,7 @@ You can access different catalogs by setting the `prefix` to the specific catalo
 ...
 ```
 
-##### gravitino-based catalog provider
+##### Gravitino server based catalog provider
 
 When using a gravitino-based catalog provider, you can leverage Gravitino to support dynamic catalog management for the Iceberg REST server.
 
