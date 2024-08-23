@@ -31,12 +31,26 @@ class Column(ABC):
     An interface representing a column of a Table. It defines basic properties of a column,
     such as name and data type.
     """
-    name: str
-    data_type: Type
-    comment: str = None
-    nullable: bool = True
-    auto_increment: bool = False
-    default_value: Expression = Expression.EMPTY_EXPRESSION
+    _name: str = field(metadata=config(field_name="name"))
+    """The name of the column."""
+
+    _data_type: Type = field(metadata=config(field_name="dataType"))
+    """The data type of the column."""
+
+    _comment: Optional[str] = field(metadata=config(field_name="comment"))
+    """The comment associated with the column."""
+
+    _nullable: bool = field(metadata=config(field_name="nullable"), default=True)
+    """Whether the column value can be null."""
+
+    _auto_increment: bool = field(metadata=config(field_name="autoIncrement"), default=False)
+    """Whether the column is an auto-increment column."""
+
+    _default_value: Optional[Expression] = field(
+        metadata=config(field_name="defaultValue"),
+        default_factory=lambda: Expression.EMPTY_EXPRESSION,
+    )
+    """The default value of the column."""
 
     @abstractmethod
     def name(self):
@@ -68,20 +82,19 @@ class Column(ABC):
 
 class ColumnImpl(Column):
     def name(self):
-        return self.name
+        return self._name
 
     def data_type(self):
-        return self.data_type
+        return self._data_type
 
     def comment(self):
-        return self.comment
+        return self._comment
 
     def nullable(self):
-        return self.nullable
+        return self._nullable
 
     def auto_increment(self):
-        return self.auto_increment
+        return self._auto_increment
 
     def default_value(self):
-        return self.default_value
-
+        return self._default_value
