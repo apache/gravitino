@@ -1031,3 +1031,36 @@ class TestLocalFilesystem(unittest.TestCase):
                 self.assertEqual(row[1], "19")
             elif row[0] == "D":
                 self.assertEqual(row[1], "18")
+
+    @patch(
+        "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
+        return_value=mock_base.mock_load_fileset(
+            "test_mount", f"{_fileset_dir}/test_mount"
+        ),
+    )
+    def test_mount(self, *mock_methods):
+        fileset_storage_location = f"{self._fileset_dir}/test_mount"
+        fileset_virtual_location = "gvfs://fileset/fileset_catalog/tmp/test_mount"
+
+        local_fs = LocalFileSystem()
+        local_fs.mkdir(fileset_storage_location)
+
+        data = pandas.DataFrame({"Name": ["A", "B", "C", "D"], "ID": [20, 21, 19, 18]})
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090", metalake_name="test_metalake"
+        )
+
+        # to parquet
+        data.to_parquet(fileset_virtual_location + "/test.parquet", filesystem=fs)
+        self.assertTrue(local_fs.exists(fileset_storage_location + "/test.parquet"))
+
+        try:
+            fs.mount(fileset_virtual_location, base_dir="/tmp")
+            self.assertTrue(
+                os.path.exists("/tmp/fileset/fileset_catalog/tmp/test_mount")
+            )
+            self.assertTrue(
+                os.path.exists("/tmp/fileset/fileset_catalog/tmp/test_mount/test.parquet")
+            )
+        finally:
+            fs.umount("/tmp/fileset/fileset_catalog/tmp/test_mount")
