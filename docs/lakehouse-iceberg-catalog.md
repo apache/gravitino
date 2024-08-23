@@ -28,7 +28,10 @@ Builds with Apache Iceberg `1.5.2`. The Apache Iceberg table format version is `
 - Works as a catalog proxy, supporting `Hive`, `JDBC` and `REST` as catalog backend.
 - Supports DDL operations for Iceberg schemas and tables.
 - Doesn't support snapshot or table management operations.
-- Supports S3 and HDFS storage.
+- Supports multi storage.
+  - S3
+  - HDFS
+  - OSS
 - Supports Kerberos or simple authentication for Iceberg catalog with Hive backend. 
 
 ### Catalog properties
@@ -81,6 +84,23 @@ For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you
 
 :::info
 To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle]([Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle)) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
+:::
+
+#### OSS
+
+Gravitino Iceberg REST service supports using static access-key-id and secret-access-key to access OSS data.
+
+| Configuration item      | Description                                                                                           | Default value | Required | Since Version |
+|-------------------------|-------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `io-impl`               | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aliyun.oss.OSSFileIO` for OSS. | (none)        | No       | 0.6.0         |
+| `oss-access-key-id`     | The static access key ID used to access OSS data.                                                     | (none)        | No       | 0.7.0         |
+| `oss-secret-access-key` | The static secret access key used to access OSS data.                                                 | (none)        | No       | 0.7.0         |
+| `oss-endpoint`          | The endpoint of Aliyun OSS service.                                                                   | (none)        | No       | 0.7.0         |
+
+For other Iceberg s3 properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.bypass.client.security-token`.
+
+:::info
+Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
 #### Catalog backend security
