@@ -54,17 +54,23 @@ public class RangerITEnv {
   protected static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";
   protected static RangerClient rangerClient;
-
+  private static volatile Boolean initRangerService = Boolean.FALSE;
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   public static void setup() {
     containerSuite.startRangerContainer();
     rangerClient = containerSuite.getRangerContainer().rangerClient;
-    // No IP address set, no impact on testing
-    createRangerHdfsRepository("", true);
-    createRangerHiveRepository("", true);
-    allowAnyoneAccessHDFS();
-    allowAnyoneAccessInformationSchema();
+
+    if (initRangerService.equals(Boolean.FALSE)) {
+      synchronized (RangerITEnv.class) {
+        // No IP address set, no impact on testing
+        createRangerHdfsRepository("", true);
+        createRangerHiveRepository("", true);
+        allowAnyoneAccessHDFS();
+        allowAnyoneAccessInformationSchema();
+        initRangerService = Boolean.TRUE;
+      }
+    }
   }
 
   public static void cleanup() {
@@ -91,6 +97,7 @@ public class RangerITEnv {
       }
     } catch (RangerServiceException e) {
       // If the policy doesn't exist, we will create it
+      LOG.warn("Error while fetching policy: {}", e.getMessage());
     }
 
     Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap =
@@ -122,6 +129,7 @@ public class RangerITEnv {
       }
     } catch (RangerServiceException e) {
       // If the policy doesn't exist, we will create it
+      LOG.warn("Error while fetching policy: {}", e.getMessage());
     }
 
     Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap =

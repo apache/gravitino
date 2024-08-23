@@ -94,7 +94,11 @@ public class RangerHiveE2EIT extends AbstractIT {
   private static String HIVE_METASTORE_URIS;
 
   @BeforeAll
-  public static void setup() throws Exception {
+  public static void startIntegrationTest() throws Exception {
+    Map<String, String> configs = Maps.newHashMap();
+    configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), String.valueOf(true));
+    configs.put(Configs.SERVICE_ADMINS.getKey(), AuthConstants.ANONYMOUS_USER);
+    registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
 
     RangerITEnv.setup();
@@ -104,11 +108,6 @@ public class RangerHiveE2EIT extends AbstractIT {
             "thrift://%s:%d",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
-
-    Map<String, String> configs = Maps.newHashMap();
-    configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), String.valueOf(true));
-    configs.put(Configs.SERVICE_ADMINS.getKey(), AuthConstants.ANONYMOUS_USER);
-    registerCustomConfigs(configs);
 
     createMetalake();
     createCatalogAndRangerAuthPlugin();
