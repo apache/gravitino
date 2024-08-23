@@ -55,8 +55,8 @@ public class GravitinoBasedIcebergTableOpsProvider implements IcebergTableOpsPro
 
   @Override
   public void initialize(Map<String, String> properties) {
-    String uri = IcebergConstants.GRAVITINO_URI;
-    String metalake = IcebergConstants.GRAVITINO_METALAKE;
+    String uri = properties.get(IcebergConstants.GRAVITINO_URI);
+    String metalake = properties.get(IcebergConstants.GRAVITINO_METALAKE);
 
     Preconditions.checkArgument(
         StringUtils.isNotBlank(uri), IcebergConstants.GRAVITINO_URI + " is blank");
