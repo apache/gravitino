@@ -30,6 +30,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -49,6 +50,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestFutureGrantManager {
   private static EntityStore entityStore = mock(EntityStore.class);
+  private static OwnerManager ownerManager = mock(OwnerManager.class);
   private static String METALAKE = "metalake";
   private static AuthorizationPlugin authorizationPlugin;
   private static BaseMetalake metalakeEntity =
@@ -72,10 +74,11 @@ public class TestFutureGrantManager {
 
   @Test
   void testGrantNormally() throws IOException {
-    FutureGrantManager manager = new FutureGrantManager(entityStore);
+    FutureGrantManager manager = new FutureGrantManager(entityStore, ownerManager);
 
     SupportsRelationOperations relationOperations = mock(SupportsRelationOperations.class);
     when(entityStore.relationOperations()).thenReturn(relationOperations);
+    when(ownerManager.getOwner(any(), any())).thenReturn(Optional.empty());
 
     // test no securable objects
     RoleEntity roleEntity = mock(RoleEntity.class);
@@ -100,9 +103,25 @@ public class TestFutureGrantManager {
     manager.grantNewlyCreatedCatalog(METALAKE, catalog);
     verify(authorizationPlugin, never()).onGrantedRolesToUser(any(), any());
     verify(authorizationPlugin, never()).onGrantedRolesToGroup(any(), any());
+    verify(authorizationPlugin, never()).onOwnerSet(any(), any(), any());
 
     // test only grant users
     reset(authorizationPlugin);
+    when(ownerManager.getOwner(any(), any()))
+        .thenReturn(
+            Optional.of(
+                new Owner() {
+                  @Override
+                  public String name() {
+                    return "test";
+                  }
+
+                  @Override
+                  public Type type() {
+                    return Type.USER;
+                  }
+                }));
+
     SecurableObject securableObject = mock(SecurableObject.class);
     when(securableObject.type()).thenReturn(MetadataObject.Type.METALAKE);
     when(securableObject.privileges())
@@ -111,6 +130,7 @@ public class TestFutureGrantManager {
     when(roleEntity.nameIdentifier()).thenReturn(AuthorizationUtils.ofRole(METALAKE, "role1"));
 
     manager.grantNewlyCreatedCatalog(METALAKE, catalog);
+    verify(authorizationPlugin).onOwnerSet(any(), any(), any());
     verify(authorizationPlugin).onGrantedRolesToUser(any(), any());
     verify(authorizationPlugin, never()).onGrantedRolesToGroup(any(), any());
 
@@ -128,6 +148,7 @@ public class TestFutureGrantManager {
             Entity.EntityType.ROLE))
         .thenReturn(Lists.newArrayList(groupEntity));
     manager.grantNewlyCreatedCatalog(METALAKE, catalog);
+    verify(authorizationPlugin).onOwnerSet(any(), any(), any());
     verify(authorizationPlugin, never()).onGrantedRolesToUser(any(), any());
     verify(authorizationPlugin).onGrantedRolesToGroup(any(), any());
 
@@ -144,6 +165,7 @@ public class TestFutureGrantManager {
             Entity.EntityType.ROLE))
         .thenReturn(Lists.newArrayList(groupEntity));
     manager.grantNewlyCreatedCatalog(METALAKE, catalog);
+    verify(authorizationPlugin).onOwnerSet(any(), any(), any());
     verify(authorizationPlugin).onGrantedRolesToUser(any(), any());
     verify(authorizationPlugin).onGrantedRolesToGroup(any(), any());
 
@@ -152,13 +174,14 @@ public class TestFutureGrantManager {
     when(securableObject.privileges())
         .thenReturn(Lists.newArrayList(Privileges.CreateCatalog.allow()));
     manager.grantNewlyCreatedCatalog(METALAKE, catalog);
+    verify(authorizationPlugin).onOwnerSet(any(), any(), any());
     verify(authorizationPlugin, never()).onGrantedRolesToUser(any(), any());
     verify(authorizationPlugin, never()).onGrantedRolesToGroup(any(), any());
   }
 
   @Test
   void testGrantWithException() throws IOException {
-    FutureGrantManager manager = new FutureGrantManager(entityStore);
+    FutureGrantManager manager = new FutureGrantManager(entityStore, ownerManager);
     SupportsRelationOperations relationOperations = mock(SupportsRelationOperations.class);
     when(entityStore.relationOperations()).thenReturn(relationOperations);
     doThrow(new IOException("mock error"))
