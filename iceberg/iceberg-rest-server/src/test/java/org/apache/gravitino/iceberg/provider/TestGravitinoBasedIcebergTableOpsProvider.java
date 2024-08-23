@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.UUID;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
 import org.apache.iceberg.hive.HiveCatalog;
@@ -77,7 +78,9 @@ public class TestGravitinoBasedIcebergTableOpsProvider {
             });
 
     GravitinoBasedIcebergTableOpsProvider provider = new GravitinoBasedIcebergTableOpsProvider();
-    provider.setGravitinoMetalake(gravitinoMetalake);
+    GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
+    Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
+    provider.setClient(client);
 
     IcebergTableOps hiveOps = provider.getIcebergTableOps(hiveCatalogName);
     IcebergTableOps jdbcOps = provider.getIcebergTableOps(jdbcCatalogName);
@@ -100,8 +103,11 @@ public class TestGravitinoBasedIcebergTableOpsProvider {
 
     Mockito.when(invalidCatalog.provider()).thenReturn("hive");
 
+    GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
+    Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
+
     GravitinoBasedIcebergTableOpsProvider provider = new GravitinoBasedIcebergTableOpsProvider();
-    provider.setGravitinoMetalake(gravitinoMetalake);
+    provider.setClient(client);
 
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class, () -> provider.getIcebergTableOps(invalidCatalogName));

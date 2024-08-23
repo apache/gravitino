@@ -21,13 +21,11 @@ package org.apache.gravitino.iceberg.provider;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.client.GravitinoAdminClient;
-import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
 import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsProvider;
@@ -41,17 +39,17 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The catalogName is iceberg_catalog
  */
-public class GravitinoBasedIcebergTableOpsProvider implements IcebergTableOpsProvider {
+public class GravitinoBasedIcebergTableOpsProvider
+    implements IcebergTableOpsProvider, AutoCloseable {
   public static final Logger LOG =
       LoggerFactory.getLogger(GravitinoBasedIcebergTableOpsProvider.class);
 
   public static final String GRAVITINO_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME =
       "gravitino-based-provider";
-  private final AtomicReference<GravitinoMetalake> metalakeWrapper = new AtomicReference<>();
-
-  private String gravitinoUri;
 
   private String gravitinoMetalake;
+
+  private GravitinoAdminClient client;
 
   @Override
   public void initialize(Map<String, String> properties) {
@@ -63,8 +61,8 @@ public class GravitinoBasedIcebergTableOpsProvider implements IcebergTableOpsPro
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metalake), IcebergConstants.GRAVITINO_METALAKE + " is blank");
 
-    this.gravitinoUri = uri;
     this.gravitinoMetalake = metalake;
+    this.client = GravitinoAdminClient.builder(uri).build();
   }
 
   @Override
@@ -75,27 +73,24 @@ public class GravitinoBasedIcebergTableOpsProvider implements IcebergTableOpsPro
         !IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(catalogName),
         IcebergConstants.GRAVITINO_DEFAULT_CATALOG + " is illegal in gravitino-based-provider");
 
-    Catalog catalog = getMetalake().loadCatalog(catalogName);
+    Catalog catalog = client.loadMetalake(gravitinoMetalake).loadCatalog(catalogName);
 
     Preconditions.checkArgument(
         "lakehouse-iceberg".equals(catalog.provider()),
-        String.format("%s.%s is not iceberg catalog", getMetalake(), catalogName));
+        String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
     Map<String, String> properties =
         IcebergPropertiesUtils.toIcebergCatalogProperties(catalog.properties());
     return new IcebergTableOps(new IcebergConfig(properties));
   }
 
-  public GravitinoMetalake getMetalake() {
-    if (metalakeWrapper.get() == null) {
-      metalakeWrapper.compareAndSet(
-          null, GravitinoAdminClient.builder(gravitinoUri).build().loadMetalake(gravitinoMetalake));
-    }
-    return metalakeWrapper.get();
+  @VisibleForTesting
+  void setClient(GravitinoAdminClient client) {
+    this.client = client;
   }
 
-  @VisibleForTesting
-  void setGravitinoMetalake(GravitinoMetalake metalake) {
-    this.metalakeWrapper.compareAndSet(null, metalake);
+  @Override
+  public void close() throws Exception {
+    client.close();
   }
 }

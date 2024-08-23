@@ -63,11 +63,7 @@ public class IcebergTableOpsManager implements AutoCloseable {
             .removalListener(
                 (k, v, c) -> {
                   LOG.info("Remove IcebergTableOps cache {}.", k);
-                  try {
-                    ((IcebergTableOps) v).close();
-                  } catch (Exception ex) {
-                    throw new RuntimeException(ex);
-                  }
+                  closeIcebergTableOps((IcebergTableOps) v);
                 })
             .scheduler(
                 Scheduler.forScheduledExecutorService(
@@ -130,8 +126,20 @@ public class IcebergTableOpsManager implements AutoCloseable {
     }
   }
 
+  private void closeIcebergTableOps(IcebergTableOps ops) {
+    try {
+      ops.close();
+    } catch (Exception ex) {
+      LOG.warn("close iceberg table ops fail: {}", ops);
+      throw new RuntimeException(ex);
+    }
+  }
+
   @Override
   public void close() throws Exception {
     icebergTableOpsCache.invalidateAll();
+    if (provider instanceof AutoCloseable) {
+      ((AutoCloseable) provider).close();
+    }
   }
 }

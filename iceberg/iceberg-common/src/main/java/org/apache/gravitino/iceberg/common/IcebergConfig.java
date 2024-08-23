@@ -171,7 +171,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .doc("Catalog cache eviction interval.")
           .version(ConfigConstants.VERSION_0_7_0)
           .longConf()
-          .createWithDefault(Long.MAX_VALUE);
+          .createWithDefault(3600000L);
 
   public static final ConfigEntry<String> ICEBERG_REST_CATALOG_PROVIDER =
       new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER)

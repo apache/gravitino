@@ -221,11 +221,11 @@ You can access different catalogs by setting the `prefix` to the specific catalo
 
 When using a gravitino-based catalog provider, you can leverage Gravitino to support dynamic catalog management for the Iceberg REST server.
 
-| Configuration item                                           | Description                                                                                                                                      | Default value     | Required | Since Version |
-|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|----------|---------------|
-| `gravitino.iceberg-rest.gravitino-uri`                       | The uri of Gravitino server address, only worked if `catalog-provider` is `gravitino-based-provider`.                                            | (none)            | No       | 0.7.0         |
-| `gravitino.iceberg-rest.gravitino-metalake`                  | The metalake name that `gravitino-based-provider` used to request to Gravitino, only worked if `catalog-provider` is `gravitino-based-provider`. | (none)            | No       | 0.7.0         |
-| `gravitino.iceberg-rest.catalog-cache-eviction-interval-ms`  | Catalog cache eviction interval.                                                                                                                 | `Long.MAX_VALUE`  | No       | 0.7.0         |
+| Configuration item                                           | Description                                                                                                                                      | Default value | Required | Since Version |
+|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.gravitino-uri`                       | The uri of Gravitino server address, only worked if `catalog-provider` is `gravitino-based-provider`.                                            | (none)        | No       | 0.7.0         |
+| `gravitino.iceberg-rest.gravitino-metalake`                  | The metalake name that `gravitino-based-provider` used to request to Gravitino, only worked if `catalog-provider` is `gravitino-based-provider`. | (none)        | No       | 0.7.0         |
+| `gravitino.iceberg-rest.catalog-cache-eviction-interval-ms`  | Catalog cache eviction interval.                                                                                                                 | 3600000       | No       | 0.7.0         |
 
 ```text
 gravitino.iceberg-rest.catalog-cache-eviction-interval-ms = 300000
