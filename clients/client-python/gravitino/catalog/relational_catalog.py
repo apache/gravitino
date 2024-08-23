@@ -20,20 +20,21 @@ under the License.
 import logging
 from typing import Dict, List, Optional
 
-from .base_schema_catalog import BaseSchemaCatalog
+from gravitino import Catalog
+from gravitino.catalog.base_schema_catalog import BaseSchemaCatalog
 from gravitino.namespace import Namespace
 from gravitino.name_identifier import NameIdentifier
-from gravitino.api import (
-    Catalog,
-    Distribution,
-    Index,
-    SortOrder,
-    Table,
-    TableCatalog,
-    Transform,
-)
-from gravitino.dto import AuditDTO, ColumnDTO, TableCreateRequest, TableResponse
-from gravitino.exceptions import TABLE_ERROR_HANDLER
+from gravitino.api.rel.expressions.distributions.distribution import Distribution
+from gravitino.api.rel.expressions.transforms.transform import Transform
+from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
+from gravitino.api.rel.indexes.index import Index
+from gravitino.api.rel.table_catalog import TableCatalog
+from gravitino.api.table import Table
+from gravitino.dto.audit_dto import AuditDTO
+from gravitino.dto.rel.column_dto import ColumnDTO
+from gravitino.dto.requests.table_create_request import TableCreateRequest
+from gravitino.dto.responses.table_response import TableResponse
+from gravitino.exceptions.handlers.table_error_handler import TABLE_ERROR_HANDLER
 from gravitino.rest import encode_string
 from gravitino.utils import HTTPClient
 

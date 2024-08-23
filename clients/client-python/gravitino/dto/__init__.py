@@ -16,10 +16,3 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
-
-from gravitino.dto.audit_dto import AuditDTO
-from gravitino.dto.rel.column_dto import ColumnDTO
-from gravitino.dto.rel.table_dto import TableDTO
-from gravitino.dto.catalog_dto import CatalogDTO
-from gravitino.dto.requests import TableCreateRequest, CatalogUpdateRequest, MetalakeUpdateRequest
-from gravitino.dto.responses import TableResponse, BaseResponse

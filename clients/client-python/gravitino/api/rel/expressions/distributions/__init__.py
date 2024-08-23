@@ -17,4 +17,3 @@ specific language governing permissions and limitations
 under the License.
 """
 
-from gravitino.api.rel.expressions.distributions.strategy import Strategy

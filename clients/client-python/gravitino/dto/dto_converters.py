@@ -18,11 +18,14 @@ under the License.
 """
 
 from .catalog_dto import CatalogDTO
-from .requests import CatalogUpdateRequest, MetalakeUpdateRequest
-from gravitino import Namespace
-from gravitino.api import Catalog, CatalogChange
-from gravitino.catalog import FilesetCatalog, RelationalCatalog
-from gravitino.api import MetalakeChange
+from .requests.catalog_update_request import CatalogUpdateRequest
+from .requests.metalake_update_request import MetalakeUpdateRequest
+from gravitino.namespace import Namespace
+from gravitino.catalog.relational_catalog import RelationalCatalog
+from gravitino.catalog.fileset_catalog import FilesetCatalog
+from gravitino.api.catalog import Catalog
+from gravitino.api.catalog_change import CatalogChange
+from gravitino.api.metalake_change import MetalakeChange
 from gravitino.utils import HTTPClient
 
 

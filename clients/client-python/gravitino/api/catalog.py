@@ -21,9 +21,8 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Dict, Optional
 
-from .auditable import Auditable
-from .supports_schemas import SupportsSchemas
-
+from gravitino.api.auditable import Auditable
+from gravitino.api.supports_schemas import SupportsSchemas
 
 class Catalog(Auditable):
     """The interface of a catalog. The catalog is the second level entity in the gravitino system,

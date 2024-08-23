@@ -22,8 +22,10 @@ from typing import Optional
 
 from dataclasses_json import config
 
-from gravitino.api import Column, Expression, Type
-from gravitino.exceptions import (
+from gravitino.api.rel.column import Column
+from gravitino.api.rel.expressions.expression import Expression
+from gravitino.api.rel.types.type import Type
+from gravitino.exceptions.base import (
     IllegalArugmentException,
     IllegalNameIdentifierException,
 )

@@ -21,7 +21,6 @@ from abc import ABC, abstractmethod
 
 from gravitino.api.audit import Audit
 
-
 class Auditable(ABC):
     """
     An auditable entity is an entity that has audit information associated with it. This audit

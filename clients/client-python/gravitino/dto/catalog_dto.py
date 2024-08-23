@@ -22,9 +22,8 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
-from .audit_dto import AuditDTO
-from ..api.catalog import Catalog
-
+from gravitino.api.catalog import Catalog
+from gravitino.dto.audit_dto import AuditDTO
 
 @dataclass
 class CatalogDTO(Catalog):

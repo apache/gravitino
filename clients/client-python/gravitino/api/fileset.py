@@ -23,7 +23,6 @@ from typing import Optional, Dict
 
 from gravitino.api.auditable import Auditable
 
-
 class Fileset(Auditable):
     """An interface representing a fileset under a schema Namespace. A fileset is a virtual
     concept of the file or directory that is managed by Gravitino. Users can create a fileset object

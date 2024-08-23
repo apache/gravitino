@@ -20,7 +20,7 @@ under the License.
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 
-from .expression import Expression
+from gravitino.api.rel.expressions.expression import Expression
 
 class NamedReference(Expression, ABC):
     """

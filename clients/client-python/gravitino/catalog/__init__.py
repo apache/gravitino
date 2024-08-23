@@ -16,6 +16,3 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
-from gravitino.catalog.base_schema_catalog import BaseSchemaCatalog
-from gravitino.catalog.fileset_catalog import FilesetCatalog
-from gravitino.catalog.relational_catalog import RelationalCatalog

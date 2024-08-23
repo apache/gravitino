@@ -16,6 +16,3 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 """
-
-from gravitino.api.rel.expressions.partitions.partition import Partition
-from gravitino.api.rel.expressions.partitions.partitions import Partitions
