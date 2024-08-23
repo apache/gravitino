@@ -51,11 +51,17 @@ dependencies {
     exclude("org.apache.ranger", "ranger-plugins-audit")
     exclude("org.apache.ranger", "ranger-plugins-cred")
     exclude("org.apache.ranger", "ranger-plugins-classloader")
+    exclude("javax.ws.rs")
   }
+  implementation(libs.javax.ws.rs.api)
   implementation(libs.javax.jaxb.api) {
     exclude("*")
   }
 
+  testImplementation(project(":common"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":server"))
+  testImplementation(project(":catalogs:catalog-common"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
@@ -69,7 +75,9 @@ dependencies {
     exclude("org.elasticsearch")
     exclude("org.elasticsearch.client")
     exclude("org.elasticsearch.plugin")
+    exclude("javax.ws.rs")
   }
+  testImplementation(libs.javax.ws.rs.api)
   testImplementation(libs.hive2.jdbc) {
     exclude("org.slf4j")
   }
@@ -80,10 +88,16 @@ tasks {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }
-}
 
-tasks.build {
-  dependsOn("runtimeJars", "javadoc")
+  val copyAuthorizationLibs by registering(Copy::class) {
+    dependsOn("jar", "runtimeJars")
+    from("build/libs")
+    into("$rootDir/distribution/package/authorizations/ranger/libs")
+  }
+
+  register("copyLibAndConfig", Copy::class) {
+    dependsOn(copyAuthorizationLibs)
+  }
 }
 
 tasks.test {
@@ -100,8 +114,4 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
   }
-}
-
-tasks.getByName("generateMetadataFileForMavenJavaPublication") {
-  dependsOn("runtimeJars")
 }
