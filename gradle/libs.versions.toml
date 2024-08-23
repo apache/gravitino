@@ -17,7 +17,6 @@
 # under the License.
 #
 [versions]
-aws = "2.26.20"
 junit = "5.8.1"
 protoc = "3.24.4"
 jackson = "2.15.2"
@@ -93,8 +92,6 @@ sun-activation-version = "1.2.0"
 error-prone = "3.1.0"
 
 [libraries]
-aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "aws" }
-aws-sts = { group = "software.amazon.awssdk", name = "sts", version.ref = "aws" }
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
 protobuf-java-util = { group = "com.google.protobuf", name = "protobuf-java-util", version.ref = "protoc" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
