@@ -18,3 +18,4 @@ under the License.
 """
 
 from gravitino.api.rel.types.type import Type
+from gravitino.api.rel.types.types import Types

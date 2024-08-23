@@ -24,7 +24,7 @@ from gravitino.api.rel.expressions import (
     Transform,
     Strategy,
 )
-from gravitino.api.rel.types import Type
+from gravitino.api.rel.types import Type, Types
 from gravitino.api.rel.indexes import Index
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.table_catalog import TableCatalog

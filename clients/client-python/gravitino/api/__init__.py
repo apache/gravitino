@@ -31,5 +31,6 @@ from gravitino.api.rel import (
     SortOrder,
     Transform,
     Type,
+    Types,
     Strategy,
 )
