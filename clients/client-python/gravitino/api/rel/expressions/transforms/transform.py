@@ -20,10 +20,10 @@ under the License.
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 
-from gravitino.api.rel.expressions.partitions.partition import Partition
-from gravitino.api.rel.expressions.partitions.partitions import Partitions
-from gravitino.api.rel.expressions.expression import Expression
-from gravitino.api.rel.expressions.named_reference import NamedReference
+from ..expression import Expression
+from ..partitions import Partition, Partitions
+from ..named_reference import NamedReference
+
 
 class Transform(Expression, ABC):
     """
@@ -54,6 +54,7 @@ class Transform(Expression, ABC):
         Default implementation to return arguments as children of this expression node.
         """
         return self.arguments()
+
 
 class SingleFieldTransform(Transform, ABC):
     """

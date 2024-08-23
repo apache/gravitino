@@ -22,8 +22,9 @@ from typing import List, Dict, Optional
 
 from dataclasses_json import config
 
+from .column_dto import ColumnDTO
+from ..audit_dto import AuditDTO
 from gravitino.api import Table, Transform, SortOrder, Distribution, Index, Audit
-from gravitino.dto import ColumnDTO, AuditDTO
 from gravitino.exceptions import (
     IllegalArugmentException,
     IllegalNameIdentifierException,

@@ -21,8 +21,8 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Dict, Optional
 
-from gravitino.api.auditable import Auditable
-from gravitino.api.supports_schemas import SupportsSchemas
+from .auditable import Auditable
+from .supports_schemas import SupportsSchemas
 
 
 class Catalog(Auditable):

@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 """
 
-from gravitino.api import Distribution
+from .distribution import Distribution
 
 class Distributions(Distribution):
     """Helper methods to create distributions to pass into Apache Gravitino."""

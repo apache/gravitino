@@ -23,7 +23,8 @@ from typing import Optional
 
 from dataclasses_json import config
 
-from gravitino.api import Type, Expression
+from .types import Type
+from ..rel.expressions import Expression
 
 @dataclass
 class Column(ABC):

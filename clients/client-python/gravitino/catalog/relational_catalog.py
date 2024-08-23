@@ -20,7 +20,9 @@ under the License.
 import logging
 from typing import Dict, List, Optional
 
-from gravitino import NameIdentifier, Namespace
+from .base_schema_catalog import BaseSchemaCatalog
+from gravitino.namespace import Namespace
+from gravitino.name_identifier import NameIdentifier
 from gravitino.api import (
     Catalog,
     Distribution,
@@ -30,7 +32,6 @@ from gravitino.api import (
     TableCatalog,
     Transform,
 )
-from gravitino.catalog import BaseSchemaCatalog
 from gravitino.dto import AuditDTO, ColumnDTO, TableCreateRequest, TableResponse
 from gravitino.exceptions import TABLE_ERROR_HANDLER
 from gravitino.rest import encode_string

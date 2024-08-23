@@ -17,10 +17,11 @@ specific language governing permissions and limitations
 under the License.
 """
 
+from .catalog_dto import CatalogDTO
+from .requests import CatalogUpdateRequest, MetalakeUpdateRequest
 from gravitino import Namespace
 from gravitino.api import Catalog, CatalogChange
 from gravitino.catalog import FilesetCatalog, RelationalCatalog
-from gravitino.dto import CatalogDTO, CatalogUpdateRequest, MetalakeUpdateRequest
 from gravitino.api import MetalakeChange
 from gravitino.utils import HTTPClient
 
