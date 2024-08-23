@@ -62,6 +62,17 @@ class DTOConverters:
                 audit=catalog.audit_info(),
                 rest_client=client,
             )
+        if catalog.type() == Catalog.Type.RELATIONAL:
+            return RelationalCatalog(
+                catalog_namespace=namespace,
+                name=catalog.name(),
+                catalog_type=catalog.type(),
+                provider=catalog.provider(),
+                comment=catalog.comment(),
+                properties=catalog.properties(),
+                audit=catalog.audit_info(),
+                rest_client=client,
+            )
 
         raise NotImplementedError("Unsupported catalog type: " + str(catalog.type()))
 
