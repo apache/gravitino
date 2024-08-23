@@ -19,13 +19,13 @@ Although many catalogs inherently manage partitions automatically, there are sce
 
 The following table shows the partition operations supported across various catalogs in Gravitino:
 
-| Operation             | Hive catalog | Iceberg catalog                                                               | Jdbc-Mysql catalog | Jdbc-PostgreSQL catalog |
-|-----------------------|--------------|-------------------------------------------------------------------------------|--------------------|-------------------------|
-| Add Partition         | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
-| Get Partition by Name | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
-| List Partition Names  | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
-| List Partitions       | &#10004;     | &#10008;                                                                      | &#10008;           | &#10008;                |
-| Drop Partition        | &#10004;     | &#128640;([Coming Soon](https://github.com/apache/gravitino/issues/1655)) | &#10008;           | &#10008;                |
+| Operation             | Hive catalog | Iceberg catalog                                                             | Jdbc-Mysql catalog | Jdbc-PostgreSQL catalog | Jdbc-Doris catalog |
+|-----------------------|--------------|-----------------------------------------------------------------------------|--------------------|-------------------------|--------------------|
+| Add Partition         | &#10004;     | &#10008;                                                                    | &#10008;           | &#10008;                | &#10004;           |
+| Get Partition by Name | &#10004;     | &#10008;                                                                    | &#10008;           | &#10008;                | &#10004;           |
+| List Partition Names  | &#10004;     | &#10008;                                                                    | &#10008;           | &#10008;                | &#10004;           |
+| List Partitions       | &#10004;     | &#10008;                                                                    | &#10008;           | &#10008;                | &#10004;           |
+| Drop Partition        | &#10004;     | &#128640;([Coming Soon](https://github.com/apache/gravitino/issues/1655))   | &#10008;           | &#10008;                | &#10004;           | 
 
 :::tip[WELCOME FEEDBACK]
 If you need additional partition management support for a specific catalog, please feel free to [create an issue](https://github.com/apache/gravitino/issues/new/choose) on the [Gravitino repository](https://github.com/apache/gravitino).

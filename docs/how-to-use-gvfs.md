@@ -274,7 +274,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 ##### Using `OAuth` authentication
 
 If you want to use `oauth2` authentication for the Gravitino client in the Gravitino Virtual File System,
-please refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](./security.md).
+please refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](security/security.md).
 
 Then, you can configure the Hadoop configuration like this:
 
@@ -298,7 +298,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 ##### Using `Kerberos` authentication
 
 If you want to use `kerberos` authentication for the Gravitino client in the Gravitino Virtual File System,
-please refer to this document to complete the configuration of the Gravitino server: [Security](./security.md).
+please refer to this document to complete the configuration of the Gravitino server: [Security](security/security.md).
 
 Then, you can configure the Hadoop configuration like this:
 

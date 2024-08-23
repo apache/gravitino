@@ -31,7 +31,8 @@ import org.apache.gravitino.MetadataObjects.MetadataObjectImpl;
 /** The helper class for {@link SecurableObject}. */
 public class SecurableObjects {
 
-  private static final Splitter DOT_SPLITTER = Splitter.on('.');
+  /** The splitter for splitting the names. */
+  public static final Splitter DOT_SPLITTER = Splitter.on('.');
 
   /**
    * Create the metalake {@link SecurableObject} with the given metalake name and privileges.

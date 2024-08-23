@@ -45,7 +45,8 @@ public class OwnerMetaService {
 
   public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(getMetalake(identifier));
+        MetalakeMetaService.getInstance()
+            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
     Long entityId = getEntityId(metalakeId, identifier, type);
 
     UserPO userPO =
@@ -58,7 +59,7 @@ public class OwnerMetaService {
           POConverters.fromUserPO(
               userPO,
               Collections.emptyList(),
-              AuthorizationUtils.ofUserNamespace(getMetalake(identifier))));
+              AuthorizationUtils.ofUserNamespace(NameIdentifierUtil.getMetalake(identifier))));
     }
 
     GroupPO groupPO =
@@ -71,7 +72,7 @@ public class OwnerMetaService {
           POConverters.fromGroupPO(
               groupPO,
               Collections.emptyList(),
-              AuthorizationUtils.ofGroupNamespace(getMetalake(identifier))));
+              AuthorizationUtils.ofGroupNamespace(NameIdentifierUtil.getMetalake(identifier))));
     }
 
     return Optional.empty();
@@ -82,7 +83,9 @@ public class OwnerMetaService {
       Entity.EntityType entityType,
       NameIdentifier owner,
       Entity.EntityType ownerType) {
-    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(getMetalake(entity));
+    long metalakeId =
+        MetalakeMetaService.getInstance()
+            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(entity));
 
     Long entityId = getEntityId(metalakeId, entity, entityType);
     Long ownerId = getEntityId(metalakeId, owner, ownerType);
@@ -116,14 +119,6 @@ public class OwnerMetaService {
         MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
         return MetadataObjectService.getMetadataObjectId(
             metalakeId, object.fullName(), object.type());
-    }
-  }
-
-  private static String getMetalake(NameIdentifier identifier) {
-    if (identifier.hasNamespace()) {
-      return identifier.namespace().level(0);
-    } else {
-      return identifier.name();
     }
   }
 }

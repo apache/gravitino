@@ -18,10 +18,12 @@ under the License.
 """
 
 import urllib.parse
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 def encode_string(to_encode: str):
 
-    assert to_encode is not None, "Invalid string to encode: None"
+    if to_encode is None:
+        raise IllegalArgumentException("Invalid string to encode: None")
 
     return urllib.parse.quote(to_encode)

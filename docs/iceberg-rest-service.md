@@ -81,7 +81,7 @@ You can also specify filter parameters by setting configuration entries in the s
 
 ### Security
 
-Gravitino Iceberg REST server supports OAuth2 and HTTPS, please refer to [Security](./security.md) for more details.
+Gravitino Iceberg REST server supports OAuth2 and HTTPS, please refer to [Security](security/security.md) for more details.
 
 #### Backend authentication
 
@@ -117,7 +117,7 @@ Gravitino Iceberg REST service supports using static access-key-id and secret-ac
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
 
 :::info
-Please set `gravitino.iceberg-rest.warehouse` to `s3://{bucket_name}/${prefix_name}` for Jdbc catalog backend, `s3a://{bucket_name}/${prefix_name}` for Hive catalog backend.
+To configure the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
 #### HDFS configuration
@@ -161,6 +161,14 @@ If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to
 :::caution
 You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 :::
+
+#### Custom backend configuration
+| Configuration item                             | Description                                                                                                         | Default value    | Required | Since Version |
+|------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|------------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend`       | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`custom`** for a Custom catalog. | `memory`         | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.catalog-backend-impl`  | The fully-qualified class name of a custom catalog implementation, only worked if `catalog-backend` is `custom`.    | (none)           | No       | 0.7.0         |
+
+If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a corresponding jar file to the classpath and load a custom Iceberg Catalog implementation by specifying the `catalog-backend-impl` property.
 
 #### Multi catalog support
 
@@ -256,7 +264,7 @@ Normally you will see the output like `{"defaults":{},"overrides":{}}%`.
 
 ### Deploying Apache Spark with Apache Iceberg support
 
-Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/1.5.2/getting-started/) to set up Apache Spark's and Apache Iceberg's environment. 
+Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/1.5.2/spark-getting-started/) to set up Apache Spark's and Apache Iceberg's environment.
 
 ### Starting the Apache Spark client with the Apache Iceberg REST catalog
 
@@ -276,7 +284,7 @@ For example, we can configure Spark catalog options to use Gravitino Iceberg RES
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/
 ```
 
-You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in S3, you need to download [iceberg-aws-bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) jar and place it in the classpath of Spark, no extra config is needed because S3 related properties is transferred from Iceberg REST server to Iceberg REST client automaticly. 
+You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in S3, you need to download [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) jar and place it in the classpath of Spark, no extra config is needed because S3 related properties is transferred from Iceberg REST server to Iceberg REST client automaticly. 
 
 ### Exploring Apache Iceberg with Apache Spark SQL
 
@@ -295,13 +303,13 @@ SELECT * FROM dml.test;
 You could run Gravitino Iceberg REST server though docker container:
 
 ```shell
-docker run -d -p 9001:9001 datastrato/iceberg-rest-server:0.6
+docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.6.0
 ```
 
 Or build it manually to add custom logics:
 
 ```shell
-sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image datastrato/iceberg-rest-server --tag 0.6
+sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image apache/gravitino-iceberg-rest --tag 0.6.0
 ```
 
-You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-iceberg-rest-service).
+You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-apache-iceberg-rest-service).

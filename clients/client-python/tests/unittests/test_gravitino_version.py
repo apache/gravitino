@@ -21,7 +21,7 @@ import unittest
 
 from gravitino.client.gravitino_version import GravitinoVersion
 from gravitino.dto.version_dto import VersionDTO
-from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.exceptions.base import BadRequestException, GravitinoRuntimeException
 
 
 class TestGravitinoVersion(unittest.TestCase):
@@ -57,16 +57,12 @@ class TestGravitinoVersion(unittest.TestCase):
         self.assertEqual(version.patch, 0)
 
         # Test an invalid the version string with 2 part
-        self.assertRaises(
-            AssertionError, GravitinoVersion, VersionDTO("0.6", "2023-01-01", "1234567")
-        )
+        with self.assertRaises(BadRequestException):
+            GravitinoVersion(VersionDTO("0.6", "2023-01-01", "1234567"))
 
         # Test an invalid the version string with not number
-        self.assertRaises(
-            AssertionError,
-            GravitinoVersion,
-            VersionDTO("a.b.c", "2023-01-01", "1234567"),
-        )
+        with self.assertRaises(BadRequestException):
+            GravitinoVersion(VersionDTO("a.b.c", "2023-01-01", "1234567"))
 
     def test_version_compare(self):
         # test equal

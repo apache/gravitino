@@ -196,7 +196,7 @@ const DetailsView = () => {
                                 : `props-value-${item.key}`
                             }
                           >
-                            {item.value}
+                            {item.key === 'jdbc-password' ? '[HIDDEN]' : item.value}
                           </div>
                         </Typography>
                       </TableCell>

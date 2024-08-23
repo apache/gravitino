@@ -97,44 +97,29 @@ DESC EXTENDED employee;
 
 For more details about `CALL`, please refer to the [Spark Procedures description](https://iceberg.apache.org/docs/1.5.2/spark-procedures/#spark-procedures) in Iceberg official document. 
 
-## Apache Iceberg catalog backend support
-- HiveCatalog
-- JdbcCatalog
-- RESTCatalog
-
-### Catalog properties
+## Catalog properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Iceberg connector configuration.
 
-#### HiveCatalog
+| Gravitino catalog property name | Spark Iceberg connector configuration | Description                                                                                                                                                                                                         | Since Version |
+|---------------------------------|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `catalog-backend`               | `type`                                | Catalog backend type                                                                                                                                                                                                | 0.5.0         |
+| `uri`                           | `uri`                                 | Catalog backend uri                                                                                                                                                                                                 | 0.5.0         |
+| `warehouse`                     | `warehouse`                           | Catalog backend warehouse                                                                                                                                                                                           | 0.5.0         |
+| `jdbc-user`                     | `jdbc.user`                           | JDBC user name                                                                                                                                                                                                      | 0.5.0         |
+| `jdbc-password`                 | `jdbc.password`                       | JDBC password                                                                                                                                                                                                       | 0.5.0         |
+| `io-impl`                       | `io-impl`                             | The io implementation for `FileIO` in Iceberg.                                                                                                                                                                      | 0.6.0         |
+| `s3-endpoint`                   | `s3.endpoint`                         | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | 0.6.0         | 
+| `s3-region`                     | `client.region`                       | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | 0.6.0         |
 
-| Gravitino catalog property name | Spark Iceberg connector configuration | Default Value | Required | Description               | Since Version |
-|---------------------------------|---------------------------------------|---------------|----------|---------------------------|---------------|
-| `catalog-backend`               | `type`                                | `memory`      | Yes      | Catalog backend type      | 0.5.0         |
-| `uri`                           | `uri`                                 | (none)        | Yes      | Catalog backend uri       | 0.5.0         |
-| `warehouse`                     | `warehouse`                           | (none)        | Yes      | Catalog backend warehouse | 0.5.0         |
-
-#### JdbcCatalog
-
-| Gravitino catalog property name | Spark Iceberg connector configuration | Default Value | Required | Description               | Since Version |
-|---------------------------------|---------------------------------------|---------------|----------|---------------------------|---------------|
-| `catalog-backend`               | `type`                                | `memory`      | Yes      | Catalog backend type      | 0.5.0         |
-| `uri`                           | `uri`                                 | (none)        | Yes      | Catalog backend uri       | 0.5.0         |
-| `warehouse`                     | `warehouse`                           | (none)        | Yes      | Catalog backend warehouse | 0.5.0         |
-| `jdbc-user`                     | `jdbc.user`                           | (none)        | Yes      | JDBC user name            | 0.5.0         |
-| `jdbc-password`                 | `jdbc.password`                       | (none)        | Yes      | JDBC password             | 0.5.0         |
-
-#### RESTCatalog
-
-| Gravitino catalog property name | Spark Iceberg connector configuration | Default Value | Required | Description               | Since Version |
-|---------------------------------|---------------------------------------|---------------|----------|---------------------------|---------------|
-| `catalog-backend`               | `type`                                | `memory`      | Yes      | Catalog backend type      | 0.5.1         |
-| `uri`                           | `uri`                                 | (none)        | Yes      | Catalog backend uri       | 0.5.1         |
-| `warehouse`                     | `warehouse`                           | (none)        | No       | Catalog backend warehouse | 0.5.1         |
-
-Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Iceberg connector. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector.
+Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Iceberg connector. For example, using `spark.bypass.clients` to pass the `clients` to the Spark Iceberg connector.
 
 :::info
 Iceberg catalog property `cache-enabled` is setting to `false` internally and not allowed to change.
 :::
 
+## Storage
+
+### S3
+
+You need to add s3 secret to the Spark configuration using `spark.sql.catalog.${iceberg_catalog_name}.s3.access-key-id` and `spark.sql.catalog.${iceberg_catalog_name}.s3.secret-access-key`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Spark.
