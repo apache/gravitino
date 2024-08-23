@@ -94,6 +94,18 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "s3 secret-access-key",
                 false /* immutable */,
                 null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_ID,
+                "OSS access-key-id",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+                "OSS access-key-secret",
+                false /* immutable */,
+                null /* defaultValue */,
                 true /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
