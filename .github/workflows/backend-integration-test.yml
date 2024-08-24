@@ -172,6 +172,7 @@ jobs:
           -x :web:test -x :clients:client-python:test -x :flink-connector:test -x :spark-connector:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
+          -x :authorizations:authorization-ranger:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3

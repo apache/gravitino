@@ -704,6 +704,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     catalog.withCatalogConf(entity.getProperties()).withCatalogEntity(entity);
+    catalog.initAuthorizationPluginInstance(classLoader);
     return catalog;
   }
 
