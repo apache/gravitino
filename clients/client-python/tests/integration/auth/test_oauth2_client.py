@@ -170,7 +170,7 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
         )
 
         self.gravitino_admin_client = GravitinoAdminClient(
-            uri="http://localhost:8090", check_version=False, auth_data_provider=oauth2_token_provider
+            uri="http://localhost:8090", auth_data_provider=oauth2_token_provider
         )
 
         self.init_test_env()
