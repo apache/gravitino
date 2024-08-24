@@ -226,6 +226,8 @@ public class TableMetaService {
               SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(parentEntityId, name);
           builder.withSchemaId(parentEntityId);
           break;
+        default:
+          throw new IllegalArgumentException("Unsupported namespace level: " + level);                    
       }
     }
   }
