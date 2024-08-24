@@ -101,6 +101,7 @@ tasks {
 }
 
 tasks.test {
+  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
   val skipUTs = project.hasProperty("skipTests")
   if (skipUTs) {
     // Only run integration tests
