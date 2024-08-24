@@ -81,6 +81,7 @@ dependencies {
   testImplementation(libs.hive2.jdbc) {
     exclude("org.slf4j")
   }
+  testImplementation(libs.mysql.driver)
 }
 
 tasks {
