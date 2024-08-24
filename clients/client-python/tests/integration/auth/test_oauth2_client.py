@@ -20,10 +20,13 @@ under the License.
 import os
 import subprocess
 import logging
+import time
 import unittest
+import sys
 import requests
 from jwcrypto import jwk
 
+from gravitino.auth.auth_constants import AuthConstants
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
 from gravitino import GravitinoAdminClient, GravitinoClient
 from gravitino.exceptions.base import GravitinoRuntimeException
@@ -36,6 +39,33 @@ logger = logging.getLogger(__name__)
 
 DOCKER_TEST = os.environ.get("DOCKER_TEST")
 
+
+def get_gravitino_server_version(token: bytes):
+    try:
+        auth_header = {
+            AuthConstants.HTTP_HEADER_AUTHORIZATION: token.decode("utf-8")
+        }
+        response = requests.get("http://localhost:8090/api/version", headers=auth_header)
+        response.raise_for_status()  # raise an exception for bad status codes
+        response.close()
+        return True
+    except requests.exceptions.RequestException:
+        logger.warning("Failed to access the Gravitino server")
+        return False
+
+
+def check_gravitino_server_status(token: bytes) -> bool:
+    gravitino_server_running = False
+    for i in range(5):
+        logger.info("Monitoring Gravitino server status. Attempt %s", i + 1)
+        if get_gravitino_server_version(token):
+            logger.debug("Gravitino Server is running")
+            gravitino_server_running = True
+            break
+        else:
+            logger.debug("Gravitino Server is not running")
+            time.sleep(1)
+    return gravitino_server_running
 
 @unittest.skipIf(
     DOCKER_TEST == "false",
@@ -125,6 +155,14 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
             logger.info("stdout: %s", result.stdout)
         if result.stderr:
             logger.info("stderr: %s", result.stderr)
+
+        oauth2_token_provider = DefaultOAuth2TokenProvider(
+            f"{cls.oauth2_server_uri}", "test:test", "test", "oauth2/token"
+        )
+
+        if not check_gravitino_server_status(oauth2_token_provider.get_token_data()):
+            logger.error("ERROR: Can't start Gravitino server!")
+            sys.exit(0)
 
     def setUp(self):
         oauth2_token_provider = DefaultOAuth2TokenProvider(
