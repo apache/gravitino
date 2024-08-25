@@ -130,7 +130,7 @@ public class IcebergTableOpsManager implements AutoCloseable {
     try {
       ops.close();
     } catch (Exception ex) {
-      LOG.warn("close iceberg table ops fail: {}, {}", ops, ex);
+      LOG.warn("Close Iceberg table ops fail: {}, {}", ops, ex);
     }
   }
 

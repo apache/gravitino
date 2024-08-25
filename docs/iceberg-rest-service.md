@@ -232,7 +232,6 @@ gravitino.iceberg-rest.catalog-cache-eviction-interval-ms = 300000
 gravitino.iceberg-rest.catalog-provider = gravitino-based-provider
 gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
 gravitino.iceberg-rest.gravitino-metalake = test
-...
 ```
 
 ### Other Apache Iceberg catalog properties
