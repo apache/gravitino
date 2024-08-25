@@ -65,7 +65,14 @@ public class IcebergConstants {
 
   public static final String GRAVITINO_ICEBERG_REST_SERVICE_NAME = "iceberg-rest";
 
+  public static final String ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL =
+      "catalog-cache-eviction-interval-ms";
+
   public static final String ICEBERG_REST_CATALOG_PROVIDER = "catalog-provider";
+
+  public static final String GRAVITINO_URI = "gravitino-uri";
+
+  public static final String GRAVITINO_METALAKE = "gravitino-metalake";
 
   public static final String GRAVITINO_DEFAULT_CATALOG = "__gravitino_default_catalog";
 }
