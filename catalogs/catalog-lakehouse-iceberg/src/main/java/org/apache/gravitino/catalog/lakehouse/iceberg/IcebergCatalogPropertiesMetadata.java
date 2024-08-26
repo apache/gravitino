@@ -36,6 +36,7 @@ import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfi
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
+  public static final String CATALOG_BACKEND_IMPL = IcebergConstants.CATALOG_BACKEND_IMPL;
   public static final String GRAVITINO_JDBC_USER = IcebergConstants.GRAVITINO_JDBC_USER;
   public static final String GRAVITINO_JDBC_PASSWORD = IcebergConstants.GRAVITINO_JDBC_PASSWORD;
   public static final String WAREHOUSE = IcebergConstants.WAREHOUSE;
@@ -70,6 +71,12 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 null /* defaultValue */,
                 false /* hidden */,
                 false /* reserved */),
+            stringOptionalPropertyEntry(
+                CATALOG_BACKEND_IMPL,
+                "Iceberg catalog implement",
+                true /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
             stringRequiredPropertyEntry(
                 URI, "Iceberg catalog uri config", false /* immutable */, false /* hidden */),
             stringRequiredPropertyEntry(
