@@ -20,10 +20,15 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -32,11 +37,10 @@ import org.apache.gravitino.integration.test.container.TrinoContainer;
 import org.apache.ranger.RangerClient;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
+import org.apache.ranger.plugin.model.RangerRole;
 import org.apache.ranger.plugin.model.RangerService;
 import org.apache.ranger.plugin.util.SearchFilter;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,16 +54,25 @@ public class RangerITEnv {
   protected static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";
   protected static RangerClient rangerClient;
-
+  private static volatile boolean initRangerService = false;
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  @BeforeAll
   public static void setup() {
     containerSuite.startRangerContainer();
     rangerClient = containerSuite.getRangerContainer().rangerClient;
+
+    if (!initRangerService) {
+      synchronized (RangerITEnv.class) {
+        // No IP address set, no impact on testing
+        createRangerHdfsRepository("", true);
+        createRangerHiveRepository("", true);
+        allowAnyoneAccessHDFS();
+        allowAnyoneAccessInformationSchema();
+        initRangerService = true;
+      }
+    }
   }
 
-  @AfterAll
   public static void cleanup() {
     try {
       if (rangerClient != null) {
@@ -73,6 +86,71 @@ public class RangerITEnv {
     } catch (RangerServiceException e) {
       // ignore
     }
+  }
+
+  /** Currently we only test Ranger Hive, So wo Allow anyone to visit HDFS */
+  static void allowAnyoneAccessHDFS() {
+    String policyName = currentFunName();
+    try {
+      if (null != rangerClient.getPolicy(RangerDefines.SERVICE_TYPE_HDFS, policyName)) {
+        return;
+      }
+    } catch (RangerServiceException e) {
+      // If the policy doesn't exist, we will create it
+      LOG.warn("Error while fetching policy: {}", e.getMessage());
+    }
+
+    Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap =
+        ImmutableMap.of(RangerDefines.RESOURCE_PATH, new RangerPolicy.RangerPolicyResource("/*"));
+    RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+    policyItem.setUsers(Arrays.asList(RangerDefines.CURRENT_USER));
+    policyItem.setAccesses(
+        Arrays.asList(
+            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_READ),
+            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_WRITE),
+            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_EXECUTE)));
+    updateOrCreateRangerPolicy(
+        RangerDefines.SERVICE_TYPE_HDFS,
+        RANGER_HDFS_REPO_NAME,
+        policyName,
+        policyResourceMap,
+        Collections.singletonList(policyItem));
+  }
+
+  /**
+   * Hive must have this policy Allow anyone can access information schema to show `database`,
+   * `tables` and `columns`
+   */
+  static void allowAnyoneAccessInformationSchema() {
+    String policyName = currentFunName();
+    try {
+      if (null != rangerClient.getPolicy(RangerDefines.SERVICE_TYPE_HIVE, policyName)) {
+        return;
+      }
+    } catch (RangerServiceException e) {
+      // If the policy doesn't exist, we will create it
+      LOG.warn("Error while fetching policy: {}", e.getMessage());
+    }
+
+    Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap =
+        ImmutableMap.of(
+            RangerDefines.RESOURCE_DATABASE,
+            new RangerPolicy.RangerPolicyResource("information_schema"),
+            RangerDefines.RESOURCE_TABLE,
+            new RangerPolicy.RangerPolicyResource("*"),
+            RangerDefines.RESOURCE_COLUMN,
+            new RangerPolicy.RangerPolicyResource("*"));
+    RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+    policyItem.setGroups(Arrays.asList(RangerDefines.PUBLIC_GROUP));
+    policyItem.setAccesses(
+        Arrays.asList(
+            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_SELECT)));
+    updateOrCreateRangerPolicy(
+        RangerDefines.SERVICE_TYPE_HIVE,
+        RANGER_HIVE_REPO_NAME,
+        policyName,
+        policyResourceMap,
+        Collections.singletonList(policyItem));
   }
 
   public void createRangerTrinoRepository(String trinoIp) {
@@ -219,6 +297,134 @@ public class RangerITEnv {
     } catch (RangerServiceException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  protected static void verifyRoleInRanger(
+      RangerAuthorizationPlugin rangerAuthPlugin,
+      Role role,
+      List<String> includeUsers,
+      List<String> excludeUsers,
+      List<String> includeGroups,
+      List<String> excludeGroups) {
+    // Verify role in RangerRole
+    RangerRole rangerRole = null;
+    try {
+      rangerRole =
+          RangerITEnv.rangerClient.getRole(
+              role.name(), rangerAuthPlugin.rangerAdminName, RangerITEnv.RANGER_HIVE_REPO_NAME);
+      LOG.info("rangerRole: " + rangerRole.toString());
+    } catch (RangerServiceException e) {
+      throw new RuntimeException(e);
+    }
+    rangerRole
+        .getUsers()
+        .forEach(
+            user -> {
+              if (includeUsers != null && !includeUsers.isEmpty()) {
+                Assertions.assertTrue(
+                    includeUsers.contains(user.getName()),
+                    "includeUsersInRole: " + includeUsers + ", user: " + user.getName());
+              }
+              if (excludeUsers != null && !excludeUsers.isEmpty()) {
+                Assertions.assertFalse(
+                    excludeUsers.contains(user.getName()),
+                    "excludeUsersInRole: " + excludeUsers.toString() + ", user: " + user.getName());
+              }
+            });
+    rangerRole
+        .getGroups()
+        .forEach(
+            group -> {
+              if (includeGroups != null && !includeGroups.isEmpty()) {
+                Assertions.assertTrue(
+                    includeGroups.contains(group.getName()),
+                    "includeGroupsInRole: "
+                        + includeGroups.toString()
+                        + ", group: "
+                        + group.getName());
+              }
+              if (excludeGroups != null && !excludeGroups.isEmpty()) {
+                Assertions.assertFalse(
+                    excludeGroups.contains(group.getName()),
+                    "excludeGroupsInRole: "
+                        + excludeGroups.toString()
+                        + ", group: "
+                        + group.getName());
+              }
+            });
+
+    // Verify role in RangerPolicy
+    role.securableObjects()
+        .forEach(
+            securableObject -> {
+              RangerPolicy policy;
+              try {
+                policy =
+                    RangerITEnv.rangerClient.getPolicy(
+                        RangerITEnv.RANGER_HIVE_REPO_NAME, securableObject.fullName());
+                LOG.info("policy: " + policy.toString());
+              } catch (RangerServiceException e) {
+                LOG.error("Failed to get policy: " + securableObject.fullName());
+                throw new RuntimeException(e);
+              }
+
+              securableObject
+                  .privileges()
+                  .forEach(
+                      gravitinoPrivilege -> {
+                        Set<String> mappedPrivileges =
+                            rangerAuthPlugin.translatePrivilege(gravitinoPrivilege.name());
+
+                        boolean match =
+                            policy.getPolicyItems().stream()
+                                .filter(
+                                    policyItem -> {
+                                      // Filter Ranger policy item by Gravitino privilege
+                                      return policyItem.getAccesses().stream()
+                                          .anyMatch(
+                                              access -> {
+                                                return mappedPrivileges.contains(access.getType());
+                                              });
+                                    })
+                                .allMatch(
+                                    policyItem -> {
+                                      // Verify role name in Ranger policy item
+                                      return policyItem.getRoles().contains(role.name());
+                                    });
+                        Assertions.assertTrue(match);
+                      });
+            });
+  }
+
+  protected static void verifyRoleInRanger(RangerAuthorizationPlugin rangerAuthPlugin, Role role) {
+    RangerITEnv.verifyRoleInRanger(rangerAuthPlugin, role, null, null, null, null);
+  }
+
+  protected static void verifyRoleInRanger(
+      RangerAuthorizationPlugin rangerAuthPlugin,
+      Role role,
+      List<String> includeRolesInPolicyItem) {
+    RangerITEnv.verifyRoleInRanger(
+        rangerAuthPlugin, role, includeRolesInPolicyItem, null, null, null);
+  }
+
+  protected static void verifyRoleInRanger(
+      RangerAuthorizationPlugin rangerAuthPlugin,
+      Role role,
+      List<String> includeRolesInPolicyItem,
+      List<String> excludeRolesInPolicyItem) {
+    RangerITEnv.verifyRoleInRanger(
+        rangerAuthPlugin, role, includeRolesInPolicyItem, excludeRolesInPolicyItem, null, null);
+  }
+
+  protected static void verifyRoleInRanger(
+      RangerAuthorizationPlugin rangerAuthPlugin,
+      Role role,
+      List<String> includeUsers,
+      List<String> excludeUsers,
+      List<String> includeGroups) {
+    RangerITEnv.verifyRoleInRanger(
+        rangerAuthPlugin, role, includeUsers, excludeUsers, includeGroups, null);
   }
 
   protected static void updateOrCreateRangerPolicy(
