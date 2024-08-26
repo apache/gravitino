@@ -53,6 +53,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -711,11 +712,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String catalogPkgPath = buildPkgPath(conf, provider);
       String catalogConfPath = buildConfPath(conf, provider);
       ArrayList<String> libAndResourcesPaths = Lists.newArrayList(catalogPkgPath, catalogConfPath);
-      String authorizationPkgPath = buildAuthorizationPkgPath(conf);
-      if (authorizationPkgPath != null) {
-        // If the catalog has an authorization provider, add the authorization package path.
-        libAndResourcesPaths.add(authorizationPkgPath);
-      }
+      buildAuthorizationPkgPath(conf).ifPresent(libAndResourcesPaths::add);
       return IsolatedClassLoader.buildClassLoader(libAndResourcesPaths);
     } else {
       // This will use the current class loader, it is mainly used for test.
@@ -832,14 +829,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return pkgPath;
   }
 
-  private String buildAuthorizationPkgPath(Map<String, String> conf) {
+  private Optional<String> buildAuthorizationPkgPath(Map<String, String> conf) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
     boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
 
     String authorizationProvider = conf.get(Catalog.AUTHORIZATION_PROVIDER);
-    if (authorizationProvider == null || authorizationProvider.isEmpty()) {
-      return null;
+    if (StringUtils.isBlank(authorizationProvider)) {
+      return Optional.empty();
     }
 
     String pkgPath;
@@ -860,7 +857,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               File.separator, gravitinoHome, "authorizations", authorizationProvider, "libs");
     }
 
-    return pkgPath;
+    return Optional.of(pkgPath);
   }
 
   private Class<? extends CatalogProvider> lookupCatalogProvider(String provider, ClassLoader cl) {

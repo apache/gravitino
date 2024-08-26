@@ -193,10 +193,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     String authorizationProvider =
-        catalogPropertiesMetadata().containsProperty(AUTHORIZATION_PROVIDER)
-            ? (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER)
-            : null;
-
+        (String) catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER);
     if (authorizationProvider == null) {
       LOG.info("Authorization provider is not set!");
       return;
