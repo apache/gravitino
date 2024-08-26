@@ -80,6 +80,7 @@ public final class JettyServer {
   private JettyServerConfig serverConfig;
 
   private String serverName;
+  private Timer timer;
 
   public JettyServer() {}
 
@@ -87,6 +88,8 @@ public final class JettyServer {
       JettyServerConfig serverConfig, String serverName, boolean shouldEnableUI) {
     this.serverConfig = serverConfig;
     this.serverName = serverName;
+
+    this.timer = new Timer();
 
     ThreadPool threadPool =
         createThreadPool(
@@ -201,9 +204,6 @@ public final class JettyServer {
       LOG.warn("Users would better use HTTPS to avoid token data leak.");
     }
 
-    Timer timer = new Timer();
-
-    // 设置定时任务，每5秒执行一次
     timer.schedule(
         new TimerTask() {
           @Override
@@ -241,6 +241,10 @@ public final class JettyServer {
   }
 
   public synchronized void stop() {
+    if (timer != null) {
+      timer.cancel();
+      timer = null;
+    }
     if (server != null) {
       try {
         // Referring from Spark's implementation to avoid the issues.
