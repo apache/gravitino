@@ -39,6 +39,8 @@ dependencies {
   implementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
+    exclude("org.eclipse.jetty", "*")
+    exclude("org.apache.hadoop", "hadoop-auth")
   }
 
   implementation(libs.hadoop3.hdfs) {
@@ -46,12 +48,14 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("com.google.guava", "guava")
     exclude("commons-io", "commons-io")
+    exclude("org.eclipse.jetty", "*")
   }
   implementation(libs.hadoop3.client) {
     exclude("org.apache.hadoop", "hadoop-mapreduce-client-core")
     exclude("org.apache.hadoop", "hadoop-mapreduce-client-jobclient")
     exclude("org.apache.hadoop", "hadoop-yarn-api")
     exclude("org.apache.hadoop", "hadoop-yarn-client")
+    exclude("com.squareup.okhttp", "okhttp")
   }
 
   implementation(libs.slf4j.api)
@@ -84,7 +88,10 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn("jar", "runtimeJars")
-    from("build/libs")
+    from("build/libs") {
+      exclude("slf4j-*.jar")
+      exclude("guava-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
 
