@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * controlled loading of classes from specified jars and shared classes from the base class loader.
  */
 public class IsolatedClassLoader implements Closeable {
-  // Gravitino have two compound (catalog and authorization) types use isolated class loader
+  // Gravitino has two compound (catalog and authorization) types use isolated class loader
   public enum IsolatedType {
     CATALOG,
     AUTHORIZATION

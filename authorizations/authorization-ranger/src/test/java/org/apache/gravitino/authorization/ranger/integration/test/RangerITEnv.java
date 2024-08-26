@@ -54,21 +54,21 @@ public class RangerITEnv {
   protected static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";
   protected static RangerClient rangerClient;
-  private static volatile Boolean initRangerService = Boolean.FALSE;
+  private static volatile boolean initRangerService = false;
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   public static void setup() {
     containerSuite.startRangerContainer();
     rangerClient = containerSuite.getRangerContainer().rangerClient;
 
-    if (initRangerService.equals(Boolean.FALSE)) {
+    if (!initRangerService) {
       synchronized (RangerITEnv.class) {
         // No IP address set, no impact on testing
         createRangerHdfsRepository("", true);
         createRangerHiveRepository("", true);
         allowAnyoneAccessHDFS();
         allowAnyoneAccessInformationSchema();
-        initRangerService = Boolean.TRUE;
+        initRangerService = true;
       }
     }
   }

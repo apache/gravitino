@@ -234,11 +234,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       LOG.error("Failed to load authorization with class loader", e);
       throw new RuntimeException(e);
     }
-
-    if (baseAuthorization == null) {
-      throw new RuntimeException(
-          "Failed to load authorization with provider: " + authorizationProvider);
-    }
     authorization = baseAuthorization;
   }
 

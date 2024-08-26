@@ -77,7 +77,6 @@ dependencies {
     exclude("org.elasticsearch.plugin")
     exclude("javax.ws.rs")
   }
-  testImplementation(libs.javax.ws.rs.api)
   testImplementation(libs.hive2.jdbc) {
     exclude("org.slf4j")
   }
