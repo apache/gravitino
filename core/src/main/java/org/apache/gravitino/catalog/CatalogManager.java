@@ -838,6 +838,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
 
     String authorizationProvider = conf.get(Catalog.AUTHORIZATION_PROVIDER);
+    if (authorizationProvider == null || authorizationProvider.isEmpty()) {
+      return null;
+    }
+
     String pkgPath;
     if (testEnv) {
       // In test, the authorization package is under the build directory.
