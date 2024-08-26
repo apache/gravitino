@@ -202,9 +202,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       return;
     }
 
-    BaseAuthorization<?> baseAuthorization;
     try {
-      baseAuthorization =
+      authorization =
           classLoader.withClassLoader(
               cl -> {
                 try {
@@ -234,7 +233,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       LOG.error("Failed to load authorization with class loader", e);
       throw new RuntimeException(e);
     }
-    authorization = baseAuthorization;
   }
 
   @Override

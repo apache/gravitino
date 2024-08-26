@@ -22,8 +22,6 @@ import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
-import static org.apache.gravitino.utils.IsolatedClassLoader.IsolatedType.AUTHORIZATION;
-import static org.apache.gravitino.utils.IsolatedClassLoader.IsolatedType.CATALOG;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -710,10 +708,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private IsolatedClassLoader createClassLoader(String provider, Map<String, String> conf) {
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      String catalogPkgPath = buildPkgPath(conf, provider, CATALOG);
+      String catalogPkgPath = buildPkgPath(conf, provider);
       String catalogConfPath = buildConfPath(conf, provider);
       ArrayList<String> libAndResourcesPaths = Lists.newArrayList(catalogPkgPath, catalogConfPath);
-      String authorizationPkgPath = buildPkgPath(conf, provider, AUTHORIZATION);
+      String authorizationPkgPath = buildAuthorizationPkgPath(conf);
       if (authorizationPkgPath != null) {
         // If the catalog has an authorization provider, add the authorization package path.
         libAndResourcesPaths.add(authorizationPkgPath);
@@ -812,60 +810,52 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return confPath;
   }
 
-  private String buildPkgPath(
-      Map<String, String> conf, String provider, IsolatedClassLoader.IsolatedType isolatedType) {
+  private String buildPkgPath(Map<String, String> conf, String provider) {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
     boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
 
     String pkg = conf.get(Catalog.PROPERTY_PACKAGE);
+    String pkgPath;
     if (pkg != null) {
-      return String.join(File.separator, pkg, "libs");
+      pkgPath = String.join(File.separator, pkg, "libs");
+    } else if (testEnv) {
+      // In test, the catalog package is under the build directory.
+      pkgPath =
+          String.join(
+              File.separator, gravitinoHome, "catalogs", "catalog-" + provider, "build", "libs");
+    } else {
+      // In real environment, the catalog package is under the catalog directory.
+      pkgPath = String.join(File.separator, gravitinoHome, "catalogs", provider, "libs");
     }
 
-    String pkgPath = null;
-    switch (isolatedType) {
-      case CATALOG:
-        if (testEnv) {
-          // In test, the catalog package is under the build directory.
-          pkgPath =
-              String.join(
-                  File.separator,
-                  gravitinoHome,
-                  "catalogs",
-                  "catalog-" + provider,
-                  "build",
-                  "libs");
-        } else {
-          // In real environment, the catalog package is under the catalog directory.
-          pkgPath = String.join(File.separator, gravitinoHome, "catalogs", provider, "libs");
-        }
-        break;
-      case AUTHORIZATION:
-        String authorizationProvider = conf.get(Catalog.AUTHORIZATION_PROVIDER);
-        if (authorizationProvider == null || authorizationProvider.isEmpty()) {
-          return null;
-        }
-        if (testEnv) {
-          // In test, the authorization package is under the build directory.
-          pkgPath =
-              String.join(
-                  File.separator,
-                  gravitinoHome,
-                  "authorizations",
-                  "authorization-" + authorizationProvider,
-                  "build",
-                  "libs");
-        } else {
-          // In real environment, the authorization package is under the authorization directory.
-          pkgPath =
-              String.join(
-                  File.separator, gravitinoHome, "authorizations", authorizationProvider, "libs");
-        }
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported isolated type: " + isolatedType);
+    return pkgPath;
+  }
+
+  private String buildAuthorizationPkgPath(Map<String, String> conf) {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
+    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
+
+    String authorizationProvider = conf.get(Catalog.AUTHORIZATION_PROVIDER);
+    String pkgPath;
+    if (testEnv) {
+      // In test, the authorization package is under the build directory.
+      pkgPath =
+          String.join(
+              File.separator,
+              gravitinoHome,
+              "authorizations",
+              "authorization-" + authorizationProvider,
+              "build",
+              "libs");
+    } else {
+      // In real environment, the authorization package is under the authorization directory.
+      pkgPath =
+          String.join(
+              File.separator, gravitinoHome, "authorizations", authorizationProvider, "libs");
     }
+
     return pkgPath;
   }
 

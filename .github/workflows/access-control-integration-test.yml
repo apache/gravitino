@@ -1,4 +1,4 @@
-name: Authorization Integration Test
+name: Access Control Integration Test
 
 # Controls when the workflow will run
 on:
@@ -22,30 +22,16 @@ jobs:
         with:
           filters: |
             source_changes:
-              - .github/**
               - api/**
               - authorizations/**
-              - bin/**
               - catalogs/**
               - clients/client-java/**
               - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
               - common/**
-              - conf/**
               - core/**
-              - gradle/**
               - integration-test-common/**
-              - iceberg/**
-              - meta/**
               - server/**
               - server-common/**
-              - trino-connector/**
-              - web/**
-              - build.gradle.kts
-              - gradle.properties
-              - gradlew
-              - setting.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
@@ -59,7 +45,7 @@ jobs:
       matrix:
         # Integration test for AMD64 architecture
         architecture: [linux/amd64]
-        java-version: [ 8, 11, 17 ]
+        java-version: [ 17 ]
         test-mode: [ embedded, deploy ]
         include:
           - test-mode: 'embedded'
