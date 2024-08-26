@@ -244,7 +244,7 @@ The related configuration is as follows.
 | Configuration item                       | Description                                                            | Default value | Required                         | Since Version |
 |------------------------------------------|------------------------------------------------------------------------|---------------|----------------------------------|---------------|
 | `gravitino.authorization.enable`         | Whether Gravitino enable authorization or not.                         | false         | No                               | 0.5.0         |
-| `gravitino.authorization.serviceAdmins`  | The admins of Gravitino service, Multiple admins are spitted by comma. | (none)        | Yes if enables the authorization | 0.5.0         |
+| `gravitino.authorization.serviceAdmins`  | The admins of Gravitino service, multiple admins are spitted by comma. | (none)        | Yes if enables the authorization | 0.5.0         |
 
 
 ## User Operation
@@ -259,7 +259,7 @@ You should add the user to your metalake before you use the authorization.
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "user1",
+  "name": "user1"
 }' http://localhost:8090/api/metalakes/test/users
 ```
 
@@ -335,7 +335,7 @@ You should add the group to your metalake before you use the authorization.
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "group1",
+  "name": "group1"
 }' http://localhost:8090/api/metalakes/test/groups
 ```
 
@@ -412,7 +412,7 @@ You can create a role by given properties.
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
    "name": "role1",
-   "properties": {"k1", "v1"}
+   "properties": {"k1": "v1"},
    "securableObjects": [
           {
              "fullName": "catalog1.schema1.table1",
@@ -459,7 +459,7 @@ You can get a role by its name.
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d http://localhost:8090/api/metalakes/test/roles/role1
+-H "Content-Type: application/json"  http://localhost:8090/api/metalakes/test/roles/role1
 ```
 
 </TabItem>
@@ -511,7 +511,7 @@ You can grant specific roles to a user.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}'http://localhost:8090/api/metalakes/test/permissions/users/user1/grant
+}' http://localhost:8090/api/metalakes/test/permissions/users/user1/grant
 ```
 
 </TabItem>
@@ -536,7 +536,7 @@ You can revoke specific roles from a user.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}'http://localhost:8090/api/metalakes/test/permissions/users/user1/revoke
+}' http://localhost:8090/api/metalakes/test/permissions/users/user1/revoke
 ```
 
 </TabItem>
@@ -562,7 +562,7 @@ You can grant specific roles to a group.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}'http://localhost:8090/api/metalakes/test/permissions/groups/group1/grant
+}' http://localhost:8090/api/metalakes/test/permissions/groups/group1/grant
 ```
 
 </TabItem>
@@ -587,7 +587,7 @@ You can revoke specific roles from a group.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}'http://localhost:8090/api/metalakes/test/permissions/groups/group1/revoke
+}' http://localhost:8090/api/metalakes/test/permissions/groups/group1/revoke
 ```
 
 </TabItem>
@@ -642,7 +642,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "name": "user1",
     "type": "USER"
-}'http://localhost:8090/api/metalakes/test/owners/table/catalog1.schema1.table1
+}' http://localhost:8090/api/metalakes/test/owners/table/catalog1.schema1.table1
 ```
 
 </TabItem>
