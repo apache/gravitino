@@ -82,7 +82,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
   @VisibleForTesting public PaimonCatalogOps paimonCatalogOps;
 
   private static final String NO_SUCH_SCHEMA_EXCEPTION =
-      "Paimon schema (database) %s does not exist.";
+      "Paimon schema sss(database) %s does not exist.";
   private static final String NON_EMPTY_SCHEMA_EXCEPTION =
       "Paimon schema (database) %s is not empty. One or more tables exist.";
   private static final String SCHEMA_ALREADY_EXISTS_EXCEPTION =
