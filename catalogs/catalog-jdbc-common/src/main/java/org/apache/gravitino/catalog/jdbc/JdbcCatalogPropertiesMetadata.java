@@ -97,7 +97,6 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* reserved */));
     PROPERTIES_METADATA =
         ImmutableMap.<String, PropertyEntry<?>>builder()
-            .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
             .putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName))
             .build();
   }

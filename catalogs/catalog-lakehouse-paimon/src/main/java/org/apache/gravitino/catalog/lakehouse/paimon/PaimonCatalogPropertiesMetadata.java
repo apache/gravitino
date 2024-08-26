@@ -84,7 +84,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */));
-    HashMap<String, PropertyEntry<?>> result = Maps.newHashMap(BASIC_CATALOG_PROPERTY_ENTRIES);
+    HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
     result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
