@@ -16,16 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.ops;
+package org.apache.gravitino.iceberg.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsProvider;
+import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergTableOpsProvider;
+import org.apache.gravitino.iceberg.provider.GravitinoBasedIcebergTableOpsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,16 +43,37 @@ public class IcebergTableOpsManager implements AutoCloseable {
   private static final ImmutableMap<String, String> ICEBERG_TABLE_OPS_PROVIDER_NAMES =
       ImmutableMap.of(
           ConfigBasedIcebergTableOpsProvider.CONFIG_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
-          ConfigBasedIcebergTableOpsProvider.class.getCanonicalName());
+          ConfigBasedIcebergTableOpsProvider.class.getCanonicalName(),
+          GravitinoBasedIcebergTableOpsProvider.GRAVITINO_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
+          GravitinoBasedIcebergTableOpsProvider.class.getCanonicalName());
 
   private final Cache<String, IcebergTableOps> icebergTableOpsCache;
 
   private final IcebergTableOpsProvider provider;
 
   public IcebergTableOpsManager(Map<String, String> properties) {
-    this.icebergTableOpsCache = Caffeine.newBuilder().build();
     this.provider = createProvider(properties);
     this.provider.initialize(properties);
+    this.icebergTableOpsCache =
+        Caffeine.newBuilder()
+            .expireAfterWrite(
+                (new IcebergConfig(properties))
+                    .get(IcebergConfig.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL),
+                TimeUnit.MILLISECONDS)
+            .removalListener(
+                (k, v, c) -> {
+                  LOG.info("Remove IcebergTableOps cache {}.", k);
+                  closeIcebergTableOps((IcebergTableOps) v);
+                })
+            .scheduler(
+                Scheduler.forScheduledExecutorService(
+                    new ScheduledThreadPoolExecutor(
+                        1,
+                        new ThreadFactoryBuilder()
+                            .setDaemon(true)
+                            .setNameFormat("table-ops-cleaner-%d")
+                            .build())))
+            .build();
   }
 
   /**
@@ -97,8 +126,19 @@ public class IcebergTableOpsManager implements AutoCloseable {
     }
   }
 
+  private void closeIcebergTableOps(IcebergTableOps ops) {
+    try {
+      ops.close();
+    } catch (Exception ex) {
+      LOG.warn("Close Iceberg table ops fail: {}, {}", ops, ex);
+    }
+  }
+
   @Override
   public void close() throws Exception {
     icebergTableOpsCache.invalidateAll();
+    if (provider instanceof AutoCloseable) {
+      ((AutoCloseable) provider).close();
+    }
   }
 }
