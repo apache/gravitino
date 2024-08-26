@@ -63,7 +63,7 @@ gravitino.catalog.cache.evictionIntervalMs = 3600000
 # Whether Gravitino enable authorization or not
 gravitino.authorization.enable = false
 # The admins of Gravitino service, multiple admins are spitted by comma.
-gravitino.authorization.serviceAdmin = anonymous
+gravitino.authorization.serviceAdmins= anonymous
 
 # THE CONFIGURATION FOR AUXILIARY SERVICE
 # Auxiliary service names, separate by ','
