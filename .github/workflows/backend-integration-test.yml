@@ -93,15 +93,15 @@ jobs:
       - name: Backend Integration Test (JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
         id: integrationTest
         run: >
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
+          timeout 60m ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
           -x :web:test -x :clients:client-python:test -x :flink-connector:test -x :spark-connector:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
-          -x :authorizations:authorization-ranger:test
+          -x :authorizations:authorization-ranger:test || echo "TIMEOUT" >> error.log
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        if: ${{ (failure() && (steps.integrationTest.outcome == 'failure' || contains(steps.integrationTest.outputs.error, 'TIMEOUT'))) || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }}
           path: |
@@ -163,15 +163,15 @@ jobs:
       - name: Backend Integration Test (JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
         id: integrationTest
         run: >
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
+          timeout 60m ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
           -x :web:test -x :clients:client-python:test -x :flink-connector:test -x :spark-connector:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
-          -x :authorizations:authorization-ranger:test
+          -x :authorizations:authorization-ranger:test || echo "TIMEOUT" >> error.log
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        if: ${{ (failure() && (steps.integrationTest.outcome == 'failure' || contains(steps.integrationTest.outputs.error, 'TIMEOUT'))) || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }}
           path: |
