@@ -4,8 +4,10 @@ Copyright 2024 The Apache Software Foundation
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
-This product includes software developed at
-Datastrato (https://datastrato.ai).
+The code is based on Gravitino, that has been kindly donated to the Apache
+Software Foundation by Datastrato (https://datastrato.ai/).
+
+The code was Copyright 2023-2024 Datastrato and/or its affiliates.
 
 The Web UI also has a NOTICE file please see web/NOTICE
 for it's contents.

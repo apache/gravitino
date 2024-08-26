@@ -4,8 +4,10 @@ Copyright 2024 The Apache Software Foundation
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
-This product includes software developed at
-Datastrato (https://datastrato.ai).
+The code is based on Gravitino, that has been kindly donated to the Apache
+Software Foundation by Datastrato (https://datastrato.ai/).
+
+The code was Copyright 2023-2024 Datastrato and/or its affiliates.
 
 The Web UI also has a NOTICE file please see web/NOTICE
 for it's contents.
@@ -231,8 +233,8 @@ framework implementation, which can be obtained at:
     * license/LICENSE.felix.txt (Apache License 2.0)
   * HOMEPAGE:
     * http://felix.apache.org/
-    
-This product optionally depends on 'Webbit', a Java event based  
+
+This product optionally depends on 'Webbit', a Java event based
 WebSocket and HTTP server:
 
   * LICENSE:
@@ -259,13 +261,13 @@ This product includes software from the Eigenbase project, licensed from
 DynamoBI Corporation.
 
 Copyright (C) 2005 Dynamo BI Corporation
-   
+
   The ExoLab Project (http://www.exolab.org/)
 
   Sun Microsystems (http://www.sun.com/)
-   
+
   Codehaus (http://castor.codehaus.org)
-   
+
   Tatu Saloranta (http://wiki.fasterxml.com/TatuSaloranta)
 
 Apache Ant
@@ -309,14 +311,14 @@ and are placed here unaltered.
 
 (C) Copyright 1997,2004 International Business Machines Corporation.  All rights reserved.
 
-(C) Copyright IBM Corp. 2003. 
+(C) Copyright IBM Corp. 2003.
 
 
 =========================================================================
 
 
-The portion of the functionTests under 'nist' was originally 
-developed by the National Institute of Standards and Technology (NIST), 
+The portion of the functionTests under 'nist' was originally
+developed by the National Institute of Standards and Technology (NIST),
 an agency of the United States Department of Commerce, and adapted by
 International Business Machines Corporation in accordance with the NIST
 Software Acknowledgment and Redistribution document at
@@ -816,8 +818,8 @@ The Apache Software Foundation (http://www.apache.org/).
 
 ## Base64 implementation
 
-JJWT's `io.jsonwebtoken.io.Base64` implementation is based on [MigBase64](https://github.com/brsanthu/migbase64) with 
-continued modifications for Base64 URL support and additional test cases. The MigBase64 copyright and license notice 
+JJWT's `io.jsonwebtoken.io.Base64` implementation is based on [MigBase64](https://github.com/brsanthu/migbase64) with
+continued modifications for Base64 URL support and additional test cases. The MigBase64 copyright and license notice
 have been retained and are repeated here per that code's requirements:
 
 ```
