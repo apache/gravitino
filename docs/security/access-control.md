@@ -244,7 +244,7 @@ The related configuration is as follows.
 | Configuration item                       | Description                                                            | Default value | Required                         | Since Version |
 |------------------------------------------|------------------------------------------------------------------------|---------------|----------------------------------|---------------|
 | `gravitino.authorization.enable`         | Whether Gravitino enable authorization or not.                         | false         | No                               | 0.5.0         |
-| `gravitino.authorization.serviceAdmins`  | The admins of Gravitino service, Multiple admins are spitted by comma. | (none)        | Yes if enables the authorization | 0.5.0         |
+| `gravitino.authorization.serviceAdmins`  | The admins of Gravitino service, multiple admins are spitted by comma. | (none)        | Yes if enables the authorization | 0.5.0         |
 
 
 ## User Operation
