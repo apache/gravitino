@@ -33,6 +33,8 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
@@ -199,8 +201,34 @@ public final class JettyServer {
       LOG.warn("Users would better use HTTPS to avoid token data leak.");
     }
 
+    Timer timer = new Timer();
+
+    // 设置定时任务，每5秒执行一次
+    timer.schedule(
+        new TimerTask() {
+          @Override
+          public void run() {
+            printAllThreadStacks();
+          }
+        },
+        0,
+        60000);
+
     LOG.info(
         "{} web server started on host {} port {}.", serverName, serverConfig.getHost(), getPort());
+  }
+
+  private static void printAllThreadStacks() {
+    Map<Thread, StackTraceElement[]> allStackTraces = Thread.getAllStackTraces();
+    for (Map.Entry<Thread, StackTraceElement[]> entry : allStackTraces.entrySet()) {
+      Thread thread = entry.getKey();
+      StackTraceElement[] stackTraces = entry.getValue();
+
+      LOG.info("Thread: " + thread.getName() + " (ID: " + thread.getId() + ")");
+      for (StackTraceElement stackTrace : stackTraces) {
+        LOG.info("    at " + stackTrace);
+      }
+    }
   }
 
   public synchronized void join() {
