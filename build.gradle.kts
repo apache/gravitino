@@ -543,7 +543,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copyAuthorizationLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -713,6 +713,7 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
+        !it.name.startsWith("authorization") &&
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
       ) {
@@ -726,20 +727,16 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
+        !it.name.startsWith("authorization") &&
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("integration-test") &&
-        it.name != "authorizations" &&
         it.name != "trino-connector" &&
         it.name != "bundled-catalog" &&
         it.name != "flink-connector"
       ) {
-        if (it.name.startsWith("authorization-")) {
-          dependsOn(":authorizations:${it.name}:build")
-        } else {
-          dependsOn("${it.name}:build")
-        }
+        dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
         into("distribution/package/libs")
         include("*.jar")
@@ -757,7 +754,13 @@ tasks {
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      "catalogs:catalog-kafka:copyLibAndConfig"
+      ":catalogs:catalog-kafka:copyLibAndConfig"
+    )
+  }
+
+  register("copyAuthorizationLibAndConfigs", Copy::class) {
+    dependsOn(
+      ":authorizations:authorization-ranger:copyLibAndConfig"
     )
   }
 
