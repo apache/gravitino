@@ -66,13 +66,15 @@ COPY --chown=trino:trino packages/gravitino-trino-connector/postgresql-42.7.0.ja
 RUN mkdir /tmp/gravitino
 COPY --chown=trino:trino packages/gravitino-trino-connector /tmp/gravitino
 
-ARG IMAGE_NAME
 ARG TAG_NAME
-RUN if [ "$TAG_NAME" = "trino-*" ] ; then \
-    mv /tmp/gravitino /usr/lib/trino/plugin/; \
-    else echo "Copying files for other images"; \
-    fi
-
+RUN case "$TAG_NAME" in \
+    trino-*) \
+        mv /tmp/gravitino /usr/lib/trino/plugin/; \
+        ;; \
+    *) \
+        echo "Copying files for other images"; \
+        ;; \
+    esac
 
 # The following ENV are needed to update configuration file before starting Trino server, you need to
 # pass these ENV variables to the container when starting it like `docker run --env GRAVITINO_HOST_IP=xxx --env GRAVITINO_HOST_PORT=xxxx`
