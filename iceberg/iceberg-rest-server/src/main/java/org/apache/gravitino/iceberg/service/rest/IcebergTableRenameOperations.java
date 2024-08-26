@@ -30,8 +30,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.IcebergTableOpsManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
