@@ -26,7 +26,7 @@ if [[ $# -ne 1 ]]; then
 fi
 
 NEW_VERSION=$1
-cd "$(cd "$(dirname "$0")" && pwd)/../docs"
+cd "$(cd "$(dirname "$0")" && pwd)/../../docs"
 CURRENT_VERSION=`cat index.md| grep pathname:///docs | head -n 1 | awk -F '///docs' '{print $2}' | awk -F '/' '{print $2}'`
 
 if [[ "${NEW_VERSION}" == "${CURRENT_VERSION}" ]]; then

@@ -148,6 +148,19 @@ Unsupported for now.
     </TabItem>
     </Tabs>
 
+### Table partitions
+
+The Doris catalog supports partitioned tables. 
+Users can create partitioned tables in the Doris catalog with specific partitioning attributes. It is also supported to pre-assign partitions when creating Doris tables. 
+Note that although Gravitino supports several partitioning strategies, Apache Doris inherently only supports these two partitioning strategies:
+
+- `RANGE`
+- `LIST`
+
+:::caution
+The `fieldName` specified in the partitioning attributes must be the name of columns defined in the table.
+:::
+
 ### Table operations
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.

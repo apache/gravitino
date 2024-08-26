@@ -20,6 +20,7 @@ package org.apache.gravitino.connector.authorization;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Map;
 
 /**
  * The abstract base class for Authorization implementations.<br>
@@ -41,13 +42,14 @@ public abstract class BaseAuthorization<T extends BaseAuthorization>
    *
    * @return A new instance of AuthorizationHook.
    */
-  protected abstract AuthorizationPlugin newPlugin();
+  protected abstract AuthorizationPlugin newPlugin(
+      String catalogProvider, Map<String, String> config);
 
-  public AuthorizationPlugin plugin() {
+  public AuthorizationPlugin plugin(String catalogProvider, Map<String, String> config) {
     if (plugin == null) {
       synchronized (this) {
         if (plugin == null) {
-          plugin = newPlugin();
+          plugin = newPlugin(catalogProvider, config);
         }
       }
     }

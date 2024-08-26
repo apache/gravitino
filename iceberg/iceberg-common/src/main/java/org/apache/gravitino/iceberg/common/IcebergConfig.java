@@ -43,6 +43,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault("memory");
 
+  public static final ConfigEntry<String> CATALOG_BACKEND_IMPL =
+      new ConfigBuilder(IcebergConstants.CATALOG_BACKEND_IMPL)
+          .doc(
+              "The fully-qualified class name of a custom catalog implementation, only worked if `catalog-backend` is `custom`")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
+
   public static final ConfigEntry<String> CATALOG_WAREHOUSE =
       new ConfigBuilder(IcebergConstants.WAREHOUSE)
           .doc("Warehouse directory of catalog")
@@ -158,6 +166,13 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .create();
 
+  public static final ConfigEntry<Long> ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL =
+      new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL)
+          .doc("Catalog cache eviction interval.")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .longConf()
+          .createWithDefault(3600000L);
+
   public static final ConfigEntry<String> ICEBERG_REST_CATALOG_PROVIDER =
       new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER)
           .doc(
@@ -165,6 +180,22 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .createWithDefault("config-based-provider");
+
+  public static final ConfigEntry<String> GRAVITINO_URI =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_URI)
+          .doc(
+              "The uri of Gravitino server address, only worked if `catalog-provider` is `gravitino-based-provider`.")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> GRAVITINO_METALAKE =
+      new ConfigBuilder(IcebergConstants.GRAVITINO_METALAKE)
+          .doc(
+              "The metalake name that `gravitino-based-provider` used to request to Gravitino, only worked if `catalog-provider` is `gravitino-based-provider`.")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
 
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);

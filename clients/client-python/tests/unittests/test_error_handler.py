@@ -32,6 +32,7 @@ from gravitino.exceptions.base import (
     IllegalArgumentException,
     AlreadyExistsException,
     NotEmptyException,
+    NonEmptySchemaException,
     SchemaAlreadyExistsException,
     UnsupportedOperationException,
     ConnectionFailedException,
@@ -217,9 +218,11 @@ class TestErrorHandler(unittest.TestCase):
                 )
             )
 
-        with self.assertRaises(NotEmptyException):
+        with self.assertRaises(NonEmptySchemaException):
             SCHEMA_ERROR_HANDLER.handle(
-                ErrorResponse.generate_error_response(NotEmptyException, "mock error")
+                ErrorResponse.generate_error_response(
+                    NonEmptySchemaException, "mock error"
+                )
             )
 
         with self.assertRaises(UnsupportedOperationException):

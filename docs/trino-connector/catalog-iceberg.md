@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino connector - Iceberg catalog"
+title: "Apache Gravitino Trino connector - Iceberg catalog"
 slug: /trino-connector/catalog-iceberg
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
@@ -32,8 +32,8 @@ CREATE SCHEMA "metalake.catalog".schema_name
 
 ### Create table
 
-The Gravitino connector currently supports basic Iceberg table creation statements, such as defining fields,
-allowing null values, and adding comments. The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+The Gravitino Trino connector currently supports basic Iceberg table creation statements, such as defining fields,
+allowing null values, and adding comments. The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
 The following example shows how to create a table in the Iceberg catalog:
 
@@ -57,7 +57,7 @@ Support for the following alter table operations:
 
 ## Select
 
-The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
+The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
 ## Table and Schema properties

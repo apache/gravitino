@@ -19,6 +19,11 @@
 package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.Configs.SERVICE_ADMINS;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -30,6 +35,9 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -52,10 +60,12 @@ public class TestAccessControlManager {
   private static AccessControlManager accessControlManager;
 
   private static EntityStore entityStore;
+  private static CatalogManager catalogManager = mock(CatalogManager.class);
 
   private static Config config;
 
   private static String METALAKE = "metalake";
+  private static AuthorizationPlugin authorizationPlugin;
 
   private static BaseMetalake metalakeEntity =
       BaseMetalake.builder()
@@ -81,6 +91,11 @@ public class TestAccessControlManager {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlManager, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    BaseCatalog catalog = mock(BaseCatalog.class);
+    when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+    authorizationPlugin = mock(AuthorizationPlugin.class);
+    when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
   }
 
   @AfterAll
@@ -213,6 +228,7 @@ public class TestAccessControlManager {
 
   @Test
   public void testCreateRole() {
+    reset(authorizationPlugin);
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
     Role role =
@@ -225,6 +241,7 @@ public class TestAccessControlManager {
                     "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
     Assertions.assertEquals("create", role.name());
     testProperties(props, role.properties());
+    verify(authorizationPlugin).onRoleCreated(any());
 
     // Test with RoleAlreadyExistsException
     Assertions.assertThrows(
@@ -281,8 +298,11 @@ public class TestAccessControlManager {
                 "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
 
     // Test drop role
+    reset(authorizationPlugin);
     boolean dropped = accessControlManager.deleteRole("metalake", "testDrop");
     Assertions.assertTrue(dropped);
+
+    verify(authorizationPlugin).onRoleDeleted(any());
 
     // Test drop non-existed role
     boolean dropped1 = accessControlManager.deleteRole("metalake", "no-exist");

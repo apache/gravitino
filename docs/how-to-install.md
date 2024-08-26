@@ -145,11 +145,11 @@ For more detailed information about the Gravitino Iceberg REST server, please re
 
 ### Get the Apache Gravitino Docker image
 
-Gravitino publishes the Docker image to [Docker Hub](https://hub.docker.com/r/datastrato/gravitino/tags).
+Gravitino publishes the Docker image to [Docker Hub](https://hub.docker.com/r/apache/gravitino/tags).
 Run the Gravitino Docker image by running:
 
 ```shell
-docker run -d -i -p 8090:8090 datastrato/gravitino:<version>
+docker run -d -i -p 8090:8090 apache/gravitino:<version>
 ```
 
 Access the Gravitino Web UI by typing `http://localhost:8090` in your browser, or you
@@ -170,3 +170,5 @@ you want to experience the whole Gravitino system with other components, use the
 For the details, review the
 [Gravitino playground repository](https://github.com/apache/gravitino-playground) and
 [playground example](./how-to-use-the-playground.md).
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToInstall" style={{ border: 0 }} alt="" />

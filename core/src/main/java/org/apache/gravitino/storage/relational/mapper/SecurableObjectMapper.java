@@ -43,12 +43,12 @@ public interface SecurableObjectMapper {
     "<script>",
     "INSERT INTO "
         + SECURABLE_OBJECT_TABLE_NAME
-        + "(role_id, entity_id, type, privilege_names, privilege_conditions, "
+        + "(role_id, metadata_object_id, type, privilege_names, privilege_conditions, "
         + " current_version, last_version, deleted_at)"
         + " VALUES ",
     "<foreach collection='securableObjects' item='item' separator=','>",
     "(#{item.roleId},"
-        + " #{item.entityId},"
+        + " #{item.metadataObjectId},"
         + " #{item.type},"
         + " #{item.privilegeNames},"
         + " #{item.privilegeConditions},"
@@ -81,7 +81,7 @@ public interface SecurableObjectMapper {
   void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @Select(
-      "SELECT role_id as roleId, entity_id as entityId,"
+      "SELECT role_id as roleId, metadata_object_id as metadataObjectId,"
           + " type as type, privilege_names as privilegeNames,"
           + " privilege_conditions as privilegeConditions, current_version as currentVersion,"
           + " last_version as lastVersion, deleted_at as deletedAt"

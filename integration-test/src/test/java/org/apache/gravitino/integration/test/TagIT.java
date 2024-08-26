@@ -182,6 +182,16 @@ public class TagIT extends AbstractIT {
     Set<Tag> tags = Sets.newHashSet(metalake.listTagsInfo());
     Set<Tag> expectedTags = Sets.newHashSet(tag, tag1);
     Assertions.assertEquals(expectedTags, tags);
+
+    // Test null comment and properties
+    String tagName2 = GravitinoITUtils.genRandomName("tag_it_tag2");
+    Tag tag2 = metalake.createTag(tagName2, null, null);
+    Assertions.assertEquals(tagName2, tag2.name());
+    Assertions.assertNull(tag2.comment());
+    Assertions.assertEquals(Collections.emptyMap(), tag2.properties());
+
+    Tag tag3 = metalake.getTag(tagName2);
+    Assertions.assertEquals(tag2, tag3);
   }
 
   @Test
@@ -228,6 +238,26 @@ public class TagIT extends AbstractIT {
     // Test throw NoSuchTagException
     Assertions.assertThrows(
         NoSuchTagException.class, () -> metalake.alterTag("non-existed-tag", rename));
+
+    // Test alter tag on no comment and properties
+    String tagName1 = GravitinoITUtils.genRandomName("tag_it_tag1");
+    metalake.createTag(tagName1, null, null);
+
+    // Test rename and update comment
+    String newTagName1 = GravitinoITUtils.genRandomName("tag_it_tag_new1");
+    TagChange rename1 = TagChange.rename(newTagName1);
+    TagChange updateComment1 = TagChange.updateComment("new comment1");
+    TagChange setProperty3 = TagChange.setProperty("k4", "v4");
+    TagChange setProperty4 = TagChange.setProperty("k5", "v5");
+    TagChange removeProperty3 = TagChange.removeProperty("k4");
+
+    Tag alteredTag5 =
+        metalake.alterTag(
+            tagName1, rename1, updateComment1, setProperty3, setProperty4, removeProperty3);
+    Assertions.assertEquals(newTagName1, alteredTag5.name());
+    Assertions.assertEquals("new comment1", alteredTag5.comment());
+    Assertions.assertEquals(ImmutableMap.of("k5", "v5"), alteredTag5.properties());
+    Assertions.assertFalse(alteredTag5.inherited().isPresent());
   }
 
   @Test

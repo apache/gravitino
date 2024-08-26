@@ -123,14 +123,11 @@ class GravitinoAdminClient(GravitinoClientBase):
         Returns:
             True if the Metalake was successfully dropped, false otherwise.
         """
-        try:
-            resp = self._rest_client.delete(
-                self.API_METALAKES_IDENTIFIER_PATH + name,
-                error_handler=METALAKE_ERROR_HANDLER,
-            )
-            drop_response = DropResponse.from_json(resp.body, infer_missing=True)
 
-            return drop_response.dropped()
-        except Exception:
-            logger.warning("Failed to drop metalake %s", name)
-            return False
+        resp = self._rest_client.delete(
+            self.API_METALAKES_IDENTIFIER_PATH + name,
+            error_handler=METALAKE_ERROR_HANDLER,
+        )
+        drop_response = DropResponse.from_json(resp.body, infer_missing=True)
+
+        return drop_response.dropped()

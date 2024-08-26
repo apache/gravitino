@@ -1,11 +1,11 @@
 ---
-title: "Apache Gravitino supported Catalogs"
+title: "Apache Gravitino Trino connector supported Catalogs"
 slug: /trino-connector/supported-catalog
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
 ---
 
-The catalogs currently supported by the Apache Gravitino connector are as follows:
+The catalogs currently supported by the Apache Gravitino Trino connector are as follows:
 
 - [Hive](catalog-hive.md)
 - [Iceberg](catalog-iceberg.md)
@@ -14,8 +14,8 @@ The catalogs currently supported by the Apache Gravitino connector are as follow
 
 ## Create catalog
 
-Users can create catalogs through the Gravitino connector and then load them into Trino. 
-The Gravitino connector provides the following stored procedures to create, delete, and alter catalogs.
+Users can create catalogs through the Gravitino Trino connector and then load them into Trino.
+The Gravitino Trino connector provides the following stored procedures to create, delete, and alter catalogs.
 User can also use the system table `catalog` to describe all the catalogs.
 
 Create catalog:
@@ -136,9 +136,9 @@ call gravitino.system.create_catalog(
 );
 ```
 
-A prefix with `trino.bypass.` in the configuration key is used to indicate Gravitino connector to pass the Trino connector configuration to the Gravitino catalog in the Trino runtime.
+A prefix with `trino.bypass.` in the configuration key is used to indicate Gravitino Trino connector to pass the Trino connector configuration to the Gravitino catalog in the Trino runtime.
 
-More trino connector configurations can refer to:
+More Trino connector configurations can refer to:
 - [Hive catalog](https://trino.io/docs/current/connector/hive.html#hive-general-configuration-properties)
 - [Iceberg catalog](https://trino.io/docs/current/connector/iceberg.html#general-configuration)
 - [MySQL catalog](https://trino.io/docs/current/connector/mysql.html#general-configuration-properties)
@@ -146,7 +146,7 @@ More trino connector configurations can refer to:
 
 ## Data type mapping between Trino and Apache Gravitino
 
-Gravitino connector supports the following data type conversions between Trino and Gravitino currently. Depending on the detailed catalog, Gravitino may not support some data types conversion for this specific catalog, for example,
+Gravitino Trino connector supports the following data type conversions between Trino and Gravitino currently. Depending on the detailed catalog, Gravitino may not support some data types conversion for this specific catalog, for example,
 Hive does not support `TIME` data type.
 
 | Gravitino Type | Trino Type |

@@ -268,3 +268,5 @@ Access [http://localhost:8090](http://localhost:8090)
 Building the Gravitino project compiles the necessary components, and starting the server allows you to access the application in your browser.
 
 For instructions on how to run the project using VSCode or IntelliJ on Windows, please refer to [CONTRIBUTING.md](https://github.com/apache/gravitino/blob/main/CONTRIBUTING.md).
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToBuild" style={{ border: 0 }} alt="" />

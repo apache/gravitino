@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import com.google.common.base.Preconditions;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -111,6 +112,7 @@ public class GravitinoEnv {
   private TagManager tagManager;
   private EventBus eventBus;
   private OwnerManager ownerManager;
+  private FutureGrantManager futureGrantManager;
 
   protected GravitinoEnv() {}
 
@@ -287,8 +289,22 @@ public class GravitinoEnv {
     return tagManager;
   }
 
+  /**
+   * Get the OwnerManager associated with the Gravitino environment.
+   *
+   * @return The OwnerManager instance.
+   */
   public OwnerManager ownerManager() {
     return ownerManager;
+  }
+
+  /**
+   * Get the FutureGrantManager associated with the Gravitino environment.
+   *
+   * @return The FutureGrantManager instance.
+   */
+  public FutureGrantManager futureGrantManager() {
+    return futureGrantManager;
   }
 
   public void start() {
@@ -410,9 +426,11 @@ public class GravitinoEnv {
 
       this.accessControlDispatcher = accessControlHookDispatcher;
       this.ownerManager = new OwnerManager(entityStore);
+      this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
       this.accessControlDispatcher = null;
       this.ownerManager = null;
+      this.futureGrantManager = null;
     }
 
     this.auxServiceManager = new AuxiliaryServiceManager();

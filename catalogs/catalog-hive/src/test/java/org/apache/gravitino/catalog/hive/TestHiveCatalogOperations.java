@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
 import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC;
@@ -41,6 +42,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -91,14 +93,24 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         HIVE_PROPERTIES_METADATA.catalogPropertiesMetadata().propertyEntries();
 
-    Assertions.assertEquals(15, propertyEntryMap.size());
+    Assertions.assertEquals(20, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
-    Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.AUTHORIZATION_PROVIDER));
+    Assertions.assertTrue(propertyEntryMap.containsKey(AUTHORIZATION_PROVIDER));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));
     Assertions.assertTrue(propertyEntryMap.containsKey(LIST_ALL_TABLES));
+    Assertions.assertTrue(
+        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_ADMIN_URL));
+    Assertions.assertTrue(
+        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_AUTH_TYPE));
+    Assertions.assertTrue(
+        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_USERNAME));
+    Assertions.assertTrue(
+        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_PASSWORD));
+    Assertions.assertTrue(
+        propertyEntryMap.containsKey(AuthorizationPropertiesMeta.RANGER_SERVICE_NAME));
 
     Assertions.assertTrue(propertyEntryMap.get(METASTORE_URIS).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(Catalog.PROPERTY_PACKAGE).isRequired());
