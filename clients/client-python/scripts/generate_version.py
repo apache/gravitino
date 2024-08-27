@@ -42,7 +42,7 @@ def get_git_commit_id():
             with open(git_path + ref_path, "r", encoding="utf-8") as file:
                 commit_id = file.readline().strip()
         return commit_id
-    except (FileNotFoundError, IOError) as e:
+    except (FileNotFoundError, IOError):
         return ""
 
 
