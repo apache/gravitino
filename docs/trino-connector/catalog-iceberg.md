@@ -239,7 +239,7 @@ replacing hdfs_user with the appropriate username:
 
 ## S3
 
-When using AWS S3 within the Iceberg catalog,users need to configure the Trino Iceberg connector's
+When using AWS S3 within the Iceberg catalog, users need to configure the Trino Iceberg connector's
 AWS S3-related properties in the catalog's properties. For specific guidance, please refer to the documentation
 of [Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
 These configurations must use the `trino.bypass.` prefix in the Iceberg catalog's attributes to be effective.
