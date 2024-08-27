@@ -20,7 +20,6 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -38,7 +37,6 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.FilesetDispatcher;
-import org.apache.gravitino.context.CallerContext;
 import org.apache.gravitino.dto.requests.FilesetCreateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
@@ -274,13 +272,6 @@ public class FilesetOperations {
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
-            Map<String, String> filteredAuditHeaders = Utils.filterFilesetAuditHeaders(httpRequest);
-            // set the audit info into the thread local context
-            if (!filteredAuditHeaders.isEmpty()) {
-              CallerContext context =
-                  CallerContext.builder().withContext(filteredAuditHeaders).build();
-              CallerContext.CallerContextHolder.set(context);
-            }
             String actualFileLocation =
                 TreeLockUtils.doWithTreeLock(
                     ident, LockType.READ, () -> dispatcher.getFileLocation(ident, subPath));

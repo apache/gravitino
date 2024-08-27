@@ -19,22 +19,16 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.catalog.FilesetDispatcher;
-import org.apache.gravitino.context.CallerContext;
-import org.apache.gravitino.enums.FilesetDataOperation;
-import org.apache.gravitino.enums.InternalClientType;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
@@ -128,48 +122,6 @@ public class TestFilesetEvent {
   }
 
   @Test
-  void testGetFileLocationEvent() {
-    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", fileset.name());
-    dispatcher.createFileset(
-        identifier,
-        fileset.comment(),
-        fileset.type(),
-        fileset.storageLocation(),
-        fileset.properties());
-    Event event = dummyEventListener.popEvent();
-    Assertions.assertEquals(identifier, event.identifier());
-    Assertions.assertEquals(CreateFilesetEvent.class, event.getClass());
-    FilesetInfo filesetInfo = ((CreateFilesetEvent) event).createdFilesetInfo();
-    checkFilesetInfo(filesetInfo, fileset);
-
-    Map<String, String> contextMap = Maps.newHashMap();
-    contextMap.put(
-        FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
-        InternalClientType.HADOOP_GVFS.name());
-    contextMap.put(
-        FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
-        FilesetDataOperation.GET_FILE_STATUS.name());
-    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
-    CallerContext.CallerContextHolder.set(callerContext);
-    String fileLocation = dispatcher.getFileLocation(identifier, "test");
-    Event event1 = dummyEventListener.popEvent();
-    Assertions.assertEquals(identifier, event1.identifier());
-    Assertions.assertEquals(GetFileLocationEvent.class, event1.getClass());
-    String actualFileLocation = ((GetFileLocationEvent) event1).actualFileLocation();
-    Assertions.assertEquals(actualFileLocation, fileLocation);
-    CallerContext actualCallerContext = ((GetFileLocationEvent) event1).callerContext();
-    assertEquals(2, actualCallerContext.context().size());
-    Assertions.assertEquals(
-        InternalClientType.HADOOP_GVFS.name(),
-        actualCallerContext.context().get(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE));
-    Assertions.assertEquals(
-        FilesetDataOperation.GET_FILE_STATUS.name(),
-        actualCallerContext
-            .context()
-            .get(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION));
-  }
-
-  @Test
   void testCreateSchemaFailureEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "fileset");
     Assertions.assertThrowsExactly(
@@ -242,20 +194,6 @@ public class TestFilesetEvent {
     Assertions.assertEquals(namespace, ((ListFilesetFailureEvent) event).namespace());
   }
 
-  @Test
-  void testGetFileLocationFailureEvent() {
-    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "fileset");
-    Assertions.assertThrowsExactly(
-        GravitinoRuntimeException.class,
-        () -> failureDispatcher.getFileLocation(identifier, "/test"));
-    Event event = dummyEventListener.popEvent();
-    Assertions.assertEquals(identifier, event.identifier());
-    Assertions.assertEquals(GetFileLocationFailureEvent.class, event.getClass());
-    Assertions.assertEquals(
-        GravitinoRuntimeException.class,
-        ((GetFileLocationFailureEvent) event).exception().getClass());
-  }
-
   private void checkFilesetInfo(FilesetInfo filesetInfo, Fileset fileset) {
     Assertions.assertEquals(fileset.name(), filesetInfo.name());
     Assertions.assertEquals(fileset.type(), filesetInfo.type());
@@ -289,8 +227,6 @@ public class TestFilesetEvent {
     when(dispatcher.listFilesets(any(Namespace.class))).thenReturn(null);
     when(dispatcher.alterFileset(any(NameIdentifier.class), any(FilesetChange.class)))
         .thenReturn(fileset);
-    when(dispatcher.getFileLocation(any(NameIdentifier.class), any()))
-        .thenReturn("file:/test/xxx.parquet");
     return dispatcher;
   }
 
