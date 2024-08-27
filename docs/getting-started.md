@@ -334,3 +334,6 @@ After completing these steps, you should be able to access the Gravitino REST in
   
 
 This document is just the beginning. You're welcome to customize your Gravitino setup based on your requirements and to explore the vast possibilities this powerful tool offers. If you encounter any issues or have questions, you can always connect with the Gravitino community for assistance.
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=GettingStarted" style={{ border: 0 }} alt="" />
+

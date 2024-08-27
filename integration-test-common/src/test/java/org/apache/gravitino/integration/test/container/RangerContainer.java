@@ -40,15 +40,18 @@ public class RangerContainer extends BaseContainer {
   public static final int RANGER_SERVER_PORT = 6080;
   public RangerClient rangerClient;
   private String rangerUrl;
-  private static final String username = "admin";
-  // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
-  private static final String password = "rangerR0cks!";
 
   /**
-   * for kerberos authentication: authType = "kerberos" username = principal password = path of the
-   * keytab file
+   * for kerberos authentication: <br>
+   * authType = "kerberos" <br>
+   * username = principal <br>
+   * password = path of the keytab file <br>
    */
-  private static final String authType = "simple";
+  public static final String authType = "simple";
+
+  public static final String rangerUserName = "admin";
+  // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
+  public static final String rangerPassword = "rangerR0cks!";
   // Ranger hive/hdfs Docker startup environment variable name
   public static final String DOCKER_ENV_RANGER_SERVER_URL = "RANGER_SERVER_URL";
   public static final String DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME = "RANGER_HDFS_REPOSITORY_NAME";
@@ -80,7 +83,7 @@ public class RangerContainer extends BaseContainer {
     super.start();
 
     rangerUrl = String.format("http://localhost:%s", this.getMappedPort(RANGER_SERVER_PORT));
-    rangerClient = new RangerClient(rangerUrl, authType, username, password, null);
+    rangerClient = new RangerClient(rangerUrl, authType, rangerUserName, rangerPassword, null);
 
     Preconditions.check("Ranger container startup failed!", checkContainerStatus(10));
   }
@@ -125,7 +128,7 @@ public class RangerContainer extends BaseContainer {
       this.hostName = HOST_NAME;
       this.exposePorts = ImmutableSet.of(RANGER_SERVER_PORT);
       this.envVars =
-          ImmutableMap.<String, String>builder().put("RANGER_PASSWORD", password).build();
+          ImmutableMap.<String, String>builder().put("RANGER_PASSWORD", rangerPassword).build();
     }
 
     @Override

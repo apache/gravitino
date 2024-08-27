@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.connector.authorization.mysql;
 
+import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
@@ -31,7 +32,7 @@ public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthoriza
   }
 
   @Override
-  protected AuthorizationPlugin newPlugin() {
+  protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
     return new TestMySQLAuthorizationPlugin();
   }
 }

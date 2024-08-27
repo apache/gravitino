@@ -109,7 +109,7 @@ class RoleManager {
       store.put(roleEntity, false /* overwritten */);
       cache.put(roleEntity.nameIdentifier(), roleEntity);
 
-      AuthorizationUtils.callAuthorizationPlugin(
+      AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
           metalake,
           roleEntity.securableObjects(),
           Sets.newHashSet(),
@@ -145,7 +145,7 @@ class RoleManager {
 
       try {
         RoleEntity roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
-        AuthorizationUtils.callAuthorizationPlugin(
+        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
             metalake,
             roleEntity.securableObjects(),
             Sets.newHashSet(),

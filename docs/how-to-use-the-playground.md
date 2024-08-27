@@ -236,3 +236,4 @@ select * from catalog_hive.sales.customers
 union
 select * from catalog_iceberg.sales.customers;
 ```
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowtoUsePlayground" style={{ border: 0 }} alt="" />

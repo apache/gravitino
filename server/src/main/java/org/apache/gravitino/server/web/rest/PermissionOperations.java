@@ -40,8 +40,10 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 
+@NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/permissions")
 public class PermissionOperations {
 

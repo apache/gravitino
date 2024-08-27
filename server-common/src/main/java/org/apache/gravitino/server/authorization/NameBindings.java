@@ -24,8 +24,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import javax.ws.rs.NameBinding;
 
+/* This class is used for Jersey filters to bind operations with the filters which need. */
 public class NameBindings {
 
+  /* This annotation will bind all access control related operations */
   @NameBinding
   @Target({ElementType.TYPE, ElementType.METHOD})
   @Retention(RetentionPolicy.RUNTIME)
