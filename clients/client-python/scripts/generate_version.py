@@ -37,9 +37,10 @@ def main():
         else:
             raise GravitinoRuntimeException("Can't find valid version info in setup.py")
 
-    git_commit = (
-        subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
-    )
+    try:
+        git_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.STDOUT).decode("ascii").strip()
+    except subprocess.CalledProcessError:
+        git_commit = ""
 
     compile_date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
