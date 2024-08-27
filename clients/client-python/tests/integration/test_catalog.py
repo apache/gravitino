@@ -28,6 +28,7 @@ from gravitino import (
 )
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.exceptions.base import (
+    GravitinoRuntimeException,
     CatalogAlreadyExistsException,
     NoSuchCatalogException,
 )
@@ -76,22 +77,26 @@ class TestCatalog(IntegrationTestEnv):
         )
 
     def clean_test_data(self):
+        self.gravitino_client = GravitinoClient(
+            uri="http://localhost:8090", metalake_name=self.metalake_name
+        )
         try:
-            self.gravitino_client = GravitinoClient(
-                uri="http://localhost:8090", metalake_name=self.metalake_name
-            )
             logger.info(
                 "Drop catalog %s[%s]",
                 self.catalog_ident,
                 self.gravitino_client.drop_catalog(name=self.catalog_name),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop catalog %s", self.catalog_name)
+
+        try:
             logger.info(
                 "Drop metalake %s[%s]",
                 self.metalake_name,
                 self.gravitino_admin_client.drop_metalake(self.metalake_name),
             )
-        except Exception as e:
-            logger.error("Clean test data failed: %s", e)
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop metalake %s", self.metalake_name)
 
     def test_list_catalogs(self):
         self.create_catalog(self.catalog_name)

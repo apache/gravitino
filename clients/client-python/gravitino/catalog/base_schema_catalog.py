@@ -199,21 +199,17 @@ class BaseSchemaCatalog(CatalogDTO, SupportsSchemas):
         Returns:
              true if the schema is dropped successfully, false otherwise.
         """
-        try:
-            params = {"cascade": str(cascade)}
-            resp = self.rest_client.delete(
-                BaseSchemaCatalog.format_schema_request_path(self._schema_namespace())
-                + "/"
-                + encode_string(schema_name),
-                params=params,
-                error_handler=SCHEMA_ERROR_HANDLER,
-            )
-            drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
-            drop_resp.validate()
-            return drop_resp.dropped()
-        except Exception:
-            logger.warning("Failed to drop schema %s", schema_name)
-            return False
+        params = {"cascade": str(cascade)}
+        resp = self.rest_client.delete(
+            BaseSchemaCatalog.format_schema_request_path(self._schema_namespace())
+            + "/"
+            + encode_string(schema_name),
+            params=params,
+            error_handler=SCHEMA_ERROR_HANDLER,
+        )
+        drop_resp = DropResponse.from_json(resp.body, infer_missing=True)
+        drop_resp.validate()
+        return drop_resp.dropped()
 
     def _schema_namespace(self) -> Namespace:
         return Namespace.of(self._catalog_namespace.level(0), self.name())

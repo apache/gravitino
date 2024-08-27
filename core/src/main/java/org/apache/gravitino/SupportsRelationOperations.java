@@ -30,7 +30,13 @@ public interface SupportsRelationOperations {
   /** Relation is an abstraction which connects two entities. */
   enum Type {
     /** The owner relationship */
-    OWNER_REL
+    OWNER_REL,
+    /** Metadata objet and role relationship */
+    METADATA_OBJECT_ROLE_REL,
+    /** Role and user relationship */
+    ROLE_USER_REL,
+    /** Role and group relationship */
+    ROLE_GROUP_REL
   }
 
   /**

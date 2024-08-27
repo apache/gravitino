@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.connector.authorization;
 
+import java.util.List;
+import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
+import org.apache.gravitino.authorization.User;
 
 /** Interface for authorization Role plugin operation of the underlying access control system */
 interface RoleAuthorizationPlugin {
@@ -67,4 +70,48 @@ interface RoleAuthorizationPlugin {
    * @throws RuntimeException If update role encounters storage issues.
    */
   Boolean onRoleUpdated(Role role, RoleChange... changes) throws RuntimeException;
+
+  /**
+   * After granting roles to a user from Gravitino, this method is called to grant roles to the user
+   * in the underlying system. <br>
+   *
+   * @param user The entity of the User.
+   * @param roles The entities of the Roles.
+   * @return True if the Grant was successful, false if the Grant was failed.
+   * @throws RuntimeException If granting roles to a user encounters storage issues.
+   */
+  Boolean onGrantedRolesToUser(List<Role> roles, User user) throws RuntimeException;
+
+  /**
+   * After revoking roles from a user from Gravitino, this method is called to revoke roles from the
+   * user in the underlying system. <br>
+   *
+   * @param user The entity of the User.
+   * @param roles The entities of the Roles.
+   * @return True if the revoke was successfully removed, false if the revoke failed.
+   * @throws RuntimeException If revoking roles from a user encounters storage issues.
+   */
+  Boolean onRevokedRolesFromUser(List<Role> roles, User user) throws RuntimeException;
+
+  /**
+   * After granting roles to a group from Gravitino, this method is called to grant roles to the
+   * group in the underlying system. <br>
+   *
+   * @param group The entity of the Group.
+   * @param roles The entities of the Roles.
+   * @return True if the revoke was successfully removed, False if the revoke failed.
+   * @throws RuntimeException If granting roles to a group encounters storage issues.
+   */
+  Boolean onGrantedRolesToGroup(List<Role> roles, Group group) throws RuntimeException;
+
+  /**
+   * After revoking roles from a group from Gravitino, this method is called to revoke roles from
+   * the group in the underlying system. <br>
+   *
+   * @param group The entity of the Group.
+   * @param roles The entities of the Roles.
+   * @return True if the revoke was successfully removed, False if the revoke failed.
+   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   */
+  Boolean onRevokedRolesFromGroup(List<Role> roles, Group group) throws RuntimeException;
 }

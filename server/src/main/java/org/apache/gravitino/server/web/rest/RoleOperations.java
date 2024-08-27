@@ -182,58 +182,51 @@ public class RoleOperations {
 
     String existErrMsg = "Securable object %s doesn't exist";
 
-    TreeLockUtils.doWithTreeLock(
-        identifier,
-        LockType.READ,
-        () -> {
-          switch (object.type()) {
-            case METALAKE:
-              if (!GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier)) {
-                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-              }
+    switch (object.type()) {
+      case METALAKE:
+        if (!GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
+        break;
 
-            case CATALOG:
-              if (!GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier)) {
-                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-              }
+      case CATALOG:
+        if (!GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
+        break;
 
-            case SCHEMA:
-              if (!GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier)) {
-                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-              }
+      case SCHEMA:
+        if (!GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
+        break;
 
-            case FILESET:
-              if (!GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier)) {
-                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-              }
+      case FILESET:
+        if (!GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
-            case TABLE:
-              if (!GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier)) {
-                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-              }
+        break;
+      case TABLE:
+        if (!GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
+        break;
 
-            case TOPIC:
-              if (!GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier)) {
-                throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-              }
+      case TOPIC:
+        if (!GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
+        break;
 
-            default:
-              throw new IllegalArgumentException(
-                  String.format("Doesn't support the type %s", object.type()));
-          }
-
-          return null;
-        });
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the type %s", object.type()));
+    }
   }
 }

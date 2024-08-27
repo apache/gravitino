@@ -7,6 +7,28 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
+Apache Gravitino(incubating) is a technical data catalog that uses a unified metadata paradigm to manage multiple data sources while still allowing multiple engines like Spark, Trino, and Flink, or Python to connect to these data sources for data processing through Gravitino.
+
+Because each underlying data source will have its own access control system, it can be difficult to plug in data engines with the intent of querying multiple of these data at once.
+This is especially important for data governance practitioners who have to worry about data access restrictions and data compliance issues, but this is streamlined through Gravitino.
+Therefore, in the hopes of solving this big data issue, Gravitino plans to implement a universal set of privilege models and paradigms.
+With this, users will be able to manage all of their data sources on a single access plane, regardless of whether the data source is a database, or a message queue or an object storage system.
+
+After authorizing these data sources within Gravitino’s metadata lake, authentication can then be performed in Spark, Trino, and Flink Engines, as well as our Python client.
+This abstraction allows users to control access to data and make compliant use of the data without having to obstruct other teams and worrying about the tedious work of individual access control systems.
+
+### Gravitino Privilege Model
+
+Gravitino’s unified management model allows for each data source to have its own authorization features. However, each data source may come with its own dedicated authorization model and methods.
+We may not be able to properly set permissions to the underlying system, so when a given user tries to access this data, the underlying authorization system may result in permission inconsistencies and cause issues for external access.
+To mitigate this issue, Gravitino aims to provide a unified authorization model and accompanying methods that sit on top of all the data sources instead, making it much easier to manage access privileges.
+
+It is important to note that Gravitino’s authorization model will not merge the access control systems of the underlying data sources to form a large and unwieldy set of privileges.
+Instead, We will summarize the usage of the privileges currently in use within the data system, and offer a set of Gravitino-native privilege models that accurately reflect it.
+
+This is so that when users and data engines use Gravitino for data processing, this permission model is used to address the complexity of managing access control for different data sources.
+This set of permission models is meant to keep everything within the Gravitino system while still managing the access control settings of different data sources separately.
+
 Gravitino adopts RBAC and DAC. 
 
 Role-based Access Control (RBAC): Access privileges are assigned to roles, which are in turn assigned to users or groups.
@@ -20,24 +42,60 @@ Gravitino doesn't support metadata authentication. It means that Gravitino won't
 
 :::
 
-
 ## Concept
+
+### Authorization
+
+Gravitino also provides a set of authorization frameworks to interact with different underlying data source
+authorization systems (e.g., MySQL's own access control management and the Apache Ranger access control management system for big data)
+in accordance with its own authorization model and methodology.
+More information you can see the [Authorization push down](authorization-pushdown.md).
+
+### Authentication
+
+As mentioned above, Gravitino uses Ownership to control the privileges of securable object in the management category and uses Role to control access securable objects,
+so when a user performs a specific operation on a specified resource,
+Gravitino will perform a composite authentication on the Ownership and Role to which the securable object belongs.
+When a user has more than one Role, Gravitino will use the user's current Role for authentication, and the user can switch the current Role to access a different securable object.
 
 ### Role
 
-A metadata object to which privileges can be granted. Roles are in turn assigned to users or groups.
+The traditional access control system generally uses RBAC (Role-Based Access Control) for access control management,
+where each Role contains a collection of different operating privileges for a different securable object.
+When the system adds a new user or user group, you can select the Roles which they are expected to be granted to,
+so that the user can quickly start using it, without waiting for the administrator to gradually set up the access privileges to securable object for him.
+
+Roles also employ the concept of ownership – the owner of a Role is by default the creator of the Role,
+implying the owner has all the access control to operate the Role, including deleting the Role.
 
 ### Privilege
 
-A defined level of access to an object. Multiple distinct privileges may be used to control the granularity of access granted.
+Privilege is a specific operation method for securable object, if you need to control fine-grained privileges on a securable object in the system,
+then you need to design many different Privileges, however, too many Privileges will cause too complicated settings in the authorization.
+
+If you only need to carry out coarse-grained privilege control on the securable object in the system, then you only need to design a small number of Privileges,
+but it will result in too weak control ability when the authentication. Therefore, the design of Privilege is an important trade-off in the access control system.
+We know that Privilege is generally divided into two types, one is the management category of Privilege, such as the `CREATE`, `DELETE` resource privilege,
+and the other is the operation category of Privilege, such as the `READ` and `WRITE` resource privilege.
+
+In most organizations, the number of data managers is much smaller than the number of data users.
+Because it is the data users who need fine-grained privilege control,
+we must provide more Privileges related to usage and more tightly gatekeeper the administrative Privileges.
+To enforce this, we’ll introduce the concept of Ownership as a complete replacement for the administrative category of Privilege.
+
+### Ownership
+
+When you create a securable object (Gravitino Service, Metalake, Catalog, and any other entity) in Gravitino, each entity has an Owner field that defines the user (or group) to which the resource belongs.
+The owner of each entity has implicit administrative class privilege, for example, to delete that securable object.
+Only the Owner of a securable object can fully manage that resource.
+If a securable object needs to be managed by more than one person at the same time, the owner is assigned to a user group.
 
 ### User
-
-A user identity recognized by Gravitino. External user system instead of Gravitino manages users. 
+Users are generally granted one or multiple Roles, and users have different operating privileges depending on their Role.
 
 ### Group
-
-A group identity recognized by Gravitino. External user system instead of Gravitino manages groups. 
+To make it easier to grant a single access control to multiple users, we can add users to a user group, and then grant one or multiple roles to that user group.
+This process allows all users belonging to that user group to have the access control in those roles.
 
 ### Metadata objects
 
@@ -55,17 +113,12 @@ The top container is the metalake.
 Catalogs are under the metalake. Catalogs represent different kinds of data sources.
 Schemas are under the catalog. There are tables, topics, or filesets under the schema.
 
-![object_image](../assets/object.png)
+![object_image](../assets/security/object.png)
 
 The relationship of the concepts is as below.
 
-![user_group_relationship_image](../assets/user-group.png)
-![concept_relationship_image](../assets/role.png)
-
-### Ownership
-
-Every metadata object has an owner. The owner could be a user or group, and has all the privileges of the metadata object.
-Meanwhile, you can transfer the ownership of securable object to another user or group.
+![user_group_relationship_image](../assets/security/user-group.png)
+![concept_relationship_image](../assets/security/role.png)
 
 ## The types of roles
 
@@ -180,7 +233,7 @@ If parent securable object has the same privilege name with different condition,
 For example, securable metalake object allows to use the catalog, but securable catalog denies to use the catalog, the user isn't able to use the catalog.
 If securable metalake object denies to use the catalog, but securable catalog allows to use the catalog, the user isn't able to use the catalog, too.
 
-![privilege_image](../assets/privilege.png)
+![privilege_image](../assets/security/privilege.png)
 
 ## Server Configuration
 
@@ -611,7 +664,7 @@ client.setOwner(table, "user1", "USER");
 
 You can follow the steps to achieve the authorization of Gravitino.
 
-![concept_workflow_image](../assets/workflow.png)
+![concept_workflow_image](../assets/security/workflow.png)
 
 1. Service admin configures the Gravitino server to enable authorization and creates a metalake.
 
