@@ -32,40 +32,12 @@ from gravitino import GravitinoAdminClient, GravitinoClient
 from gravitino.exceptions.base import GravitinoRuntimeException
 
 from tests.integration.auth.test_auth_common import TestCommonAuth
-from tests.integration.integration_test_env import IntegrationTestEnv
+from tests.integration.integration_test_env import IntegrationTestEnv, check_gravitino_server_status
 from tests.integration.containers.oauth2_container import OAuth2Container
 
 logger = logging.getLogger(__name__)
 
 DOCKER_TEST = os.environ.get("DOCKER_TEST")
-
-
-def get_gravitino_server_version(token: bytes):
-    try:
-        auth_header = {
-            AuthConstants.HTTP_HEADER_AUTHORIZATION: token.decode("utf-8")
-        }
-        response = requests.get("http://localhost:8090/api/version", headers=auth_header)
-        response.raise_for_status()  # raise an exception for bad status codes
-        response.close()
-        return True
-    except requests.exceptions.RequestException:
-        logger.warning("Failed to access the Gravitino server")
-        return False
-
-
-def check_gravitino_server_status(token: bytes) -> bool:
-    gravitino_server_running = False
-    for i in range(5):
-        logger.info("Monitoring Gravitino server status. Attempt %s", i + 1)
-        if get_gravitino_server_version(token):
-            logger.debug("Gravitino Server is running")
-            gravitino_server_running = True
-            break
-        else:
-            logger.debug("Gravitino Server is not running")
-            time.sleep(1)
-    return gravitino_server_running
 
 @unittest.skipIf(
     DOCKER_TEST == "false",
@@ -160,7 +132,11 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
             f"{cls.oauth2_server_uri}", "test:test", "test", "oauth2/token"
         )
 
-        if not check_gravitino_server_status(oauth2_token_provider.get_token_data()):
+        auth_header = {
+            AuthConstants.HTTP_HEADER_AUTHORIZATION: oauth2_token_provider.get_token_data().decode("utf-8")
+        }
+
+        if not check_gravitino_server_status(headers = auth_header):
             logger.error("ERROR: Can't start Gravitino server!")
             sys.exit(0)
 

@@ -31,9 +31,9 @@ from gravitino.exceptions.base import GravitinoRuntimeException
 logger = logging.getLogger(__name__)
 
 
-def get_gravitino_server_version():
+def get_gravitino_server_version(**kwargs):
     try:
-        response = requests.get("http://localhost:8090/api/version")
+        response = requests.get("http://localhost:8090/api/version", **kwargs)
         response.raise_for_status()  # raise an exception for bad status codes
         response.close()
         return True
@@ -42,11 +42,11 @@ def get_gravitino_server_version():
         return False
 
 
-def check_gravitino_server_status() -> bool:
+def check_gravitino_server_status(**kwargs) -> bool:
     gravitino_server_running = False
     for i in range(5):
         logger.info("Monitoring Gravitino server status. Attempt %s", i + 1)
-        if get_gravitino_server_version():
+        if get_gravitino_server_version(**kwargs):
             logger.debug("Gravitino Server is running")
             gravitino_server_running = True
             break
