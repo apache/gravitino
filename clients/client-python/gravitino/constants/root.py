@@ -21,4 +21,5 @@ from pathlib import Path
 
 MODULE_NAME = "gravitino"
 PROJECT_HOME = Path(__file__).parent.parent.parent
+PROJECT_ROOT = PROJECT_HOME.parent.parent
 GRAVITINO_DIR = PROJECT_HOME / MODULE_NAME
