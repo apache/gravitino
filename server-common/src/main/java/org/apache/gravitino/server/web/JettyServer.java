@@ -79,7 +79,7 @@ public final class JettyServer {
   private JettyServerConfig serverConfig;
 
   private String serverName;
-  private Timer timer;
+  //private Timer timer;
 
   public JettyServer() {}
 
@@ -88,7 +88,7 @@ public final class JettyServer {
     this.serverConfig = serverConfig;
     this.serverName = serverName;
 
-    this.timer = new Timer();
+    //this.timer = new Timer();
 
     ThreadPool threadPool =
         createThreadPool(
@@ -242,10 +242,12 @@ public final class JettyServer {
   }
 
   public synchronized void stop() {
+    /*
     if (timer != null) {
       timer.cancel();
       timer = null;
     }
+     */
     if (server != null) {
       try {
         // Referring from Spark's implementation to avoid the issues.
