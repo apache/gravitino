@@ -20,35 +20,10 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import static org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper.TABLE_NAME;
 
-import com.google.common.collect.ImmutableMap;
-import java.util.Map;
-import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaSQLProvider.MetalakeMetaH2Provider;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaSQLProvider.MetalakeMetaMySQLProvider;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaSQLProvider.MetalakeMetaPGProvider;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 public class MetalakeMetaBaseProvider {
-
-  private static final Map<JDBCBackendType, MetalakeMetaBaseProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
-          ImmutableMap.of(
-              JDBCBackendType.MYSQL, new MetalakeMetaMySQLProvider(),
-              JDBCBackendType.H2, new MetalakeMetaH2Provider(),
-              JDBCBackendType.PG, new MetalakeMetaPGProvider());
-
-  public static MetalakeMetaBaseProvider getProvider() {
-    String databaseId =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getDatabaseId();
-
-    JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
-  }
 
   public String listMetalakePOs() {
     return "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"
