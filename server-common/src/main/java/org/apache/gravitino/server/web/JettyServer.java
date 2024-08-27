@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Timer;
-import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
@@ -204,6 +203,7 @@ public final class JettyServer {
       LOG.warn("Users would better use HTTPS to avoid token data leak.");
     }
 
+    /*
     timer.schedule(
         new TimerTask() {
           @Override
@@ -213,6 +213,7 @@ public final class JettyServer {
         },
         0,
         60000);
+     */
 
     LOG.info(
         "{} web server started on host {} port {}.", serverName, serverConfig.getHost(), getPort());

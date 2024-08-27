@@ -171,6 +171,7 @@ public class AbstractIT {
             DriverManager.getConnection(
                 StringUtils.substring(mysqlUrl, 0, mysqlUrl.lastIndexOf("/")), "root", "root");
         final Statement statement = connection.createStatement()) {
+      LOG.info("get connection");
       statement.execute("drop database if exists " + META_DATA);
       statement.execute("create database " + META_DATA);
       String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
@@ -182,6 +183,7 @@ public class AbstractIT {
                           "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_6_0)),
               "UTF-8");
 
+      LOG.info("read file");
       String[] initMySQLBackendSqls =
           Arrays.stream(mysqlContent.split(";"))
               .map(String::trim)
@@ -192,6 +194,7 @@ public class AbstractIT {
       for (String sql : initMySQLBackendSqls) {
         statement.execute(sql);
       }
+      LOG.info("execute");
     } catch (Exception e) {
       LOG.error("Failed to create database in mysql", e);
       throw new RuntimeException(e);
@@ -223,6 +226,7 @@ public class AbstractIT {
       setMySQLBackend();
     }
 
+    LOG.info("finish mysql");
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
     File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
     file.mkdir();
@@ -231,8 +235,10 @@ public class AbstractIT {
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
+      LOG.info("start mini context");
       MiniGravitinoContext context =
           new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
+      LOG.info("stop mini context");
       miniGravitino = new MiniGravitino(context);
       miniGravitino.start();
       serverConfig = miniGravitino.getServerConfig();
