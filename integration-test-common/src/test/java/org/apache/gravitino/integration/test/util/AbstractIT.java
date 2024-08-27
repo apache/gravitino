@@ -156,9 +156,8 @@ public class AbstractIT {
     }
   }
 
-  private static void setMySQLBackend() {
-    Random random = new Random(System.currentTimeMillis());
-    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl("test_" + (random.nextInt()));
+  private static void setMySQLBackend(String dbName) {
+    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(dbName);
     customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
     customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
     customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, mysqlUrl);
@@ -174,8 +173,8 @@ public class AbstractIT {
                 StringUtils.substring(mysqlUrl, 0, mysqlUrl.lastIndexOf("/")), "root", "root");
         final Statement statement = connection.createStatement()) {
       LOG.info("get connection");
-      statement.execute("drop database if exists " + META_DATA);
-      statement.execute("create database " + META_DATA);
+      statement.execute("drop database if exists " + dbName);
+      statement.execute("create database " + dbName);
       String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
       String mysqlContent =
           FileUtils.readFileToString(
@@ -192,7 +191,7 @@ public class AbstractIT {
               .filter(s -> !s.isEmpty())
               .toArray(String[]::new);
 
-      initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + META_DATA + ";");
+      initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + dbName + ";");
       for (String sql : initMySQLBackendSqls) {
         statement.execute(sql);
       }
@@ -227,7 +226,7 @@ public class AbstractIT {
       containerSuite.startMySQLContainer(META_DATA);
       MYSQL_CONTAINER = containerSuite.getMySQLContainer();
 
-      setMySQLBackend();
+      setMySQLBackend(dbName);
     }
 
     LOG.info("finish mysql");
