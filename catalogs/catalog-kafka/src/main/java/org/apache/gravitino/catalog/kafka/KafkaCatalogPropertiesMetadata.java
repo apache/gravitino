@@ -39,7 +39,6 @@ public class KafkaCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadat
                       + "comma-separating them",
                   false /* immutable */,
                   false /* hidden */))
-          .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           .build();
 
   @Override
