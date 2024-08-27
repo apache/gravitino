@@ -30,7 +30,7 @@
 
 ## Introduction
 
-Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
+Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages metadata directly in different sources, types, and regions and provides users with unified metadata access for data and AI assets.
 
 ![Gravitino Architecture](docs/assets/gravitino-architecture.png)
 
@@ -43,15 +43,15 @@ Gravitino aims to provide several key features:
 
 ## Contributing to Apache Gravitino
 
-Gravitino is open source software available under the Apache 2.0 license. For information on how to contribute to Gravitino please see the [Contribution guidelines](CONTRIBUTING.md).
+Gravitino is open source software available under the Apache 2.0 license. For information on how to contribute to Gravitino, please see the [Contribution guidelines](CONTRIBUTING.md).
 
 ## Online documentation
 
-You can find the latest Gravitino documentation in the [doc folder](docs). This README file only contains basic setup instructions.
+The latest Gravitino documentation is in the [doc folder](docs). This README file only contains basic setup instructions.
 
 ## Building Apache Gravitino
 
-You can build Gravitino using Gradle. Currently you can build Gravitino on Linux and macOS, Windows isn't supported.
+You can build Gravitino using Gradle. Currently, you can build Gravitino on Linux and macOS, and Windows isn't supported.
 
 To build Gravitino, please run:
 
@@ -77,13 +77,13 @@ to build a compressed distribution package.
 
 The directory `distribution` contains the generated binary distribution package.
 
-For the details of building and testing Gravitino, please see [How to build Gravitino](docs/how-to-build.md).
+Please see [How to build Gravitino](docs/how-to-build.md) for details on building and testing Gravitino.
 
 ## Quick start
 
 ### Configure and start the Apache Gravitino server
 
-If you already have a binary distribution package, go to the directory of the decompressed package.
+If you already have a binary distribution package, go to the decompressed package directory.
 
 Before starting the Gravitino server, please configure the Gravitino server configuration file. The
 configuration file, `gravitino.conf`, is in the `conf` directory and follows the standard property file format. You can modify the configuration within this file.
@@ -100,7 +100,7 @@ To stop the Gravitino server, please run:
 ./bin/gravitino.sh stop
 ```
 
-Alternatively, to run the Gravitino server in frontend, please run:
+Alternatively, to run the Gravitino server in the frontend, please run:
 
 ```shell
 ./bin/gravitino.sh run
@@ -110,7 +110,7 @@ And press `CTRL+C` to stop the Gravitino server.
 
 ### Gravitino Iceberg REST catalog service
 
-Gravitino provides Iceberg REST catalog service to manage Iceberg, please refer to [Gravitino Iceberg REST catalog service](docs/iceberg-rest-service.md) for more details.
+Gravitino provides Iceberg REST catalog service to manage Iceberg. For more details, please refer to [Gravitino Iceberg REST catalog service](docs/iceberg-rest-service.md).
 
 ### Using Trino with Apache Gravitino
 
@@ -124,11 +124,11 @@ Gravitino provides a Trino connector to access the metadata in Gravitino. To use
 
 ## License
 
-Gravitino is under the Apache License Version 2.0, See the [LICENSE](LICENSE) for the details.
+Gravitino is licensed under the Apache License Version 2.0. For details, see the [LICENSE](LICENSE).
 
 ## ASF Incubator disclaimer
 
-Apache Gravitino is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
+Apache Gravitino is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required for all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
 
 <sub>Apache®, Apache Gravitino&trade;, Apache Hadoop&reg;, Apache Hive&trade;, Apache Iceberg&trade;, Apache Kafka&reg;, Apache Spark&trade;, Apache Submarine&trade;, Apache Thrift&trade; and Apache Zeppelin&trade; are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>
 
