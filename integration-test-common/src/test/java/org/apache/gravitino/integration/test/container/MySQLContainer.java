@@ -149,6 +149,10 @@ public class MySQLContainer extends BaseContainer {
     return format("jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT, testDatabaseName);
   }
 
+  public String getJdbcUrl(String testDatabaseName) {
+    return format("jdbc:mysql://%s:%d/%s", getContainerIpAddress(), MYSQL_PORT, testDatabaseName);
+  }
+
   public String getDriverClassName(TestDatabaseName testDatabaseName) throws SQLException {
     return DriverManager.getDriver(getJdbcUrl(testDatabaseName)).getClass().getName();
   }

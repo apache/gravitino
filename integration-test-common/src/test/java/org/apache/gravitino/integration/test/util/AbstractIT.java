@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -156,7 +157,8 @@ public class AbstractIT {
   }
 
   private static void setMySQLBackend() {
-    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
+    Random random = new Random(System.currentTimeMillis());
+    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl("test_" + (random.nextInt()));
     customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
     customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
     customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, mysqlUrl);
