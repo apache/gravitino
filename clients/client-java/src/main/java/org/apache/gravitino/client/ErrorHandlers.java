@@ -564,6 +564,9 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new UserAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -598,6 +601,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new GroupAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -638,6 +644,9 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new RoleAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -674,6 +683,9 @@ public class ErrorHandlers {
           } else {
             throw new NotFoundException(errorMessage);
           }
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -747,6 +759,9 @@ public class ErrorHandlers {
           } else {
             throw new NotFoundException(errorMessage);
           }
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
