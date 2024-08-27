@@ -239,11 +239,12 @@ replacing hdfs_user with the appropriate username:
 
 ## S3
 
-Uses can use AWS S3 storage in the Iceberg catalog. The AWS S3 configuration of Trino Iceberg connector can reference to
-[Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
-The configurations can config by the Iceberg catalog properties with the `trino.bypass.` prefix.
+When using AWS S3 within the Iceberg catalog,users need to configure the Trino Iceberg connector's
+AWS S3-related properties in the catalog's properties. For specific guidance, please refer to the documentation
+of [Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
+These configurations must use the `trino.bypass.` prefix in the Iceberg catalog's attributes to be effective.
 
-Create an Iceberg catalog with the AWS S3 configuration in the Trino cli:
+To create an Iceberg catalog with AWS S3 configuration in the Trino CLI, use the following command:
 
 ```sql
 call gravitino.system.create_catalog(
@@ -262,12 +263,12 @@ call gravitino.system.create_catalog(
 ```
 
 - The configurations of `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key`, `trino.bypass.hive.s3.region`
-are the required the configurations use by the Apache Gravitino Trino connector.
+are the required the configurations for the Apache Gravitino Trino connector.
 - The configurations of `s3-access-key-id`, `s3-secret-access-key`, `io-impl` and `s3-region`.
-is the required the configuration of the [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
-- The `location` is the storage path of AWS s3. You need make sure the directory in AWS S3 is exists.
+are the required the configurations for the [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
+- The `location` specifies the storage path on AWS S3. Ensure that the specified directory exists on AWS S3 before proceeding.
 
-When the Iceberg catalog created successfully, you can create schemas and tables by the following command.
+Once the Iceberg catalog is successfully created, users can create schemas and tables as follows:
 
 ```sql
 CREATE SCHEMA gt_iceberg.gt_db03;
@@ -278,9 +279,9 @@ CREATE TABLE gt_iceberg.gt_db03.tb01 (
 );
 ```
 
-After that, you can use the table read and write the data in AWS S3.
+After running the command, the tables are ready for data reading and writing operations on AWS S3.
 
 :::note
-The Iceberg catalog module in the Apache Gravitino server should Add AWS s3 support.
+TThe Iceberg catalog module in the Apache Gravitino server should add AWS S3 support.
 Please refer to [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
 :::

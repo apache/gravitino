@@ -290,9 +290,9 @@ DROP TABLE hive_test.database_01.table_01;
 
 ## HDFS config and permissions
 
-For basic setups, Apache Gravitino Trino connector configures the HDFS client by the catalog configurations.
-It is support to config the `hdfs-site.xml` and `core-site.xml` files to the HDFS client by the configuration
-`trino.bypass.hive.config.resources` in the catalog configurations.
+For basic setups, the Apache Gravitino Trino connector configures the HDFS client
+using catalog configurations. It supports configuring the HDFS client with `hdfs-site.xml`
+and `core-site.xml` files via the `trino.bypass.hive.config.resources` setting in the catalog configurations.
 
 Before running any `Insert` statements for Hive tables in Trino,
 you must check that the user Trino is using to access HDFS has access to the Hive warehouse directory.
@@ -305,11 +305,11 @@ replacing hdfs_user with the appropriate username:
 
 ## S3
 
-Uses can use AWS S3 storage in the Hive catalog. The AWS S3 configuration of Trino Hive connector can reference to
-[Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
-The configurations can config by the Hive catalog properties with the `trino.bypass.` prefix.
+When using AWS S3 within the Hive catalog, users need to configure the Trino Hive connector's
+AWS S3-related properties in the catalog's properteis. For specific guidance, please refer to the documentation
+of [Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
 
-Create a Hive catalog with the AWS S3 configuration in the Trino cli:
+To create a Hive catalog with AWS S3 configuration in the Trino CLI, use the following command:
 
 ```sql
 call gravitino.system.create_catalog(
@@ -324,10 +324,10 @@ call gravitino.system.create_catalog(
 );
 ```
 
-- The configurations of `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key`, `trino.bypass.hive.s3.region`
-are the required the configurations use by the Apache Gravitino Trino connector.
+- The settings for `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key` and `trino.bypass.hive.s3.region`
+are required by the Apache Gravitino Trino connector.
 
-When the Hive catalog created successfully, you can create  schemas and tables by the following command.
+Once the Hive catalog is successfully created, users can create schemas and tables as follows:
 
 ```sql
 CREATE SCHEMA gt_hive.gt_db02
@@ -339,9 +339,10 @@ CREATE TABLE gt_hive.gt_db02.tb01 (
 );
 ```
 
-The `location` is the storage path of AWS s3.
-After that, you can use the table read and write the data in AWS S3.
+The `location` specifies the AWS S3 storage path.
+
+After running the command, the tables are ready for data reading and writing operations on AWS S3.
 
 :::note
-The Hive Metastore service used by the Hive catalog should support AWS s3.
+Ensure the Hive Metastore service used by the Hive catalog supports AWS S3.
 :::
