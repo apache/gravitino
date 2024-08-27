@@ -19,6 +19,8 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.authorization.SecurableObjects.DOT_SPLITTER;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.verifyRoleInRanger;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
@@ -34,7 +36,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Owner;
@@ -57,7 +58,6 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
-import org.apache.ranger.plugin.model.RangerRole;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
@@ -66,7 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class RangerHiveIT extends RangerITEnv {
+public class RangerHiveIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -118,13 +118,6 @@ public class RangerHiveIT extends RangerITEnv {
                 AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME));
     rangerPolicyHelper = new RangerHelper(rangerAuthPlugin, "hive");
-
-    createRangerHdfsRepository(
-        containerSuite.getHiveRangerContainer().getContainerIpAddress(), true);
-    createRangerHiveRepository(
-        containerSuite.getHiveRangerContainer().getContainerIpAddress(), true);
-    allowAnyoneAccessHDFS();
-    allowAnyoneAccessInformationSchema();
 
     // Create hive connection
     String url =
@@ -182,7 +175,7 @@ public class RangerHiveIT extends RangerITEnv {
   public void testOnRoleCreated() {
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role));
-    verifyRoleInRanger(role);
+    verifyRoleInRanger(rangerAuthPlugin, role);
   }
 
   @Test
@@ -297,9 +290,9 @@ public class RangerHiveIT extends RangerITEnv {
     policyItem.setAccesses(
         Arrays.asList(
             new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_SELECT)));
-    updateOrCreateRangerPolicy(
+    RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HIVE,
-        RANGER_HIVE_REPO_NAME,
+        RangerITEnv.RANGER_HIVE_REPO_NAME,
         roleName,
         policyResourceMap,
         Collections.singletonList(policyItem));
@@ -328,7 +321,7 @@ public class RangerHiveIT extends RangerITEnv {
             .withAuditInfo(auditInfo)
             .withSecurableObjects(Lists.newArrayList(securableObject1))
             .build();
-    verifyRoleInRanger(verifyRole1);
+    verifyRoleInRanger(rangerAuthPlugin, verifyRole1);
 
     // 2. Multi-call Add a same entity and privilege to the role, because support idempotent
     // operation, so return true
@@ -336,7 +329,7 @@ public class RangerHiveIT extends RangerITEnv {
         rangerAuthPlugin.onRoleUpdated(
             mockCatalogRole,
             RoleChange.addSecurableObject(mockCatalogRole.name(), securableObject1)));
-    verifyRoleInRanger(verifyRole1);
+    verifyRoleInRanger(rangerAuthPlugin, verifyRole1);
 
     // 3. Add the same metadata but have different privileges to the role
     SecurableObject securableObject3 =
@@ -376,7 +369,7 @@ public class RangerHiveIT extends RangerITEnv {
                 .withAuditInfo(auditInfo)
                 .withSecurableObjects(securableObjects)
                 .build();
-        verifyRoleInRanger(verifyRole);
+        verifyRoleInRanger(rangerAuthPlugin, verifyRole);
       }
     }
   }
@@ -418,7 +411,7 @@ public class RangerHiveIT extends RangerITEnv {
             .withAuditInfo(auditInfo)
             .withSecurableObjects(Lists.newArrayList(newSecurableObject))
             .build();
-    verifyRoleInRanger(verifyRole);
+    verifyRoleInRanger(rangerAuthPlugin, verifyRole);
   }
 
   @Test
@@ -465,7 +458,7 @@ public class RangerHiveIT extends RangerITEnv {
             .withAuditInfo(auditInfo)
             .withSecurableObjects(Lists.newArrayList(newSecurableObject))
             .build();
-    verifyRoleInRanger(verifyRole);
+    verifyRoleInRanger(rangerAuthPlugin, verifyRole);
     verifyOwnerInRanger(oldMetadataObject, Lists.newArrayList(userName));
 
     // Delete the role
@@ -496,12 +489,12 @@ public class RangerHiveIT extends RangerITEnv {
             .build();
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role), userEntity1));
-    verifyRoleInRanger(role, Lists.newArrayList(userName1));
+    verifyRoleInRanger(rangerAuthPlugin, role, Lists.newArrayList(userName1));
 
     // multi-call to granted role to the user1
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role), userEntity1));
-    verifyRoleInRanger(role, Lists.newArrayList(userName1));
+    verifyRoleInRanger(rangerAuthPlugin, role, Lists.newArrayList(userName1));
 
     // granted a role to the user2
     String userName2 = "user2";
@@ -517,7 +510,7 @@ public class RangerHiveIT extends RangerITEnv {
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role), userEntity2));
 
     // Same to verify user1 and user2
-    verifyRoleInRanger(role, Lists.newArrayList(userName1, userName2));
+    verifyRoleInRanger(rangerAuthPlugin, role, Lists.newArrayList(userName1, userName2));
   }
 
   @Test
@@ -538,16 +531,16 @@ public class RangerHiveIT extends RangerITEnv {
             .build();
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role), userEntity1));
-    verifyRoleInRanger(role, Lists.newArrayList(userName1));
+    verifyRoleInRanger(rangerAuthPlugin, role, Lists.newArrayList(userName1));
 
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromUser(Lists.newArrayList(role), userEntity1));
-    verifyRoleInRanger(role, null, Lists.newArrayList(userName1));
+    verifyRoleInRanger(rangerAuthPlugin, role, null, Lists.newArrayList(userName1));
 
     // multi-call to revoked role from user1
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromUser(Lists.newArrayList(role), userEntity1));
-    verifyRoleInRanger(role, null, Lists.newArrayList(userName1));
+    verifyRoleInRanger(rangerAuthPlugin, role, null, Lists.newArrayList(userName1));
   }
 
   @Test
@@ -568,12 +561,12 @@ public class RangerHiveIT extends RangerITEnv {
             .build();
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role), groupEntity1));
-    verifyRoleInRanger(role, null, null, Lists.newArrayList(groupName1));
+    verifyRoleInRanger(rangerAuthPlugin, role, null, null, Lists.newArrayList(groupName1));
 
     // multi-call to grant a role to the group1 test idempotent operation
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role), groupEntity1));
-    verifyRoleInRanger(role, null, null, Lists.newArrayList(groupName1));
+    verifyRoleInRanger(rangerAuthPlugin, role, null, null, Lists.newArrayList(groupName1));
 
     // granted a role to the group2
     String groupName2 = "group2";
@@ -589,7 +582,8 @@ public class RangerHiveIT extends RangerITEnv {
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role), groupEntity2));
 
     // Same to verify group1 and group2
-    verifyRoleInRanger(role, null, null, Lists.newArrayList(groupName1, groupName2));
+    verifyRoleInRanger(
+        rangerAuthPlugin, role, null, null, Lists.newArrayList(groupName1, groupName2));
   }
 
   @Test
@@ -610,16 +604,16 @@ public class RangerHiveIT extends RangerITEnv {
             .build();
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role), groupEntity1));
-    verifyRoleInRanger(role, null, null, Lists.newArrayList(groupName1));
+    verifyRoleInRanger(rangerAuthPlugin, role, null, null, Lists.newArrayList(groupName1));
 
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromGroup(Lists.newArrayList(role), groupEntity1));
-    verifyRoleInRanger(role, null, null, null, Lists.newArrayList(groupName1));
+    verifyRoleInRanger(rangerAuthPlugin, role, null, null, null, Lists.newArrayList(groupName1));
 
     // multi-call to revoke from the group1
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromGroup(Lists.newArrayList(role), groupEntity1));
-    verifyRoleInRanger(role, null, null, null, Lists.newArrayList(groupName1));
+    verifyRoleInRanger(rangerAuthPlugin, role, null, null, null, Lists.newArrayList(groupName1));
   }
 
   private static class MockOwner implements Owner {
@@ -734,7 +728,7 @@ public class RangerHiveIT extends RangerITEnv {
             .withSecurableObjects(Lists.newArrayList(securableObject1))
             .build();
     Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role1));
-    verifyRoleInRanger(role1);
+    verifyRoleInRanger(rangerAuthPlugin, role1);
 
     // Create a `SelectTable` privilege role
     SecurableObject securableObject2 =
@@ -750,7 +744,7 @@ public class RangerHiveIT extends RangerITEnv {
             .withSecurableObjects(Lists.newArrayList(securableObject2))
             .build();
     Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role2));
-    verifyRoleInRanger(role2);
+    verifyRoleInRanger(rangerAuthPlugin, role2);
 
     // Create a `ModifyTable` privilege role
     SecurableObject securableObject3 =
@@ -766,7 +760,7 @@ public class RangerHiveIT extends RangerITEnv {
             .withSecurableObjects(Lists.newArrayList(securableObject3))
             .build();
     Assertions.assertTrue(rangerAuthPlugin.onRoleCreated(role3));
-    verifyRoleInRanger(role3);
+    verifyRoleInRanger(rangerAuthPlugin, role3);
 
     /** Test grant to user */
     // granted role1 to the user1
@@ -784,7 +778,7 @@ public class RangerHiveIT extends RangerITEnv {
     // multiple call to grant role1 to the user1 to test idempotent operation
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role1), userEntity1));
-    verifyRoleInRanger(role1, Lists.newArrayList(userName1));
+    verifyRoleInRanger(rangerAuthPlugin, role1, Lists.newArrayList(userName1));
 
     // granted role1 to the user2
     String userName2 = "user2";
@@ -798,7 +792,7 @@ public class RangerHiveIT extends RangerITEnv {
             .build();
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role1), userEntity2));
-    verifyRoleInRanger(role1, Lists.newArrayList(userName1, userName2));
+    verifyRoleInRanger(rangerAuthPlugin, role1, Lists.newArrayList(userName1, userName2));
 
     // granted role1 to the user3
     String userName3 = "user3";
@@ -812,22 +806,25 @@ public class RangerHiveIT extends RangerITEnv {
             .build();
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role1), userEntity3));
-    verifyRoleInRanger(role1, Lists.newArrayList(userName1, userName2, userName3));
+    verifyRoleInRanger(
+        rangerAuthPlugin, role1, Lists.newArrayList(userName1, userName2, userName3));
 
     // Same granted role2 and role3 to the user1 and user2 and user3
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role2, role3), userEntity1));
-    verifyRoleInRanger(role2, Lists.newArrayList(userName1));
-    verifyRoleInRanger(role3, Lists.newArrayList(userName1));
+    verifyRoleInRanger(rangerAuthPlugin, role2, Lists.newArrayList(userName1));
+    verifyRoleInRanger(rangerAuthPlugin, role3, Lists.newArrayList(userName1));
 
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role2, role3), userEntity2));
-    verifyRoleInRanger(role2, Lists.newArrayList(userName1, userName2));
-    verifyRoleInRanger(role3, Lists.newArrayList(userName1, userName2));
+    verifyRoleInRanger(rangerAuthPlugin, role2, Lists.newArrayList(userName1, userName2));
+    verifyRoleInRanger(rangerAuthPlugin, role3, Lists.newArrayList(userName1, userName2));
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role2, role3), userEntity3));
-    verifyRoleInRanger(role2, Lists.newArrayList(userName1, userName2, userName3));
-    verifyRoleInRanger(role3, Lists.newArrayList(userName1, userName2, userName3));
+    verifyRoleInRanger(
+        rangerAuthPlugin, role2, Lists.newArrayList(userName1, userName2, userName3));
+    verifyRoleInRanger(
+        rangerAuthPlugin, role3, Lists.newArrayList(userName1, userName2, userName3));
 
     /** Test grant to group */
     // granted role1 to the group1
@@ -843,6 +840,7 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role1), groupEntity1));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role1,
         Lists.newArrayList(userName1, userName2, userName3),
         null,
@@ -861,6 +859,7 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role1), groupEntity2));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role1,
         Lists.newArrayList(userName1, userName2, userName3),
         null,
@@ -879,6 +878,7 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role1), groupEntity3));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role1,
         Lists.newArrayList(userName1, userName2, userName3),
         null,
@@ -888,11 +888,13 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role2, role3), groupEntity1));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role2,
         Lists.newArrayList(userName1, userName2, userName3),
         null,
         Lists.newArrayList(groupName1));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role3,
         Lists.newArrayList(userName1, userName2, userName3),
         null,
@@ -901,11 +903,13 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role2, role3), groupEntity2));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role2,
         Lists.newArrayList(userName1, userName2, userName3),
         null,
         Lists.newArrayList(groupName1, groupName2));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role3,
         Lists.newArrayList(userName1, userName2, userName3),
         null,
@@ -913,11 +917,13 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onGrantedRolesToGroup(Lists.newArrayList(role2, role3), groupEntity3));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role2,
         Lists.newArrayList(userName1, userName2, userName3),
         null,
         Lists.newArrayList(groupName1, groupName2, groupName3));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role3,
         Lists.newArrayList(userName1, userName2, userName3),
         null,
@@ -928,6 +934,7 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromUser(Lists.newArrayList(role1), userEntity1));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role1,
         Lists.newArrayList(userName2, userName3),
         Lists.newArrayList(userName1),
@@ -937,6 +944,7 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromUser(Lists.newArrayList(role1), userEntity2));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role1,
         Lists.newArrayList(userName3),
         Lists.newArrayList(userName1, userName2),
@@ -946,6 +954,7 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromUser(Lists.newArrayList(role1), userEntity3));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role1,
         null,
         Lists.newArrayList(userName1, userName2, userName3),
@@ -955,29 +964,44 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromUser(Lists.newArrayList(role2, role3), userEntity1));
     verifyRoleInRanger(
-        role2, Lists.newArrayList(userName2, userName3), Lists.newArrayList(userName1));
+        rangerAuthPlugin,
+        role2,
+        Lists.newArrayList(userName2, userName3),
+        Lists.newArrayList(userName1));
     verifyRoleInRanger(
-        role3, Lists.newArrayList(userName2, userName3), Lists.newArrayList(userName1));
+        rangerAuthPlugin,
+        role3,
+        Lists.newArrayList(userName2, userName3),
+        Lists.newArrayList(userName1));
 
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromUser(Lists.newArrayList(role2, role3), userEntity2));
     verifyRoleInRanger(
-        role2, Lists.newArrayList(userName3), Lists.newArrayList(userName1, userName2));
+        rangerAuthPlugin,
+        role2,
+        Lists.newArrayList(userName3),
+        Lists.newArrayList(userName1, userName2));
     verifyRoleInRanger(
-        role3, Lists.newArrayList(userName3), Lists.newArrayList(userName1, userName2));
+        rangerAuthPlugin,
+        role3,
+        Lists.newArrayList(userName3),
+        Lists.newArrayList(userName1, userName2));
 
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromUser(Lists.newArrayList(role2, role3), userEntity3));
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromUser(Lists.newArrayList(role2, role3), userEntity3));
-    verifyRoleInRanger(role2, null, Lists.newArrayList(userName1, userName2, userName3));
-    verifyRoleInRanger(role3, null, Lists.newArrayList(userName1, userName2, userName3));
+    verifyRoleInRanger(
+        rangerAuthPlugin, role2, null, Lists.newArrayList(userName1, userName2, userName3));
+    verifyRoleInRanger(
+        rangerAuthPlugin, role3, null, Lists.newArrayList(userName1, userName2, userName3));
 
     /** Test revoke from group */
     // revoke role1 from the group1
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromGroup(Lists.newArrayList(role1), groupEntity1));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role1,
         null,
         Lists.newArrayList(userName1, userName2, userName3),
@@ -988,6 +1012,7 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromGroup(Lists.newArrayList(role1), groupEntity2));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role1,
         null,
         Lists.newArrayList(userName1, userName2, userName3),
@@ -998,6 +1023,7 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromGroup(Lists.newArrayList(role1), groupEntity3));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role1,
         null,
         Lists.newArrayList(userName1, userName2, userName3),
@@ -1008,12 +1034,14 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromGroup(Lists.newArrayList(role2, role3), groupEntity1));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role2,
         null,
         Lists.newArrayList(userName1, userName2, userName3),
         Lists.newArrayList(groupName2, groupName3),
         Lists.newArrayList(groupName1));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role3,
         null,
         Lists.newArrayList(userName1, userName2, userName3),
@@ -1023,12 +1051,14 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromGroup(Lists.newArrayList(role2, role3), groupEntity2));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role2,
         null,
         Lists.newArrayList(userName1, userName2, userName3),
         Lists.newArrayList(groupName3),
         Lists.newArrayList(groupName1, groupName2));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role3,
         null,
         Lists.newArrayList(userName1, userName2, userName3),
@@ -1038,12 +1068,14 @@ public class RangerHiveIT extends RangerITEnv {
     Assertions.assertTrue(
         rangerAuthPlugin.onRevokedRolesFromGroup(Lists.newArrayList(role2, role3), groupEntity3));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role2,
         null,
         Lists.newArrayList(userName1, userName2, userName3),
         null,
         Lists.newArrayList(groupName1, groupName2, groupName3));
     verifyRoleInRanger(
+        rangerAuthPlugin,
         role3,
         null,
         Lists.newArrayList(userName1, userName2, userName3),
@@ -1068,102 +1100,6 @@ public class RangerHiveIT extends RangerITEnv {
                 Assertions.assertNotNull(rangerPolicyHelper.findManagedPolicy(securableObject)));
   }
 
-  private void verifyRoleInRanger(
-      Role role,
-      List<String> includeUsers,
-      List<String> excludeUsers,
-      List<String> includeGroups,
-      List<String> excludeGroups) {
-    // Verify role in RangerRole
-    RangerRole rangerRole = null;
-    try {
-      rangerRole =
-          rangerClient.getRole(
-              role.name(), rangerAuthPlugin.rangerAdminName, RANGER_HIVE_REPO_NAME);
-      LOG.info("rangerRole: " + rangerRole.toString());
-    } catch (RangerServiceException e) {
-      throw new RuntimeException(e);
-    }
-    rangerRole
-        .getUsers()
-        .forEach(
-            user -> {
-              if (includeUsers != null && !includeUsers.isEmpty()) {
-                Assertions.assertTrue(
-                    includeUsers.contains(user.getName()),
-                    "includeUsersInRole: " + includeUsers + ", user: " + user.getName());
-              }
-              if (excludeUsers != null && !excludeUsers.isEmpty()) {
-                Assertions.assertFalse(
-                    excludeUsers.contains(user.getName()),
-                    "excludeUsersInRole: " + excludeUsers.toString() + ", user: " + user.getName());
-              }
-            });
-    rangerRole
-        .getGroups()
-        .forEach(
-            group -> {
-              if (includeGroups != null && !includeGroups.isEmpty()) {
-                Assertions.assertTrue(
-                    includeGroups.contains(group.getName()),
-                    "includeGroupsInRole: "
-                        + includeGroups.toString()
-                        + ", group: "
-                        + group.getName());
-              }
-              if (excludeGroups != null && !excludeGroups.isEmpty()) {
-                Assertions.assertFalse(
-                    excludeGroups.contains(group.getName()),
-                    "excludeGroupsInRole: "
-                        + excludeGroups.toString()
-                        + ", group: "
-                        + group.getName());
-              }
-            });
-
-    // Verify role in RangerPolicy
-    role.securableObjects()
-        .forEach(
-            securableObject -> {
-              RangerPolicy policy;
-              try {
-                policy =
-                    rangerClient.getPolicy(
-                        RangerITEnv.RANGER_HIVE_REPO_NAME, securableObject.fullName());
-                LOG.info("policy: " + policy.toString());
-              } catch (RangerServiceException e) {
-                LOG.error("Failed to get policy: " + securableObject.fullName());
-                throw new RuntimeException(e);
-              }
-
-              securableObject
-                  .privileges()
-                  .forEach(
-                      gravitinoPrivilege -> {
-                        Set<String> mappedPrivileges =
-                            rangerAuthPlugin.translatePrivilege(gravitinoPrivilege.name());
-
-                        boolean match =
-                            policy.getPolicyItems().stream()
-                                .filter(
-                                    policyItem -> {
-                                      // Filter Ranger policy item by Gravitino privilege
-                                      return policyItem.getAccesses().stream()
-                                          .anyMatch(
-                                              access -> {
-                                                return mappedPrivileges.contains(access.getType());
-                                              });
-                                    })
-                                .allMatch(
-                                    policyItem -> {
-                                      // Verify role name in Ranger policy item
-                                      return policyItem.getRoles().contains(role.name());
-                                    });
-                        Assertions.assertTrue(match);
-                      });
-            });
-  }
-
   /** Verify the Gravitino role in Ranger service */
   private void verifyOwnerInRanger(
       MetadataObject metadataObject,
@@ -1175,7 +1111,7 @@ public class RangerHiveIT extends RangerITEnv {
     String policyName = metadataObject.fullName();
     RangerPolicy policy;
     try {
-      policy = rangerClient.getPolicy(RangerITEnv.RANGER_HIVE_REPO_NAME, policyName);
+      policy = RangerITEnv.rangerClient.getPolicy(RangerITEnv.RANGER_HIVE_REPO_NAME, policyName);
       LOG.info("policy: " + policy.toString());
     } catch (RangerServiceException e) {
       LOG.error("Failed to get policy: " + policyName);
@@ -1259,29 +1195,11 @@ public class RangerHiveIT extends RangerITEnv {
     verifyOwnerInRanger(metadataObject, includeUsers, null, null, null);
   }
 
-  private void verifyRoleInRanger(Role role) {
-    verifyRoleInRanger(role, null, null, null, null);
-  }
-
-  private void verifyRoleInRanger(Role role, List<String> includeRolesInPolicyItem) {
-    verifyRoleInRanger(role, includeRolesInPolicyItem, null, null, null);
-  }
-
-  private void verifyRoleInRanger(
-      Role role, List<String> includeRolesInPolicyItem, List<String> excludeRolesInPolicyItem) {
-    verifyRoleInRanger(role, includeRolesInPolicyItem, excludeRolesInPolicyItem, null, null);
-  }
-
-  private void verifyRoleInRanger(
-      Role role, List<String> includeUsers, List<String> excludeUsers, List<String> includeGroups) {
-    verifyRoleInRanger(role, includeUsers, excludeUsers, includeGroups, null);
-  }
-
   /** Currently we only test Ranger Hive, So wo Allow anyone to visit HDFS */
   static void allowAnyoneAccessHDFS() {
     String policyName = currentFunName();
     try {
-      if (null != rangerClient.getPolicy(RangerDefines.SERVICE_TYPE_HDFS, policyName)) {
+      if (null != RangerITEnv.rangerClient.getPolicy(RangerDefines.SERVICE_TYPE_HDFS, policyName)) {
         return;
       }
     } catch (RangerServiceException e) {
@@ -1297,9 +1215,9 @@ public class RangerHiveIT extends RangerITEnv {
             new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_READ),
             new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_WRITE),
             new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_EXECUTE)));
-    updateOrCreateRangerPolicy(
+    RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HDFS,
-        RANGER_HDFS_REPO_NAME,
+        RangerITEnv.RANGER_HDFS_REPO_NAME,
         policyName,
         policyResourceMap,
         Collections.singletonList(policyItem));
@@ -1312,7 +1230,7 @@ public class RangerHiveIT extends RangerITEnv {
   static void allowAnyoneAccessInformationSchema() {
     String policyName = currentFunName();
     try {
-      if (null != rangerClient.getPolicy(RangerDefines.SERVICE_TYPE_HIVE, policyName)) {
+      if (null != RangerITEnv.rangerClient.getPolicy(RangerDefines.SERVICE_TYPE_HIVE, policyName)) {
         return;
       }
     } catch (RangerServiceException e) {
@@ -1332,9 +1250,9 @@ public class RangerHiveIT extends RangerITEnv {
     policyItem.setAccesses(
         Arrays.asList(
             new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_SELECT)));
-    updateOrCreateRangerPolicy(
+    RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HIVE,
-        RANGER_HIVE_REPO_NAME,
+        RangerITEnv.RANGER_HIVE_REPO_NAME,
         policyName,
         policyResourceMap,
         Collections.singletonList(policyItem));
@@ -1353,9 +1271,9 @@ public class RangerHiveIT extends RangerITEnv {
     policyItem.setUsers(Arrays.asList(adminUser));
     policyItem.setAccesses(
         Arrays.asList(new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_ALL)));
-    updateOrCreateRangerPolicy(
+    RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HIVE,
-        RANGER_HIVE_REPO_NAME,
+        RangerITEnv.RANGER_HIVE_REPO_NAME,
         "testAllowShowDatabase",
         policyResourceMap,
         Collections.singletonList(policyItem));
@@ -1383,9 +1301,9 @@ public class RangerHiveIT extends RangerITEnv {
     policyItem.setUsers(Arrays.asList(adminUser, anonymousUser));
     policyItem.setAccesses(
         Arrays.asList(new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_ALL)));
-    updateOrCreateRangerPolicy(
+    RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HIVE,
-        RANGER_HIVE_REPO_NAME,
+        RangerITEnv.RANGER_HIVE_REPO_NAME,
         "testAllowShowDatabase",
         policyResourceMap,
         Collections.singletonList(policyItem));

@@ -220,7 +220,10 @@ public class CatalogRegister {
   private void executeSql(String sql) {
     try {
       int retries = EXECUTE_QUERY_MAX_RETRIES;
-      Exception failedException = null;
+      Exception failedException =
+          new TrinoException(
+              GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
+              "Initial placeholder exception - this should be replaced with a real exception if retries fail.");
       while (retries-- > 0) {
         try (Statement statement = connection.createStatement()) {
           // check the catalog is already created

@@ -44,7 +44,6 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* immutable */,
                   null,
                   false /* hidden */))
-          .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           // The following two are about authentication.
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)

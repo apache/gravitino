@@ -134,83 +134,83 @@ You can also create a dedicated role for your business by API or the client.
 
 ### User privileges
 
-| Name        | Supports Securable Object | Operation           |
-|-------------|---------------------------|---------------------|
-| ManageUsers | Metalake                  | Add or remove users |
+| Name         | Supports Securable Object | Operation           |
+|--------------|---------------------------|---------------------|
+| MANAGE_USERS | Metalake                  | Add or remove users |
 
 ### Group privileges
 
-| Name         | Supports Securable Object | Operation            |
-|--------------|---------------------------|----------------------|
-| ManageGroups | Metalake                  | Add or remove groups |
+| Name          | Supports Securable Object | Operation            |
+|---------------|---------------------------|----------------------|
+| MANAGE_GROUPS | Metalake                  | Add or remove groups |
 
 ### Role privileges
 
-| Name       | Supports Securable Object | Operation     |
-|------------|---------------------------|---------------|
-| CreateRole | Metalake                  | Create a role |
+| Name        | Supports Securable Object | Operation     |
+|-------------|---------------------------|---------------|
+| CREATE_ROLE | Metalake                  | Create a role |
 
 ### Permission privileges
 
-| Name         | Supports Securable Object | Operation              |
-|--------------|---------------------------|------------------------|
-| ManageGrants | Metalake                  | grant or revoke a role |
+| Name          | Supports Securable Object | Operation              |
+|---------------|---------------------------|------------------------|
+| MANAGE_GRANTS | Metalake                  | grant or revoke a role |
 
 ### Catalog privileges
 
-| Name          | Supports Securable Object | Operation        |
-|---------------|---------------------------|------------------|
-| CreateCatalog | Metalake                  | Create a catalog |
-| UseCatalog    | Metalake, Catalog         |                  |
+| Name           | Supports Securable Object | Operation        |
+|----------------|---------------------------|------------------|
+| CREATE_CATALOG | Metalake                  | Create a catalog |
+| USE_CATALOG    | Metalake, Catalog         |                  |
 
 :::info
 
 `USE_CATALOG` is needed for a user to interact with any object within the catalog. 
 
-For example, to select data from a table, users need to have the SELECT_TABLE privilege on that table and
-`USE CATALOG` privileges on its parent catalog as well as `USE SCHEMA` privileges on its parent schema.
+For example, to select data from a table, users need to have the `SELECT_TABLE` privilege on that table and
+`USE_CATALOG` privileges on its parent catalog as well as `USE_SCHEMA` privileges on its parent schema.
 
 :::
 
 ### Schema privileges
 
-| Name         | Supports Securable Object | Operation       |
-|--------------|---------------------------|-----------------|
-| CreateSchema | Metalake, Catalog         | Create a schema |
-| UseSchema    | Metalake, Catalog, Schema | Use a schema    |
+| Name          | Supports Securable Object | Operation       |
+|---------------|---------------------------|-----------------|
+| CREATE_SCHEMA | Metalake, Catalog         | Create a schema |
+| USE_SCHEMA    | Metalake, Catalog, Schema | Use a schema    |
 
 :::info
 
-`UseSchema`is needed for a user to interact with any object within the schema. 
+`USE_SCHEMA`is needed for a user to interact with any object within the schema. 
 
 For example, to select data from a table, users need to have the `SELECT_TABLE` privilege on that table
-and `USE SCHEMA` privileges on its parent schema.
+and `USE_SCHEMA` privileges on its parent schema.
 
 :::
 
 ### Table privileges
 
-| Name        | Supports Securable Object         | Operation                                      |
-|-------------|-----------------------------------|------------------------------------------------|
-| CreateTable | Metalake, Catalog, Schema         | Create a table                                 |
-| ModifyTable | Metalake, Catalog, Schema, Table  | Use the SQL `UPDATE`,`DELETE`,`INSERT` a table |
-| SelectTable | Metalake, Catalog, Schema, Table  | Use the SQL `SELECT` data from a table         |
+| Name         | Supports Securable Object         | Operation                                      |
+|--------------|-----------------------------------|------------------------------------------------|
+| CREATE_TABLE | Metalake, Catalog, Schema         | Create a table                                 |
+| MODIFY_TABLE | Metalake, Catalog, Schema, Table  | Use the SQL `UPDATE`,`DELETE`,`INSERT` a table |
+| SELECT_TABLE | Metalake, Catalog, Schema, Table  | Use the SQL `SELECT` data from a table         |
 
 ### Topic privileges
 
-| Name         | Supports Securable Object        | Operation                                 |
-|--------------|----------------------------------|-------------------------------------------|
-| CreateTopic  | Metalake, Catalog, Schema        | Create a topic                            |
-| ProduceTopic | Metalake, Catalog, Schema, Topic | Produce a topic (including alter a topic) |
-| ConsumeTopic | Metalake, Catalog, Schema, Topic | Consume a topic                           |
+| Name          | Supports Securable Object        | Operation                                 |
+|---------------|----------------------------------|-------------------------------------------|
+| CREATE_TOPIC  | Metalake, Catalog, Schema        | Create a topic                            |
+| PRODUCE_TOPIC | Metalake, Catalog, Schema, Topic | Produce a topic (including alter a topic) |
+| CONSUME_TOPIC | Metalake, Catalog, Schema, Topic | Consume a topic                           |
 
 ### Fileset privileges
 
-| Name          | Supports Securable Object          | Operation                                   |
-|---------------|------------------------------------|---------------------------------------------|
-| CreateFileset | Metalake, Catalog, Schema          | Create a fileset                            |
-| WriteFileset  | Metalake, Catalog, Schema, Fileset | Write a fileset (including alter a fileset) |
-| ReadFileset   | Metalake, Catalog, Schema, Fileset | read a fileset                              |
+| Name           | Supports Securable Object          | Operation                                   |
+|----------------|------------------------------------|---------------------------------------------|
+| CREATE_FILESET | Metalake, Catalog, Schema          | Create a fileset                            |
+| WRITE_FILESET  | Metalake, Catalog, Schema, Fileset | Write a fileset (including alter a fileset) |
+| READ_FILESET   | Metalake, Catalog, Schema, Fileset | read a fileset                              |
 
 ## Inheritance Model
 
@@ -224,9 +224,9 @@ will be able to select(read) all tables in that catalog.
 
 ## Privilege Condition
 
-The privilege supports two condition: `allow` and `deny`. `allow` means that you are able to use the privilege,
-`deny` means that you aren't able to use the privilege.
-`deny` condition is prior to `allow` condition. If a role has the `allow` condition and `deny` condition at the same time. 
+The privilege supports two condition: `ALLOW` and `DENY`. `ALLOW` means that you are able to use the privilege,
+`DENY` means that you aren't able to use the privilege.
+`DENY` condition is prior to `ALLOW` condition. If a role has the `ALLOW` condition and `DENY` condition at the same time. 
 The user won't be able to use the privilege.
 
 If parent securable object has the same privilege name with different condition, the securable object won't override the parent object privilege.
@@ -244,7 +244,7 @@ The related configuration is as follows.
 | Configuration item                       | Description                                                            | Default value | Required                         | Since Version |
 |------------------------------------------|------------------------------------------------------------------------|---------------|----------------------------------|---------------|
 | `gravitino.authorization.enable`         | Whether Gravitino enable authorization or not.                         | false         | No                               | 0.5.0         |
-| `gravitino.authorization.serviceAdmins`  | The admins of Gravitino service, Multiple admins are spitted by comma. | (none)        | Yes if enables the authorization | 0.5.0         |
+| `gravitino.authorization.serviceAdmins`  | The admins of Gravitino service, multiple admins are spitted by comma. | (none)        | Yes if enables the authorization | 0.5.0         |
 
 
 ## User Operation
@@ -259,7 +259,7 @@ You should add the user to your metalake before you use the authorization.
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "user1",
+  "name": "user1"
 }' http://localhost:8090/api/metalakes/test/users
 ```
 
@@ -335,7 +335,7 @@ You should add the group to your metalake before you use the authorization.
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "group1",
+  "name": "group1"
 }' http://localhost:8090/api/metalakes/test/groups
 ```
 
@@ -412,7 +412,7 @@ You can create a role by given properties.
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
    "name": "role1",
-   "properties": {"k1", "v1"}
+   "properties": {"k1": "v1"},
    "securableObjects": [
           {
              "fullName": "catalog1.schema1.table1",
@@ -459,7 +459,7 @@ You can get a role by its name.
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d http://localhost:8090/api/metalakes/test/roles/role1
+-H "Content-Type: application/json"  http://localhost:8090/api/metalakes/test/roles/role1
 ```
 
 </TabItem>
@@ -511,7 +511,7 @@ You can grant specific roles to a user.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}'http://localhost:8090/api/metalakes/test/permissions/users/user1/grant
+}' http://localhost:8090/api/metalakes/test/permissions/users/user1/grant
 ```
 
 </TabItem>
@@ -536,7 +536,7 @@ You can revoke specific roles from a user.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}'http://localhost:8090/api/metalakes/test/permissions/users/user1/revoke
+}' http://localhost:8090/api/metalakes/test/permissions/users/user1/revoke
 ```
 
 </TabItem>
@@ -562,7 +562,7 @@ You can grant specific roles to a group.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}'http://localhost:8090/api/metalakes/test/permissions/groups/group1/grant
+}' http://localhost:8090/api/metalakes/test/permissions/groups/group1/grant
 ```
 
 </TabItem>
@@ -587,7 +587,7 @@ You can revoke specific roles from a group.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "roleNames": ["role1"]
-}'http://localhost:8090/api/metalakes/test/permissions/groups/group1/revoke
+}' http://localhost:8090/api/metalakes/test/permissions/groups/group1/revoke
 ```
 
 </TabItem>
@@ -642,7 +642,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
     "name": "user1",
     "type": "USER"
-}'http://localhost:8090/api/metalakes/test/owners/table/catalog1.schema1.table1
+}' http://localhost:8090/api/metalakes/test/owners/table/catalog1.schema1.table1
 ```
 
 </TabItem>

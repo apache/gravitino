@@ -310,6 +310,8 @@
    Apache Yetus - Audience Annotations
    Apache Kerby
    Apache Kyuubi
+   Apache Ranger
+   Apache Ranger intg
    Jackson JSON processor
    DataNucleus
    Modernizer Maven Plugin
@@ -364,7 +366,7 @@
 
    This product bundles various third-party components also under the
    BSD license
-   
+
    JSR305
    LevelDB JNI
    RocksDB JNI
@@ -446,6 +448,7 @@
    Jakarta RESTful WS API
    Jakarta XML Binding API
    JavaServer Pages(TM) API
+   Javax WS RS API
    HK2 API Module
    HK2 Service Locator
    HK2 Utils
