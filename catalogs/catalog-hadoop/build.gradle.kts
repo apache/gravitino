@@ -41,6 +41,10 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("org.eclipse.jetty", "*")
     exclude("org.apache.hadoop", "hadoop-auth")
+    exclude("org.apache.curator", "curator-client")
+    exclude("org.apache.curator", "curator-framework")
+    exclude("org.apache.curator", "curator-recipes")
+    exclude("org.apache.avro", "avro")
   }
 
   implementation(libs.hadoop3.hdfs) {
@@ -49,6 +53,8 @@ dependencies {
     exclude("com.google.guava", "guava")
     exclude("commons-io", "commons-io")
     exclude("org.eclipse.jetty", "*")
+    exclude("io.netty")
+    exclude("org.fusesource.leveldbjni")
   }
   implementation(libs.hadoop3.client) {
     exclude("org.apache.hadoop", "hadoop-mapreduce-client-core")
@@ -91,6 +97,12 @@ tasks {
     from("build/libs") {
       exclude("slf4j-*.jar")
       exclude("guava-*.jar")
+      exclude("curator-*.jar")
+      exclude("netty-*.jar")
+      exclude("snappy-*.jar")
+      exclude("zookeeper-*.jar")
+      exclude("jetty-*.jar")
+      exclude("javax.servlet-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
