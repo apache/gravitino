@@ -33,7 +33,6 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.Timer;
 import java.util.concurrent.LinkedBlockingQueue;
 import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
@@ -79,7 +78,7 @@ public final class JettyServer {
   private JettyServerConfig serverConfig;
 
   private String serverName;
-  //private Timer timer;
+  // private Timer timer;
 
   public JettyServer() {}
 
@@ -88,7 +87,7 @@ public final class JettyServer {
     this.serverConfig = serverConfig;
     this.serverName = serverName;
 
-    //this.timer = new Timer();
+    // this.timer = new Timer();
 
     ThreadPool threadPool =
         createThreadPool(
