@@ -1,3 +1,6 @@
+import java.time.Duration
+import java.time.Instant
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -143,4 +146,21 @@ tasks.test {
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {
   dependsOn("runtimeJars")
+}
+
+tasks.testClasses {
+  doFirst {
+    val startTime = System.currentTimeMillis()
+    println("Task ':catalogs:catalog-lakehouse-paimon:testClasses' started at: ${Instant.ofEpochMilli(startTime)}")
+    // You can save this start time to use it later if needed
+    project.extra["testClassesStartTime"] = startTime
+  }
+
+  doLast {
+    val endTime = System.currentTimeMillis()
+    val startTime = project.extra["testClassesStartTime"] as Long
+    val elapsedTime = endTime - startTime
+    println("Task ':catalogs:catalog-lakehouse-paimon:testClasses' finished at: ${Instant.ofEpochMilli(endTime)}")
+    println("Elapsed time: ${Duration.ofMillis(elapsedTime).toString().substring(2).toLowerCase()}")
+  }
 }
