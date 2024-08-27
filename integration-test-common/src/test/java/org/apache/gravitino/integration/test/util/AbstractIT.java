@@ -221,7 +221,7 @@ public class AbstractIT {
     if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
       Random random = new Random(System.currentTimeMillis());
-      String dbName = "test_" + (random.nextInt());
+      String dbName = "test" + (random.nextInt());
       META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
       containerSuite.startMySQLContainer(META_DATA);
       MYSQL_CONTAINER = containerSuite.getMySQLContainer();
