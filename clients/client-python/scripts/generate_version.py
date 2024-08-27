@@ -43,7 +43,6 @@ def get_git_commit_id():
                 commit_id = file.readline().strip()
         return commit_id
     except (FileNotFoundError, IOError) as e:
-        print(f"Warn: Failed to get git commit Id. {e}")
         return ""
 
 
