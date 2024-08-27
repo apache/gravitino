@@ -131,26 +131,6 @@ tasks {
   }
 }
 
-// run  ./gradlew :catalogs:catalog-lakehouse-paimon:calcDepsSize at the root of the project
-tasks.register("calcDepsSize") {
-  group = "verification"
-  description = "Calculates the total size of all dependencies in the runtimeClasspath configuration for :catalogs:catalog-lakehouse-paimon"
-
-  doLast {
-    val runtimeClasspath = configurations.runtimeClasspath.get()
-    var totalSize: Long = 0
-
-    runtimeClasspath.forEach { file ->
-      if (file.exists()) {
-        totalSize += file.length()
-      } else {
-        println("File not found: ${file.absolutePath}")
-      }
-    }
-
-    println("Total size of dependencies: ${totalSize / (1024 * 1024)} MB")
-  }
-}
 tasks.test {
   val skipUTs = project.hasProperty("skipTests")
   if (skipUTs) {
