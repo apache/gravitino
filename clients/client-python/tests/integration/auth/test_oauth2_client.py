@@ -20,7 +20,6 @@ under the License.
 import os
 import subprocess
 import logging
-import time
 import unittest
 import sys
 import requests
@@ -32,12 +31,16 @@ from gravitino import GravitinoAdminClient, GravitinoClient
 from gravitino.exceptions.base import GravitinoRuntimeException
 
 from tests.integration.auth.test_auth_common import TestCommonAuth
-from tests.integration.integration_test_env import IntegrationTestEnv, check_gravitino_server_status
+from tests.integration.integration_test_env import (
+    IntegrationTestEnv,
+    check_gravitino_server_status,
+)
 from tests.integration.containers.oauth2_container import OAuth2Container
 
 logger = logging.getLogger(__name__)
 
 DOCKER_TEST = os.environ.get("DOCKER_TEST")
+
 
 @unittest.skipIf(
     DOCKER_TEST == "false",
@@ -133,10 +136,12 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
         )
 
         auth_header = {
-            AuthConstants.HTTP_HEADER_AUTHORIZATION: oauth2_token_provider.get_token_data().decode("utf-8")
+            AuthConstants.HTTP_HEADER_AUTHORIZATION: oauth2_token_provider.get_token_data().decode(
+                "utf-8"
+            )
         }
 
-        if not check_gravitino_server_status(headers = auth_header):
+        if not check_gravitino_server_status(headers=auth_header):
             logger.error("ERROR: Can't start Gravitino server!")
             sys.exit(0)
 
