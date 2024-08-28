@@ -193,6 +193,9 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   }
 
   private void createMetalake() {
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
+
     GravitinoMetalake createdMetalake =
         client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);

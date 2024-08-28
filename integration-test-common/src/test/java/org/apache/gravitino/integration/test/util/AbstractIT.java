@@ -177,7 +177,7 @@ public class AbstractIT {
     LOG.info("PG URL: {}", pgUrlWithoutSchema);
 
     String randomSchemaName = RandomStringUtils.random(10, true, false);
-    // Connect to the mysql docker and create a databases
+    // Connect to the PostgreSQL docker and create a schema
     String currentExecuteSql = "";
     try (Connection connection =
         DriverManager.getConnection(
