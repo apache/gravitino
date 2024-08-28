@@ -116,7 +116,7 @@ public class PostgreSQLContainer extends BaseContainer {
             DriverManager.getConnection(getJdbcUrl(), getUsername(), getPassword());
         Statement statement = connection.createStatement()) {
 
-      String query = format("CREATE DATABASE %s;", testDatabaseName);
+      String query = format("CREATE DATABASE \"%s\"", testDatabaseName);
       statement.execute(query);
       LOG.info(format("PostgreSQL container database %s has been created", testDatabaseName));
     } catch (SQLException e) {

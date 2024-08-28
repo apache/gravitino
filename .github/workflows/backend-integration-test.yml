@@ -67,6 +67,8 @@ jobs:
             backend: 'h2'
           - test-mode: 'deploy'
             backend: 'mysql'
+          - test-mode: 'deploy'
+            backend: 'postgresql'
 
     env:
       PLATFORM: ${{ matrix.architecture }}
@@ -137,6 +139,8 @@ jobs:
             backend: 'h2'
           - test-mode: 'deploy'
             backend: 'mysql'
+          - test-mode: 'deploy'
+            backend: 'postgresql'
 
     env:
       PLATFORM: ${{ matrix.architecture }}

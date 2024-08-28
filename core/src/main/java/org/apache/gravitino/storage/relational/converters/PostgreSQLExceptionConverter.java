@@ -16,7 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.storage.relational.converters;
 
-package org.apache.gravitino.storage.relational.mapper;
+import java.io.IOException;
+import java.sql.SQLException;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 
-public class CatalogMetaH2Provider extends CatalogMetaMySQLProvider {}
+public class PostgreSQLExceptionConverter implements SQLExceptionConverter {
+  private static final int DUPLICATED_ENTRY_ERROR_CODE = 1062;
+
+  @Override
+  @SuppressWarnings("FormatStringAnnotation")
+  public void toGravitinoException(SQLException sqlException, Entity.EntityType type, String name)
+      throws IOException {
+
+    switch (sqlException.getErrorCode()) {
+      case DUPLICATED_ENTRY_ERROR_CODE:
+        throw new EntityAlreadyExistsException(sqlException, sqlException.getMessage());
+      default:
+        throw new IOException(sqlException);
+    }
+  }
+}

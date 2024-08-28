@@ -108,6 +108,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
 
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
     exclude("org.apache.hadoop")

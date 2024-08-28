@@ -38,168 +38,48 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface CatalogMetaMapper {
   String TABLE_NAME = "catalog_meta";
 
-  @SelectProvider.List({
-    @SelectProvider(
-        type = CatalogMetaMySQLProvider.class,
-        method = "listCatalogPOsByMetalakeId",
-        databaseId = "mysql"),
-    @SelectProvider(
-        type = CatalogMetaH2Provider.class,
-        method = "listCatalogPOsByMetalakeId",
-        databaseId = "h2"),
-    @SelectProvider(
-        type = CatalogMetaPGProvider.class,
-        method = "listCatalogPOsByMetalakeId",
-        databaseId = "postgresql"),
-  })
+  @SelectProvider(type = CatalogMetaSQLProvider.class, method = "listCatalogPOsByMetalakeId")
   List<CatalogPO> listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @SelectProvider.List({
-    @SelectProvider(
-        type = CatalogMetaMySQLProvider.class,
-        method = "selectCatalogIdByMetalakeIdAndName",
-        databaseId = "mysql"),
-    @SelectProvider(
-        type = CatalogMetaH2Provider.class,
-        method = "selectCatalogIdByMetalakeIdAndName",
-        databaseId = "h2"),
-    @SelectProvider(
-        type = CatalogMetaPGProvider.class,
-        method = "selectCatalogIdByMetalakeIdAndName",
-        databaseId = "postgresql"),
-  })
+  @SelectProvider(
+      type = CatalogMetaSQLProvider.class,
+      method = "selectCatalogIdByMetalakeIdAndName")
   Long selectCatalogIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
 
-  @SelectProvider.List({
-    @SelectProvider(
-        type = CatalogMetaMySQLProvider.class,
-        method = "selectCatalogMetaByMetalakeIdAndName",
-        databaseId = "mysql"),
-    @SelectProvider(
-        type = CatalogMetaH2Provider.class,
-        method = "selectCatalogMetaByMetalakeIdAndName",
-        databaseId = "h2"),
-    @SelectProvider(
-        type = CatalogMetaPGProvider.class,
-        method = "selectCatalogMetaByMetalakeIdAndName",
-        databaseId = "postgresql"),
-  })
+  @SelectProvider(
+      type = CatalogMetaSQLProvider.class,
+      method = "selectCatalogMetaByMetalakeIdAndName")
   CatalogPO selectCatalogMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
 
-  @SelectProvider.List({
-    @SelectProvider(
-        type = CatalogMetaMySQLProvider.class,
-        method = "selectCatalogMetaById",
-        databaseId = "mysql"),
-    @SelectProvider(
-        type = CatalogMetaH2Provider.class,
-        method = "selectCatalogMetaById",
-        databaseId = "h2"),
-    @SelectProvider(
-        type = CatalogMetaPGProvider.class,
-        method = "selectCatalogMetaById",
-        databaseId = "postgresql"),
-  })
+  @SelectProvider(type = CatalogMetaSQLProvider.class, method = "selectCatalogMetaById")
   CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);
 
-  @InsertProvider.List({
-    @InsertProvider(
-        type = CatalogMetaMySQLProvider.class,
-        method = "insertCatalogMeta",
-        databaseId = "mysql"),
-    @InsertProvider(
-        type = CatalogMetaH2Provider.class,
-        method = "insertCatalogMeta",
-        databaseId = "h2"),
-    @InsertProvider(
-        type = CatalogMetaPGProvider.class,
-        method = "insertCatalogMeta",
-        databaseId = "postgresql"),
-  })
+  @InsertProvider(type = CatalogMetaSQLProvider.class, method = "insertCatalogMeta")
   void insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO);
 
-  @InsertProvider.List({
-    @InsertProvider(
-        type = CatalogMetaMySQLProvider.class,
-        method = "insertCatalogMetaOnDuplicateKeyUpdate",
-        databaseId = "mysql"),
-    @InsertProvider(
-        type = CatalogMetaH2Provider.class,
-        method = "insertCatalogMetaOnDuplicateKeyUpdate",
-        databaseId = "h2"),
-    @InsertProvider(
-        type = CatalogMetaPGProvider.class,
-        method = "insertCatalogMetaOnDuplicateKeyUpdate",
-        databaseId = "postgresql"),
-  })
+  @InsertProvider(
+      type = CatalogMetaSQLProvider.class,
+      method = "insertCatalogMetaOnDuplicateKeyUpdate")
   void insertCatalogMetaOnDuplicateKeyUpdate(@Param("catalogMeta") CatalogPO catalogPO);
 
-  @UpdateProvider.List({
-    @UpdateProvider(
-        type = CatalogMetaMySQLProvider.class,
-        method = "updateCatalogMeta",
-        databaseId = "mysql"),
-    @UpdateProvider(
-        type = CatalogMetaH2Provider.class,
-        method = "updateCatalogMeta",
-        databaseId = "h2"),
-    @UpdateProvider(
-        type = CatalogMetaPGProvider.class,
-        method = "updateCatalogMeta",
-        databaseId = "postgresql"),
-  })
+  @UpdateProvider(type = CatalogMetaSQLProvider.class, method = "updateCatalogMeta")
   Integer updateCatalogMeta(
       @Param("newCatalogMeta") CatalogPO newCatalogPO,
       @Param("oldCatalogMeta") CatalogPO oldCatalogPO);
 
-  @UpdateProvider.List({
-    @UpdateProvider(
-        type = CatalogMetaMySQLProvider.class,
-        method = "softDeleteCatalogMetasByCatalogId",
-        databaseId = "mysql"),
-    @UpdateProvider(
-        type = CatalogMetaH2Provider.class,
-        method = "softDeleteCatalogMetasByCatalogId",
-        databaseId = "h2"),
-    @UpdateProvider(
-        type = CatalogMetaPGProvider.class,
-        method = "softDeleteCatalogMetasByCatalogId",
-        databaseId = "postgresql"),
-  })
+  @UpdateProvider(type = CatalogMetaSQLProvider.class, method = "softDeleteCatalogMetasByCatalogId")
   Integer softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId);
 
-  @UpdateProvider.List({
-    @UpdateProvider(
-        type = CatalogMetaMySQLProvider.class,
-        method = "softDeleteCatalogMetasByMetalakeId",
-        databaseId = "mysql"),
-    @UpdateProvider(
-        type = CatalogMetaH2Provider.class,
-        method = "softDeleteCatalogMetasByMetalakeId",
-        databaseId = "h2"),
-    @UpdateProvider(
-        type = CatalogMetaPGProvider.class,
-        method = "softDeleteCatalogMetasByMetalakeId",
-        databaseId = "postgresql"),
-  })
+  @UpdateProvider(
+      type = CatalogMetaSQLProvider.class,
+      method = "softDeleteCatalogMetasByMetalakeId")
   Integer softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @DeleteProvider.List({
-    @DeleteProvider(
-        type = CatalogMetaMySQLProvider.class,
-        method = "deleteCatalogMetasByLegacyTimeline",
-        databaseId = "mysql"),
-    @DeleteProvider(
-        type = CatalogMetaH2Provider.class,
-        method = "deleteCatalogMetasByLegacyTimeline",
-        databaseId = "h2"),
-    @DeleteProvider(
-        type = CatalogMetaPGProvider.class,
-        method = "deleteCatalogMetasByLegacyTimeline",
-        databaseId = "postgresql"),
-  })
+  @DeleteProvider(
+      type = CatalogMetaSQLProvider.class,
+      method = "deleteCatalogMetasByLegacyTimeline")
   Integer deleteCatalogMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

@@ -433,6 +433,8 @@ public class JDBCBackend implements RelationalBackend {
         return JDBCBackendType.H2;
       } else if (jdbcURI.startsWith("jdbc:mysql")) {
         return JDBCBackendType.MYSQL;
+      } else if (jdbcURI.startsWith("jdbc:postgresql")) {
+        return JDBCBackendType.PG;
       } else {
         throw new IllegalArgumentException("Unknown JDBC URI: " + jdbcURI);
       }

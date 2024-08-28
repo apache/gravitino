@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
+import static org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper.TABLE_NAME;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
@@ -50,7 +52,16 @@ public class MetalakeMetaSQLProvider {
 
   static class MetalakeMetaH2Provider extends MetalakeMetaBaseProvider {}
 
-  static class MetalakeMetaPGProvider extends MetalakeMetaBaseProvider {}
+  static class MetalakeMetaPGProvider extends MetalakeMetaBaseProvider {
+
+    @Override
+    public String softDeleteMetalakeMetaByMetalakeId(Long metalakeId) {
+      return "UPDATE "
+          + TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+  }
 
   public String listMetalakePOs() {
     return getProvider().listMetalakePOs();

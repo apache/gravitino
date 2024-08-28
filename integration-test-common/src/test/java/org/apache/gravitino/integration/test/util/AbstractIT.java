@@ -19,6 +19,8 @@
 package org.apache.gravitino.integration.test.util;
 
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
+import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_CATALOG_POSTGRESQL_IT;
+import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_JDBC_BACKEND;
 import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.google.common.base.Splitter;
@@ -30,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,6 +52,7 @@ import org.apache.gravitino.integration.test.MiniGravitino;
 import org.apache.gravitino.integration.test.MiniGravitinoContext;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
 import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -92,6 +96,7 @@ public class AbstractIT {
 
   private static TestDatabaseName META_DATA;
   private static MySQLContainer MYSQL_CONTAINER;
+  private static PostgreSQLContainer POSTGRESQL_CONTAINER;
 
   protected static String serverUri;
 
@@ -152,6 +157,55 @@ public class AbstractIT {
 
       JdbcDriverDownloader.downloadJdbcDriver(
           DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
+    }
+  }
+
+  protected static void setPGBackend() throws SQLException {
+    String pgUrl = POSTGRESQL_CONTAINER.getJdbcUrl(META_DATA);
+    customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
+    customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
+    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgUrl);
+    customConfigs.put(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY,
+        POSTGRESQL_CONTAINER.getDriverClassName(META_DATA));
+    customConfigs.put(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, POSTGRESQL_CONTAINER.getUsername());
+    customConfigs.put(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, POSTGRESQL_CONTAINER.getPassword());
+
+    LOG.info("PG URL: {}", pgUrl);
+    // Connect to the mysql docker and create a databases
+    String currentExecuteSql = "";
+    try (Connection connection =
+        DriverManager.getConnection(
+            pgUrl, POSTGRESQL_CONTAINER.getUsername(), POSTGRESQL_CONTAINER.getPassword())) {
+      connection.setCatalog(PG_CATALOG_POSTGRESQL_IT.toString());
+      final Statement statement = connection.createStatement();
+      statement.execute("drop database if exists " + META_DATA);
+      statement.execute("create database " + META_DATA);
+      String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
+      String mysqlContent =
+          FileUtils.readFileToString(
+              new File(
+                  gravitinoHome
+                      + String.format(
+                          "/scripts/postgresql/schema-%s-postgresql.sql",
+                          ConfigConstants.VERSION_0_7_0)),
+              "UTF-8");
+
+      String[] initPGBackendSqls =
+          Arrays.stream(mysqlContent.split(";"))
+              .map(String::trim)
+              .filter(s -> !s.isEmpty())
+              .toArray(String[]::new);
+
+      for (String sql : initPGBackendSqls) {
+        currentExecuteSql = sql;
+        statement.execute(sql);
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to create database in pg, sql:\n{}", currentExecuteSql, e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -221,6 +275,13 @@ public class AbstractIT {
       MYSQL_CONTAINER = containerSuite.getMySQLContainer();
 
       setMySQLBackend();
+    } else if ("PostgreSQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
+      // Start PostgreSQL docker instance.
+      META_DATA = PG_JDBC_BACKEND;
+      containerSuite.startPostgreSQLContainer(META_DATA);
+      POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
+
+      setPGBackend();
     }
 
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
