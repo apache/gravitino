@@ -76,7 +76,7 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
         # append the hadoop conf to server
         cls._append_conf(cls.config, cls.oauth2_conf_path)
         # restart the server
-        cls._restart_oauth_server()
+        cls._restart_server_with_oauth()
 
     @classmethod
     def tearDownClass(cls):
@@ -106,7 +106,7 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
         return default_sign_key
 
     @classmethod
-    def _restart_oauth_server(cls):
+    def _restart_server_with_oauth(cls):
         logger.info("Restarting Gravitino server...")
         gravitino_home = os.environ.get("GRAVITINO_HOME")
         gravitino_startup_script = os.path.join(gravitino_home, "bin/gravitino.sh")
