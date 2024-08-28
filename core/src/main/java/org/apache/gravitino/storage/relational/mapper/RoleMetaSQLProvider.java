@@ -32,7 +32,7 @@ public class RoleMetaSQLProvider {
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new RoleMetaMySQLProvider(),
           JDBCBackendType.H2, new RoleMetaH2Provider(),
-          JDBCBackendType.PG, new RoleMetaPGProvider());
+          JDBCBackendType.PG, new RoleMetaPostgreSQLProvider());
 
   public static RoleMetaBaseProvider getProvider() {
     String databaseId =
@@ -49,7 +49,7 @@ public class RoleMetaSQLProvider {
 
   static class RoleMetaH2Provider extends RoleMetaBaseProvider {}
 
-  static class RoleMetaPGProvider extends RoleMetaBaseProvider {
+  static class RoleMetaPostgreSQLProvider extends RoleMetaBaseProvider {
 
     @Override
     public String softDeleteRoleMetaByRoleId(Long roleId) {
@@ -65,6 +65,32 @@ public class RoleMetaSQLProvider {
           + ROLE_TABLE_NAME
           + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertRoleMetaOnDuplicateKeyUpdate(RolePO rolePO) {
+      return "INSERT INTO "
+          + ROLE_TABLE_NAME
+          + "(role_id, role_name,"
+          + " metalake_id, properties,"
+          + " audit_info, current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{roleMeta.roleId},"
+          + " #{roleMeta.roleName},"
+          + " #{roleMeta.metalakeId},"
+          + " #{roleMeta.properties},"
+          + " #{roleMeta.auditInfo},"
+          + " #{roleMeta.currentVersion},"
+          + " #{roleMeta.lastVersion},"
+          + " #{roleMeta.deletedAt}"
+          + " ) ON CONFLICT (role_id) DO UPDATE SET"
+          + " role_name = #{roleMeta.roleName},"
+          + " metalake_id = #{roleMeta.metalakeId},"
+          + " properties = #{roleMeta.properties},"
+          + " audit_info = #{roleMeta.auditInfo},"
+          + " current_version = #{roleMeta.currentVersion},"
+          + " last_version = #{roleMeta.lastVersion},"
+          + " deleted_at = #{roleMeta.deletedAt}";
     }
   }
 

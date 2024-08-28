@@ -36,7 +36,7 @@ public class GroupRoleRelSQLProvider {
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new GroupRoleRelMySQLProvider(),
               JDBCBackendType.H2, new GroupRoleRelH2Provider(),
-              JDBCBackendType.PG, new GroupRoleRelPGProvider());
+              JDBCBackendType.PG, new GroupRoleRelPostgreSQLProvider());
 
   public static GroupRoleRelBaseProvider getProvider() {
     String databaseId =
@@ -53,7 +53,7 @@ public class GroupRoleRelSQLProvider {
 
   static class GroupRoleRelH2Provider extends GroupRoleRelBaseProvider {}
 
-  static class GroupRoleRelPGProvider extends GroupRoleRelBaseProvider {
+  static class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseProvider {
 
     @Override
     public String softDeleteGroupRoleRelByGroupId(Long groupId) {

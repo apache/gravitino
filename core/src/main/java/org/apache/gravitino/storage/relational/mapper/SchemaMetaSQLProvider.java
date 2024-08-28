@@ -32,7 +32,7 @@ public class SchemaMetaSQLProvider {
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new SchemaMetaMySQLProvider(),
           JDBCBackendType.H2, new SchemaMetaH2Provider(),
-          JDBCBackendType.PG, new SchemaMetaPGProvider());
+          JDBCBackendType.PG, new SchemaMetaPostgreSQLProvider());
 
   public static SchemaMetaBaseProvider getProvider() {
     String databaseId =
@@ -49,7 +49,7 @@ public class SchemaMetaSQLProvider {
 
   static class SchemaMetaH2Provider extends SchemaMetaBaseProvider {}
 
-  static class SchemaMetaPGProvider extends SchemaMetaBaseProvider {
+  static class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseProvider {
 
     @Override
     public String insertSchemaMetaOnDuplicateKeyUpdate(SchemaPO schemaPO) {

@@ -34,7 +34,7 @@ public class UserMetaSQLProvider {
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new UserMetaMySQLProvider(),
           JDBCBackendType.H2, new UserMetaH2Provider(),
-          JDBCBackendType.PG, new UserMetaPGProvider());
+          JDBCBackendType.PG, new UserMetaPostgreSQLProvider());
 
   public static UserMetaBaseProvider getProvider() {
     String databaseId =
@@ -51,7 +51,7 @@ public class UserMetaSQLProvider {
 
   static class UserMetaH2Provider extends UserMetaBaseProvider {}
 
-  static class UserMetaPGProvider extends UserMetaBaseProvider {
+  static class UserMetaPostgreSQLProvider extends UserMetaBaseProvider {
 
     @Override
     public String softDeleteUserMetaByUserId(Long userId) {
@@ -67,6 +67,31 @@ public class UserMetaSQLProvider {
           + USER_TABLE_NAME
           + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertUserMetaOnDuplicateKeyUpdate(UserPO userPO) {
+      return "INSERT INTO "
+          + USER_TABLE_NAME
+          + "(user_id, user_name,"
+          + "metalake_id, audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{userMeta.userId},"
+          + " #{userMeta.userName},"
+          + " #{userMeta.metalakeId},"
+          + " #{userMeta.auditInfo},"
+          + " #{userMeta.currentVersion},"
+          + " #{userMeta.lastVersion},"
+          + " #{userMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT(user_id) DO UPDATE SET"
+          + " user_name = #{userMeta.userName},"
+          + " metalake_id = #{userMeta.metalakeId},"
+          + " audit_info = #{userMeta.auditInfo},"
+          + " current_version = #{userMeta.currentVersion},"
+          + " last_version = #{userMeta.lastVersion},"
+          + " deleted_at = #{userMeta.deletedAt}";
     }
   }
 

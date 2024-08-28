@@ -33,7 +33,7 @@ public class TableMetaSQLProvider {
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new TableMetaMySQLProvider(),
           JDBCBackendType.H2, new TableMetaH2Provider(),
-          JDBCBackendType.PG, new TableMetaPGProvider());
+          JDBCBackendType.PG, new TableMetaPostgreSQLProvider());
 
   public static TableMetaBaseProvider getProvider() {
     String databaseId =
@@ -50,7 +50,7 @@ public class TableMetaSQLProvider {
 
   static class TableMetaH2Provider extends TableMetaBaseProvider {}
 
-  static class TableMetaPGProvider extends TableMetaBaseProvider {
+  static class TableMetaPostgreSQLProvider extends TableMetaBaseProvider {
 
     @Override
     public String insertTableMetaOnDuplicateKeyUpdate(TablePO tablePO) {

@@ -33,7 +33,7 @@ public class FilesetVersionSQLProvider {
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new FilesetVersionMySQLProvider(),
               JDBCBackendType.H2, new FilesetVersionH2Provider(),
-              JDBCBackendType.PG, new FilesetVersionPGProvider());
+              JDBCBackendType.PG, new FilesetVersionPostgreSQLProvider());
 
   public static FilesetVersionBaseProvider getProvider() {
     String databaseId =
@@ -50,7 +50,7 @@ public class FilesetVersionSQLProvider {
 
   static class FilesetVersionH2Provider extends FilesetVersionBaseProvider {}
 
-  static class FilesetVersionPGProvider extends FilesetVersionBaseProvider {
+  static class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseProvider {
 
     @Override
     public String softDeleteFilesetVersionsByMetalakeId(Long metalakeId) {
@@ -91,6 +91,36 @@ public class FilesetVersionSQLProvider {
           + VERSION_TABLE_NAME
           + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
           + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit}";
+    }
+
+    @Override
+    public String insertFilesetVersionOnDuplicateKeyUpdate(FilesetVersionPO filesetVersionPO) {
+      return "INSERT INTO "
+          + VERSION_TABLE_NAME
+          + "(metalake_id, catalog_id, schema_id, fileset_id,"
+          + " version, fileset_comment, properties, storage_location,"
+          + " deleted_at)"
+          + " VALUES("
+          + " #{filesetVersion.metalakeId},"
+          + " #{filesetVersion.catalogId},"
+          + " #{filesetVersion.schemaId},"
+          + " #{filesetVersion.filesetId},"
+          + " #{filesetVersion.version},"
+          + " #{filesetVersion.filesetComment},"
+          + " #{filesetVersion.properties},"
+          + " #{filesetVersion.storageLocation},"
+          + " #{filesetVersion.deletedAt}"
+          + " )"
+          + " ON CONFLICT(fileset_id, version, deleted_at) DO UPDATE SET"
+          + " metalake_id = #{filesetVersion.metalakeId},"
+          + " catalog_id = #{filesetVersion.catalogId},"
+          + " schema_id = #{filesetVersion.schemaId},"
+          + " fileset_id = #{filesetVersion.filesetId},"
+          + " version = #{filesetVersion.version},"
+          + " fileset_comment = #{filesetVersion.filesetComment},"
+          + " properties = #{filesetVersion.properties},"
+          + " storage_location = #{filesetVersion.storageLocation},"
+          + " deleted_at = #{filesetVersion.deletedAt}";
     }
   }
 

@@ -35,7 +35,7 @@ public class MetalakeMetaSQLProvider {
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new MetalakeMetaMySQLProvider(),
               JDBCBackendType.H2, new MetalakeMetaH2Provider(),
-              JDBCBackendType.PG, new MetalakeMetaPGProvider());
+              JDBCBackendType.PG, new MetalakeMetaPostgreSQLProvider());
 
   public static MetalakeMetaBaseProvider getProvider() {
     String databaseId =
@@ -52,7 +52,7 @@ public class MetalakeMetaSQLProvider {
 
   static class MetalakeMetaH2Provider extends MetalakeMetaBaseProvider {}
 
-  static class MetalakeMetaPGProvider extends MetalakeMetaBaseProvider {
+  static class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseProvider {
 
     @Override
     public String softDeleteMetalakeMetaByMetalakeId(Long metalakeId) {
@@ -60,6 +60,34 @@ public class MetalakeMetaSQLProvider {
           + TABLE_NAME
           + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertMetalakeMetaOnDuplicateKeyUpdate(MetalakePO metalakePO) {
+      return "INSERT INTO "
+          + TABLE_NAME
+          + "(metalake_id, metalake_name, metalake_comment, properties, audit_info,"
+          + " schema_version, current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{metalakeMeta.metalakeId},"
+          + " #{metalakeMeta.metalakeName},"
+          + " #{metalakeMeta.metalakeComment},"
+          + " #{metalakeMeta.properties},"
+          + " #{metalakeMeta.auditInfo},"
+          + " #{metalakeMeta.schemaVersion},"
+          + " #{metalakeMeta.currentVersion},"
+          + " #{metalakeMeta.lastVersion},"
+          + " #{metalakeMeta.deletedAt}"
+          + " )"
+          + " ON CONFILCT(metalake_id) DO UPDATE SET"
+          + " metalake_name = #{metalakeMeta.metalakeName},"
+          + " metalake_comment = #{metalakeMeta.metalakeComment},"
+          + " properties = #{metalakeMeta.properties},"
+          + " audit_info = #{metalakeMeta.auditInfo},"
+          + " schema_version = #{metalakeMeta.schemaVersion},"
+          + " current_version = #{metalakeMeta.currentVersion},"
+          + " last_version = #{metalakeMeta.lastVersion},"
+          + " deleted_at = #{metalakeMeta.deletedAt}";
     }
   }
 

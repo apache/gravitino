@@ -34,7 +34,7 @@ public class TopicMetaSQLProvider {
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new TopicMetaMySQLProvider(),
           JDBCBackendType.H2, new TopicMetaH2Provider(),
-          JDBCBackendType.PG, new TopicMetaPGProvider());
+          JDBCBackendType.PG, new TopicMetaPostgreSQLProvider());
 
   public static TopicMetaBaseProvider getProvider() {
     String databaseId =
@@ -51,7 +51,7 @@ public class TopicMetaSQLProvider {
 
   static class TopicMetaH2Provider extends TopicMetaBaseProvider {}
 
-  static class TopicMetaPGProvider extends TopicMetaBaseProvider {
+  static class TopicMetaPostgreSQLProvider extends TopicMetaBaseProvider {
 
     @Override
     public String softDeleteTopicMetasByTopicId(Long topicId) {
@@ -83,6 +83,39 @@ public class TopicMetaSQLProvider {
           + TABLE_NAME
           + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
           + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertTopicMetaOnDuplicateKeyUpdate(TopicPO topicPO) {
+      return "INSERT INTO "
+          + TABLE_NAME
+          + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
+          + " comment, properties, audit_info, current_version, last_version,"
+          + " deleted_at)"
+          + " VALUES("
+          + " #{topicMeta.topicId},"
+          + " #{topicMeta.topicName},"
+          + " #{topicMeta.metalakeId},"
+          + " #{topicMeta.catalogId},"
+          + " #{topicMeta.schemaId},"
+          + " #{topicMeta.comment},"
+          + " #{topicMeta.properties},"
+          + " #{topicMeta.auditInfo},"
+          + " #{topicMeta.currentVersion},"
+          + " #{topicMeta.lastVersion},"
+          + " #{topicMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT (topic_id) DO UPDATE SET"
+          + " topic_name = #{topicMeta.topicName},"
+          + " metalake_id = #{topicMeta.metalakeId},"
+          + " catalog_id = #{topicMeta.catalogId},"
+          + " schema_id = #{topicMeta.schemaId},"
+          + " comment = #{topicMeta.comment},"
+          + " properties = #{topicMeta.properties},"
+          + " audit_info = #{topicMeta.auditInfo},"
+          + " current_version = #{topicMeta.currentVersion},"
+          + " last_version = #{topicMeta.lastVersion},"
+          + " deleted_at = #{topicMeta.deletedAt}";
     }
   }
 

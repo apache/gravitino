@@ -36,7 +36,7 @@ public class SecurableObjectSQLProvider {
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new SecurableObjectMySQLProvider(),
               JDBCBackendType.H2, new SecurableObjectH2Provider(),
-              JDBCBackendType.PG, new SecurableObjectPGProvider());
+              JDBCBackendType.PG, new SecurableObjectPostgreSQLProvider());
 
   public static SecurableObjectBaseProvider getProvider() {
     String databaseId =
@@ -53,7 +53,7 @@ public class SecurableObjectSQLProvider {
 
   static class SecurableObjectH2Provider extends SecurableObjectBaseProvider {}
 
-  static class SecurableObjectPGProvider extends SecurableObjectBaseProvider {
+  static class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseProvider {
 
     @Override
     public String softDeleteSecurableObjectsByRoleId(Long roleId) {

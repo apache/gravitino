@@ -37,7 +37,7 @@ public class UserRoleRelSQLProvider {
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new UserRoleRelMySQLProvider(),
               JDBCBackendType.H2, new UserRoleRelH2Provider(),
-              JDBCBackendType.PG, new UserRoleRelPGProvider());
+              JDBCBackendType.PG, new UserRoleRelPostgreSQLProvider());
 
   public static UserRoleRelBaseProvider getProvider() {
     String databaseId =
@@ -54,7 +54,7 @@ public class UserRoleRelSQLProvider {
 
   static class UserRoleRelH2Provider extends UserRoleRelBaseProvider {}
 
-  static class UserRoleRelPGProvider extends UserRoleRelBaseProvider {
+  static class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseProvider {
 
     @Override
     public String softDeleteUserRoleRelByUserId(Long userId) {
@@ -96,6 +96,33 @@ public class UserRoleRelSQLProvider {
           + USER_ROLE_RELATION_TABLE_NAME
           + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
           + " WHERE role_id = #{roleId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String batchInsertUserRoleRelOnDuplicateKeyUpdate(List<UserRoleRelPO> userRoleRelPOs) {
+      return "<script>"
+          + "INSERT INTO "
+          + USER_ROLE_RELATION_TABLE_NAME
+          + "(user_id, role_id,"
+          + " audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES "
+          + "<foreach collection='userRoleRels' item='item' separator=','>"
+          + "(#{item.userId},"
+          + " #{item.roleId},"
+          + " #{item.auditInfo},"
+          + " #{item.currentVersion},"
+          + " #{item.lastVersion},"
+          + " #{item.deletedAt})"
+          + "</foreach>"
+          + " ON CONFLICT (user_id, role_id, deleted_at) DO UPDATE SET"
+          + " user_id = VALUES(user_id),"
+          + " role_id = VALUES(role_id),"
+          + " audit_info = VALUES(audit_info),"
+          + " current_version = VALUES(current_version),"
+          + " last_version = VALUES(last_version),"
+          + " deleted_at = VALUES(deleted_at)"
+          + "</script>";
     }
   }
 

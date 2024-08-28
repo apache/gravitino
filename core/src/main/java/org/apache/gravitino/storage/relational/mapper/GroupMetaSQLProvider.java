@@ -32,7 +32,7 @@ public class GroupMetaSQLProvider {
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new GroupMetaMySQLProvider(),
           JDBCBackendType.H2, new GroupMetaH2Provider(),
-          JDBCBackendType.PG, new GroupMetaPGProvider());
+          JDBCBackendType.PG, new GroupMetaPostgreSQLProvider());
 
   public static GroupMetaBaseProvider getProvider() {
     String databaseId =
@@ -49,7 +49,7 @@ public class GroupMetaSQLProvider {
 
   static class GroupMetaH2Provider extends GroupMetaBaseProvider {}
 
-  static class GroupMetaPGProvider extends GroupMetaBaseProvider {
+  static class GroupMetaPostgreSQLProvider extends GroupMetaBaseProvider {
 
     @Override
     public String softDeleteGroupMetaByGroupId(Long groupId) {
@@ -65,6 +65,31 @@ public class GroupMetaSQLProvider {
           + GROUP_TABLE_NAME
           + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertGroupMetaOnDuplicateKeyUpdate(GroupPO groupPO) {
+      return "INSERT INTO "
+          + GROUP_TABLE_NAME
+          + "(group_id, group_name,"
+          + "metalake_id, audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{groupMeta.groupId},"
+          + " #{groupMeta.groupName},"
+          + " #{groupMeta.metalakeId},"
+          + " #{groupMeta.auditInfo},"
+          + " #{groupMeta.currentVersion},"
+          + " #{groupMeta.lastVersion},"
+          + " #{groupMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT(group_id) DO UPDATE SET"
+          + " group_name = #{groupMeta.groupName},"
+          + " metalake_id = #{groupMeta.metalakeId},"
+          + " audit_info = #{groupMeta.auditInfo},"
+          + " current_version = #{groupMeta.currentVersion},"
+          + " last_version = #{groupMeta.lastVersion},"
+          + " deleted_at = #{groupMeta.deletedAt}";
     }
   }
 

@@ -34,7 +34,7 @@ public class TagMetaSQLProvider {
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new TagMetaMySQLProvider(),
           JDBCBackendType.H2, new TagMetaH2Provider(),
-          JDBCBackendType.PG, new TagMetaPGProvider());
+          JDBCBackendType.PG, new TagMetaPostgreSQLProvider());
 
   public static TagMetaBaseProvider getProvider() {
     String databaseId =
@@ -51,7 +51,7 @@ public class TagMetaSQLProvider {
 
   static class TagMetaH2Provider extends TagMetaBaseProvider {}
 
-  static class TagMetaPGProvider extends TagMetaBaseProvider {
+  static class TagMetaPostgreSQLProvider extends TagMetaBaseProvider {
 
     @Override
     public String softDeleteTagMetaByMetalakeAndTagName(String metalakeName, String tagName) {
@@ -71,6 +71,35 @@ public class TagMetaSQLProvider {
           + TAG_TABLE_NAME
           + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertTagMetaOnDuplicateKeyUpdate(TagPO tagPO) {
+      return "INSERT INTO "
+          + TAG_TABLE_NAME
+          + "(tag_id, tag_name,"
+          + " metalake_id, tag_comment, properties, audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{tagMeta.tagId},"
+          + " #{tagMeta.tagName},"
+          + " #{tagMeta.metalakeId},"
+          + " #{tagMeta.comment},"
+          + " #{tagMeta.properties},"
+          + " #{tagMeta.auditInfo},"
+          + " #{tagMeta.currentVersion},"
+          + " #{tagMeta.lastVersion},"
+          + " #{tagMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT(tag_id) DO UPDATE SET"
+          + " tag_name = #{tagMeta.tagName},"
+          + " metalake_id = #{tagMeta.metalakeId},"
+          + " tag_comment = #{tagMeta.comment},"
+          + " properties = #{tagMeta.properties},"
+          + " audit_info = #{tagMeta.auditInfo},"
+          + " current_version = #{tagMeta.currentVersion},"
+          + " last_version = #{tagMeta.lastVersion},"
+          + " deleted_at = #{tagMeta.deletedAt}";
     }
   }
 

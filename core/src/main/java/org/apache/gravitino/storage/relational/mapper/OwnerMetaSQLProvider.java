@@ -33,7 +33,7 @@ public class OwnerMetaSQLProvider {
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new OwnerMetaMySQLProvider(),
           JDBCBackendType.H2, new OwnerMetaH2Provider(),
-          JDBCBackendType.PG, new OwnerMetaPGProvider());
+          JDBCBackendType.PG, new OwnerMetaPostgreSQLProvider());
 
   public static OwnerMetaBaseProvider getProvider() {
     String databaseId =
@@ -50,7 +50,7 @@ public class OwnerMetaSQLProvider {
 
   static class OwnerMetaH2Provider extends OwnerMetaBaseProvider {}
 
-  static class OwnerMetaPGProvider extends OwnerMetaBaseProvider {
+  static class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseProvider {
 
     @Override
     public String softDeleteOwnerRelByMetadataObjectIdAndType(

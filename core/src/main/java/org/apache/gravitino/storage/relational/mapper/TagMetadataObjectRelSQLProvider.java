@@ -35,7 +35,7 @@ public class TagMetadataObjectRelSQLProvider {
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new TagMetadataObjectRelMySQLProvider(),
               JDBCBackendType.H2, new TagMetadataObjectRelH2Provider(),
-              JDBCBackendType.PG, new TagMetadataObjectRelPGProvider());
+              JDBCBackendType.PG, new TagMetadataObjectRelPostgreSQLProvider());
 
   public static TagMetadataObjectRelBaseProvider getProvider() {
     String databaseId =
@@ -52,7 +52,7 @@ public class TagMetadataObjectRelSQLProvider {
 
   static class TagMetadataObjectRelH2Provider extends TagMetadataObjectRelBaseProvider {}
 
-  static class TagMetadataObjectRelPGProvider extends TagMetadataObjectRelBaseProvider {
+  static class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRelBaseProvider {
 
     @Override
     public String softDeleteTagMetadataObjectRelsByMetalakeAndTagName(

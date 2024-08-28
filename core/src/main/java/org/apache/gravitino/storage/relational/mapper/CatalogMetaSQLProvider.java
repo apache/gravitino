@@ -35,7 +35,7 @@ public class CatalogMetaSQLProvider {
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new CatalogMetaMySQLProvider(),
               JDBCBackendType.H2, new CatalogMetaH2Provider(),
-              JDBCBackendType.PG, new CatalogMetaPGProvider());
+              JDBCBackendType.PG, new CatalogMetaPostgreSQLProvider());
 
   public static CatalogMetaBaseProvider getProvider() {
     String databaseId =
@@ -52,7 +52,7 @@ public class CatalogMetaSQLProvider {
 
   static class CatalogMetaH2Provider extends CatalogMetaBaseProvider {}
 
-  static class CatalogMetaPGProvider extends CatalogMetaBaseProvider {
+  static class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseProvider {
 
     @Override
     public String softDeleteCatalogMetasByCatalogId(Long catalogId) {
@@ -68,6 +68,39 @@ public class CatalogMetaSQLProvider {
           + TABLE_NAME
           + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
           + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertCatalogMetaOnDuplicateKeyUpdate(CatalogPO catalogPO) {
+      return "INSERT INTO "
+          + TABLE_NAME
+          + "(catalog_id, catalog_name, metalake_id,"
+          + " type, provider, catalog_comment, properties, audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{catalogMeta.catalogId},"
+          + " #{catalogMeta.catalogName},"
+          + " #{catalogMeta.metalakeId},"
+          + " #{catalogMeta.type},"
+          + " #{catalogMeta.provider},"
+          + " #{catalogMeta.catalogComment},"
+          + " #{catalogMeta.properties},"
+          + " #{catalogMeta.auditInfo},"
+          + " #{catalogMeta.currentVersion},"
+          + " #{catalogMeta.lastVersion},"
+          + " #{catalogMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT(catalog_id) DO UPDATE SET"
+          + " catalog_name = #{catalogMeta.catalogName},"
+          + " metalake_id = #{catalogMeta.metalakeId},"
+          + " type = #{catalogMeta.type},"
+          + " provider = #{catalogMeta.provider},"
+          + " catalog_comment = #{catalogMeta.catalogComment},"
+          + " properties = #{catalogMeta.properties},"
+          + " audit_info = #{catalogMeta.auditInfo},"
+          + " current_version = #{catalogMeta.currentVersion},"
+          + " last_version = #{catalogMeta.lastVersion},"
+          + " deleted_at = #{catalogMeta.deletedAt}";
     }
   }
 

@@ -34,7 +34,7 @@ public class FilesetMetaSQLProvider {
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new FilesetMetaMySQLProvider(),
               JDBCBackendType.H2, new FilesetMetaH2Provider(),
-              JDBCBackendType.PG, new FilesetMetaPGProvider());
+              JDBCBackendType.PG, new FilesetMetaPostgreSQLProvider());
 
   public static FilesetMetaBaseProvider getProvider() {
     String databaseId =
@@ -51,7 +51,7 @@ public class FilesetMetaSQLProvider {
 
   static class FilesetMetaH2Provider extends FilesetMetaBaseProvider {}
 
-  static class FilesetMetaPGProvider extends FilesetMetaBaseProvider {
+  static class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseProvider {
 
     @Override
     public String softDeleteFilesetMetasByMetalakeId(Long metalakeId) {
@@ -83,6 +83,37 @@ public class FilesetMetaSQLProvider {
           + META_TABLE_NAME
           + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
           + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertFilesetMetaOnDuplicateKeyUpdate(FilesetPO filesetPO) {
+      return "INSERT INTO "
+          + META_TABLE_NAME
+          + "(fileset_id, fileset_name, metalake_id,"
+          + " catalog_id, schema_id, type, audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{filesetMeta.filesetId},"
+          + " #{filesetMeta.filesetName},"
+          + " #{filesetMeta.metalakeId},"
+          + " #{filesetMeta.catalogId},"
+          + " #{filesetMeta.schemaId},"
+          + " #{filesetMeta.type},"
+          + " #{filesetMeta.auditInfo},"
+          + " #{filesetMeta.currentVersion},"
+          + " #{filesetMeta.lastVersion},"
+          + " #{filesetMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT(fileset_id) DO UPDATE SET"
+          + " fileset_name = #{filesetMeta.filesetName},"
+          + " metalake_id = #{filesetMeta.metalakeId},"
+          + " catalog_id = #{filesetMeta.catalogId},"
+          + " schema_id = #{filesetMeta.schemaId},"
+          + " type = #{filesetMeta.type},"
+          + " audit_info = #{filesetMeta.auditInfo},"
+          + " current_version = #{filesetMeta.currentVersion},"
+          + " last_version = #{filesetMeta.lastVersion},"
+          + " deleted_at = #{filesetMeta.deletedAt}";
     }
   }
 
