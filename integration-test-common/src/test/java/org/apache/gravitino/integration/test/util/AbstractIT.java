@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -161,10 +162,10 @@ public class AbstractIT {
   }
 
   protected static void setPGBackend() throws SQLException {
-    String pgUrl = POSTGRESQL_CONTAINER.getJdbcUrl(META_DATA);
+    String pgUrlWithoutSchema = POSTGRESQL_CONTAINER.getJdbcUrl(META_DATA);
     customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
     customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgUrl);
+    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgUrlWithoutSchema);
     customConfigs.put(
         Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY,
         POSTGRESQL_CONTAINER.getDriverClassName(META_DATA));
@@ -173,16 +174,21 @@ public class AbstractIT {
     customConfigs.put(
         Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, POSTGRESQL_CONTAINER.getPassword());
 
-    LOG.info("PG URL: {}", pgUrl);
+    LOG.info("PG URL: {}", pgUrlWithoutSchema);
+
+    String randomSchemaName = RandomStringUtils.random(10, true, false);
     // Connect to the mysql docker and create a databases
     String currentExecuteSql = "";
     try (Connection connection =
         DriverManager.getConnection(
-            pgUrl, POSTGRESQL_CONTAINER.getUsername(), POSTGRESQL_CONTAINER.getPassword())) {
+            pgUrlWithoutSchema,
+            POSTGRESQL_CONTAINER.getUsername(),
+            POSTGRESQL_CONTAINER.getPassword())) {
       connection.setCatalog(PG_CATALOG_POSTGRESQL_IT.toString());
       final Statement statement = connection.createStatement();
-      statement.execute("drop database if exists " + META_DATA);
-      statement.execute("create database " + META_DATA);
+      statement.execute("drop schema if exists " + randomSchemaName);
+      statement.execute("create schema " + randomSchemaName);
+      statement.execute("set search_path to " + randomSchemaName);
       String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
       String mysqlContent =
           FileUtils.readFileToString(
@@ -207,6 +213,9 @@ public class AbstractIT {
       LOG.error("Failed to create database in pg, sql:\n{}", currentExecuteSql, e);
       throw new RuntimeException(e);
     }
+
+    pgUrlWithoutSchema = pgUrlWithoutSchema + "?currentSchema=" + randomSchemaName;
+    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgUrlWithoutSchema);
   }
 
   private static void setMySQLBackend() {
