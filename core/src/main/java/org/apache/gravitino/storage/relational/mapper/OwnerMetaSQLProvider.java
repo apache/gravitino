@@ -81,7 +81,7 @@ public class OwnerMetaSQLProvider {
     public String softDeleteOwnerRelByCatalogId(Long catalogId) {
       return "UPDATE  "
           + OWNER_TABLE_NAME
-          + " ot SET ot.deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " ot SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
           + " WHERE EXISTS ("
           + " SELECT ct.catalog_id FROM "
           + CatalogMetaMapper.TABLE_NAME
