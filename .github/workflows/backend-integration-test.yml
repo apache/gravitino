@@ -66,6 +66,8 @@ jobs:
           - test-mode: 'embedded'
             backend: 'h2'
           - test-mode: 'deploy'
+            backend: 'mysql'
+          - test-mode: 'deploy'
             backend: 'postgresql'
 
     env:
@@ -135,6 +137,8 @@ jobs:
         include:
           - test-mode: 'embedded'
             backend: 'h2'
+          - test-mode: 'deploy'
+            backend: 'mysql'
           - test-mode: 'deploy'
             backend: 'postgresql'
 
