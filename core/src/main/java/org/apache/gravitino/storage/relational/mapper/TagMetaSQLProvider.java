@@ -57,7 +57,7 @@ public class TagMetaSQLProvider {
     public String softDeleteTagMetaByMetalakeAndTagName(String metalakeName, String tagName) {
       return "UPDATE "
           + TAG_TABLE_NAME
-          + " tm SET tm.deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
+          + " tm SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
           + " WHERE tm.metalake_id IN ("
           + " SELECT mm.metalake_id FROM "
           + MetalakeMetaMapper.TABLE_NAME

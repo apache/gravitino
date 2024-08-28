@@ -23,15 +23,20 @@ import java.sql.SQLException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 
+/**
+ * Exception converter to Apache Gravitino exception for PostgreSQL. The definition of error codes
+ * can be found in the document: <a
+ * href="https://www.postgresql.org/docs/8.4/errcodes-appendix.html">error code of PostgreSQL</a>
+ */
 public class PostgreSQLExceptionConverter implements SQLExceptionConverter {
-  private static final int DUPLICATED_ENTRY_ERROR_CODE = 1062;
+  private static final int DUPLICATED_ENTRY_ERROR_CODE = 23505;
 
   @Override
   @SuppressWarnings("FormatStringAnnotation")
   public void toGravitinoException(SQLException sqlException, Entity.EntityType type, String name)
       throws IOException {
-
-    switch (sqlException.getErrorCode()) {
+    int errorCode = Integer.valueOf(sqlException.getSQLState());
+    switch (errorCode) {
       case DUPLICATED_ENTRY_ERROR_CODE:
         throw new EntityAlreadyExistsException(sqlException, sqlException.getMessage());
       default:
