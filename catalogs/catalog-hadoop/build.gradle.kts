@@ -45,6 +45,7 @@ dependencies {
     exclude("org.apache.curator", "curator-framework")
     exclude("org.apache.curator", "curator-recipes")
     exclude("org.apache.avro", "avro")
+    exclude("com.sun.jersey", "jersey-servlet")
   }
 
   implementation(libs.hadoop3.hdfs) {
@@ -103,6 +104,8 @@ tasks {
       exclude("zookeeper-*.jar")
       exclude("jetty-*.jar")
       exclude("javax.servlet-*.jar")
+      exclude("kerb-*.jar")
+      exclude("kerby-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
