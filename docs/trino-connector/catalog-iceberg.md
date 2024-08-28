@@ -256,8 +256,8 @@ call gravitino.system.create_catalog(
           's3-access-key-id', 's3-secret-access-key', 's3-region', 'io-impl'
         ],
         array['thrift://hive:9083', 'hive', 's3a://trino-test-ice/dw2',
-        'xxx', 'xxx', 'xxx',
-        'xxx', 'xxx', 'xxx', 'org.apache.iceberg.aws.s3.S3FileIO']
+        '<aws-access-key>', '<aws-secret-key>', '<region>',
+        '<aws-access-key>', '<aws-secret-key>', '<region>', 'org.apache.iceberg.aws.s3.S3FileIO']
     )
 );
 ```

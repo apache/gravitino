@@ -319,7 +319,7 @@ call gravitino.system.create_catalog(
     array['metastore.uris',
         'trino.bypass.hive.s3.aws-access-key', 'trino.bypass.hive.s3.aws-secret-key', 'trino.bypass.hive.s3.region'
     ],
-    array['thrift://hive:9083', 'XXXX', 'XXX', 'XXX']
+    array['thrift://hive:9083', '<aws-access-key>', '<aws-secret-key>', '<region>']
   )
 );
 ```
