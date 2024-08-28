@@ -571,6 +571,7 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("package") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -616,6 +617,26 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-iceberg-rest-server") }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
+    }
+  }
+
+  val compileTrinoConnector by registering {
+    dependsOn("trino-connector:copyLibs")
+    group = "gravitino distribution"
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector"))
+    doLast {
+      copy {
+        from(projectDir.dir("licenses")) { into("${rootProject.name}-trino-connector/licenses") }
+        from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-trino-connector") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -636,11 +657,11 @@ tasks {
   }
 
   val assembleTrinoConnector by registering(Tar::class) {
-    dependsOn("trino-connector:copyLibs")
+    dependsOn("compileTrinoConnector")
     group = "gravitino distribution"
     finalizedBy("checksumTrinoConnector")
     into("${rootProject.name}-trino-connector-$version")
-    from("trino-connector/build/libs")
+    from(compileTrinoConnector.map { it.outputs.files.single() })
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
