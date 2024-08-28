@@ -18,13 +18,12 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -56,12 +55,11 @@ public class RangerHelper {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHelper.class);
 
   public static final String MANAGED_BY_GRAVITINO = "MANAGED_BY_GRAVITINO";
-  RangerAuthorizationPlugin rangerAuthorizationPlugin;
 
   /** Mapping Gravitino privilege name to the underlying authorization system privileges. */
-  protected Map<Privilege.Name, Set<String>> privilegesMapping = null;
+  protected Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping = new HashMap<>();
   /** The owner privileges, the owner can do anything on the metadata object */
-  protected Set<String> ownerPrivileges = null;
+  private Set<RangerPrivilege> ownerPrivileges = new HashSet<>();
 
   /**
    * Because Ranger doesn't support the precise search, Ranger will return the policy meets the
@@ -69,70 +67,112 @@ public class RangerHelper {
    * match `db1.table1`, `db1.table2`, `db*.table*`, So we need to manually precisely filter this
    * research results. <br>
    * policySearchKeys: The search Ranger policy condition key defines. <br>
-   * policyPreciseFilterKeys: The precise filter Ranger search results key defines <br>
+   * policyResourceDefines: The Ranger policy resource defines. <br>
    */
-  protected List<String> policySearchKeys = null;
+  private List<String> policySearchKeys = new ArrayList<>();
 
-  protected List<String> policyPreciseFilterKeys = null;
+  private List<String> policyResourceDefines = new ArrayList<>();
 
-  public RangerHelper(RangerAuthorizationPlugin rangerAuthorizationPlugin, String catalogProvider) {
-    this.rangerAuthorizationPlugin = rangerAuthorizationPlugin;
-    switch (catalogProvider) {
-      case "hive":
-        initPrivilegesMapping();
-        initOwnerPrivileges();
-        initPolicySearchKeys();
-        initPreciseFilterKeys();
-        break;
-      default:
-        throw new IllegalArgumentException(
-            "Authorization plugin unsupported catalog provider: " + catalogProvider);
+  private final RangerClientExtend rangerClient;
+  private final String rangerAdminName;
+  private final String rangerServiceName;
+  private AuthorizationConfig authorizationConfig = null;
+
+  public RangerHelper(
+      String catalogProvider,
+      RangerClientExtend rangerClient,
+      String rangerAdminName,
+      String rangerServiceName) {
+    this.rangerClient = rangerClient;
+    this.rangerAdminName = rangerAdminName;
+    this.rangerServiceName = rangerServiceName;
+
+    this.authorizationConfig = AuthorizationConfig.loadConfig(catalogProvider);
+    initAuthorizationConfig(authorizationConfig);
+  }
+
+  @VisibleForTesting
+  RangerHelper(AuthorizationConfig authorizationConfig) {
+    this.rangerClient = null;
+    this.rangerAdminName = null;
+    this.rangerServiceName = null;
+
+    this.authorizationConfig = authorizationConfig;
+    initAuthorizationConfig(authorizationConfig);
+  }
+
+  /**
+   * Initial mapping Gravitino privilege name to the underlying authorization system privileges.
+   * <br>
+   * Initial Owner privileges. <br>
+   * Initial Ranger policy search key defines. <br>
+   * Initial precise filter key defines. <br>
+   */
+  private void initAuthorizationConfig(AuthorizationConfig authorizationConfig) {
+    // Initial mapping Gravitino privilege name to the underlying authorization system privileges.
+    try {
+      authorizationConfig
+          .getConfigsWithPrefix(AuthorizationConfig.PRIVILEGE_MAPPING_PREFIX)
+          .forEach(
+              (key, value) -> {
+                Privilege.Name gravitinoPrivilege =
+                    Privilege.Name.valueOf(key.trim().toUpperCase());
+                Set<String> strRangerPrivileges = Sets.newHashSet(value.split(","));
+                // Check the privilege mapping configured if support in the Ranger
+                RangerHelper.check(
+                    strRangerPrivileges.size() > 0,
+                    "The privilege mapping value should not be empty");
+                Set<RangerPrivilege> rangerPrivileges =
+                    strRangerPrivileges.stream()
+                        .map(v -> RangerPrivileges.valueOf(v))
+                        .collect(Collectors.toSet());
+                privilegesMapping.put(gravitinoPrivilege, rangerPrivileges);
+              });
+    } catch (IllegalArgumentException e) {
+      throw new AuthorizationPluginException(e);
     }
+
+    // Initial Owner privileges
+    authorizationConfig.get(AuthorizationConfig.AUTHORIZATION_OWNER_PRIVILEGES).stream()
+        .map(RangerPrivileges::valueOf)
+        .forEach(ownerPrivileges::add);
+    RangerHelper.check(ownerPrivileges.size() > 0, "The owner privileges should not be empty");
+
+    // Initial Ranger policy search key defines
+    // Ranger policy search keys format: `resource:database`, `resource:table`, `resource:column`
+    authorizationConfig.get(AuthorizationConfig.RANGER_POLICY_RESOURCE_DEFINES).stream()
+        .forEach(
+            resource -> {
+              // Check the policy resource configured if support in the Ranger
+              RangerDefines.PolicyResource policyResource =
+                  RangerDefines.PolicyResource.valueOf(resource.trim().toUpperCase());
+              policySearchKeys.add(SearchFilter.RESOURCE_PREFIX + policyResource.toString());
+              policyResourceDefines.add(policyResource.toString());
+            });
+    RangerHelper.check(policySearchKeys.size() > 0, "The policy search keys should not be empty");
+    RangerHelper.check(
+        policyResourceDefines.size() > 0, "The policy resource defines should not be empty");
   }
 
-  /** Initial mapping Gravitino privilege name to the underlying authorization system privileges. */
-  private void initPrivilegesMapping() {
-    privilegesMapping =
-        ImmutableMap.<Privilege.Name, Set<String>>builder()
-            .put(
-                Privilege.Name.CREATE_SCHEMA,
-                ImmutableSet.of(RangerDefines.ACCESS_TYPE_HIVE_CREATE))
-            .put(
-                Privilege.Name.CREATE_TABLE, ImmutableSet.of(RangerDefines.ACCESS_TYPE_HIVE_CREATE))
-            .put(
-                Privilege.Name.MODIFY_TABLE,
-                ImmutableSet.of(
-                    RangerDefines.ACCESS_TYPE_HIVE_UPDATE,
-                    RangerDefines.ACCESS_TYPE_HIVE_ALTER,
-                    RangerDefines.ACCESS_TYPE_HIVE_WRITE))
-            .put(
-                Privilege.Name.SELECT_TABLE,
-                ImmutableSet.of(
-                    RangerDefines.ACCESS_TYPE_HIVE_READ, RangerDefines.ACCESS_TYPE_HIVE_SELECT))
-            .build();
+  /**
+   * Translate the privilege name to the corresponding privilege name in the Ranger
+   *
+   * @param name The privilege name to translate
+   * @return The corresponding Ranger privilege name in the underlying permission system
+   */
+  public Set<String> translatePrivilege(Privilege.Name name) {
+    return privilegesMapping.get(name).stream()
+        .map(RangerPrivilege::toString)
+        .collect(Collectors.toSet());
   }
 
-  /** Initial Owner privileges */
-  private void initOwnerPrivileges() {
-    ownerPrivileges = ImmutableSet.of(RangerDefines.ACCESS_TYPE_HIVE_ALL);
-  }
-
-  /** Initial Ranger policy search key defines */
-  private void initPolicySearchKeys() {
-    policySearchKeys =
-        Arrays.asList(
-            RangerDefines.SEARCH_FILTER_DATABASE,
-            RangerDefines.SEARCH_FILTER_TABLE,
-            RangerDefines.SEARCH_FILTER_COLUMN);
-  }
-
-  /** Initial precise filter key defines */
-  private void initPreciseFilterKeys() {
-    policyPreciseFilterKeys =
-        Arrays.asList(
-            RangerDefines.RESOURCE_DATABASE,
-            RangerDefines.RESOURCE_TABLE,
-            RangerDefines.RESOURCE_COLUMN);
+  /**
+   * Get the owner privilege to the corresponding privilege name in the Ranger
+   *
+   * @return The corresponding Ranger privilege name in the underlying permission system
+   */
+  public Set<String> getOwnerPrivileges() {
+    return ownerPrivileges.stream().map(RangerPrivilege::toString).collect(Collectors.toSet());
   }
 
   /**
@@ -176,10 +216,9 @@ public class RangerHelper {
         .forEach(
             gravitinoPrivilege -> {
               // Translate the Gravitino privilege to map Ranger privilege
-              rangerAuthorizationPlugin
-                  .translatePrivilege(gravitinoPrivilege.name())
+              translatePrivilege(gravitinoPrivilege.name())
                   .forEach(
-                      mappedPrivilege -> {
+                      rangerPrivilege -> {
                         // Find the policy item that matches Gravitino privilege
                         List<RangerPolicy.RangerPolicyItem> matchPolicyItems =
                             policy.getPolicyItems().stream()
@@ -187,7 +226,7 @@ public class RangerHelper {
                                     policyItem -> {
                                       return policyItem.getAccesses().stream()
                                           .anyMatch(
-                                              access -> access.getType().equals(mappedPrivilege));
+                                              access -> access.getType().equals(rangerPrivilege));
                                     })
                                 .collect(Collectors.toList());
 
@@ -197,7 +236,7 @@ public class RangerHelper {
                               new RangerPolicy.RangerPolicyItem();
                           RangerPolicy.RangerPolicyItemAccess access =
                               new RangerPolicy.RangerPolicyItemAccess();
-                          access.setType(mappedPrivilege);
+                          access.setType(rangerPrivilege);
                           policyItem.getAccesses().add(access);
                           policyItem.getRoles().add(roleName);
                           if (Privilege.Condition.ALLOW == gravitinoPrivilege.condition()) {
@@ -240,10 +279,7 @@ public class RangerHelper {
                         boolean matchPrivilege =
                             securableObject.privileges().stream()
                                 .filter(Objects::nonNull)
-                                .flatMap(
-                                    privilege ->
-                                        rangerAuthorizationPlugin
-                                            .translatePrivilege(privilege.name()).stream())
+                                .flatMap(privilege -> translatePrivilege(privilege.name()).stream())
                                 .filter(Objects::nonNull)
                                 .anyMatch(
                                     privilege -> {
@@ -297,17 +333,15 @@ public class RangerHelper {
 
     Map<String, String> searchFilters = new HashMap<>();
     Map<String, String> preciseFilters = new HashMap<>();
-    searchFilters.put(
-        RangerDefines.SEARCH_FILTER_SERVICE_NAME, rangerAuthorizationPlugin.rangerServiceName);
+    searchFilters.put(SearchFilter.SERVICE_NAME, rangerServiceName);
     searchFilters.put(SearchFilter.POLICY_LABELS_PARTIAL, MANAGED_BY_GRAVITINO);
     for (int i = 0; i < nsMetadataObj.size(); i++) {
       searchFilters.put(policySearchKeys.get(i), nsMetadataObj.get(i));
-      preciseFilters.put(policyPreciseFilterKeys.get(i), nsMetadataObj.get(i));
+      preciseFilters.put(policyResourceDefines.get(i), nsMetadataObj.get(i));
     }
 
     try {
-      List<RangerPolicy> policies =
-          rangerAuthorizationPlugin.rangerClient.findPolicies(searchFilters);
+      List<RangerPolicy> policies = rangerClient.findPolicies(searchFilters);
 
       if (!policies.isEmpty()) {
         /**
@@ -357,10 +391,7 @@ public class RangerHelper {
 
   protected boolean checkRangerRole(String roleName) throws AuthorizationPluginException {
     try {
-      rangerAuthorizationPlugin.rangerClient.getRole(
-          roleName,
-          rangerAuthorizationPlugin.rangerAdminName,
-          rangerAuthorizationPlugin.rangerServiceName);
+      rangerClient.getRole(roleName, rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
       throw new AuthorizationPluginException(e);
     }
@@ -377,7 +408,7 @@ public class RangerHelper {
     GrantRevokeRoleRequest roleRequest = new GrantRevokeRoleRequest();
     roleRequest.setUsers(users);
     roleRequest.setGroups(groups);
-    roleRequest.setGrantor(rangerAuthorizationPlugin.rangerAdminName);
+    roleRequest.setGrantor(rangerAdminName);
     roleRequest.setTargetRoles(Sets.newHashSet(roleName));
     return roleRequest;
   }
@@ -386,11 +417,7 @@ public class RangerHelper {
   protected RangerRole createRangerRoleIfNotExists(String roleName) {
     RangerRole rangerRole = null;
     try {
-      rangerRole =
-          rangerAuthorizationPlugin.rangerClient.getRole(
-              roleName,
-              rangerAuthorizationPlugin.rangerAdminName,
-              rangerAuthorizationPlugin.rangerServiceName);
+      rangerRole = rangerClient.getRole(roleName, rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
       // ignore exception, If the role does not exist, then create it.
       LOG.warn("The role({}) does not exist in the Ranger!", roleName);
@@ -398,8 +425,7 @@ public class RangerHelper {
     try {
       if (rangerRole == null) {
         rangerRole = new RangerRole(roleName, RangerHelper.MANAGED_BY_GRAVITINO, null, null, null);
-        rangerAuthorizationPlugin.rangerClient.createRole(
-            rangerAuthorizationPlugin.rangerServiceName, rangerRole);
+        rangerClient.createRole(rangerServiceName, rangerRole);
       }
     } catch (RangerServiceException e) {
       throw new RuntimeException(e);
@@ -416,7 +442,11 @@ public class RangerHelper {
                   return policyItem.getAccesses().stream()
                       .allMatch(
                           policyItemAccess -> {
-                            return ownerPrivileges.contains(policyItemAccess.getType());
+                            return ownerPrivileges.stream()
+                                .anyMatch(
+                                    ownerPrivilege -> {
+                                      return ownerPrivilege.equals(policyItemAccess.getType());
+                                    });
                           });
                 })
             .collect(Collectors.toList());
@@ -461,7 +491,9 @@ public class RangerHelper {
             // Add lost owner's privilege to the policy
             ownerPrivilege -> {
               RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-              policyItem.getAccesses().add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege));
+              policyItem
+                  .getAccesses()
+                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.toString()));
               if (newOwner != null) {
                 if (newOwner.type() == Owner.Type.USER) {
                   policyItem.getUsers().add(newOwner.name());
@@ -486,7 +518,7 @@ public class RangerHelper {
 
   protected RangerPolicy createPolicyAddResources(MetadataObject metadataObject) {
     RangerPolicy policy = new RangerPolicy();
-    policy.setService(rangerAuthorizationPlugin.rangerServiceName);
+    policy.setService(rangerServiceName);
     policy.setName(metadataObject.fullName());
     policy.setPolicyLabels(Lists.newArrayList(RangerHelper.MANAGED_BY_GRAVITINO));
 
@@ -495,7 +527,7 @@ public class RangerHelper {
     for (int i = 0; i < nsMetadataObject.size(); i++) {
       RangerPolicy.RangerPolicyResource policyResource =
           new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
-      policy.getResources().put(policyPreciseFilterKeys.get(i), policyResource);
+      policy.getResources().put(policyResourceDefines.get(i), policyResource);
     }
     return policy;
   }
@@ -507,7 +539,9 @@ public class RangerHelper {
         ownerPrivilege -> {
           // Each owner's privilege will create one RangerPolicyItemAccess in the policy
           RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-          policyItem.getAccesses().add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege));
+          policyItem
+              .getAccesses()
+              .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.toString()));
           if (newOwner != null) {
             if (newOwner.type() == Owner.Type.USER) {
               policyItem.getUsers().add(newOwner.name());

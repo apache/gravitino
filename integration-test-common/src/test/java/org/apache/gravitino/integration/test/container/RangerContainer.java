@@ -25,7 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.apache.ranger.RangerClient;
+import org.apache.gravitino.authorization.ranger.RangerClientExtend;
 import org.apache.ranger.RangerServiceException;
 import org.rnorth.ducttape.Preconditions;
 import org.slf4j.Logger;
@@ -38,7 +38,7 @@ public class RangerContainer extends BaseContainer {
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_RANGER_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-ranger";
   public static final int RANGER_SERVER_PORT = 6080;
-  public RangerClient rangerClient;
+  public RangerClientExtend rangerClient;
   private String rangerUrl;
 
   /**
@@ -83,7 +83,7 @@ public class RangerContainer extends BaseContainer {
     super.start();
 
     rangerUrl = String.format("http://localhost:%s", this.getMappedPort(RANGER_SERVER_PORT));
-    rangerClient = new RangerClient(rangerUrl, authType, rangerUserName, rangerPassword, null);
+    rangerClient = new RangerClientExtend(rangerUrl, authType, rangerUserName, rangerPassword);
 
     Preconditions.check("Ranger container startup failed!", checkContainerStatus(10));
   }

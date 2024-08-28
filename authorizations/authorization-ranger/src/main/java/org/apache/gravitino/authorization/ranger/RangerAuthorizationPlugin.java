@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -87,7 +86,8 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
     RangerHelper.check(password != null, "Ranger password is required");
     RangerHelper.check(rangerServiceName != null, "Ranger service name is required");
     rangerClient = new RangerClientExtend(rangerUrl, authType, rangerAdminName, password);
-    rangerHelper = new RangerHelper(this, catalogProvider);
+    rangerHelper =
+        new RangerHelper(catalogProvider, rangerClient, rangerAdminName, rangerServiceName);
   }
 
   /**
@@ -97,12 +97,11 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
    * @return The corresponding privilege name in the underlying permission system
    */
   public Set<String> translatePrivilege(Privilege.Name name) {
-    return rangerHelper.privilegesMapping.get(name);
+    return rangerHelper.translatePrivilege(name);
   }
 
-  @VisibleForTesting
-  public List<String> getOwnerPrivileges() {
-    return Lists.newArrayList(rangerHelper.ownerPrivileges);
+  public Set<String> getOwnerPrivileges() {
+    return rangerHelper.getOwnerPrivileges();
   }
 
   /**

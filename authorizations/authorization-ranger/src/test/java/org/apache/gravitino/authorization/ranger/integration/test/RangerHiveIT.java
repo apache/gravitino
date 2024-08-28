@@ -19,7 +19,9 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.authorization.SecurableObjects.DOT_SPLITTER;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.RESOURCE_DATABASE;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.rangerClient;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.verifyRoleInRanger;
 
 import com.google.common.collect.ImmutableMap;
@@ -46,6 +48,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
+import org.apache.gravitino.authorization.ranger.RangerPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -117,7 +120,12 @@ public class RangerHiveIT {
                 RangerContainer.rangerPassword,
                 AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME));
-    rangerPolicyHelper = new RangerHelper(rangerAuthPlugin, "hive");
+    rangerPolicyHelper =
+        new RangerHelper(
+            "hive",
+            rangerClient,
+            RangerContainer.rangerUserName,
+            RangerITEnv.RANGER_HIVE_REPO_NAME);
 
     // Create hive connection
     String url =
@@ -280,8 +288,8 @@ public class RangerHiveIT {
           new RangerPolicy.RangerPolicyResource(metaObjects.get(i));
       policyResourceMap.put(
           i == 0
-              ? RangerDefines.RESOURCE_DATABASE
-              : i == 1 ? RangerDefines.RESOURCE_TABLE : RangerDefines.RESOURCE_COLUMN,
+              ? RangerITEnv.RESOURCE_DATABASE
+              : i == 1 ? RangerITEnv.RESOURCE_TABLE : RangerITEnv.RESOURCE_COLUMN,
           policyResource);
     }
 
@@ -289,7 +297,8 @@ public class RangerHiveIT {
     policyItem.setGroups(Arrays.asList(RangerDefines.PUBLIC_GROUP));
     policyItem.setAccesses(
         Arrays.asList(
-            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_SELECT)));
+            new RangerPolicy.RangerPolicyItemAccess(
+                RangerPrivilege.RangerHivePrivilege.SELECT.toString())));
     RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HIVE,
         RangerITEnv.RANGER_HIVE_REPO_NAME,
@@ -1132,8 +1141,8 @@ public class RangerHiveIT {
               .getResources()
               .get(
                   i == 0
-                      ? RangerDefines.RESOURCE_DATABASE
-                      : i == 1 ? RangerDefines.RESOURCE_TABLE : RangerDefines.RESOURCE_COLUMN)
+                      ? RangerITEnv.RESOURCE_DATABASE
+                      : i == 1 ? RangerITEnv.RESOURCE_TABLE : RangerITEnv.RESOURCE_COLUMN)
               .getValues()
               .get(0));
     }
@@ -1195,69 +1204,6 @@ public class RangerHiveIT {
     verifyOwnerInRanger(metadataObject, includeUsers, null, null, null);
   }
 
-  /** Currently we only test Ranger Hive, So wo Allow anyone to visit HDFS */
-  static void allowAnyoneAccessHDFS() {
-    String policyName = currentFunName();
-    try {
-      if (null != RangerITEnv.rangerClient.getPolicy(RangerDefines.SERVICE_TYPE_HDFS, policyName)) {
-        return;
-      }
-    } catch (RangerServiceException e) {
-      // If the policy doesn't exist, we will create it
-    }
-
-    Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap =
-        ImmutableMap.of(RangerDefines.RESOURCE_PATH, new RangerPolicy.RangerPolicyResource("/*"));
-    RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-    policyItem.setUsers(Arrays.asList(RangerDefines.CURRENT_USER));
-    policyItem.setAccesses(
-        Arrays.asList(
-            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_READ),
-            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_WRITE),
-            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_EXECUTE)));
-    RangerITEnv.updateOrCreateRangerPolicy(
-        RangerDefines.SERVICE_TYPE_HDFS,
-        RangerITEnv.RANGER_HDFS_REPO_NAME,
-        policyName,
-        policyResourceMap,
-        Collections.singletonList(policyItem));
-  }
-
-  /**
-   * Hive must have this policy Allow anyone can access information schema to show `database`,
-   * `tables` and `columns`
-   */
-  static void allowAnyoneAccessInformationSchema() {
-    String policyName = currentFunName();
-    try {
-      if (null != RangerITEnv.rangerClient.getPolicy(RangerDefines.SERVICE_TYPE_HIVE, policyName)) {
-        return;
-      }
-    } catch (RangerServiceException e) {
-      // If the policy doesn't exist, we will create it
-    }
-
-    Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap =
-        ImmutableMap.of(
-            RangerDefines.RESOURCE_DATABASE,
-            new RangerPolicy.RangerPolicyResource("information_schema"),
-            RangerDefines.RESOURCE_TABLE,
-            new RangerPolicy.RangerPolicyResource("*"),
-            RangerDefines.RESOURCE_COLUMN,
-            new RangerPolicy.RangerPolicyResource("*"));
-    RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-    policyItem.setGroups(Arrays.asList(RangerDefines.PUBLIC_GROUP));
-    policyItem.setAccesses(
-        Arrays.asList(
-            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_SELECT)));
-    RangerITEnv.updateOrCreateRangerPolicy(
-        RangerDefines.SERVICE_TYPE_HIVE,
-        RangerITEnv.RANGER_HIVE_REPO_NAME,
-        policyName,
-        policyResourceMap,
-        Collections.singletonList(policyItem));
-  }
-
   @Test
   public void testCreateDatabase() throws Exception {
     String dbName = currentFunName().toLowerCase(); // Hive database name is case-insensitive
@@ -1265,12 +1211,13 @@ public class RangerHiveIT {
     // Only allow admin user to operation database `db1`
     // Other users can't see the database `db1`
     Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap =
-        ImmutableMap.of(
-            RangerDefines.RESOURCE_DATABASE, new RangerPolicy.RangerPolicyResource(dbName));
+        ImmutableMap.of(RESOURCE_DATABASE, new RangerPolicy.RangerPolicyResource(dbName));
     RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
     policyItem.setUsers(Arrays.asList(adminUser));
     policyItem.setAccesses(
-        Arrays.asList(new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_ALL)));
+        Arrays.asList(
+            new RangerPolicy.RangerPolicyItemAccess(
+                RangerPrivilege.RangerHivePrivilege.ALL.toString())));
     RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HIVE,
         RangerITEnv.RANGER_HIVE_REPO_NAME,
@@ -1300,7 +1247,9 @@ public class RangerHiveIT {
     // Allow anonymous user to see the database `db1`
     policyItem.setUsers(Arrays.asList(adminUser, anonymousUser));
     policyItem.setAccesses(
-        Arrays.asList(new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_ALL)));
+        Arrays.asList(
+            new RangerPolicy.RangerPolicyItemAccess(
+                RangerPrivilege.RangerHivePrivilege.ALL.toString())));
     RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HIVE,
         RangerITEnv.RANGER_HIVE_REPO_NAME,

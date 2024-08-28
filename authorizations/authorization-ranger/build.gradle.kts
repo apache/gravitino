@@ -91,12 +91,19 @@ dependencies {
 
 tasks {
   val runtimeJars by registering(Copy::class) {
-    from(configurations.runtimeClasspath)
+    from(configurations.runtimeClasspath, "src/main/resources")
     into("build/libs")
+    rename { original ->
+      if (original.endsWith(".properties.template")) {
+        original.replace(".properties.template", ".properties")
+      } else {
+        original
+      }
+    }
   }
 
   val copyAuthorizationLibs by registering(Copy::class) {
-    dependsOn("jar", "runtimeJars")
+    dependsOn("jar", runtimeJars)
     from("build/libs") {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
@@ -105,8 +112,19 @@ tasks {
     into("$rootDir/distribution/package/authorizations/ranger/libs")
   }
 
+  val copyAuthorizationConfig by registering(Copy::class) {
+    from("src/main/resources")
+    into("$rootDir/distribution/package/authorizations/ranger/conf")
+    exclude("META-INF")
+    fileMode = 0b111101101
+  }
+
   register("copyLibAndConfig", Copy::class) {
-    dependsOn(copyAuthorizationLibs)
+    dependsOn(copyAuthorizationLibs, copyAuthorizationConfig)
+  }
+
+  jar {
+    dependsOn(runtimeJars)
   }
 }
 
