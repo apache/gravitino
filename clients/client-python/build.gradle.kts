@@ -287,7 +287,7 @@ tasks {
         from("${project.rootDir}/LICENSE.bin") { into("./") }
         from("${project.rootDir}/NOTICE.bin") { into("./") }
         from("${project.rootDir}/DISCLAIMER_WIP.txt") { into("./") }
-        into("${project.rootDir.path}/clients/client-python")
+        into("${project.rootDir}/clients/client-python")
         rename { fileName ->
           fileName.replace(".bin", "")
         }
