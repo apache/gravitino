@@ -19,14 +19,14 @@ Install Git and Docker Compose.
 
 The playground runs a number of services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
 
-| Docker container      | Ports used     |
-|-----------------------|----------------|
-| playground-gravitino  | 8090 9001      |
-| playground-hive       | 3307 9000 9083 |
-| playground-mysql      | 3306           |
-| playground-postgresql | 5342           |
-| playground-trino      | 8080           |
-| playground-jupyter    | 8888           |
+| Docker container      | Ports used           |
+|-----------------------|----------------------|
+| playground-gravitino  | 8090 9001            |
+| playground-hive       | 3307 9003 9084 50071 |
+| playground-mysql      | 13306                |
+| playground-postgresql | 15342                |
+| playground-trino      | 18080                |
+| playground-jupyter    | 18888                |
 
 ## Start playground
 
@@ -38,26 +38,6 @@ cd gravitino-playground
 ./launch-playground.sh
 ```
 
-### Launch big data components of playground
-
-```shell
-git clone git@github.com:apache/gravitino-playground.git
-cd gravitino-playground
-./launch-playground.sh bigdata
-# equivalent to
-./launch-playground.sh hive gravitino trino postgresql mysql spark
-```
-
-### Launch AI components of playground
-
-```shell
-git clone git@github.com:apache/gravitino-playground.git
-cd gravitino-playground
-./launch-playground.sh ai
-# equivalent to
-./launch-playground.sh hive gravitino mysql jupyter
-```
-
 ### Launch special component or components of playground
 
 ```shell
@@ -66,38 +46,12 @@ cd gravitino-playground
 ./launch-playground.sh hive|gravitino|trino|postgresql|mysql|spark|jupyter
 ```
 
-### Experiencing Apache Gravitino Fileset with Jupyter
-
-We provide a Fileset playground environment to help you quickly understand how to use Gravitino
-Python client to manage non-tabular data on HDFS via fileset in Gravitino service.
-You can refer document of [Launch AI components of playground](#launch-ai-components-of-playground)
-to launch a Gravitino server, HDFS and Jupyter notebook environment in you local Docker environment.
-
-Waiting for the playground Docker environment to start, you can directly open
-`http://localhost:8888/lab/tree/gravitino-fileset-example.ipynb` in the browser and run the example.
-
-The [gravitino-fileset-example](https://github.com/apache/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
-contains the following code snippets:
-
-1. Install HDFS Python client.
-2. Create a HDFS client to connect HDFS and to do some test operations.
-3. Install Gravitino Python client.
-4. Initialize Gravitino admin client and create a Gravitino metalake.
-5. Initialize Gravitino client and list metalakes.
-6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is
-   [hadoop](./hadoop-catalog.md)
-7. Create a Gravitino `Schema` with the `location` pointed to a HDFS path, and use `hdfs client` to
-   check if the schema location is successfully created in HDFS.
-8. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](./manage-fileset-metadata-using-gravitino.md#fileset-operations),
-   use `hdfs client` to check if the fileset location was successfully created in HDFS.
-9. Drop this `Fileset.Type.MANAGED` type fileset and check if the fileset location was
-   successfully deleted in HDFS.
-10. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](./manage-fileset-metadata-using-gravitino.md#fileset-operations)
-    and `location` pointed to exist HDFS path
-11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
-    not deleted in HDFS.
+Note. Components have dependencies, only launching one or several components cannot experience
+the full functionality of the playground.
 
 ## Experiencing Apache Gravitino with Trino SQL
+
+### Using Trino CLI in Docker Container
 
 1. Log in to the Gravitino playground Trino Docker container using the following command:
 
@@ -110,6 +64,14 @@ docker exec -it playground-trino bash
 ```shell
 trino@container_id:/$ trino
 ```
+
+### Using Jupiter Notebook
+
+1. Open the Jupyter Notebook in the browser at [http://localhost:18888](http://localhost:18888).
+
+2. Open the `gravitino-trino-example.ipynb` notebook.
+
+3. Start the notebook and run the cells.
 
 ## Example
 
@@ -236,4 +198,34 @@ select * from catalog_hive.sales.customers
 union
 select * from catalog_iceberg.sales.customers;
 ```
+
+### Using Gravitino with LlamaIndex
+
+Gravitino playground also provides a simple RAG demo with LlamaIndex. This demo will show you the
+ability of using Gravitino to manage both tabular and non-tabular dataset, connecting to
+LlamaIndex as a unified data source, then use LlamaIndex and LLM to query both tabular and
+non-tabular data with one natural language query.
+
+The demo is located in the `jupyter` folder, you can open the `gravitino_llama_index_demo.ipynb`
+demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
+
+The scenario of this demo is that basic structured city statistics data is stored in MySQL, and
+detailed city introductions are stored in PDF files. The user wants to know the answers to the
+cities both in the structured data and the PDF files.
+
+In this demo, you will use Gravitino to manage the MySQL table using relational catalog, pdf
+files using fileset catalog, treated Gravitino as a unified data source for LlamaIndex to build
+indexes on both tabular and non-tabular data. Then you will use LLM to query the data with natural
+language queries.
+
+Note: to run this demo, you need to set `OPENAI_API_KEY` in the `gravitino_llama_index_demo.ipynb`,
+like below, `OPENAI_API_BASE` is optional.
+
+```python
+import os
+
+os.environ["OPENAI_API_KEY"] = ""
+os.environ["OPENAI_API_BASE"] = ""
+```
+
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowtoUsePlayground" style={{ border: 0 }} alt="" />
