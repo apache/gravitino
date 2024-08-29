@@ -290,9 +290,9 @@ DROP TABLE hive_test.database_01.table_01;
 
 ## HDFS config and permissions
 
-For basic setups, Gravitino Trino connector configures the HDFS client automatically and does not require any configuration
-files.
-Gravitino Trino connector is not support user to config the `hdfs-site.xml` and `core-site.xml` files to the HDFS client.
+For basic setups, Apache Gravitino Trino connector configures the HDFS client by the catalog configurations.
+It is support to config the `hdfs-site.xml` and `core-site.xml` files to the HDFS client by the configuration
+`trino.bypass.hive.config.resources` in the catalog configurations.
 
 Before running any `Insert` statements for Hive tables in Trino,
 you must check that the user Trino is using to access HDFS has access to the Hive warehouse directory.
@@ -302,3 +302,46 @@ replacing hdfs_user with the appropriate username:
 ```text
 -DHADOOP_USER_NAME=hdfs_user
 ```
+
+## S3
+
+Uses can use AWS S3 storage in the Hive catalog. The AWS S3 configuration of Trino Hive connector can reference to
+[Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
+The configurations can config by the Hive catalog properties with the `trino.bypass.` prefix.
+
+Create a Hive catalog with the AWS S3 configuration in the Trino cli:
+
+```sql
+call gravitino.system.create_catalog(
+  'gt_hive',
+  'hive',
+  map(
+    array['metastore.uris',
+        'trino.bypass.hive.s3.aws-access-key', 'trino.bypass.hive.s3.aws-secret-key', 'trino.bypass.hive.s3.region'
+    ],
+    array['thrift://hive:9083', 'XXXX', 'XXX', 'XXX']
+  )
+);
+```
+
+- The configurations of `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key`, `trino.bypass.hive.s3.region`
+are the required the configurations use by the Apache Gravitino Trino connector.
+
+When the Hive catalog created successfully, you can create  schemas and tables by the following command.
+
+```sql
+CREATE SCHEMA gt_hive.gt_db02
+WITH (location = 's3a://trino-test/dw/gt_db02');
+
+CREATE TABLE gt_hive.gt_db02.tb01 (
+    name varchar,
+    salary int
+);
+```
+
+The `location` is the storage path of AWS s3.
+After that, you can use the table read and write the data in AWS S3.
+
+:::note
+The Hive Metastore service used by the Hive catalog should support AWS s3.
+:::

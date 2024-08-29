@@ -32,8 +32,8 @@ CREATE SCHEMA catalog.schema_name
 
 ### Create table
 
-The Gravitino Trino connector currently supports basic Iceberg table creation statements, such as defining fields,
-allowing null values, and adding comments. The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
+The Apache Gravitino Trino connector currently supports basic Iceberg table creation statements, such as defining fields,
+allowing null values, and adding comments. The Apache Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
 The following example shows how to create a table in the Iceberg catalog:
 
@@ -57,7 +57,7 @@ Support for the following alter table operations:
 
 ## Select
 
-The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
+The Apache Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
 ## Table and Schema properties
@@ -92,10 +92,10 @@ Reserved properties: A reserved property is one can't be set by users but can be
 
 ## Basic usage examples
 
-You need to do the following steps before you can use the Iceberg catalog in Trino through Gravitino.
+You need to do the following steps before you can use the Iceberg catalog in Trino through Apache Gravitino.
 
-- Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `iceberg_test`,
-then you can use the following code to create them in Gravitino:
+- Create a metalake and catalog in Apache Gravitino. Assuming that the metalake name is `test` and the catalog name is `iceberg_test`,
+then you can use the following code to create them in Apache Gravitino:
 
 ```bash
 curl -X POST -H "Content-Type: application/json" \
@@ -125,7 +125,7 @@ For More information about the Iceberg catalog, please refer to [Iceberg catalog
 
 Use the Trino CLI to connect to the Trino container and run a query.
 
-Listing all Gravitino managed catalogs:
+Listing all Apache Gravitino managed catalogs:
 
 ```sql 
 SHOW CATALOGS;
@@ -146,7 +146,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
 The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
-The `iceberg_test` catalog is the catalog created by you in Gravitino.
+The `iceberg_test` catalog is the catalog created by you in Apache Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
@@ -236,3 +236,51 @@ replacing hdfs_user with the appropriate username:
 ```text
 -DHADOOP_USER_NAME=hdfs_user
 ```
+
+## S3
+
+Uses can use AWS S3 storage in the Iceberg catalog. The AWS S3 configuration of Trino Iceberg connector can reference to
+[Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
+The configurations can config by the Iceberg catalog properties with the `trino.bypass.` prefix.
+
+Create an Iceberg catalog with the AWS S3 configuration in the Trino cli:
+
+```sql
+call gravitino.system.create_catalog(
+    'gt_iceberg',
+    'lakehouse-iceberg',
+    map(
+        array['uri', 'catalog-backend', 'warehouse',
+          'trino.bypass.hive.s3.aws-access-key', 'trino.bypass.hive.s3.aws-secret-key', 'trino.bypass.hive.s3.region',
+          's3-access-key-id', 's3-secret-access-key', 's3-region', 'io-impl'
+        ],
+        array['thrift://hive:9083', 'hive', 's3a://trino-test-ice/dw2',
+        'xxx', 'xxx', 'xxx',
+        'xxx', 'xxx', 'xxx', 'org.apache.iceberg.aws.s3.S3FileIO']
+    )
+);
+```
+
+- The configurations of `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key`, `trino.bypass.hive.s3.region`
+are the required the configurations use by the Apache Gravitino Trino connector.
+- The configurations of `s3-access-key-id`, `s3-secret-access-key`, `io-impl` and `s3-region`.
+is the required the configuration of the [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
+- The `location` is the storage path of AWS s3. You need make sure the directory in AWS S3 is exists.
+
+When the Iceberg catalog created successfully, you can create schemas and tables by the following command.
+
+```sql
+CREATE SCHEMA gt_iceberg.gt_db03;
+
+CREATE TABLE gt_iceberg.gt_db03.tb01 (
+    name varchar,
+    salary int
+);
+```
+
+After that, you can use the table read and write the data in AWS S3.
+
+:::note
+The Iceberg catalog module in the Apache Gravitino server should Add AWS s3 support.
+Please refer to [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
+:::
