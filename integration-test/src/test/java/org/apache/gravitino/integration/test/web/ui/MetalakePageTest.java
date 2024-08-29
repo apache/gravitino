@@ -34,7 +34,7 @@ public class MetalakePageTest extends AbstractWebIT {
   private static final String METALAKE_NAME = "metalake_name";
   private static final String EDITED_METALAKE_NAME = METALAKE_NAME + "_edited";
   private static final String FOOTER_LINK_DATASTRATO = "https://gravitino.apache.org/";
-  private static final String FOOTER_LINK_DOCS = "https://datastrato.ai/docs/";
+  private static final String FOOTER_LINK_DOCS = "https://gravitino.apache.org/docs/latest/";
   private static final String FOOTER_LINK_LICENSE =
       "https://github.com/apache/gravitino/blob/main/LICENSE";
   private static final String FOOTER_LINK_SUPPORT = "https://github.com/apache/gravitino/issues";
