@@ -52,7 +52,7 @@ Note. Components have dependencies, so not launching all components may prevent 
 
 ### Using Trino CLI in Docker Container
 
-1. Log in to the Gravitino playground Trino Docker container using the following command:
+1. Login to the Gravitino playground Trino Docker container using the following command:
 
 ```shell
 docker exec -it playground-trino bash
@@ -74,7 +74,7 @@ trino@container_id:/$ trino
 
 ## Using Spark client
 
-1. Log in to the Gravitino playground Spark Docker container using the following command:
+1. Login to the Gravitino playground Spark Docker container using the following command:
 
 ```shell
 docker exec -it playground-spark bash
@@ -163,7 +163,7 @@ GROUP BY e.employee_id,  given_name, family_name;
 
 You might consider generating data with SparkSQL and then querying this data using Trino. Give it a try with Gravitino:
 
-1. login Spark container and execute the SQLs:
+1. Login Spark container and execute the SQLs:
 
 ```sql
 // using Hive catalog to create Hive table
