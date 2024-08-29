@@ -14,4 +14,4 @@ CREATE SCHEMA gt_iceberg_mysql.gt_db2;
 
 USE gt_iceberg_mysql.gt_db2;
 
-DROP  SCHEMA gt_iceberg_mysql.gt_db2;
+DROP SCHEMA gt_iceberg_mysql.gt_db2;
