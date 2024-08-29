@@ -41,7 +41,13 @@ dependencies {
   }
 
   implementation(libs.caffeine)
+  implementation(libs.commons.collections3)
+  implementation(libs.commons.configuration1)
+  implementation(libs.htrace.core4)
   implementation(libs.guava)
+  implementation(libs.hadoop2.auth) {
+    exclude("*")
+  }
   implementation(libs.hive2.exec) {
     artifact {
       classifier = "core"
@@ -49,19 +55,27 @@ dependencies {
     exclude("com.google.code.findbugs", "jsr305")
     exclude("com.google.protobuf")
     exclude("org.apache.avro")
+    exclude("org.apache.ant")
     exclude("org.apache.calcite")
     exclude("org.apache.calcite.avatica")
     exclude("org.apache.curator")
+    exclude("org.apache.derby")
     exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
+    exclude("org.apache.hive", "hive-llap-tez")
+    exclude("org.apache.ivy")
     exclude("org.apache.logging.log4j")
     exclude("org.apache.zookeeper")
+    exclude("org.codehaus.groovy", "groovy-all")
+    exclude("org.datanucleus", "datanucleus-core")
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("org.openjdk.jol")
     exclude("org.pentaho")
     exclude("org.slf4j")
   }
+  implementation(libs.woodstox.core)
   implementation(libs.hive2.metastore) {
+    exclude("ant")
     exclude("co.cask.tephra")
     exclude("com.github.joshelser")
     exclude("com.google.code.findbugs", "jsr305")
@@ -70,13 +84,16 @@ dependencies {
     exclude("com.zaxxer", "HikariCP")
     exclude("io.dropwizard.metricss")
     exclude("javax.transaction", "transaction-api")
+    exclude("org.apache.ant")
     exclude("org.apache.avro")
     exclude("org.apache.curator")
+    exclude("org.apache.derby")
     exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
     exclude("org.apache.hbase")
     exclude("org.apache.logging.log4j")
     exclude("org.apache.parquet", "parquet-hadoop-bundle")
     exclude("org.apache.zookeeper")
+    exclude("org.datanucleus")
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("org.openjdk.jol")
