@@ -32,13 +32,10 @@ dependencies {
     exclude(group = "*")
   }
   implementation(libs.bundles.log4j)
-  implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.slf4j.api)
 
   compileOnly(libs.lombok)
-  implementation(libs.jackson.annotations)
   implementation(libs.ranger.intg) {
     exclude("org.apache.hadoop", "hadoop-common")
     exclude("org.apache.hive", "hive-storage-api")
@@ -50,7 +47,8 @@ dependencies {
     exclude("org.elasticsearch.plugin")
     exclude("org.apache.ranger", "ranger-plugins-audit")
     exclude("org.apache.ranger", "ranger-plugins-cred")
-    exclude("org.apache.ranger", "ranger-plugins-classloader")
+    exclude("org.apache.ranger", "ranger-plugin-classloader")
+    exclude("net.java.dev.jna")
     exclude("javax.ws.rs")
   }
   implementation(libs.javax.ws.rs.api)
@@ -76,6 +74,7 @@ dependencies {
     exclude("org.elasticsearch.client")
     exclude("org.elasticsearch.plugin")
     exclude("javax.ws.rs")
+    exclude("org.apache.ranger", "ranger-plugin-classloader")
   }
   testImplementation(libs.hive2.jdbc) {
     exclude("org.slf4j")
@@ -91,7 +90,11 @@ tasks {
 
   val copyAuthorizationLibs by registering(Copy::class) {
     dependsOn("jar", "runtimeJars")
-    from("build/libs")
+    from("build/libs") {
+      exclude("guava-*.jar")
+      exclude("log4j-*.jar")
+      exclude("slf4j-*.jar")
+    }
     into("$rootDir/distribution/package/authorizations/ranger/libs")
   }
 
