@@ -27,15 +27,15 @@ Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
 
 ## How to use it
 
-1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/spark-connector-runtime) the Gravitino spark connector jar, and place it to the classpath of Spark.
+1. [Build](../how-to-build.md) or download ([gravitino-spark-connector-runtime-3.3](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.3), [gravitino-spark-connector-runtime-3.4](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.4), [gravitino-spark-connector-runtime-3.5](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5)) (https://mvnrepository.com/artifact/org.apache.gravitino/spark-connector-runtime), and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
 
-| Property                                 | Type   | Default Value | Description                                                                                         | Required | Since Version |
-|------------------------------------------|--------|---------------|-----------------------------------------------------------------------------------------------------|----------|---------------|
+| Property                                 | Type   | Default Value | Description                                                                                     | Required | Since Version |
+|------------------------------------------|--------|---------------|-------------------------------------------------------------------------------------------------|----------|---------------|
 | spark.plugins                            | string | (none)        | Gravitino spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin` | Yes      | 0.5.0         |
-| spark.sql.gravitino.metalake             | string | (none)        | The metalake name that spark connector used to request to Gravitino.                                | Yes      | 0.5.0         |
-| spark.sql.gravitino.uri                  | string | (none)        | The uri of Gravitino server address.                                                                | Yes      | 0.5.0         |
-| spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                               | No       | 0.5.1         |
+| spark.sql.gravitino.metalake             | string | (none)        | The metalake name that spark connector used to request to Gravitino.                            | Yes      | 0.5.0         |
+| spark.sql.gravitino.uri                  | string | (none)        | The uri of Gravitino server address.                                                            | Yes      | 0.5.0         |
+| spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                           | No       | 0.5.1         |
 
 ```shell
 ./bin/spark-sql -v \
