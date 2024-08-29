@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Playground introduction
 
-The playground is a complete Apache Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Gravitino` server.
+The playground is a complete Apache Gravitino Docker runtime environment with `Apache Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Apache Gravitino` server.
 
 Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open [http://localhost:8090](http://localhost:8090) in a browser to access the Gravitino Web UI.
 
@@ -17,7 +17,7 @@ Install Git and Docker Compose.
 
 ## TCP ports used
 
-The playground runs a number of services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
+The playground runs several services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
 
 | Docker container      | Ports used           |
 |-----------------------|----------------------|
@@ -30,7 +30,7 @@ The playground runs a number of services. The TCP ports used may clash with exis
 
 ## Start playground
 
-### Launch all components of playground
+### Launch all components of the playground
 
 ```shell
 git clone git@github.com:apache/gravitino-playground.git
@@ -38,7 +38,7 @@ cd gravitino-playground
 ./launch-playground.sh
 ```
 
-### Launch special component or components of playground
+### Launching a component of the playground
 
 ```shell
 git clone git@github.com:apache/gravitino-playground.git
@@ -46,10 +46,9 @@ cd gravitino-playground
 ./launch-playground.sh hive|gravitino|trino|postgresql|mysql|spark|jupyter
 ```
 
-Note. Components have dependencies, only launching one or several components cannot experience
-the full functionality of the playground.
+Note. Components have dependencies, so not launching all components may prevent you from experiencing the full functionality of the playground.
 
-## Experiencing Apache Gravitino with Trino SQL
+## Using Apache Gravitino with Trino SQL
 
 ### Using Trino CLI in Docker Container
 
@@ -109,7 +108,7 @@ SHOW TABLES from catalog_hive.company;
 
 ### Cross-catalog queries
 
-In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data and the sales department uses PostgreSQL. You can run some interesting queries by joining the two departments' data together with Gravitino.
+In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data, and the sales department uses PostgreSQL. You can run some interesting queries by joining the two departments' data together with Gravitino.
 
 To know which employee has the largest sales amount, run this SQL:
 
@@ -148,9 +147,9 @@ GROUP BY e.employee_id,  given_name, family_name;
 
 ### Using Apache Iceberg REST service
 
-If you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
-Gravitino provides an Iceberg REST catalog service, too. You can use Spark to access REST catalog to write the table data.
-Then, you can use Trino to read the data from the Hive table joining the Iceberg table.
+Suppose you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
+Gravitino provides an Iceberg REST catalog service. You can use Spark to access the REST catalog to write the table data.
+Then, you can use Trino to read the data from the Hive table and join it with the Iceberg table.
 
 `spark-defaults.conf` is as follows (It's already configured in the playground):
 
@@ -183,7 +182,7 @@ insert into customers (customer_id, customer_name, customer_email) values (12,'J
 ```
 
 2. Login Trino container and execute the steps.
-You can get all the customers from both the Hive and Iceberg table.
+You can get all the customers from both the Hive and Iceberg tables.
 
 ```shell
 docker exec -it playground-trino bash
@@ -201,21 +200,20 @@ select * from catalog_iceberg.sales.customers;
 
 ### Using Gravitino with LlamaIndex
 
-Gravitino playground also provides a simple RAG demo with LlamaIndex. This demo will show you the
-ability of using Gravitino to manage both tabular and non-tabular dataset, connecting to
+The Gravitino playground also provides a simple RAG demo with LlamaIndex. This demo will show you the
+ability to use Gravitino to manage both tabular and non-tabular datasets, connecting to
 LlamaIndex as a unified data source, then use LlamaIndex and LLM to query both tabular and
 non-tabular data with one natural language query.
 
-The demo is located in the `jupyter` folder, you can open the `gravitino_llama_index_demo.ipynb`
+The demo is located in the `jupyter` folder, and you can open the `gravitino_llama_index_demo.ipynb`
 demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
 
 The scenario of this demo is that basic structured city statistics data is stored in MySQL, and
-detailed city introductions are stored in PDF files. The user wants to know the answers to the
-cities both in the structured data and the PDF files.
+detailed city introductions are stored in PDF files. The user wants to find answers about cities in the structured data and the PDF files.
 
-In this demo, you will use Gravitino to manage the MySQL table using relational catalog, pdf
-files using fileset catalog, treated Gravitino as a unified data source for LlamaIndex to build
-indexes on both tabular and non-tabular data. Then you will use LLM to query the data with natural
+In this demo, you will use Gravitino to manage the MySQL table using a relational catalog, pdf
+files using a fileset catalog, treating Gravitino as a unified data source for LlamaIndex to build
+indexes on both tabular and non-tabular data. Then you will use LLM to query the data using natural
 language queries.
 
 Note: to run this demo, you need to set `OPENAI_API_KEY` in the `gravitino_llama_index_demo.ipynb`,
