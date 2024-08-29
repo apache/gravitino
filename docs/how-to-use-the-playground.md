@@ -64,7 +64,7 @@ docker exec -it playground-trino bash
 trino@container_id:/$ trino
 ```
 
-### Using Jupiter Notebook
+### Using Jupyter Notebook
 
 1. Open the Jupyter Notebook in the browser at [http://localhost:18888](http://localhost:18888).
 
