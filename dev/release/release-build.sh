@@ -250,6 +250,7 @@ if [[ "$1" == "package" ]]; then
 
     echo "Copying release tarballs"
     cp gravitino-* "svn-gravitino/${DEST_DIR_NAME}/"
+    cp apache_gravitino-* "svn-gravitino/${DEST_DIR_NAME}/"
     svn add "svn-gravitino/${DEST_DIR_NAME}"
 
     cd svn-gravitino
@@ -333,7 +334,7 @@ if [[ "$1" == "publish-release" ]]; then
   if ! is_dry_run; then
     nexus_upload=$NEXUS_ROOT/deployByRepositoryId/$staged_repo_id
     echo "Uploading files to $nexus_upload"
-    for file in $(find . -type f)
+    for file in $(find . -type f -not -path "./docs/*" -not -path "./web/*")
     do
       # strip leading ./
       file_short=$(echo $file | sed -e "s/\.\///")
