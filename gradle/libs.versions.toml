@@ -92,6 +92,9 @@ commons-cli = "1.2"
 sun-activation-version = "1.2.0"
 error-prone = "3.1.0"
 woodstox-core = "5.3.0"
+mail = "1.4.1"
+rome = "1.0"
+jettison = "1.1"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -205,6 +208,9 @@ mybatis = { group = "org.mybatis", name = "mybatis", version.ref = "mybatis"}
 h2db = { group = "com.h2database", name = "h2", version.ref = "h2db"}
 awaitility = { group = "org.awaitility", name = "awaitility", version.ref = "awaitility" }
 servlet = { group = "javax.servlet", name = "javax.servlet-api", version.ref = "servlet" }
+mail = { group = "javax.mail", name = "mail", version.ref = "mail" }
+rome = { group = "rome", name = "rome", version.ref = "rome" }
+jettison = { group = "org.codehaus.jettison", name = "jettison", version.ref = "jettison" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]
