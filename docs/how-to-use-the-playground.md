@@ -184,7 +184,7 @@ INSERT OVERWRITE TABLE employees PARTITION(department='Engineering') VALUES (1, 
 INSERT OVERWRITE TABLE employees PARTITION(department='Marketing') VALUES (3, 'Mike Brown', 32);
 ```
 
-2. login Trino container and execute SQLs:
+2. Login Trino container and execute SQLs:
 
 ```sql
 SELECT * FROM catalog_hive.product.employees WHERE department = 'Engineering';
