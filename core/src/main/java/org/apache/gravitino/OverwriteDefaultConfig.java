@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.web;
+package org.apache.gravitino;
 
 import java.util.Map;
 

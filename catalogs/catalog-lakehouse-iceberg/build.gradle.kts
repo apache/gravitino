@@ -36,7 +36,6 @@ dependencies {
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(project(":iceberg:iceberg-common"))
-  implementation(project(":server-common"))
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.jetty)
