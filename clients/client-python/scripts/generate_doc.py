@@ -22,7 +22,7 @@ import os
 import shutil
 
 from gravitino.constants.doc import DOC_DIR
-from gravitino.constants.root import GRAVITINO_DIR, MODULE_NAME
+from gravitino.constants.root import GRAVITINO_DIR, MODULE_NAME, PROJECT_ROOT
 
 if __name__ == "__main__":
 
@@ -40,3 +40,15 @@ if __name__ == "__main__":
 
     # Write doc for submodules
     pydoc.writedocs(GRAVITINO_DIR.as_posix(), MODULE_NAME + ".")
+
+    # Remove compile path in the python client docs
+    for root, _, files in os.walk(DOC_DIR):
+        for file in files:
+            file_path = os.path.join(root, file)
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            content = content.replace(
+                f"PosixPath('{PROJECT_ROOT.parent}", "PosixPath('"
+            )
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
