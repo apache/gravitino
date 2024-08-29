@@ -115,6 +115,13 @@ tasks {
   val copyAuthorizationConfig by registering(Copy::class) {
     from("src/main/resources")
     into("$rootDir/distribution/package/authorizations/ranger/conf")
+    rename { original ->
+      if (original.endsWith(".properties.template")) {
+        original.replace(".properties.template", ".properties")
+      } else {
+        original
+      }
+    }
     exclude("META-INF")
     fileMode = 0b111101101
   }

@@ -86,7 +86,7 @@ public class AuthorizationConfig extends Config {
             File.separator,
             System.getenv("GRAVITINO_HOME"),
             "authorizations",
-            provideName,
+            "ranger",
             "conf",
             propertyFilePath);
     try {
