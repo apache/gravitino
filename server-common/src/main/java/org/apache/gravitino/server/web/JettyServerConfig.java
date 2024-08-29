@@ -31,6 +31,7 @@ import java.util.Set;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.OverwriteDefaultConfig;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -41,8 +42,6 @@ public final class JettyServerConfig {
   private static final Logger LOG = LoggerFactory.getLogger(JettyServerConfig.class);
   public static final String GRAVITINO_SERVER_CONFIG_PREFIX = "gravitino.server.webserver.";
   private static final String SPLITTER = ",";
-  public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
-  public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
   public static final int DEFAULT_GRAVITINO_WEBSERVER_HTTP_PORT = 8090;
   public static final int DEFAULT_GRAVITINO_WEBSERVER_HTTPS_PORT = 8433;
 
@@ -54,7 +53,7 @@ public final class JettyServerConfig {
           .createWithDefault("0.0.0.0");
 
   public static final ConfigEntry<Integer> WEBSERVER_HTTP_PORT =
-      new ConfigBuilder("httpPort")
+      new ConfigBuilder(ConfigConstants.WEBSERVER_HTTP_PORT)
           .doc("The http port number of the Jetty web server")
           .version(ConfigConstants.VERSION_0_1_0)
           .intConf()
@@ -126,7 +125,7 @@ public final class JettyServerConfig {
           .createWithDefault(false);
 
   public static final ConfigEntry<Integer> WEBSERVER_HTTPS_PORT =
-      new ConfigBuilder("httpsPort")
+      new ConfigBuilder(ConfigConstants.WEBSERVER_HTTPS_PORT)
           .doc("The https port number of the Jetty web server")
           .version(ConfigConstants.VERSION_0_3_0)
           .intConf()

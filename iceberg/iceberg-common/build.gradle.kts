@@ -28,7 +28,6 @@ dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":core"))
   implementation(project(":common"))
-  implementation(project(":server-common"))
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.log4j)
   implementation(libs.caffeine)
@@ -83,6 +82,7 @@ dependencies {
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
+  testImplementation(project(":server-common"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.sqlite.jdbc)
