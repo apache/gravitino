@@ -172,7 +172,7 @@ license: "This software is licensed under the Apache License version 2."
 
    This creates `gravitino-iceberg-rest-server-{version}.tar.gz` and `gravitino-iceberg-rest-server-{version}.tar.gz.sha256` under the `distribution` directory. You can uncompress and deploy it to use the Gravitino Iceberg REST server.
 
-## How to Build Apache Gravitino on Windows (Using WSL)
+## How to build Apache Gravitino on Windows (Using WSL)
 
 ### Download WSL (Ubuntu)
 
@@ -184,7 +184,7 @@ Refer to this guide for installation: [WSL Installation Guide](https://learn.mic
 
 This step involves setting up your Windows machine's Windows Subsystem for Linux (WSL). WSL allows you to run a Linux distribution alongside Windows, providing a Linux-like environment for development.
 
-### Update Package List and Install Necessary Packages
+### Update package list and install necessary packages
 
 **On Ubuntu (WSL):**
 
@@ -195,7 +195,7 @@ sudo apt install apt-transport-https ca-certificates curl software-properties-co
 
 Updating the package list ensures you have the latest information on the newest versions of packages and dependencies. Installing the necessary packages lets your system download and manage additional software securely.
 
-### Download and Setup Java SDK 17 (11 or 8 also works)
+### Download and setup Java SDK 17 (11 or 8 also works)
 
 **On Ubuntu (WSL):**
 
@@ -250,7 +250,7 @@ python3.11 --version
 
 These commands add a repository that provides the latest Python versions and installs Python 3.11.
 
-### Download Apache Gravitino Project to WSL
+### Download Apache Gravitino project to WSL
 
 **On Ubuntu (WSL):**
 
