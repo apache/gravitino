@@ -16,12 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi.backend.hms;
+package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
-import org.apache.gravitino.catalog.hudi.HudiSchema;
+import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.hadoop.hive.metastore.api.Database;
 
-public class HudiHMSSchema extends HudiSchema {
+public class HudiHMSSchema extends HudiSchema<Database> {
 
   public static Builder builder() {
     return new Builder();
@@ -29,6 +29,11 @@ public class HudiHMSSchema extends HudiSchema {
 
   private HudiHMSSchema() {
     super();
+  }
+
+  @Override
+  public Database fromHudiSchema() {
+    throw new UnsupportedOperationException("Not implemented yet");
   }
 
   public static class Builder extends HudiSchema.Builder<Database> {

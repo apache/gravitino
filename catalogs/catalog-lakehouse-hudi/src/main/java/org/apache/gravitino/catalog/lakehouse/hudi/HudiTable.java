@@ -16,12 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi;
+package org.apache.gravitino.catalog.lakehouse.hudi;
 
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
 
-public abstract class HudiTable extends BaseTable {
+/**
+ * Represents a table from a Hudi catalog. Different Hudi catalog backends should extend this
+ * abstract class and the inner Builder class to provide the conversion between the backend table
+ * and the HudiTable.
+ *
+ * @param <TABLE> the table type from the backend
+ */
+public abstract class HudiTable<TABLE> extends BaseTable {
+  /**
+   * Converts the HudiTable to the backend table.
+   *
+   * @return the backend table
+   */
+  public abstract TABLE fromHudiTable();
 
   @Override
   public TableOperations newOps() throws UnsupportedOperationException {
@@ -37,12 +50,23 @@ public abstract class HudiTable extends BaseTable {
     }
 
     @Override
-    protected HudiTable internalBuild() {
+    protected HudiTable<T> internalBuild() {
       return backendTable == null ? simpleBuild() : buildFromTable(backendTable);
     }
 
-    protected abstract HudiTable simpleBuild();
+    /**
+     * Builds a simple HudiTable without a backend table.
+     *
+     * @return the HudiTable
+     */
+    protected abstract HudiTable<T> simpleBuild();
 
-    protected abstract HudiTable buildFromTable(T backendTable);
+    /**
+     * Builds a HudiTable from the backend table.
+     *
+     * @param backendTable the backend table
+     * @return the HudiTable
+     */
+    protected abstract HudiTable<T> buildFromTable(T backendTable);
   }
 }

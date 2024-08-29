@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi.backend.hms;
+package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.catalog.hudi.ops.HudiCatalogOps;
+import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -36,7 +36,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 
-public class HudiHMSBackendOps implements HudiCatalogOps {
+public class HudiHMSBackendOps implements HudiCatalogBackendOps {
 
   @Override
   public void initialize(Map<String, String> properties) {

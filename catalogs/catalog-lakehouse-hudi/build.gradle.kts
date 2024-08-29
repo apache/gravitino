@@ -25,13 +25,17 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":core"))
+  implementation(project(":api")) {
+    exclude(group = "*")
+  }
+  implementation(project(":core")) {
+    exclude(group = "*")
+  }
 
   implementation(libs.guava)
   implementation(libs.hive2.metastore) {
     exclude("*")
   }
-  implementation("org.apache.thrift:libthrift:0.12.0")
   implementation(libs.slf4j.api)
+  implementation(libs.thrift)
 }

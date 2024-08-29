@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi;
+package org.apache.gravitino.catalog.lakehouse.hudi;
 
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
-public class HudiSchemaPropertiesMetadata extends BasePropertiesMetadata {
+public class HudiTablePropertiesMetadata extends BasePropertiesMetadata {
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return Collections.emptyMap();

@@ -16,18 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi.backend.hms;
+package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
-import org.apache.gravitino.catalog.hudi.HudiTable;
+import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
 import org.apache.hadoop.hive.metastore.api.Table;
 
-public class HudiHMSTable extends HudiTable {
+public class HudiHMSTable extends HudiTable<Table> {
   public static Builder builder() {
     return new Builder();
   }
 
   private HudiHMSTable() {
     super();
+  }
+
+  @Override
+  public Table fromHudiTable() {
+    throw new UnsupportedOperationException("Not implemented yet");
   }
 
   public static class Builder extends HudiTable.Builder<Table> {

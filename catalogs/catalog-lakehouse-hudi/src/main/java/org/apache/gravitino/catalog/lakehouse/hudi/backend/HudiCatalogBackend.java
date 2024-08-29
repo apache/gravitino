@@ -16,25 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi.backend.hms;
+package org.apache.gravitino.catalog.lakehouse.hudi.backend;
 
 import java.util.Map;
-import org.apache.gravitino.catalog.hudi.backend.HudiCatalogBackend;
-import org.apache.gravitino.catalog.hudi.ops.HudiCatalogOps;
+import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
 
-public class HudiHMSBackend extends HudiCatalogBackend {
+/** Base class for Hudi catalog backends. */
+public abstract class HudiCatalogBackend {
 
-  public HudiHMSBackend() {
-    this(HudiCatalogBackend.Type.HMS, new HudiHMSBackendOps());
+  private final Type backendType;
+
+  private final HudiCatalogBackendOps catalogOps;
+
+  public abstract void initialize(Map<String, String> properties);
+
+  public enum Type {
+    HMS, // Hive Metastore backend
   }
 
-  private HudiHMSBackend(HudiCatalogBackend.Type backendType, HudiCatalogOps catalogOps) {
-    super(backendType, catalogOps);
+  protected HudiCatalogBackend(Type backendType, HudiCatalogBackendOps catalogOps) {
+    this.backendType = backendType;
+    this.catalogOps = catalogOps;
   }
 
-  @Override
-  public void initialize(Map<String, String> properties) {
-    // todo: initialize the catalogOps
-    catalogOps().initialize(properties);
+  public Type type() {
+    return backendType;
+  }
+
+  public HudiCatalogBackendOps catalogOps() {
+    return catalogOps;
   }
 }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi;
+package org.apache.gravitino.catalog.lakehouse.hudi;
 
 import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalog;

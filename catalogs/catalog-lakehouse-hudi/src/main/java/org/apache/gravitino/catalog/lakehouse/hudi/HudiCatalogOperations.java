@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi;
+package org.apache.gravitino.catalog.lakehouse.hudi;
 
 import java.util.Map;
 import org.apache.gravitino.Catalog;
@@ -24,9 +24,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.catalog.hudi.backend.HudiCatalogBackend;
-import org.apache.gravitino.catalog.hudi.ops.HudiCatalogOps;
-import org.apache.gravitino.catalog.hudi.utils.CatalogUtils;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
+import org.apache.gravitino.catalog.lakehouse.hudi.utils.CatalogUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -54,7 +54,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private static final Logger LOG = LoggerFactory.getLogger(HudiCatalogOperations.class);
 
-  private HudiCatalogOps hudiCatalogOps;
+  private HudiCatalogBackendOps hudiCatalogBackendOps;
 
   /**
    * Load the Hudi Catalog Backend and initialize the Hudi Catalog Operations.
@@ -69,7 +69,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     HudiCatalogBackend hudiCatalogBackend = CatalogUtils.loadHudiCatalogBackend(config);
-    hudiCatalogOps = hudiCatalogBackend.catalogOps();
+    hudiCatalogBackendOps = hudiCatalogBackend.catalogOps();
   }
 
   /**
@@ -91,7 +91,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> properties)
       throws Exception {
     try {
-      hudiCatalogOps.listSchemas(null);
+      hudiCatalogBackendOps.listSchemas(null);
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run listSchemas on Hudi catalog: %s", e.getMessage());
@@ -100,9 +100,9 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @Override
   public void close() {
-    if (hudiCatalogOps != null) {
+    if (hudiCatalogBackendOps != null) {
       try {
-        hudiCatalogOps.close();
+        hudiCatalogBackendOps.close();
       } catch (Exception e) {
         LOG.warn("Failed to close Hudi catalog", e);
       }
@@ -118,7 +118,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
-    return hudiCatalogOps.listSchemas(namespace);
+    return hudiCatalogBackendOps.listSchemas(namespace);
   }
 
   /**
@@ -134,7 +134,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return hudiCatalogOps.createSchema(ident, comment, properties);
+    return hudiCatalogBackendOps.createSchema(ident, comment, properties);
   }
 
   /**
@@ -146,7 +146,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
-    return hudiCatalogOps.loadSchema(ident);
+    return hudiCatalogBackendOps.loadSchema(ident);
   }
 
   /**
@@ -160,7 +160,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
-    return hudiCatalogOps.alterSchema(ident, changes);
+    return hudiCatalogBackendOps.alterSchema(ident, changes);
   }
 
   /**
@@ -173,7 +173,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
-    return hudiCatalogOps.dropSchema(ident, cascade);
+    return hudiCatalogBackendOps.dropSchema(ident, cascade);
   }
 
   /**
@@ -185,7 +185,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
-    return hudiCatalogOps.listTables(namespace);
+    return hudiCatalogBackendOps.listTables(namespace);
   }
 
   /**
@@ -197,7 +197,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    return hudiCatalogOps.loadTable(ident);
+    return hudiCatalogBackendOps.loadTable(ident);
   }
 
   /**
@@ -226,7 +226,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    return hudiCatalogOps.createTable(
+    return hudiCatalogBackendOps.createTable(
         ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
   }
 
@@ -242,7 +242,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    return hudiCatalogOps.alterTable(ident, changes);
+    return hudiCatalogBackendOps.alterTable(ident, changes);
   }
 
   /**
@@ -253,6 +253,6 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
    */
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    return hudiCatalogOps.dropTable(ident);
+    return hudiCatalogBackendOps.dropTable(ident);
   }
 }

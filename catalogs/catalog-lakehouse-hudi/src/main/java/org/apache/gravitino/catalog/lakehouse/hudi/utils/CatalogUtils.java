@@ -16,16 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi;
+package org.apache.gravitino.catalog.lakehouse.hudi.utils;
 
-import java.util.Collections;
 import java.util.Map;
-import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
-import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.HudiHMSBackend;
 
-public class HudiCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
-  @Override
-  protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return Collections.emptyMap();
+public class CatalogUtils {
+  private CatalogUtils() {}
+
+  public static HudiCatalogBackend loadHudiCatalogBackend(Map<String, String> properties) {
+    // todo: load and initialize the backend based on the properties
+    HudiCatalogBackend hudiHMSBackend = new HudiHMSBackend();
+    hudiHMSBackend.initialize(properties);
+    return hudiHMSBackend;
   }
 }

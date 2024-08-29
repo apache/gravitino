@@ -16,19 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi.utils;
+package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
 import java.util.Map;
-import org.apache.gravitino.catalog.hudi.backend.HudiCatalogBackend;
-import org.apache.gravitino.catalog.hudi.backend.hms.HudiHMSBackend;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
 
-public class CatalogUtils {
-  private CatalogUtils() {}
+public class HudiHMSBackend extends HudiCatalogBackend {
 
-  public static HudiCatalogBackend loadHudiCatalogBackend(Map<String, String> properties) {
-    // todo: load and initialize the backend based on the properties
-    HudiCatalogBackend hudiHMSBackend = new HudiHMSBackend();
-    hudiHMSBackend.initialize(properties);
-    return hudiHMSBackend;
+  public HudiHMSBackend() {
+    this(HudiCatalogBackend.Type.HMS, new HudiHMSBackendOps());
+  }
+
+  private HudiHMSBackend(HudiCatalogBackend.Type backendType, HudiCatalogBackendOps catalogOps) {
+    super(backendType, catalogOps);
+  }
+
+  @Override
+  public void initialize(Map<String, String> properties) {
+    // todo: initialize the catalogOps
+    catalogOps().initialize(properties);
   }
 }

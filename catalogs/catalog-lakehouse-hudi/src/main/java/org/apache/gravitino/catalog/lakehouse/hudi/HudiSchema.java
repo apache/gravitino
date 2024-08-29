@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi;
+package org.apache.gravitino.catalog.lakehouse.hudi;
 
 import org.apache.gravitino.connector.BaseSchema;
 
@@ -24,8 +24,16 @@ import org.apache.gravitino.connector.BaseSchema;
  * Represents a schema (database) from a Hudi catalog. Different Hudi catalog backends should extend
  * this abstract class and the inner Builder class to provide the conversion between the backend
  * schema and the HudiSchema.
+ *
+ * @param <DATABASE> the schema (database) type from the backend
  */
-public abstract class HudiSchema extends BaseSchema {
+public abstract class HudiSchema<DATABASE> extends BaseSchema {
+  /**
+   * Converts the HudiSchema to the backend schema (database).
+   *
+   * @return the backend schema (database)
+   */
+  public abstract DATABASE fromHudiSchema();
 
   /**
    * Builder class for HudiSchema. The builder should be extended by the backend schema builder to
@@ -55,7 +63,7 @@ public abstract class HudiSchema extends BaseSchema {
      * @return the HudiSchema
      */
     @Override
-    protected HudiSchema internalBuild() {
+    protected HudiSchema<T> internalBuild() {
       return backendSchema == null ? simpleBuild() : buildFromSchema(backendSchema);
     }
 
@@ -64,7 +72,7 @@ public abstract class HudiSchema extends BaseSchema {
      *
      * @return the HudiSchema
      */
-    protected abstract HudiSchema simpleBuild();
+    protected abstract HudiSchema<T> simpleBuild();
 
     /**
      * Builds the HudiSchema from the backend schema (database).
@@ -72,6 +80,6 @@ public abstract class HudiSchema extends BaseSchema {
      * @param schema the backend schema (database)
      * @return the HudiSchema
      */
-    protected abstract HudiSchema buildFromSchema(T schema);
+    protected abstract HudiSchema<T> buildFromSchema(T schema);
   }
 }

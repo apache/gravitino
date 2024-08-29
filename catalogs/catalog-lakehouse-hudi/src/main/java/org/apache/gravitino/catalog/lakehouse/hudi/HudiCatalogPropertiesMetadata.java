@@ -16,34 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi.backend;
+package org.apache.gravitino.catalog.lakehouse.hudi;
 
+import java.util.Collections;
 import java.util.Map;
-import org.apache.gravitino.catalog.hudi.ops.HudiCatalogOps;
+import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
+import org.apache.gravitino.connector.PropertyEntry;
 
-/** Base class for Hudi catalog backends. */
-public abstract class HudiCatalogBackend {
-
-  private final Type backendType;
-
-  private final HudiCatalogOps catalogOps;
-
-  public abstract void initialize(Map<String, String> properties);
-
-  public enum Type {
-    HMS, // Hive Metastore backend
-  }
-
-  protected HudiCatalogBackend(Type backendType, HudiCatalogOps catalogOps) {
-    this.backendType = backendType;
-    this.catalogOps = catalogOps;
-  }
-
-  public Type type() {
-    return backendType;
-  }
-
-  public HudiCatalogOps catalogOps() {
-    return catalogOps;
+public class HudiCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
+  @Override
+  protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+    return Collections.emptyMap();
   }
 }

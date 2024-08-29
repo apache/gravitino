@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-org.apache.gravitino.catalog.hudi.HudiCatalog
+org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalog

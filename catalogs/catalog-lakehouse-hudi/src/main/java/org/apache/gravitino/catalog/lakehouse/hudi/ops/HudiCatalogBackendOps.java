@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hudi.ops;
+package org.apache.gravitino.catalog.lakehouse.hudi.ops;
 
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.catalog.hudi.HudiSchema;
+import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -38,7 +38,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 
 /** Operations for Interacting with Hudi Catalog. */
-public interface HudiCatalogOps extends AutoCloseable {
+public interface HudiCatalogBackendOps extends AutoCloseable {
 
   void initialize(Map<String, String> properties);
 
