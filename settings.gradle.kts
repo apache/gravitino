@@ -56,7 +56,8 @@ if (scalaVersion == "2.12") {
   project(":spark-connector:spark-3.3").projectDir = file("spark-connector/v3.3/spark")
   project(":spark-connector:spark-runtime-3.3").projectDir = file("spark-connector/v3.3/spark-runtime")
   // flink only support scala 2.12
-  include("flink-connector")
+  include("flink-connector:flink")
+  include("flink-connector:flink-runtime")
 }
 include("spark-connector:spark-3.4", "spark-connector:spark-runtime-3.4", "spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
 project(":spark-connector:spark-3.4").projectDir = file("spark-connector/v3.4/spark")

@@ -23,7 +23,7 @@ This capability allows users to perform federation queries, accessing data from 
 
 ## How to use it
 
-1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector) the Gravitino flink connector jar, and place it to the classpath of Flink.
+1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18) the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
 2. Configure the Flink configuration to use the Gravitino flink connector.
 
 | Property                                         | Type   | Default Value     | Description                                                          | Required | Since Version |
