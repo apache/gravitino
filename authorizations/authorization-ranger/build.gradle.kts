@@ -94,8 +94,8 @@ tasks {
     from(configurations.runtimeClasspath, "src/main/resources")
     into("build/libs")
     rename { original ->
-      if (original.endsWith(".properties.template")) {
-        original.replace(".properties.template", ".properties")
+      if (original.endsWith(".template")) {
+        original.replace(".template", "")
       } else {
         original
       }
@@ -116,8 +116,8 @@ tasks {
     from("src/main/resources")
     into("$rootDir/distribution/package/authorizations/ranger/conf")
     rename { original ->
-      if (original.endsWith(".properties.template")) {
-        original.replace(".properties.template", ".properties")
+      if (original.endsWith(".template")) {
+        original.replace(".template", "")
       } else {
         original
       }

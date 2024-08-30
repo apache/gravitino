@@ -21,7 +21,6 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.util.List;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
@@ -58,37 +57,35 @@ public class AuthorizationConfig extends Config {
   public static final String PRIVILEGE_MAPPING_PREFIX =
       "gravitino.authorization.privilege.mapping.";
 
-  public static AuthorizationConfig loadConfig(String provideName) {
+  public static AuthorizationConfig loadConfig(String providerName) {
     AuthorizationConfig authorizationConfig = new AuthorizationConfig();
     boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
     String propertyFilePath =
-        String.format("authorization-defs/authorization-%s.properties", provideName);
+        String.format("authorization-defs/authorization-%s.properties", providerName);
 
-    // Only load from resources in test environment
+    String confPath;
     if (testEnv) {
-      URL resourceUrl = AuthorizationConfig.class.getResource(File.separator + propertyFilePath);
-      try {
-        if (resourceUrl != null) {
-          Properties properties =
-              authorizationConfig.loadPropertiesFromFile(new File(resourceUrl.getPath()));
-          authorizationConfig.loadFromProperties(properties);
-          return authorizationConfig;
-        }
-      } catch (IOException e) {
-        throw new IllegalArgumentException(
-            "Failed to load authorization config from resource " + resourceUrl, e);
-      }
+      // Load from resources in test environment
+      confPath =
+          String.join(
+              File.separator,
+              System.getenv("GRAVITINO_HOME"),
+              "authorizations",
+              "authorization-ranger",
+              "build",
+              "libs",
+              propertyFilePath);
+    } else {
+      // Load from configuration directory in production environment
+      confPath =
+          String.join(
+              File.separator,
+              System.getenv("GRAVITINO_HOME"),
+              "authorizations",
+              "ranger",
+              "conf",
+              propertyFilePath);
     }
-
-    // Load from configuration directory in production environment
-    String confPath =
-        String.join(
-            File.separator,
-            System.getenv("GRAVITINO_HOME"),
-            "authorizations",
-            "ranger",
-            "conf",
-            propertyFilePath);
     try {
       Properties properties = authorizationConfig.loadPropertiesFromFile(new File(confPath));
       authorizationConfig.loadFromProperties(properties);
@@ -96,6 +93,7 @@ public class AuthorizationConfig extends Config {
       throw new IllegalArgumentException(
           "Failed to load authorization config from file " + confPath, e);
     }
+
     return authorizationConfig;
   }
 }

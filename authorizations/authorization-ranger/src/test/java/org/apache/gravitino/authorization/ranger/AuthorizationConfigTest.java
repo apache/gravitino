@@ -34,10 +34,9 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class AuthorizationConfigTest {
   @Test
-  public void testErrorHiveProperties() {
+  public void testNonstandardHiveProperties() {
     AuthorizationConfig authorizationConfig = new AuthorizationConfig();
-    String propertyFilePath =
-        String.format("/authorization-defs/authorization-%s.properties", "hive");
+    String propertyFilePath = "/authorization-defs/authorization-hive-nonstandard.properties";
     URL resourceUrl = AuthorizationConfigTest.class.getResource(propertyFilePath);
     try {
       if (resourceUrl != null) {
