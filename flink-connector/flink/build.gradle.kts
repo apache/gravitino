@@ -41,7 +41,6 @@ dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":common"))
   implementation(project(":core"))
-  implementation(project(":clients:client-java"))
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
@@ -77,9 +76,13 @@ dependencies {
     exclude("org.slf4j")
   }
 
+  // replace with client-java-runtime in flink connector runtime
+  compileOnly(project(":clients:client-java"))
+
   testAnnotationProcessor(libs.lombok)
 
   testCompileOnly(libs.lombok)
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
