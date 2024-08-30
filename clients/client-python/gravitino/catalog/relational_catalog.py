@@ -81,8 +81,8 @@ class RelationalCatalog(BaseSchemaCatalog, TableCatalog):
         :param namespace: The namespace to check.
         """
         Namespace.check(
-            namespace is not None and namespace.length() == 3,
-            f"Table namespace must be non-null and have 3 level, the input namespace is {namespace}",
+            namespace is not None and namespace.length() == 1,
+            f"Table namespace must be non-null and have 1 level, the input namespace is {namespace}",
         )
 
     @staticmethod
