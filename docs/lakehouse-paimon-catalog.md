@@ -72,12 +72,13 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 ### Table capabilities
 
 - Supporting createTable, dropTable, alterTable, loadTable and listTable.
-```
-dropTable will delete the table location directly, similar with purgeTable.
-```
 - Supporting Column default value through table properties, such as `fields.{columnName}.default-value`, not column expression.
  
 - Doesn't support table distribution and sort orders.
+
+:::info
+Paimon does not support purgeTable, but the dropTable will both remove the table metadata and the table location from the file system and skip the trash.
+:::
 
 :::info
 Paimon does not support auto increment column.
@@ -85,6 +86,7 @@ Paimon does not support auto increment column.
 
 #### Table changes
 
+- RenameTable
 - AddColumn
 - DeleteColumn
 - RenameColumn
