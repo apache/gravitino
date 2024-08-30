@@ -100,7 +100,7 @@ Changelog
 
 - datastrato/trino:426-gravitino-0.3.0
   - Docker image `datastrato/trino:426-gravitino-0.3.0`
-  - Base on `trino:462`
+  - Base on `trino:426`
   - Added Gravitino trino-connector-0.3.0 libraries into the `/usr/lib/trino/plugin/gravitino`
 
 # Developer Docker images
