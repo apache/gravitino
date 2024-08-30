@@ -25,21 +25,45 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":core"))
-  implementation(project(":common"))
+  implementation(project(":api")) {
+    exclude(group = "*")
+  }
 
-  implementation(libs.guava)
+  implementation(project(":core")) {
+    exclude(group = "*")
+  }
+  implementation(project(":common")) {
+    exclude(group = "*")
+  }
+
   implementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
+    exclude("org.eclipse.jetty", "*")
+    exclude("org.apache.hadoop", "hadoop-auth")
+    exclude("org.apache.curator", "curator-client")
+    exclude("org.apache.curator", "curator-framework")
+    exclude("org.apache.curator", "curator-recipes")
+    exclude("org.apache.avro", "avro")
+    exclude("com.sun.jersey", "jersey-servlet")
   }
 
   implementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
+    exclude("com.google.guava", "guava")
+    exclude("commons-io", "commons-io")
+    exclude("org.eclipse.jetty", "*")
+    exclude("io.netty")
+    exclude("org.fusesource.leveldbjni")
   }
-  implementation(libs.hadoop3.client)
+  implementation(libs.hadoop3.client) {
+    exclude("org.apache.hadoop", "hadoop-mapreduce-client-core")
+    exclude("org.apache.hadoop", "hadoop-mapreduce-client-jobclient")
+    exclude("org.apache.hadoop", "hadoop-yarn-api")
+    exclude("org.apache.hadoop", "hadoop-yarn-client")
+    exclude("com.squareup.okhttp", "okhttp")
+  }
 
   implementation(libs.slf4j.api)
 
@@ -71,7 +95,18 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn("jar", "runtimeJars")
-    from("build/libs")
+    from("build/libs") {
+      exclude("slf4j-*.jar")
+      exclude("guava-*.jar")
+      exclude("curator-*.jar")
+      exclude("netty-*.jar")
+      exclude("snappy-*.jar")
+      exclude("zookeeper-*.jar")
+      exclude("jetty-*.jar")
+      exclude("javax.servlet-*.jar")
+      exclude("kerb-*.jar")
+      exclude("kerby-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
 

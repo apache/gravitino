@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Playground introduction
 
-The playground is a complete Apache Gravitino Docker runtime environment with `Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Gravitino` server.
+The playground is a complete Apache Gravitino Docker runtime environment with `Apache Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Apache Gravitino` server.
 
 Depending on your network and computer, startup time may take 3-5 minutes. Once the playground environment has started, you can open [http://localhost:8090](http://localhost:8090) in a browser to access the Gravitino Web UI.
 
@@ -17,20 +17,20 @@ Install Git and Docker Compose.
 
 ## TCP ports used
 
-The playground runs a number of services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
+The playground runs several services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
 
-| Docker container      | Ports used     |
-|-----------------------|----------------|
-| playground-gravitino  | 8090 9001      |
-| playground-hive       | 3307 9000 9083 |
-| playground-mysql      | 3306           |
-| playground-postgresql | 5342           |
-| playground-trino      | 8080           |
-| playground-jupyter    | 8888           |
+| Docker container      | Ports used             |
+|-----------------------|------------------------|
+| playground-gravitino  | 8090 9001              |
+| playground-hive       | 3307 19000 19083 60070 |
+| playground-mysql      | 13306                  |
+| playground-postgresql | 15342                  |
+| playground-trino      | 18080                  |
+| playground-jupyter    | 18888                  |
 
 ## Start playground
 
-### Launch all components of playground
+### Launch all components of the playground
 
 ```shell
 git clone git@github.com:apache/gravitino-playground.git
@@ -38,68 +38,21 @@ cd gravitino-playground
 ./launch-playground.sh
 ```
 
-### Launch big data components of playground
-
-```shell
-git clone git@github.com:apache/gravitino-playground.git
-cd gravitino-playground
-./launch-playground.sh bigdata
-# equivalent to
-./launch-playground.sh hive gravitino trino postgresql mysql spark
-```
-
-### Launch AI components of playground
-
-```shell
-git clone git@github.com:apache/gravitino-playground.git
-cd gravitino-playground
-./launch-playground.sh ai
-# equivalent to
-./launch-playground.sh hive gravitino mysql jupyter
-```
 
 ### Launch special component or components of playground
-
 ```shell
 git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
 ./launch-playground.sh hive|gravitino|trino|postgresql|mysql|spark|jupyter
 ```
 
-### Experiencing Apache Gravitino Fileset with Jupyter
+Note. Components have dependencies, so not launching all components may prevent you from experiencing the full functionality of the playground.
 
-We provide a Fileset playground environment to help you quickly understand how to use Gravitino
-Python client to manage non-tabular data on HDFS via fileset in Gravitino service.
-You can refer document of [Launch AI components of playground](#launch-ai-components-of-playground)
-to launch a Gravitino server, HDFS and Jupyter notebook environment in you local Docker environment.
+## Using Apache Gravitino with Trino SQL
 
-Waiting for the playground Docker environment to start, you can directly open
-`http://localhost:8888/lab/tree/gravitino-fileset-example.ipynb` in the browser and run the example.
+### Using Trino CLI in Docker Container
 
-The [gravitino-fileset-example](https://github.com/apache/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
-contains the following code snippets:
-
-1. Install HDFS Python client.
-2. Create a HDFS client to connect HDFS and to do some test operations.
-3. Install Gravitino Python client.
-4. Initialize Gravitino admin client and create a Gravitino metalake.
-5. Initialize Gravitino client and list metalakes.
-6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is
-   [hadoop](./hadoop-catalog.md)
-7. Create a Gravitino `Schema` with the `location` pointed to a HDFS path, and use `hdfs client` to
-   check if the schema location is successfully created in HDFS.
-8. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](./manage-fileset-metadata-using-gravitino.md#fileset-operations),
-   use `hdfs client` to check if the fileset location was successfully created in HDFS.
-9. Drop this `Fileset.Type.MANAGED` type fileset and check if the fileset location was
-   successfully deleted in HDFS.
-10. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](./manage-fileset-metadata-using-gravitino.md#fileset-operations)
-    and `location` pointed to exist HDFS path
-11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
-    not deleted in HDFS.
-
-## Experiencing Apache Gravitino with Trino SQL
-
-1. Log in to the Gravitino playground Trino Docker container using the following command:
+1. Login to the Gravitino playground Trino Docker container using the following command:
 
 ```shell
 docker exec -it playground-trino bash
@@ -111,9 +64,31 @@ docker exec -it playground-trino bash
 trino@container_id:/$ trino
 ```
 
+## Using Jupyter Notebook
+
+1. Open the Jupyter Notebook in the browser at [http://localhost:18888](http://localhost:18888).
+
+2. Open the `gravitino-trino-example.ipynb` notebook.
+
+3. Start the notebook and run the cells.
+
+## Using Spark client
+
+1. Login to the Gravitino playground Spark Docker container using the following command:
+
+```shell
+docker exec -it playground-spark bash
+````
+
+2. Open the Spark SQL client in the container.
+
+```shell
+spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql 
+```
+
 ## Example
 
-### Simple queries
+### Simple Trino queries
 
 You can use simple queries to test in the Trino CLI.
 
@@ -147,7 +122,7 @@ SHOW TABLES from catalog_hive.company;
 
 ### Cross-catalog queries
 
-In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data and the sales department uses PostgreSQL. You can run some interesting queries by joining the two departments' data together with Gravitino.
+In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data, and the sales department uses PostgreSQL. You can run some interesting queries by joining the two departments' data together with Gravitino.
 
 To know which employee has the largest sales amount, run this SQL:
 
@@ -184,21 +159,55 @@ WHERE e.employee_id = p.employee_id AND p.employee_id = s.employee_id
 GROUP BY e.employee_id,  given_name, family_name;
 ```
 
+### Using Spark and Trino
+
+You might consider generating data with SparkSQL and then querying this data using Trino. Give it a try with Gravitino:
+
+1. Login Spark container and execute the SQLs:
+
+```sql
+// using Hive catalog to create Hive table
+USE catalog_hive;
+CREATE DATABASE product;
+USE product;
+
+CREATE TABLE IF NOT EXISTS employees (
+    id INT,
+    name STRING,
+    age INT
+)
+PARTITIONED BY (department STRING)
+STORED AS PARQUET;
+DESC TABLE EXTENDED employees;
+
+INSERT OVERWRITE TABLE employees PARTITION(department='Engineering') VALUES (1, 'John Doe', 30), (2, 'Jane Smith', 28);
+INSERT OVERWRITE TABLE employees PARTITION(department='Marketing') VALUES (3, 'Mike Brown', 32);
+```
+
+2. Login Trino container and execute SQLs:
+
+```sql
+SELECT * FROM catalog_hive.product.employees WHERE department = 'Engineering';
+```
+
+
 ### Using Apache Iceberg REST service
 
-If you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
-Gravitino provides an Iceberg REST catalog service, too. You can use Spark to access REST catalog to write the table data.
-Then, you can use Trino to read the data from the Hive table joining the Iceberg table.
+Suppose you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
+Gravitino provides an Iceberg REST catalog service. You can use Spark to access the REST catalog to write the table data.
+Then, you can use Trino to read the data from the Hive table and join it with the Iceberg table.
 
 `spark-defaults.conf` is as follows (It's already configured in the playground):
 
 ```text
 spark.sql.extensions org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
-spark.sql.catalog.catalog_iceberg org.apache.iceberg.spark.SparkCatalog
-spark.sql.catalog.catalog_iceberg.type rest
-spark.sql.catalog.catalog_iceberg.uri http://gravitino:9001/iceberg/
+spark.sql.catalog.catalog_rest org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.catalog_rest.type rest
+spark.sql.catalog.catalog_rest.uri http://gravitino:9001/iceberg/
 spark.locality.wait.node 0
 ```
+
+Please note that `catalog_rest` in SparkSQL and `catalog_iceberg` in Gravitino and Trino share the same Iceberg JDBC backend, which implies that they can access the same dataset.
 
 1. Login Spark container and execute the steps.
 
@@ -211,7 +220,7 @@ spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
 ```
 
 ```SQL
-use catalog_iceberg;
+use catalog_rest;
 create database sales;
 use sales;
 create table customers (customer_id int, customer_name varchar(100), customer_email varchar(100));
@@ -221,7 +230,7 @@ insert into customers (customer_id, customer_name, customer_email) values (12,'J
 ```
 
 2. Login Trino container and execute the steps.
-You can get all the customers from both the Hive and Iceberg table.
+You can get all the customers from both the Hive and Iceberg tables.
 
 ```shell
 docker exec -it playground-trino bash
@@ -236,4 +245,33 @@ select * from catalog_hive.sales.customers
 union
 select * from catalog_iceberg.sales.customers;
 ```
-<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowtoUsePlayground" style={{ border: 0 }} alt="" />
+
+### Using Gravitino with LlamaIndex
+
+The Gravitino playground also provides a simple RAG demo with LlamaIndex. This demo will show you the
+ability to use Gravitino to manage both tabular and non-tabular datasets, connecting to
+LlamaIndex as a unified data source, then use LlamaIndex and LLM to query both tabular and
+non-tabular data with one natural language query.
+
+The demo is located in the `jupyter` folder, and you can open the `gravitino_llama_index_demo.ipynb`
+demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
+
+The scenario of this demo is that basic structured city statistics data is stored in MySQL, and
+detailed city introductions are stored in PDF files. The user wants to find answers about cities in the structured data and the PDF files.
+
+In this demo, you will use Gravitino to manage the MySQL table using a relational catalog, pdf
+files using a fileset catalog, treating Gravitino as a unified data source for LlamaIndex to build
+indexes on both tabular and non-tabular data. Then you will use LLM to query the data using natural
+language queries.
+
+Note: to run this demo, you need to set `OPENAI_API_KEY` in the `gravitino_llama_index_demo.ipynb`,
+like below, `OPENAI_API_BASE` is optional.
+
+```python
+import os
+
+os.environ["OPENAI_API_KEY"] = ""
+os.environ["OPENAI_API_BASE"] = ""
+```
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowtoUsePlayground" alt="" />

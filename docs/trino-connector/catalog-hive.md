@@ -91,7 +91,7 @@ statement.
 Users can use the following example to create a schema with properties: 
 
 ```sql
-CREATE SCHEMA "metalake.catalog".dbname
+CREATE SCHEMA catalog.dbname
 WITH (
   location = 'hdfs://hdfs-host:9000/user/hive/warehouse/dbname'
 );
@@ -196,7 +196,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
 The `gravitino` catalog is a catalog defined By Trino catalog configuration.
-The `test.hive_test` catalog is the catalog created by you in Gravitino.
+The `hive_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
