@@ -275,6 +275,15 @@ The Gravitino server doesn't allow passing the following reserved fields.
 | `identifier-fields`             | The identifier fields for defining the table.           |
 | `write.distribution-mode`       | Defines distribution of write data                      |
 
+Gravitino server doesn't allow to change such properties:
+
+| Configuration item | Description                                  |
+|--------------------|----------------------------------------------|
+| `location`         | Iceberg location for table storage.          |
+| `format`           | Iceberg table format like `iceberg/parquet`. |
+| `format-version`   | Iceberg meta data format version.            |
+| `provider`         | Table provider like `iceberg`.               |
+
 ### Table indexes
 
 - Doesn't support table indexes.
