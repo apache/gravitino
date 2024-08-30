@@ -59,9 +59,9 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Schema properties
 
-- Doesn't support specify location and store any schema properties when createSchema for FilesystemCatalog now.
-- Doesn't return any schema properties when loadSchema for FilesystemCatalog now.
-- Doesn't support store schema comment for FilesystemCatalog now.
+- Doesn't support specify location and store any schema properties when createSchema for FilesystemCatalog.
+- Doesn't return any schema properties when loadSchema for FilesystemCatalog.
+- Doesn't support store schema comment for FilesystemCatalog.
 
 ### Schema operations
 
