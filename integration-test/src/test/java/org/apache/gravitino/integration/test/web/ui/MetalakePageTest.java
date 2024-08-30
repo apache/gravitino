@@ -33,7 +33,7 @@ public class MetalakePageTest extends AbstractWebIT {
   private static final String WEB_TITLE = "Gravitino";
   private static final String METALAKE_NAME = "metalake_name";
   private static final String EDITED_METALAKE_NAME = METALAKE_NAME + "_edited";
-  private static final String FOOTER_LINK_DATASTRATO = "https://gravitino.apache.org/";
+  private static final String FOOTER_LINK_GRAVITINO = "https://gravitino.apache.org/";
   private static final String FOOTER_LINK_DOCS = "https://gravitino.apache.org/docs/latest/";
   private static final String FOOTER_LINK_LICENSE =
       "https://github.com/apache/gravitino/blob/main/LICENSE";
@@ -146,11 +146,11 @@ public class MetalakePageTest extends AbstractWebIT {
 
   @Test
   @Order(10)
-  public void testCheckLinkDatastrato() {
+  public void testCheckLinkGravitino() {
     String originalWindowHandle = driver.getWindowHandle();
-    metalakePage.footerLinkDatastrato.click();
+    metalakePage.footerLinkGravitino.click();
     Assertions.assertTrue(
-        metalakePage.verifyLinkInNewWindow(originalWindowHandle, FOOTER_LINK_DATASTRATO, false));
+        metalakePage.verifyLinkInNewWindow(originalWindowHandle, FOOTER_LINK_GRAVITINO, false));
   }
 
   @Test
