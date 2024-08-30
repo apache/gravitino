@@ -119,15 +119,11 @@ public class TopicOperations {
                 NameIdentifierUtil.ofTopic(metalake, catalog, schema, request.getName());
 
             Topic topic =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifierUtil.ofSchema(metalake, catalog, schema),
-                    LockType.WRITE,
-                    () ->
-                        dispatcher.createTopic(
-                            ident,
-                            request.getComment(),
-                            null /* dataLayout, always null because it's not supported yet.*/,
-                            request.getProperties()));
+                dispatcher.createTopic(
+                    ident,
+                    request.getComment(),
+                    null /* dataLayout, always null because it's not supported yet.*/,
+                    request.getProperties());
             Response response = Utils.ok(new TopicResponse(DTOConverters.toDTO(topic)));
             LOG.info("Topic created: {}.{}.{}.{}", metalake, catalog, schema, topic.name());
             return response;
