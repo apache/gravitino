@@ -29,7 +29,6 @@ repositories {
 val flinkVersion: String = libs.versions.flink.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 
-
 // The Flink only support scala 2.12, and all scala api will be removed in a future version.
 // You can find more detail at the following issues:
 // https://issues.apache.org/jira/browse/FLINK-23986,
