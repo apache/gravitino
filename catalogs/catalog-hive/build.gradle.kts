@@ -62,6 +62,7 @@ dependencies {
     exclude("org.apache.derby")
     exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
     exclude("org.apache.hive", "hive-llap-tez")
+    exclude("org.apache.hive", "hive-vector-code-gen")
     exclude("org.apache.ivy")
     exclude("org.apache.logging.log4j")
     exclude("org.apache.zookeeper")
