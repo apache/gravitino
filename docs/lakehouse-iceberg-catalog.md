@@ -268,7 +268,6 @@ The Gravitino server doesn't allow passing the following reserved fields.
 |---------------------------------|---------------------------------------------------------|
 | `comment`                       | The table comment.                                      |
 | `creator`                       | The table creator.                                      |
-| `location`                      | Iceberg location for table storage.                     |
 | `current-snapshot-id`           | The snapshot represents the current state of the table. |
 | `cherry-pick-snapshot-id`       | Selecting a specific snapshot in a merge operation.     |
 | `sort-order`                    | Selecting a specific snapshot in a merge operation.     |
