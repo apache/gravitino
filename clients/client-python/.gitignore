@@ -28,7 +28,6 @@ dist
 build
 README.md
 gravitino/version.ini
-docs
 
 # Unit test / coverage reports
 htmlcov/
