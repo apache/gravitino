@@ -266,7 +266,7 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
     Table loadTable = catalog.asTableCatalog().loadTable(tableNameIdentifier);
     Assertions.assertEquals(loadTable.name(), tableNameIdentifier.name());
 
-    // Drop table
+    // Purge table
     catalog.asTableCatalog().purgeTable(tableNameIdentifier);
     Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableNameIdentifier));
 
