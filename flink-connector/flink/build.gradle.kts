@@ -42,7 +42,7 @@ dependencies {
   implementation(project(":common"))
   implementation(project(":core"))
 
-  implementation(libs.bundles.log4j)
+  compileOnly(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.httpclient5)
@@ -51,9 +51,9 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
 
-  implementation("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
-  implementation("org.apache.flink:flink-table-common:$flinkVersion")
-  implementation("org.apache.flink:flink-table-api-java:$flinkVersion")
+  compileOnly("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
+  compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
+  compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
 
   implementation(libs.hive2.exec) {
     artifact {

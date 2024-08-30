@@ -68,6 +68,4 @@ include("web")
 include("docs")
 include("integration-test-common")
 include("flink-connector:flink")
-findProject(":flink-connector:flink")?.name = "flink"
 include("flink-connector:flink-runtime")
-findProject(":flink-connector:flink-runtime")?.name = "flink-runtime"
