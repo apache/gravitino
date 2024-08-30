@@ -221,11 +221,12 @@ Create a new table named `table_01` in schema `hive_test.database_01` and stored
 CREATE TABLE  hive_test.database_01.table_01
 (
 name varchar,
-salary int
+salary int,
+month int    
 )
 WITH (
   format = 'TEXTFILE',
-  partitioned_by = ARRAY['salary'],
+  partitioned_by = ARRAY['month'],
   bucketed_by = ARRAY['name'],
   bucket_count = 2,
   sorted_by = ARRAY['salary']  
@@ -237,13 +238,13 @@ WITH (
 Insert data into the table `table_01`:
 
 ```sql
-INSERT INTO hive_test.database_01.table_01 (name, salary) VALUES ('ice', 12);
+INSERT INTO hive_test.database_01.table_01 (name, salary) VALUES ('ice', 12, 22);
 ```
 
 Insert data into the table `table_01` from select:
 
 ```sql
-INSERT INTO hive_test.database_01.table_01 (name, salary) SELECT * FROM hive_test.database_01.table_01;
+INSERT INTO hive_test.database_01.table_01 (name, salary, month) SELECT * FROM hive_test.database_01.table_01;
 ```
 
 ### Querying data
