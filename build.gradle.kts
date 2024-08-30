@@ -736,7 +736,7 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("authorization") &&
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
+        it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink")
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
