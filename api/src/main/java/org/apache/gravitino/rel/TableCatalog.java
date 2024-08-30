@@ -279,7 +279,7 @@ public interface TableCatalog {
    * @param ident A table identifier.
    * @return True if the table is dropped, false if the table does not exist.
    */
-  boolean dropTable(NameIdentifier ident);
+  boolean dropTable(NameIdentifier ident) throws IllegalAccessException;
 
   /**
    * Drop a table from the catalog and completely remove its data. Removes both the metadata and the
