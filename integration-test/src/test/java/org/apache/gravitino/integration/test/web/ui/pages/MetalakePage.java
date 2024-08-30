@@ -98,7 +98,7 @@ public class MetalakePage extends AbstractWebIT {
   public WebElement metalakePageTitle;
 
   @FindBy(xpath = "//a[@data-refer='footer-link-gravitino']")
-  public WebElement footerLinkDatastrato;
+  public WebElement footerLinkGravitino;
 
   @FindBy(xpath = "//a[@data-refer='footer-link-license']")
   public WebElement footerLinkLicense;
