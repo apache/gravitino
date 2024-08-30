@@ -121,19 +121,15 @@ public class TableOperations {
                 NameIdentifierUtil.ofTable(metalake, catalog, schema, request.getName());
 
             Table table =
-                TreeLockUtils.doWithTreeLock(
-                    NameIdentifier.of(metalake, catalog, schema),
-                    LockType.WRITE,
-                    () ->
-                        dispatcher.createTable(
-                            ident,
-                            fromDTOs(request.getColumns()),
-                            request.getComment(),
-                            request.getProperties(),
-                            fromDTOs(request.getPartitioning()),
-                            fromDTO(request.getDistribution()),
-                            fromDTOs(request.getSortOrders()),
-                            fromDTOs(request.getIndexes())));
+                dispatcher.createTable(
+                    ident,
+                    fromDTOs(request.getColumns()),
+                    request.getComment(),
+                    request.getProperties(),
+                    fromDTOs(request.getPartitioning()),
+                    fromDTO(request.getDistribution()),
+                    fromDTOs(request.getSortOrders()),
+                    fromDTOs(request.getIndexes()));
             Response response = Utils.ok(new TableResponse(DTOConverters.toDTO(table)));
             LOG.info("Table created: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
             return response;

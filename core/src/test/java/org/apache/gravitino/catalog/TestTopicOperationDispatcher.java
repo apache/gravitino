@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.reset;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -40,7 +42,9 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.messaging.Topic;
@@ -122,25 +126,23 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     // Case 2: Test if the topic entity is not found in the entity store
     reset(entityStore);
     entityStore.delete(topicIdent1, Entity.EntityType.TOPIC);
-    entityStore.delete(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA);
+    entityStore.delete(NameIdentifier.of(topicNs.levels()), SCHEMA);
     doThrow(new NoSuchEntityException("")).when(entityStore).get(any(), any(), any());
     Topic loadedTopic2 = topicOperationDispatcher.loadTopic(topicIdent1);
     // Succeed to import the topic entity
     Assertions.assertTrue(entityStore.exists(topicIdent1, Entity.EntityType.TOPIC));
-    Assertions.assertTrue(
-        entityStore.exists(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(entityStore.exists(NameIdentifier.of(topicNs.levels()), SCHEMA));
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTopic2.auditInfo().creator());
 
     // Case 3: Test if the entity store is failed to get the topic entity
     reset(entityStore);
     entityStore.delete(topicIdent1, Entity.EntityType.TOPIC);
-    entityStore.delete(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA);
+    entityStore.delete(NameIdentifier.of(topicNs.levels()), SCHEMA);
     doThrow(new IOException()).when(entityStore).get(any(), any(), any());
     Topic loadedTopic3 = topicOperationDispatcher.loadTopic(topicIdent1);
     // Succeed to import the topic entity
-    Assertions.assertTrue(
-        entityStore.exists(NameIdentifier.of(topicNs.levels()), Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(entityStore.exists(NameIdentifier.of(topicNs.levels()), SCHEMA));
     Assertions.assertTrue(entityStore.exists(topicIdent1, Entity.EntityType.TOPIC));
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTopic3.auditInfo().creator());
@@ -249,5 +251,20 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> topicOperationDispatcher.dropTopic(topicIdent));
+  }
+
+  @Test
+  public void testCreateTopicNeedImportingSchema() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema161");
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic61");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    testCatalogOperations.createSchema(
+        NameIdentifier.of(topicNs.levels()), "", Collections.emptyMap());
+    topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
+    Assertions.assertTrue(entityStore.exists(NameIdentifier.of(topicNs.levels()), SCHEMA));
+    Assertions.assertTrue(entityStore.exists(topicIdent, Entity.EntityType.TOPIC));
   }
 }
