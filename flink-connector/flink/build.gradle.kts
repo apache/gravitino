@@ -99,6 +99,27 @@ dependencies {
   testImplementation("org.apache.flink:flink-table-common:$flinkVersion")
   testImplementation("org.apache.flink:flink-table-api-java:$flinkVersion")
 
+  testImplementation(libs.hive2.exec) {
+    artifact {
+      classifier = "core"
+    }
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.google.code.findbugs", "jsr305")
+    exclude("com.google.protobuf")
+    exclude("org.apache.avro")
+    exclude("org.apache.calcite")
+    exclude("org.apache.calcite.avatica")
+    exclude("org.apache.curator")
+    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.zookeeper")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.openjdk.jol")
+    exclude("org.pentaho")
+    exclude("org.slf4j")
+  }
+
   testImplementation(libs.hadoop2.common) {
     exclude("*")
   }
