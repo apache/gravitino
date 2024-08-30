@@ -27,6 +27,8 @@ repositories {
 }
 
 val flinkVersion: String = libs.versions.flink.get()
+val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
+
 
 // The Flink only support scala 2.12, and all scala api will be removed in a future version.
 // You can find more detail at the following issues:
@@ -34,7 +36,7 @@ val flinkVersion: String = libs.versions.flink.get()
 // https://issues.apache.org/jira/browse/FLINK-20845,
 // https://issues.apache.org/jira/browse/FLINK-13414.
 val scalaVersion: String = "2.12"
-val artifactName = "gravitino-${project.name}_$scalaVersion"
+val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion"
 
 dependencies {
   implementation(project(":api"))
