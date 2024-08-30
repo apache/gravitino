@@ -55,7 +55,7 @@ dependencies {
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
 
-  implementation(libs.hive2.exec) {
+  compileOnly(libs.hive2.exec) {
     artifact {
       classifier = "core"
     }
@@ -94,6 +94,10 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
+
+  testImplementation("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
+  testImplementation("org.apache.flink:flink-table-common:$flinkVersion")
+  testImplementation("org.apache.flink:flink-table-api-java:$flinkVersion")
 
   testImplementation(libs.hadoop2.common) {
     exclude("*")
