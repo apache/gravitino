@@ -753,9 +753,9 @@ tasks {
         !it.name.startsWith("spark") &&
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("integration-test") &&
+        !it.name.startsWith("flink") &&
         it.name != "trino-connector" &&
-        it.name != "bundled-catalog" &&
-        it.name != "flink-connector"
+        it.name != "bundled-catalog"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
