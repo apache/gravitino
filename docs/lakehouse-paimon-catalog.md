@@ -71,13 +71,14 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Table capabilities
 
-- Supporting createTable, dropTable, alterTable, loadTable and listTable.
+- Supporting createTable, purgeTable, alterTable, loadTable and listTable.
 - Supporting Column default value through table properties, such as `fields.{columnName}.default-value`, not column expression.
- 
+
+- Doesn't support dropTable.
 - Doesn't support table distribution and sort orders.
 
 :::info
-Paimon does not support purgeTable, but the dropTable will both remove the table metadata and the table location from the file system and skip the trash.
+Gravitino Paimon Catalog does not support dropTable, because the dropTable in Paimon will both remove the table metadata and the table location from the file system and skip the trash, we should use purgeTable instead in Gravitino.
 :::
 
 :::info
