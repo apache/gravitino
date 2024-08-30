@@ -267,7 +267,7 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
     Assertions.assertEquals(loadTable.name(), tableNameIdentifier.name());
 
     // Drop table
-    catalog.asTableCatalog().dropTable(tableNameIdentifier);
+    catalog.asTableCatalog().purgeTable(tableNameIdentifier);
     Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableNameIdentifier));
 
     // Drop schema
