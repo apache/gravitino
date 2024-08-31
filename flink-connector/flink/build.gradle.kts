@@ -41,7 +41,6 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":common"))
-  implementation(project(":core"))
 
   compileOnly(libs.bundles.log4j)
   implementation(libs.commons.lang3)
@@ -179,8 +178,7 @@ tasks.test {
   }
 
   val skipITs = project.hasProperty("skipITs")
-  val skipFlinkITs = project.hasProperty("skipFlinkITs")
-  if (skipITs || skipFlinkITs) {
+  if (skipITs) {
     // Exclude integration tests
     exclude("**/integration/**")
   } else {

@@ -22,21 +22,32 @@ jobs:
         with:
           filters: |
             source_changes:
+              - .github/**
               - api/**
               - authorizations/**
+              - bin/**
               - catalogs/**
               - clients/client-java/**
               - clients/client-java-runtime/**
               - common/**
+              - conf/**
               - core/**
+              - dev/**
+              - gradle/**
+              - iceberg/**
               - integration-test-common/**
+              - meta/**
+              - scripts/**
               - server/**
               - server-common/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - setting.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  # Integration test for AMD64 architecture
-  test-amd64-arch:
+  access-control-IT:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
@@ -46,12 +57,6 @@ jobs:
         # Integration test for AMD64 architecture
         architecture: [linux/amd64]
         java-version: [ 17 ]
-        test-mode: [ embedded, deploy ]
-        include:
-          - test-mode: 'embedded'
-            backend: 'h2'
-          - test-mode: 'deploy'
-            backend: 'mysql'
 
     env:
       PLATFORM: ${{ matrix.architecture }}
@@ -72,7 +77,6 @@ jobs:
           dev/ci/check_commands.sh
 
       - name: Package Gravitino
-        if : ${{ matrix.test-mode == 'deploy' }}
         run: |
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
@@ -83,7 +87,8 @@ jobs:
       - name: Authorization Integration Test (JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdbcBackend=${{ matrix.backend }} -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test --tests "org.apache.gravitino.authorization.ranger.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PjdbcBackend=h2 -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test --tests "org.apache.gravitino.authorization.ranger.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PjdbcBackend=mysql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test --tests "org.apache.gravitino.authorization.ranger.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3

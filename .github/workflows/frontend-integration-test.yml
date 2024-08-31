@@ -27,22 +27,18 @@ jobs:
               - bin/**
               - catalogs/**
               - clients/client-java/**
-              - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
               - dev/**
               - gradle/**
-              - integration-test/**
+              - iceberg/**
+              - integration-test-common/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
-              - spark-connector/**
-              - trino-connector/**
               - web/**
-              - docs/open-api/**
               - build.gradle.kts
               - gradle.properties
               - gradlew
@@ -50,14 +46,14 @@ jobs:
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  # Integration test for AMD64 architecture
-  test-amd64-arch:
+  FrontendIT:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       matrix:
+        # Integration test for AMD64 architecture
         architecture: [linux/amd64]
         java-version: [ 8 ]
     env:
@@ -89,8 +85,8 @@ jobs:
       - name: Frontend Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :web:integration-test:test --tests "org.apache.gravitino.integration.test.web.ui.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :web:integration-test:test --tests "org.apache.gravitino.integration.test.web.ui.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :web:integration-test:test
+          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :web:integration-test:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
