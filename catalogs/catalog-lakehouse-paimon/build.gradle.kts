@@ -42,23 +42,25 @@ dependencies {
   implementation(libs.bundles.paimon) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
+    exclude("org.apache.hive")
+    exclude("org.apache.hbase")
+    exclude("it.unimi.dsi")
+    exclude("org.apache.hadoop")
+    exclude("org.mortbay.jetty")
+    exclude("org.apache.parquet")
+    exclude("org.mortbay.jetty:jetty")
+    exclude("org.mortbay.jetty:jetty-util")
+    exclude("org.mortbay.jetty:jetty-sslengine")
+    exclude("org.eclipse.jetty.aggregate:jetty-all")
   }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
-  implementation(libs.caffeine)
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
     exclude("javax.servlet")
-  }
-  implementation(libs.hadoop2.hdfs) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
-  }
-  implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
+    exclude("org.mortbay.jetty")
   }
 
   annotationProcessor(libs.lombok)
@@ -67,9 +69,13 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
-  testImplementation(project(":server-common"))
+  testImplementation(project(":server-common")) {
+    exclude("org.mortbay.jetty")
+    exclude("com.sun.jersey.contribs")
+  }
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
     exclude("org.apache.hadoop")
+    exclude("org.rocksdb")
   }
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
     exclude("org.apache.avro")
