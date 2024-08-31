@@ -24,23 +24,23 @@ jobs:
             source_changes:
               - .github/**
               - api/**
+              - authorizations/**
               - bin/**
               - catalogs/**
               - clients/client-java/**
               - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
               - dev/**
               - gradle/**
               - iceberg/**
+              - integration-test-common/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
               - spark-connector/**
-              - docs/open-api/**
               - build.gradle.kts
               - gradle.properties
               - gradlew
