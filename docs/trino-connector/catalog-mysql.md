@@ -95,7 +95,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
 The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
-The `test.mysql_test` catalog is the catalog created by you in Gravitino.
+The `mysql_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
@@ -155,7 +155,7 @@ ALTER TABLE mysql_test.database_01.table_01 DROP COLUMN age;
 Rename the `table_01` table to `table_02`:
 
 ```sql
-ALTER TABLE mysql_test.database_01.table_01 RENAME TO "test.mysql_test".database_01.table_02;
+ALTER TABLE mysql_test.database_01.table_01 RENAME TO mysql_test.database_01.table_02;
 ```
 
 ### DROP

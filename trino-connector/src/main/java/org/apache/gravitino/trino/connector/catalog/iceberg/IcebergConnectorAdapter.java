@@ -46,6 +46,7 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
+    catalog.getProperties().put("catalog-name", catalog.getName());
     return catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
   }
 
