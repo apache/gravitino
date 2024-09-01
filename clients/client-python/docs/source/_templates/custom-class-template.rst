@@ -15,22 +15,35 @@
    specific language governing permissions and limitations
    under the License.
 
-.. Apache Gravitino Python Client documentation master file, created by
-   sphinx-quickstart on Fri Aug 30 14:16:27 2024.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+{{ fullname | escape | underline}}
 
-Apache Gravitino Python Client documentation
-============================================
+.. currentmodule:: {{ module }}
 
-Packages
------------
-.. autosummary::
-    :toctree: generated
-    :template: custom-module-template.rst
-    :recursive:
+.. autoclass:: {{ objname }}
+   :members:                                    
+   :show-inheritance:                           
+   :inherited-members:                          
 
-    gravitino
+   {% block methods %}
+   .. automethod:: __init__
 
-   
+   {% if methods %}
+   .. rubric:: {{ _('Methods') }}
 
+   .. autosummary::
+   {% for item in methods %}
+      ~{{ name }}.{{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}
+
+   {% block attributes %}
+   {% if attributes %}
+   .. rubric:: {{ _('Attributes') }}
+
+   .. autosummary::
+   {% for item in attributes %}
+      ~{{ name }}.{{ item }}
+   {%- endfor %}
+   {% endif %}
+   {% endblock %}

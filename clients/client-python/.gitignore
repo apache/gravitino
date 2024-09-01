@@ -43,3 +43,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+
+# Documentation Related
+docs/build
+docs/source/generated
