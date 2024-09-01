@@ -42,18 +42,6 @@ public class AuthorizationConfig extends Config {
               ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(Lists.newArrayList());
 
-  public static final ConfigEntry<List<String>> RANGER_POLICY_RESOURCE_DEFINES =
-      new ConfigBuilder("gravitino.authorization.ranger.policy.resource.defines")
-          .doc("The resource defines that are used in Ranger policies.")
-          .version(ConfigConstants.VERSION_0_7_0)
-          .stringConf()
-          .toSequence()
-          .checkValue(
-              valueList ->
-                  valueList != null && valueList.stream().allMatch(StringUtils::isNotBlank),
-              ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .createWithDefault(Lists.newArrayList());
-
   public static final String PRIVILEGE_MAPPING_PREFIX =
       "gravitino.authorization.privilege.mapping.";
 
@@ -73,7 +61,8 @@ public class AuthorizationConfig extends Config {
               "authorizations",
               "authorization-ranger",
               "build",
-              "libs",
+              "resources",
+              "test",
               propertyFilePath);
     } else {
       // Load from configuration directory in production environment

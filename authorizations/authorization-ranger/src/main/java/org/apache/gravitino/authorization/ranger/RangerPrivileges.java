@@ -22,7 +22,7 @@ import com.google.common.collect.Lists;
 import java.util.List;
 
 public class RangerPrivileges {
-  static List<Class<? extends Enum<? extends RangerPrivilege>>> allRangerPrivilege =
+  static List<Class<? extends Enum<? extends RangerPrivilege>>> allRangerPrivileges =
       Lists.newArrayList(
           RangerPrivilege.RangerHivePrivilege.class, RangerPrivilege.RangerHdfsPrivilege.class);
 
@@ -30,7 +30,7 @@ public class RangerPrivileges {
     RangerHelper.check(string != null, "Privilege name string cannot be null!");
 
     String strPrivilege = string.trim().toLowerCase();
-    for (Class<? extends Enum<? extends RangerPrivilege>> enumClass : allRangerPrivilege) {
+    for (Class<? extends Enum<? extends RangerPrivilege>> enumClass : allRangerPrivileges) {
       for (Enum<? extends RangerPrivilege> privilege : enumClass.getEnumConstants()) {
         if (((RangerPrivilege) privilege).equals(strPrivilege)) {
           return (RangerPrivilege) privilege;

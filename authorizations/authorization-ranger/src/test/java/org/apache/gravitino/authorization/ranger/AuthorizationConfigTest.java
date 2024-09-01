@@ -23,18 +23,50 @@ import static org.apache.gravitino.authorization.Privilege.Name.CREATE_TABLE;
 import static org.apache.gravitino.authorization.Privilege.Name.MODIFY_TABLE;
 import static org.apache.gravitino.authorization.Privilege.Name.SELECT_TABLE;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.Properties;
-import java.util.Set;
+import org.apache.gravitino.authorization.ranger.RangerPrivilege.RangerHivePrivilege;
+import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
+import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableSet;
 
 public class AuthorizationConfigTest {
   @Test
   public void testNonstandardHiveProperties() {
+    RangerAuthorizationHivePlugin rangerAuthTestPlugin =
+        new RangerAuthorizationHivePlugin(
+            ImmutableMap.of(
+                AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
+                "http://localhost:6080",
+                AuthorizationPropertiesMeta.RANGER_AUTH_TYPE,
+                RangerContainer.authType,
+                AuthorizationPropertiesMeta.RANGER_USERNAME,
+                RangerContainer.rangerUserName,
+                AuthorizationPropertiesMeta.RANGER_PASSWORD,
+                RangerContainer.rangerPassword,
+                AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
+                ""));
+    Assertions.assertEquals(
+        rangerAuthTestPlugin.getOwnerPrivileges(),
+        Sets.newHashSet(RangerHivePrivilege.SERVICEADMIN));
+    Assertions.assertEquals(
+        rangerAuthTestPlugin.getPrivilegesMapping().get(CREATE_SCHEMA),
+        Sets.newHashSet(RangerHivePrivilege.SERVICEADMIN));
+    Assertions.assertEquals(
+        rangerAuthTestPlugin.getPrivilegesMapping().get(CREATE_TABLE),
+        Sets.newHashSet(RangerHivePrivilege.SERVICEADMIN));
+    Assertions.assertEquals(
+        rangerAuthTestPlugin.getPrivilegesMapping().get(SELECT_TABLE),
+        Sets.newHashSet(RangerHivePrivilege.SERVICEADMIN));
+    Assertions.assertEquals(
+        rangerAuthTestPlugin.getPrivilegesMapping().get(MODIFY_TABLE),
+        Sets.newHashSet(RangerHivePrivilege.SERVICEADMIN));
+
     AuthorizationConfig authorizationConfig = new AuthorizationConfig();
     String propertyFilePath = "/authorization-defs/authorization-hive-nonstandard.properties";
     URL resourceUrl = AuthorizationConfigTest.class.getResource(propertyFilePath);
@@ -48,32 +80,21 @@ public class AuthorizationConfigTest {
       throw new IllegalArgumentException(
           "Failed to load authorization config from resource " + resourceUrl, e);
     }
-
-    RangerHelper rangerHelper = new RangerHelper(authorizationConfig);
-    Set<String> ownerPrivileges = rangerHelper.getOwnerPrivileges();
-    Set<String> createSchemaPrivileges = rangerHelper.translatePrivilege(CREATE_SCHEMA);
-    Set<String> createTablePrivileges = rangerHelper.translatePrivilege(CREATE_TABLE);
-    Set<String> selectTablePrivileges = rangerHelper.translatePrivilege(SELECT_TABLE);
-    Set<String> modifyTablePrivileges = rangerHelper.translatePrivilege(MODIFY_TABLE);
-
+    rangerAuthTestPlugin.overrideAuthorizationConfig(authorizationConfig);
     Assertions.assertEquals(
-        ownerPrivileges, ImmutableSet.of(RangerPrivilege.RangerHivePrivilege.ALL.toString()));
+        rangerAuthTestPlugin.getOwnerPrivileges(), Sets.newHashSet(RangerHivePrivilege.ALL));
     Assertions.assertEquals(
-        createSchemaPrivileges,
-        ImmutableSet.of(RangerPrivilege.RangerHivePrivilege.CREATE.toString()));
+        rangerAuthTestPlugin.getPrivilegesMapping().get(CREATE_SCHEMA),
+        Sets.newHashSet(RangerHivePrivilege.CREATE));
     Assertions.assertEquals(
-        createTablePrivileges,
-        ImmutableSet.of(RangerPrivilege.RangerHivePrivilege.CREATE.toString()));
+        rangerAuthTestPlugin.getPrivilegesMapping().get(CREATE_TABLE),
+        Sets.newHashSet(RangerHivePrivilege.CREATE));
     Assertions.assertEquals(
-        selectTablePrivileges,
-        ImmutableSet.of(
-            RangerPrivilege.RangerHivePrivilege.READ.toString(),
-            RangerPrivilege.RangerHivePrivilege.SELECT.toString()));
+        rangerAuthTestPlugin.getPrivilegesMapping().get(SELECT_TABLE),
+        Sets.newHashSet(RangerHivePrivilege.READ, RangerHivePrivilege.SELECT));
     Assertions.assertEquals(
-        modifyTablePrivileges,
-        ImmutableSet.of(
-            RangerPrivilege.RangerHivePrivilege.UPDATE.toString(),
-            RangerPrivilege.RangerHivePrivilege.ALTER.toString(),
-            RangerPrivilege.RangerHivePrivilege.WRITE.toString()));
+        rangerAuthTestPlugin.getPrivilegesMapping().get(MODIFY_TABLE),
+        Sets.newHashSet(
+            RangerHivePrivilege.UPDATE, RangerHivePrivilege.ALTER, RangerHivePrivilege.WRITE));
   }
 }

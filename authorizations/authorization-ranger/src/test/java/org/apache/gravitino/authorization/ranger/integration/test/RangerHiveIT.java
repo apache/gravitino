@@ -46,9 +46,11 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationHivePlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivilege;
+import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -104,8 +106,7 @@ public class RangerHiveIT {
                 adminUser)));
 
     rangerAuthPlugin =
-        new RangerAuthorizationPlugin(
-            "hive",
+        new RangerAuthorizationHivePlugin(
             ImmutableMap.of(
                 AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
                 String.format(
@@ -122,10 +123,12 @@ public class RangerHiveIT {
                 RangerITEnv.RANGER_HIVE_REPO_NAME));
     rangerPolicyHelper =
         new RangerHelper(
-            "hive",
             rangerClient,
             RangerContainer.rangerUserName,
-            RangerITEnv.RANGER_HIVE_REPO_NAME);
+            RangerITEnv.RANGER_HIVE_REPO_NAME,
+            rangerAuthPlugin.getPrivilegesMapping(),
+            rangerAuthPlugin.getOwnerPrivileges(),
+            rangerAuthPlugin.getPolicyResourceDefines());
 
     // Create hive connection
     String url =
@@ -1155,7 +1158,9 @@ public class RangerHiveIT {
               return policyItem.getAccesses().stream()
                   .anyMatch(
                       access -> {
-                        return rangerAuthPlugin.getOwnerPrivileges().contains(access.getType());
+                        return rangerAuthPlugin
+                            .getOwnerPrivileges()
+                            .contains(RangerPrivileges.valueOf(access.getType()));
                       });
             })
         .anyMatch(

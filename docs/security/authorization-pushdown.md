@@ -15,7 +15,7 @@ This module translates Gravitino's authorization model into the permission rules
 
 ### Authorization Hive with Ranger properties
 
-In order to use the Authorization Ranger Hive Plugin, you need to configure the following properties and [Apache Hive catalog properties](../apache-hive-catalog.md#catalog-properties):
+In order to use the Authorization Ranger Hive Plugin, you need to configure the following properties and [Apache Hive catalog properties](../apache-hive-catalog.md#catalog-properties) in the Hive Catalog:
 
 | Property Name                       | Description                                                                                                                                          | Default Value | Required | Since Version |
 |-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -27,6 +27,27 @@ In order to use the Authorization Ranger Hive Plugin, you need to configure the 
 | `authorization.ranger.service.name` | The Apache Ranger service name.                                                                                                                      | (none)        | No       | 0.6.0         |
 
 Once you have used the correct configuration, you can perform authorization operations by calling Gravitino [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-roles-to-a-user).
+
+#### Gravitino authorization privilege mapping Hive privilege property configurations
+
+If you enable these property configurations, The RangerAuthorizationHivePlugin will use these properties to override the default configuration in the program.
+
+| Property Name                                             | Description                                                                           | Default Value        | Since Version |
+|-----------------------------------------------------------|---------------------------------------------------------------------------------------|----------------------|---------------|
+| `gravitino.authorization.owner.privileges`                | The owner privileges, the owner can do anything on the metadata object configuration. | `all`                | 0.6.1         |
+| `gravitino.authorization.privilege.mapping.CREATE_SCHEMA` | Gravitino `CREATE_SCHEMA` privilege mapping Ranger privileges.                        | `create`             | 0.6.1         |
+| `gravitino.authorization.privilege.mapping.CREATE_TABLE`  | Gravitino `CREATE_TABLE` privilege mapping Ranger privileges.                         | `create`             | 0.6.1         |
+| `gravitino.authorization.privilege.mapping.SELECT_TABLE`  | Gravitino `SELECT_TABLE` privilege mapping Ranger privileges.                         | `read,select`        | 0.6.1         |
+| `gravitino.authorization.privilege.mapping.MODIFY_TABLE`  | Gravitino `MODIFY_TABLE` privilege mapping Ranger privileges.                         | `update,alter,write` | 0.6.1         |
+
+:::caution
+Ranger Hive privileges enum RangerHivePrivilege: create, alter, drop, index, lock, select, insert, update, delete, read, write, all
+defined in the `authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/RangerPrivilege.java`
+Format: gravitino.authorization.owner.privileges = <RANGER-PRIVILEGE>,<RANGER-PRIVILEGE>,...
+
+Gravitino privileges defined in the `api/src/main/java/org/apache/gravitino/authorization/Privilege.java`
+Format: authorization.privilege.mapping.<GRAVITINO-PRIVILEGE> = <RANGER-PRIVILEGE>,<RANGER-PRIVILEGE>,...
+:::
 
 #### Example of using the Authorization Ranger Hive Plugin
 

@@ -42,6 +42,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationHivePlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -149,8 +150,7 @@ public class RangerHiveE2EIT extends AbstractIT {
 
   private static void createCatalogAndRangerAuthPlugin() {
     rangerAuthPlugin =
-        new RangerAuthorizationPlugin(
-            "hive",
+        new RangerAuthorizationHivePlugin(
             ImmutableMap.of(
                 AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
                 String.format(
