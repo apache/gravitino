@@ -155,6 +155,7 @@ rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksd
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }
+iceberg-aliyun = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg" }
 iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
