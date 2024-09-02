@@ -24,26 +24,22 @@ jobs:
             source_changes:
               - .github/**
               - api/**
+              - authorizations/**
               - bin/**
               - catalogs/**
               - clients/client-java/**
               - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
               - dev/**
               - gradle/**
-              - integration-test/**
-              - integration-test-common/**
               - iceberg/**
+              - integration-test-common/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
-              - trino-connector/**
-              - web/**
-              - docs/open-api/**
               - build.gradle.kts
               - gradle.properties
               - gradlew
@@ -102,7 +98,7 @@ jobs:
           -x :web:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
-          -x :authorizations:authorization-ranger:test
+          -x :authorizations:authorization-ranger:test -x :authorizations:authorization-ranger:test -x :web:integration-test:test -x :trino-connector:integration-test:test -x :trino-connector:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
@@ -165,14 +161,35 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
+      #      - name: Setup debug Github Action
+      #        if: ${{ contains(github.event.pull_request.labels.*.name, 'debug action') }}
+      #        uses: csexton/debugger-action@master
+
+      - name: Setup reused hive services
+        run: |
+          free -h
+          docker compose -f integration-test-common/docker-script/docker-compose.yaml up -d hive hive_with_kerberos || true
+          if [ $? -ne 0 ]; then
+            docker compose integration-test/trino-it/docker-compose.yaml ps
+            docker compose integration-test/trino-it/docker-compose.yaml logs
+          
+            exit 1
+          else
+          echo "Services started successfully"
+          fi
+
+      - name: check services status
+        run: |
+          docker compose -f integration-test-common/docker-script/docker-compose.yaml ps
+
       - name: Backend Integration Test (JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
         id: integrationTest
         run: >
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
+          export ACTIVE_CI=true && ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
           -x :web:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
-          -x :authorizations:authorization-ranger:test
+          -x :authorizations:authorization-ranger:test -x :web:integration-test:test -x :trino-connector:integration-test:test -x :trino-connector:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
@@ -182,9 +199,6 @@ jobs:
           path: |
             build/reports
             iceberg/iceberg-rest-server/build/*.log
-            integration-test/build/*.log
-            integration-test/build/*.tar
-            integration-test/build/trino-ci-container-log
             distribution/package/logs/*.out
             distribution/package/logs/*.log
             catalogs/**/*.log

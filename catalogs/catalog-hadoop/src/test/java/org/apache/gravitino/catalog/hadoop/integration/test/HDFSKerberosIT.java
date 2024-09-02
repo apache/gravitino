@@ -63,15 +63,11 @@ public class HDFSKerberosIT {
     keytabPath = file.getAbsolutePath() + "/client.keytab";
     containerSuite
         .getKerberosHiveContainer()
-        .getContainer()
         .copyFileFromContainer("/etc/admin.keytab", keytabPath);
 
     String krb5TmpPath = file.getAbsolutePath() + "/krb5.conf_tmp";
     String krb5Path = file.getAbsolutePath() + "/krb5.conf";
-    containerSuite
-        .getKerberosHiveContainer()
-        .getContainer()
-        .copyFileFromContainer("/etc/krb5.conf", krb5TmpPath);
+    containerSuite.getKerberosHiveContainer().copyFileFromContainer("/etc/krb5.conf", krb5TmpPath);
 
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
     String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();

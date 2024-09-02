@@ -24,14 +24,24 @@ jobs:
             source_changes:
               - .github/**
               - api/**
-              - catalogs/catalog-hadoop/**
+              - authorizations/**
+              - bin/**
+              - catalogs/**
               - clients/client-python/**
               - common/**
               - conf/**
               - core/**
+              - dev/**
+              - gradle/**
+              - iceberg/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - setting.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 

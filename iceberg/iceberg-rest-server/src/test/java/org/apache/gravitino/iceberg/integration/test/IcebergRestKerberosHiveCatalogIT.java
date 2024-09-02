@@ -60,13 +60,12 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
       tempDir = file.getAbsolutePath();
 
       HiveContainer kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
-      kerberosHiveContainer
-          .getContainer()
-          .copyFileFromContainer("/etc/admin.keytab", tempDir + HIVE_METASTORE_CLIENT_KEYTAB);
+      kerberosHiveContainer.copyFileFromContainer(
+          "/etc/admin.keytab", tempDir + HIVE_METASTORE_CLIENT_KEYTAB);
 
       String tmpKrb5Path = tempDir + "/krb5.conf_tmp";
       String krb5Path = tempDir + "/krb5.conf";
-      kerberosHiveContainer.getContainer().copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
+      kerberosHiveContainer.copyFileFromContainer("/etc/krb5.conf", tmpKrb5Path);
 
       // Modify the krb5.conf and change the kdc and admin_server to the container IP
       String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();

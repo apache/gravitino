@@ -61,6 +61,7 @@ testcontainers = "1.19.0"
 jwt = "0.11.1"
 jline = "3.21.0"
 okhttp3 = "4.11.0"
+opencsv = "2.3"
 metrics = "4.2.25"
 prometheus = "0.16.0"
 mysql = "8.0.23"
@@ -183,6 +184,7 @@ metrics-jvm = { group = "io.dropwizard.metrics", name = "metrics-jvm", version.r
 metrics-jmx = { group = "io.dropwizard.metrics", name = "metrics-jmx", version.ref = "metrics" }
 jline-terminal = { group = "org.jline", name = "jline-terminal", version.ref = "jline" }
 okhttp3-loginterceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp3" }
+opencsv = {group = "net.sf.opencsv", name = "opencsv", version.ref = "opencsv"}
 metrics-servlets = { group = "io.dropwizard.metrics", name = "metrics-servlets", version.ref = "metrics" }
 prometheus-client = { group = "io.prometheus", name = "simpleclient", version.ref = "prometheus" }
 prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwizard", version.ref = "prometheus" }

@@ -22,16 +22,27 @@ jobs:
         with:
           filters: |
             source_changes:
+              - .github/**
               - api/**
-              - authorizations/**
+              - bin/**
               - catalogs/**
               - clients/client-java/**
               - clients/client-java-runtime/**
               - common/**
+              - conf/**
               - core/**
+              - dev/**
+              - gradle/**
+              - iceberg/**
               - integration-test-common/**
+              - meta/**
+              - scripts/**
               - server/**
               - server-common/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - setting.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
