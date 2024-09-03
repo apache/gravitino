@@ -27,14 +27,14 @@ const Footer = props => {
       <Box className='footer-content-wrapper twc-px-6 twc-w-full twc-py-[0.75rem] [@media(min-width:1440px)]:twc-max-w-[1440px]'>
         <Box className={'twc-flex twc-flex-wrap twc-items-center twc-justify-between'}>
           <Typography className='twc-mr-2'>
-            {`© 2023 `}
+            {`© 2024 `}
             <Link
               className={'twc-no-underline twc-text-primary-main'}
               target='_blank'
               href='https://gravitino.apache.org/'
               data-refer='footer-link-gravitino'
             >
-              Gravitino
+              ASF
             </Link>
           </Typography>
           <Box className={'twc-flex twc-flex-wrap twc-items-center [&>:not(:last-child)]:twc-mr-4'}>
@@ -49,7 +49,7 @@ const Footer = props => {
             <Link
               className={'twc-no-underline twc-text-primary-main'}
               target='_blank'
-              href='https://datastrato.ai/docs/'
+              href='https://gravitino.apache.org/docs/latest/'
               data-refer='footer-link-docs'
             >
               Documentation

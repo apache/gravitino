@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.trino.spi.TrinoException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
@@ -59,7 +60,7 @@ public class GravitinoCatalog {
     this.metalake = metalake;
     this.provider = catalog.provider();
     this.name = catalog.name();
-    this.properties = catalog.properties();
+    this.properties = new HashMap<>(catalog.properties());
     Instant time =
         catalog.auditInfo().lastModifiedTime() == null
             ? catalog.auditInfo().createTime()

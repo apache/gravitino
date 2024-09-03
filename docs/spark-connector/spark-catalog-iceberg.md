@@ -111,6 +111,7 @@ Gravitino spark connector will transform below property names which are defined 
 | `io-impl`                       | `io-impl`                             | The io implementation for `FileIO` in Iceberg.                                                                                                                                                                      | 0.6.0         |
 | `s3-endpoint`                   | `s3.endpoint`                         | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | 0.6.0         | 
 | `s3-region`                     | `client.region`                       | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | 0.6.0         |
+| `oss-endpoint`                  | `oss.endpoint`                        | The endpoint of Aliyun OSS service.                                                                                                                                                                                 | 0.7.0         |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Iceberg connector. For example, using `spark.bypass.clients` to pass the `clients` to the Spark Iceberg connector.
 
@@ -123,3 +124,7 @@ Iceberg catalog property `cache-enabled` is setting to `false` internally and no
 ### S3
 
 You need to add s3 secret to the Spark configuration using `spark.sql.catalog.${iceberg_catalog_name}.s3.access-key-id` and `spark.sql.catalog.${iceberg_catalog_name}.s3.secret-access-key`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Spark.
+
+### OSS
+
+You need to add OSS secret key to the Spark configuration using `spark.sql.catalog.${iceberg_catalog_name}.client.access-key-id` and `spark.sql.catalog.${iceberg_catalog_name}.client.access-key-secret`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the classpath of Spark.

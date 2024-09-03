@@ -18,9 +18,19 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+
 import com.google.common.collect.Maps;
 import java.util.Arrays;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -50,7 +60,7 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
           Maps.newHashMap());
 
   @BeforeAll
-  public static void initialize() {
+  public static void initialize() throws IllegalAccessException {
     prepareTable();
     partitionOperationDispatcher.addPartition(TABLE_IDENT, PARTITION);
 
@@ -66,13 +76,21 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
         "Custom class loader is not used");
   }
 
-  protected static void prepareTable() {
+  protected static void prepareTable() throws IllegalAccessException {
     schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
     tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
     partitionOperationDispatcher =
         new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+
+    Config config = mock(Config.class);
+    doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
     schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);

@@ -296,6 +296,11 @@
    Apache HttpCore
    Apache HttpClient
    Apache Iceberg
+   Apache Iceberg Aliyun
+   Apache Iceberg api
+   Apache Iceberg AWS
+   Apache Iceberg core
+   Apache Iceberg Hive metastore
    Apache Ivy
    Apache Log4j 1.x Compatibility API
    Apache Log4j API
@@ -358,6 +363,8 @@
    WildFly
    Confluent Kafka Streams Examples
    Apache Arrow
+   Rome
+   Jettison
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -404,6 +411,7 @@
    Common Development and Distribution License 1.0
 
    Javax Activation
+   Javax Mail
    Stax API
    Java Servlet API
    JSR311 API

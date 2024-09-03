@@ -39,12 +39,20 @@ public class IcebergPropertiesUtils {
     map.put(IcebergConstants.WAREHOUSE, IcebergConstants.WAREHOUSE);
     map.put(IcebergConstants.CATALOG_BACKEND_NAME, IcebergConstants.CATALOG_BACKEND_NAME);
     map.put(IcebergConstants.IO_IMPL, IcebergConstants.IO_IMPL);
+    // S3
     map.put(IcebergConstants.GRAVITINO_S3_ENDPOINT, IcebergConstants.ICEBERG_S3_ENDPOINT);
     map.put(IcebergConstants.GRAVITINO_S3_REGION, IcebergConstants.AWS_S3_REGION);
     map.put(IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID, IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID);
     map.put(
         IcebergConstants.GRAVITINO_S3_SECRET_ACCESS_KEY,
         IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY);
+    // OSS
+    map.put(IcebergConstants.GRAVITINO_OSS_ENDPOINT, IcebergConstants.ICEBERG_OSS_ENDPOINT);
+    map.put(
+        IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_ID, IcebergConstants.ICEBERG_OSS_ACCESS_KEY_ID);
+    map.put(
+        IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+        IcebergConstants.ICEBERG_OSS_ACCESS_KEY_SECRET);
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
   }
 

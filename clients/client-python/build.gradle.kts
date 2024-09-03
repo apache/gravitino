@@ -282,6 +282,16 @@ tasks {
       delete("README.md")
       generatePypiProjectHomePage()
       delete("dist")
+      copy {
+        from("${project.rootDir}/licenses") { into("licenses") }
+        from("${project.rootDir}/LICENSE.bin") { into("./") }
+        from("${project.rootDir}/NOTICE.bin") { into("./") }
+        from("${project.rootDir}/DISCLAIMER_WIP.txt") { into("./") }
+        into("${project.rootDir}/clients/client-python")
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
     }
 
     venvExec = "python"
@@ -289,6 +299,10 @@ tasks {
 
     doLast {
       delete("README.md")
+      delete("licenses")
+      delete("LICENSE")
+      delete("NOTICE")
+      delete("DISCLAIMER_WIP.txt")
     }
   }
 
@@ -305,7 +319,7 @@ tasks {
     delete("dist")
     delete("docs")
     delete("gravitino/version.ini")
-    delete("gravitino.egg-info")
+    delete("apache_gravitino.egg-info")
     delete("tests/unittests/htmlcov")
     delete("tests/unittests/.coverage")
     delete("tests/integration/htmlcov")
