@@ -148,3 +148,20 @@ class FilesetUpdateRequest:
 
         def fileset_change(self):
             return FilesetChange.remove_property(self._property)
+
+    @dataclass
+    class RemoveFilesetCommentRequest(FilesetUpdateRequestBase):
+        """Represents a request to remove comment from a Fileset."""
+
+        def __init__(self):
+            super().__init__("removeComment")
+
+        def validate(self):
+            """Validates the fields of the request.
+
+            always pass
+            """
+            pass
+
+        def fileset_change(self):
+            return FilesetChange.remove_comment()

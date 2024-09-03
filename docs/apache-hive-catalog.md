@@ -16,7 +16,8 @@ Apache Gravitino offers the capability to utilize [Apache Hive](https://hive.apa
 * Gravitino must have network access to the Hive metastore service using the Thrift protocol.
 
 :::note
-The Hive catalog is available for Apache Hive **2.x** only. Support for Apache Hive 3.x is under development.
+Although the Hive catalog uses the Hive2 metastore client, it can be compatible with the Hive3 metastore service because the called HMS APIs are still available in Hive3.
+If there is any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
 :::
 
 ## Catalog
@@ -46,7 +47,7 @@ When you use the Gravitino with Trino. You can pass the Trino Hive connector con
 
 When you use the Gravitino with Spark. You can pass the Spark Hive connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
 
-
+When you use the Gravitino authorization Hive with Apache Ranger. You can see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#authorization-hive-with-ranger-properties)
 ### Catalog operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.

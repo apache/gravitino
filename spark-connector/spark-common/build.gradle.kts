@@ -37,7 +37,7 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":catalogs:bundled-catalog", configuration = "shadow"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(libs.guava)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
@@ -141,18 +141,19 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 
 tasks.clean {
   delete("spark-warehouse")
+}
+
+sourceSets {
+  named("test") {
+    resources {
+      exclude("**/*")
+    }
+  }
 }
 
 val testJar by tasks.registering(Jar::class) {

@@ -156,16 +156,24 @@ allprojects {
     }
   }
 
-  val setIntegrationTestEnvironment: (Test) -> Unit = { param ->
+  val setTestEnvironment: (Test) -> Unit = { param ->
     param.doFirst {
       param.jvmArgs(project.property("extraJvmArgs") as List<*>)
 
       // Default use MiniGravitino to run integration tests
       param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
       param.environment("IT_PROJECT_DIR", project.buildDir.path)
-      param.environment("HADOOP_USER_NAME", "datastrato")
+      param.environment("HADOOP_USER_NAME", "anonymous")
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
+
+      // Gravitino CI Docker image
+      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.13")
+      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.5")
+      param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
+      param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
+      param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.1")
+      param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
 
       val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
       val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
@@ -205,7 +213,7 @@ allprojects {
     }
   }
 
-  extra["initIntegrationTest"] = setIntegrationTestEnvironment
+  extra["initTestParam"] = setTestEnvironment
 }
 
 nexusPublishing {
@@ -226,7 +234,7 @@ nexusPublishing {
     }
   }
 
-  packageGroup.set("com.datastrato.gravitino")
+  packageGroup.set("org.apache.gravitino")
 }
 
 subprojects {
@@ -409,6 +417,11 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
+    if (project.name != "server-common") {
+      val initTest = project.extra.get("initTestParam") as (Test) -> Unit
+      initTest(this)
+    }
+
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
       showExceptions = true
@@ -418,7 +431,7 @@ subprojects {
     reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
-      jvmArgs = listOf("-Xmx2G")
+      jvmArgs = listOf("-Xmx4G")
       useJUnitPlatform()
       jvmArgs(project.property("extraJvmArgs") as List<*>)
       finalizedBy(tasks.getByName("jacocoTestReport"))
@@ -435,7 +448,7 @@ subprojects {
 
   tasks.register("allDeps", DependencyReportTask::class)
 
-  group = "com.datastrato.gravitino"
+  group = "org.apache.gravitino"
   version = "$version"
 
   tasks.withType<Jar> {
@@ -466,10 +479,14 @@ tasks.rat {
     "dev/docker/**/*.conf",
     "dev/docker/kerberos-hive/kadm5.acl",
     "**/*.log",
+    "**/*.out",
+    "**/testsets",
     "**/licenses/*.txt",
     "**/licenses/*.md",
-    "integration-test/**",
+    "integration-test/**/*.sql",
+    "integration-test/**/*.txt",
     "docs/**/*.md",
+    "spark-connector/spark-common/src/test/resources/**",
     "web/.**",
     "web/next-env.d.ts",
     "web/dist/**/*",
@@ -487,9 +504,11 @@ tasks.rat {
     "DISCLAIMER.txt",
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
-    "clients/client-python/gravitino.egg-info/*",
-    "clients/client-python/gravitino/utils/exceptions.py",
-    "clients/client-python/gravitino/utils/http_client.py"
+    "clients/client-python/.venv/*",
+    "clients/client-python/apache_gravitino.egg-info/*",
+    "clients/client-python/gravitino/utils/http_client.py",
+    "clients/client-python/tests/unittests/htmlcov/*",
+    "clients/client-python/tests/integration/htmlcov/*"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -524,7 +543,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copyAuthorizationLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -538,6 +557,13 @@ tasks {
         rename { fileName ->
           fileName.replace(".template", "")
         }
+        eachFile {
+          if (name == "gravitino-env.sh") {
+            filter { line ->
+              line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
+            }
+          }
+        }
         fileMode = 0b111101101
       }
       copy {
@@ -545,6 +571,7 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("package") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -557,8 +584,69 @@ tasks {
     }
   }
 
+  val compileIcebergRESTServer by registering {
+    dependsOn("iceberg:iceberg-rest-server:copyLibAndConfigsToStandalonePackage")
+    group = "gravitino distribution"
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-iceberg-rest-server"))
+    doLast {
+      copy {
+        from(projectDir.dir("conf")) {
+          include("${rootProject.name}-iceberg-rest-server.conf.template", "${rootProject.name}-env.sh.template", "log4j2.properties.template")
+          into("${rootProject.name}-iceberg-rest-server/conf")
+        }
+        from(projectDir.dir("bin")) {
+          include("common.sh", "${rootProject.name}-iceberg-rest-server.sh")
+          into("${rootProject.name}-iceberg-rest-server/bin")
+        }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".template", "")
+        }
+        eachFile {
+          if (name == "gravitino-env.sh") {
+            filter { line ->
+              line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
+            }
+          }
+        }
+        fileMode = 0b111101101
+      }
+
+      copy {
+        from(projectDir.dir("licenses")) { into("${rootProject.name}-iceberg-rest-server/licenses") }
+        from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-iceberg-rest-server") }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
+    }
+  }
+
+  val compileTrinoConnector by registering {
+    dependsOn("trino-connector:copyLibs")
+    group = "gravitino distribution"
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector"))
+    doLast {
+      copy {
+        from(projectDir.dir("licenses")) { into("${rootProject.name}-trino-connector/licenses") }
+        from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-trino-connector") }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
+    }
+  }
+
   val assembleDistribution by registering(Tar::class) {
-    dependsOn("assembleTrinoConnector")
+    dependsOn("assembleTrinoConnector", "assembleIcebergRESTServer")
     group = "gravitino distribution"
     finalizedBy("checksumDistribution")
     into("${rootProject.name}-$version-bin")
@@ -569,19 +657,46 @@ tasks {
   }
 
   val assembleTrinoConnector by registering(Tar::class) {
-    dependsOn("trino-connector:copyLibs")
+    dependsOn("compileTrinoConnector")
     group = "gravitino distribution"
     finalizedBy("checksumTrinoConnector")
     into("${rootProject.name}-trino-connector-$version")
-    from("trino-connector/build/libs")
+    from(compileTrinoConnector.map { it.outputs.files.single() })
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
+  val assembleIcebergRESTServer by registering(Tar::class) {
+    dependsOn("compileIcebergRESTServer")
+    group = "gravitino distribution"
+    finalizedBy("checksumIcebergRESTServerDistribution")
+    into("${rootProject.name}-iceberg-rest-server-$version-bin")
+    from(compileIcebergRESTServer.map { it.outputs.files.single() })
+    compression = Compression.GZIP
+    archiveFileName.set("${rootProject.name}-iceberg-rest-server-$version-bin.tar.gz")
+    destinationDirectory.set(projectDir.dir("distribution"))
+  }
+
+  register("checksumIcebergRESTServerDistribution") {
+    group = "gravitino distribution"
+    dependsOn(assembleIcebergRESTServer)
+    val archiveFile = assembleIcebergRESTServer.flatMap { it.archiveFile }
+    val checksumFile = archiveFile.map { archive ->
+      archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
+    }
+    inputs.file(archiveFile)
+    outputs.file(checksumFile)
+    doLast {
+      checksumFile.get().writeText(
+        serviceOf<ChecksumService>().sha256(archiveFile.get().asFile).toString()
+      )
+    }
+  }
+
   register("checksumDistribution") {
     group = "gravitino distribution"
-    dependsOn(assembleDistribution, "checksumTrinoConnector")
+    dependsOn(assembleDistribution, "checksumTrinoConnector", "checksumIcebergRESTServerDistribution")
     val archiveFile = assembleDistribution.flatMap { it.archiveFile }
     val checksumFile = archiveFile.map { archive ->
       archive.asFile.let { it.resolveSibling("${it.name}.sha256") }
@@ -619,8 +734,9 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
+        !it.name.startsWith("authorization") &&
+        !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
+        it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink")
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -632,12 +748,14 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
+        !it.name.startsWith("authorization") &&
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
+        !it.name.startsWith("iceberg") &&
+        !it.name.startsWith("integration-test") &&
+        !it.name.startsWith("flink") &&
         it.name != "trino-connector" &&
-        it.name != "integration-test" &&
-        it.name != "bundled-catalog" &&
-        it.name != "flink-connector"
+        it.name != "bundled-catalog"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
@@ -657,7 +775,13 @@ tasks {
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      "catalogs:catalog-kafka:copyLibAndConfig"
+      ":catalogs:catalog-kafka:copyLibAndConfig"
+    )
+  }
+
+  register("copyAuthorizationLibAndConfigs", Copy::class) {
+    dependsOn(
+      ":authorizations:authorization-ranger:copyLibAndConfig"
     )
   }
 
@@ -686,8 +810,14 @@ fun printDockerCheckInfo() {
   val dockerRunning = project.extra["dockerRunning"] as? Boolean ?: false
   val macDockerConnector = project.extra["macDockerConnector"] as? Boolean ?: false
   val isOrbStack = project.extra["isOrbStack"] as? Boolean ?: false
-
-  if (extra["skipDockerTests"].toString().toBoolean()) {
+  val skipDockerTests = if (extra["skipDockerTests"].toString().toBoolean()) {
+    // Read the environment variable (SKIP_DOCKER_TESTS) when skipDockerTests is true
+    // which means users can enable the docker tests by setting the gradle properties or the environment variable.
+    System.getenv("SKIP_DOCKER_TESTS")?.toBoolean() ?: true
+  } else {
+    false
+  }
+  if (skipDockerTests) {
     project.extra["dockerTest"] = false
   } else if (OperatingSystem.current().isMacOsX() &&
     dockerRunning &&
@@ -699,17 +829,17 @@ fun printDockerCheckInfo() {
   }
 
   println("------------------ Check Docker environment ---------------------")
-  println("Docker server status ............................................ [${if (dockerRunning) "running" else "stop"}]")
+  println("Docker server status ............................................ [${if (dockerRunning) "running" else "\u001B[31mstop\u001B[0m"}]")
   if (OperatingSystem.current().isMacOsX()) {
-    println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "stop"}]")
-    println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "no"}]")
+    println("mac-docker-connector status ..................................... [${if (macDockerConnector) "running" else "\u001B[31mstop\u001B[0m"}]")
+    println("OrbStack status ................................................. [${if (dockerRunning && isOrbStack) "yes" else "\u001B[31mno\u001B[0m"}]")
   }
 
   val dockerTest = project.extra["dockerTest"] as? Boolean ?: false
   if (dockerTest) {
-    println("Using Docker container to run all tests. [$testMode test]")
+    println("Using Docker container to run all tests ......................... [$testMode test]")
   } else {
-    println("Run test cases without `gravitino-docker-test` tag ................ [$testMode test]")
+    println("Run test cases without `gravitino-docker-test` tag .............. [$testMode test]")
   }
   println("-----------------------------------------------------------------")
 

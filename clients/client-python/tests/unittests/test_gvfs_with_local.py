@@ -17,12 +17,15 @@ specific language governing permissions and limitations
 under the License.
 """
 
-# pylint: disable=protected-access
+# pylint: disable=protected-access,too-many-lines,too-many-locals
 
+import base64
+import os
 import random
 import string
 import time
 import unittest
+from unittest import mock
 from unittest.mock import patch
 
 import pandas
@@ -32,8 +35,9 @@ import pyarrow.parquet as pq
 from fsspec.implementations.local import LocalFileSystem
 from llama_index.core import SimpleDirectoryReader
 
-from gravitino import gvfs
+from gravitino import gvfs, Fileset
 from gravitino import NameIdentifier
+from gravitino.auth.auth_constants import AuthConstants
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.filesystem.gvfs import FilesetContext, StorageType
@@ -77,12 +81,11 @@ class TestLocalFilesystem(unittest.TestCase):
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_cache"
         local_fs.mkdir(fileset_storage_location)
         self.assertTrue(local_fs.exists(fileset_storage_location))
-
+        options = {"cache_size": 1, "cache_expired_time": 2}
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:9090",
             metalake_name="metalake_demo",
-            cache_size=1,
-            cache_expired_time=1,
+            options=options,
         )
         self.assertTrue(fs.exists(fileset_virtual_location))
         # wait 2 seconds
@@ -94,6 +97,32 @@ class TestLocalFilesystem(unittest.TestCase):
                 )
             )
         )
+
+    @patch(
+        "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
+        return_value=mock_base.mock_load_fileset(
+            "test_simple_auth", f"{_fileset_dir}/test_simple_auth"
+        ),
+    )
+    def test_simple_auth(self, mock_method1, mock_method2, mock_method3, mock_method4):
+        options = {"auth_type": "simple"}
+        current_user = (
+            None if os.environ.get("user.name") is None else os.environ["user.name"]
+        )
+        user = "test_gvfs"
+        os.environ["user.name"] = user
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:9090",
+            metalake_name="metalake_demo",
+            options=options,
+        )
+        token = fs._client._rest_client.auth_data_provider.get_token_data()
+        token_string = base64.b64decode(
+            token.decode("utf-8")[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
+        ).decode("utf-8")
+        self.assertEqual(f"{user}:dummy", token_string)
+        if current_user is not None:
+            os.environ["user.name"] = current_user
 
     @patch(
         "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
@@ -768,6 +797,44 @@ class TestLocalFilesystem(unittest.TestCase):
             "fileset/test_catalog/test_schema/test_f1/actual_path", virtual_path
         )
 
+        # test storage location without "/"
+        actual_path = "/tmp/test_convert_actual_path/sub_dir/1.parquet"
+        storage_location1 = "file:/tmp/test_convert_actual_path"
+        mock_fileset1: Fileset = mock.Mock(spec=Fileset)
+        mock_fileset1.storage_location.return_value = storage_location1
+
+        mock_fileset_context1: FilesetContext = mock.Mock(spec=FilesetContext)
+        mock_fileset_context1.get_storage_type.return_value = StorageType.LOCAL
+        mock_fileset_context1.get_name_identifier.return_value = NameIdentifier.of(
+            "test_metalake", "catalog", "schema", "test_convert_actual_path"
+        )
+        mock_fileset_context1.get_fileset.return_value = mock_fileset1
+
+        virtual_path = fs._convert_actual_path(actual_path, mock_fileset_context1)
+        self.assertEqual(
+            "fileset/catalog/schema/test_convert_actual_path/sub_dir/1.parquet",
+            virtual_path,
+        )
+
+        # test storage location with "/"
+        actual_path = "/tmp/test_convert_actual_path/sub_dir/1.parquet"
+        storage_location2 = "file:/tmp/test_convert_actual_path/"
+        mock_fileset2: Fileset = mock.Mock(spec=Fileset)
+        mock_fileset2.storage_location.return_value = storage_location2
+
+        mock_fileset_context2: FilesetContext = mock.Mock(spec=FilesetContext)
+        mock_fileset_context2.get_storage_type.return_value = StorageType.LOCAL
+        mock_fileset_context2.get_name_identifier.return_value = NameIdentifier.of(
+            "test_metalake", "catalog", "schema", "test_convert_actual_path"
+        )
+        mock_fileset_context2.get_fileset.return_value = mock_fileset2
+
+        virtual_path = fs._convert_actual_path(actual_path, mock_fileset_context2)
+        self.assertEqual(
+            "fileset/catalog/schema/test_convert_actual_path/sub_dir/1.parquet",
+            virtual_path,
+        )
+
     def test_convert_info(self, *mock_methods3):
         # test convert actual hdfs path
         audit_dto = AuditDTO(
@@ -1003,3 +1070,107 @@ class TestLocalFilesystem(unittest.TestCase):
                 self.assertEqual(row[1], "19")
             elif row[0] == "D":
                 self.assertEqual(row[1], "18")
+
+    @patch(
+        "gravitino.catalog.fileset_catalog.FilesetCatalog.load_fileset",
+        return_value=mock_base.mock_load_fileset(
+            "test_location_with_tailing_slash",
+            f"{_fileset_dir}/test_location_with_tailing_slash/",
+        ),
+    )
+    def test_location_with_tailing_slash(self, *mock_methods):
+        local_fs = LocalFileSystem()
+        # storage location is ending with a "/"
+        fileset_storage_location = (
+            f"{self._fileset_dir}/test_location_with_tailing_slash/"
+        )
+        fileset_virtual_location = (
+            "fileset/fileset_catalog/tmp/test_location_with_tailing_slash"
+        )
+        local_fs.mkdir(fileset_storage_location)
+        sub_dir_path = f"{fileset_storage_location}test_1"
+        local_fs.mkdir(sub_dir_path)
+        self.assertTrue(local_fs.exists(sub_dir_path))
+        sub_file_path = f"{sub_dir_path}/test_file_1.par"
+        local_fs.touch(sub_file_path)
+        self.assertTrue(local_fs.exists(sub_file_path))
+
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:9090", metalake_name="metalake_demo"
+        )
+        self.assertTrue(fs.exists(fileset_virtual_location))
+
+        dir_virtual_path = fileset_virtual_location + "/test_1"
+        dir_info = fs.info(dir_virtual_path)
+        self.assertEqual(dir_info["name"], dir_virtual_path)
+
+        file_virtual_path = fileset_virtual_location + "/test_1/test_file_1.par"
+        file_info = fs.info(file_virtual_path)
+        self.assertEqual(file_info["name"], file_virtual_path)
+
+        file_status = fs.ls(fileset_virtual_location, detail=True)
+        for status in file_status:
+            if status["name"].endswith("test_1"):
+                self.assertEqual(status["name"], dir_virtual_path)
+            elif status["name"].endswith("test_file_1.par"):
+                self.assertEqual(status["name"], file_virtual_path)
+            else:
+                raise GravitinoRuntimeException("Unexpected file found")
+
+    def test_get_actual_path_by_ident(self, *mock_methods):
+        ident1 = NameIdentifier.of(
+            "test_metalake", "catalog", "schema", "test_get_actual_path_by_ident"
+        )
+        storage_type = gvfs.StorageType.LOCAL
+        local_fs = LocalFileSystem()
+
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:9090", metalake_name="metalake_demo"
+        )
+
+        # test storage location end with "/"
+        storage_location_1 = f"{self._fileset_dir}/test_get_actual_path_by_ident/"
+        # virtual path end with "/"
+        virtual_path1 = "fileset/catalog/schema/test_get_actual_path_by_ident/"
+        local_fs.mkdir(storage_location_1)
+        self.assertTrue(local_fs.exists(storage_location_1))
+
+        mock_fileset1: Fileset = mock.Mock(spec=Fileset)
+        mock_fileset1.storage_location.return_value = storage_location_1
+
+        actual_path1 = fs._get_actual_path_by_ident(
+            ident1, mock_fileset1, local_fs, storage_type, virtual_path1
+        )
+        self.assertEqual(actual_path1, storage_location_1)
+
+        # virtual path end without "/"
+        virtual_path2 = "fileset/catalog/schema/test_get_actual_path_by_ident"
+        actual_path2 = fs._get_actual_path_by_ident(
+            ident1, mock_fileset1, local_fs, storage_type, virtual_path2
+        )
+        self.assertEqual(actual_path2, storage_location_1)
+
+        # test storage location end without "/"
+        ident2 = NameIdentifier.of(
+            "test_metalake", "catalog", "schema", "test_without_slash"
+        )
+        storage_location_2 = f"{self._fileset_dir}/test_without_slash"
+        # virtual path end with "/"
+        virtual_path3 = "fileset/catalog/schema/test_without_slash/"
+        local_fs.mkdir(storage_location_2)
+        self.assertTrue(local_fs.exists(storage_location_2))
+
+        mock_fileset2: Fileset = mock.Mock(spec=Fileset)
+        mock_fileset2.storage_location.return_value = storage_location_2
+
+        actual_path3 = fs._get_actual_path_by_ident(
+            ident2, mock_fileset2, local_fs, storage_type, virtual_path3
+        )
+        self.assertEqual(actual_path3, f"{storage_location_2}/")
+
+        # virtual path end without "/"
+        virtual_path4 = "fileset/catalog/schema/test_without_slash"
+        actual_path4 = fs._get_actual_path_by_ident(
+            ident2, mock_fileset2, local_fs, storage_type, virtual_path4
+        )
+        self.assertEqual(actual_path4, storage_location_2)

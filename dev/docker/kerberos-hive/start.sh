@@ -21,10 +21,12 @@
 # start ssh
 HOSTNAME=`hostname`
 service ssh start
-ssh-keyscan ${HOSTNAME} >> /root/.ssh/known_hosts
-ssh-keyscan localhost >> /root/.ssh/known_hosts
-ssh-keyscan 0.0.0.0 >> /root/.ssh/known_hosts
-ssh-keyscan 127.0.0.1 >> /root/.ssh/known_hosts
+
+for host in ${HOSTNAME} localhost 127.0.0.1 0.0.0.0; do
+  ssh-keygen -R ${host}
+  ssh-keyscan ${host} >> /root/.ssh/known_hosts
+  ssh -o BatchMode=yes -o ConnectTimeout=5 ${host} "exit" &>/dev/null || { echo "failed to connect to ${host}"; exit 1; }
+done
 
 # init the Kerberos database
 echo -e "${PASS}\n${PASS}" | kdb5_util create -s
@@ -71,6 +73,7 @@ echo -e "${PASS}\n" | kinit hive/${HOSTNAME}
 sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
 sed -i "s/mockhost/${HOSTNAME}/g" ${HADOOP_CONF_DIR}/core-site.xml
 sed -i "s/mockhost/${HOSTNAME}/g" ${HIVE_HOME}/conf/hive-site.xml
+sed -i "s/mockhost/${HOSTNAME}/g" ${HIVE_HOME}/conf1/hive-site.xml
 
 # format HDFS
 ${HADOOP_HOME}/bin/hdfs namenode -format -nonInteractive
@@ -79,22 +82,36 @@ echo "Starting HDFS..."
 echo "Starting NameNode..."
 ${HADOOP_HOME}/sbin/hadoop-daemon.sh start namenode
 
+# Check if the nameNode is running
+ps -ef | grep NameNode | grep -v "grep"
+if [[ $? -ne 0 ]]; then
+  echo "NameNode failed to start, please check the logs"
+  echo "HDFS NameNode log start---------------------------"
+  cat ${HADOOP_HOME}/logs/*.log
+  cat ${HADOOP_HOME}/logs/*.out
+  echo "HDFS NameNode log end-----------------------------"
+  exit 1
+fi
+
+
 echo "Starting DataNode..."
 ${HADOOP_HOME}/sbin/start-secure-dns.sh
 sleep 5
 
 # Check if the DataNode is running
-ps -ef | grep DataNode | grep -v "color=auto"
+ps -ef | grep DataNode | grep -v "grep"
 if [[ $? -ne 0 ]]; then
   echo "DataNode failed to start, please check the logs"
-  ehco "HDFS DataNode log start----------------------------"
-  cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
+  echo "HDFS DataNode log start---------------------------"
+  cat ${HADOOP_HOME}/logs/*.log
+  cat ${HADOOP_HOME}/logs/*.out
+  echo "HDFS DataNode log end-----------------------------"
   exit 1
 fi
 
 retry_times=0
 ready=0
-while [[ ${retry_times} -lt 10 ]]; do
+while [[ ${retry_times} -lt 15 ]]; do
   hdfs_ready=$(hdfs dfsadmin -report | grep "Live datanodes" | awk '{print $3}')
   if [[ ${hdfs_ready} == "(1):" ]]; then
     echo "HDFS is ready, retry_times = ${retry_times}"
@@ -106,9 +123,13 @@ while [[ ${retry_times} -lt 10 ]]; do
 done
 
 if [[ ${ready} -ne 1 ]]; then
-  echo "HDFS is not ready"
-  ehco "HDFS DataNode log start---------------------------"
-  cat ${HADOOP_HOME}/bin/logs/hadoop-root-datanode-*.log
+  echo "HDFS is not ready, execute log:"
+  ps -ef | grep DataNode | grep -v "grep"
+  hdfs dfsadmin -report
+  echo "HDFS DataNode log start---------------------------"
+  cat ${HADOOP_HOME}/logs/*.log
+  cat ${HADOOP_HOME}/logs/*.out
+  echo "HDFS DataNode log end-----------------------------"
   exit 1
 fi
 
@@ -131,6 +152,10 @@ echo """
 # start hive
 ${HIVE_HOME}/bin/schematool -initSchema -dbType mysql
 ${HIVE_HOME}/bin/hive --service hiveserver2 > /dev/null 2>&1 &
+${HIVE_HOME}/bin/hive --service metastore > /dev/null 2>&1 &
+
+# Start another metastore
+export HIVE_CONF_DIR=${HIVE_HOME}/conf1
 ${HIVE_HOME}/bin/hive --service metastore > /dev/null 2>&1 &
 
 # persist the container

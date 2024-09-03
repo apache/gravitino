@@ -61,7 +61,7 @@ cd gravitino
 
 ### Development Setup
 
-Once you have cloned the [GitHub repository](https://github.com/apache/gravitino), see [how to build](/docs/how-to-build.md) for instructions on how to build, or you can use the provided docker images at [Datastrato's DockerHub repository](https://hub.docker.com/u/datastrato).
+Once you have cloned the [GitHub repository](https://github.com/apache/gravitino), see [how to build](/docs/how-to-build.md) for instructions on how to build, or you can use the provided docker images at [Apache DockerHub repository](https://hub.docker.com/u/apache).
 
 To stop and start a local Gravitino server via `bin/gravitino.sh start` and `bin/gravitino.sh stop` in a Gravitino distribution, see [how to build](/docs/how-to-build.md) for more instructions.
 

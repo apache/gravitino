@@ -1,7 +1,7 @@
 <configuration>
   <property>
     <name>fs.defaultFS</name>
-    <value>hdfs://0.0.0.0:9000</value>
+    <value>hdfs://__REPLACE__HOST_NAME:9000</value>
   </property>
 
   <property>
@@ -31,6 +31,16 @@
 
   <property>
     <name>hadoop.proxyuser.root.hosts</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.gravitino.groups</name>
+    <value>*</value>
+  </property>
+
+  <property>
+    <name>hadoop.proxyuser.gravitino.hosts</name>
     <value>*</value>
   </property>
 </configuration>

@@ -35,6 +35,7 @@ jobs:
               - core/**
               - dev/**
               - gradle/**
+              - iceberg/**
               - meta/**
               - server/**
               - server-common/**
@@ -90,10 +91,10 @@ jobs:
         id: integrationTest
         run: |
           if [ "${{ matrix.scala-version }}" == "2.12" ];then 
-            ./gradlew -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ matrix.scala-version }} -PskipDockerTests=false :spark-connector:spark-3.3:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
+            ./gradlew -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ matrix.scala-version }} -PskipDockerTests=false :spark-connector:spark-3.3:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
           fi
-          ./gradlew -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ matrix.scala-version }} -PskipDockerTests=false :spark-connector:spark-3.4:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
-          ./gradlew -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ matrix.scala-version }} -PskipDockerTests=false :spark-connector:spark-3.5:test --tests "com.datastrato.gravitino.spark.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ matrix.scala-version }} -PskipDockerTests=false :spark-connector:spark-3.4:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ matrix.scala-version }} -PskipDockerTests=false :spark-connector:spark-3.5:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
@@ -105,5 +106,5 @@ jobs:
             spark-connector/v3.3/spark/build/spark-3.3-integration-test.log
             spark-connector/v3.4/spark/build/spark-3.4-integration-test.log
             spark-connector/v3.5/spark/build/spark-3.5-integration-test.log
-            distribution/package/logs/gravitino-server.out
-            distribution/package/logs/gravitino-server.log
+            distribution/package/logs/*.out
+            distribution/package/logs/*.log

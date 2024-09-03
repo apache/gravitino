@@ -135,13 +135,13 @@ fun generatePypiProjectHomePage() {
     }
 
     // Use regular expression to match the `![](./a/b/c.png)` link in the content
-    // Convert `![](./a/b/c.png)` to `[](https://raw.githubusercontent.com/datastrato/gravitino/main/docs/a/b/c.png)`
-    val assertUrl = "https://raw.githubusercontent.com/datastrato/gravitino/main/docs"
+    // Convert `![](./a/b/c.png)` to `[](https://github.com/apache/gravitino/blob/main/docs/a/b/c.png?raw=true)`
+    val assertUrl = "https://github.com/apache/gravitino/blob/main/docs"
     val patternImage = """!\[([^\]]+)]\(\./assets/([^)]+)\)""".toRegex()
     val contentUpdateImage = patternImage.replace(contentUpdateDocs) { matchResult ->
       val altText = matchResult.groupValues[1]
       val fileName = matchResult.groupValues[2]
-      "![${altText}]($assertUrl/assets/$fileName)"
+      "![${altText}]($assertUrl/assets/$fileName?raw=true)"
     }
 
     val readmeFile = file("README.md")
@@ -213,16 +213,19 @@ tasks {
     if (dockerTest) {
       dependsOn("verifyHadoopPack")
       envMap.putAll(mapOf(
-          "HADOOP_VERSION" to hadoopVersion,
-          "PYTHON_BUILD_PATH" to project.rootDir.path + "/clients/client-python/build"
+        "HADOOP_VERSION" to hadoopVersion,
+        "PYTHON_BUILD_PATH" to project.rootDir.path + "/clients/client-python/build"
       ))
     }
     envMap.putAll(mapOf(
-        "PROJECT_VERSION" to project.version,
-        "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
-        "START_EXTERNAL_GRAVITINO" to "true",
-        "DOCKER_TEST" to dockerTest.toString(),
-        "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "datastrato/gravitino-ci-hive:0.1.12",
+      "PROJECT_VERSION" to project.version,
+      "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
+      "START_EXTERNAL_GRAVITINO" to "true",
+      "DOCKER_TEST" to dockerTest.toString(),
+      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "apache/gravitino-ci:hive-0.1.13",
+      // Set the PYTHONPATH to the client-python directory, make sure the tests can import the
+      // modules from the client-python directory.
+      "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
     ))
     environment = envMap
 
@@ -244,20 +247,25 @@ tasks {
     args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/unittests")
 
+    environment = mapOf(
+      // Set the PYTHONPATH to the client-python directory, make sure the tests can import the
+      // modules from the client-python directory.
+      "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
+    )
+
     finalizedBy(unitCoverageReport)
   }
 
   val test by registering(VenvTask::class) {
     val skipUTs = project.hasProperty("skipTests")
-    val skipPyClientITs = project.hasProperty("skipPyClientITs")
     val skipITs = project.hasProperty("skipITs")
-    val skipAllTests = skipUTs && (skipITs || skipPyClientITs)
+    val skipAllTests = skipUTs && skipITs
     if (!skipAllTests) {
       dependsOn(pipInstall, pylint)
       if (!skipUTs) {
         dependsOn(unitTests)
       }
-      if (!skipITs && !skipPyClientITs) {
+      if (!skipITs) {
         dependsOn(integrationTest)
       }
     }
@@ -274,6 +282,16 @@ tasks {
       delete("README.md")
       generatePypiProjectHomePage()
       delete("dist")
+      copy {
+        from("${project.rootDir}/licenses") { into("licenses") }
+        from("${project.rootDir}/LICENSE.bin") { into("./") }
+        from("${project.rootDir}/NOTICE.bin") { into("./") }
+        from("${project.rootDir}/DISCLAIMER_WIP.txt") { into("./") }
+        into("${project.rootDir}/clients/client-python")
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
     }
 
     venvExec = "python"
@@ -281,6 +299,10 @@ tasks {
 
     doLast {
       delete("README.md")
+      delete("licenses")
+      delete("LICENSE")
+      delete("NOTICE")
+      delete("DISCLAIMER_WIP.txt")
     }
   }
 
@@ -297,7 +319,7 @@ tasks {
     delete("dist")
     delete("docs")
     delete("gravitino/version.ini")
-    delete("gravitino.egg-info")
+    delete("apache_gravitino.egg-info")
     delete("tests/unittests/htmlcov")
     delete("tests/unittests/.coverage")
     delete("tests/integration/htmlcov")

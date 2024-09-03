@@ -296,6 +296,11 @@
    Apache HttpCore
    Apache HttpClient
    Apache Iceberg
+   Apache Iceberg Aliyun
+   Apache Iceberg api
+   Apache Iceberg AWS
+   Apache Iceberg core
+   Apache Iceberg Hive metastore
    Apache Ivy
    Apache Log4j 1.x Compatibility API
    Apache Log4j API
@@ -310,6 +315,8 @@
    Apache Yetus - Audience Annotations
    Apache Kerby
    Apache Kyuubi
+   Apache Ranger
+   Apache Ranger intg
    Jackson JSON processor
    DataNucleus
    Modernizer Maven Plugin
@@ -356,6 +363,8 @@
    WildFly
    Confluent Kafka Streams Examples
    Apache Arrow
+   Rome
+   Jettison
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1
@@ -364,7 +373,7 @@
 
    This product bundles various third-party components also under the
    BSD license
-   
+
    JSR305
    LevelDB JNI
    RocksDB JNI
@@ -402,6 +411,7 @@
    Common Development and Distribution License 1.0
 
    Javax Activation
+   Javax Mail
    Stax API
    Java Servlet API
    JSR311 API
@@ -446,6 +456,7 @@
    Jakarta RESTful WS API
    Jakarta XML Binding API
    JavaServer Pages(TM) API
+   Javax WS RS API
    HK2 API Module
    HK2 Service Locator
    HK2 Utils

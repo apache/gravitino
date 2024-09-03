@@ -21,4 +21,6 @@ under the License.
 class AuthConstants:
     HTTP_HEADER_AUTHORIZATION: str = "Authorization"
 
+    AUTHORIZATION_BEARER_HEADER: str = "Bearer "
+
     AUTHORIZATION_BASIC_HEADER: str = "Basic "
