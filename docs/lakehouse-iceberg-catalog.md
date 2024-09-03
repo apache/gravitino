@@ -264,24 +264,21 @@ You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/co
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
-| Configuration item        | Description                                             | Default value | Required | Since Version |
-|---------------------------|---------------------------------------------------------|---------------|----------|---------------|
-| `comment`                 | The table comment.                                      | None          | No       | 0.2.0         |
-| `creator`                 | The table creator.                                      | None          | No       | 0.2.0         |
-| `current-snapshot-id`     | The snapshot represents the current state of the table. | None          | No       | 0.2.0         |
-| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.     | None          | No       | 0.2.0         |
-| `sort-order`              | Selecting a specific snapshot in a merge operation.     | None          | No       | 0.2.0         |
-| `identifier-fields`       | The identifier fields for defining the table.           | None          | No       | 0.2.0         |
-| `write.distribution-mode` | Defines distribution of write data                      | None          | No       | 0.2.0         |
+| Configuration item        | Description                                                                          | Default value | Required | Since Version |
+|---------------------------|--------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `comment`                 | The table comment, please use `comment` field in table meta instead.                 | None          | No       | 0.2.0         |
+| `creator`                 | The table creator.                                                                   | None          | No       | 0.2.0         |
+| `current-snapshot-id`     | The snapshot represents the current state of the table.                              | None          | No       | 0.2.0         |
+| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                  | None          | No       | 0.2.0         |
+| `sort-order`              | Iceberg table sort order, please use `SortOrder` in table meta instead.              | None          | No       | 0.2.0         |
+| `identifier-fields`       | The identifier fields for defining the table.                                        | None          | No       | 0.2.0         |
+| `write.distribution-mode` | Defines distribution of write data, please use `distribution` in table meta instead. | None          | No       | 0.2.0         |
 
 Gravitino server doesn't allow to change such properties:
 
 | Configuration item | Description                                  | Default value | Required | Since Version |
 |--------------------|----------------------------------------------|---------------|----------|---------------|
 | `location`         | Iceberg location for table storage.          | None          | No       | 0.2.0         |
-| `format`           | Iceberg table format like `iceberg/parquet`. | None          | No       | 0.2.0         |
-| `format-version`   | Iceberg meta data format version.            | None          | No       | 0.2.0         |
-| `provider`         | Table provider like `iceberg`.               | None          | No       | 0.2.0         |
 
 ### Table indexes
 
