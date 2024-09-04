@@ -18,30 +18,23 @@
  */
 package org.apache.gravitino.storage.relational.converters;
 
-import java.io.IOException;
 import java.sql.SQLException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-/**
- * Exception converter to Apache Gravitino exception for MySQL. The definition of error codes can be
- * found in the document: <a
- * href="https://dev.mysql.com/doc/connector-j/en/connector-j-reference-error-sqlstates.html"></a>
- */
-public class MySQLExceptionConverter implements SQLExceptionConverter {
-  /** It means found a duplicated primary key or unique key entry in MySQL. */
-  private static final int DUPLICATED_ENTRY_ERROR_CODE = 1062;
+public class TestMySQLExceptionConverter {
 
-  @SuppressWarnings("FormatStringAnnotation")
-  @Override
-  public void toGravitinoException(SQLException se, Entity.EntityType type, String name)
-      throws IOException {
-    switch (se.getErrorCode()) {
-      case DUPLICATED_ENTRY_ERROR_CODE:
-        throw new EntityAlreadyExistsException(
-            se, "The %s entity: %s already exists.", type.name(), name);
-      default:
-        throw new IOException(se);
-    }
+  @Test
+  public void testConvertDuplicatedEntryException() {
+    SQLException mockException = Mockito.mock(SQLException.class);
+    Mockito.when(mockException.getErrorCode()).thenReturn(1062);
+    MySQLExceptionConverter converter = new MySQLExceptionConverter();
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class,
+        () -> converter.toGravitinoException(mockException, Entity.EntityType.METALAKE, "test"),
+        String.format("The %s entity: %s already exists.", Entity.EntityType.METALAKE, "test"));
   }
 }
