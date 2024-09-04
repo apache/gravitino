@@ -34,8 +34,6 @@ import org.apache.gravitino.listener.api.event.CreateFilesetEvent;
 import org.apache.gravitino.listener.api.event.CreateFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetFailureEvent;
-import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
-import org.apache.gravitino.listener.api.event.GetFileLocationFailureEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadFilesetEvent;
@@ -144,16 +142,6 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
-    try {
-      String actualFileLocation = dispatcher.getFileLocation(ident, subPath);
-      eventBus.dispatchEvent(
-          new GetFileLocationEvent(
-              PrincipalUtils.getCurrentUserName(), ident, actualFileLocation, null));
-      return actualFileLocation;
-    } catch (Exception e) {
-      eventBus.dispatchEvent(
-          new GetFileLocationFailureEvent(PrincipalUtils.getCurrentUserName(), ident, subPath, e));
-      throw e;
-    }
+    throw new UnsupportedOperationException("Not implemented");
   }
 }
