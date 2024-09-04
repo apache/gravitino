@@ -112,7 +112,14 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          file: ${{ github.workspace }}/**/build/reports/jacoco/test/jacocoTestReport.xml
+          files: ${{ github.workspace }}/server/build/reports/jacoco/test/jacocoTestReport.xml,
+                    ${{ github.workspace }}/clients/client-java/build/reports/jacoco/test/jacocoTestReport.xml,
+                    ${{ github.workspace }}/clients/client-java-runtime/build/reports/jacoco/test/jacocoTestReport.xml,
+                    ${{ github.workspace }}/clients/filesystem-hadoop3/build/reports/jacoco/test/jacocoTestReport.xml,
+                    ${{ github.workspace }}/clients/filesystem-hadoop3-runtime/build/reports/jacoco/test/jacocoTestReport.xml,
+                    ${{ github.workspace }}/spark-connector/build/reports/jacoco/test/jacocoTestReport.xml,
+                    ${{ github.workspace }}/flink-connector/build/reports/jacoco/test/jacocoTestReport.xml,
+                    ${{ github.workspace }}/trino-connector/build/reports/jacoco/test/jacocoTestReport.xml
 
 #      - name: Jacoco Report to PR
 #        id: jacoco
