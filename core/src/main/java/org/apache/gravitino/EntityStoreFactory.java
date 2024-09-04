@@ -68,4 +68,21 @@ public class EntityStoreFactory {
       throw new RuntimeException("Failed to create and initialize EntityStore: " + name, e);
     }
   }
+
+  public static EntityStore createEntityStore(Config config) {
+    String name = config.get(Configs.ENTITY_STORE);
+    String className = ENTITY_STORES.getOrDefault(name, name);
+
+    if (KV_STORE_KEY.equals(name)) {
+      throw new UnsupportedOperationException(
+          "KvEntityStore is not supported since version 0.6.0. Please use RelationalEntityStore instead.");
+    }
+
+    try {
+      return (EntityStore) Class.forName(className).getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      LOG.error("Failed to create and initialize EntityStore by name {}.", name, e);
+      throw new RuntimeException("Failed to create and initialize EntityStore: " + name, e);
+    }
+  }
 }
