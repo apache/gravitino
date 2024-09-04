@@ -160,6 +160,7 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+
 components:
 
   schemas:
@@ -357,6 +358,7 @@ components:
           examples:
             FilesetResponse:
               $ref: "#/components/examples/FilesetResponse"
+
 
   examples:
     FilesetCreateRequest:
