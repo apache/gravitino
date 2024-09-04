@@ -25,7 +25,7 @@ To use Iceberg, you need:
 Users can create a schema through Apache Gravitino Trino connector as follows:
 
 ```SQL
-CREATE SCHEMA "metalake.catalog".schema_name 
+CREATE SCHEMA catalog.schema_name
 ```
 
 ## Table operations
@@ -38,7 +38,7 @@ allowing null values, and adding comments. The Gravitino Trino connector does no
 The following example shows how to create a table in the Iceberg catalog:
 
 ```shell
-CREATE TABLE "metalake.catalog".schema_name.table_name
+CREATE TABLE catalog.schema_name.table_name
 (
   name varchar,
   salary int
@@ -71,12 +71,11 @@ Iceberg schema does not support properties.
 Users can use the following example to create a table with properties:
 
 ```sql
-CREATE TABLE "metalake.catalog".dbname.tablename
+CREATE TABLE catalog.dbname.tablename
 (
   name varchar,
   salary int
 ) WITH (
-  format = 'TEXTFILE',
   KEY = 'VALUE',
   ...      
 );
@@ -147,7 +146,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
 The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
-The `test.iceberg_test` catalog is the catalog created by you in Gravitino.
+The `iceberg_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
@@ -158,7 +157,7 @@ Create a new schema named `database_01` in `test.iceberg_test` catalog.
 CREATE SCHEMA iceberg_test.database_01;
 ```
 
-Create a new table named `table_01` in schema `"test.iceberg_test".database_01`.
+Create a new table named `table_01` in schema `iceberg_test.database_01`.
 
 ```sql
 CREATE TABLE iceberg_test.database_01.table_01
@@ -182,7 +181,7 @@ INSERT INTO iceberg_test.database_01.table_01 (name, salary) VALUES ('ice', 12);
 Insert data into the table `table_01` from select:
 
 ```sql
-INSERT INTO iceberg_test.database_01.table_01 (name, salary) SELECT * FROM "test.iceberg_test".database_01.table_01;
+INSERT INTO iceberg_test.database_01.table_01 (name, salary) SELECT * FROM iceberg_test.database_01.table_01;
 ```
 
 ### Querying data
@@ -190,7 +189,7 @@ INSERT INTO iceberg_test.database_01.table_01 (name, salary) SELECT * FROM "test
 Query the `table_01` table:
 
 ```sql
-SELECT * FROM "test.iceberg_test".database_01.table_01;
+SELECT * FROM iceberg_test.database_01.table_01;
 ```
 
 ### Modify a table
@@ -198,19 +197,19 @@ SELECT * FROM "test.iceberg_test".database_01.table_01;
 Add a new column `age` to the `table_01` table:
 
 ```sql
-ALTER TABLE "test.iceberg_test".database_01.table_01 ADD COLUMN age int;
+ALTER TABLE iceberg_test.database_01.table_01 ADD COLUMN age int;
 ```
 
 Drop a column `age` from the `table_01` table:
 
 ```sql
-ALTER TABLE "test.iceberg_test".database_01.table_01 DROP COLUMN age;
+ALTER TABLE iceberg_test.database_01.table_01 DROP COLUMN age;
 ```
 
 Rename the `table_01` table to `table_02`:
 
 ```sql
-ALTER TABLE "test.iceberg_test".database_01.table_01 RENAME TO "test.iceberg_test".database_01.table_02;
+ALTER TABLE iceberg_test.database_01.table_01 RENAME TO iceberg_test.database_01.table_02;
 ```
 
 ### Drop
@@ -218,13 +217,13 @@ ALTER TABLE "test.iceberg_test".database_01.table_01 RENAME TO "test.iceberg_tes
 Drop a schema:
 
 ```sql
-DROP SCHEMA "test.iceberg_test".database_01;
+DROP SCHEMA iceberg_test.database_01;
 ```
 
 Drop a table:
 
 ```sql
-DROP TABLE "test.iceberg_test".database_01.table_01;
+DROP TABLE iceberg_test.database_01.table_01;
 ```
 
 ## HDFS username and permissions

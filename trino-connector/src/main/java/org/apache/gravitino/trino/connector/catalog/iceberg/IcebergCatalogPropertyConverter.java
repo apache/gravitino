@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 
@@ -350,8 +351,11 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
     jdbcProperties.put("iceberg.jdbc-catalog.connection-password", properties.get("jdbc-password"));
     jdbcProperties.put("iceberg.jdbc-catalog.default-warehouse-dir", properties.get("warehouse"));
 
-    // TODO (FANG) make the catalog name equal to the catalog name in Gravitino
-    jdbcProperties.put("iceberg.jdbc-catalog.catalog-name", "jdbc");
+    // TODO (yuhui) Optimize the code for retrieve the catalogname
+    String catalogName = properties.get("catalog-name");
+    jdbcProperties.put(
+        "iceberg.jdbc-catalog.catalog-name",
+        properties.getOrDefault(IcebergConstants.CATALOG_BACKEND_NAME, catalogName));
 
     return jdbcProperties;
   }

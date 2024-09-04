@@ -90,7 +90,7 @@ public class PaimonCatalogOps implements AutoCloseable {
     catalog.createTable(tableIdentifier(tableName), schema, false);
   }
 
-  public void dropTable(String tableName) throws TableNotExistException {
+  public void purgeTable(String tableName) throws TableNotExistException {
     catalog.dropTable(tableIdentifier(tableName), false);
   }
 

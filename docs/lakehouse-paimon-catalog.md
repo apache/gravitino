@@ -59,9 +59,9 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Schema properties
 
-- Doesn't support specify location and store any schema properties when createSchema for FilesystemCatalog now.
-- Doesn't return any schema properties when loadSchema for FilesystemCatalog now.
-- Doesn't support store schema comment for FilesystemCatalog now.
+- Doesn't support specify location and store any schema properties when createSchema for FilesystemCatalog.
+- Doesn't return any schema properties when loadSchema for FilesystemCatalog.
+- Doesn't support store schema comment for FilesystemCatalog.
 
 ### Schema operations
 
@@ -71,13 +71,15 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Table capabilities
 
-- Supporting createTable, dropTable, alterTable, loadTable and listTable.
-```
-dropTable will delete the table location directly, similar with purgeTable.
-```
+- Supporting createTable, purgeTable, alterTable, loadTable and listTable.
 - Supporting Column default value through table properties, such as `fields.{columnName}.default-value`, not column expression.
- 
+
+- Doesn't support dropTable.
 - Doesn't support table distribution and sort orders.
+
+:::info
+Gravitino Paimon Catalog does not support dropTable, because the dropTable in Paimon will both remove the table metadata and the table location from the file system and skip the trash, we should use purgeTable instead in Gravitino.
+:::
 
 :::info
 Paimon does not support auto increment column.
@@ -85,6 +87,7 @@ Paimon does not support auto increment column.
 
 #### Table changes
 
+- RenameTable
 - AddColumn
 - DeleteColumn
 - RenameColumn

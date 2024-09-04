@@ -246,6 +246,13 @@ The related configuration is as follows.
 | `gravitino.authorization.enable`         | Whether Gravitino enable authorization or not.                         | false         | No                               | 0.5.0         |
 | `gravitino.authorization.serviceAdmins`  | The admins of Gravitino service, multiple admins are spitted by comma. | (none)        | Yes if enables the authorization | 0.5.0         |
 
+:::info
+
+If you enable authorization, you should add users to the metalake first, otherwise you will fail to create metadata objects.
+If you don't set a user explicitly, you will use `anonymous` as the user.
+When you enable authorization and create a metalake, the service will add the creator to the metalake automatically.
+
+:::
 
 ## User Operation
 
