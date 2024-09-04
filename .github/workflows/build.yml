@@ -73,7 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java-version: [ 8 ]
+        java-version: [ 17 ]
     timeout-minutes: 30
     needs: changes
     permissions: write-all
