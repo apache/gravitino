@@ -25,7 +25,7 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-public class TableMetaSQLProvider {
+public class TableMetaProviderFactory {
 
   private static final Map<JDBCBackendType, TableMetaBaseProvider> METALAKE_META_SQL_PROVIDER_MAP =
       ImmutableMap.of(

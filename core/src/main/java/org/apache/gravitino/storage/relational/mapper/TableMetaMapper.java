@@ -38,43 +38,51 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface TableMetaMapper {
   String TABLE_NAME = "table_meta";
 
-  @SelectProvider(type = TableMetaSQLProvider.class, method = "listTablePOsBySchemaId")
+  @SelectProvider(type = TableMetaProviderFactory.class, method = "listTablePOsBySchemaId")
   List<TablePO> listTablePOsBySchemaId(@Param("schemaId") Long schemaId);
 
-  @SelectProvider(type = TableMetaSQLProvider.class, method = "selectTableIdBySchemaIdAndName")
+  @SelectProvider(type = TableMetaProviderFactory.class, method = "selectTableIdBySchemaIdAndName")
   Long selectTableIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
 
-  @SelectProvider(type = TableMetaSQLProvider.class, method = "selectTableMetaBySchemaIdAndName")
+  @SelectProvider(
+      type = TableMetaProviderFactory.class,
+      method = "selectTableMetaBySchemaIdAndName")
   TablePO selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
 
-  @SelectProvider(type = TableMetaSQLProvider.class, method = "selectTableMetaById")
+  @SelectProvider(type = TableMetaProviderFactory.class, method = "selectTableMetaById")
   TablePO selectTableMetaById(@Param("tableId") Long tableId);
 
-  @InsertProvider(type = TableMetaSQLProvider.class, method = "insertTableMeta")
+  @InsertProvider(type = TableMetaProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);
 
-  @InsertProvider(type = TableMetaSQLProvider.class, method = "insertTableMetaOnDuplicateKeyUpdate")
+  @InsertProvider(
+      type = TableMetaProviderFactory.class,
+      method = "insertTableMetaOnDuplicateKeyUpdate")
   void insertTableMetaOnDuplicateKeyUpdate(@Param("tableMeta") TablePO tablePO);
 
-  @UpdateProvider(type = TableMetaSQLProvider.class, method = "updateTableMeta")
+  @UpdateProvider(type = TableMetaProviderFactory.class, method = "updateTableMeta")
   Integer updateTableMeta(
       @Param("newTableMeta") TablePO newTablePO, @Param("oldTableMeta") TablePO oldTablePO);
 
-  @UpdateProvider(type = TableMetaSQLProvider.class, method = "softDeleteTableMetasByTableId")
+  @UpdateProvider(type = TableMetaProviderFactory.class, method = "softDeleteTableMetasByTableId")
   Integer softDeleteTableMetasByTableId(@Param("tableId") Long tableId);
 
-  @UpdateProvider(type = TableMetaSQLProvider.class, method = "softDeleteTableMetasByMetalakeId")
+  @UpdateProvider(
+      type = TableMetaProviderFactory.class,
+      method = "softDeleteTableMetasByMetalakeId")
   Integer softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @UpdateProvider(type = TableMetaSQLProvider.class, method = "softDeleteTableMetasByCatalogId")
+  @UpdateProvider(type = TableMetaProviderFactory.class, method = "softDeleteTableMetasByCatalogId")
   Integer softDeleteTableMetasByCatalogId(@Param("catalogId") Long catalogId);
 
-  @UpdateProvider(type = TableMetaSQLProvider.class, method = "softDeleteTableMetasBySchemaId")
+  @UpdateProvider(type = TableMetaProviderFactory.class, method = "softDeleteTableMetasBySchemaId")
   Integer softDeleteTableMetasBySchemaId(@Param("schemaId") Long schemaId);
 
-  @DeleteProvider(type = TableMetaSQLProvider.class, method = "deleteTableMetasByLegacyTimeline")
+  @DeleteProvider(
+      type = TableMetaProviderFactory.class,
+      method = "deleteTableMetasByLegacyTimeline")
   Integer deleteTableMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }
