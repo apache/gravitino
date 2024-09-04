@@ -120,7 +120,10 @@ public class UserMetaService {
       UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
-      List<Long> roleIds = Optional.ofNullable(userEntity.roleIds()).orElse(Lists.newArrayList());
+      List<Long> roleIds =
+          Optional.ofNullable(userEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
+              .map(RoleEntity::id)
+              .collect(Collectors.toList());
       List<UserRoleRelPO> userRoleRelPOs =
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
 
@@ -196,11 +199,14 @@ public class UserMetaService {
         oldUserEntity.id());
 
     Set<Long> oldRoleIds =
-        oldUserEntity.roleIds() == null
-            ? Sets.newHashSet()
-            : Sets.newHashSet(oldUserEntity.roleIds());
+        Optional.ofNullable(oldUserEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
+            .map(RoleEntity::id)
+            .collect(Collectors.toSet());
+
     Set<Long> newRoleIds =
-        newEntity.roleIds() == null ? Sets.newHashSet() : Sets.newHashSet(newEntity.roleIds());
+        Optional.ofNullable(newEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
+            .map(RoleEntity::id)
+            .collect(Collectors.toSet());
 
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);

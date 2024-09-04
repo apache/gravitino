@@ -30,6 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -714,24 +715,16 @@ public class POConverters {
               .withNamespace(namespace)
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class))
-              .withRoleNamesSupplier(
-                  () -> {
-                    List<RolePO> rolePOs = rolePOsSupplier.get();
-                    if (rolePOs.isEmpty()) {
-                      return null;
-                    }
-
-                    return rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
-                  })
-              .withRoleIdsSupplier(
-                  () -> {
-                    List<RolePO> rolePOs = rolePOsSupplier.get();
-                    if (rolePOs.isEmpty()) {
-                      return null;
-                    }
-
-                    return rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
-                  });
+              .withRolesSupplier(
+                  () ->
+                      rolePOsSupplier.get().stream()
+                          .map(
+                              po ->
+                                  fromRolePO(
+                                      po,
+                                      SupplierUtils.createSecurableObjectsSupplier(po),
+                                      AuthorizationUtils.ofRoleNamespace(namespace.level(0))))
+                          .collect(Collectors.toList()));
 
       return builder.build();
     } catch (JsonProcessingException e) {
@@ -757,24 +750,16 @@ public class POConverters {
               .withNamespace(namespace)
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class))
-              .withRoleNamesSupplier(
-                  () -> {
-                    List<RolePO> rolePOs = rolePOsSupplier.get();
-                    if (rolePOs.isEmpty()) {
-                      return null;
-                    }
-
-                    return rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
-                  })
-              .withRoleIdsSupplier(
-                  () -> {
-                    List<RolePO> rolePOs = rolePOsSupplier.get();
-                    if (rolePOs.isEmpty()) {
-                      return null;
-                    }
-
-                    return rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
-                  });
+              .withRolesSupplier(
+                  () ->
+                      rolePOsSupplier.get().stream()
+                          .map(
+                              po ->
+                                  fromRolePO(
+                                      po,
+                                      SupplierUtils.createSecurableObjectsSupplier(po),
+                                      AuthorizationUtils.ofRoleNamespace(namespace.level(0))))
+                          .collect(Collectors.toList()));
 
       return builder.build();
     } catch (JsonProcessingException e) {

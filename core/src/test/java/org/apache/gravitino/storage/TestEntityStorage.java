@@ -1234,7 +1234,7 @@ public class TestEntityStorage {
         .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoleNames(null)
+        .withRoles(null)
         .build();
   }
 
@@ -1245,7 +1245,7 @@ public class TestEntityStorage {
         .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoleNames(null)
+        .withRoles(null)
         .build();
   }
 

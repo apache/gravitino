@@ -22,9 +22,11 @@ import static org.apache.gravitino.authorization.AuthorizationUtils.GROUP_DOES_N
 import static org.apache.gravitino.authorization.AuthorizationUtils.USER_DOES_NOT_EXIST_MSG;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -70,14 +72,10 @@ class PermissionManager {
               UserEntity.class,
               Entity.EntityType.USER,
               userEntity -> {
-                List<RoleEntity> roleEntities = Lists.newArrayList();
-                if (userEntity.roleNames() != null) {
-                  for (String role : userEntity.roleNames()) {
-                    roleEntities.add(roleManager.getRole(metalake, role));
-                  }
-                }
-                List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
-                List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
+                List<RoleEntity> roleEntities = Lists.newArrayList(userEntity.roleEntities());
+
+                List<Long> roleIds =
+                    roleEntities.stream().map(RoleEntity::id).collect(Collectors.toList());
 
                 for (RoleEntity roleEntityToGrant : roleEntitiesToGrant) {
                   if (roleIds.contains(roleEntityToGrant.id())) {
@@ -87,8 +85,8 @@ class PermissionManager {
                         user,
                         metalake);
                   } else {
-                    roleNames.add(roleEntityToGrant.name());
                     roleIds.add(roleEntityToGrant.id());
+                    roleEntities.add(roleEntityToGrant);
                   }
                 }
 
@@ -104,8 +102,7 @@ class PermissionManager {
                     .withNamespace(userEntity.namespace())
                     .withId(userEntity.id())
                     .withName(userEntity.name())
-                    .withRoleNames(roleNames)
-                    .withRoleIds(roleIds)
+                    .withRoles(roleEntities)
                     .withAuditInfo(auditInfo)
                     .build();
               });
@@ -149,13 +146,8 @@ class PermissionManager {
               GroupEntity.class,
               Entity.EntityType.GROUP,
               groupEntity -> {
-                List<RoleEntity> roleEntities = Lists.newArrayList();
-                if (groupEntity.roleNames() != null) {
-                  for (String role : groupEntity.roleNames()) {
-                    roleEntities.add(roleManager.getRole(metalake, role));
-                  }
-                }
-                List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
+                List<RoleEntity> roleEntities = Lists.newArrayList(groupEntity.roleEntities());
+
                 List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
                 for (RoleEntity roleEntityToGrant : roleEntitiesToGrant) {
@@ -166,8 +158,8 @@ class PermissionManager {
                         group,
                         metalake);
                   } else {
-                    roleNames.add(roleEntityToGrant.name());
                     roleIds.add(roleEntityToGrant.id());
+                    roleEntities.add(roleEntityToGrant);
                   }
                 }
 
@@ -183,8 +175,7 @@ class PermissionManager {
                     .withId(groupEntity.id())
                     .withNamespace(groupEntity.namespace())
                     .withName(groupEntity.name())
-                    .withRoleNames(roleNames)
-                    .withRoleIds(roleIds)
+                    .withRoles(roleEntities)
                     .withAuditInfo(auditInfo)
                     .build();
               });
@@ -228,19 +219,19 @@ class PermissionManager {
               GroupEntity.class,
               Entity.EntityType.GROUP,
               groupEntity -> {
-                List<RoleEntity> roleEntities = Lists.newArrayList();
-                if (groupEntity.roleNames() != null) {
-                  for (String role : groupEntity.roleNames()) {
-                    roleEntities.add(roleManager.getRole(metalake, role));
-                  }
+                List<RoleEntity> roleEntities = groupEntity.roleEntities();
+
+                // We should only compare role id, otherwise we will load securable objects of the
+                // role
+                Map<Long, RoleEntity> roleEntitiesMap = Maps.newHashMap();
+                for (RoleEntity entity : roleEntities) {
+                  roleEntitiesMap.put(entity.id(), entity);
                 }
-                List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
-                List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
 
                 for (RoleEntity roleEntityToRevoke : roleEntitiesToRevoke) {
-                  roleNames.remove(roleEntityToRevoke.name());
-                  boolean removed = roleIds.remove(roleEntityToRevoke.id());
-                  if (!removed) {
+                  if (roleEntitiesMap.containsKey(roleEntityToRevoke.id())) {
+                    roleEntitiesMap.remove(roleEntityToRevoke.id());
+                  } else {
                     LOG.warn(
                         "Failed to revoke, role {} does not exist in the group {} of metalake {}",
                         roleEntityToRevoke.name(),
@@ -261,8 +252,7 @@ class PermissionManager {
                     .withNamespace(groupEntity.namespace())
                     .withId(groupEntity.id())
                     .withName(groupEntity.name())
-                    .withRoleNames(roleNames)
-                    .withRoleIds(roleIds)
+                    .withRoles(Lists.newArrayList(roleEntitiesMap.values()))
                     .withAuditInfo(auditInfo)
                     .build();
               });
@@ -308,20 +298,19 @@ class PermissionManager {
               UserEntity.class,
               Entity.EntityType.USER,
               userEntity -> {
-                List<RoleEntity> roleEntities = Lists.newArrayList();
-                if (userEntity.roleNames() != null) {
-                  for (String role : userEntity.roleNames()) {
-                    roleEntities.add(roleManager.getRole(metalake, role));
-                  }
+                List<RoleEntity> roleEntities = userEntity.roleEntities();
+
+                // We should only compare role id, otherwise we will load securable objects of the
+                // role
+                Map<Long, RoleEntity> roleEntitiesMap = Maps.newHashMap();
+                for (RoleEntity entity : roleEntities) {
+                  roleEntitiesMap.put(entity.id(), entity);
                 }
 
-                List<String> roleNames = Lists.newArrayList(toRoleNames(roleEntities));
-                List<Long> roleIds = Lists.newArrayList(toRoleIds(roleEntities));
-
                 for (RoleEntity roleEntityToRevoke : roleEntitiesToRevoke) {
-                  roleNames.remove(roleEntityToRevoke.name());
-                  boolean removed = roleIds.remove(roleEntityToRevoke.id());
-                  if (!removed) {
+                  if (roleEntitiesMap.containsKey(roleEntityToRevoke.id())) {
+                    roleEntitiesMap.remove(roleEntityToRevoke.id());
+                  } else {
                     LOG.warn(
                         "Failed to revoke, role {} doesn't exist in the user {} of metalake {}",
                         roleEntityToRevoke.name(),
@@ -341,8 +330,7 @@ class PermissionManager {
                     .withId(userEntity.id())
                     .withNamespace(userEntity.namespace())
                     .withName(userEntity.name())
-                    .withRoleNames(roleNames)
-                    .withRoleIds(roleIds)
+                    .withRoles(Lists.newArrayList(roleEntitiesMap.values()))
                     .withAuditInfo(auditInfo)
                     .build();
               });
@@ -371,10 +359,6 @@ class PermissionManager {
           ioe);
       throw new RuntimeException(ioe);
     }
-  }
-
-  private List<String> toRoleNames(List<RoleEntity> roleEntities) {
-    return roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList());
   }
 
   private List<Long> toRoleIds(List<RoleEntity> roleEntities) {

@@ -58,7 +58,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   private Map<String, String> properties;
   private AuditInfo auditInfo;
   private Namespace namespace;
-  private Supplier<List<SecurableObject>> securableObjectsSupplier;
+  private Supplier<List<SecurableObject>> securableObjectsSupplier = () -> null;
 
   /**
    * The name of the role.

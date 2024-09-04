@@ -21,6 +21,7 @@ package org.apache.gravitino.meta;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -241,7 +242,13 @@ public class TestEntity {
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
-            .withRoleNames(Lists.newArrayList("role"))
+            .withRoles(
+                Lists.newArrayList(
+                    RoleEntity.builder()
+                        .withId(1L)
+                        .withName("role")
+                        .withAuditInfo(auditInfo)
+                        .build()))
             .build();
 
     Map<Field, Object> fields = testUserEntity.fields();
@@ -249,45 +256,34 @@ public class TestEntity {
     Assertions.assertEquals(userName, fields.get(UserEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(UserEntity.AUDIT_INFO));
     Assertions.assertEquals(
-        Lists.newArrayList("role"),
-        ((Supplier<List<String>>) fields.get(UserEntity.ROLE_NAMES_SUPPLIER)).get());
+        Lists.newArrayList(
+            RoleEntity.builder().withId(1L).withName("role").withAuditInfo(auditInfo).build()),
+        ((Supplier<List<RoleEntity>>) fields.get(UserEntity.ROLES_SUPPLIER)).get());
 
     UserEntity testUserEntityWithoutFields =
         UserEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
 
-    Assertions.assertNull(testUserEntityWithoutFields.roles());
+    Assertions.assertTrue(testUserEntityWithoutFields.roles().isEmpty());
 
     // Test lazily loading
-    AtomicBoolean hasCallRoleIdsSupplier = new AtomicBoolean(false);
-    AtomicBoolean hasCallRoleNamesSupplier = new AtomicBoolean(false);
+    AtomicBoolean hasCallRolesSupplier = new AtomicBoolean(false);
 
     UserEntity userWithSupplier =
         UserEntity.builder()
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
-            .withRoleIdsSupplier(
+            .withRolesSupplier(
                 () -> {
-                  hasCallRoleIdsSupplier.set(true);
-                  return null;
-                })
-            .withRoleNamesSupplier(
-                () -> {
-                  hasCallRoleNamesSupplier.set(true);
-                  return null;
+                  hasCallRolesSupplier.set(true);
+                  return Collections.emptyList();
                 })
             .build();
 
-    Assertions.assertFalse(hasCallRoleIdsSupplier.get());
-    Assertions.assertFalse(hasCallRoleNamesSupplier.get());
+    Assertions.assertFalse(hasCallRolesSupplier.get());
 
-    userWithSupplier.roleIds();
-    Assertions.assertTrue(hasCallRoleIdsSupplier.get());
-    Assertions.assertFalse(hasCallRoleNamesSupplier.get());
-
-    userWithSupplier.roleNames();
-    Assertions.assertTrue(hasCallRoleIdsSupplier.get());
-    Assertions.assertTrue(hasCallRoleNamesSupplier.get());
+    userWithSupplier.roles();
+    Assertions.assertTrue(hasCallRolesSupplier.get());
   }
 
   @Test
@@ -296,24 +292,30 @@ public class TestEntity {
         GroupEntity.builder()
             .withId(groupId)
             .withName(groupName)
+            .withRoles(
+                Lists.newArrayList(
+                    RoleEntity.builder()
+                        .withId(1L)
+                        .withName("role")
+                        .withAuditInfo(auditInfo)
+                        .build()))
             .withAuditInfo(auditInfo)
-            .withRoleNames(Lists.newArrayList("role"))
             .build();
     Map<Field, Object> fields = group.fields();
     Assertions.assertEquals(groupId, fields.get(GroupEntity.ID));
     Assertions.assertEquals(groupName, fields.get(GroupEntity.NAME));
     Assertions.assertEquals(auditInfo, fields.get(GroupEntity.AUDIT_INFO));
     Assertions.assertEquals(
-        Lists.newArrayList("role"),
-        ((Supplier<List<String>>) fields.get(GroupEntity.ROLE_NAMES_SUPPLIER)).get());
+        Lists.newArrayList(
+            RoleEntity.builder().withId(1L).withName("role").withAuditInfo(auditInfo).build()),
+        ((Supplier<List<RoleEntity>>) fields.get(GroupEntity.ROLES_SUPPLIER)).get());
 
     GroupEntity groupWithoutFields =
         GroupEntity.builder().withId(userId).withName(userName).withAuditInfo(auditInfo).build();
 
-    Assertions.assertNull(groupWithoutFields.roles());
+    Assertions.assertTrue(groupWithoutFields.roles().isEmpty());
 
-    AtomicBoolean hasCallRoleIdsSupplier = new AtomicBoolean(false);
-    AtomicBoolean hasCallRoleNamesSupplier = new AtomicBoolean(false);
+    AtomicBoolean hasCallRolesSupplier = new AtomicBoolean(false);
 
     // Test lazily loading
     GroupEntity groupWithSupplier =
@@ -321,28 +323,17 @@ public class TestEntity {
             .withId(userId)
             .withName(userName)
             .withAuditInfo(auditInfo)
-            .withRoleIdsSupplier(
+            .withRolesSupplier(
                 () -> {
-                  hasCallRoleIdsSupplier.set(true);
-                  return null;
-                })
-            .withRoleNamesSupplier(
-                () -> {
-                  hasCallRoleNamesSupplier.set(true);
-                  return null;
+                  hasCallRolesSupplier.set(true);
+                  return Collections.emptyList();
                 })
             .build();
 
-    Assertions.assertFalse(hasCallRoleIdsSupplier.get());
-    Assertions.assertFalse(hasCallRoleNamesSupplier.get());
+    Assertions.assertFalse(hasCallRolesSupplier.get());
 
-    groupWithSupplier.roleIds();
-    Assertions.assertTrue(hasCallRoleIdsSupplier.get());
-    Assertions.assertFalse(hasCallRoleNamesSupplier.get());
-
-    groupWithSupplier.roleNames();
-    Assertions.assertTrue(hasCallRoleIdsSupplier.get());
-    Assertions.assertTrue(hasCallRoleNamesSupplier.get());
+    groupWithSupplier.roles();
+    Assertions.assertTrue(hasCallRolesSupplier.get());
   }
 
   @Test

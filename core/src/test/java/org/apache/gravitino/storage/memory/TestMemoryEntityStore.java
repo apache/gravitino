@@ -224,7 +224,7 @@ public class TestMemoryEntityStore {
             .withName("user")
             .withNamespace(Namespace.of("metalake", "catalog", "db"))
             .withAuditInfo(auditInfo)
-            .withRoleNames(null)
+            .withRoles(null)
             .build();
 
     GroupEntity groupEntity =
@@ -233,7 +233,7 @@ public class TestMemoryEntityStore {
             .withName("group")
             .withNamespace(AuthorizationUtils.ofGroupNamespace("metalake"))
             .withAuditInfo(auditInfo)
-            .withRoleNames(null)
+            .withRoles(null)
             .build();
 
     RoleEntity roleEntity =

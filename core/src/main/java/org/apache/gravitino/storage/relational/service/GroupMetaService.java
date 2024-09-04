@@ -120,7 +120,10 @@ public class GroupMetaService {
       GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakeId);
       GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
 
-      List<Long> roleIds = Optional.ofNullable(groupEntity.roleIds()).orElse(Lists.newArrayList());
+      List<Long> roleIds =
+          Optional.ofNullable(groupEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
+              .map(RoleEntity::id)
+              .collect(Collectors.toList());
       List<GroupRoleRelPO> groupRoleRelPOS =
           POConverters.initializeGroupRoleRelsPOWithVersion(groupEntity, roleIds);
 
@@ -198,11 +201,14 @@ public class GroupMetaService {
         oldGroupEntity.id());
 
     Set<Long> oldRoleIds =
-        oldGroupEntity.roleIds() == null
-            ? Sets.newHashSet()
-            : Sets.newHashSet(oldGroupEntity.roleIds());
+        Optional.ofNullable(oldGroupEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
+            .map(RoleEntity::id)
+            .collect(Collectors.toSet());
+
     Set<Long> newRoleIds =
-        newEntity.roleIds() == null ? Sets.newHashSet() : Sets.newHashSet(newEntity.roleIds());
+        Optional.ofNullable(newEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
+            .map(RoleEntity::id)
+            .collect(Collectors.toSet());
 
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);

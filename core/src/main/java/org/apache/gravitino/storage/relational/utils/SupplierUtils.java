@@ -47,8 +47,8 @@ public class SupplierUtils {
       @Override
       public List<RolePO> get() {
         if (waitToLoad) {
-          waitToLoad = false;
           rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+          waitToLoad = false;
         }
 
         return rolePOs;
@@ -64,8 +64,8 @@ public class SupplierUtils {
       @Override
       public List<RolePO> get() {
         if (waitToLoad) {
-          waitToLoad = false;
           rolePOS = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
+          waitToLoad = false;
         }
 
         return rolePOS;
@@ -82,7 +82,6 @@ public class SupplierUtils {
       @Override
       public List<SecurableObject> get() {
         if (waitToLoad) {
-          waitToLoad = false;
           List<SecurableObjectPO> securableObjectPOs =
               RoleMetaService.getInstance().listSecurableObjectsByRoleId(rolePO.getRoleId());
 
@@ -105,6 +104,7 @@ public class SupplierUtils {
                   securableObjectPO.getType());
             }
           }
+          waitToLoad = false;
         }
 
         return securableObjects;
