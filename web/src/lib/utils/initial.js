@@ -67,6 +67,7 @@ export const providers = [
       {
         key: 'catalog-backend',
         value: 'hive',
+        defaultValue: 'hive',
         required: true,
         description: 'Apache Iceberg catalog type choose properties',
         select: ['hive', 'jdbc']
@@ -87,6 +88,7 @@ export const providers = [
         key: 'jdbc-driver',
         value: '',
         required: true,
+        parentField: 'catalog-backend',
         hide: 'hive',
         description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`
       },
@@ -94,13 +96,39 @@ export const providers = [
         key: 'jdbc-user',
         value: '',
         required: true,
+        parentField: 'catalog-backend',
         hide: 'hive'
       },
       {
         key: 'jdbc-password',
         value: '',
         required: true,
+        parentField: 'catalog-backend',
         hide: 'hive'
+      },
+      {
+        key: 'authentication.type',
+        value: 'simple',
+        defaultValue: 'simple',
+        required: false,
+        description: 'The type of authentication for Paimon catalog backend, currently Gravitino only supports Kerberos and simple',
+        select: ['simple', 'Kerberos']
+      },
+      {
+        key: 'authentication.kerberos.principal',
+        value: '',
+        required: true,
+        description: 'The principal of the Kerberos authentication.',
+        parentField: 'authentication.type',
+        hide: 'simple'
+      },
+      {
+        key: 'authentication.kerberos.keytab-uri',
+        value: '',
+        required: true,
+        description: 'The URI of The keytab for the Kerberos authentication.',
+        parentField: 'authentication.type',
+        hide: 'simple'
       }
     ]
   },
@@ -190,6 +218,57 @@ export const providers = [
         key: 'jdbc-password',
         value: '',
         required: true
+      }
+    ]
+  },
+  {
+    label: 'Apache Paimon',
+    value: 'lakehouse-paimon',
+    defaultProps: [
+      {
+        key: 'catalog-backend',
+        value: 'filesystem',
+        defaultValue: 'filesystem',
+        required: true,
+        description: 'Only supports "filesystem" now.'
+      },
+      {
+        key: 'uri',
+        value: '',
+        required: true,
+        description: 'e.g. thrift://127.0.0.1:9083 or jdbc:postgresql://127.0.0.1:5432/db_name or jdbc:mysql://127.0.0.1:3306/metastore_db',
+        parentField: 'catalog-backend',
+        hide: 'filesystem'
+      },
+      {
+        key: 'warehouse',
+        value: '',
+        required: true,
+        description: 'e.g. file:///user/hive/warehouse-paimon/ or hdfs://namespace/hdfs/path'
+      },
+      {
+        key: 'authentication.type',
+        value: 'simple',
+        defaultValue: 'simple',
+        required: false,
+        description: 'The type of authentication for Paimon catalog backend, currently Gravitino only supports Kerberos and simple',
+        select: ['simple', 'Kerberos']
+      },
+      {
+        key: 'authentication.kerberos.principal',
+        value: '',
+        required: true,
+        description: 'The principal of the Kerberos authentication.',
+        parentField: 'authentication.type',
+        hide: 'simple'
+      },
+      {
+        key: 'authentication.kerberos.keytab-uri',
+        value: '',
+        required: true,
+        description: 'The URI of The keytab for the Kerberos authentication.',
+        parentField: 'authentication.type',
+        hide: 'simple'
       }
     ]
   }
