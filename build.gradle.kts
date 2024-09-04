@@ -627,7 +627,7 @@ tasks {
   }
 
   val compileTrinoConnector by registering {
-    dependsOn("trino-connector:copyLibs")
+    dependsOn("trino-connector:trino-connector:copyLibs")
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector"))
     doLast {
@@ -754,7 +754,7 @@ tasks {
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("integration-test") &&
         !it.name.startsWith("flink") &&
-        it.name != "trino-connector" &&
+        !it.name.startsWith("trino-connector") &&
         it.name != "bundled-catalog"
       ) {
         dependsOn("${it.name}:build")

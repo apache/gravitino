@@ -52,7 +52,7 @@ dependencies {
 }
 
 tasks.named("generateMetadataFileForMavenJavaPublication") {
-  dependsOn(":trino-connector:copyDepends")
+  dependsOn(":trino-connector:trino-connector:copyDepends")
 }
 
 tasks {
