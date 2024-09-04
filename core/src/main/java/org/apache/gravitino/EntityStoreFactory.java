@@ -69,7 +69,7 @@ public class EntityStoreFactory {
     }
   }
 
-  public static EntityStore createEntityStore(Config config) {
+  public static EntityStore createEntityStore1(Config config) {
     String name = config.get(Configs.ENTITY_STORE);
     String className = ENTITY_STORES.getOrDefault(name, name);
 
