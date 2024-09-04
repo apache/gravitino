@@ -151,7 +151,7 @@ public interface CatalogMetaMapper {
           + " AND type = #{oldCatalogMeta.type}"
           + " AND provider = #{oldCatalogMeta.provider}"
           + " AND (catalog_comment = #{oldCatalogMeta.catalogComment} "
-          + "   or (catalog_comment is null and #{oldCatalogMeta.catalogComment} is null))"
+          + "   OR (catalog_comment IS NULL and #{oldCatalogMeta.catalogComment} IS NULL))"
           + " AND properties = #{oldCatalogMeta.properties}"
           + " AND audit_info = #{oldCatalogMeta.auditInfo}"
           + " AND current_version = #{oldCatalogMeta.currentVersion}"
