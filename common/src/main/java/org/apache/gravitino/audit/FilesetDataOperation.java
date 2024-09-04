@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.enums;
+package org.apache.gravitino.audit;
 
 /** An enum class containing fileset data operations that supported. */
 public enum FilesetDataOperation {

@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.context;
+package org.apache.gravitino.audit;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;

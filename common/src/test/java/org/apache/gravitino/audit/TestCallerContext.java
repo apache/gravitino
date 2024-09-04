@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.context;
+package org.apache.gravitino.audit;
 
 import java.util.HashMap;
 import java.util.Map;
