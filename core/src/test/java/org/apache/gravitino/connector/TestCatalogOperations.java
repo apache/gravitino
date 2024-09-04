@@ -431,6 +431,11 @@ public class TestCatalogOperations
   }
 
   @Override
+  public String getFileLocation(NameIdentifier ident, String subPath) {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
   public NameIdentifier[] listTopics(Namespace namespace) throws NoSuchSchemaException {
     return topics.keySet().stream()
         .filter(ident -> ident.namespace().equals(namespace))
