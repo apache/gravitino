@@ -84,6 +84,7 @@ import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -432,6 +433,96 @@ public class TestJDBCBackend {
                 topicCopy.nameIdentifier(),
                 Entity.EntityType.TOPIC,
                 e -> createTopicEntity(topicCopy.id(), topicCopy.namespace(), "topic", auditInfo)));
+  }
+
+  @Test
+  void testUpdateMetalakeWithNullableComment() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    BaseMetalake metalake =
+        BaseMetalake.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("metalake" + RandomIdGenerator.INSTANCE.nextId())
+            .withAuditInfo(auditInfo)
+            .withComment(null)
+            .withProperties(null)
+            .withVersion(SchemaVersion.V_0_1)
+            .build();
+
+    backend.insert(metalake, false);
+
+    backend.update(
+        metalake.nameIdentifier(),
+        Entity.EntityType.METALAKE,
+        e ->
+            BaseMetalake.builder()
+                .withId(metalake.id())
+                .withName(metalake.name())
+                .withAuditInfo(auditInfo)
+                .withComment("comment")
+                .withProperties(metalake.properties())
+                .withVersion(metalake.getVersion())
+                .build());
+
+    BaseMetalake updatedMetalake =
+        backend.get(metalake.nameIdentifier(), Entity.EntityType.METALAKE);
+    Assertions.assertNotNull(updatedMetalake.comment());
+
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, false);
+  }
+
+  @Test
+  void testUpdateCatalogWithNullableComment() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    String metalakeName = "metalake" + RandomIdGenerator.INSTANCE.nextId();
+    BaseMetalake metalake =
+        BaseMetalake.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(metalakeName)
+            .withAuditInfo(auditInfo)
+            .withComment("")
+            .withProperties(null)
+            .withVersion(SchemaVersion.V_0_1)
+            .build();
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withNamespace(NamespaceUtil.ofCatalog(metalakeName))
+            .withName("catalog")
+            .withAuditInfo(auditInfo)
+            .withComment(null)
+            .withProperties(null)
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .build();
+
+    backend.insert(catalog, false);
+
+    backend.update(
+        catalog.nameIdentifier(),
+        Entity.EntityType.CATALOG,
+        e ->
+            CatalogEntity.builder()
+                .withId(catalog.id())
+                .withNamespace(catalog.namespace())
+                .withName(catalog.name())
+                .withAuditInfo(auditInfo)
+                .withComment("comment")
+                .withProperties(catalog.getProperties())
+                .withType(Catalog.Type.RELATIONAL)
+                .withProvider("test")
+                .build());
+
+    CatalogEntity updatedCatalog = backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    Assertions.assertNotNull(updatedCatalog.getComment());
+
+    backend.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG, false);
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, false);
   }
 
   @Test
