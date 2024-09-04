@@ -266,8 +266,8 @@
    ./dev/docker/hive/hadoop-env.sh
    ./dev/docker/kerberos-hive/hadoop-env.sh
    ./dev/docker/kerberos-hive/yarn-env.sh
+   ./common/src/main/java/org/apache/gravitino/audit/CallerContext.java
    ./common/src/main/java/org/apache/gravitino/auth/KerberosUtils.java
-   ./common/src/main/java/org/apache/gravitino/context/CallerContext.java
    ./server-common/src/main/java/org/apache/gravitino/server/authentication/KerberosAuthenticator.java
    ./server-common/src/test/java/org/apache/gravitino/server/authentication/KerberosTestUtils.java
    ./server-common/src/main/java/org/apache/gravitino/server/authentication/KerberosServerUtils.java
