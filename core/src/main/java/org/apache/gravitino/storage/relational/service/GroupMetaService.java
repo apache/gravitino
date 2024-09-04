@@ -24,7 +24,6 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -121,9 +120,7 @@ public class GroupMetaService {
       GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
 
       List<Long> roleIds =
-          Optional.ofNullable(groupEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
-              .map(RoleEntity::id)
-              .collect(Collectors.toList());
+          groupEntity.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toList());
       List<GroupRoleRelPO> groupRoleRelPOS =
           POConverters.initializeGroupRoleRelsPOWithVersion(groupEntity, roleIds);
 
@@ -201,14 +198,10 @@ public class GroupMetaService {
         oldGroupEntity.id());
 
     Set<Long> oldRoleIds =
-        Optional.ofNullable(oldGroupEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
-            .map(RoleEntity::id)
-            .collect(Collectors.toSet());
+        oldGroupEntity.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet());
 
     Set<Long> newRoleIds =
-        Optional.ofNullable(newEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
-            .map(RoleEntity::id)
-            .collect(Collectors.toSet());
+        newEntity.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet());
 
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);

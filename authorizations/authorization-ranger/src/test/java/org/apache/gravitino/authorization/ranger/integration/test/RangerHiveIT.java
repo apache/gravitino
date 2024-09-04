@@ -674,7 +674,7 @@ public class RangerHiveIT {
             .withId(0L)
             .withName(currentFunName())
             .withAuditInfo(auditInfo)
-            .withRoles(null)
+            .withRoles(Collections.emptyList())
             .build();
     Assertions.assertTrue(rangerAuthPlugin.onUserAdded(user));
     Assertions.assertTrue(rangerAuthPlugin.onUserAcquired(user));
@@ -689,7 +689,7 @@ public class RangerHiveIT {
             .withId(0L)
             .withName(currentFunName())
             .withAuditInfo(auditInfo)
-            .withRoles(null)
+            .withRoles(Collections.emptyList())
             .build();
 
     Assertions.assertTrue(rangerAuthPlugin.onGroupAdded(group));

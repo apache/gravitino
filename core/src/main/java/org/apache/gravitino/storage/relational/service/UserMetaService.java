@@ -24,7 +24,6 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -121,9 +120,7 @@ public class UserMetaService {
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
       List<Long> roleIds =
-          Optional.ofNullable(userEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
-              .map(RoleEntity::id)
-              .collect(Collectors.toList());
+          userEntity.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toList());
       List<UserRoleRelPO> userRoleRelPOs =
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
 
@@ -199,14 +196,10 @@ public class UserMetaService {
         oldUserEntity.id());
 
     Set<Long> oldRoleIds =
-        Optional.ofNullable(oldUserEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
-            .map(RoleEntity::id)
-            .collect(Collectors.toSet());
+        oldUserEntity.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet());
 
     Set<Long> newRoleIds =
-        Optional.ofNullable(newEntity.roleEntities()).orElse(Lists.newArrayList()).stream()
-            .map(RoleEntity::id)
-            .collect(Collectors.toSet());
+        newEntity.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet());
 
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);

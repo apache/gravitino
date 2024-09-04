@@ -221,8 +221,7 @@ class PermissionManager {
               groupEntity -> {
                 List<RoleEntity> roleEntities = groupEntity.roleEntities();
 
-                // We should only compare role id, otherwise we will load securable objects of the
-                // role
+                // Avoid loading securable objects
                 Map<Long, RoleEntity> roleEntitiesMap = Maps.newHashMap();
                 for (RoleEntity entity : roleEntities) {
                   roleEntitiesMap.put(entity.id(), entity);
@@ -300,8 +299,7 @@ class PermissionManager {
               userEntity -> {
                 List<RoleEntity> roleEntities = userEntity.roleEntities();
 
-                // We should only compare role id, otherwise we will load securable objects of the
-                // role
+                // Avoid loading securable objects
                 Map<Long, RoleEntity> roleEntitiesMap = Maps.newHashMap();
                 for (RoleEntity entity : roleEntities) {
                   roleEntitiesMap.put(entity.id(), entity);
