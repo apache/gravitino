@@ -45,7 +45,6 @@ dependencies {
     exclude("org.apache.hive")
     exclude("org.apache.hbase")
     exclude("it.unimi.dsi")
-    exclude("org.apache.hadoop")
     exclude("org.mortbay.jetty")
     exclude("org.apache.parquet")
     exclude("org.mortbay.jetty:jetty")
