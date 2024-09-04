@@ -18,17 +18,20 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
+import static org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType.HMS;
+
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
 
 public class HudiHMSBackend extends HudiCatalogBackend {
 
   public HudiHMSBackend() {
-    this(HudiCatalogBackend.Type.HMS, new HudiHMSBackendOps());
+    this(HMS, new HudiHMSBackendOps());
   }
 
-  private HudiHMSBackend(HudiCatalogBackend.Type backendType, HudiCatalogBackendOps catalogOps) {
+  private HudiHMSBackend(BackendType backendType, HudiCatalogBackendOps catalogOps) {
     super(backendType, catalogOps);
   }
 

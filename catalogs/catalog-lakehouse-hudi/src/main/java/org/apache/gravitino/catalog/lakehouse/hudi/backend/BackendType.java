@@ -18,28 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.backend;
 
-import java.util.Map;
-import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
-
-/** Base class for Hudi catalog backends. */
-public abstract class HudiCatalogBackend {
-
-  private final BackendType backendType;
-
-  private final HudiCatalogBackendOps catalogOps;
-
-  public abstract void initialize(Map<String, String> properties);
-
-  protected HudiCatalogBackend(BackendType backendType, HudiCatalogBackendOps catalogOps) {
-    this.backendType = backendType;
-    this.catalogOps = catalogOps;
-  }
-
-  public BackendType type() {
-    return backendType;
-  }
-
-  public HudiCatalogBackendOps catalogOps() {
-    return catalogOps;
-  }
+public enum BackendType {
+  HMS, // Hive Metastore backend
 }
