@@ -39,49 +39,49 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface FilesetVersionMapper {
   String VERSION_TABLE_NAME = "fileset_version_info";
 
-  @InsertProvider(type = FilesetVersionSQLProvider.class, method = "insertFilesetVersion")
+  @InsertProvider(type = FilesetVersionProviderFactory.class, method = "insertFilesetVersion")
   void insertFilesetVersion(@Param("filesetVersion") FilesetVersionPO filesetVersionPO);
 
   @InsertProvider(
-      type = FilesetVersionSQLProvider.class,
+      type = FilesetVersionProviderFactory.class,
       method = "insertFilesetVersionOnDuplicateKeyUpdate")
   void insertFilesetVersionOnDuplicateKeyUpdate(
       @Param("filesetVersion") FilesetVersionPO filesetVersionPO);
 
   @UpdateProvider(
-      type = FilesetVersionSQLProvider.class,
+      type = FilesetVersionProviderFactory.class,
       method = "softDeleteFilesetVersionsByMetalakeId")
   Integer softDeleteFilesetVersionsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @UpdateProvider(
-      type = FilesetVersionSQLProvider.class,
+      type = FilesetVersionProviderFactory.class,
       method = "softDeleteFilesetVersionsByCatalogId")
   Integer softDeleteFilesetVersionsByCatalogId(@Param("catalogId") Long catalogId);
 
   @UpdateProvider(
-      type = FilesetVersionSQLProvider.class,
+      type = FilesetVersionProviderFactory.class,
       method = "softDeleteFilesetVersionsBySchemaId")
   Integer softDeleteFilesetVersionsBySchemaId(@Param("schemaId") Long schemaId);
 
   @UpdateProvider(
-      type = FilesetVersionSQLProvider.class,
+      type = FilesetVersionProviderFactory.class,
       method = "softDeleteFilesetVersionsByFilesetId")
   Integer softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId);
 
   @DeleteProvider(
-      type = FilesetVersionSQLProvider.class,
+      type = FilesetVersionProviderFactory.class,
       method = "deleteFilesetVersionsByLegacyTimeline")
   Integer deleteFilesetVersionsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
   @SelectProvider(
-      type = FilesetVersionSQLProvider.class,
+      type = FilesetVersionProviderFactory.class,
       method = "selectFilesetVersionsByRetentionCount")
   List<FilesetMaxVersionPO> selectFilesetVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount);
 
   @UpdateProvider(
-      type = FilesetVersionSQLProvider.class,
+      type = FilesetVersionProviderFactory.class,
       method = "softDeleteFilesetVersionsByRetentionLine")
   Integer softDeleteFilesetVersionsByRetentionLine(
       @Param("filesetId") Long filesetId,

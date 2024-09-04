@@ -26,7 +26,7 @@ import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-public class CatalogMetaSQLProvider {
+public class CatalogMetaProviderFactory {
 
   private static final Map<JDBCBackendType, CatalogMetaBaseProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
@@ -52,47 +52,48 @@ public class CatalogMetaSQLProvider {
 
   static class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseProvider {}
 
-  public String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public static String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().listCatalogPOsByMetalakeId(metalakeId);
   }
 
-  public String selectCatalogIdByMetalakeIdAndName(
+  public static String selectCatalogIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name) {
     return getProvider().selectCatalogIdByMetalakeIdAndName(metalakeId, name);
   }
 
-  public String selectCatalogMetaByMetalakeIdAndName(
+  public static String selectCatalogMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name) {
     return getProvider().selectCatalogMetaByMetalakeIdAndName(metalakeId, name);
   }
 
-  public String selectCatalogMetaById(@Param("catalogId") Long catalogId) {
+  public static String selectCatalogMetaById(@Param("catalogId") Long catalogId) {
     return getProvider().selectCatalogMetaById(catalogId);
   }
 
-  public String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
+  public static String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
     return getProvider().insertCatalogMeta(catalogPO);
   }
 
-  public String insertCatalogMetaOnDuplicateKeyUpdate(@Param("catalogMeta") CatalogPO catalogPO) {
+  public static String insertCatalogMetaOnDuplicateKeyUpdate(
+      @Param("catalogMeta") CatalogPO catalogPO) {
     return getProvider().insertCatalogMetaOnDuplicateKeyUpdate(catalogPO);
   }
 
-  public String updateCatalogMeta(
+  public static String updateCatalogMeta(
       @Param("newCatalogMeta") CatalogPO newCatalogPO,
       @Param("oldCatalogMeta") CatalogPO oldCatalogPO) {
     return getProvider().updateCatalogMeta(newCatalogPO, oldCatalogPO);
   }
 
-  public String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {
+  public static String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return getProvider().softDeleteCatalogMetasByCatalogId(catalogId);
   }
 
-  public String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public static String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteCatalogMetasByMetalakeId(metalakeId);
   }
 
-  public String deleteCatalogMetasByLegacyTimeline(
+  public static String deleteCatalogMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteCatalogMetasByLegacyTimeline(legacyTimeline, limit);
   }

@@ -27,13 +27,12 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 /** SQL Provider for Metalake Meta operations. */
-public class MetalakeMetaSQLProvider {
+public class MetalakeMetaProviderFactory {
   private static final Map<JDBCBackendType, MetalakeMetaBaseProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new MetalakeMetaMySQLProvider(),
-              JDBCBackendType.H2, new MetalakeMetaH2Provider(),
-              JDBCBackendType.POSTGRESQL, new MetalakeMetaPostgreSQLProvider());
+              JDBCBackendType.H2, new MetalakeMetaH2Provider());
 
   public static MetalakeMetaBaseProvider getProvider() {
     String databaseId =
@@ -50,44 +49,42 @@ public class MetalakeMetaSQLProvider {
 
   static class MetalakeMetaH2Provider extends MetalakeMetaBaseProvider {}
 
-  static class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseProvider {}
-
   public String listMetalakePOs() {
     return getProvider().listMetalakePOs();
   }
 
-  public String selectMetalakeMetaByName(@Param("metalakeName") String metalakeName) {
+  public static String selectMetalakeMetaByName(@Param("metalakeName") String metalakeName) {
     return getProvider().selectMetalakeMetaByName(metalakeName);
   }
 
-  public String selectMetalakeMetaById(@Param("metalakeId") Long metalakeId) {
+  public static String selectMetalakeMetaById(@Param("metalakeId") Long metalakeId) {
     return getProvider().selectMetalakeMetaById(metalakeId);
   }
 
-  public String selectMetalakeIdMetaByName(@Param("metalakeName") String metalakeName) {
+  public static String selectMetalakeIdMetaByName(@Param("metalakeName") String metalakeName) {
     return getProvider().selectMetalakeIdMetaByName(metalakeName);
   }
 
-  public String insertMetalakeMeta(@Param("metalakeMeta") MetalakePO metalakePO) {
+  public static String insertMetalakeMeta(@Param("metalakeMeta") MetalakePO metalakePO) {
     return getProvider().insertMetalakeMeta(metalakePO);
   }
 
-  public String insertMetalakeMetaOnDuplicateKeyUpdate(
+  public static String insertMetalakeMetaOnDuplicateKeyUpdate(
       @Param("metalakeMeta") MetalakePO metalakePO) {
     return getProvider().insertMetalakeMetaOnDuplicateKeyUpdate(metalakePO);
   }
 
-  public String updateMetalakeMeta(
+  public static String updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO) {
     return getProvider().updateMetalakeMeta(newMetalakePO, oldMetalakePO);
   }
 
-  public String softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public static String softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteMetalakeMetaByMetalakeId(metalakeId);
   }
 
-  public String deleteMetalakeMetasByLegacyTimeline(
+  public static String deleteMetalakeMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteMetalakeMetasByLegacyTimeline(legacyTimeline, limit);
   }

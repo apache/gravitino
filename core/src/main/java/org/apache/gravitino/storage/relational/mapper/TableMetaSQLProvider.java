@@ -30,8 +30,7 @@ public class TableMetaSQLProvider {
   private static final Map<JDBCBackendType, TableMetaBaseProvider> METALAKE_META_SQL_PROVIDER_MAP =
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new TableMetaMySQLProvider(),
-          JDBCBackendType.H2, new TableMetaH2Provider(),
-          JDBCBackendType.POSTGRESQL, new TableMetaPostgreSQLProvider());
+          JDBCBackendType.H2, new TableMetaH2Provider());
 
   public static TableMetaBaseProvider getProvider() {
     String databaseId =
@@ -48,56 +47,54 @@ public class TableMetaSQLProvider {
 
   static class TableMetaH2Provider extends TableMetaBaseProvider {}
 
-  static class TableMetaPostgreSQLProvider extends TableMetaBaseProvider {}
-
-  public String listTablePOsBySchemaId(@Param("schemaId") Long schemaId) {
+  public static String listTablePOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listTablePOsBySchemaId(schemaId);
   }
 
-  public String selectTableIdBySchemaIdAndName(
+  public static String selectTableIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name) {
     return getProvider().selectTableIdBySchemaIdAndName(schemaId, name);
   }
 
-  public String selectTableMetaBySchemaIdAndName(
+  public static String selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name) {
     return getProvider().selectTableMetaBySchemaIdAndName(schemaId, name);
   }
 
-  public String selectTableMetaById(@Param("tableId") Long tableId) {
+  public static String selectTableMetaById(@Param("tableId") Long tableId) {
     return getProvider().selectTableMetaById(tableId);
   }
 
-  public String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
+  public static String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
     return getProvider().insertTableMeta(tablePO);
   }
 
-  public String insertTableMetaOnDuplicateKeyUpdate(@Param("tableMeta") TablePO tablePO) {
+  public static String insertTableMetaOnDuplicateKeyUpdate(@Param("tableMeta") TablePO tablePO) {
     return getProvider().insertTableMetaOnDuplicateKeyUpdate(tablePO);
   }
 
-  public String updateTableMeta(
+  public static String updateTableMeta(
       @Param("newTableMeta") TablePO newTablePO, @Param("oldTableMeta") TablePO oldTablePO) {
     return getProvider().updateTableMeta(newTablePO, oldTablePO);
   }
 
-  public String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
+  public static String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
     return getProvider().softDeleteTableMetasByTableId(tableId);
   }
 
-  public String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public static String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteTableMetasByMetalakeId(metalakeId);
   }
 
-  public String softDeleteTableMetasByCatalogId(@Param("catalogId") Long catalogId) {
+  public static String softDeleteTableMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return getProvider().softDeleteTableMetasByCatalogId(catalogId);
   }
 
-  public String softDeleteTableMetasBySchemaId(@Param("schemaId") Long schemaId) {
+  public static String softDeleteTableMetasBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().softDeleteTableMetasBySchemaId(schemaId);
   }
 
-  public String deleteTableMetasByLegacyTimeline(
+  public static String deleteTableMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteTableMetasByLegacyTimeline(legacyTimeline, limit);
   }

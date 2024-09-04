@@ -25,13 +25,12 @@ import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-public class FilesetVersionSQLProvider {
+public class FilesetVersionProviderFactory {
   private static final Map<JDBCBackendType, FilesetVersionBaseProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new FilesetVersionMySQLProvider(),
-              JDBCBackendType.H2, new FilesetVersionH2Provider(),
-              JDBCBackendType.POSTGRESQL, new FilesetVersionPostgreSQLProvider());
+              JDBCBackendType.H2, new FilesetVersionH2Provider());
 
   public static FilesetVersionBaseProvider getProvider() {
     String databaseId =
@@ -48,44 +47,43 @@ public class FilesetVersionSQLProvider {
 
   static class FilesetVersionH2Provider extends FilesetVersionBaseProvider {}
 
-  static class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseProvider {}
-
-  public String insertFilesetVersion(@Param("filesetVersion") FilesetVersionPO filesetVersionPO) {
+  public static String insertFilesetVersion(
+      @Param("filesetVersion") FilesetVersionPO filesetVersionPO) {
     return getProvider().insertFilesetVersion(filesetVersionPO);
   }
 
-  public String insertFilesetVersionOnDuplicateKeyUpdate(
+  public static String insertFilesetVersionOnDuplicateKeyUpdate(
       @Param("filesetVersion") FilesetVersionPO filesetVersionPO) {
     return getProvider().insertFilesetVersionOnDuplicateKeyUpdate(filesetVersionPO);
   }
 
-  public String softDeleteFilesetVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public static String softDeleteFilesetVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteFilesetVersionsByMetalakeId(metalakeId);
   }
 
-  public String softDeleteFilesetVersionsByCatalogId(@Param("catalogId") Long catalogId) {
+  public static String softDeleteFilesetVersionsByCatalogId(@Param("catalogId") Long catalogId) {
     return getProvider().softDeleteFilesetVersionsByCatalogId(catalogId);
   }
 
-  public String softDeleteFilesetVersionsBySchemaId(@Param("schemaId") Long schemaId) {
+  public static String softDeleteFilesetVersionsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().softDeleteFilesetVersionsBySchemaId(schemaId);
   }
 
-  public String softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId) {
+  public static String softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId) {
     return getProvider().softDeleteFilesetVersionsByFilesetId(filesetId);
   }
 
-  public String deleteFilesetVersionsByLegacyTimeline(
+  public static String deleteFilesetVersionsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteFilesetVersionsByLegacyTimeline(legacyTimeline, limit);
   }
 
-  public String selectFilesetVersionsByRetentionCount(
+  public static String selectFilesetVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount) {
     return getProvider().selectFilesetVersionsByRetentionCount(versionRetentionCount);
   }
 
-  public String softDeleteFilesetVersionsByRetentionLine(
+  public static String softDeleteFilesetVersionsByRetentionLine(
       @Param("filesetId") Long filesetId,
       @Param("versionRetentionLine") long versionRetentionLine,
       @Param("limit") int limit) {

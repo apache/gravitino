@@ -26,13 +26,12 @@ import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-public class FilesetMetaSQLProvider {
+public class FilesetMetaProviderFactory {
   private static final Map<JDBCBackendType, FilesetMetaBaseProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new FilesetMetaMySQLProvider(),
-              JDBCBackendType.H2, new FilesetMetaH2Provider(),
-              JDBCBackendType.POSTGRESQL, new FilesetMetaPostgreSQLProvider());
+              JDBCBackendType.H2, new FilesetMetaH2Provider());
 
   public static FilesetMetaBaseProvider getProvider() {
     String databaseId =
@@ -49,49 +48,48 @@ public class FilesetMetaSQLProvider {
 
   static class FilesetMetaH2Provider extends FilesetMetaBaseProvider {}
 
-  static class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseProvider {}
-
-  public String listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId) {
+  public static String listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listFilesetPOsBySchemaId(schemaId);
   }
 
-  public String selectFilesetIdBySchemaIdAndName(
+  public static String selectFilesetIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("filesetName") String name) {
     return getProvider().selectFilesetIdBySchemaIdAndName(schemaId, name);
   }
 
-  public String selectFilesetMetaBySchemaIdAndName(
+  public static String selectFilesetMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("filesetName") String name) {
     return getProvider().selectFilesetMetaBySchemaIdAndName(schemaId, name);
   }
 
-  public String selectFilesetMetaById(@Param("filesetId") Long filesetId) {
+  public static String selectFilesetMetaById(@Param("filesetId") Long filesetId) {
     return getProvider().selectFilesetMetaById(filesetId);
   }
 
-  public String insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO) {
+  public static String insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO) {
     return getProvider().insertFilesetMeta(filesetPO);
   }
 
-  public String insertFilesetMetaOnDuplicateKeyUpdate(@Param("filesetMeta") FilesetPO filesetPO) {
+  public static String insertFilesetMetaOnDuplicateKeyUpdate(
+      @Param("filesetMeta") FilesetPO filesetPO) {
     return getProvider().insertFilesetMetaOnDuplicateKeyUpdate(filesetPO);
   }
 
-  public String updateFilesetMeta(
+  public static String updateFilesetMeta(
       @Param("newFilesetMeta") FilesetPO newFilesetPO,
       @Param("oldFilesetMeta") FilesetPO oldFilesetPO) {
     return getProvider().updateFilesetMeta(newFilesetPO, oldFilesetPO);
   }
 
-  public String softDeleteFilesetMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public static String softDeleteFilesetMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteFilesetMetasByMetalakeId(metalakeId);
   }
 
-  public String softDeleteFilesetMetasByCatalogId(@Param("catalogId") Long catalogId) {
+  public static String softDeleteFilesetMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return getProvider().softDeleteFilesetMetasByCatalogId(catalogId);
   }
 
-  public String softDeleteFilesetMetasBySchemaId(@Param("schemaId") Long schemaId) {
+  public static String softDeleteFilesetMetasBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().softDeleteFilesetMetasBySchemaId(schemaId);
   }
 
