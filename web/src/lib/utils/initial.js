@@ -111,7 +111,8 @@ export const providers = [
         value: 'simple',
         defaultValue: 'simple',
         required: false,
-        description: 'The type of authentication for Paimon catalog backend, currently Gravitino only supports Kerberos and simple',
+        description:
+          'The type of authentication for Paimon catalog backend, currently Gravitino only supports Kerberos and simple',
         select: ['simple', 'Kerberos']
       },
       {
@@ -236,7 +237,8 @@ export const providers = [
         key: 'uri',
         value: '',
         required: true,
-        description: 'e.g. thrift://127.0.0.1:9083 or jdbc:postgresql://127.0.0.1:5432/db_name or jdbc:mysql://127.0.0.1:3306/metastore_db',
+        description:
+          'e.g. thrift://127.0.0.1:9083 or jdbc:postgresql://127.0.0.1:5432/db_name or jdbc:mysql://127.0.0.1:3306/metastore_db',
         parentField: 'catalog-backend',
         hide: 'filesystem'
       },
@@ -251,7 +253,8 @@ export const providers = [
         value: 'simple',
         defaultValue: 'simple',
         required: false,
-        description: 'The type of authentication for Paimon catalog backend, currently Gravitino only supports Kerberos and simple',
+        description:
+          'The type of authentication for Paimon catalog backend, currently Gravitino only supports Kerberos and simple',
         select: ['simple', 'Kerberos']
       },
       {

@@ -177,7 +177,9 @@ const CreateCatalogDialog = props => {
       return true
     }
     const parentField = innerProps.find(i => i.key === field.parentField)
-    const check = parentField && parentField.value === field.hide || (field.parentField === 'authentication.type' && parentField === undefined)
+    const check =
+      (parentField && parentField.value === field.hide) ||
+      (field.parentField === 'authentication.type' && parentField === undefined)
 
     return check
   }
@@ -226,14 +228,24 @@ const CreateCatalogDialog = props => {
 
     let nextProps = propItems
 
-    if (propItems[0]?.key === 'catalog-backend' && propItems[0]?.value === 'hive' && providerSelect === 'lakehouse-iceberg') {
+    if (
+      propItems[0]?.key === 'catalog-backend' &&
+      propItems[0]?.value === 'hive' &&
+      providerSelect === 'lakehouse-iceberg'
+    ) {
       nextProps = propItems.filter(item => !['jdbc-driver', 'jdbc-user', 'jdbc-password'].includes(item.key))
-    } else if (propItems[0]?.key === 'catalog-backend' && propItems[0]?.value === 'filesystem' && providerSelect === 'lakehouse-paimon') {
+    } else if (
+      propItems[0]?.key === 'catalog-backend' &&
+      propItems[0]?.value === 'filesystem' &&
+      providerSelect === 'lakehouse-paimon'
+    ) {
       nextProps = propItems.filter(item => item.key !== 'uri')
     }
     const parentField = nextProps.find(i => i.key === 'authentication.type')
     if (parentField && parentField.value === 'simple') {
-      nextProps = nextProps.filter(item => item.key !== 'authentication.kerberos.principal' && item.key !== 'authentication.kerberos.keytab-uri')
+      nextProps = nextProps.filter(
+        item => item.key !== 'authentication.kerberos.principal' && item.key !== 'authentication.kerberos.keytab-uri'
+      )
     }
 
     trigger()
@@ -258,7 +270,7 @@ const CreateCatalogDialog = props => {
           'jdbc-driver': jdbcDriver,
           'jdbc-user': jdbcUser,
           'jdbc-password': jdbcPwd,
-          'uri': uri,
+          uri: uri,
           'authentication.type': authType,
           'authentication.kerberos.principal': kerberosPrincipal,
           'authentication.kerberos.keytab-uri': kerberosKeytabUri,
@@ -268,7 +280,7 @@ const CreateCatalogDialog = props => {
         if (catalogBackend && catalogBackend === 'hive' && providerSelect === 'lakehouse-iceberg') {
           properties = {
             'catalog-backend': catalogBackend,
-            'uri': uri,
+            uri: uri,
             ...others
           }
         } else if (catalogBackend && catalogBackend === 'filesystem' && providerSelect === 'lakehouse-paimon') {
