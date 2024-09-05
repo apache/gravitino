@@ -37,9 +37,6 @@ public class EntityAlreadyExistsException extends GravitinoRuntimeException {
   @FormatMethod
   public EntityAlreadyExistsException(@FormatString String message, Object... args) {
     super(message, args);
-
-
-
   }
 
   /**
