@@ -289,14 +289,17 @@ const CreateCatalogDialog = props => {
             'catalog-backend': catalogBackend,
             ...others
           }
-          uri && (properties.uri = uri)
-        } else if (!authType || authType === 'simple') {
+          uri && (properties['uri'] = uri)
+        } else if (
+          (!authType || authType === 'simple') &&
+          ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
+        ) {
           properties = {
             'catalog-backend': catalogBackend,
             ...others
           }
-          uri && (properties.uri = uri)
-          authType && (properties.authType = authType)
+          uri && (properties['uri'] = uri)
+          authType && (properties['authType'] = authType)
         } else {
           properties = prevProperties
         }
