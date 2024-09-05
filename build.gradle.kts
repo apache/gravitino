@@ -421,7 +421,10 @@ subprojects {
       jvmArgs = listOf("-Xmx2G")
       useJUnitPlatform()
       jvmArgs(project.property("extraJvmArgs") as List<*>)
-      finalizedBy(tasks.getByName("jacocoTestReport"))
+
+      if (project.name != "integration-test-common") {
+        finalizedBy(tasks.getByName("jacocoTestReport"))
+      }
     }
   }
 
