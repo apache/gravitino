@@ -24,9 +24,10 @@ import time
 
 import docker
 from docker import types as tp
-from docker.errors import NotFound
+from docker.errors import NotFound, DockerException
 
 from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.exceptions.base import InternalError
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ async def check_hdfs_status(hdfs_container):
             else:
                 logger.info("HDFS startup successfully!")
                 return True
-        except Exception as e:
+        except DockerException as e:
             logger.error(
                 "Exception occurred while checking HDFS container status: %s", e
             )
@@ -63,7 +64,8 @@ async def check_hdfs_container_status(hdfs_container):
         result = await asyncio.wait_for(
             check_hdfs_status(hdfs_container), timeout=timeout_sec
         )
-        assert result is True, "HDFS container startup failed!"
+        if not result:
+            raise InternalError("HDFS container startup failed!")
     except asyncio.TimeoutError as e:
         raise GravitinoRuntimeException(
             "Timeout occurred while waiting for checking HDFS container status."
@@ -99,7 +101,7 @@ class HDFSContainer:
                 image=image_name,
                 name=self._container_name,
                 detach=True,
-                environment={"HADOOP_USER_NAME": "datastrato"},
+                environment={"HADOOP_USER_NAME": "anonymous"},
                 network=self._network_name,
             )
         asyncio.run(check_hdfs_container_status(self._container))

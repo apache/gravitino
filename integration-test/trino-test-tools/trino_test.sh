@@ -17,7 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-#
+set -e
 
 DIR=$(cd "$(dirname "$0")" && pwd)/../..
 export GRAVITINO_ROOT_DIR=$(cd "$DIR" && pwd)

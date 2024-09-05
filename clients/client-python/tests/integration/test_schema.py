@@ -29,6 +29,11 @@ from gravitino import (
     SchemaChange,
     Schema,
 )
+from gravitino.exceptions.base import (
+    GravitinoRuntimeException,
+    NoSuchSchemaException,
+    SchemaAlreadyExistsException,
+)
 
 from tests.integration.integration_test_env import IntegrationTestEnv
 
@@ -90,33 +95,45 @@ class TestSchema(IntegrationTestEnv):
         )
 
     def clean_test_data(self):
+        self.gravitino_client = GravitinoClient(
+            uri="http://localhost:8090", metalake_name=self.metalake_name
+        )
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         try:
-            self.gravitino_client = GravitinoClient(
-                uri="http://localhost:8090", metalake_name=self.metalake_name
-            )
-            catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
             logger.info(
                 "Drop schema %s[%s]",
                 self.schema_ident,
                 catalog.as_schemas().drop_schema(self.schema_name, cascade=True),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop schema %s", self.schema_name)
+
+        try:
             logger.info(
                 "Drop schema %s[%s]",
                 self.schema_new_ident,
                 catalog.as_schemas().drop_schema(self.schema_new_name, cascade=True),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop schema %s", self.schema_new_name)
+
+        try:
             logger.info(
                 "Drop catalog %s[%s]",
                 self.catalog_ident,
                 self.gravitino_client.drop_catalog(name=self.catalog_name),
             )
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop catalog %s", self.catalog_name)
+
+        try:
             logger.info(
                 "Drop metalake %s[%s]",
                 self.metalake_name,
                 self.gravitino_admin_client.drop_metalake(self.metalake_name),
             )
-        except Exception as e:
-            logger.error("Clean test data failed: %s", e)
+        except GravitinoRuntimeException:
+            logger.warning("Failed to drop metalake %s", self.metalake_name)
 
     def create_schema(self) -> Schema:
         catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
@@ -132,6 +149,11 @@ class TestSchema(IntegrationTestEnv):
         self.assertEqual(schema.comment(), self.schema_comment)
         self.assertEqual(schema.properties(), self.schema_properties)
         self.assertEqual(schema.audit_info().creator(), "anonymous")
+
+    def test_failed_create_schema(self):
+        self.create_schema()
+        with self.assertRaises(SchemaAlreadyExistsException):
+            _ = self.create_schema()
 
     def test_drop_schema(self):
         self.create_schema()
@@ -158,20 +180,25 @@ class TestSchema(IntegrationTestEnv):
         self.assertEqual(schema.properties(), self.schema_properties)
         self.assertEqual(schema.audit_info().creator(), "anonymous")
 
+    def test_failed_load_schema(self):
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
+        with self.assertRaises(NoSuchSchemaException):
+            _ = catalog.as_schemas().load_schema(schema_name=self.schema_name)
+
     def test_alter_schema(self):
         self.create_schema()
-        schema_propertie_new_value = self.schema_properties_value2 + "_new"
+        schema_properties_new_value = self.schema_properties_value2 + "_new"
 
         changes = (
             SchemaChange.remove_property(self.schema_properties_key1),
             SchemaChange.set_property(
-                self.schema_properties_key2, schema_propertie_new_value
+                self.schema_properties_key2, schema_properties_new_value
             ),
         )
         catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
         schema_new = catalog.as_schemas().alter_schema(self.schema_name, *changes)
         self.assertEqual(
             schema_new.properties().get(self.schema_properties_key2),
-            schema_propertie_new_value,
+            schema_properties_new_value,
         )
         self.assertTrue(self.schema_properties_key1 not in schema_new.properties())

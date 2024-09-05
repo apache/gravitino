@@ -39,6 +39,7 @@ dependencies {
   }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
+  implementation(libs.caffeine)
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
@@ -115,6 +116,8 @@ tasks {
     exclude { details ->
       details.file.isDirectory()
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyLibAndConfig", Copy::class) {
@@ -135,13 +138,6 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

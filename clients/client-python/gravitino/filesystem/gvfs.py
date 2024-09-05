@@ -32,8 +32,10 @@ from pyarrow.fs import HadoopFileSystem
 from readerwriterlock import rwlock
 from gravitino.api.catalog import Catalog
 from gravitino.api.fileset import Fileset
+from gravitino.auth.simple_auth_provider import SimpleAuthProvider
 from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.name_identifier import NameIdentifier
 
 PROTOCOL_NAME = "gvfs"
@@ -91,18 +93,48 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     # Override the parent variable
     protocol = PROTOCOL_NAME
     _identifier_pattern = re.compile("^fileset/([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$")
+    SLASH = "/"
 
     def __init__(
         self,
-        server_uri=None,
-        metalake_name=None,
-        cache_size=20,
-        cache_expired_time=3600,
+        server_uri: str = None,
+        metalake_name: str = None,
+        options: Dict = None,
         **kwargs,
     ):
+        """Initialize the GravitinoVirtualFileSystem.
+        :param server_uri: Gravitino server URI
+        :param metalake_name: Gravitino metalake name
+        :param options: Options for the GravitinoVirtualFileSystem
+        :param kwargs: Extra args for super filesystem
+        """
         self._metalake = metalake_name
-        self._client = GravitinoClient(
-            uri=server_uri, metalake_name=metalake_name, check_version=False
+        auth_type = (
+            GVFSConfig.DEFAULT_AUTH_TYPE
+            if options is None
+            else options.get(GVFSConfig.AUTH_TYPE, GVFSConfig.DEFAULT_AUTH_TYPE)
+        )
+        if auth_type == GVFSConfig.DEFAULT_AUTH_TYPE:
+            self._client = GravitinoClient(
+                uri=server_uri,
+                metalake_name=metalake_name,
+                auth_data_provider=SimpleAuthProvider(),
+            )
+        else:
+            raise GravitinoRuntimeException(
+                f"Authentication type {auth_type} is not supported."
+            )
+        cache_size = (
+            GVFSConfig.DEFAULT_CACHE_SIZE
+            if options is None
+            else options.get(GVFSConfig.CACHE_SIZE, GVFSConfig.DEFAULT_CACHE_SIZE)
+        )
+        cache_expired_time = (
+            GVFSConfig.DEFAULT_CACHE_EXPIRED_TIME
+            if options is None
+            else options.get(
+                GVFSConfig.CACHE_EXPIRED_TIME, GVFSConfig.DEFAULT_CACHE_EXPIRED_TIME
+            )
         )
         self._cache = TTLCache(maxsize=cache_size, ttl=cache_expired_time)
         self._cache_lock = rwlock.RWLockFair()
@@ -469,6 +501,12 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 f"Path {path} does not start with valid prefix {actual_prefix}."
             )
         virtual_location = self._get_virtual_location(context.get_name_identifier())
+        # if the storage location is end with "/",
+        # we should truncate this to avoid replace issues.
+        if actual_prefix.endswith(self.SLASH) and not virtual_location.endswith(
+            self.SLASH
+        ):
+            return f"{path.replace(actual_prefix[:-1], virtual_location)}"
         return f"{path.replace(actual_prefix, virtual_location)}"
 
     def _convert_actual_info(self, entry: Dict, context: FilesetContext):
@@ -614,6 +652,24 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                     " when the fileset only mounts a single file."
                 )
             return storage_location
+        # if the storage location ends with "/",
+        # we should handle the conversion specially
+        if storage_location.endswith(self.SLASH):
+            sub_path = virtual_path[len(virtual_location) :]
+            # For example, if the virtual path is `gvfs://fileset/catalog/schema/test_fileset/ttt`,
+            # and the storage location is `hdfs://cluster:8020/user/`,
+            # we should replace `gvfs://fileset/catalog/schema/test_fileset`
+            # with `hdfs://localhost:8020/user` which truncates the tailing slash.
+            # If the storage location is `hdfs://cluster:8020/user`,
+            # we can replace `gvfs://fileset/catalog/schema/test_fileset`
+            # with `hdfs://localhost:8020/user` directly.
+            if sub_path.startswith(self.SLASH):
+                new_storage_location = storage_location[:-1]
+            else:
+                new_storage_location = storage_location
+
+            # Replace virtual_location with the adjusted storage_location
+            return virtual_path.replace(virtual_location, new_storage_location, 1)
         return virtual_path.replace(virtual_location, storage_location, 1)
 
     @staticmethod

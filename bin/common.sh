@@ -90,6 +90,12 @@ function addJarInDir(){
   fi
 }
 
+function addDirToClasspath(){
+  if [[ -d "${1}" ]]; then
+    GRAVITINO_CLASSPATH="${1}:${GRAVITINO_CLASSPATH}"
+  fi
+}
+
 if [[ -z "${GRAVITINO_MEM}" ]]; then
   export GRAVITINO_MEM="-Xmx1024m"
 fi
@@ -99,3 +105,20 @@ if [[ -n "${JAVA_HOME}" ]]; then
 else
   export JAVA_RUNNER=java
 fi
+
+function printArt() {
+  local lineLength=70
+  local versionText="Version: ${GRAVITINO_VERSION}  "
+  local versionTextLength=${#versionText}
+  local paddingLength=$((lineLength - versionTextLength - 3))
+  local versionLine=$(printf "#%${paddingLength}s%s#" "" "$versionText")
+
+  echo "#####################################################################"
+  echo "#    ____   ____      _ ___     ___ ___  _____  ___  _   _   ___    #"
+  echo "#   / ___| |  _ \    / \ \ \   / / |_ _||_   _||_ _|| \ | | / _ \   #"
+  echo "#  | | __  | |_) |  / _ \ \ \ / /   | |   | |   | | |  \| || | | |  #"
+  echo "#  | |_| | |  _ <  / ___ \ \ V /    | |   | |   | | | |\  || |_| |  #"
+  echo "#   \____| |_| \_\/_/   \_\ \_/    |___|  |_|  |___||_| \_| \___/   #"
+  echo "$versionLine"
+  echo "#####################################################################"
+}

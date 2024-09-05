@@ -38,7 +38,6 @@ disable=missing-class-docstring,
         fixme,          
         unnecessary-pass,               
         missing-timeout,                #TODO-fix
-        broad-exception-caught,         #TODO-fix    
         duplicate-code,                 #TODO-fix
         too-many-arguments,             #TODO-fix
 

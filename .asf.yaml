@@ -52,6 +52,14 @@ github:
   dependabot_updates: false
   protected_tags:
     - "v*.*.*"
+  collaborators:
+    - jerqi
+    - diqiu50
+    - xloya
+    - coolderli
+    - LauraXia123
+    - noidname01
+    - caican00
 
 notifications:
   commits: commits@gravitino.apache.org

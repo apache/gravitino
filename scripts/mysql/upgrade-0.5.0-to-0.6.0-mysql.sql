@@ -24,7 +24,7 @@ ALTER TABLE `role_meta` MODIFY COLUMN `privilege_conditions` VARCHAR(64) NOT NUL
 CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     `id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'securable object id',
     `role_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'role id',
-    `entity_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'The entity id of securable object',
+    `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'The entity id of securable object',
     `type`  VARCHAR(128) NOT NULL COMMENT 'securable object type',
     `privilege_names` VARCHAR(256) NOT NULL COMMENT 'securable object privilege names',
     `privilege_conditions` VARCHAR(256) NOT NULL COMMENT 'securable object privilege conditions',
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'securable object deleted at',
     PRIMARY KEY (`id`),
     KEY `idx_obj_rid` (`role_id`),
-    KEY `idx_obj_eid` (`entity_id`)
+    KEY `idx_obj_eid` (`metadata_object_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'securable object meta';
 
 CREATE TABLE IF NOT EXISTS `tag_meta` (
@@ -60,7 +60,24 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ti_mi_del` (`tag_id`, `metadata_object_id`, `deleted_at`),
+    UNIQUE KEY `uk_ti_mi_mo_del` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_tid` (`tag_id`),
     KEY `idx_mid` (`metadata_object_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'tag metadata object relation';
+
+CREATE TABLE IF NOT EXISTS `owner_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `owner_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'owner id',
+    `owner_type` VARCHAR(64) NOT NULL COMMENT 'owner type',
+    `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
+    `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'owner relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'owner relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
+    KEY `idx_oid` (`owner_id`),
+    KEY `idx_meid` (`metadata_object_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'owner relation';

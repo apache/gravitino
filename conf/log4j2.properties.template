@@ -21,12 +21,13 @@ status = warn
 
 # Log files location
 property.basePath = ${sys:gravitino.log.path}
+property.serverName = ${sys:gravitino.server.name}
 
 # RollingFileAppender name, pattern, path and rollover policy
 appender.rolling.type = RollingFile
 appender.rolling.name = fileLogger
-appender.rolling.fileName = ${basePath}/gravitino-server.log
-appender.rolling.filePattern = ${basePath}/gravitino-server_%d{yyyyMMdd}.log.gz
+appender.rolling.fileName = ${basePath}/${serverName}.log
+appender.rolling.filePattern = ${basePath}/${serverName}_%d{yyyyMMdd}.log.gz
 appender.rolling.layout.type = PatternLayout
 appender.rolling.layout.pattern = %d{yyyy-MM-dd HH:mm:ss.SSS} %level [%t] [%l] - %msg%n
 appender.rolling.policies.type = Policies

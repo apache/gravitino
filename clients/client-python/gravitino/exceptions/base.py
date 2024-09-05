@@ -32,18 +32,18 @@ class RESTException(RuntimeError):
         super().__init__(message % args)
 
 
-class IllegalArugmentException(ValueError):
+class IllegalArgumentException(ValueError):
     """Base class for all exceptions thrown when arguments are invalid."""
 
     def __init__(self, message, *args):
         super().__init__(message % args)
 
 
-class IllegalNameIdentifierException(IllegalArugmentException):
+class IllegalNameIdentifierException(IllegalArgumentException):
     """An exception thrown when a name identifier is invalid."""
 
 
-class IllegalNamespaceException(IllegalArugmentException):
+class IllegalNamespaceException(IllegalArgumentException):
     """An exception thrown when a namespace is invalid."""
 
 
@@ -67,12 +67,32 @@ class NoSuchMetalakeException(NotFoundException):
     """An exception thrown when a metalake is not found."""
 
 
-class AlreadyExistException(GravitinoRuntimeException):
+class NoSuchCatalogException(NotFoundException):
+    """An exception thrown when a catalog is not found."""
+
+
+class AlreadyExistsException(GravitinoRuntimeException):
     """Base exception thrown when an entity or resource already exists."""
+
+
+class MetalakeAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a metalake already exists."""
+
+
+class SchemaAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a schema already exists."""
+
+
+class CatalogAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a resource already exists."""
 
 
 class NotEmptyException(GravitinoRuntimeException):
     """Base class for all exceptions thrown when a resource is not empty."""
+
+
+class NonEmptySchemaException(NotEmptyException):
+    """Exception thrown when a namespace is not empty."""
 
 
 class UnsupportedOperationException(GravitinoRuntimeException):
@@ -81,3 +101,15 @@ class UnsupportedOperationException(GravitinoRuntimeException):
 
 class UnknownError(RuntimeError):
     """An exception thrown when other unknown exception is thrown"""
+
+
+class ConnectionFailedException(GravitinoRuntimeException):
+    """An exception thrown when connect to catalog failed."""
+
+
+class UnauthorizedException(GravitinoRuntimeException):
+    """An exception thrown when a user is not authorized to perform an action."""
+
+
+class BadRequestException(GravitinoRuntimeException):
+    """An exception thrown when the request is invalid."""
