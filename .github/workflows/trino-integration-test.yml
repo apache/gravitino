@@ -97,7 +97,6 @@ jobs:
           path: |
             build/reports
             trino-connector/integrate-test/build/*.log
-            trino-connector/integrate-test/build/*.tar
             integration-test-common/build/trino-ci-container-log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log

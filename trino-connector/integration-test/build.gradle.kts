@@ -75,14 +75,11 @@ tasks.test {
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
-    dependsOn(":trino-connector:jar")
+    dependsOn(":trino-connector:trino-connector:jar")
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
-    dependsOn(":catalogs:catalog-jdbc-doris:jar", ":catalogs:catalog-jdbc-doris:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
-    dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
-    dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
 
     doFirst {
       copy {
@@ -96,7 +93,7 @@ tasks.test {
       println("Current project version: $version")
 
       // Check whether this module has already built
-      val trinoConnectorBuildDir = project(":trino-connector").buildDir
+      val trinoConnectorBuildDir = project(":trino-connector:trino-connector").buildDir
       if (trinoConnectorBuildDir.exists()) {
         // Check the version Gravitino related jars in build equal to the current project version
         val invalidGravitinoJars = trinoConnectorBuildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
