@@ -194,6 +194,20 @@ public class MetalakeIT extends AbstractIT {
     assertFalse(client.dropMetalake(metalakeA.name()), "metalake should be non-existent");
   }
 
+  @Test
+  public void testUpdateMetalakeWithNullableComment() {
+    client.createMetalake(metalakeNameA, null, Collections.emptyMap());
+    GravitinoMetalake metalake = client.loadMetalake(metalakeNameA);
+    assertEquals(metalakeNameA, metalake.name());
+    assertEquals(null, metalake.comment());
+
+    MetalakeChange[] changes =
+        new MetalakeChange[] {MetalakeChange.updateComment("new metalake comment")};
+    GravitinoMetalake updatedMetalake = client.alterMetalake(metalakeNameA, changes);
+    assertEquals("new metalake comment", updatedMetalake.comment());
+    client.dropMetalake(metalakeNameA);
+  }
+
   public void dropMetalakes() {
     GravitinoMetalake[] metaLakes = client.listMetalakes();
     for (GravitinoMetalake metalake : metaLakes) {
