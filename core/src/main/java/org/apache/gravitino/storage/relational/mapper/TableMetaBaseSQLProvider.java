@@ -23,7 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.TableMetaMapper.TAB
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
 
-public class TableMetaBaseProvider {
+public class TableMetaBaseSQLProvider {
 
   public String listTablePOsBySchemaId(@Param("schemaId") Long schemaId) {
     return "SELECT table_id as tableId, table_name as tableName,"

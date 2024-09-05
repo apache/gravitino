@@ -24,7 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.TopicMetaMapper.TAB
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.ibatis.annotations.Param;
 
-public class TopicMetaBaseProvider {
+public class TopicMetaBaseSQLProvider {
 
   public String insertTopicMeta(@Param("topicMeta") TopicPO topicPO) {
     return "INSERT INTO "

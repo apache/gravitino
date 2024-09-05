@@ -38,38 +38,40 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface MetalakeMetaMapper {
   String TABLE_NAME = "metalake_meta";
 
-  @SelectProvider(type = MetalakeMetaProviderFactory.class, method = "listMetalakePOs")
+  @SelectProvider(type = MetalakeMetaSQLProviderFactory.class, method = "listMetalakePOs")
   List<MetalakePO> listMetalakePOs();
 
-  @SelectProvider(type = MetalakeMetaProviderFactory.class, method = "selectMetalakeMetaByName")
+  @SelectProvider(type = MetalakeMetaSQLProviderFactory.class, method = "selectMetalakeMetaByName")
   MetalakePO selectMetalakeMetaByName(@Param("metalakeName") String name);
 
-  @SelectProvider(type = MetalakeMetaProviderFactory.class, method = "selectMetalakeMetaById")
+  @SelectProvider(type = MetalakeMetaSQLProviderFactory.class, method = "selectMetalakeMetaById")
   MetalakePO selectMetalakeMetaById(@Param("metalakeId") Long metalakeId);
 
-  @SelectProvider(type = MetalakeMetaProviderFactory.class, method = "selectMetalakeIdMetaByName")
+  @SelectProvider(
+      type = MetalakeMetaSQLProviderFactory.class,
+      method = "selectMetalakeIdMetaByName")
   Long selectMetalakeIdMetaByName(@Param("metalakeName") String name);
 
-  @InsertProvider(type = MetalakeMetaProviderFactory.class, method = "insertMetalakeMeta")
+  @InsertProvider(type = MetalakeMetaSQLProviderFactory.class, method = "insertMetalakeMeta")
   void insertMetalakeMeta(@Param("metalakeMeta") MetalakePO metalakePO);
 
   @InsertProvider(
-      type = MetalakeMetaProviderFactory.class,
+      type = MetalakeMetaSQLProviderFactory.class,
       method = "insertMetalakeMetaOnDuplicateKeyUpdate")
   void insertMetalakeMetaOnDuplicateKeyUpdate(@Param("metalakeMeta") MetalakePO metalakePO);
 
-  @UpdateProvider(type = MetalakeMetaProviderFactory.class, method = "updateMetalakeMeta")
+  @UpdateProvider(type = MetalakeMetaSQLProviderFactory.class, method = "updateMetalakeMeta")
   Integer updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO);
 
   @UpdateProvider(
-      type = MetalakeMetaProviderFactory.class,
+      type = MetalakeMetaSQLProviderFactory.class,
       method = "softDeleteMetalakeMetaByMetalakeId")
   Integer softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @DeleteProvider(
-      type = MetalakeMetaProviderFactory.class,
+      type = MetalakeMetaSQLProviderFactory.class,
       method = "deleteMetalakeMetasByLegacyTimeline")
   Integer deleteMetalakeMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);

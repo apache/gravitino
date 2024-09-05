@@ -26,14 +26,15 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-public class TopicMetaProviderFactory {
+public class TopicMetaSQLProviderFactory {
 
-  private static final Map<JDBCBackendType, TopicMetaBaseProvider> METALAKE_META_SQL_PROVIDER_MAP =
-      ImmutableMap.of(
-          JDBCBackendType.MYSQL, new TopicMetaMySQLProvider(),
-          JDBCBackendType.H2, new TopicMetaH2Provider());
+  private static final Map<JDBCBackendType, TopicMetaBaseSQLProvider>
+      METALAKE_META_SQL_PROVIDER_MAP =
+          ImmutableMap.of(
+              JDBCBackendType.MYSQL, new TopicMetaMySQLSQLProvider(),
+              JDBCBackendType.H2, new TopicMetaH2SQLProvider());
 
-  public static TopicMetaBaseProvider getProvider() {
+  public static TopicMetaBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
             .getSqlSessionFactory()
@@ -44,9 +45,9 @@ public class TopicMetaProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class TopicMetaMySQLProvider extends TopicMetaBaseProvider {}
+  static class TopicMetaMySQLSQLProvider extends TopicMetaBaseSQLProvider {}
 
-  static class TopicMetaH2Provider extends TopicMetaBaseProvider {}
+  static class TopicMetaH2SQLProvider extends TopicMetaBaseSQLProvider {}
 
   public static String insertTopicMeta(@Param("topicMeta") TopicPO topicPO) {
     return getProvider().insertTopicMeta(topicPO);

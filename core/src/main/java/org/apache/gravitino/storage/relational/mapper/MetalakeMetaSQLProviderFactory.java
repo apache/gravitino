@@ -27,14 +27,14 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 /** SQL Provider for Metalake Meta operations. */
-public class MetalakeMetaProviderFactory {
-  private static final Map<JDBCBackendType, MetalakeMetaBaseProvider>
+public class MetalakeMetaSQLProviderFactory {
+  private static final Map<JDBCBackendType, MetalakeMetaBaseSQLProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
-              JDBCBackendType.MYSQL, new MetalakeMetaMySQLProvider(),
-              JDBCBackendType.H2, new MetalakeMetaH2Provider());
+              JDBCBackendType.MYSQL, new MetalakeMetaMySQLSQLProvider(),
+              JDBCBackendType.H2, new MetalakeMetaH2SQLProvider());
 
-  public static MetalakeMetaBaseProvider getProvider() {
+  public static MetalakeMetaBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
             .getSqlSessionFactory()
@@ -45,9 +45,9 @@ public class MetalakeMetaProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class MetalakeMetaMySQLProvider extends MetalakeMetaBaseProvider {}
+  static class MetalakeMetaMySQLSQLProvider extends MetalakeMetaBaseSQLProvider {}
 
-  static class MetalakeMetaH2Provider extends MetalakeMetaBaseProvider {}
+  static class MetalakeMetaH2SQLProvider extends MetalakeMetaBaseSQLProvider {}
 
   public String listMetalakePOs() {
     return getProvider().listMetalakePOs();

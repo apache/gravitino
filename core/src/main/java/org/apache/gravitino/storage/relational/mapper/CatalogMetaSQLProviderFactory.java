@@ -26,15 +26,15 @@ import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-public class CatalogMetaProviderFactory {
+public class CatalogMetaSQLProviderFactory {
 
-  private static final Map<JDBCBackendType, CatalogMetaBaseProvider>
+  private static final Map<JDBCBackendType, CatalogMetaBaseSQLProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
-              JDBCBackendType.MYSQL, new CatalogMetaMySQLProvider(),
-              JDBCBackendType.H2, new CatalogMetaH2Provider());
+              JDBCBackendType.MYSQL, new CatalogMetaMySQLSQLProvider(),
+              JDBCBackendType.H2, new CatalogMetaH2SQLProvider());
 
-  public static CatalogMetaBaseProvider getProvider() {
+  public static CatalogMetaBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
             .getSqlSessionFactory()
@@ -45,9 +45,9 @@ public class CatalogMetaProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class CatalogMetaMySQLProvider extends CatalogMetaBaseProvider {}
+  static class CatalogMetaMySQLSQLProvider extends CatalogMetaBaseSQLProvider {}
 
-  static class CatalogMetaH2Provider extends CatalogMetaBaseProvider {}
+  static class CatalogMetaH2SQLProvider extends CatalogMetaBaseSQLProvider {}
 
   public static String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().listCatalogPOsByMetalakeId(metalakeId);

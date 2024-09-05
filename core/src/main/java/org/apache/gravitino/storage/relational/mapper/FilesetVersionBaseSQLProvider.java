@@ -23,7 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.FilesetVersionMappe
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.ibatis.annotations.Param;
 
-public class FilesetVersionBaseProvider {
+public class FilesetVersionBaseSQLProvider {
   public String insertFilesetVersion(@Param("filesetVersion") FilesetVersionPO filesetVersionPO) {
     return "INSERT INTO "
         + VERSION_TABLE_NAME

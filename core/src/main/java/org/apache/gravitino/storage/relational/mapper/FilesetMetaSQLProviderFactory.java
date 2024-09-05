@@ -26,14 +26,14 @@ import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-public class FilesetMetaProviderFactory {
-  private static final Map<JDBCBackendType, FilesetMetaBaseProvider>
+public class FilesetMetaSQLProviderFactory {
+  private static final Map<JDBCBackendType, FilesetMetaBaseSQLProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
-              JDBCBackendType.MYSQL, new FilesetMetaMySQLProvider(),
-              JDBCBackendType.H2, new FilesetMetaH2Provider());
+              JDBCBackendType.MYSQL, new FilesetMetaMySQLSQLProvider(),
+              JDBCBackendType.H2, new FilesetMetaH2SQLProvider());
 
-  public static FilesetMetaBaseProvider getProvider() {
+  public static FilesetMetaBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
             .getSqlSessionFactory()
@@ -44,9 +44,9 @@ public class FilesetMetaProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class FilesetMetaMySQLProvider extends FilesetMetaBaseProvider {}
+  static class FilesetMetaMySQLSQLProvider extends FilesetMetaBaseSQLProvider {}
 
-  static class FilesetMetaH2Provider extends FilesetMetaBaseProvider {}
+  static class FilesetMetaH2SQLProvider extends FilesetMetaBaseSQLProvider {}
 
   public static String listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listFilesetPOsBySchemaId(schemaId);

@@ -25,14 +25,15 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-public class TableMetaProviderFactory {
+public class TableMetaSQLProviderFactory {
 
-  private static final Map<JDBCBackendType, TableMetaBaseProvider> METALAKE_META_SQL_PROVIDER_MAP =
-      ImmutableMap.of(
-          JDBCBackendType.MYSQL, new TableMetaMySQLProvider(),
-          JDBCBackendType.H2, new TableMetaH2Provider());
+  private static final Map<JDBCBackendType, TableMetaBaseSQLProvider>
+      METALAKE_META_SQL_PROVIDER_MAP =
+          ImmutableMap.of(
+              JDBCBackendType.MYSQL, new TableMetaMySQLSQLProvider(),
+              JDBCBackendType.H2, new TableMetaH2SQLProvider());
 
-  public static TableMetaBaseProvider getProvider() {
+  public static TableMetaBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
             .getSqlSessionFactory()
@@ -43,9 +44,9 @@ public class TableMetaProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class TableMetaMySQLProvider extends TableMetaBaseProvider {}
+  static class TableMetaMySQLSQLProvider extends TableMetaBaseSQLProvider {}
 
-  static class TableMetaH2Provider extends TableMetaBaseProvider {}
+  static class TableMetaH2SQLProvider extends TableMetaBaseSQLProvider {}
 
   public static String listTablePOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listTablePOsBySchemaId(schemaId);

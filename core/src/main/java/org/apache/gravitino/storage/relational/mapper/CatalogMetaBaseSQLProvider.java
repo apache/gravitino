@@ -24,7 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.T
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.Param;
 
-public class CatalogMetaBaseProvider {
+public class CatalogMetaBaseSQLProvider {
   public String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT catalog_id as catalogId, catalog_name as catalogName,"
         + " metalake_id as metalakeId, type, provider,"
@@ -37,7 +37,7 @@ public class CatalogMetaBaseProvider {
   }
 
   public String selectCatalogIdByMetalakeIdAndName(
-      @Param("metalakeId") Long metalakeId, @Param("catalogName") String named) {
+      @Param("metalakeId") Long metalakeId, @Param("catalogName") String name) {
     return "SELECT catalog_id as catalogId FROM "
         + TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND catalog_name = #{catalogName} AND deleted_at = 0";
@@ -145,7 +145,7 @@ public class CatalogMetaBaseProvider {
         + " AND audit_info = #{oldCatalogMeta.auditInfo}"
         + " AND current_version = #{oldCatalogMeta.currentVersion}"
         + " AND last_version = #{oldCatalogMeta.lastVersion}"
-        + " AND deleted_at = 0")
+        + " AND deleted_at = 0";
   }
 
   public String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {

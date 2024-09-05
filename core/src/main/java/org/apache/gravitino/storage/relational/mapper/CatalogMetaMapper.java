@@ -38,49 +38,49 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface CatalogMetaMapper {
   String TABLE_NAME = "catalog_meta";
 
-  @SelectProvider(type = CatalogMetaProviderFactory.class, method = "listCatalogPOsByMetalakeId")
+  @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "listCatalogPOsByMetalakeId")
   List<CatalogPO> listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @SelectProvider(
-      type = CatalogMetaProviderFactory.class,
+      type = CatalogMetaSQLProviderFactory.class,
       method = "selectCatalogIdByMetalakeIdAndName")
   Long selectCatalogIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
 
   @SelectProvider(
-      type = CatalogMetaProviderFactory.class,
+      type = CatalogMetaSQLProviderFactory.class,
       method = "selectCatalogMetaByMetalakeIdAndName")
   CatalogPO selectCatalogMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
 
-  @SelectProvider(type = CatalogMetaProviderFactory.class, method = "selectCatalogMetaById")
+  @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaById")
   CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);
 
-  @InsertProvider(type = CatalogMetaProviderFactory.class, method = "insertCatalogMeta")
+  @InsertProvider(type = CatalogMetaSQLProviderFactory.class, method = "insertCatalogMeta")
   void insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO);
 
   @InsertProvider(
-      type = CatalogMetaProviderFactory.class,
+      type = CatalogMetaSQLProviderFactory.class,
       method = "insertCatalogMetaOnDuplicateKeyUpdate")
   void insertCatalogMetaOnDuplicateKeyUpdate(@Param("catalogMeta") CatalogPO catalogPO);
 
-  @UpdateProvider(type = CatalogMetaProviderFactory.class, method = "updateCatalogMeta")
+  @UpdateProvider(type = CatalogMetaSQLProviderFactory.class, method = "updateCatalogMeta")
   Integer updateCatalogMeta(
       @Param("newCatalogMeta") CatalogPO newCatalogPO,
       @Param("oldCatalogMeta") CatalogPO oldCatalogPO);
 
   @UpdateProvider(
-      type = CatalogMetaProviderFactory.class,
+      type = CatalogMetaSQLProviderFactory.class,
       method = "softDeleteCatalogMetasByCatalogId")
   Integer softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId);
 
   @UpdateProvider(
-      type = CatalogMetaProviderFactory.class,
+      type = CatalogMetaSQLProviderFactory.class,
       method = "softDeleteCatalogMetasByMetalakeId")
   Integer softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @DeleteProvider(
-      type = CatalogMetaProviderFactory.class,
+      type = CatalogMetaSQLProviderFactory.class,
       method = "deleteCatalogMetasByLegacyTimeline")
   Integer deleteCatalogMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);

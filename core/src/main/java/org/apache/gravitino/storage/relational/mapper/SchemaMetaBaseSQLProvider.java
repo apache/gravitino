@@ -23,7 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper.TA
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.Param;
 
-public class SchemaMetaBaseProvider {
+public class SchemaMetaBaseSQLProvider {
   public String listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId) {
     return "SELECT schema_id as schemaId, schema_name as schemaName,"
         + " metalake_id as metalakeId, catalog_id as catalogId,"

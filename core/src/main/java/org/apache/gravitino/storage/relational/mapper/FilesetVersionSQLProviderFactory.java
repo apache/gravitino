@@ -25,14 +25,14 @@ import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-public class FilesetVersionProviderFactory {
-  private static final Map<JDBCBackendType, FilesetVersionBaseProvider>
+public class FilesetVersionSQLProviderFactory {
+  private static final Map<JDBCBackendType, FilesetVersionBaseSQLProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
-              JDBCBackendType.MYSQL, new FilesetVersionMySQLProvider(),
-              JDBCBackendType.H2, new FilesetVersionH2Provider());
+              JDBCBackendType.MYSQL, new FilesetVersionMySQLSQLProvider(),
+              JDBCBackendType.H2, new FilesetVersionH2SQLProvider());
 
-  public static FilesetVersionBaseProvider getProvider() {
+  public static FilesetVersionBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
             .getSqlSessionFactory()
@@ -43,9 +43,9 @@ public class FilesetVersionProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class FilesetVersionMySQLProvider extends FilesetVersionBaseProvider {}
+  static class FilesetVersionMySQLSQLProvider extends FilesetVersionBaseSQLProvider {}
 
-  static class FilesetVersionH2Provider extends FilesetVersionBaseProvider {}
+  static class FilesetVersionH2SQLProvider extends FilesetVersionBaseSQLProvider {}
 
   public static String insertFilesetVersion(
       @Param("filesetVersion") FilesetVersionPO filesetVersionPO) {

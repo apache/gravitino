@@ -64,11 +64,11 @@ public interface FilesetMetaMapper {
     @Result(property = "filesetVersionPO.storageLocation", column = "storage_location"),
     @Result(property = "filesetVersionPO.deletedAt", column = "version_deleted_at")
   })
-  @SelectProvider(type = FilesetMetaProviderFactory.class, method = "listFilesetPOsBySchemaId")
+  @SelectProvider(type = FilesetMetaSQLProviderFactory.class, method = "listFilesetPOsBySchemaId")
   List<FilesetPO> listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId);
 
   @SelectProvider(
-      type = FilesetMetaProviderFactory.class,
+      type = FilesetMetaSQLProviderFactory.class,
       method = "selectFilesetIdBySchemaIdAndName")
   Long selectFilesetIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("filesetName") String name);
@@ -96,7 +96,7 @@ public interface FilesetMetaMapper {
     @Result(property = "filesetVersionPO.deletedAt", column = "version_deleted_at")
   })
   @SelectProvider(
-      type = FilesetMetaProviderFactory.class,
+      type = FilesetMetaSQLProviderFactory.class,
       method = "selectFilesetMetaBySchemaIdAndName")
   FilesetPO selectFilesetMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("filesetName") String name);
@@ -123,44 +123,44 @@ public interface FilesetMetaMapper {
     @Result(property = "filesetVersionPO.storageLocation", column = "storage_location"),
     @Result(property = "filesetVersionPO.deletedAt", column = "version_deleted_at")
   })
-  @SelectProvider(type = FilesetMetaProviderFactory.class, method = "selectFilesetMetaById")
+  @SelectProvider(type = FilesetMetaSQLProviderFactory.class, method = "selectFilesetMetaById")
   FilesetPO selectFilesetMetaById(@Param("filesetId") Long filesetId);
 
-  @InsertProvider(type = FilesetMetaProviderFactory.class, method = "insertFilesetMeta")
+  @InsertProvider(type = FilesetMetaSQLProviderFactory.class, method = "insertFilesetMeta")
   void insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO);
 
   @InsertProvider(
-      type = FilesetMetaProviderFactory.class,
+      type = FilesetMetaSQLProviderFactory.class,
       method = "insertFilesetMetaOnDuplicateKeyUpdate")
   void insertFilesetMetaOnDuplicateKeyUpdate(@Param("filesetMeta") FilesetPO filesetPO);
 
-  @UpdateProvider(type = FilesetMetaProviderFactory.class, method = "updateFilesetMeta")
+  @UpdateProvider(type = FilesetMetaSQLProviderFactory.class, method = "updateFilesetMeta")
   Integer updateFilesetMeta(
       @Param("newFilesetMeta") FilesetPO newFilesetPO,
       @Param("oldFilesetMeta") FilesetPO oldFilesetPO);
 
   @UpdateProvider(
-      type = FilesetMetaProviderFactory.class,
+      type = FilesetMetaSQLProviderFactory.class,
       method = "softDeleteFilesetMetasByMetalakeId")
   Integer softDeleteFilesetMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @UpdateProvider(
-      type = FilesetMetaProviderFactory.class,
+      type = FilesetMetaSQLProviderFactory.class,
       method = "softDeleteFilesetMetasByCatalogId")
   Integer softDeleteFilesetMetasByCatalogId(@Param("catalogId") Long catalogId);
 
   @UpdateProvider(
-      type = FilesetMetaProviderFactory.class,
+      type = FilesetMetaSQLProviderFactory.class,
       method = "softDeleteFilesetMetasBySchemaId")
   Integer softDeleteFilesetMetasBySchemaId(@Param("schemaId") Long schemaId);
 
   @UpdateProvider(
-      type = FilesetMetaProviderFactory.class,
+      type = FilesetMetaSQLProviderFactory.class,
       method = "softDeleteFilesetMetasByFilesetId")
   Integer softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId);
 
   @DeleteProvider(
-      type = FilesetMetaProviderFactory.class,
+      type = FilesetMetaSQLProviderFactory.class,
       method = "deleteFilesetMetasByLegacyTimeline")
   Integer deleteFilesetMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);

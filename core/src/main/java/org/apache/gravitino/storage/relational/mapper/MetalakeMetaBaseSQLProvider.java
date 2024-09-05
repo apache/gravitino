@@ -23,7 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper.
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.ibatis.annotations.Param;
 
-public class MetalakeMetaBaseProvider {
+public class MetalakeMetaBaseSQLProvider {
 
   public String listMetalakePOs() {
     return "SELECT metalake_id as metalakeId, metalake_name as metalakeName,"

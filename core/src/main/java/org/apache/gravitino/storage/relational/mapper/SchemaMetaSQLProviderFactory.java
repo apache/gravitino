@@ -25,13 +25,14 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-public class SchemaMetaProviderFactory {
-  private static final Map<JDBCBackendType, SchemaMetaBaseProvider> METALAKE_META_SQL_PROVIDER_MAP =
-      ImmutableMap.of(
-          JDBCBackendType.MYSQL, new SchemaMetaMySQLProvider(),
-          JDBCBackendType.H2, new SchemaMetaH2Provider());
+public class SchemaMetaSQLProviderFactory {
+  private static final Map<JDBCBackendType, SchemaMetaBaseSQLProvider>
+      METALAKE_META_SQL_PROVIDER_MAP =
+          ImmutableMap.of(
+              JDBCBackendType.MYSQL, new SchemaMetaMySQLSQLProvider(),
+              JDBCBackendType.H2, new SchemaMetaH2SQLProvider());
 
-  public static SchemaMetaBaseProvider getProvider() {
+  public static SchemaMetaBaseSQLProvider getProvider() {
     String databaseId =
         SqlSessionFactoryHelper.getInstance()
             .getSqlSessionFactory()
@@ -42,9 +43,9 @@ public class SchemaMetaProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class SchemaMetaMySQLProvider extends SchemaMetaBaseProvider {}
+  static class SchemaMetaMySQLSQLProvider extends SchemaMetaBaseSQLProvider {}
 
-  static class SchemaMetaH2Provider extends SchemaMetaBaseProvider {}
+  static class SchemaMetaH2SQLProvider extends SchemaMetaBaseSQLProvider {}
 
   public static String listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId) {
     return getProvider().listSchemaPOsByCatalogId(catalogId);

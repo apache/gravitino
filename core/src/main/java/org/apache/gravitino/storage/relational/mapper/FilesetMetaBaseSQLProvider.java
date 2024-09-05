@@ -25,7 +25,7 @@ import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.V
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.ibatis.annotations.Param;
 
-public class FilesetMetaBaseProvider {
+public class FilesetMetaBaseSQLProvider {
 
   public String listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return "SELECT fm.fileset_id, fm.fileset_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"

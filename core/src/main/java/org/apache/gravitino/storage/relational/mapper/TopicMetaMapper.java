@@ -29,50 +29,58 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface TopicMetaMapper {
   String TABLE_NAME = "topic_meta";
 
-  @InsertProvider(type = TopicMetaProviderFactory.class, method = "insertTopicMeta")
+  @InsertProvider(type = TopicMetaSQLProviderFactory.class, method = "insertTopicMeta")
   void insertTopicMeta(@Param("topicMeta") TopicPO topicPO);
 
   @InsertProvider(
-      type = TopicMetaProviderFactory.class,
+      type = TopicMetaSQLProviderFactory.class,
       method = "insertTopicMetaOnDuplicateKeyUpdate")
   void insertTopicMetaOnDuplicateKeyUpdate(@Param("topicMeta") TopicPO topicPO);
 
-  @SelectProvider(type = TopicMetaProviderFactory.class, method = "listTopicPOsBySchemaId")
+  @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "listTopicPOsBySchemaId")
   List<TopicPO> listTopicPOsBySchemaId(@Param("schemaId") Long schemaId);
 
   @SelectProvider(
-      type = TopicMetaProviderFactory.class,
+      type = TopicMetaSQLProviderFactory.class,
       method = "selectTopicMetaBySchemaIdAndName")
   TopicPO selectTopicMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("topicName") String topicName);
 
-  @SelectProvider(type = TopicMetaProviderFactory.class, method = "selectTopicMetaById")
+  @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "selectTopicMetaById")
   TopicPO selectTopicMetaById(@Param("topicId") Long topicId);
 
-  @UpdateProvider(type = TopicMetaProviderFactory.class, method = "updateTopicMeta")
+  @UpdateProvider(type = TopicMetaSQLProviderFactory.class, method = "updateTopicMeta")
   Integer updateTopicMeta(
       @Param("newTopicMeta") TopicPO newTopicPO, @Param("oldTopicMeta") TopicPO oldTopicPO);
 
-  @SelectProvider(type = TopicMetaProviderFactory.class, method = "selectTopicIdBySchemaIdAndName")
+  @SelectProvider(
+      type = TopicMetaSQLProviderFactory.class,
+      method = "selectTopicIdBySchemaIdAndName")
   Long selectTopicIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("topicName") String name);
 
-  @UpdateProvider(type = TopicMetaProviderFactory.class, method = "softDeleteTopicMetasByTopicId")
+  @UpdateProvider(
+      type = TopicMetaSQLProviderFactory.class,
+      method = "softDeleteTopicMetasByTopicId")
   Integer softDeleteTopicMetasByTopicId(@Param("topicId") Long topicId);
 
-  @UpdateProvider(type = TopicMetaProviderFactory.class, method = "softDeleteTopicMetasByCatalogId")
+  @UpdateProvider(
+      type = TopicMetaSQLProviderFactory.class,
+      method = "softDeleteTopicMetasByCatalogId")
   Integer softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId);
 
   @UpdateProvider(
-      type = TopicMetaProviderFactory.class,
+      type = TopicMetaSQLProviderFactory.class,
       method = "softDeleteTopicMetasByMetalakeId")
   Integer softDeleteTopicMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @UpdateProvider(type = TopicMetaProviderFactory.class, method = "softDeleteTopicMetasBySchemaId")
+  @UpdateProvider(
+      type = TopicMetaSQLProviderFactory.class,
+      method = "softDeleteTopicMetasBySchemaId")
   Integer softDeleteTopicMetasBySchemaId(@Param("schemaId") Long schemaId);
 
   @DeleteProvider(
-      type = TopicMetaProviderFactory.class,
+      type = TopicMetaSQLProviderFactory.class,
       method = "deleteTopicMetasByLegacyTimeline")
   Integer deleteTopicMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
