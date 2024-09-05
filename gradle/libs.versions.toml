@@ -95,6 +95,7 @@ woodstox-core = "5.3.0"
 mail = "1.4.1"
 rome = "1.0"
 jettison = "1.1"
+thrift = "0.12.0"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -155,6 +156,7 @@ rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksd
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }
+iceberg-aliyun = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg" }
 iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
@@ -198,6 +200,7 @@ kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka"
 curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
 cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
 woodstox-core = { group = "com.fasterxml.woodstox", name = "woodstox-core", version.ref = "woodstox-core"}
+thrift = { group = "org.apache.thrift", name = "libthrift", version.ref = "thrift"}
 
 ranger-intg = { group = "org.apache.ranger", name = "ranger-intg", version.ref = "ranger" }
 javax-jaxb-api = { group = "javax.xml.bind", name = "jaxb-api", version.ref = "javax-jaxb-api" }

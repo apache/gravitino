@@ -139,12 +139,13 @@ public class CatalogMetaBaseProvider {
         + " AND metalake_id = #{oldCatalogMeta.metalakeId}"
         + " AND type = #{oldCatalogMeta.type}"
         + " AND provider = #{oldCatalogMeta.provider}"
-        + " AND catalog_comment = #{oldCatalogMeta.catalogComment}"
+        + " AND (catalog_comment = #{oldCatalogMeta.catalogComment} "
+        + "   OR (catalog_comment IS NULL and #{oldCatalogMeta.catalogComment} IS NULL))"
         + " AND properties = #{oldCatalogMeta.properties}"
         + " AND audit_info = #{oldCatalogMeta.auditInfo}"
         + " AND current_version = #{oldCatalogMeta.currentVersion}"
         + " AND last_version = #{oldCatalogMeta.lastVersion}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0")
   }
 
   public String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {

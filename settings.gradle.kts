@@ -30,6 +30,7 @@ include("catalogs:catalog-common")
 include("catalogs:catalog-hive")
 include("catalogs:catalog-lakehouse-iceberg")
 include("catalogs:catalog-lakehouse-paimon")
+include("catalogs:catalog-lakehouse-hudi")
 include(
   "catalogs:catalog-jdbc-common",
   "catalogs:catalog-jdbc-doris",

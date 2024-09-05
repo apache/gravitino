@@ -46,7 +46,7 @@ from gravitino import (
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.exceptions.base import GravitinoRuntimeException
 from tests.integration.integration_test_env import IntegrationTestEnv
-from tests.integration.hdfs_container import HDFSContainer
+from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.base_hadoop_env import BaseHadoopEnvironment
 
 logger = logging.getLogger(__name__)
@@ -94,6 +94,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
     @classmethod
     def setUpClass(cls):
+
+        cls._get_gravitino_home()
+
         cls.hdfs_container = HDFSContainer()
         hdfs_container_ip = cls.hdfs_container.get_ip()
         # init hadoop env
@@ -101,8 +104,11 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         cls.config = {
             "gravitino.bypass.fs.defaultFS": f"hdfs://{hdfs_container_ip}:9000"
         }
+
+        cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+
         # append the hadoop conf to server
-        cls._append_catalog_hadoop_conf(cls.config)
+        cls._append_conf(cls.config, cls.hadoop_conf_path)
         # restart the server
         cls.restart_server()
         # create entity
@@ -113,7 +119,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         try:
             cls._clean_test_data()
             # reset server conf
-            cls._reset_catalog_hadoop_conf(cls.config)
+            cls._reset_conf(cls.config, cls.hadoop_conf_path)
             # restart server
             cls.restart_server()
             # clear hadoop env

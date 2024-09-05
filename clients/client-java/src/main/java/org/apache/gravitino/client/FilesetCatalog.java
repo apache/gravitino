@@ -226,6 +226,21 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
     return resp.dropped();
   }
 
+  /**
+   * Get the actual path of a file or directory based on the storage location of Fileset and the sub
+   * path.
+   *
+   * @param ident A fileset identifier.
+   * @param subPath The sub path to the file or directory.
+   * @return The actual location of the file or directory.
+   * @throws NoSuchFilesetException If the fileset does not exist.
+   */
+  @Override
+  public String getFileLocation(NameIdentifier ident, String subPath)
+      throws NoSuchFilesetException {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
   @VisibleForTesting
   static String formatFilesetRequestPath(Namespace ns) {
     Namespace schemaNs = Namespace.of(ns.level(0), ns.level(1));

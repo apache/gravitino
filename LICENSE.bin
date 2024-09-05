@@ -296,6 +296,11 @@
    Apache HttpCore
    Apache HttpClient
    Apache Iceberg
+   Apache Iceberg Aliyun
+   Apache Iceberg api
+   Apache Iceberg AWS
+   Apache Iceberg core
+   Apache Iceberg Hive metastore
    Apache Ivy
    Apache Log4j 1.x Compatibility API
    Apache Log4j API
