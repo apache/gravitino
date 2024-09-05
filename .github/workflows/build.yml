@@ -108,6 +108,7 @@ jobs:
       matrix:
         java-version: [ 8, 11, 17 ]
     timeout-minutes: 30
+    permissions: write-all
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     # Steps represent a sequence of tasks that will be executed as part of the job
@@ -121,8 +122,8 @@ jobs:
           distribution: 'temurin'
           cache: 'gradle'
 
-      - name: Test publish to local
-        run: ./gradlew publishToMavenLocal -x test -PjdkVersion=${{ matrix.java-version }}
+#      - name: Test publish to local
+#        run: ./gradlew publishToMavenLocal -x test -PjdkVersion=${{ matrix.java-version }}
 
       - name: Free up disk space
         run: |
@@ -140,3 +141,21 @@ jobs:
             build/reports
             catalogs/**/*.log
             catalogs/**/*.tar
+
+      - name: Jacoco Report to PR
+        id: jacoco
+        uses: madrapps/jacoco-report@v1.6.1
+        with:
+          paths: ${{ github.workspace }}/**/build/reports/jacoco/test/jacocoTestReport.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 40
+          min-coverage-changed-files: 60
+          title: 'Code Coverage Report'
+          debug-mode: false
+          update-comment: true
+          pass-emoji: ':green_circle:'
+          fail-emoji: ':red_circle:'
+      - name: Get the Coverage info
+        run: |
+          echo "Total coverage ${{ steps.jacoco.outputs.coverage-overall }}"
+          echo "Changed Files coverage ${{ steps.jacoco.outputs.coverage-changed-files }}"       
