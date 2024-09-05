@@ -34,6 +34,7 @@ dependencies {
   implementation(libs.caffeine)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+  implementation(libs.iceberg.aliyun)
   implementation(libs.iceberg.aws)
   implementation(libs.iceberg.hive.metastore)
   implementation(libs.hadoop2.common) {

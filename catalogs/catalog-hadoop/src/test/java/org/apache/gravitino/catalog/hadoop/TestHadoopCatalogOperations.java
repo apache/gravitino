@@ -778,15 +778,27 @@ public class TestHadoopCatalogOperations {
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      // test sub path starts with "/"
       String subPath1 = "/test/test.parquet";
       String fileLocation1 = ops.getFileLocation(filesetIdent, subPath1);
       Assertions.assertEquals(
           String.format("%s%s", fileset.storageLocation(), subPath1), fileLocation1);
 
+      // test sub path not starts with "/"
       String subPath2 = "test/test.parquet";
       String fileLocation2 = ops.getFileLocation(filesetIdent, subPath2);
       Assertions.assertEquals(
           String.format("%s/%s", fileset.storageLocation(), subPath2), fileLocation2);
+
+      // test sub path is null
+      String subPath3 = null;
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> ops.getFileLocation(filesetIdent, subPath3));
+
+      // test sub path is blank but not null
+      String subPath4 = "";
+      String fileLocation3 = ops.getFileLocation(filesetIdent, subPath4);
+      Assertions.assertEquals(fileset.storageLocation(), fileLocation3);
     }
   }
 

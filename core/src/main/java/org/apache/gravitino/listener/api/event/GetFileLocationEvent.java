@@ -21,7 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.context.CallerContext;
+import org.apache.gravitino.audit.CallerContext;
 
 /** Represents an event that occurs when getting a actual file location. */
 @DeveloperApi

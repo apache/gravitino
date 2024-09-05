@@ -25,9 +25,15 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":core"))
-  implementation(project(":common"))
+  implementation(project(":api")) {
+    exclude("*")
+  }
+  implementation(project(":core")) {
+    exclude("*")
+  }
+  implementation(project(":common")) {
+    exclude("*")
+  }
 
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
@@ -59,7 +65,11 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn(jar, runtimeJars)
-    from("build/libs")
+    from("build/libs") {
+      exclude("guava-*.jar")
+      exclude("log4j-*.jar")
+      exclude("slf4j-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/kafka/libs")
   }
 

@@ -369,16 +369,16 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
     Fileset fileset = loadFileset(ident);
 
-    String storageLocation = fileset.storageLocation();
     String fileLocation;
     // subPath cannot be null, so we only need check if it is blank
     if (StringUtils.isBlank(processedSubPath)) {
-      fileLocation = storageLocation;
+      fileLocation = fileset.storageLocation();
     } else {
-      fileLocation =
-          processedSubPath.startsWith("/")
-              ? String.format("%s%s", storageLocation, processedSubPath)
-              : String.format("%s/%s", storageLocation, processedSubPath);
+      String storageLocation =
+          fileset.storageLocation().endsWith(SLASH)
+              ? fileset.storageLocation().substring(0, fileset.storageLocation().length() - 1)
+              : fileset.storageLocation();
+      fileLocation = String.format("%s%s", storageLocation, processedSubPath);
     }
     return fileLocation;
   }

@@ -46,6 +46,13 @@ public class IcebergConstants {
   public static final String GRAVITINO_S3_REGION = "s3-region";
   public static final String AWS_S3_REGION = "client.region";
 
+  public static final String GRAVITINO_OSS_ENDPOINT = "oss-endpoint";
+  public static final String ICEBERG_OSS_ENDPOINT = "oss.endpoint";
+  public static final String GRAVITINO_OSS_ACCESS_KEY_ID = "oss-access-key-id";
+  public static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
+  public static final String GRAVITINO_OSS_ACCESS_KEY_SECRET = "oss-access-key-secret";
+  public static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
+
   // Iceberg Table properties constants
 
   public static final String COMMENT = "comment";
@@ -65,7 +72,14 @@ public class IcebergConstants {
 
   public static final String GRAVITINO_ICEBERG_REST_SERVICE_NAME = "iceberg-rest";
 
+  public static final String ICEBERG_REST_CATALOG_CACHE_EVICTION_INTERVAL =
+      "catalog-cache-eviction-interval-ms";
+
   public static final String ICEBERG_REST_CATALOG_PROVIDER = "catalog-provider";
+
+  public static final String GRAVITINO_URI = "gravitino-uri";
+
+  public static final String GRAVITINO_METALAKE = "gravitino-metalake";
 
   public static final String GRAVITINO_DEFAULT_CATALOG = "__gravitino_default_catalog";
 }

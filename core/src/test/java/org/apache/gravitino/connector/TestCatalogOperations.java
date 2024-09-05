@@ -77,6 +77,8 @@ public class TestCatalogOperations
 
   public static final String FAIL_TEST = "need-fail";
 
+  private static final String SLASH = "/";
+
   public TestCatalogOperations(Map<String, String> config) {
     tables = Maps.newHashMap();
     schemas = Maps.newHashMap();
@@ -435,21 +437,26 @@ public class TestCatalogOperations
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath) {
     Preconditions.checkArgument(subPath != null, "subPath must not be null");
+    String processedSubPath;
+    if (!subPath.trim().isEmpty() && !subPath.trim().startsWith(SLASH)) {
+      processedSubPath = SLASH + subPath.trim();
+    } else {
+      processedSubPath = subPath.trim();
+    }
 
     Fileset fileset = loadFileset(ident);
 
-    String storageLocation = fileset.storageLocation();
     String fileLocation;
     // subPath cannot be null, so we only need check if it is blank
-    if (StringUtils.isBlank(subPath)) {
-      fileLocation = storageLocation;
+    if (StringUtils.isBlank(processedSubPath)) {
+      fileLocation = fileset.storageLocation();
     } else {
-      fileLocation =
-          subPath.startsWith("/")
-              ? String.format("%s%s", storageLocation, subPath)
-              : String.format("%s/%s", storageLocation, subPath);
+      String storageLocation =
+          fileset.storageLocation().endsWith(SLASH)
+              ? fileset.storageLocation().substring(0, fileset.storageLocation().length() - 1)
+              : fileset.storageLocation();
+      fileLocation = String.format("%s%s", storageLocation, processedSubPath);
     }
-
     return fileLocation;
   }
 

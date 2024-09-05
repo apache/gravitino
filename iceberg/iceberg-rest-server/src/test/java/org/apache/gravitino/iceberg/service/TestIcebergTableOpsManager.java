@@ -16,11 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.ops;
+package org.apache.gravitino.iceberg.service;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -43,9 +44,9 @@ public class TestIcebergTableOpsManager {
     IcebergTableOps ops = manager.getOps(rawPrefix);
 
     if (StringUtils.isBlank(prefix)) {
-      Assertions.assertEquals(ops.catalog.name(), DEFAULT_CATALOG);
+      Assertions.assertEquals(ops.getCatalog().name(), DEFAULT_CATALOG);
     } else {
-      Assertions.assertEquals(ops.catalog.name(), prefix);
+      Assertions.assertEquals(ops.getCatalog().name(), prefix);
     }
   }
 

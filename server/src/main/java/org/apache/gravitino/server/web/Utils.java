@@ -28,10 +28,10 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.enums.FilesetDataOperation;
-import org.apache.gravitino.enums.InternalClientType;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class Utils {

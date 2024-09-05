@@ -45,7 +45,6 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
-import org.apache.parquet.Strings;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,19 +162,19 @@ public class HiveTableOperations implements TableOperations, SupportsPartitions 
     Preconditions.checkArgument(
         transformFields.size() == identityPartition.fieldNames().length,
         "Hive partition field names must be the same as table partitioning field names: %s, but got %s",
-        Strings.join(transformFields, ","),
-        Strings.join(
+        String.join(",", transformFields),
+        String.join(
+            ",",
             Arrays.stream(identityPartition.fieldNames())
-                .map(f -> Strings.join(f, "."))
-                .collect(Collectors.toList()),
-            ","));
+                .map(f -> String.join(".", f))
+                .collect(Collectors.toList())));
     Arrays.stream(identityPartition.fieldNames())
         .forEach(
             f ->
                 Preconditions.checkArgument(
                     transformFields.contains(f[0]),
                     "Hive partition field name must be in table partitioning field names: %s, but got %s",
-                    Strings.join(transformFields, ","),
+                    String.join(",", transformFields),
                     f[0]));
 
     try {

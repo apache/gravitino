@@ -44,8 +44,6 @@ class OAuth2TokenResponse(BaseResponse):
         Raise:
             IllegalArgumentException If the response is invalid, this exception is thrown.
         """
-        super().validate()
-
         if self._access_token is None:
             raise IllegalArgumentException("Invalid access token: None")
 

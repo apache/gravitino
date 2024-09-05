@@ -431,7 +431,7 @@ subprojects {
     reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
-      jvmArgs = listOf("-Xmx2G")
+      jvmArgs = listOf("-Xmx4G")
       useJUnitPlatform()
       jvmArgs(project.property("extraJvmArgs") as List<*>)
       finalizedBy(tasks.getByName("jacocoTestReport"))
@@ -543,7 +543,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
+    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copyAuthorizationLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -571,6 +571,7 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("package") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -616,6 +617,26 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-iceberg-rest-server") }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
+    }
+  }
+
+  val compileTrinoConnector by registering {
+    dependsOn("trino-connector:copyLibs")
+    group = "gravitino distribution"
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector"))
+    doLast {
+      copy {
+        from(projectDir.dir("licenses")) { into("${rootProject.name}-trino-connector/licenses") }
+        from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-trino-connector") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -636,11 +657,11 @@ tasks {
   }
 
   val assembleTrinoConnector by registering(Tar::class) {
-    dependsOn("trino-connector:copyLibs")
+    dependsOn("compileTrinoConnector")
     group = "gravitino distribution"
     finalizedBy("checksumTrinoConnector")
     into("${rootProject.name}-trino-connector-$version")
-    from("trino-connector/build/libs")
+    from(compileTrinoConnector.map { it.outputs.files.single() })
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
@@ -713,8 +734,9 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
+        !it.name.startsWith("authorization") &&
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
+        it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink")
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -726,20 +748,16 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
+        !it.name.startsWith("authorization") &&
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("integration-test") &&
-        it.name != "authorizations" &&
+        !it.name.startsWith("flink") &&
         it.name != "trino-connector" &&
-        it.name != "bundled-catalog" &&
-        it.name != "flink-connector"
+        it.name != "bundled-catalog"
       ) {
-        if (it.name.startsWith("authorization-")) {
-          dependsOn(":authorizations:${it.name}:build")
-        } else {
-          dependsOn("${it.name}:build")
-        }
+        dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
         into("distribution/package/libs")
         include("*.jar")
@@ -757,7 +775,13 @@ tasks {
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      "catalogs:catalog-kafka:copyLibAndConfig"
+      ":catalogs:catalog-kafka:copyLibAndConfig"
+    )
+  }
+
+  register("copyAuthorizationLibAndConfigs", Copy::class) {
+    dependsOn(
+      ":authorizations:authorization-ranger:copyLibAndConfig"
     )
   }
 

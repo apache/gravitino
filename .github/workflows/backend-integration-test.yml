@@ -55,7 +55,7 @@ jobs:
     needs: changes
     if: (github.event_name == 'push' && needs.changes.outputs.source_changes == 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       matrix:
         # Integration test for AMD64 architecture
@@ -95,13 +95,14 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Backend Integration Test(JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
+      - name: Backend Integration Test (JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
         id: integrationTest
         run: >
           ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
-          -x :web:test -x :clients:client-python:test -x :flink-connector:test -x :spark-connector:test -x :spark-connector:spark-common:test 
+          -x :web:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
+          -x :authorizations:authorization-ranger:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
@@ -124,7 +125,7 @@ jobs:
     needs: changes
     if: (github.event_name == 'pull_request' && needs.changes.outputs.source_changes == 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     strategy:
       matrix:
         # Integration test for AMD64 architecture
@@ -164,13 +165,14 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Backend Integration Test(JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
+      - name: Backend Integration Test (JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
         id: integrationTest
         run: >
           ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
-          -x :web:test -x :clients:client-python:test -x :flink-connector:test -x :spark-connector:test -x :spark-connector:spark-common:test 
+          -x :web:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
+          -x :authorizations:authorization-ranger:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
