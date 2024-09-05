@@ -191,7 +191,7 @@ public interface EntityStoreV2 extends Closeable {
    * @param end NameIdentifier of the ending point of the relationship.
    * @param endType EntityType of the ending point.
    * @param type RelationType of the relationship.
-   * @Throws AlreadyExistsException if the relation already exists.
+   * @throws AlreadyExistsException if the relation already exists.
    */
   void addRelation(
       NameIdentifier start,
