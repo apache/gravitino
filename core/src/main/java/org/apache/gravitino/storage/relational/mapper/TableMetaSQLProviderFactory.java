@@ -30,8 +30,8 @@ public class TableMetaSQLProviderFactory {
   private static final Map<JDBCBackendType, TableMetaBaseSQLProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
-              JDBCBackendType.MYSQL, new TableMetaMySQLSQLProvider(),
-              JDBCBackendType.H2, new TableMetaH2SQLProvider());
+              JDBCBackendType.MYSQL, new TableMetaMySQLProvider(),
+              JDBCBackendType.H2, new TableMetaH2Provider());
 
   public static TableMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -44,9 +44,9 @@ public class TableMetaSQLProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class TableMetaMySQLSQLProvider extends TableMetaBaseSQLProvider {}
+  static class TableMetaMySQLProvider extends TableMetaBaseSQLProvider {}
 
-  static class TableMetaH2SQLProvider extends TableMetaBaseSQLProvider {}
+  static class TableMetaH2Provider extends TableMetaBaseSQLProvider {}
 
   public static String listTablePOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listTablePOsBySchemaId(schemaId);

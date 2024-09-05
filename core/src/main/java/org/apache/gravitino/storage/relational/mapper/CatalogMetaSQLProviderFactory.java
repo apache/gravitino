@@ -31,8 +31,8 @@ public class CatalogMetaSQLProviderFactory {
   private static final Map<JDBCBackendType, CatalogMetaBaseSQLProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
-              JDBCBackendType.MYSQL, new CatalogMetaMySQLSQLProvider(),
-              JDBCBackendType.H2, new CatalogMetaH2SQLProvider());
+              JDBCBackendType.MYSQL, new CatalogMetaMySQLProvider(),
+              JDBCBackendType.H2, new CatalogMetaH2Provider());
 
   public static CatalogMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -45,9 +45,9 @@ public class CatalogMetaSQLProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class CatalogMetaMySQLSQLProvider extends CatalogMetaBaseSQLProvider {}
+  static class CatalogMetaMySQLProvider extends CatalogMetaBaseSQLProvider {}
 
-  static class CatalogMetaH2SQLProvider extends CatalogMetaBaseSQLProvider {}
+  static class CatalogMetaH2Provider extends CatalogMetaBaseSQLProvider {}
 
   public static String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().listCatalogPOsByMetalakeId(metalakeId);

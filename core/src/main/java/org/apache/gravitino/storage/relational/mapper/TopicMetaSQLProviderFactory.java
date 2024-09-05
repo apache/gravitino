@@ -31,8 +31,8 @@ public class TopicMetaSQLProviderFactory {
   private static final Map<JDBCBackendType, TopicMetaBaseSQLProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
-              JDBCBackendType.MYSQL, new TopicMetaMySQLSQLProvider(),
-              JDBCBackendType.H2, new TopicMetaH2SQLProvider());
+              JDBCBackendType.MYSQL, new TopicMetaMySQLProvider(),
+              JDBCBackendType.H2, new TopicMetaH2Provider());
 
   public static TopicMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -45,9 +45,9 @@ public class TopicMetaSQLProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class TopicMetaMySQLSQLProvider extends TopicMetaBaseSQLProvider {}
+  static class TopicMetaMySQLProvider extends TopicMetaBaseSQLProvider {}
 
-  static class TopicMetaH2SQLProvider extends TopicMetaBaseSQLProvider {}
+  static class TopicMetaH2Provider extends TopicMetaBaseSQLProvider {}
 
   public static String insertTopicMeta(@Param("topicMeta") TopicPO topicPO) {
     return getProvider().insertTopicMeta(topicPO);

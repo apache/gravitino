@@ -29,8 +29,8 @@ public class FilesetVersionSQLProviderFactory {
   private static final Map<JDBCBackendType, FilesetVersionBaseSQLProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
-              JDBCBackendType.MYSQL, new FilesetVersionMySQLSQLProvider(),
-              JDBCBackendType.H2, new FilesetVersionH2SQLProvider());
+              JDBCBackendType.MYSQL, new FilesetVersionMySQLProvider(),
+              JDBCBackendType.H2, new FilesetVersionH2Provider());
 
   public static FilesetVersionBaseSQLProvider getProvider() {
     String databaseId =
@@ -43,9 +43,9 @@ public class FilesetVersionSQLProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class FilesetVersionMySQLSQLProvider extends FilesetVersionBaseSQLProvider {}
+  static class FilesetVersionMySQLProvider extends FilesetVersionBaseSQLProvider {}
 
-  static class FilesetVersionH2SQLProvider extends FilesetVersionBaseSQLProvider {}
+  static class FilesetVersionH2Provider extends FilesetVersionBaseSQLProvider {}
 
   public static String insertFilesetVersion(
       @Param("filesetVersion") FilesetVersionPO filesetVersionPO) {

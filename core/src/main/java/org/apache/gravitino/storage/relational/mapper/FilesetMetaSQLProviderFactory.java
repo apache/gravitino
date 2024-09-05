@@ -30,8 +30,8 @@ public class FilesetMetaSQLProviderFactory {
   private static final Map<JDBCBackendType, FilesetMetaBaseSQLProvider>
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
-              JDBCBackendType.MYSQL, new FilesetMetaMySQLSQLProvider(),
-              JDBCBackendType.H2, new FilesetMetaH2SQLProvider());
+              JDBCBackendType.MYSQL, new FilesetMetaMySQLProvider(),
+              JDBCBackendType.H2, new FilesetMetaH2Provider());
 
   public static FilesetMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -44,9 +44,9 @@ public class FilesetMetaSQLProviderFactory {
     return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  static class FilesetMetaMySQLSQLProvider extends FilesetMetaBaseSQLProvider {}
+  static class FilesetMetaMySQLProvider extends FilesetMetaBaseSQLProvider {}
 
-  static class FilesetMetaH2SQLProvider extends FilesetMetaBaseSQLProvider {}
+  static class FilesetMetaH2Provider extends FilesetMetaBaseSQLProvider {}
 
   public static String listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listFilesetPOsBySchemaId(schemaId);
