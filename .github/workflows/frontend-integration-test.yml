@@ -99,8 +99,7 @@ jobs:
           name: integrate-test-reports-${{ matrix.java-version }}
           path: |
             build/reports
-            integration-test-common/build/integration-test-integration-test.log
-            integration-test-common/build/*.tar
+            integration-test-common/build/*.log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
