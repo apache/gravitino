@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -29,6 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.FilesetCreateRequest;
@@ -36,6 +38,7 @@ import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -238,7 +241,23 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
-    throw new UnsupportedOperationException("Not implemented");
+    checkFilesetNameIdentifier(ident);
+    Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
+
+    CallerContext callerContext = CallerContext.CallerContextHolder.get();
+
+    Map<String, String> params = new HashMap<>();
+    params.put("sub_path", RESTUtils.encodeString(subPath));
+    FileLocationResponse resp =
+        restClient.get(
+            formatFileLocationRequestPath(fullNamespace, ident.name()),
+            params,
+            FileLocationResponse.class,
+            callerContext != null ? callerContext.context() : Collections.emptyMap(),
+            ErrorHandlers.filesetErrorHandler());
+    resp.validate();
+
+    return resp.getFileLocation();
   }
 
   @VisibleForTesting
@@ -249,6 +268,19 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
         .append("/")
         .append(RESTUtils.encodeString(ns.level(2)))
         .append("/filesets")
+        .toString();
+  }
+
+  @VisibleForTesting
+  static String formatFileLocationRequestPath(Namespace ns, String name) {
+    Namespace schemaNs = Namespace.of(ns.level(0), ns.level(1));
+    return new StringBuilder()
+        .append(formatSchemaRequestPath(schemaNs))
+        .append("/")
+        .append(RESTUtils.encodeString(ns.level(2)))
+        .append("/filesets/")
+        .append(RESTUtils.encodeString(name))
+        .append("/location")
         .toString();
   }
 
