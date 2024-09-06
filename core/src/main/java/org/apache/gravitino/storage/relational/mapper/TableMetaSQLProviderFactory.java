@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import static org.apache.gravitino.storage.relational.mapper.TableMetaMapper.TABLE_NAME;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
@@ -31,7 +33,8 @@ public class TableMetaSQLProviderFactory {
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new TableMetaMySQLProvider(),
-              JDBCBackendType.H2, new TableMetaH2Provider());
+              JDBCBackendType.H2, new TableMetaH2Provider(),
+              JDBCBackendType.POSTGRESQL, new TableMetaPostgreSQLProvider());
 
   public static TableMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -47,6 +50,70 @@ public class TableMetaSQLProviderFactory {
   static class TableMetaMySQLProvider extends TableMetaBaseSQLProvider {}
 
   static class TableMetaH2Provider extends TableMetaBaseSQLProvider {}
+
+  static class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
+
+    @Override
+    public String insertTableMetaOnDuplicateKeyUpdate(TablePO tablePO) {
+      return "INSERT INTO "
+          + TABLE_NAME
+          + "(table_id, table_name, metalake_id,"
+          + " catalog_id, schema_id, audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{tableMeta.tableId},"
+          + " #{tableMeta.tableName},"
+          + " #{tableMeta.metalakeId},"
+          + " #{tableMeta.catalogId},"
+          + " #{tableMeta.schemaId},"
+          + " #{tableMeta.auditInfo},"
+          + " #{tableMeta.currentVersion},"
+          + " #{tableMeta.lastVersion},"
+          + " #{tableMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT (table_id) DO UPDATE SET "
+          + " table_name = #{tableMeta.tableName},"
+          + " metalake_id = #{tableMeta.metalakeId},"
+          + " catalog_id = #{tableMeta.catalogId},"
+          + " schema_id = #{tableMeta.schemaId},"
+          + " audit_info = #{tableMeta.auditInfo},"
+          + " current_version = #{tableMeta.currentVersion},"
+          + " last_version = #{tableMeta.lastVersion},"
+          + " deleted_at = #{tableMeta.deletedAt}";
+    }
+
+    @Override
+    public String softDeleteTableMetasByTableId(Long tableId) {
+      return "UPDATE "
+          + TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
+          + " WHERE table_id = #{tableId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String softDeleteTableMetasByMetalakeId(Long metalakeId) {
+      return "UPDATE "
+          + TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String softDeleteTableMetasByCatalogId(Long catalogId) {
+      return "UPDATE "
+          + TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String softDeleteTableMetasBySchemaId(Long schemaId) {
+      return "UPDATE "
+          + TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+    }
+  }
 
   public static String listTablePOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listTablePOsBySchemaId(schemaId);

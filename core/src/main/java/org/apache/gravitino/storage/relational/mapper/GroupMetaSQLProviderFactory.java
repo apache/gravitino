@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import static org.apache.gravitino.storage.relational.mapper.GroupMetaMapper.GROUP_TABLE_NAME;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
@@ -30,7 +32,8 @@ public class GroupMetaSQLProviderFactory {
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new GroupMetaMySQLProvider(),
-              JDBCBackendType.H2, new GroupMetaH2Provider());
+              JDBCBackendType.H2, new GroupMetaH2Provider(),
+              JDBCBackendType.POSTGRESQL, new GroupMetaPostgreSQLProvider());
 
   public static GroupMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -46,6 +49,50 @@ public class GroupMetaSQLProviderFactory {
   static class GroupMetaMySQLProvider extends GroupMetaBaseSQLProvider {}
 
   static class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {}
+
+  static class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
+
+    @Override
+    public String softDeleteGroupMetaByGroupId(Long groupId) {
+      return "UPDATE "
+          + GROUP_TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE group_id = #{groupId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String softDeleteGroupMetasByMetalakeId(Long metalakeId) {
+      return "UPDATE "
+          + GROUP_TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertGroupMetaOnDuplicateKeyUpdate(GroupPO groupPO) {
+      return "INSERT INTO "
+          + GROUP_TABLE_NAME
+          + "(group_id, group_name,"
+          + "metalake_id, audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{groupMeta.groupId},"
+          + " #{groupMeta.groupName},"
+          + " #{groupMeta.metalakeId},"
+          + " #{groupMeta.auditInfo},"
+          + " #{groupMeta.currentVersion},"
+          + " #{groupMeta.lastVersion},"
+          + " #{groupMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT(group_id) DO UPDATE SET"
+          + " group_name = #{groupMeta.groupName},"
+          + " metalake_id = #{groupMeta.metalakeId},"
+          + " audit_info = #{groupMeta.auditInfo},"
+          + " current_version = #{groupMeta.currentVersion},"
+          + " last_version = #{groupMeta.lastVersion},"
+          + " deleted_at = #{groupMeta.deletedAt}";
+    }
+  }
 
   public static String selectGroupIdBySchemaIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name) {

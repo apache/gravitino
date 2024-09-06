@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import static org.apache.gravitino.storage.relational.mapper.TagMetaMapper.TAG_TABLE_NAME;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +33,8 @@ public class TagMetaSQLProviderFactory {
   private static final Map<JDBCBackendType, TagMetaBaseSQLProvider> METALAKE_META_SQL_PROVIDER_MAP =
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new TagMetaMySQLProvider(),
-          JDBCBackendType.H2, new TagMetaH2Provider());
+          JDBCBackendType.H2, new TagMetaH2Provider(),
+          JDBCBackendType.POSTGRESQL, new TagMetaPostgreSQLProvider());
 
   public static TagMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -47,6 +50,58 @@ public class TagMetaSQLProviderFactory {
   static class TagMetaMySQLProvider extends TagMetaBaseSQLProvider {}
 
   static class TagMetaH2Provider extends TagMetaBaseSQLProvider {}
+
+  static class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
+
+    @Override
+    public String softDeleteTagMetaByMetalakeAndTagName(String metalakeName, String tagName) {
+      return "UPDATE "
+          + TAG_TABLE_NAME
+          + " tm SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
+          + " WHERE tm.metalake_id IN ("
+          + " SELECT mm.metalake_id FROM "
+          + MetalakeMetaMapper.TABLE_NAME
+          + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
+          + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0";
+    }
+
+    @Override
+    public String softDeleteTagMetasByMetalakeId(Long metalakeId) {
+      return "UPDATE "
+          + TAG_TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
+          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertTagMetaOnDuplicateKeyUpdate(TagPO tagPO) {
+      return "INSERT INTO "
+          + TAG_TABLE_NAME
+          + "(tag_id, tag_name,"
+          + " metalake_id, tag_comment, properties, audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{tagMeta.tagId},"
+          + " #{tagMeta.tagName},"
+          + " #{tagMeta.metalakeId},"
+          + " #{tagMeta.comment},"
+          + " #{tagMeta.properties},"
+          + " #{tagMeta.auditInfo},"
+          + " #{tagMeta.currentVersion},"
+          + " #{tagMeta.lastVersion},"
+          + " #{tagMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT(tag_id) DO UPDATE SET"
+          + " tag_name = #{tagMeta.tagName},"
+          + " metalake_id = #{tagMeta.metalakeId},"
+          + " tag_comment = #{tagMeta.comment},"
+          + " properties = #{tagMeta.properties},"
+          + " audit_info = #{tagMeta.auditInfo},"
+          + " current_version = #{tagMeta.currentVersion},"
+          + " last_version = #{tagMeta.lastVersion},"
+          + " deleted_at = #{tagMeta.deletedAt}";
+    }
+  }
 
   public static String listTagPOsByMetalake(@Param("metalakeName") String metalakeName) {
     return getProvider().listTagPOsByMetalake(metalakeName);

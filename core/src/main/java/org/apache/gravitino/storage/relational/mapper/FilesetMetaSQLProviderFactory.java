@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
+import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.META_TABLE_NAME;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
@@ -31,7 +33,8 @@ public class FilesetMetaSQLProviderFactory {
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new FilesetMetaMySQLProvider(),
-              JDBCBackendType.H2, new FilesetMetaH2Provider());
+              JDBCBackendType.H2, new FilesetMetaH2Provider(),
+              JDBCBackendType.POSTGRESQL, new FilesetMetaPostgreSQLProvider());
 
   public static FilesetMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -47,6 +50,72 @@ public class FilesetMetaSQLProviderFactory {
   static class FilesetMetaMySQLProvider extends FilesetMetaBaseSQLProvider {}
 
   static class FilesetMetaH2Provider extends FilesetMetaBaseSQLProvider {}
+
+  static class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
+
+    @Override
+    public String softDeleteFilesetMetasByMetalakeId(Long metalakeId) {
+      return "UPDATE "
+          + META_TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String softDeleteFilesetMetasByCatalogId(Long catalogId) {
+      return "UPDATE "
+          + META_TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String softDeleteFilesetMetasBySchemaId(Long schemaId) {
+      return "UPDATE "
+          + META_TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String softDeleteFilesetMetasByFilesetId(Long filesetId) {
+      return "UPDATE "
+          + META_TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertFilesetMetaOnDuplicateKeyUpdate(FilesetPO filesetPO) {
+      return "INSERT INTO "
+          + META_TABLE_NAME
+          + "(fileset_id, fileset_name, metalake_id,"
+          + " catalog_id, schema_id, type, audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{filesetMeta.filesetId},"
+          + " #{filesetMeta.filesetName},"
+          + " #{filesetMeta.metalakeId},"
+          + " #{filesetMeta.catalogId},"
+          + " #{filesetMeta.schemaId},"
+          + " #{filesetMeta.type},"
+          + " #{filesetMeta.auditInfo},"
+          + " #{filesetMeta.currentVersion},"
+          + " #{filesetMeta.lastVersion},"
+          + " #{filesetMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT(fileset_id) DO UPDATE SET"
+          + " fileset_name = #{filesetMeta.filesetName},"
+          + " metalake_id = #{filesetMeta.metalakeId},"
+          + " catalog_id = #{filesetMeta.catalogId},"
+          + " schema_id = #{filesetMeta.schemaId},"
+          + " type = #{filesetMeta.type},"
+          + " audit_info = #{filesetMeta.auditInfo},"
+          + " current_version = #{filesetMeta.currentVersion},"
+          + " last_version = #{filesetMeta.lastVersion},"
+          + " deleted_at = #{filesetMeta.deletedAt}";
+    }
+  }
 
   public static String listFilesetPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listFilesetPOsBySchemaId(schemaId);

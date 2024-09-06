@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import static org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +34,8 @@ public class TagMetadataObjectRelSQLProviderFactory {
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new TagMetadataObjectRelMySQLProvider(),
-              JDBCBackendType.H2, new TagMetadataObjectRelH2Provider());
+              JDBCBackendType.H2, new TagMetadataObjectRelH2Provider(),
+              JDBCBackendType.POSTGRESQL, new TagMetadataObjectRelPostgreSQLProvider());
 
   public static TagMetadataObjectRelBaseSQLProvider getProvider() {
     String databaseId =
@@ -48,6 +51,68 @@ public class TagMetadataObjectRelSQLProviderFactory {
   static class TagMetadataObjectRelMySQLProvider extends TagMetadataObjectRelBaseSQLProvider {}
 
   static class TagMetadataObjectRelH2Provider extends TagMetadataObjectRelBaseSQLProvider {}
+
+  static class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRelBaseSQLProvider {
+
+    @Override
+    public String softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
+        String metalakeName, String tagName) {
+      return "UPDATE "
+          + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+          + " te SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
+          + " WHERE te.tag_id IN (SELECT tm.tag_id FROM "
+          + TagMetaMapper.TAG_TABLE_NAME
+          + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
+          + MetalakeMetaMapper.TABLE_NAME
+          + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
+          + " AND tm.deleted_at = 0) AND te.deleted_at = 0";
+    }
+
+    @Override
+    public String softDeleteTagMetadataObjectRelsByMetalakeId(Long metalakeId) {
+      return "UPDATE "
+          + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+          + " te SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
+          + " WHERE EXISTS (SELECT * FROM "
+          + TagMetaMapper.TAG_TABLE_NAME
+          + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = te.tag_id"
+          + " AND tm.deleted_at = 0) AND te.deleted_at = 0";
+    }
+
+    @Override
+    public String batchDeleteTagMetadataObjectRelsByTagIdsAndMetadataObject(
+        Long metadataObjectId, String metadataObjectType, List<Long> tagIds) {
+      return "<script>"
+          + "UPDATE "
+          + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
+          + " WHERE tag_id IN "
+          + "<foreach item='tagId' collection='tagIds' open='(' separator=',' close=')'>"
+          + "#{tagId}"
+          + "</foreach>"
+          + " And metadata_object_id = #{metadataObjectId}"
+          + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
+          + "</script>";
+    }
+
+    @Override
+    public String listTagMetadataObjectRelsByMetalakeAndTagName(
+        String metalakeName, String tagName) {
+      return "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
+          + " te.metadata_object_type as metadataObjectType, te.audit_info as auditInfo,"
+          + " te.current_version as currentVersion, te.last_version as lastVersion,"
+          + " te.deleted_at as deletedAt"
+          + " FROM "
+          + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+          + " te JOIN "
+          + TagMetaMapper.TAG_TABLE_NAME
+          + " tm ON te.tag_id = tm.tag_id JOIN "
+          + MetalakeMetaMapper.TABLE_NAME
+          + " mm ON tm.metalake_id = mm.metalake_id"
+          + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
+          + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0";
+    }
+  }
 
   public static String listTagPOsByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,

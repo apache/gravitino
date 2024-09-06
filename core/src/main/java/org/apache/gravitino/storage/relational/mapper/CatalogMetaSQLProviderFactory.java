@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
+import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.TABLE_NAME;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
@@ -32,7 +34,8 @@ public class CatalogMetaSQLProviderFactory {
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new CatalogMetaMySQLProvider(),
-              JDBCBackendType.H2, new CatalogMetaH2Provider());
+              JDBCBackendType.H2, new CatalogMetaH2Provider(),
+              JDBCBackendType.POSTGRESQL, new CatalogMetaPostgreSQLProvider());
 
   public static CatalogMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -48,6 +51,58 @@ public class CatalogMetaSQLProviderFactory {
   static class CatalogMetaMySQLProvider extends CatalogMetaBaseSQLProvider {}
 
   static class CatalogMetaH2Provider extends CatalogMetaBaseSQLProvider {}
+
+  static class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
+
+    @Override
+    public String softDeleteCatalogMetasByCatalogId(Long catalogId) {
+      return "UPDATE "
+          + TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String softDeleteCatalogMetasByMetalakeId(Long metalakeId) {
+      return "UPDATE "
+          + TABLE_NAME
+          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+    }
+
+    @Override
+    public String insertCatalogMetaOnDuplicateKeyUpdate(CatalogPO catalogPO) {
+      return "INSERT INTO "
+          + TABLE_NAME
+          + "(catalog_id, catalog_name, metalake_id,"
+          + " type, provider, catalog_comment, properties, audit_info,"
+          + " current_version, last_version, deleted_at)"
+          + " VALUES("
+          + " #{catalogMeta.catalogId},"
+          + " #{catalogMeta.catalogName},"
+          + " #{catalogMeta.metalakeId},"
+          + " #{catalogMeta.type},"
+          + " #{catalogMeta.provider},"
+          + " #{catalogMeta.catalogComment},"
+          + " #{catalogMeta.properties},"
+          + " #{catalogMeta.auditInfo},"
+          + " #{catalogMeta.currentVersion},"
+          + " #{catalogMeta.lastVersion},"
+          + " #{catalogMeta.deletedAt}"
+          + " )"
+          + " ON CONFLICT(catalog_id) DO UPDATE SET"
+          + " catalog_name = #{catalogMeta.catalogName},"
+          + " metalake_id = #{catalogMeta.metalakeId},"
+          + " type = #{catalogMeta.type},"
+          + " provider = #{catalogMeta.provider},"
+          + " catalog_comment = #{catalogMeta.catalogComment},"
+          + " properties = #{catalogMeta.properties},"
+          + " audit_info = #{catalogMeta.auditInfo},"
+          + " current_version = #{catalogMeta.currentVersion},"
+          + " last_version = #{catalogMeta.lastVersion},"
+          + " deleted_at = #{catalogMeta.deletedAt}";
+    }
+  }
 
   public static String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().listCatalogPOsByMetalakeId(metalakeId);
