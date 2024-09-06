@@ -198,7 +198,7 @@ allprojects {
       } else if (testMode == "embedded") {
         param.environment("GRAVITINO_HOME", project.rootDir.path)
         param.environment("GRAVITINO_TEST", "true")
-        param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/dist/")
+        param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/web/dist/")
         param.systemProperty("testMode", "embedded")
       } else {
         throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
@@ -487,17 +487,17 @@ tasks.rat {
     "integration-test/**/*.txt",
     "docs/**/*.md",
     "spark-connector/spark-common/src/test/resources/**",
-    "web/.**",
-    "web/next-env.d.ts",
-    "web/dist/**/*",
-    "web/node_modules/**/*",
-    "web/src/lib/utils/axios/**/*",
-    "web/src/lib/enums/httpEnum.js",
-    "web/src/types/axios.d.ts",
-    "web/yarn.lock",
-    "web/package-lock.json",
-    "web/pnpm-lock.yaml",
-    "web/src/lib/icons/svg/**/*.svg",
+    "web/web/.**",
+    "web/web/next-env.d.ts",
+    "web/web/dist/**/*",
+    "web/web/node_modules/**/*",
+    "web/web/src/lib/utils/axios/**/*",
+    "web/web/src/lib/enums/httpEnum.js",
+    "web/web/src/types/axios.d.ts",
+    "web/web/yarn.lock",
+    "web/web/package-lock.json",
+    "web/web/pnpm-lock.yaml",
+    "web/web/src/lib/icons/svg/**/*.svg",
     "**/LICENSE.*",
     "**/NOTICE.*",
     "DISCLAIMER_WIP.txt",
@@ -520,8 +520,6 @@ tasks.rat {
     exclusions.addAll(gitIgnoreExcludes)
   }
 
-  dependsOn(":web:nodeSetup")
-
   verbose.set(true)
   failOnError.set(true)
   setExcludes(exclusions)
@@ -543,7 +541,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copyAuthorizationLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
+    dependsOn(":web:web:build", "copySubprojectDependencies", "copyCatalogLibAndConfigs", "copyAuthorizationLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -551,7 +549,7 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->

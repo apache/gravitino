@@ -28,8 +28,6 @@ jobs:
               - catalogs/**
               - clients/client-java/**
               - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
@@ -39,7 +37,6 @@ jobs:
               - server/**
               - server-common/**
               - trino-connector/**
-              - docs/open-api/**
               - build.gradle.kts
               - gradle.properties
               - gradlew

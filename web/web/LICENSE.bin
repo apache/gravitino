@@ -205,8 +205,8 @@
    Apache Software License 2.0.
 
    Apache Zeppelin
-   ./web/WEB-INF/web.xml
-   
+   ./web/web/WEB-INF/web.xml
+
    @humanwhocodes/config-array
    @humanwhocodes/module-importer
    @pkgjs/parseargs
@@ -508,7 +508,7 @@
    is-weakmap
    is-weakref
    is-weakset
-   isarray   
+   isarray
    internal-slot
    iterator.prototype
    jiti

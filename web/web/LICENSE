@@ -205,7 +205,7 @@
    Apache Software License 2.0.
 
    Apache Zeppelin
-   ./web/WEB-INF/web.xml
+   ./web/web/WEB-INF/web.xml
 
    This product bundles various third-party components also under the
    MIT license.

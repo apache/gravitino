@@ -56,7 +56,7 @@ tasks.test {
   val skipITs = project.hasProperty("skipITs")
   val skipWebITs = project.hasProperty("skipWebITs")
   if (skipITs || skipWebITs) {
-    exclude("**/integration/test/**")
+    exclude("*")
   } else {
     dependsOn(":trino-connector:trino-connector:jar")
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
@@ -68,6 +68,6 @@ tasks.test {
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
 
     // Frontend tests depend on the web page, so we need to build the web module first.
-    dependsOn(":web:build")
+    dependsOn(":web:web:build")
   }
 }

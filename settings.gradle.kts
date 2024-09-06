@@ -65,6 +65,6 @@ project(":spark-connector:spark-3.4").projectDir = file("spark-connector/v3.4/sp
 project(":spark-connector:spark-runtime-3.4").projectDir = file("spark-connector/v3.4/spark-runtime")
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
 project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
-include("web", "web:integration-test")
+include("web:web", "web:integration-test")
 include("docs")
 include("integration-test-common")
