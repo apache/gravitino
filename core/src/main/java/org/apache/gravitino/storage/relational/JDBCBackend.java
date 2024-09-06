@@ -420,7 +420,7 @@ public class JDBCBackend implements RelationalBackend {
   public enum JDBCBackendType {
     H2(true),
     MYSQL(false),
-    PG(false);
+    POSTGRESQL(false);
 
     private final boolean embedded;
 
@@ -434,7 +434,7 @@ public class JDBCBackend implements RelationalBackend {
       } else if (jdbcURI.startsWith("jdbc:mysql")) {
         return JDBCBackendType.MYSQL;
       } else if (jdbcURI.startsWith("jdbc:postgresql")) {
-        return JDBCBackendType.PG;
+        return JDBCBackendType.POSTGRESQL;
       } else {
         throw new IllegalArgumentException("Unknown JDBC URI: " + jdbcURI);
       }
@@ -447,7 +447,7 @@ public class JDBCBackend implements RelationalBackend {
         case "mysql":
           return JDBCBackendType.MYSQL;
         case "postgresql":
-          return JDBCBackendType.PG;
+          return JDBCBackendType.POSTGRESQL;
         default:
           throw new IllegalArgumentException("Unknown JDBC type: " + jdbcType);
       }

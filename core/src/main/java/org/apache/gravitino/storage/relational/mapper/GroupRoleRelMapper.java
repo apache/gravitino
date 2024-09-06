@@ -37,34 +37,38 @@ public interface GroupRoleRelMapper {
   String GROUP_TABLE_NAME = "group_meta";
   String GROUP_ROLE_RELATION_TABLE_NAME = "group_role_rel";
 
-  @InsertProvider(type = GroupRoleRelSQLProvider.class, method = "batchInsertGroupRoleRel")
+  @InsertProvider(type = GroupRoleRelSQLProviderFactory.class, method = "batchInsertGroupRoleRel")
   void batchInsertGroupRoleRel(@Param("groupRoleRels") List<GroupRoleRelPO> groupRoleRelPOS);
 
   @InsertProvider(
-      type = GroupRoleRelSQLProvider.class,
+      type = GroupRoleRelSQLProviderFactory.class,
       method = "batchInsertGroupRoleRelOnDuplicateKeyUpdate")
   void batchInsertGroupRoleRelOnDuplicateKeyUpdate(
       @Param("groupRoleRels") List<GroupRoleRelPO> groupRoleRelPOS);
 
-  @UpdateProvider(type = GroupRoleRelSQLProvider.class, method = "softDeleteGroupRoleRelByGroupId")
+  @UpdateProvider(
+      type = GroupRoleRelSQLProviderFactory.class,
+      method = "softDeleteGroupRoleRelByGroupId")
   void softDeleteGroupRoleRelByGroupId(@Param("groupId") Long groupId);
 
   @UpdateProvider(
-      type = GroupRoleRelSQLProvider.class,
+      type = GroupRoleRelSQLProviderFactory.class,
       method = "softDeleteGroupRoleRelByGroupAndRoles")
   void softDeleteGroupRoleRelByGroupAndRoles(
       @Param("groupId") Long groupId, @Param("roleIds") List<Long> roleIds);
 
   @UpdateProvider(
-      type = GroupRoleRelSQLProvider.class,
+      type = GroupRoleRelSQLProviderFactory.class,
       method = "softDeleteGroupRoleRelByMetalakeId")
   void softDeleteGroupRoleRelByMetalakeId(Long metalakeId);
 
-  @UpdateProvider(type = GroupRoleRelSQLProvider.class, method = "softDeleteGroupRoleRelByRoleId")
+  @UpdateProvider(
+      type = GroupRoleRelSQLProviderFactory.class,
+      method = "softDeleteGroupRoleRelByRoleId")
   void softDeleteGroupRoleRelByRoleId(Long roleId);
 
   @UpdateProvider(
-      type = GroupRoleRelSQLProvider.class,
+      type = GroupRoleRelSQLProviderFactory.class,
       method = "deleteGroupRoleRelMetasByLegacyTimeline")
   Integer deleteGroupRoleRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);

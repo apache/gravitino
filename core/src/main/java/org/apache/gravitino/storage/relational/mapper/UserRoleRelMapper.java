@@ -38,32 +38,38 @@ public interface UserRoleRelMapper {
   String USER_TABLE_NAME = "user_meta";
   String USER_ROLE_RELATION_TABLE_NAME = "user_role_rel";
 
-  @InsertProvider(type = UserRoleRelSQLProvider.class, method = "batchInsertUserRoleRel")
+  @InsertProvider(type = UserRoleRelSQLProviderFactory.class, method = "batchInsertUserRoleRel")
   void batchInsertUserRoleRel(@Param("userRoleRels") List<UserRoleRelPO> userRoleRelPOs);
 
   @InsertProvider(
-      type = UserRoleRelSQLProvider.class,
+      type = UserRoleRelSQLProviderFactory.class,
       method = "batchInsertUserRoleRelOnDuplicateKeyUpdate")
   void batchInsertUserRoleRelOnDuplicateKeyUpdate(
       @Param("userRoleRels") List<UserRoleRelPO> userRoleRelPOs);
 
-  @UpdateProvider(type = UserRoleRelSQLProvider.class, method = "softDeleteUserRoleRelByUserId")
+  @UpdateProvider(
+      type = UserRoleRelSQLProviderFactory.class,
+      method = "softDeleteUserRoleRelByUserId")
   void softDeleteUserRoleRelByUserId(@Param("userId") Long userId);
 
   @UpdateProvider(
-      type = UserRoleRelSQLProvider.class,
+      type = UserRoleRelSQLProviderFactory.class,
       method = "softDeleteUserRoleRelByUserAndRoles")
   void softDeleteUserRoleRelByUserAndRoles(
       @Param("userId") Long userId, @Param("roleIds") List<Long> roleIds);
 
-  @UpdateProvider(type = UserRoleRelSQLProvider.class, method = "softDeleteUserRoleRelByMetalakeId")
+  @UpdateProvider(
+      type = UserRoleRelSQLProviderFactory.class,
+      method = "softDeleteUserRoleRelByMetalakeId")
   void softDeleteUserRoleRelByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @UpdateProvider(type = UserRoleRelSQLProvider.class, method = "softDeleteUserRoleRelByRoleId")
+  @UpdateProvider(
+      type = UserRoleRelSQLProviderFactory.class,
+      method = "softDeleteUserRoleRelByRoleId")
   void softDeleteUserRoleRelByRoleId(@Param("roleId") Long roleId);
 
   @DeleteProvider(
-      type = UserRoleRelSQLProvider.class,
+      type = UserRoleRelSQLProviderFactory.class,
       method = "deleteUserRoleRelMetasByLegacyTimeline")
   Integer deleteUserRoleRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);

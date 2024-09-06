@@ -39,25 +39,29 @@ public interface SecurableObjectMapper {
   String SECURABLE_OBJECT_TABLE_NAME = "role_meta_securable_object";
   String ROLE_TABLE_NAME = "role_meta";
 
-  @InsertProvider(type = SecurableObjectSQLProvider.class, method = "batchInsertSecurableObjects")
+  @InsertProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "batchInsertSecurableObjects")
   void batchInsertSecurableObjects(
       @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs);
 
   @UpdateProvider(
-      type = SecurableObjectSQLProvider.class,
+      type = SecurableObjectSQLProviderFactory.class,
       method = "softDeleteSecurableObjectsByRoleId")
   void softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId);
 
   @UpdateProvider(
-      type = SecurableObjectSQLProvider.class,
+      type = SecurableObjectSQLProviderFactory.class,
       method = "softDeleteRoleMetasByMetalakeId")
   void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @SelectProvider(type = SecurableObjectSQLProvider.class, method = "listSecurableObjectsByRoleId")
+  @SelectProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "listSecurableObjectsByRoleId")
   List<SecurableObjectPO> listSecurableObjectsByRoleId(@Param("roleId") Long roleId);
 
   @DeleteProvider(
-      type = SecurableObjectSQLProvider.class,
+      type = SecurableObjectSQLProviderFactory.class,
       method = "deleteSecurableObjectsByLegacyTimeline")
   Integer deleteSecurableObjectsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);

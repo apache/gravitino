@@ -30,38 +30,44 @@ public interface TagMetaMapper {
 
   String TAG_TABLE_NAME = "tag_meta";
 
-  @SelectProvider(type = TagMetaSQLProvider.class, method = "listTagPOsByMetalake")
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "listTagPOsByMetalake")
   List<TagPO> listTagPOsByMetalake(@Param("metalakeName") String metalakeName);
 
-  @SelectProvider(type = TagMetaSQLProvider.class, method = "listTagPOsByMetalakeAndTagNames")
+  @SelectProvider(
+      type = TagMetaSQLProviderFactory.class,
+      method = "listTagPOsByMetalakeAndTagNames")
   List<TagPO> listTagPOsByMetalakeAndTagNames(
       @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames);
 
-  @SelectProvider(type = TagMetaSQLProvider.class, method = "selectTagIdByMetalakeAndName")
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "selectTagIdByMetalakeAndName")
   Long selectTagIdByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
-  @SelectProvider(type = TagMetaSQLProvider.class, method = "selectTagMetaByMetalakeAndName")
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "selectTagMetaByMetalakeAndName")
   TagPO selectTagMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
-  @InsertProvider(type = TagMetaSQLProvider.class, method = "insertTagMeta")
+  @InsertProvider(type = TagMetaSQLProviderFactory.class, method = "insertTagMeta")
   void insertTagMeta(@Param("tagMeta") TagPO tagPO);
 
-  @InsertProvider(type = TagMetaSQLProvider.class, method = "insertTagMetaOnDuplicateKeyUpdate")
+  @InsertProvider(
+      type = TagMetaSQLProviderFactory.class,
+      method = "insertTagMetaOnDuplicateKeyUpdate")
   void insertTagMetaOnDuplicateKeyUpdate(@Param("tagMeta") TagPO tagPO);
 
-  @UpdateProvider(type = TagMetaSQLProvider.class, method = "updateTagMeta")
+  @UpdateProvider(type = TagMetaSQLProviderFactory.class, method = "updateTagMeta")
   Integer updateTagMeta(@Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO);
 
-  @UpdateProvider(type = TagMetaSQLProvider.class, method = "softDeleteTagMetaByMetalakeAndTagName")
+  @UpdateProvider(
+      type = TagMetaSQLProviderFactory.class,
+      method = "softDeleteTagMetaByMetalakeAndTagName")
   Integer softDeleteTagMetaByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
-  @UpdateProvider(type = TagMetaSQLProvider.class, method = "softDeleteTagMetasByMetalakeId")
+  @UpdateProvider(type = TagMetaSQLProviderFactory.class, method = "softDeleteTagMetasByMetalakeId")
   void softDeleteTagMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @DeleteProvider(type = TagMetaSQLProvider.class, method = "deleteTagMetasByLegacyTimeline")
+  @DeleteProvider(type = TagMetaSQLProviderFactory.class, method = "deleteTagMetasByLegacyTimeline")
   Integer deleteTagMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

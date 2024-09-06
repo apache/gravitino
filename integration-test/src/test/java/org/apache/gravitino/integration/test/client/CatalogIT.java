@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -277,5 +278,26 @@ public class CatalogIT extends AbstractIT {
                     catalogName1, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties));
     Assertions.assertTrue(
         exception.getMessage().contains("Invalid package path: /tmp/none_exist_path_to_package"));
+  }
+
+  @Test
+  void testUpdateCatalogWithNullableComment() {
+    String catalogName = GravitinoITUtils.genRandomName("catalog");
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
+
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("metastore.uris", hmsUri);
+    Catalog catalog =
+        metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, "hive", null, properties);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+
+    Assertions.assertEquals(catalogName, catalog.name());
+    Assertions.assertEquals(null, catalog.comment());
+
+    Catalog updatedCatalog =
+        metalake.alterCatalog(catalogName, CatalogChange.updateComment("new catalog comment"));
+    Assertions.assertEquals("new catalog comment", updatedCatalog.comment());
+
+    metalake.dropCatalog(catalogName);
   }
 }

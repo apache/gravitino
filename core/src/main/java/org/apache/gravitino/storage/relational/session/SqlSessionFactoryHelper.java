@@ -26,6 +26,7 @@ import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
@@ -74,7 +75,7 @@ public class SqlSessionFactoryHelper {
     // Initialize the data source
     BasicDataSource dataSource = new BasicDataSource();
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
-    String jdbcType = getJdbcType(jdbcUrl);
+    JDBCBackendType jdbcType = JDBCBackendType.fromURI(jdbcUrl);
     dataSource.setUrl(jdbcUrl);
     dataSource.setDriverClassName(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER));
     dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER));
@@ -104,8 +105,7 @@ public class SqlSessionFactoryHelper {
 
     // Initialize the configuration
     Configuration configuration = new Configuration(environment);
-    configuration.setDatabaseId(jdbcType);
-
+    configuration.setDatabaseId(jdbcType.name().toLowerCase());
     configuration.addMapper(MetalakeMetaMapper.class);
     configuration.addMapper(CatalogMetaMapper.class);
     configuration.addMapper(SchemaMetaMapper.class);
@@ -130,22 +130,6 @@ public class SqlSessionFactoryHelper {
           sqlSessionFactory = new SqlSessionFactoryBuilder().build(configuration);
         }
       }
-    }
-  }
-
-  private String getJdbcType(String jdbcUrl) {
-    if (jdbcUrl.startsWith("jdbc:mysql")) {
-      return "mysql";
-    } else if (jdbcUrl.startsWith("jdbc:h2")) {
-      return "h2";
-    } else if (jdbcUrl.startsWith("jdbc:postgresql")) {
-      return "postgresql";
-    } else if (jdbcUrl.startsWith("jdbc:oracle")) {
-      return "oracle";
-    } else if (jdbcUrl.startsWith("jdbc:sqlserver")) {
-      return "sqlserver";
-    } else {
-      throw new IllegalArgumentException("Unsupported JDBC URL: " + jdbcUrl);
     }
   }
 

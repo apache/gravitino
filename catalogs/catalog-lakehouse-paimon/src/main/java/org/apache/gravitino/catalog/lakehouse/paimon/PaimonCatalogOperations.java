@@ -438,15 +438,8 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
    */
   @Override
   public boolean dropTable(NameIdentifier identifier) {
-    try {
-      NameIdentifier tableIdentifier = buildPaimonNameIdentifier(identifier);
-      paimonCatalogOps.dropTable(tableIdentifier.toString());
-    } catch (Catalog.TableNotExistException e) {
-      LOG.warn("Paimon table {} does not exist.", identifier);
-      return false;
-    }
-    LOG.info("Dropped Paimon table {}.", identifier);
-    return true;
+    throw new UnsupportedOperationException(
+        "Paimon dropTable will both remove the metadata and data, please use purgeTable instead in Gravitino.");
   }
 
   /**
@@ -458,7 +451,15 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
    */
   @Override
   public boolean purgeTable(NameIdentifier identifier) throws UnsupportedOperationException {
-    throw new UnsupportedOperationException("purgeTable is unsupported now for Paimon Catalog.");
+    try {
+      NameIdentifier tableIdentifier = buildPaimonNameIdentifier(identifier);
+      paimonCatalogOps.purgeTable(tableIdentifier.toString());
+    } catch (Catalog.TableNotExistException e) {
+      LOG.warn("Paimon table {} does not exist.", identifier);
+      return false;
+    }
+    LOG.info("Purged Paimon table {}.", identifier);
+    return true;
   }
 
   @Override

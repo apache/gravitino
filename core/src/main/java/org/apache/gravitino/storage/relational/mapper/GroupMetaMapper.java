@@ -39,34 +39,44 @@ public interface GroupMetaMapper {
   String GROUP_TABLE_NAME = "group_meta";
   String GROUP_ROLE_RELATION_TABLE_NAME = "group_role_rel";
 
-  @SelectProvider(type = GroupMetaSQLProvider.class, method = "selectGroupIdBySchemaIdAndName")
+  @SelectProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "selectGroupIdBySchemaIdAndName")
   Long selectGroupIdBySchemaIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
 
-  @SelectProvider(type = GroupMetaSQLProvider.class, method = "selectGroupMetaByMetalakeIdAndName")
+  @SelectProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "selectGroupMetaByMetalakeIdAndName")
   GroupPO selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
 
-  @InsertProvider(type = GroupMetaSQLProvider.class, method = "insertGroupMeta")
+  @InsertProvider(type = GroupMetaSQLProviderFactory.class, method = "insertGroupMeta")
   void insertGroupMeta(@Param("groupMeta") GroupPO groupPO);
 
-  @InsertProvider(type = GroupMetaSQLProvider.class, method = "insertGroupMetaOnDuplicateKeyUpdate")
+  @InsertProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "insertGroupMetaOnDuplicateKeyUpdate")
   void insertGroupMetaOnDuplicateKeyUpdate(@Param("groupMeta") GroupPO groupPO);
 
-  @UpdateProvider(type = GroupMetaSQLProvider.class, method = "softDeleteGroupMetaByGroupId")
+  @UpdateProvider(type = GroupMetaSQLProviderFactory.class, method = "softDeleteGroupMetaByGroupId")
   void softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId);
 
-  @UpdateProvider(type = GroupMetaSQLProvider.class, method = "softDeleteGroupMetasByMetalakeId")
+  @UpdateProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "softDeleteGroupMetasByMetalakeId")
   void softDeleteGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @UpdateProvider(type = GroupMetaSQLProvider.class, method = "updateGroupMeta")
+  @UpdateProvider(type = GroupMetaSQLProviderFactory.class, method = "updateGroupMeta")
   Integer updateGroupMeta(
       @Param("newGroupMeta") GroupPO newGroupPO, @Param("oldGroupMeta") GroupPO oldGroupPO);
 
-  @SelectProvider(type = GroupMetaSQLProvider.class, method = "listGroupsByRoleId")
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "listGroupsByRoleId")
   List<GroupPO> listGroupsByRoleId(@Param("roleId") Long roleId);
 
-  @DeleteProvider(type = GroupMetaSQLProvider.class, method = "deleteGroupMetasByLegacyTimeline")
+  @DeleteProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "deleteGroupMetasByLegacyTimeline")
   Integer deleteGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

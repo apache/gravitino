@@ -38,42 +38,54 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface SchemaMetaMapper {
   String TABLE_NAME = "schema_meta";
 
-  @SelectProvider(type = SchemaMetaSQLProvider.class, method = "listSchemaPOsByCatalogId")
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByCatalogId")
   List<SchemaPO> listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId);
 
-  @SelectProvider(type = SchemaMetaSQLProvider.class, method = "selectSchemaIdByCatalogIdAndName")
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaIdByCatalogIdAndName")
   Long selectSchemaIdByCatalogIdAndName(
       @Param("catalogId") Long catalogId, @Param("schemaName") String name);
 
-  @SelectProvider(type = SchemaMetaSQLProvider.class, method = "selectSchemaMetaByCatalogIdAndName")
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaMetaByCatalogIdAndName")
   SchemaPO selectSchemaMetaByCatalogIdAndName(
       @Param("catalogId") Long catalogId, @Param("schemaName") String name);
 
-  @SelectProvider(type = SchemaMetaSQLProvider.class, method = "selectSchemaMetaById")
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectSchemaMetaById")
   SchemaPO selectSchemaMetaById(@Param("schemaId") Long schemaId);
 
-  @InsertProvider(type = SchemaMetaSQLProvider.class, method = "insertSchemaMeta")
+  @InsertProvider(type = SchemaMetaSQLProviderFactory.class, method = "insertSchemaMeta")
   void insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO);
 
   @InsertProvider(
-      type = SchemaMetaSQLProvider.class,
+      type = SchemaMetaSQLProviderFactory.class,
       method = "insertSchemaMetaOnDuplicateKeyUpdate")
   void insertSchemaMetaOnDuplicateKeyUpdate(@Param("schemaMeta") SchemaPO schemaPO);
 
-  @UpdateProvider(type = SchemaMetaSQLProvider.class, method = "updateSchemaMeta")
+  @UpdateProvider(type = SchemaMetaSQLProviderFactory.class, method = "updateSchemaMeta")
   Integer updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO);
 
-  @UpdateProvider(type = SchemaMetaSQLProvider.class, method = "softDeleteSchemaMetasBySchemaId")
+  @UpdateProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "softDeleteSchemaMetasBySchemaId")
   Integer softDeleteSchemaMetasBySchemaId(@Param("schemaId") Long schemaId);
 
-  @UpdateProvider(type = SchemaMetaSQLProvider.class, method = "softDeleteSchemaMetasByMetalakeId")
+  @UpdateProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "softDeleteSchemaMetasByMetalakeId")
   Integer softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @UpdateProvider(type = SchemaMetaSQLProvider.class, method = "softDeleteSchemaMetasByCatalogId")
+  @UpdateProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "softDeleteSchemaMetasByCatalogId")
   Integer softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId);
 
-  @DeleteProvider(type = SchemaMetaSQLProvider.class, method = "deleteSchemaMetasByLegacyTimeline")
+  @DeleteProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "deleteSchemaMetasByLegacyTimeline")
   Integer deleteSchemaMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

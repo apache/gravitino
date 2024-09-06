@@ -138,4 +138,10 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
       throw e;
     }
   }
+
+  @Override
+  public String getFileLocation(NameIdentifier ident, String subPath)
+      throws NoSuchFilesetException {
+    throw new UnsupportedOperationException("Not implemented");
+  }
 }

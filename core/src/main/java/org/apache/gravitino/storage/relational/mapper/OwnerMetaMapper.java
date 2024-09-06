@@ -39,43 +39,51 @@ public interface OwnerMetaMapper {
   String OWNER_TABLE_NAME = "owner_meta";
 
   @SelectProvider(
-      type = OwnerMetaSQLProvider.class,
+      type = OwnerMetaSQLProviderFactory.class,
       method = "selectUserOwnerMetaByMetadataObjectIdAndType")
   UserPO selectUserOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
   @SelectProvider(
-      type = OwnerMetaSQLProvider.class,
+      type = OwnerMetaSQLProviderFactory.class,
       method = "selectGroupOwnerMetaByMetadataObjectIdAndType")
   GroupPO selectGroupOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
-  @InsertProvider(type = OwnerMetaSQLProvider.class, method = "insertOwnerRel")
+  @InsertProvider(type = OwnerMetaSQLProviderFactory.class, method = "insertOwnerRel")
   void insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO);
 
   @UpdateProvider(
-      type = OwnerMetaSQLProvider.class,
+      type = OwnerMetaSQLProviderFactory.class,
       method = "softDeleteOwnerRelByMetadataObjectIdAndType")
   void softDeleteOwnerRelByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
-  @UpdateProvider(type = OwnerMetaSQLProvider.class, method = "softDeleteOwnerRelByOwnerIdAndType")
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelByOwnerIdAndType")
   void softDeleteOwnerRelByOwnerIdAndType(
       @Param("ownerId") Long ownerId, @Param("ownerType") String ownerType);
 
-  @UpdateProvider(type = OwnerMetaSQLProvider.class, method = "softDeleteOwnerRelByMetalakeId")
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelByMetalakeId")
   void softDeleteOwnerRelByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @UpdateProvider(type = OwnerMetaSQLProvider.class, method = "softDeleteOwnerRelByCatalogId")
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelByCatalogId")
   void softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId);
 
-  @UpdateProvider(type = OwnerMetaSQLProvider.class, method = "softDeleteOwnerRelBySchemaId")
+  @UpdateProvider(type = OwnerMetaSQLProviderFactory.class, method = "softDeleteOwnerRelBySchemaId")
   void softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId);
 
-  @UpdateProvider(type = OwnerMetaSQLProvider.class, method = "deleteOwnerMetasByLegacyTimeline")
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "deleteOwnerMetasByLegacyTimeline")
   Integer deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

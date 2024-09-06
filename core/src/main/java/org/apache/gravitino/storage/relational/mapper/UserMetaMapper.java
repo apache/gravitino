@@ -39,34 +39,44 @@ public interface UserMetaMapper {
   String USER_TABLE_NAME = "user_meta";
   String USER_ROLE_RELATION_TABLE_NAME = "user_role_rel";
 
-  @SelectProvider(type = UserMetaSQLProvider.class, method = "selectUserIdByMetalakeIdAndName")
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "selectUserIdByMetalakeIdAndName")
   Long selectUserIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name);
 
-  @SelectProvider(type = UserMetaSQLProvider.class, method = "selectUserMetaByMetalakeIdAndName")
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "selectUserMetaByMetalakeIdAndName")
   UserPO selectUserMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name);
 
-  @InsertProvider(type = UserMetaSQLProvider.class, method = "insertUserMeta")
+  @InsertProvider(type = UserMetaSQLProviderFactory.class, method = "insertUserMeta")
   void insertUserMeta(@Param("userMeta") UserPO userPO);
 
-  @InsertProvider(type = UserMetaSQLProvider.class, method = "insertUserMetaOnDuplicateKeyUpdate")
+  @InsertProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "insertUserMetaOnDuplicateKeyUpdate")
   void insertUserMetaOnDuplicateKeyUpdate(@Param("userMeta") UserPO userPO);
 
-  @UpdateProvider(type = UserMetaSQLProvider.class, method = "softDeleteUserMetaByUserId")
+  @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "softDeleteUserMetaByUserId")
   void softDeleteUserMetaByUserId(@Param("userId") Long userId);
 
-  @UpdateProvider(type = UserMetaSQLProvider.class, method = "softDeleteUserMetasByMetalakeId")
+  @UpdateProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "softDeleteUserMetasByMetalakeId")
   void softDeleteUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @UpdateProvider(type = UserMetaSQLProvider.class, method = "updateUserMeta")
+  @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "updateUserMeta")
   Integer updateUserMeta(
       @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO);
 
-  @SelectProvider(type = UserMetaSQLProvider.class, method = "listUsersByRoleId")
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "listUsersByRoleId")
   List<UserPO> listUsersByRoleId(@Param("roleId") Long roleId);
 
-  @DeleteProvider(type = UserMetaSQLProvider.class, method = "deleteUserMetasByLegacyTimeline")
+  @DeleteProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "deleteUserMetasByLegacyTimeline")
   Integer deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

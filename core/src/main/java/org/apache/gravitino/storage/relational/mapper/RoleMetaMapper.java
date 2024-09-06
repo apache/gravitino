@@ -40,38 +40,50 @@ public interface RoleMetaMapper {
   String USER_ROLE_RELATION_TABLE_NAME = "user_role_rel";
   String GROUP_ROLE_RELATION_TABLE_NAME = "group_role_rel";
 
-  @SelectProvider(type = RoleMetaSQLProvider.class, method = "selectRoleMetaByMetalakeIdAndName")
+  @SelectProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "selectRoleMetaByMetalakeIdAndName")
   RolePO selectRoleMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName);
 
-  @SelectProvider(type = RoleMetaSQLProvider.class, method = "selectRoleIdByMetalakeIdAndName")
+  @SelectProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "selectRoleIdByMetalakeIdAndName")
   Long selectRoleIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String name);
 
-  @SelectProvider(type = RoleMetaSQLProvider.class, method = "listRolesByUserId")
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listRolesByUserId")
   List<RolePO> listRolesByUserId(@Param("userId") Long userId);
 
-  @SelectProvider(type = RoleMetaSQLProvider.class, method = "listRolesByGroupId")
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listRolesByGroupId")
   List<RolePO> listRolesByGroupId(Long groupId);
 
-  @SelectProvider(type = RoleMetaSQLProvider.class, method = "listRolesByMetadataObjectIdAndType")
+  @SelectProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "listRolesByMetadataObjectIdAndType")
   List<RolePO> listRolesByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
-  @InsertProvider(type = RoleMetaSQLProvider.class, method = "insertRoleMeta")
+  @InsertProvider(type = RoleMetaSQLProviderFactory.class, method = "insertRoleMeta")
   void insertRoleMeta(@Param("roleMeta") RolePO rolePO);
 
-  @InsertProvider(type = RoleMetaSQLProvider.class, method = "insertRoleMetaOnDuplicateKeyUpdate")
+  @InsertProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "insertRoleMetaOnDuplicateKeyUpdate")
   void insertRoleMetaOnDuplicateKeyUpdate(@Param("roleMeta") RolePO rolePO);
 
-  @UpdateProvider(type = RoleMetaSQLProvider.class, method = "softDeleteRoleMetaByRoleId")
+  @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "softDeleteRoleMetaByRoleId")
   void softDeleteRoleMetaByRoleId(Long roleId);
 
-  @UpdateProvider(type = RoleMetaSQLProvider.class, method = "softDeleteRoleMetasByMetalakeId")
+  @UpdateProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "softDeleteRoleMetasByMetalakeId")
   void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @DeleteProvider(type = RoleMetaSQLProvider.class, method = "deleteRoleMetasByLegacyTimeline")
+  @DeleteProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "deleteRoleMetasByLegacyTimeline")
   Integer deleteRoleMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }
