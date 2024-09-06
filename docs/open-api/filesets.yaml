@@ -157,6 +157,46 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/location:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/fileset"
+
+    get:
+      tags:
+        - location
+      summary: Get file location
+      operationId: getFileLocation
+      description: Returns the specified file location object
+      parameters:
+        - name: sub_path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The sub path to the file or directory
+      responses:
+        "200":
+          $ref: "#/components/responses/FileLocationResponse"
+        "404":
+          description: Not Found - The target fileset does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchFilesetException:
+                  $ref: "#/components/examples/NoSuchFilesetException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
 
@@ -356,6 +396,25 @@ components:
             FilesetResponse:
               $ref: "#/components/examples/FilesetResponse"
 
+    FileLocationResponse:
+      description: The response of the file location object
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              fileLocation:
+                type: string
+                description: The actual file location
+          examples:
+            FileLocationResponse:
+              $ref: "#/components/examples/FileLocationResponse"
 
   examples:
     FilesetCreateRequest:
@@ -383,6 +442,12 @@ components:
             "key2": "value2"
           }
         }
+      }
+
+    FileLocationResponse:
+      value: {
+        "code": 0,
+        "fileLocation": "hdfs://host/user/fileset/schema/fileset1/test.parquet"
       }
 
     FilesetAlreadyExistsException:

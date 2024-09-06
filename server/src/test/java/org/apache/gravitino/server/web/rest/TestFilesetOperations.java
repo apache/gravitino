@@ -51,6 +51,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -430,6 +431,54 @@ public class TestFilesetOperations extends JerseyTest {
     ErrorResponse errorResp = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
+  public void testGetFileLocation() {
+    String actualPath = "mock location/path1";
+
+    when(dispatcher.getFileLocation(any(), any())).thenReturn(actualPath);
+    Response resp =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/location")
+            .queryParam("sub_path", RESTUtils.encodeString("test/1"))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    FileLocationResponse contextResponse = resp.readEntity(FileLocationResponse.class);
+    Assertions.assertEquals(0, contextResponse.getCode());
+
+    Assertions.assertEquals(actualPath, contextResponse.getFileLocation());
+
+    // Test throw NoSuchFilesetException
+    doThrow(new NoSuchFilesetException("no found")).when(dispatcher).getFileLocation(any(), any());
+    Response resp1 =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/location")
+            .queryParam("sub_path", RESTUtils.encodeString("test/1"))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+
+    ErrorResponse errorResp = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(NoSuchFilesetException.class.getSimpleName(), errorResp.getType());
+
+    // Test throw RuntimeException
+    doThrow(new RuntimeException("internal error")).when(dispatcher).getFileLocation(any(), any());
+    Response resp2 =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/location")
+            .queryParam("sub_path", RESTUtils.encodeString("test/1"))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
   }
 
   private void assertUpdateFileset(FilesetUpdatesRequest req, Fileset updatedFileset) {
