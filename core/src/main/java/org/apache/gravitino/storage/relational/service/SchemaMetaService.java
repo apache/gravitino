@@ -211,7 +211,8 @@ public class SchemaMetaService {
                     mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)),
             () ->
                 SessionUtils.doWithoutCommit(
-                    OwnerMetaMapper.class, mapper -> mapper.sotDeleteOwnerRelBySchemaId(schemaId)));
+                    OwnerMetaMapper.class,
+                    mapper -> mapper.softDeleteOwnerRelBySchemaId(schemaId)));
       } else {
         List<TableEntity> tableEntities =
             TableMetaService.getInstance()
