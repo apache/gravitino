@@ -60,7 +60,7 @@ jobs:
       matrix:
         # Integration test for AMD64 architecture
         architecture: [linux/amd64]
-        java-version: [ 17 ]
+        java-version: [ 8, 11, 17 ]
         backend: [ h2, mysql, postgresql ]
         test-mode: [ embedded, deploy ]
         exclude:
@@ -136,6 +136,13 @@ jobs:
         java-version: [ 17 ]
         test-mode: [ embedded, deploy ]
         backend: [ h2, mysql, postgresql ]
+        exclude:
+          - test-mode: 'embedded'
+            backend: 'mysql'
+          - test-mode: 'embedded'
+            backend: 'postgresql'
+          - test-mode: 'deploy'
+            backend: 'h2'
 
     env:
       PLATFORM: ${{ matrix.architecture }}
