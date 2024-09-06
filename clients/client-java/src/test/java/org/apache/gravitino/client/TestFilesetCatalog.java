@@ -438,6 +438,42 @@ public class TestFilesetCatalog extends TestBase {
                 NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath);
     Assertions.assertTrue(StringUtils.isNotBlank(actualFileLocation));
     Assertions.assertEquals(mockFileLocation, actualFileLocation);
+
+    // Throw schema not found exception
+    ErrorResponse errResp =
+        ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
+    buildMockResource(Method.GET, filesetPath, null, errResp, SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NoSuchSchemaException.class,
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .getFileLocation(
+                    NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath),
+        "schema not found");
+
+    ErrorResponse errResp1 =
+        ErrorResponse.notFound(NotFoundException.class.getSimpleName(), "fileset not found");
+    buildMockResource(Method.GET, filesetPath, null, errResp1, SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NotFoundException.class,
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .getFileLocation(
+                    NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath),
+        "fileset not found");
+
+    ErrorResponse errResp2 = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.GET, filesetPath, null, errResp2, SC_SERVER_ERROR);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .getFileLocation(
+                    NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath),
+        "internal error");
   }
 
   @Test
