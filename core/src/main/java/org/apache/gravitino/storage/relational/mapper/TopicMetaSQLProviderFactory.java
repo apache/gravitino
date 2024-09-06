@@ -19,11 +19,10 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
-import static org.apache.gravitino.storage.relational.mapper.TopicMetaMapper.TABLE_NAME;
-
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.mapper.postgresql.TopicMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -51,74 +50,6 @@ public class TopicMetaSQLProviderFactory {
   static class TopicMetaMySQLProvider extends TopicMetaBaseSQLProvider {}
 
   static class TopicMetaH2Provider extends TopicMetaBaseSQLProvider {}
-
-  static class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
-
-    @Override
-    public String softDeleteTopicMetasByTopicId(Long topicId) {
-      return "UPDATE "
-          + TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
-          + " WHERE topic_id = #{topicId} AND deleted_at = 0";
-    }
-
-    @Override
-    public String softDeleteTopicMetasByCatalogId(Long catalogId) {
-      return "UPDATE "
-          + TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
-          + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
-    }
-
-    @Override
-    public String softDeleteTopicMetasByMetalakeId(Long metalakeId) {
-      return "UPDATE "
-          + TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-    }
-
-    @Override
-    public String softDeleteTopicMetasBySchemaId(Long schemaId) {
-      return "UPDATE "
-          + TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
-          + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-    }
-
-    @Override
-    public String insertTopicMetaOnDuplicateKeyUpdate(TopicPO topicPO) {
-      return "INSERT INTO "
-          + TABLE_NAME
-          + "(topic_id, topic_name, metalake_id, catalog_id, schema_id,"
-          + " comment, properties, audit_info, current_version, last_version,"
-          + " deleted_at)"
-          + " VALUES("
-          + " #{topicMeta.topicId},"
-          + " #{topicMeta.topicName},"
-          + " #{topicMeta.metalakeId},"
-          + " #{topicMeta.catalogId},"
-          + " #{topicMeta.schemaId},"
-          + " #{topicMeta.comment},"
-          + " #{topicMeta.properties},"
-          + " #{topicMeta.auditInfo},"
-          + " #{topicMeta.currentVersion},"
-          + " #{topicMeta.lastVersion},"
-          + " #{topicMeta.deletedAt}"
-          + " )"
-          + " ON CONFLICT (topic_id) DO UPDATE SET"
-          + " topic_name = #{topicMeta.topicName},"
-          + " metalake_id = #{topicMeta.metalakeId},"
-          + " catalog_id = #{topicMeta.catalogId},"
-          + " schema_id = #{topicMeta.schemaId},"
-          + " comment = #{topicMeta.comment},"
-          + " properties = #{topicMeta.properties},"
-          + " audit_info = #{topicMeta.auditInfo},"
-          + " current_version = #{topicMeta.currentVersion},"
-          + " last_version = #{topicMeta.lastVersion},"
-          + " deleted_at = #{topicMeta.deletedAt}";
-    }
-  }
 
   public static String insertTopicMeta(@Param("topicMeta") TopicPO topicPO) {
     return getProvider().insertTopicMeta(topicPO);

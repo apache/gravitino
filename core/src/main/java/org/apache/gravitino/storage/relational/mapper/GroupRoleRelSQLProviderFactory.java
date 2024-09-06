@@ -18,13 +18,11 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
-import static org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper.GROUP_ROLE_RELATION_TABLE_NAME;
-import static org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper.GROUP_TABLE_NAME;
-
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.mapper.postgresql.GroupRoleRelPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -52,51 +50,6 @@ public class GroupRoleRelSQLProviderFactory {
   static class GroupRoleRelMySQLProvider extends GroupRoleRelBaseSQLProvider {}
 
   static class GroupRoleRelH2Provider extends GroupRoleRelBaseSQLProvider {}
-
-  static class GroupRoleRelPostgreSQLProvider extends GroupRoleRelBaseSQLProvider {
-
-    @Override
-    public String softDeleteGroupRoleRelByGroupId(Long groupId) {
-      return "UPDATE "
-          + GROUP_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
-          + " WHERE group_id = #{groupId} AND deleted_at = 0";
-    }
-
-    @Override
-    public String softDeleteGroupRoleRelByGroupAndRoles(Long groupId, List<Long> roleIds) {
-      return "<script>"
-          + "UPDATE "
-          + GROUP_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
-          + " WHERE group_id = #{groupId} AND role_id in ("
-          + "<foreach collection='roleIds' item='roleId' separator=','>"
-          + "#{roleId}"
-          + "</foreach>"
-          + ") "
-          + "AND deleted_at = 0"
-          + "</script>";
-    }
-
-    @Override
-    public String softDeleteGroupRoleRelByMetalakeId(Long metalakeId) {
-      return "UPDATE "
-          + GROUP_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
-          + " WHERE group_id IN (SELECT group_id FROM "
-          + GROUP_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
-          + " AND deleted_at = 0";
-    }
-
-    @Override
-    public String softDeleteGroupRoleRelByRoleId(Long roleId) {
-      return "UPDATE "
-          + GROUP_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
-          + " WHERE role_id = #{roleId} AND deleted_at = 0";
-    }
-  }
 
   public static String batchInsertGroupRoleRel(
       @Param("groupRoleRels") List<GroupRoleRelPO> groupRoleRelPOS) {

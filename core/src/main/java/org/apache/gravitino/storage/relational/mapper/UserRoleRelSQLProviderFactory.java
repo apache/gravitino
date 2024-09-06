@@ -19,13 +19,11 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
-import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_ROLE_RELATION_TABLE_NAME;
-import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
-
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.mapper.postgresql.UserRoleRelPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -53,78 +51,6 @@ public class UserRoleRelSQLProviderFactory {
   static class UserRoleRelMySQLProvider extends UserRoleRelBaseSQLProvider {}
 
   static class UserRoleRelH2Provider extends UserRoleRelBaseSQLProvider {}
-
-  static class UserRoleRelPostgreSQLProvider extends UserRoleRelBaseSQLProvider {
-
-    @Override
-    public String softDeleteUserRoleRelByUserId(Long userId) {
-      return "UPDATE "
-          + USER_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
-          + " WHERE user_id = #{userId} AND deleted_at = 0";
-    }
-
-    @Override
-    public String softDeleteUserRoleRelByUserAndRoles(Long userId, List<Long> roleIds) {
-      return "<script>"
-          + "UPDATE "
-          + USER_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
-          + " WHERE user_id = #{userId} AND role_id in ("
-          + "<foreach collection='roleIds' item='roleId' separator=','>"
-          + "#{roleId}"
-          + "</foreach>"
-          + ") "
-          + "AND deleted_at = 0"
-          + "</script>";
-    }
-
-    @Override
-    public String softDeleteUserRoleRelByMetalakeId(Long metalakeId) {
-      return "UPDATE "
-          + USER_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
-          + " WHERE user_id IN (SELECT user_id FROM "
-          + USER_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
-          + " AND deleted_at = 0";
-    }
-
-    @Override
-    public String softDeleteUserRoleRelByRoleId(Long roleId) {
-      return "UPDATE "
-          + USER_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
-          + " WHERE role_id = #{roleId} AND deleted_at = 0";
-    }
-
-    @Override
-    public String batchInsertUserRoleRelOnDuplicateKeyUpdate(List<UserRoleRelPO> userRoleRelPOs) {
-      return "<script>"
-          + "INSERT INTO "
-          + USER_ROLE_RELATION_TABLE_NAME
-          + "(user_id, role_id,"
-          + " audit_info,"
-          + " current_version, last_version, deleted_at)"
-          + " VALUES "
-          + "<foreach collection='userRoleRels' item='item' separator=','>"
-          + "(#{item.userId},"
-          + " #{item.roleId},"
-          + " #{item.auditInfo},"
-          + " #{item.currentVersion},"
-          + " #{item.lastVersion},"
-          + " #{item.deletedAt})"
-          + "</foreach>"
-          + " ON CONFLICT (user_id, role_id, deleted_at) DO UPDATE SET"
-          + " user_id = VALUES(user_id),"
-          + " role_id = VALUES(role_id),"
-          + " audit_info = VALUES(audit_info),"
-          + " current_version = VALUES(current_version),"
-          + " last_version = VALUES(last_version),"
-          + " deleted_at = VALUES(deleted_at)"
-          + "</script>";
-    }
-  }
 
   public static String batchInsertUserRoleRel(
       @Param("userRoleRels") List<UserRoleRelPO> userRoleRelPOs) {

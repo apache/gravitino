@@ -19,11 +19,10 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
-import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
-
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.mapper.postgresql.UserMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -51,50 +50,6 @@ public class UserMetaSQLProviderFactory {
   static class UserMetaMySQLProvider extends UserMetaBaseSQLProvider {}
 
   static class UserMetaH2Provider extends UserMetaBaseSQLProvider {}
-
-  static class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
-
-    @Override
-    public String softDeleteUserMetaByUserId(Long userId) {
-      return "UPDATE "
-          + USER_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
-          + " WHERE user_id = #{userId} AND deleted_at = 0";
-    }
-
-    @Override
-    public String softDeleteUserMetasByMetalakeId(Long metalakeId) {
-      return "UPDATE "
-          + USER_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-    }
-
-    @Override
-    public String insertUserMetaOnDuplicateKeyUpdate(UserPO userPO) {
-      return "INSERT INTO "
-          + USER_TABLE_NAME
-          + "(user_id, user_name,"
-          + "metalake_id, audit_info,"
-          + " current_version, last_version, deleted_at)"
-          + " VALUES("
-          + " #{userMeta.userId},"
-          + " #{userMeta.userName},"
-          + " #{userMeta.metalakeId},"
-          + " #{userMeta.auditInfo},"
-          + " #{userMeta.currentVersion},"
-          + " #{userMeta.lastVersion},"
-          + " #{userMeta.deletedAt}"
-          + " )"
-          + " ON CONFLICT(user_id) DO UPDATE SET"
-          + " user_name = #{userMeta.userName},"
-          + " metalake_id = #{userMeta.metalakeId},"
-          + " audit_info = #{userMeta.auditInfo},"
-          + " current_version = #{userMeta.currentVersion},"
-          + " last_version = #{userMeta.lastVersion},"
-          + " deleted_at = #{userMeta.deletedAt}";
-    }
-  }
 
   public static String selectUserIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String userName) {

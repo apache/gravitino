@@ -18,13 +18,11 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
-import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.ROLE_TABLE_NAME;
-import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME;
-
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.mapper.postgresql.SecurableObjectPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -52,28 +50,6 @@ public class SecurableObjectSQLProviderFactory {
   static class SecurableObjectMySQLProvider extends SecurableObjectBaseSQLProvider {}
 
   static class SecurableObjectH2Provider extends SecurableObjectBaseSQLProvider {}
-
-  static class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLProvider {
-
-    @Override
-    public String softDeleteSecurableObjectsByRoleId(Long roleId) {
-      return "UPDATE "
-          + SECURABLE_OBJECT_TABLE_NAME
-          + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
-          + " WHERE role_id = #{roleId} AND deleted_at = 0";
-    }
-
-    @Override
-    public String softDeleteRoleMetasByMetalakeId(Long metalakeId) {
-      return "UPDATE "
-          + SECURABLE_OBJECT_TABLE_NAME
-          + " ob SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
-          + " WHERE exists (SELECT * from "
-          + ROLE_TABLE_NAME
-          + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
-          + " AND ro.deleted_at = 0) AND ob.deleted_at = 0";
-    }
-  }
 
   public static String batchInsertSecurableObjects(
       @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
