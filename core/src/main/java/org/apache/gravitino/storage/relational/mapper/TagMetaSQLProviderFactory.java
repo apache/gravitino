@@ -101,6 +101,29 @@ public class TagMetaSQLProviderFactory {
           + " last_version = #{tagMeta.lastVersion},"
           + " deleted_at = #{tagMeta.deletedAt}";
     }
+
+    public String updateTagMeta(
+        @Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO) {
+      return "UPDATE "
+          + TAG_TABLE_NAME
+          + " SET tag_name = #{newTagMeta.tagName},"
+          + " tag_comment = #{newTagMeta.comment},"
+          + " properties = #{newTagMeta.properties},"
+          + " audit_info = #{newTagMeta.auditInfo},"
+          + " current_version = #{newTagMeta.currentVersion},"
+          + " last_version = #{newTagMeta.lastVersion},"
+          + " deleted_at = #{newTagMeta.deletedAt}"
+          + " WHERE tag_id = #{oldTagMeta.tagId}"
+          + " AND metalake_id = #{oldTagMeta.metalakeId}"
+          + " AND tag_name = #{oldTagMeta.tagName}"
+          + " AND (tag_comment = #{oldTagMeta.comment} "
+          + "   OR (CAST(tag_comment AS VARCHAR) IS NULL AND CAST(#{oldTagMeta.comment} AS VARCHAR) IS NULL))"
+          + " AND properties = #{oldTagMeta.properties}"
+          + " AND audit_info = #{oldTagMeta.auditInfo}"
+          + " AND current_version = #{oldTagMeta.currentVersion}"
+          + " AND last_version = #{oldTagMeta.lastVersion}"
+          + " AND deleted_at = 0";
+    }
   }
 
   public static String listTagPOsByMetalake(@Param("metalakeName") String metalakeName) {

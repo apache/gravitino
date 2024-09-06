@@ -102,6 +102,36 @@ public class CatalogMetaSQLProviderFactory {
           + " last_version = #{catalogMeta.lastVersion},"
           + " deleted_at = #{catalogMeta.deletedAt}";
     }
+
+    public String updateCatalogMeta(
+        @Param("newCatalogMeta") CatalogPO newCatalogPO,
+        @Param("oldCatalogMeta") CatalogPO oldCatalogPO) {
+      return "UPDATE "
+          + TABLE_NAME
+          + " SET catalog_name = #{newCatalogMeta.catalogName},"
+          + " metalake_id = #{newCatalogMeta.metalakeId},"
+          + " type = #{newCatalogMeta.type},"
+          + " provider = #{newCatalogMeta.provider},"
+          + " catalog_comment = #{newCatalogMeta.catalogComment},"
+          + " properties = #{newCatalogMeta.properties},"
+          + " audit_info = #{newCatalogMeta.auditInfo},"
+          + " current_version = #{newCatalogMeta.currentVersion},"
+          + " last_version = #{newCatalogMeta.lastVersion},"
+          + " deleted_at = #{newCatalogMeta.deletedAt}"
+          + " WHERE catalog_id = #{oldCatalogMeta.catalogId}"
+          + " AND catalog_name = #{oldCatalogMeta.catalogName}"
+          + " AND metalake_id = #{oldCatalogMeta.metalakeId}"
+          + " AND type = #{oldCatalogMeta.type}"
+          + " AND provider = #{oldCatalogMeta.provider}"
+          + " AND (catalog_comment = #{oldCatalogMeta.catalogComment} "
+          + "   OR (CAST(catalog_comment AS VARCHAR) IS NULL AND "
+          + "   CAST(#{oldCatalogMeta.catalogComment} AS VARCHAR) IS NULL))"
+          + " AND properties = #{oldCatalogMeta.properties}"
+          + " AND audit_info = #{oldCatalogMeta.auditInfo}"
+          + " AND current_version = #{oldCatalogMeta.currentVersion}"
+          + " AND last_version = #{oldCatalogMeta.lastVersion}"
+          + " AND deleted_at = 0";
+    }
   }
 
   public static String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {

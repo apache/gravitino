@@ -38,7 +38,8 @@ public class PostgreSQLExceptionConverter implements SQLExceptionConverter {
     int errorCode = Integer.valueOf(sqlException.getSQLState());
     switch (errorCode) {
       case DUPLICATED_ENTRY_ERROR_CODE:
-        throw new EntityAlreadyExistsException(sqlException, sqlException.getMessage());
+        throw new EntityAlreadyExistsException(
+            sqlException, "The %s entity: %s already exists.", type.name(), name);
       default:
         throw new IOException(sqlException);
     }
