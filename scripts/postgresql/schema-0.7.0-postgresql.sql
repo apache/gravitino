@@ -17,6 +17,14 @@
 -- under the License.
 --
 
+-- Note: Database and schema creation is not included in this script. Please create the database and
+-- schema before running this script. for example in psql:
+-- CREATE DATABASE example_db;
+-- \c example_db
+-- CREATE SCHEMA example_schema;
+-- set search_path to example_schema;
+
+
 CREATE TABLE IF NOT EXISTS metalake_meta (
     metalake_id BIGINT NOT NULL,
     metalake_name VARCHAR(128) NOT NULL,
