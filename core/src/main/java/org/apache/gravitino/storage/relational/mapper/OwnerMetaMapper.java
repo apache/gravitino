@@ -21,11 +21,10 @@ package org.apache.gravitino.storage.relational.mapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
  * A MyBatis Mapper for owner meta operation SQLs.
@@ -39,158 +38,52 @@ public interface OwnerMetaMapper {
 
   String OWNER_TABLE_NAME = "owner_meta";
 
-  @Select(
-      "SELECT ut.user_id as userId,"
-          + " ut.user_name as userName,"
-          + " ut.metalake_id as metalakeId,"
-          + " ut.audit_info as auditInfo,"
-          + " ut.current_version as currentVersion,"
-          + " ut.last_version as lastVersion,"
-          + " ut.deleted_at as deletedAt"
-          + " FROM "
-          + OWNER_TABLE_NAME
-          + " ot JOIN "
-          + UserMetaMapper.USER_TABLE_NAME
-          + " ut ON ut.user_id = ot.owner_id"
-          + " WHERE ot.metadata_object_id = #{metadataObjectId} AND"
-          + " ot.metadata_object_type = #{metadataObjectType} AND"
-          + " ot.owner_type = 'USER' AND"
-          + " ot.deleted_at = 0 AND ut.deleted_at = 0")
+  @SelectProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "selectUserOwnerMetaByMetadataObjectIdAndType")
   UserPO selectUserOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
-  @Select(
-      "SELECT gt.group_id as groupId,"
-          + " gt.group_name as groupName,"
-          + " gt.metalake_id as metalakeId,"
-          + " gt.audit_info as auditInfo,"
-          + " gt.current_version as currentVersion,"
-          + " gt.last_version as lastVersion,"
-          + " gt.deleted_at as deletedAt"
-          + " FROM "
-          + OWNER_TABLE_NAME
-          + " ot JOIN "
-          + GroupMetaMapper.GROUP_TABLE_NAME
-          + " gt ON gt.group_id = ot.owner_id"
-          + " WHERE ot.metadata_object_id = #{metadataObjectId} AND"
-          + " ot.metadata_object_type = #{metadataObjectType} AND"
-          + " ot.owner_type = 'GROUP' AND"
-          + " ot.deleted_at = 0 AND gt.deleted_at = 0")
+  @SelectProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "selectGroupOwnerMetaByMetadataObjectIdAndType")
   GroupPO selectGroupOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
-  @Insert(
-      "INSERT INTO "
-          + OWNER_TABLE_NAME
-          + "(metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
-          + " audit_info, current_version, last_version, deleted_at)"
-          + " VALUES ("
-          + " #{ownerRelPO.metalakeId},"
-          + " #{ownerRelPO.metadataObjectId},"
-          + " #{ownerRelPO.metadataObjectType},"
-          + " #{ownerRelPO.ownerId},"
-          + " #{ownerRelPO.ownerType},"
-          + " #{ownerRelPO.auditInfo},"
-          + " #{ownerRelPO.currentVersion},"
-          + " #{ownerRelPO.lastVersion},"
-          + " #{ownerRelPO.deletedAt}"
-          + ")")
+  @InsertProvider(type = OwnerMetaSQLProviderFactory.class, method = "insertOwnerRel")
   void insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO);
 
-  @Update(
-      "UPDATE "
-          + OWNER_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE metadata_object_id = #{metadataObjectId} AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0")
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelByMetadataObjectIdAndType")
   void softDeleteOwnerRelByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
-  @Update(
-      "UPDATE "
-          + OWNER_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE owner_id = #{ownerId} AND owner_type = #{ownerType} AND deleted_at = 0")
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelByOwnerIdAndType")
   void softDeleteOwnerRelByOwnerIdAndType(
       @Param("ownerId") Long ownerId, @Param("ownerType") String ownerType);
 
-  @Update(
-      "UPDATE  "
-          + OWNER_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at =0")
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelByMetalakeId")
   void softDeleteOwnerRelByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @Update(
-      "UPDATE  "
-          + OWNER_TABLE_NAME
-          + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE EXISTS ("
-          + " SELECT ct.catalog_id FROM "
-          + CatalogMetaMapper.TABLE_NAME
-          + " ct WHERE ct.catalog_id = #{catalogId}  AND ct.deleted_at = 0 AND ot.deleted_at = 0 AND "
-          + "ct.catalog_id = ot.metadata_object_id AND ot.metadata_object_type = 'CATALOG'"
-          + " UNION "
-          + " SELECT st.catalog_id FROM "
-          + SchemaMetaMapper.TABLE_NAME
-          + " st WHERE st.catalog_id = #{catalogId} AND st.deleted_at = 0 AND ot.deleted_at = 0 AND "
-          + "st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
-          + " UNION "
-          + " SELECT tt.catalog_id FROM "
-          + TopicMetaMapper.TABLE_NAME
-          + " tt WHERE tt.catalog_id = #{catalogId} AND tt.deleted_at = 0 AND ot.deleted_at = 0 AND "
-          + "tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
-          + " UNION "
-          + " SELECT tat.catalog_id FROM "
-          + TableMetaMapper.TABLE_NAME
-          + " tat WHERE tat.catalog_id = #{catalogId} AND tat.deleted_at = 0 AND ot.deleted_at = 0 AND "
-          + "tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
-          + " UNION "
-          + " SELECT ft.catalog_id FROM "
-          + FilesetMetaMapper.META_TABLE_NAME
-          + " ft WHERE ft.catalog_id = #{catalogId} AND ft.deleted_at = 0 AND ot.deleted_at = 0 AND"
-          + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
-          + ")")
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelByCatalogId")
   void softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId);
 
-  @Update(
-      "UPDATE  "
-          + OWNER_TABLE_NAME
-          + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE EXISTS ("
-          + " SELECT st.schema_id FROM "
-          + SchemaMetaMapper.TABLE_NAME
-          + " st WHERE st.schema_id = #{schemaId} AND st.deleted_at = 0 AND ot.deleted_at = 0 "
-          + "AND st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
-          + " UNION "
-          + " SELECT tt.schema_id FROM "
-          + TopicMetaMapper.TABLE_NAME
-          + " tt WHERE tt.schema_id = #{schemaId} AND tt.deleted_at = 0 AND ot.deleted_at = 0 AND "
-          + "tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
-          + " UNION "
-          + " SELECT tat.schema_id FROM "
-          + TableMetaMapper.TABLE_NAME
-          + " tat WHERE tat.schema_id = #{schemaId} AND tat.deleted_at = 0 AND ot.deleted_at = 0 AND "
-          + "tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
-          + " UNION "
-          + " SELECT ft.schema_id FROM "
-          + FilesetMetaMapper.META_TABLE_NAME
-          + " ft WHERE ft.schema_id = #{schemaId} AND ft.deleted_at = 0 AND ot.deleted_at = 0 AND "
-          + "ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
-          + ")")
-  void sotDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId);
+  @UpdateProvider(type = OwnerMetaSQLProviderFactory.class, method = "softDeleteOwnerRelBySchemaId")
+  void softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId);
 
-  @Delete(
-      "DELETE FROM "
-          + OWNER_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "deleteOwnerMetasByLegacyTimeline")
   Integer deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }
