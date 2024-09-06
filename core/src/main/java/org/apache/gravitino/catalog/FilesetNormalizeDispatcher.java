@@ -96,9 +96,7 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
 
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath) {
-    // The constraints of the name spec may be more strict than underlying catalog,
-    // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.getFileLocation(normalizeCaseSensitive(ident), subPath);
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {

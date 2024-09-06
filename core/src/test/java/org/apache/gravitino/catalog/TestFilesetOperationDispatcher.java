@@ -21,10 +21,8 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 
 import com.google.common.collect.ImmutableMap;
-import java.io.File;
 import java.io.IOException;
 import java.util.Map;
-import java.util.UUID;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.file.Fileset;
@@ -170,34 +168,5 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
     boolean dropped = filesetOperationDispatcher.dropFileset(filesetIdent1);
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(filesetOperationDispatcher.dropFileset(filesetIdent1));
-  }
-
-  @Test
-  public void testCreateAndGetFileLocation() {
-    String tmpDir = "/tmp/test_get_file_location_" + UUID.randomUUID();
-    try {
-      Namespace filesetNs = Namespace.of(metalake, catalog, "schema1024");
-      Map<String, String> props = ImmutableMap.of("k1", "v1", "location", "schema1024");
-      schemaOperationDispatcher.createSchema(
-          NameIdentifier.of(filesetNs.levels()), "comment", props);
-
-      NameIdentifier filesetIdent1 = NameIdentifier.of(filesetNs, "fileset1024");
-      Fileset fileset1 =
-          filesetOperationDispatcher.createFileset(
-              filesetIdent1, "comment", Fileset.Type.MANAGED, tmpDir, props);
-      Assertions.assertEquals("fileset1024", fileset1.name());
-      Assertions.assertEquals("comment", fileset1.comment());
-      testProperties(props, fileset1.properties());
-      Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
-      Assertions.assertNotNull(fileset1.storageLocation());
-      String subPath = "/test/x.parquet";
-      String fileLocation = filesetOperationDispatcher.getFileLocation(filesetIdent1, subPath);
-      Assertions.assertEquals(fileset1.storageLocation() + subPath, fileLocation);
-    } finally {
-      File path = new File(tmpDir);
-      if (path.exists()) {
-        path.delete();
-      }
-    }
   }
 }

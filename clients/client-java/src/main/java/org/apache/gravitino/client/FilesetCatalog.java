@@ -20,9 +20,9 @@ package org.apache.gravitino.client;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -245,12 +245,13 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
 
     CallerContext callerContext = CallerContext.CallerContextHolder.get();
-    Map<String, String> queryParams = Maps.newHashMap();
-    queryParams.put("subPath", subPath);
+
+    Map<String, String> params = new HashMap<>();
+    params.put("subPath", RESTUtils.encodeString(subPath));
     FileLocationResponse resp =
         restClient.get(
-            formatFilesetRequestPath(fullNamespace) + "/" + ident.name() + "/" + "fileLocation",
-            queryParams,
+            formatFileLocationRequestPath(fullNamespace, ident.name()),
+            params,
             FileLocationResponse.class,
             callerContext != null ? callerContext.context() : Collections.emptyMap(),
             ErrorHandlers.filesetErrorHandler());
@@ -267,6 +268,19 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
         .append("/")
         .append(RESTUtils.encodeString(ns.level(2)))
         .append("/filesets")
+        .toString();
+  }
+
+  @VisibleForTesting
+  static String formatFileLocationRequestPath(Namespace ns, String name) {
+    Namespace schemaNs = Namespace.of(ns.level(0), ns.level(1));
+    return new StringBuilder()
+        .append(formatSchemaRequestPath(schemaNs))
+        .append("/")
+        .append(RESTUtils.encodeString(ns.level(2)))
+        .append("/filesets/")
+        .append(RESTUtils.encodeString(name))
+        .append("/fileLocation")
         .toString();
   }
 
