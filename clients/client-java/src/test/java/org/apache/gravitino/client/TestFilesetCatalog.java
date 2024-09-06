@@ -424,7 +424,7 @@ public class TestFilesetCatalog extends TestBase {
             FilesetCatalog.formatFileLocationRequestPath(
                 Namespace.of(metalakeName, catalogName, "schema1"), fileset.name()));
     Map<String, String> queryParams = new HashMap<>();
-    queryParams.put("subPath", RESTUtils.encodeString(mockSubPath));
+    queryParams.put("sub_path", RESTUtils.encodeString(mockSubPath));
 
     String mockFileLocation =
         String.format("file:/fileset/%s/%s/%s/%s", catalogName, "schema1", "fileset1", mockSubPath);
@@ -449,7 +449,7 @@ public class TestFilesetCatalog extends TestBase {
             FilesetCatalog.formatFileLocationRequestPath(
                 Namespace.of(metalakeName, catalogName, "schema1"), fileset.name()));
     Map<String, String> queryParams = new HashMap<>();
-    queryParams.put("subPath", RESTUtils.encodeString(mockSubPath));
+    queryParams.put("sub_path", RESTUtils.encodeString(mockSubPath));
     String mockFileLocation =
         String.format("file:/fileset/%s/%s/%s/%s", catalogName, "schema1", "fileset1", mockSubPath);
     FileLocationResponse resp = new FileLocationResponse(mockFileLocation);

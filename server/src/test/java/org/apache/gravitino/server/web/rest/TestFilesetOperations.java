@@ -439,8 +439,8 @@ public class TestFilesetOperations extends JerseyTest {
 
     when(dispatcher.getFileLocation(any(), any())).thenReturn(actualPath);
     Response resp =
-        target(filesetPath(metalake, catalog, schema) + "fileset1/fileLocation")
-            .queryParam("subPath", RESTUtils.encodeString("test/1"))
+        target(filesetPath(metalake, catalog, schema) + "fileset1/location")
+            .queryParam("sub_path", RESTUtils.encodeString("test/1"))
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();

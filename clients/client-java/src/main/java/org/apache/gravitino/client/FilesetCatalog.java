@@ -247,7 +247,7 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
     CallerContext callerContext = CallerContext.CallerContextHolder.get();
 
     Map<String, String> params = new HashMap<>();
-    params.put("subPath", RESTUtils.encodeString(subPath));
+    params.put("sub_path", RESTUtils.encodeString(subPath));
     FileLocationResponse resp =
         restClient.get(
             formatFileLocationRequestPath(fullNamespace, ident.name()),
@@ -280,7 +280,7 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
         .append(RESTUtils.encodeString(ns.level(2)))
         .append("/filesets/")
         .append(RESTUtils.encodeString(name))
-        .append("/fileLocation")
+        .append("/location")
         .toString();
   }
 

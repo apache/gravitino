@@ -157,7 +157,7 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/fileLocation:
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/location:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
       - $ref: "./openapi.yaml#/components/parameters/catalog"
@@ -166,12 +166,12 @@ paths:
 
     get:
       tags:
-        - fileLocation
+        - location
       summary: Get file location
       operationId: getFileLocation
       description: Returns the specified file location object
       parameters:
-        - name: subPath
+        - name: sub_path
           in: query
           required: true
           schema:
