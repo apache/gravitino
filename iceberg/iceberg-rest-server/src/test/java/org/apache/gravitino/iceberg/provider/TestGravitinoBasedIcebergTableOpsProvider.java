@@ -19,7 +19,6 @@
 package org.apache.gravitino.iceberg.provider;
 
 import java.util.HashMap;
-import java.util.UUID;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -32,9 +31,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class TestGravitinoBasedIcebergTableOpsProvider {
-  private static final String STORE_PATH =
-      "/tmp/gravitino_test_iceberg_jdbc_backend_" + UUID.randomUUID().toString().replace("-", "");
-
   @Test
   public void testValidIcebergTableOps() {
     String hiveCatalogName = "hive_backend";
@@ -65,13 +61,11 @@ public class TestGravitinoBasedIcebergTableOpsProvider {
             new HashMap<String, String>() {
               {
                 put(IcebergConstants.CATALOG_BACKEND, "jdbc");
-                put(
-                    IcebergConstants.URI,
-                    String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", STORE_PATH));
+                put(IcebergConstants.URI, "jdbc:sqlite::memory:");
                 put(IcebergConstants.WAREHOUSE, "/tmp/user/hive/warehouse-jdbc");
                 put(IcebergConstants.GRAVITINO_JDBC_USER, "gravitino");
                 put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, "gravitino");
-                put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.h2.Driver");
+                put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
                 put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
                 put(IcebergConstants.CATALOG_BACKEND_NAME, jdbcCatalogName);
               }

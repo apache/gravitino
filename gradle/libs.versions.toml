@@ -138,6 +138,7 @@ hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = 
 hive2-jdbc = { group = "org.apache.hive", name = "hive-jdbc", version.ref = "hive2"}
 hadoop2-auth = { group = "org.apache.hadoop", name = "hadoop-auth", version.ref = "hadoop2" }
 hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
+hadoop2-hdfs-client = { group = "org.apache.hadoop", name = "hadoop-hdfs-client", version.ref = "hadoop2" }
 hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
 hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop3" }

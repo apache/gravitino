@@ -26,11 +26,17 @@ plugins {
 
 dependencies {
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":core"))
-  implementation(project(":common"))
+  implementation(project(":core")) {
+    exclude("*")
+  }
+  implementation(project(":common")) {
+    exclude("*")
+  }
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.log4j)
+  implementation(libs.bundles.kerby)
   implementation(libs.caffeine)
+  implementation(libs.cglib)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.iceberg.aliyun)
@@ -41,17 +47,22 @@ dependencies {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
     exclude("javax.servlet")
+    exclude("org.apache.curator")
+    exclude("org.apache.zookeeper")
     exclude("org.mortbay.jetty")
   }
+  // use hdfs-default.xml
   implementation(libs.hadoop2.hdfs) {
+    exclude("*")
+  }
+  implementation(libs.hadoop2.hdfs.client) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
+    exclude("org.fusesource.leveldbjni")
     exclude("org.mortbay.jetty")
   }
   implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
-    exclude("org.mortbay.jetty")
+    exclude("*")
   }
   implementation(libs.hive2.metastore) {
     exclude("co.cask.tephra")
@@ -60,10 +71,17 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("com.tdunning", "json")
     exclude("com.zaxxer", "HikariCP")
+    exclude("com.github.joshelser")
+    exclude("io.dropwizard.metrics")
     exclude("javax.servlet")
     exclude("javax.transaction", "transaction-api")
+    exclude("org.apache.ant")
     exclude("org.apache.avro", "avro")
+    exclude("org.apache.curator")
+    exclude("org.apache.derby")
     exclude("org.apache.hbase")
+    exclude("org.apache.hive", "hive-service-rpc")
+    exclude("org.apache.hadoop")
     exclude("org.apache.hadoop", "hadoop-yarn-api")
     exclude("org.apache.hadoop", "hadoop-yarn-server-applicationhistoryservice")
     exclude("org.apache.hadoop", "hadoop-yarn-server-common")
@@ -71,7 +89,9 @@ dependencies {
     exclude("org.apache.hadoop", "hadoop-yarn-server-web-proxy")
     exclude("org.apache.logging.log4j")
     exclude("org.apache.parquet", "parquet-hadoop-bundle")
+    exclude("org.apache.orc")
     exclude("org.apache.zookeeper")
+    exclude("org.datanucleus")
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("org.mortbay.jetty")
