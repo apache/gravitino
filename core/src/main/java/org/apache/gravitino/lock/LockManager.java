@@ -91,6 +91,9 @@ public class LockManager {
 
     long cleanIntervalInSecs = config.get(TREE_LOCK_CLEAN_INTERVAL);
     if (cleanIntervalInSecs <= 0) {
+      LOG.info(
+          "The interval in seconds to clean up the stale tree lock nodes is set to '{}'",
+          cleanIntervalInSecs);
       throw new IllegalArgumentException(
           String.format(
               "The interval in seconds to clean up the stale tree lock nodes '%d' should be greater than 0",
