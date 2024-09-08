@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -83,6 +84,11 @@ public class AccessControlManager implements AccessControlDispatcher {
   public Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
     return userGroupManager.getGroup(metalake, group);
+  }
+
+  @Override
+  public Group[] listGroup(Namespace namespace) {
+    return userGroupManager.listGroups(namespace);
   }
 
   @Override

@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Arrays;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -31,9 +32,13 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.dto.authorization.GroupDTO;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
+import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -132,6 +137,38 @@ public class GroupOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(OperationType.REMOVE, group, metalake, e);
+    }
+  }
+
+  @GET
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-group", absolute = true)
+  public Response listGroups(@PathParam("metalake") String metalake) {
+    LOG.info("Received list groups request.");
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            Namespace groupNS = AuthorizationUtils.ofGroupNamespace(metalake);
+            Group[] groups =
+                TreeLockUtils.doWithTreeLock(
+                    NameIdentifier.of(metalake),
+                    LockType.READ,
+                    () -> accessControlManager.listGroup(groupNS));
+            GroupDTO[] groupDTOS;
+            if (groups == null) {
+              groupDTOS = new GroupDTO[0];
+            } else {
+              groupDTOS = Arrays.stream(groups).map(DTOConverters::toDTO).toArray(GroupDTO[]::new);
+            }
+            LOG.info("List {} groups in Gravitino", groupDTOS.length);
+            return Utils.ok(new GroupListResponse(groupDTOS));
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleGroupException(
+          OperationType.LIST, Namespace.empty().toString(), metalake, e);
     }
   }
 }

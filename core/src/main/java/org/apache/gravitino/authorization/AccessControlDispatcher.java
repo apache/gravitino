@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -108,6 +109,13 @@ public interface AccessControlDispatcher {
    */
   Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException;
+
+  /**
+   * List groups
+   *
+   * @return The list of groups
+   */
+  Group[] listGroup(Namespace namespace);
 
   /**
    * Grant roles to a user.

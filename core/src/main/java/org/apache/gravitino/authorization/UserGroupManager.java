@@ -23,11 +23,15 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -46,6 +50,7 @@ import org.slf4j.LoggerFactory;
 class UserGroupManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserGroupManager.class);
+  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
@@ -162,6 +167,28 @@ class UserGroupManager {
       throw new NoSuchGroupException(AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     } catch (IOException ioe) {
       LOG.error("Getting group {} failed due to storage issues", group, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  private void checkMetalakeExists(NameIdentifier ident) throws NoSuchMetalakeException {
+    try {
+      if (!store.exists(ident, EntityType.METALAKE)) {
+        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to do storage operation", e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  Group[] listGroups(Namespace namespace) {
+    NameIdentifier groupIdent = NameIdentifier.of(namespace.levels());
+    checkMetalakeExists(groupIdent);
+    try {
+      return store.list(namespace, GroupEntity.class, EntityType.GROUP).toArray(new Group[0]);
+    } catch (Exception ioe) {
+      LOG.error("Listing Groups failed due to storage issues.", ioe);
       throw new RuntimeException(ioe);
     }
   }
