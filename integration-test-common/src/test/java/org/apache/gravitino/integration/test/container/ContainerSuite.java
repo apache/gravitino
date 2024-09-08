@@ -123,7 +123,7 @@ public class ContainerSuite implements Closeable {
                   .withHostName("gravitino-ci-hive")
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "anonymous")
+                          .put("HADOOP_USER_NAME", "gravitino")
                           .build())
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
@@ -207,7 +207,7 @@ public class ContainerSuite implements Closeable {
               TrinoContainer.builder()
                   .withEnvVars(
                       ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "anonymous")
+                          .put("HADOOP_USER_NAME", "gravitino")
                           .put("GRAVITINO_HOST_IP", "host.docker.internal")
                           .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
                           .put("GRAVITINO_METALAKE_NAME", metalakeName)
