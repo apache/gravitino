@@ -59,7 +59,7 @@ public class TestHiveTableOperations extends MiniHiveMetastoreService {
   public static void setup() {
     hiveCatalog = initHiveCatalog();
     hiveCatalogOperations = (HiveCatalogOperations) hiveCatalog.ops();
-    initHiveSchema(hiveCatalog);
+    initHiveSchema(hiveCatalogOperations);
     hiveTable = createPartitionedTable();
 
     // add partition: city=0/dt=2020-01-01

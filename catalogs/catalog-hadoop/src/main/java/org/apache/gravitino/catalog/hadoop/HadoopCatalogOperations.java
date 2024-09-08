@@ -355,6 +355,12 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @Override
+  public String getFileLocation(NameIdentifier ident, String subPath)
+      throws NoSuchFilesetException {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     try {
       List<SchemaEntity> schemas =

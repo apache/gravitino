@@ -94,6 +94,11 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
     return dispatcher.dropFileset(normalizeCaseSensitive(ident));
   }
 
+  @Override
+  public String getFileLocation(NameIdentifier ident, String subPath) {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
     Capability capabilities = getCapability(ident, catalogManager);
     return applyCapabilities(ident, Capability.Scope.FILESET, capabilities);
