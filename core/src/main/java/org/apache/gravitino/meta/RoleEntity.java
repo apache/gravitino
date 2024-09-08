@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
@@ -46,15 +47,18 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the role entity.");
 
-  public static final Field SECURABLE_OBJECT =
-      Field.required("securable_objects", List.class, "The securable objects of the role entity.");
+  public static final Field SECURABLE_OBJECTS_SUPPLIER =
+      Field.required(
+          "securable_objects_supplier",
+          Supplier.class,
+          "The securable objects supplier of the role entity.");
 
   private Long id;
   private String name;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
   private Namespace namespace;
-  private List<SecurableObject> securableObjects;
+  private Supplier<List<SecurableObject>> securableObjectsSupplier = () -> null;
 
   /**
    * The name of the role.
@@ -91,16 +95,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
    */
   @Override
   public List<SecurableObject> securableObjects() {
-    // The securable object is a special kind of entities. Some entity types aren't the securable
-    // object, such as
-    // User, Role, etc.
-    // The securable object identifier must be unique.
-    // Gravitino assumes that the identifiers of the entities may be the same if they have different
-    // types.
-    // So one type of them can't be the securable object at least if there are the two same
-    // identifier
-    // entities .
-    return securableObjects;
+    return securableObjectsSupplier.get();
   }
 
   /**
@@ -115,7 +110,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
-    fields.put(SECURABLE_OBJECT, securableObjects);
+    fields.put(SECURABLE_OBJECTS_SUPPLIER, securableObjectsSupplier);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -151,12 +146,12 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(properties, that.properties)
-        && Objects.equals(securableObjects, that.securableObjects);
+        && Objects.equals(securableObjects(), that.securableObjects());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, properties, auditInfo, securableObjects, namespace);
+    return Objects.hash(id, name, properties, auditInfo, securableObjects(), namespace);
   }
 
   /**
@@ -231,7 +226,19 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withSecurableObjects(List<SecurableObject> securableObjects) {
-      roleEntity.securableObjects = ImmutableList.copyOf(securableObjects);
+      roleEntity.securableObjectsSupplier = () -> ImmutableList.copyOf(securableObjects);
+      return this;
+    }
+
+    /**
+     * Sets the securable objects supplier of the role entity.
+     *
+     * @param securableObjectsSupplier The securable objects supplier of the role entity.
+     * @return The builder instance.
+     */
+    public Builder withSecurableObjectsSupplier(
+        Supplier<List<SecurableObject>> securableObjectsSupplier) {
+      roleEntity.securableObjectsSupplier = securableObjectsSupplier;
       return this;
     }
 

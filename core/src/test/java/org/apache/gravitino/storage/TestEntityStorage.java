@@ -46,6 +46,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
@@ -1234,7 +1235,7 @@ public class TestEntityStorage {
         .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoleNames(null)
+        .withRoles(Collections.emptyList())
         .build();
   }
 
@@ -1245,7 +1246,7 @@ public class TestEntityStorage {
         .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoleNames(null)
+        .withRoles(Collections.emptyList())
         .build();
   }
 

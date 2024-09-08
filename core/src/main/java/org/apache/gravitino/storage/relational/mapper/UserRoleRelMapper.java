@@ -21,10 +21,10 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.DeleteProvider;
+import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
  * A MyBatis Mapper for table meta operation SQLs.
@@ -38,101 +38,39 @@ public interface UserRoleRelMapper {
   String USER_TABLE_NAME = "user_meta";
   String USER_ROLE_RELATION_TABLE_NAME = "user_role_rel";
 
-  @Insert({
-    "<script>",
-    "INSERT INTO "
-        + USER_ROLE_RELATION_TABLE_NAME
-        + "(user_id, role_id,"
-        + " audit_info,"
-        + " current_version, last_version, deleted_at)"
-        + " VALUES ",
-    "<foreach collection='userRoleRels' item='item' separator=','>",
-    "(#{item.userId},"
-        + " #{item.roleId},"
-        + " #{item.auditInfo},"
-        + " #{item.currentVersion},"
-        + " #{item.lastVersion},"
-        + " #{item.deletedAt})",
-    "</foreach>",
-    "</script>"
-  })
+  @InsertProvider(type = UserRoleRelSQLProviderFactory.class, method = "batchInsertUserRoleRel")
   void batchInsertUserRoleRel(@Param("userRoleRels") List<UserRoleRelPO> userRoleRelPOs);
 
-  @Insert({
-    "<script>",
-    "INSERT INTO "
-        + USER_ROLE_RELATION_TABLE_NAME
-        + "(user_id, role_id,"
-        + " audit_info,"
-        + " current_version, last_version, deleted_at)"
-        + " VALUES ",
-    "<foreach collection='userRoleRels' item='item' separator=','>",
-    "(#{item.userId},"
-        + " #{item.roleId},"
-        + " #{item.auditInfo},"
-        + " #{item.currentVersion},"
-        + " #{item.lastVersion},"
-        + " #{item.deletedAt})",
-    "</foreach>",
-    " ON DUPLICATE KEY UPDATE"
-        + " user_id = VALUES(user_id),"
-        + " role_id = VALUES(role_id),"
-        + " audit_info = VALUES(audit_info),"
-        + " current_version = VALUES(current_version),"
-        + " last_version = VALUES(last_version),"
-        + " deleted_at = VALUES(deleted_at)",
-    "</script>"
-  })
+  @InsertProvider(
+      type = UserRoleRelSQLProviderFactory.class,
+      method = "batchInsertUserRoleRelOnDuplicateKeyUpdate")
   void batchInsertUserRoleRelOnDuplicateKeyUpdate(
       @Param("userRoleRels") List<UserRoleRelPO> userRoleRelPOs);
 
-  @Update(
-      "UPDATE "
-          + USER_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
-          + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE user_id = #{userId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = UserRoleRelSQLProviderFactory.class,
+      method = "softDeleteUserRoleRelByUserId")
   void softDeleteUserRoleRelByUserId(@Param("userId") Long userId);
 
-  @Update({
-    "<script>",
-    "UPDATE "
-        + USER_ROLE_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
-        + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE user_id = #{userId} AND role_id in (",
-    "<foreach collection='roleIds' item='roleId' separator=','>",
-    "#{roleId}",
-    "</foreach>",
-    ") " + "AND deleted_at = 0",
-    "</script>"
-  })
+  @UpdateProvider(
+      type = UserRoleRelSQLProviderFactory.class,
+      method = "softDeleteUserRoleRelByUserAndRoles")
   void softDeleteUserRoleRelByUserAndRoles(
       @Param("userId") Long userId, @Param("roleIds") List<Long> roleIds);
 
-  @Update(
-      "UPDATE "
-          + USER_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
-          + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE user_id IN (SELECT user_id FROM "
-          + USER_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0)"
-          + " AND deleted_at = 0")
-  void softDeleteUserRoleRelByMetalakeId(Long metalakeId);
+  @UpdateProvider(
+      type = UserRoleRelSQLProviderFactory.class,
+      method = "softDeleteUserRoleRelByMetalakeId")
+  void softDeleteUserRoleRelByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @Update(
-      "UPDATE "
-          + USER_ROLE_RELATION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) "
-          + "+ EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE role_id = #{roleId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = UserRoleRelSQLProviderFactory.class,
+      method = "softDeleteUserRoleRelByRoleId")
   void softDeleteUserRoleRelByRoleId(@Param("roleId") Long roleId);
 
-  @Delete(
-      "DELETE FROM "
-          + USER_ROLE_RELATION_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  @DeleteProvider(
+      type = UserRoleRelSQLProviderFactory.class,
+      method = "deleteUserRoleRelMetasByLegacyTimeline")
   Integer deleteUserRoleRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

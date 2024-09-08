@@ -89,6 +89,7 @@ dependencies {
   testImplementation(libs.slf4j.api)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
