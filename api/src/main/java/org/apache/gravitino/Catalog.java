@@ -97,6 +97,9 @@ public interface Catalog extends Auditable {
    */
   String PROPERTY_PACKAGE = "package";
 
+  /** The property indicating the metalake is in use. */
+  String PROPERTY_IN_USE = "in-use";
+
   /**
    * The property to specify the cloud that the catalog is running on. The value should be one of
    * the {@link CloudName}.

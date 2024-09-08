@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.metalake;
 
+import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
+
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -28,13 +31,15 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -116,14 +121,13 @@ public class MetalakeManager implements MetalakeDispatcher {
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
     long uid = idGenerator.nextId();
-    StringIdentifier stringId = StringIdentifier.fromId(uid);
 
     BaseMetalake metalake =
         BaseMetalake.builder()
             .withId(uid)
             .withName(ident.name())
             .withComment(comment)
-            .withProperties(StringIdentifier.newPropertiesWithId(stringId, properties))
+            .withProperties(properties)
             .withVersion(SchemaVersion.V_0_1)
             .withAuditInfo(
                 AuditInfo.builder()
@@ -158,6 +162,11 @@ public class MetalakeManager implements MetalakeDispatcher {
   public BaseMetalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
     try {
+      if (!inUse(ident)) {
+        throw new EntityInUseException(
+            "Metalake %s is not in use, please activate it first", ident);
+      }
+
       return store.update(
           ident,
           BaseMetalake.class,
@@ -204,20 +213,86 @@ public class MetalakeManager implements MetalakeDispatcher {
     }
   }
 
-  /**
-   * Deletes a Metalake.
-   *
-   * @param ident The identifier of the Metalake to be deleted.
-   * @return `true` if the Metalake was successfully deleted, `false` otherwise.
-   * @throws RuntimeException If deleting the Metalake encounters storage issues.
-   */
   @Override
-  public boolean dropMetalake(NameIdentifier ident) {
+  public boolean dropMetalake(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, EntityInUseException {
     try {
-      return store.delete(ident, EntityType.METALAKE);
-    } catch (IOException ioe) {
-      LOG.error("Deleting metalake {} failed due to storage issues", ident, ioe);
-      throw new RuntimeException(ioe);
+      if (!store.exists(ident, EntityType.METALAKE)) {
+        return false;
+      }
+
+      BaseMetalake metalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+      boolean inUse = metalake.inUse();
+      if (inUse && !force) {
+        throw new EntityInUseException(
+            "Metalake %s is in use, please inactivate it first or use force option", ident);
+      }
+
+      List<CatalogEntity> catalogEntities =
+          store.list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG);
+      if (!catalogEntities.isEmpty() && !force) {
+        throw new NonEmptyEntityException(
+            "Metalake %s has catalogs, please drop them first or use force option", ident);
+      }
+
+      if (inUse) {
+        inactivateMetalake(ident);
+      }
+
+      return store.delete(ident, EntityType.METALAKE, true);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void activateMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    try {
+
+      boolean inUse = inUse(ident);
+      if (!inUse) {
+        BaseMetalake metalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+        Map<String, String> newProps = Maps.newHashMap(metalake.properties());
+        newProps.put(PROPERTY_IN_USE, "true");
+
+        BaseMetalake.Builder builder =
+            BaseMetalake.builder()
+                .withId(metalake.id())
+                .withName(metalake.name())
+                .withComment(metalake.comment())
+                .withProperties(newProps)
+                .withVersion(metalake.getVersion())
+                .withAuditInfo(metalake.auditInfo());
+
+        store.put(builder.build(), true);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void inactivateMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    try {
+      boolean inUse = inUse(ident);
+      if (inUse) {
+        BaseMetalake metalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+        Map<String, String> newProps = Maps.newHashMap(metalake.properties());
+        newProps.put(PROPERTY_IN_USE, "false");
+
+        BaseMetalake.Builder builder =
+            BaseMetalake.builder()
+                .withId(metalake.id())
+                .withName(metalake.name())
+                .withComment(metalake.comment())
+                .withProperties(newProps)
+                .withVersion(metalake.getVersion())
+                .withAuditInfo(metalake.auditInfo());
+
+        store.put(builder.build(), true);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -256,5 +331,14 @@ public class MetalakeManager implements MetalakeDispatcher {
     }
 
     return builder.withProperties(newProps);
+  }
+
+  private boolean inUse(NameIdentifier ident) throws IOException {
+    if (!store.exists(ident, EntityType.METALAKE)) {
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
+    }
+
+    BaseMetalake metalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+    return (boolean) metalake.propertiesMetadata().getDefaultValue(PROPERTY_IN_USE);
   }
 }

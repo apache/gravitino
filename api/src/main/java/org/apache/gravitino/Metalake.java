@@ -28,6 +28,9 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public interface Metalake extends Auditable {
 
+  /** The property indicating the metalake is in use. */
+  String PROPERTY_IN_USE = "in-use";
+
   /**
    * The name of the metalake.
    *

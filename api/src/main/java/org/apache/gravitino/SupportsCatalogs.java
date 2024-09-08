@@ -21,8 +21,10 @@ package org.apache.gravitino;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 
 /**
  * Client interface for supporting catalogs. It includes methods for listing, loading, creating,
@@ -108,12 +110,67 @@ public interface SupportsCatalogs {
       throws NoSuchCatalogException, IllegalArgumentException;
 
   /**
-   * Drop a catalog with specified identifier.
+   * Drop a catalog with specified identifier. Please make sure:
    *
-   * @param catalogName the name of the catalog.
-   * @return True if the catalog was dropped, false otherwise.
+   * <ul>
+   *   <li>There is no schema in the catalog. Otherwise, a {@link NonEmptyEntityException} will be
+   *       thrown.
+   *   <li>The method {@link #inactivateCatalog(NameIdentifier)} has been called before dropping the
+   *       catalog. Otherwise, a {@link EntityInUseException} will be thrown.
+   * </ul>
+   *
+   * It is equivalent to calling {@code dropCatalog(ident, false)}.
+   *
+   * @param ident the identifier of the catalog.
+   * @return True if the catalog was dropped, false if the catalog does not exist.
+   * @throws NonEmptyEntityException If the catalog is not empty.
+   * @throws EntityInUseException If the catalog is in use.
    */
-  boolean dropCatalog(String catalogName);
+  boolean dropCatalog(NameIdentifier ident) throws NonEmptyEntityException, EntityInUseException;
+
+  /**
+   * Drop a catalog with specified identifier. If the force flag is true, it will:
+   *
+   * <ul>
+   *   <li>Cascade drop all sub-entities (schemas, tables, etc.) of the catalog in Gravitino store.
+   *   <li>Drop the catalog even if it is in use.
+   *   <li>External resources (e.g. database, table, etc.) associated with sub-entities will not be
+   *       dropped unless it is managed (such as managed fileset).
+   * </ul>
+   *
+   * @param ident The identifier of the catalog.
+   * @param force Whether to force the drop.
+   * @return True if the catalog was dropped, false if the catalog does not exist.
+   * @throws NonEmptyEntityException If the catalog is not empty and force is false.
+   * @throws EntityInUseException If the catalog is in use and force is false.
+   */
+  boolean dropCatalog(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, EntityInUseException;
+
+  /**
+   * Activate a catalog. If the catalog is already active, this method does nothing.
+   *
+   * @param ident The identifier of the catalog.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   */
+  void activateCatalog(NameIdentifier ident) throws NoSuchCatalogException;
+
+  /**
+   * Inactivate a catalog. If the catalog is already inactive, this method does nothing. Once a
+   * catalog is inactivated:
+   *
+   * <ul>
+   *   <li>It can only be listed, loaded, dropped, or activated.
+   *   <li>Any other operations on the catalog will throw an {@link
+   *       org.apache.gravitino.exceptions.NonInUseEntityException}.
+   *   <li>Any operation on the sub-entities (schemas, tables, etc.) will throw an {@link
+   *       org.apache.gravitino.exceptions.NonInUseEntityException}.
+   * </ul>
+   *
+   * @param ident The identifier of the catalog.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   */
+  void inactivateCatalog(NameIdentifier ident) throws NoSuchCatalogException;
 
   /**
    * Test whether the catalog with specified parameters can be connected to before creating it.

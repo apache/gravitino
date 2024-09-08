@@ -21,7 +21,6 @@ package org.apache.gravitino;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -127,27 +126,6 @@ public class StringIdentifier {
         .putAll(properties)
         .put(ID_KEY, stringId.toString())
         .build();
-  }
-
-  /**
-   * Remove StringIdentifier from properties.
-   *
-   * @param properties the properties to remove the string identifier from.
-   * @return the properties with the string identifier removed.
-   */
-  public static Map<String, String> newPropertiesWithoutId(Map<String, String> properties) {
-    if (properties == null) {
-      return null;
-    }
-
-    if (!properties.containsKey(ID_KEY)) {
-      return Collections.unmodifiableMap(properties);
-    }
-
-    Map<String, String> copy = Maps.newHashMap(properties);
-    copy.remove(ID_KEY);
-
-    return ImmutableMap.<String, String>builder().putAll(copy).build();
   }
 
   public static StringIdentifier fromProperties(Map<String, String> properties) {

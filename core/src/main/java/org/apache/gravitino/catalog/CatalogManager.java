@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
@@ -70,19 +71,24 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -100,6 +106,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
+  private static final PropertiesMetadata BASIC_CATALOG_PROPERTIES_METADATA =
+      new BaseCatalogPropertiesMetadata() {
+        @Override
+        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+          return Collections.emptyMap();
+        }
+      };
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
@@ -466,6 +479,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
+  @Override
+  public void activateCatalog(NameIdentifier ident) throws NoSuchCatalogException {}
+
+  @Override
+  public void inactivateCatalog(NameIdentifier ident) throws NoSuchCatalogException {}
+
   /**
    * Alters an existing catalog with the specified changes.
    *
@@ -587,6 +606,59 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       LOG.error("Failed to drop catalog {}", ident, ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  @Override
+  public boolean dropCatalog(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, EntityInUseException {
+
+    try {
+      if (store.exists(ident, EntityType.CATALOG)) {
+        return false;
+      }
+
+      CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      boolean catalogInUse = catalogInUse(ident);
+
+      if (catalogInUse && !force) {
+        throw new EntityInUseException(
+            "Catalog %s is in use, please inactivate it first or use force option", ident);
+      }
+
+      List<SchemaEntity> schemas =
+          store.list(
+              Namespace.of(ident.namespace().level(0), ident.name()),
+              SchemaEntity.class,
+              EntityType.SCHEMA);
+      if (!schemas.isEmpty()
+          && !force
+          && (!catalogEntity.getProvider().equals("kafka") || schemas.size() > 1)) {
+        throw new NonEmptyEntityException(
+            "Catalog %s has schemas, please drop them first or use force option", ident);
+      }
+
+      if (catalogInUse) {
+        inactivateCatalog(ident);
+      }
+
+      // There could be a race issue that someone is using the catalog while we are dropping it.
+      catalogCache.invalidate(ident);
+      return store.delete(ident, EntityType.CATALOG, true);
+
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private boolean catalogInUse(NameIdentifier ident) throws IOException {
+    CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    BaseMetalake metalake =
+        store.get(
+            NameIdentifier.of(ident.namespace().levels()), EntityType.METALAKE, BaseMetalake.class);
+    return metalake.inUse()
+        && (boolean)
+            BASIC_CATALOG_PROPERTIES_METADATA.getOrDefault(
+                catalogEntity.getProperties(), PROPERTY_IN_USE);
   }
 
   /**
