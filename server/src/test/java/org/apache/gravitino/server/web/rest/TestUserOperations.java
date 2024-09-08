@@ -246,7 +246,7 @@ public class TestUserOperations extends JerseyTest {
     return UserEntity.builder()
         .withId(1L)
         .withName(user)
-        .withRoleNames(Collections.emptyList())
+        .withRoles(Collections.emptyList())
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

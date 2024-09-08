@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
@@ -224,7 +225,7 @@ public class TestMemoryEntityStore {
             .withName("user")
             .withNamespace(Namespace.of("metalake", "catalog", "db"))
             .withAuditInfo(auditInfo)
-            .withRoleNames(null)
+            .withRoles(Collections.emptyList())
             .build();
 
     GroupEntity groupEntity =
@@ -233,7 +234,7 @@ public class TestMemoryEntityStore {
             .withName("group")
             .withNamespace(AuthorizationUtils.ofGroupNamespace("metalake"))
             .withAuditInfo(auditInfo)
-            .withRoleNames(null)
+            .withRoles(Collections.emptyList())
             .build();
 
     RoleEntity roleEntity =
