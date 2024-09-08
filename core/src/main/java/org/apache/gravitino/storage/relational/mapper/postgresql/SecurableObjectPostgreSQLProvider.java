@@ -28,7 +28,8 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
   public String softDeleteSecurableObjectsByRoleId(Long roleId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
@@ -36,7 +37,8 @@ public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLPro
   public String softDeleteRoleMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
-        + " ob SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " ob SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE exists (SELECT * from "
         + ROLE_TABLE_NAME
         + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"

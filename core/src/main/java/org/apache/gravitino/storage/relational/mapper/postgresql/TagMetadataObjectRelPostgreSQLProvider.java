@@ -31,7 +31,8 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
       String metalakeName, String tagName) {
     return "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
+        + " te SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000))) "
         + " WHERE te.tag_id IN (SELECT tm.tag_id FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
@@ -44,7 +45,8 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   public String softDeleteTagMetadataObjectRelsByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
+        + " te SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000))) "
         + " WHERE EXISTS (SELECT * FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = te.tag_id"
@@ -57,7 +59,8 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
     return "<script>"
         + "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000))) "
         + " WHERE tag_id IN "
         + "<foreach item='tagId' collection='tagIds' open='(' separator=',' close=')'>"
         + "#{tagId}"

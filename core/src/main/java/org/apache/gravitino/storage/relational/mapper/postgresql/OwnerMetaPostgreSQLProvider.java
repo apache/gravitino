@@ -33,7 +33,8 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
       Long metadataObjectId, String metadataObjectType) {
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE metadata_object_id = #{metadataObjectId} AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0";
   }
 
@@ -41,7 +42,8 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
   public String softDeleteOwnerRelByOwnerIdAndType(Long ownerId, String ownerType) {
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE owner_id = #{ownerId} AND owner_type = #{ownerType} AND deleted_at = 0";
   }
 
@@ -49,7 +51,8 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
   public String softDeleteOwnerRelByMetalakeId(Long metalakeId) {
     return "UPDATE  "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at =0";
   }
 
@@ -57,7 +60,8 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
   public String softDeleteOwnerRelByCatalogId(Long catalogId) {
     return "UPDATE  "
         + OWNER_TABLE_NAME
-        + " ot SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " ot SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME

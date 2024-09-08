@@ -28,7 +28,8 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
   public String softDeleteFilesetVersionsByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -36,7 +37,8 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
   public String softDeleteFilesetVersionsByCatalogId(Long catalogId) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -44,7 +46,8 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
   public String softDeleteFilesetVersionsBySchemaId(Long schemaId) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
@@ -52,7 +55,8 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
   public String softDeleteFilesetVersionsByFilesetId(Long filesetId) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
   }
 
@@ -61,7 +65,8 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
       Long filesetId, long versionRetentionLine, int limit) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000)))"
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit}";
   }
 
