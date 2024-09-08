@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.mapper.postgresql.TagMetadataObjectRelPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -32,7 +33,8 @@ public class TagMetadataObjectRelSQLProviderFactory {
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new TagMetadataObjectRelMySQLProvider(),
-              JDBCBackendType.H2, new TagMetadataObjectRelH2Provider());
+              JDBCBackendType.H2, new TagMetadataObjectRelH2Provider(),
+              JDBCBackendType.POSTGRESQL, new TagMetadataObjectRelPostgreSQLProvider());
 
   public static TagMetadataObjectRelBaseSQLProvider getProvider() {
     String databaseId =

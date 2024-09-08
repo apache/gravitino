@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.mapper.postgresql.MetalakeMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -32,7 +33,8 @@ public class MetalakeMetaSQLProviderFactory {
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new MetalakeMetaMySQLProvider(),
-              JDBCBackendType.H2, new MetalakeMetaH2Provider());
+              JDBCBackendType.H2, new MetalakeMetaH2Provider(),
+              JDBCBackendType.POSTGRESQL, new MetalakeMetaPostgreSQLProvider());
 
   public static MetalakeMetaBaseSQLProvider getProvider() {
     String databaseId =

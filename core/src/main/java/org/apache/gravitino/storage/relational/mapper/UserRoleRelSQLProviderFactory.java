@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.mapper.postgresql.UserRoleRelPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -33,7 +34,8 @@ public class UserRoleRelSQLProviderFactory {
       METALAKE_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new UserRoleRelMySQLProvider(),
-              JDBCBackendType.H2, new UserRoleRelH2Provider());
+              JDBCBackendType.H2, new UserRoleRelH2Provider(),
+              JDBCBackendType.POSTGRESQL, new UserRoleRelPostgreSQLProvider());
 
   public static UserRoleRelBaseSQLProvider getProvider() {
     String databaseId =
