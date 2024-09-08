@@ -80,7 +80,7 @@ class HDFSContainer(BaseContainer):
             raise GravitinoRuntimeException(
                 "GRAVITINO_CI_HIVE_DOCKER_IMAGE env variable is not set."
             )
-        environment = {"HADOOP_USER_NAME": "anonymous"}
+        environment = {"HADOOP_USER_NAME": "gravitino"}
 
         super().__init__(container_name, image_name, environment)
 
