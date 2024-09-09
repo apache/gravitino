@@ -35,6 +35,7 @@ dependencies {
     exclude("*")
   }
   implementation(libs.bundles.iceberg)
+  implementation(libs.bundles.kerby)
   implementation(libs.bundles.log4j)
   implementation(libs.caffeine)
   implementation(libs.cglib)
@@ -95,8 +96,6 @@ dependencies {
     exclude("org.pentaho") // missing dependency
     exclude("org.slf4j", "slf4j-log4j12")
   }
-
-  runtimeOnly(libs.bundles.kerby)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
