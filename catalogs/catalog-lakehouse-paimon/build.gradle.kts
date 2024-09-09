@@ -61,7 +61,11 @@ dependencies {
     exclude("javax.servlet")
     exclude("org.mortbay.jetty")
   }
-
+  implementation(libs.hadoop2.hdfs) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet")
+    exclude("org.mortbay.jetty")
+  }
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
