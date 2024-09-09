@@ -260,12 +260,13 @@
    Apache Zeppelin
    ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/CommandExecutor.java
    ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/ProcessData.java
-   ./web/WEB-INF/web.xml
+   ./web/web/WEB-INF/web.xml
 
    Apache Hadoop
    ./dev/docker/hive/hadoop-env.sh
    ./dev/docker/kerberos-hive/hadoop-env.sh
    ./dev/docker/kerberos-hive/yarn-env.sh
+   ./common/src/main/java/org/apache/gravitino/audit/CallerContext.java
    ./common/src/main/java/org/apache/gravitino/auth/KerberosUtils.java
    ./server-common/src/main/java/org/apache/gravitino/server/authentication/KerberosAuthenticator.java
    ./server-common/src/test/java/org/apache/gravitino/server/authentication/KerberosTestUtils.java

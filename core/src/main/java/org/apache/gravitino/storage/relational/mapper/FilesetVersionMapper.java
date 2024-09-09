@@ -22,11 +22,11 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.DeleteProvider;
+import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
  * A MyBatis Mapper for fileset version info operation SQLs.
@@ -39,110 +39,50 @@ import org.apache.ibatis.annotations.Update;
 public interface FilesetVersionMapper {
   String VERSION_TABLE_NAME = "fileset_version_info";
 
-  @Insert(
-      "INSERT INTO "
-          + VERSION_TABLE_NAME
-          + "(metalake_id, catalog_id, schema_id, fileset_id,"
-          + " version, fileset_comment, properties, storage_location,"
-          + " deleted_at)"
-          + " VALUES("
-          + " #{filesetVersion.metalakeId},"
-          + " #{filesetVersion.catalogId},"
-          + " #{filesetVersion.schemaId},"
-          + " #{filesetVersion.filesetId},"
-          + " #{filesetVersion.version},"
-          + " #{filesetVersion.filesetComment},"
-          + " #{filesetVersion.properties},"
-          + " #{filesetVersion.storageLocation},"
-          + " #{filesetVersion.deletedAt}"
-          + " )")
+  @InsertProvider(type = FilesetVersionSQLProviderFactory.class, method = "insertFilesetVersion")
   void insertFilesetVersion(@Param("filesetVersion") FilesetVersionPO filesetVersionPO);
 
-  @Insert(
-      "INSERT INTO "
-          + VERSION_TABLE_NAME
-          + "(metalake_id, catalog_id, schema_id, fileset_id,"
-          + " version, fileset_comment, properties, storage_location,"
-          + " deleted_at)"
-          + " VALUES("
-          + " #{filesetVersion.metalakeId},"
-          + " #{filesetVersion.catalogId},"
-          + " #{filesetVersion.schemaId},"
-          + " #{filesetVersion.filesetId},"
-          + " #{filesetVersion.version},"
-          + " #{filesetVersion.filesetComment},"
-          + " #{filesetVersion.properties},"
-          + " #{filesetVersion.storageLocation},"
-          + " #{filesetVersion.deletedAt}"
-          + " )"
-          + " ON DUPLICATE KEY UPDATE"
-          + " metalake_id = #{filesetVersion.metalakeId},"
-          + " catalog_id = #{filesetVersion.catalogId},"
-          + " schema_id = #{filesetVersion.schemaId},"
-          + " fileset_id = #{filesetVersion.filesetId},"
-          + " version = #{filesetVersion.version},"
-          + " fileset_comment = #{filesetVersion.filesetComment},"
-          + " properties = #{filesetVersion.properties},"
-          + " storage_location = #{filesetVersion.storageLocation},"
-          + " deleted_at = #{filesetVersion.deletedAt}")
+  @InsertProvider(
+      type = FilesetVersionSQLProviderFactory.class,
+      method = "insertFilesetVersionOnDuplicateKeyUpdate")
   void insertFilesetVersionOnDuplicateKeyUpdate(
       @Param("filesetVersion") FilesetVersionPO filesetVersionPO);
 
-  @Update(
-      "UPDATE "
-          + VERSION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = FilesetVersionSQLProviderFactory.class,
+      method = "softDeleteFilesetVersionsByMetalakeId")
   Integer softDeleteFilesetVersionsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @Update(
-      "UPDATE "
-          + VERSION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = FilesetVersionSQLProviderFactory.class,
+      method = "softDeleteFilesetVersionsByCatalogId")
   Integer softDeleteFilesetVersionsByCatalogId(@Param("catalogId") Long catalogId);
 
-  @Update(
-      "UPDATE "
-          + VERSION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE schema_id = #{schemaId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = FilesetVersionSQLProviderFactory.class,
+      method = "softDeleteFilesetVersionsBySchemaId")
   Integer softDeleteFilesetVersionsBySchemaId(@Param("schemaId") Long schemaId);
 
-  @Update(
-      "UPDATE "
-          + VERSION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE fileset_id = #{filesetId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = FilesetVersionSQLProviderFactory.class,
+      method = "softDeleteFilesetVersionsByFilesetId")
   Integer softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId);
 
-  @Delete(
-      "DELETE FROM "
-          + VERSION_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  @DeleteProvider(
+      type = FilesetVersionSQLProviderFactory.class,
+      method = "deleteFilesetVersionsByLegacyTimeline")
   Integer deleteFilesetVersionsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
-  @Select(
-      "SELECT fileset_id as filesetId,"
-          + " Max(version) as version"
-          + " FROM "
-          + VERSION_TABLE_NAME
-          + " WHERE version > #{versionRetentionCount} AND deleted_at = 0"
-          + " GROUP BY fileset_id")
+  @SelectProvider(
+      type = FilesetVersionSQLProviderFactory.class,
+      method = "selectFilesetVersionsByRetentionCount")
   List<FilesetMaxVersionPO> selectFilesetVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount);
 
-  @Update(
-      "UPDATE "
-          + VERSION_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit}")
+  @UpdateProvider(
+      type = FilesetVersionSQLProviderFactory.class,
+      method = "softDeleteFilesetVersionsByRetentionLine")
   Integer softDeleteFilesetVersionsByRetentionLine(
       @Param("filesetId") Long filesetId,
       @Param("versionRetentionLine") long versionRetentionLine,

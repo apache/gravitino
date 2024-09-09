@@ -223,6 +223,7 @@ tasks {
       "START_EXTERNAL_GRAVITINO" to "true",
       "DOCKER_TEST" to dockerTest.toString(),
       "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "apache/gravitino-ci:hive-0.1.13",
+      "GRAVITINO_OAUTH2_SAMPLE_SERVER" to "datastrato/sample-authorization-server:0.3.0",
       // Set the PYTHONPATH to the client-python directory, make sure the tests can import the
       // modules from the client-python directory.
       "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
@@ -319,7 +320,7 @@ tasks {
     delete("dist")
     delete("docs")
     delete("gravitino/version.ini")
-    delete("gravitino.egg-info")
+    delete("apache_gravitino.egg-info")
     delete("tests/unittests/htmlcov")
     delete("tests/unittests/.coverage")
     delete("tests/integration/htmlcov")

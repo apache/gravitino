@@ -31,11 +31,17 @@ dependencies {
   implementation(project(":core")) {
     exclude(group = "*")
   }
+
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-
+  implementation(libs.javax.jaxb.api) {
+    exclude("*")
+  }
+  implementation(libs.javax.ws.rs.api)
+  implementation(libs.jettison)
   compileOnly(libs.lombok)
+  implementation(libs.mail)
   implementation(libs.ranger.intg) {
     exclude("org.apache.hadoop", "hadoop-common")
     exclude("org.apache.hive", "hive-storage-api")
@@ -50,11 +56,9 @@ dependencies {
     exclude("org.apache.ranger", "ranger-plugin-classloader")
     exclude("net.java.dev.jna")
     exclude("javax.ws.rs")
+    exclude("org.eclipse.jetty")
   }
-  implementation(libs.javax.ws.rs.api)
-  implementation(libs.javax.jaxb.api) {
-    exclude("*")
-  }
+  implementation(libs.rome)
 
   testImplementation(project(":common"))
   testImplementation(project(":clients:client-java"))
@@ -70,6 +74,7 @@ dependencies {
     exclude("org.apache.lucene")
     exclude("org.apache.solr")
     exclude("org.apache.kafka")
+    exclude("org.eclipse.jetty")
     exclude("org.elasticsearch")
     exclude("org.elasticsearch.client")
     exclude("org.elasticsearch.plugin")
@@ -78,6 +83,7 @@ dependencies {
   }
   testImplementation(libs.hive2.jdbc) {
     exclude("org.slf4j")
+    exclude("org.eclipse.jetty.aggregate")
   }
   testImplementation(libs.mysql.driver)
 }

@@ -595,13 +595,13 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Assertions.assertEquals("table_1", tableIdentifiers.get(0));
     Assertions.assertEquals("table_2", tableIdentifiers.get(1));
 
-    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(table1));
+    Assertions.assertDoesNotThrow(() -> tableCatalog.purgeTable(table1));
 
     nameIdentifiers = tableCatalog.listTables(Namespace.of(schemaName));
     Assertions.assertEquals(1, nameIdentifiers.length);
     Assertions.assertEquals("table_2", nameIdentifiers[0].name());
 
-    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(table2));
+    Assertions.assertDoesNotThrow(() -> tableCatalog.purgeTable(table2));
     Namespace schemaNamespace = Namespace.of(schemaName);
     nameIdentifiers = tableCatalog.listTables(schemaNamespace);
     Assertions.assertEquals(0, nameIdentifiers.length);

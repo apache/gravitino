@@ -27,6 +27,7 @@ plugins {
 
 dependencies {
   implementation(project(":clients:filesystem-hadoop3"))
+  implementation(project(":clients:client-java-runtime", configuration = "shadow"))
 }
 
 tasks.withType<ShadowJar>(ShadowJar::class.java) {

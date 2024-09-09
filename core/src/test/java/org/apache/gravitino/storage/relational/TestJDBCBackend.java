@@ -45,6 +45,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +85,7 @@ import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -435,6 +437,96 @@ public class TestJDBCBackend {
   }
 
   @Test
+  void testUpdateMetalakeWithNullableComment() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    BaseMetalake metalake =
+        BaseMetalake.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("metalake" + RandomIdGenerator.INSTANCE.nextId())
+            .withAuditInfo(auditInfo)
+            .withComment(null)
+            .withProperties(null)
+            .withVersion(SchemaVersion.V_0_1)
+            .build();
+
+    backend.insert(metalake, false);
+
+    backend.update(
+        metalake.nameIdentifier(),
+        Entity.EntityType.METALAKE,
+        e ->
+            BaseMetalake.builder()
+                .withId(metalake.id())
+                .withName(metalake.name())
+                .withAuditInfo(auditInfo)
+                .withComment("comment")
+                .withProperties(metalake.properties())
+                .withVersion(metalake.getVersion())
+                .build());
+
+    BaseMetalake updatedMetalake =
+        backend.get(metalake.nameIdentifier(), Entity.EntityType.METALAKE);
+    Assertions.assertNotNull(updatedMetalake.comment());
+
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, false);
+  }
+
+  @Test
+  void testUpdateCatalogWithNullableComment() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    String metalakeName = "metalake" + RandomIdGenerator.INSTANCE.nextId();
+    BaseMetalake metalake =
+        BaseMetalake.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(metalakeName)
+            .withAuditInfo(auditInfo)
+            .withComment("")
+            .withProperties(null)
+            .withVersion(SchemaVersion.V_0_1)
+            .build();
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withNamespace(NamespaceUtil.ofCatalog(metalakeName))
+            .withName("catalog")
+            .withAuditInfo(auditInfo)
+            .withComment(null)
+            .withProperties(null)
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .build();
+
+    backend.insert(catalog, false);
+
+    backend.update(
+        catalog.nameIdentifier(),
+        Entity.EntityType.CATALOG,
+        e ->
+            CatalogEntity.builder()
+                .withId(catalog.id())
+                .withNamespace(catalog.namespace())
+                .withName(catalog.name())
+                .withAuditInfo(auditInfo)
+                .withComment("comment")
+                .withProperties(catalog.getProperties())
+                .withType(Catalog.Type.RELATIONAL)
+                .withProvider("test")
+                .build());
+
+    CatalogEntity updatedCatalog = backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    Assertions.assertNotNull(updatedCatalog.getComment());
+
+    backend.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG, false);
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, false);
+  }
+
+  @Test
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -509,8 +601,7 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace("metalake"),
             "user",
             auditInfo,
-            Lists.newArrayList(role.name()),
-            Lists.newArrayList(role.id()));
+            Lists.newArrayList(role));
     backend.insert(user, false);
 
     GroupEntity group =
@@ -519,8 +610,7 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace("metalake"),
             "group",
             auditInfo,
-            Lists.newArrayList(role.name()),
-            Lists.newArrayList(role.id()));
+            Lists.newArrayList(role));
     backend.insert(group, false);
 
     TagEntity tag =
@@ -597,8 +687,7 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace("another-metalake"),
             "another-user",
             auditInfo,
-            Lists.newArrayList(anotherRole.name()),
-            Lists.newArrayList(anotherRole.id()));
+            Lists.newArrayList(anotherRole));
     backend.insert(anotherUser, false);
 
     GroupEntity anotherGroup =
@@ -607,8 +696,7 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace("another-metalake"),
             "another-group",
             auditInfo,
-            Lists.newArrayList(anotherRole.name()),
-            Lists.newArrayList(anotherRole.id()));
+            Lists.newArrayList(anotherRole));
     backend.insert(anotherGroup, false);
 
     TagEntity anotherTagEntity =
@@ -1021,8 +1109,7 @@ public class TestJDBCBackend {
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoleNames(null)
-        .withRoleIds(null)
+        .withRoles(Collections.emptyList())
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -1032,14 +1119,12 @@ public class TestJDBCBackend {
       Namespace namespace,
       String name,
       AuditInfo auditInfo,
-      List<String> roleNames,
-      List<Long> roleIds) {
+      List<RoleEntity> roleEntities) {
     return UserEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoleNames(roleNames)
-        .withRoleIds(roleIds)
+        .withRoles(roleEntities)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -1065,25 +1150,18 @@ public class TestJDBCBackend {
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoleNames(null)
-        .withRoleIds(null)
+        .withRoles(Collections.emptyList())
         .withAuditInfo(auditInfo)
         .build();
   }
 
   public static GroupEntity createGroupEntity(
-      Long id,
-      Namespace namespace,
-      String name,
-      AuditInfo auditInfo,
-      List<String> roleNames,
-      List<Long> roleIds) {
+      Long id, Namespace namespace, String name, AuditInfo auditInfo, List<RoleEntity> roles) {
     return GroupEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoleNames(roleNames)
-        .withRoleIds(roleIds)
+        .withRoles(roles)
         .withAuditInfo(auditInfo)
         .build();
   }
