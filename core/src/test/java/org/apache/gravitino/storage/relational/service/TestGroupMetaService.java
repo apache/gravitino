@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
@@ -110,13 +111,11 @@ class TestGroupMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     groupMetaService.insertGroup(group2, false);
     GroupEntity actualGroup = groupMetaService.getGroupByIdentifier(group2.nameIdentifier());
     Assertions.assertEquals(group2.name(), actualGroup.name());
-    Assertions.assertEquals(
-        Sets.newHashSet(group2.roleNames()), Sets.newHashSet(actualGroup.roleNames()));
+    Assertions.assertEquals(Sets.newHashSet(group2.roles()), Sets.newHashSet(actualGroup.roles()));
   }
 
   @Test
@@ -194,13 +193,11 @@ class TestGroupMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     Assertions.assertDoesNotThrow(() -> groupMetaService.insertGroup(group2, false));
     GroupEntity actualGroup = groupMetaService.getGroupByIdentifier(group2.nameIdentifier());
     Assertions.assertEquals(group2.name(), actualGroup.name());
-    Assertions.assertEquals(
-        Sets.newHashSet(group2.roleNames()), Sets.newHashSet(actualGroup.roleNames()));
+    Assertions.assertEquals(Sets.newHashSet(group2.roles()), Sets.newHashSet(actualGroup.roles()));
 
     // insert duplicate group with roles
     GroupEntity group2Exist =
@@ -219,17 +216,16 @@ class TestGroupMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2Overwrite",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     Assertions.assertDoesNotThrow(() -> groupMetaService.insertGroup(group2Overwrite, true));
 
     GroupEntity actualOverwriteGroup2 =
         groupMetaService.getGroupByIdentifier(group2Overwrite.nameIdentifier());
     Assertions.assertEquals("group2Overwrite", actualOverwriteGroup2.name());
-    Assertions.assertEquals(2, actualOverwriteGroup2.roleNames().size());
+    Assertions.assertEquals(2, actualOverwriteGroup2.roles().size());
     Assertions.assertEquals(
         Sets.newHashSet(role1.name(), role2.name()),
-        Sets.newHashSet(actualOverwriteGroup2.roleNames()));
+        Sets.newHashSet(actualOverwriteGroup2.roles()));
 
     // insert overwrite user with 1 role
     RoleEntity role3 =
@@ -246,15 +242,14 @@ class TestGroupMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "group3Overwrite",
             auditInfo,
-            Lists.newArrayList(role3.name()),
-            Lists.newArrayList(role3.id()));
+            Lists.newArrayList(role3));
     Assertions.assertDoesNotThrow(() -> groupMetaService.insertGroup(group3Overwrite, true));
 
     GroupEntity actualOverwriteGroup3 =
         groupMetaService.getGroupByIdentifier(group3Overwrite.nameIdentifier());
     Assertions.assertEquals("group3Overwrite", actualOverwriteGroup3.name());
-    Assertions.assertEquals(1, actualOverwriteGroup3.roleNames().size());
-    Assertions.assertEquals("role3", actualOverwriteGroup3.roleNames().get(0));
+    Assertions.assertEquals(1, actualOverwriteGroup3.roles().size());
+    Assertions.assertEquals("role3", actualOverwriteGroup3.roles().get(0));
 
     // insert overwrite user with 0 roles
     GroupEntity group4Overwrite =
@@ -268,7 +263,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity actualOverwriteGroup4 =
         groupMetaService.getGroupByIdentifier(group4Overwrite.nameIdentifier());
     Assertions.assertEquals("group4Overwrite", actualOverwriteGroup4.name());
-    Assertions.assertNull(actualOverwriteGroup4.roleNames());
+    Assertions.assertTrue(actualOverwriteGroup4.roles().isEmpty());
   }
 
   @Test
@@ -341,8 +336,7 @@ class TestGroupMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     groupMetaService.insertGroup(group2, false);
     List<RolePO> rolePOs =
         SessionUtils.doWithCommitAndFetchResult(
@@ -350,8 +344,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertEquals(2, rolePOs.size());
     GroupEntity actualGroup = groupMetaService.getGroupByIdentifier(group2.nameIdentifier());
     Assertions.assertEquals(group2.name(), actualGroup.name());
-    Assertions.assertEquals(
-        Sets.newHashSet(group2.roleNames()), Sets.newHashSet(actualGroup.roleNames()));
+    Assertions.assertEquals(Sets.newHashSet(group2.roles()), Sets.newHashSet(actualGroup.roles()));
 
     Assertions.assertTrue(groupMetaService.deleteGroup(group2.nameIdentifier()));
     Assertions.assertThrows(
@@ -400,13 +393,11 @@ class TestGroupMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group1",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     groupMetaService.insertGroup(group1, false);
     GroupEntity actualGroup = groupMetaService.getGroupByIdentifier(group1.nameIdentifier());
     Assertions.assertEquals(group1.name(), actualGroup.name());
-    Assertions.assertEquals(
-        Sets.newHashSet(group1.roleNames()), Sets.newHashSet(actualGroup.roleNames()));
+    Assertions.assertEquals(Sets.newHashSet(group1.roles()), Sets.newHashSet(actualGroup.roles()));
 
     RoleEntity role3 =
         createRoleEntity(
@@ -428,17 +419,14 @@ class TestGroupMetaService extends TestJDBCBackend {
                   .withLastModifiedTime(Instant.now())
                   .build();
 
-          List<String> roleNames = Lists.newArrayList(group.roleNames());
-          List<Long> roleIds = Lists.newArrayList(group.roleIds());
-          roleNames.add(role3.name());
-          roleIds.add(role3.id());
+          List<RoleEntity> roleEntities = Lists.newArrayList(group.roleEntities());
+          roleEntities.add(role3);
 
           return GroupEntity.builder()
               .withNamespace(group.namespace())
               .withId(group.id())
               .withName(group.name())
-              .withRoleNames(roleNames)
-              .withRoleIds(roleIds)
+              .withRoles(roleEntities)
               .withAuditInfo(updateAuditInfo)
               .build();
         };
@@ -449,9 +437,10 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertEquals(group1.id(), grantGroup.id());
     Assertions.assertEquals(group1.name(), grantGroup.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role2", "role3"), Sets.newHashSet(grantGroup.roleNames()));
+        Sets.newHashSet("role1", "role2", "role3"), Sets.newHashSet(grantGroup.roles()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role2.id(), role3.id()), Sets.newHashSet(grantGroup.roleIds()));
+        Sets.newHashSet(role1.id(), role2.id(), role3.id()),
+        grantGroup.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet()));
     Assertions.assertEquals("creator", grantGroup.auditInfo().creator());
     Assertions.assertEquals("grantGroup", grantGroup.auditInfo().lastModifier());
 
@@ -466,17 +455,16 @@ class TestGroupMetaService extends TestJDBCBackend {
                   .withLastModifiedTime(Instant.now())
                   .build();
 
-          List<String> roleNames = Lists.newArrayList(group.roleNames());
-          List<Long> roleIds = Lists.newArrayList(group.roleIds());
-          roleIds.remove(roleNames.indexOf("role2"));
-          roleNames.remove("role2");
+          List<RoleEntity> roleEntities = Lists.newArrayList(group.roleEntities());
+          List<String> roleNames =
+              roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList());
+          roleEntities.remove(roleNames.indexOf("role2"));
 
           return GroupEntity.builder()
               .withNamespace(group.namespace())
               .withId(group.id())
               .withName(group.name())
-              .withRoleNames(roleNames)
-              .withRoleIds(roleIds)
+              .withRoles(roleEntities)
               .withAuditInfo(updateAuditInfo)
               .build();
         };
@@ -487,9 +475,10 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertEquals(group1.id(), revokeGroup.id());
     Assertions.assertEquals(group1.name(), revokeGroup.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role3"), Sets.newHashSet(revokeGroup.roleNames()));
+        Sets.newHashSet("role1", "role3"), Sets.newHashSet(revokeGroup.roles()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role3.id()), Sets.newHashSet(revokeGroup.roleIds()));
+        Sets.newHashSet(role1.id(), role3.id()),
+        revokeGroup.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet()));
     Assertions.assertEquals("creator", revokeGroup.auditInfo().creator());
     Assertions.assertEquals("revokeGroup", revokeGroup.auditInfo().lastModifier());
 
@@ -513,19 +502,16 @@ class TestGroupMetaService extends TestJDBCBackend {
                   .withLastModifiedTime(Instant.now())
                   .build();
 
-          List<String> roleNames = Lists.newArrayList(group.roleNames());
-          List<Long> roleIds = Lists.newArrayList(group.roleIds());
-          roleIds.remove(roleNames.indexOf("role3"));
-          roleNames.remove("role3");
-          roleIds.add(role4.id());
-          roleNames.add(role4.name());
+          List<String> roleNames = Lists.newArrayList(group.roles());
+          List<RoleEntity> roleEntities = Lists.newArrayList(group.roleEntities());
+          roleEntities.remove(roleNames.indexOf("role3"));
+          roleEntities.add(role4);
 
           return GroupEntity.builder()
               .withNamespace(group.namespace())
               .withId(group.id())
               .withName(group.name())
-              .withRoleNames(roleNames)
-              .withRoleIds(roleIds)
+              .withRoles(roleEntities)
               .withAuditInfo(updateAuditInfo)
               .build();
         };
@@ -536,9 +522,10 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertEquals(group1.id(), grantRevokeGroup.id());
     Assertions.assertEquals(group1.name(), grantRevokeGroup.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role4"), Sets.newHashSet(grantRevokeGroup.roleNames()));
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(grantRevokeGroup.roles()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(grantRevokeGroup.roleIds()));
+        Sets.newHashSet(role1.id(), role4.id()),
+        grantRevokeGroup.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet()));
     Assertions.assertEquals("creator", grantRevokeGroup.auditInfo().creator());
     Assertions.assertEquals("grantRevokeUser", grantRevokeGroup.auditInfo().lastModifier());
 
@@ -553,15 +540,13 @@ class TestGroupMetaService extends TestJDBCBackend {
                   .withLastModifiedTime(Instant.now())
                   .build();
 
-          List<String> roleNames = Lists.newArrayList(group.roleNames());
-          List<Long> roleIds = Lists.newArrayList(group.roleIds());
+          List<RoleEntity> roleEntities = Lists.newArrayList(group.roleEntities());
 
           return GroupEntity.builder()
               .withNamespace(group.namespace())
               .withId(group.id())
               .withName(group.name())
-              .withRoleNames(roleNames)
-              .withRoleIds(roleIds)
+              .withRoles(roleEntities)
               .withAuditInfo(updateAuditInfo)
               .build();
         };
@@ -571,9 +556,10 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertEquals(group1.id(), noUpdaterGroup.id());
     Assertions.assertEquals(group1.name(), noUpdaterGroup.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role4"), Sets.newHashSet(noUpdaterGroup.roleNames()));
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(noUpdaterGroup.roles()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(noUpdaterGroup.roleIds()));
+        Sets.newHashSet(role1.id(), role4.id()),
+        noUpdaterGroup.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet()));
     Assertions.assertEquals("creator", noUpdaterGroup.auditInfo().creator());
     Assertions.assertEquals("grantRevokeUser", noUpdaterGroup.auditInfo().lastModifier());
 
@@ -581,7 +567,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     RoleMetaService.getInstance().deleteRole(role1.nameIdentifier());
     GroupEntity groupEntity =
         GroupMetaService.getInstance().getGroupByIdentifier(group1.nameIdentifier());
-    Assertions.assertEquals(Sets.newHashSet("role4"), Sets.newHashSet(groupEntity.roleNames()));
+    Assertions.assertEquals(Sets.newHashSet("role4"), Sets.newHashSet(groupEntity.roles()));
   }
 
   @Test
@@ -629,16 +615,14 @@ class TestGroupMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group1",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     GroupEntity group2 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2",
             auditInfo,
-            Lists.newArrayList(role3.name()),
-            Lists.newArrayList(role3.id()));
+            Lists.newArrayList(role3));
     groupMetaService.insertGroup(group1, false);
     groupMetaService.insertGroup(group2, false);
 
@@ -710,16 +694,14 @@ class TestGroupMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group1",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     GroupEntity group2 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2",
             auditInfo,
-            Lists.newArrayList(role3.name()),
-            Lists.newArrayList(role3.id()));
+            Lists.newArrayList(role3));
     groupMetaService.insertGroup(group1, false);
     groupMetaService.insertGroup(group2, false);
 
@@ -782,32 +764,28 @@ class TestGroupMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "group1",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     GroupEntity group2 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "group2",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     GroupEntity group3 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "group3",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     GroupEntity group4 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "group4",
             auditInfo,
-            Lists.newArrayList(role1.name(), role2.name()),
-            Lists.newArrayList(role1.id(), role2.id()));
+            Lists.newArrayList(role1, role2));
     groupMetaService.insertGroup(group1, false);
     groupMetaService.insertGroup(group2, false);
     groupMetaService.insertGroup(group3, false);

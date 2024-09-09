@@ -252,7 +252,7 @@ public class FilesetOperations {
   }
 
   @GET
-  @Path("{fileset}/fileLocation")
+  @Path("{fileset}/location")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-file-location." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-file-location", absolute = true)
@@ -261,7 +261,7 @@ public class FilesetOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("fileset") String fileset,
-      @QueryParam("subPath") @NotNull String subPath) {
+      @QueryParam("sub_path") @NotNull String subPath) {
     LOG.info(
         "Received get file location request: {}.{}.{}.{}, sub path:{}",
         metalake,

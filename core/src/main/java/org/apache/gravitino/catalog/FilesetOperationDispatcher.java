@@ -208,9 +208,6 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
-    return doWithCatalog(
-        getCatalogIdentifier(ident),
-        c -> c.doWithFilesetOps(f -> f.getFileLocation(ident, subPath)),
-        NonEmptyEntityException.class);
+    throw new UnsupportedOperationException("Not implemented");
   }
 }

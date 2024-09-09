@@ -19,23 +19,15 @@
 package org.apache.gravitino.proto;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntitySerDe;
 import org.apache.gravitino.EntitySerDeFactory;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.authorization.Privileges;
-import org.apache.gravitino.authorization.SecurableObject;
-import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.meta.GroupEntity;
-import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
-import org.apache.gravitino.meta.UserEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -323,110 +315,5 @@ public class TestEntityProtoSerDe {
     Assertions.assertEquals(topicEntity1, topicEntityFromBytes1);
     Assertions.assertNull(topicEntityFromBytes1.comment());
     Assertions.assertNull(topicEntityFromBytes1.properties());
-
-    // Test UserEntity
-    Namespace userNamespace =
-        Namespace.of("metalake", Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME);
-    Long userId = 1L;
-    String userName = "user";
-    UserEntity userEntity =
-        UserEntity.builder()
-            .withId(userId)
-            .withName(userName)
-            .withNamespace(userNamespace)
-            .withAuditInfo(auditInfo)
-            .withRoleNames(Lists.newArrayList("role"))
-            .withRoleIds(Lists.newArrayList(1L))
-            .build();
-    byte[] userBytes = protoEntitySerDe.serialize(userEntity);
-    UserEntity userEntityFromBytes =
-        protoEntitySerDe.deserialize(userBytes, UserEntity.class, userNamespace);
-    Assertions.assertEquals(userEntity, userEntityFromBytes);
-
-    UserEntity userEntityWithoutFields =
-        UserEntity.builder()
-            .withId(userId)
-            .withName(userName)
-            .withNamespace(userNamespace)
-            .withAuditInfo(auditInfo)
-            .build();
-    userBytes = protoEntitySerDe.serialize(userEntityWithoutFields);
-    userEntityFromBytes = protoEntitySerDe.deserialize(userBytes, UserEntity.class, userNamespace);
-    Assertions.assertEquals(userEntityWithoutFields, userEntityFromBytes);
-    Assertions.assertNull(userEntityWithoutFields.roles());
-    Assertions.assertNull(userEntityWithoutFields.roleIds());
-
-    // Test GroupEntity
-    Namespace groupNamespace =
-        Namespace.of("metalake", Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME);
-    Long groupId = 1L;
-    String groupName = "group";
-
-    GroupEntity group =
-        GroupEntity.builder()
-            .withId(groupId)
-            .withName(groupName)
-            .withNamespace(groupNamespace)
-            .withAuditInfo(auditInfo)
-            .withRoleNames(Lists.newArrayList("role"))
-            .withRoleIds(Lists.newArrayList(1L))
-            .build();
-    byte[] groupBytes = protoEntitySerDe.serialize(group);
-    GroupEntity groupFromBytes =
-        protoEntitySerDe.deserialize(groupBytes, GroupEntity.class, groupNamespace);
-    Assertions.assertEquals(group, groupFromBytes);
-
-    GroupEntity groupWithoutFields =
-        GroupEntity.builder()
-            .withId(groupId)
-            .withName(groupName)
-            .withNamespace(groupNamespace)
-            .withAuditInfo(auditInfo)
-            .build();
-    groupBytes = protoEntitySerDe.serialize(groupWithoutFields);
-    groupFromBytes = protoEntitySerDe.deserialize(groupBytes, GroupEntity.class, groupNamespace);
-    Assertions.assertEquals(groupWithoutFields, groupFromBytes);
-    Assertions.assertNull(groupWithoutFields.roles());
-    Assertions.assertNull(groupWithoutFields.roleIds());
-
-    // Test RoleEntity
-    Namespace roleNamespace =
-        Namespace.of("metalake", Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
-    Long roleId = 1L;
-    String roleName = "testRole";
-    String anotherCatalogName = "anotherCatalog";
-    SecurableObject securableObject =
-        SecurableObjects.ofCatalog(
-            catalogName,
-            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.deny()));
-    SecurableObject anotherSecurableObject =
-        SecurableObjects.ofCatalog(
-            anotherCatalogName, Lists.newArrayList(Privileges.UseCatalog.allow()));
-
-    RoleEntity roleEntity =
-        RoleEntity.builder()
-            .withId(roleId)
-            .withName(roleName)
-            .withNamespace(roleNamespace)
-            .withAuditInfo(auditInfo)
-            .withSecurableObjects(Lists.newArrayList(securableObject, anotherSecurableObject))
-            .withProperties(props)
-            .build();
-    byte[] roleBytes = protoEntitySerDe.serialize(roleEntity);
-    RoleEntity roleFromBytes =
-        protoEntitySerDe.deserialize(roleBytes, RoleEntity.class, roleNamespace);
-    Assertions.assertEquals(roleEntity, roleFromBytes);
-
-    RoleEntity roleWithoutFields =
-        RoleEntity.builder()
-            .withId(1L)
-            .withName(roleName)
-            .withNamespace(roleNamespace)
-            .withAuditInfo(auditInfo)
-            .withSecurableObjects(Lists.newArrayList(securableObject, anotherSecurableObject))
-            .build();
-    roleBytes = protoEntitySerDe.serialize(roleWithoutFields);
-    roleFromBytes = protoEntitySerDe.deserialize(roleBytes, RoleEntity.class, roleNamespace);
-    Assertions.assertEquals(roleWithoutFields, roleFromBytes);
   }
 }

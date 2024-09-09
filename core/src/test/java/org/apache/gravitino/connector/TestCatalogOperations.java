@@ -18,13 +18,11 @@
  */
 package org.apache.gravitino.connector;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -76,8 +74,6 @@ public class TestCatalogOperations
   public static final String FAIL_CREATE = "fail-create";
 
   public static final String FAIL_TEST = "need-fail";
-
-  private static final String SLASH = "/";
 
   public TestCatalogOperations(Map<String, String> config) {
     tables = Maps.newHashMap();
@@ -436,28 +432,7 @@ public class TestCatalogOperations
 
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath) {
-    Preconditions.checkArgument(subPath != null, "subPath must not be null");
-    String processedSubPath;
-    if (!subPath.trim().isEmpty() && !subPath.trim().startsWith(SLASH)) {
-      processedSubPath = SLASH + subPath.trim();
-    } else {
-      processedSubPath = subPath.trim();
-    }
-
-    Fileset fileset = loadFileset(ident);
-
-    String fileLocation;
-    // subPath cannot be null, so we only need check if it is blank
-    if (StringUtils.isBlank(processedSubPath)) {
-      fileLocation = fileset.storageLocation();
-    } else {
-      String storageLocation =
-          fileset.storageLocation().endsWith(SLASH)
-              ? fileset.storageLocation().substring(0, fileset.storageLocation().length() - 1)
-              : fileset.storageLocation();
-      fileLocation = String.format("%s%s", storageLocation, processedSubPath);
-    }
-    return fileLocation;
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
