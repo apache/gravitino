@@ -129,6 +129,11 @@ set search_path to your_schema;
 \i schema-{version}-postgresql.sql
 ```
 
+:::note
+Database and schema are required parameters in the Gravitino PostgreSQL JDBC URL, Users should
+create them in advance and set the database and schema in the JDBC URL.
+:::
+
 
 ### Step 3: Place the PostgreSQL connector Jar
 
