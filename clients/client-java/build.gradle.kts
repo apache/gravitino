@@ -58,6 +58,7 @@ dependencies {
   testImplementation(libs.mockserver.netty)
   testImplementation(libs.mockserver.client.java)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

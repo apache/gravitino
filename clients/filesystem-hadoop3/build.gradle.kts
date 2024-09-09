@@ -63,6 +63,7 @@ dependencies {
     exclude("com.google.guava", "guava")
   }
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
