@@ -25,11 +25,12 @@ rootProject.name = "gravitino"
 val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion"]?.toString()
   ?: settings.extra["defaultScalaVersion"].toString()
 
-include("api", "common", "core", "meta", "server", "integration-test", "server-common")
+include("api", "common", "core", "meta", "server", "server-common")
 include("catalogs:catalog-common")
 include("catalogs:catalog-hive")
 include("catalogs:catalog-lakehouse-iceberg")
 include("catalogs:catalog-lakehouse-paimon")
+include("catalogs:catalog-lakehouse-hudi")
 include(
   "catalogs:catalog-jdbc-common",
   "catalogs:catalog-jdbc-doris",
@@ -47,7 +48,8 @@ include(
 )
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
-include("trino-connector")
+include("authorizations:authorization-ranger")
+include("trino-connector:trino-connector", "trino-connector:integration-test")
 include("spark-connector:spark-common")
 // kyuubi hive connector doesn't support 2.13 for Spark3.3
 if (scalaVersion == "2.12") {
@@ -55,13 +57,14 @@ if (scalaVersion == "2.12") {
   project(":spark-connector:spark-3.3").projectDir = file("spark-connector/v3.3/spark")
   project(":spark-connector:spark-runtime-3.3").projectDir = file("spark-connector/v3.3/spark-runtime")
   // flink only support scala 2.12
-  include("flink-connector")
+  include("flink-connector:flink")
+  include("flink-connector:flink-runtime")
 }
 include("spark-connector:spark-3.4", "spark-connector:spark-runtime-3.4", "spark-connector:spark-3.5", "spark-connector:spark-runtime-3.5")
 project(":spark-connector:spark-3.4").projectDir = file("spark-connector/v3.4/spark")
 project(":spark-connector:spark-runtime-3.4").projectDir = file("spark-connector/v3.4/spark-runtime")
 project(":spark-connector:spark-3.5").projectDir = file("spark-connector/v3.5/spark")
 project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector/v3.5/spark-runtime")
-include("web")
+include("web:web", "web:integration-test")
 include("docs")
 include("integration-test-common")

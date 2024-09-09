@@ -40,7 +40,7 @@ document [How to use the playground](./how-to-use-the-playground.md)
 to launch a Gravitino server, HDFS and Jupyter notebook environment in you local Docker environment.
 
 Waiting for the playground Docker environment to start, you can directly open
-`http://localhost:8888/lab/tree/gravitino-fileset-example.ipynb` in the browser and run the example.
+`http://localhost:18888/lab/tree/gravitino-fileset-example.ipynb` in the browser and run the example.
 
 The [gravitino-fileset-example](https://github.com/apache/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
 contains the following code snippets:
@@ -122,8 +122,7 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
 + Official website https://gravitino.apache.org/
 + Project home on GitHub: https://github.com/apache/gravitino/
 + Playground with Docker: https://github.com/apache/gravitino-playground
-+ User documentation: https://datastrato.ai/docs/
-+ Videos on Youtube: https://www.youtube.com/@Datastrato
++ User documentation: https://gravitino.apache.org/docs/
 + Slack Community: [https://the-asf.slack.com#gravitino](https://the-asf.slack.com/archives/C078RESTT19)
 
 ## License

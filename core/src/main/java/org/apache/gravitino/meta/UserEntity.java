@@ -23,6 +23,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
@@ -44,18 +46,15 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the user entity.");
 
-  public static final Field ROLE_NAMES =
-      Field.optional("role_names", List.class, "The role names of the user entity");
-
-  public static final Field ROLE_IDS =
-      Field.optional("role_ids", List.class, "The role ids of the user entity");
+  public static final Field ROLES_SUPPLIER =
+      Field.required("roles_supplier", Supplier.class, "The roles supplier of the user entity");
 
   private Long id;
   private String name;
   private AuditInfo auditInfo;
-  private List<String> roleNames;
-  private List<Long> roleIds;
   private Namespace namespace;
+  // The roles is a lazy field to avoid unnecessary cost.
+  private Supplier<List<RoleEntity>> rolesSupplier = Collections::emptyList;
 
   private UserEntity() {}
 
@@ -70,8 +69,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     fields.put(ID, id);
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
-    fields.put(ROLE_NAMES, roleNames);
-    fields.put(ROLE_IDS, roleIds);
+    fields.put(ROLES_SUPPLIER, rolesSupplier);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -133,25 +131,16 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
    */
   @Override
   public List<String> roles() {
-    return roleNames;
+    return roleEntities().stream().map(RoleEntity::name).collect(Collectors.toList());
   }
 
   /**
-   * Returns the role names of the user entity.
+   * Returns the role entities of the user entity.
    *
-   * @return The role names of the user entity.
+   * @return The role entities of the user entity.
    */
-  public List<String> roleNames() {
-    return roleNames;
-  }
-
-  /**
-   * Returns the role ids of the user entity.
-   *
-   * @return The role ids of the user entity.
-   */
-  public List<Long> roleIds() {
-    return roleIds;
+  public List<RoleEntity> roleEntities() {
+    return rolesSupplier.get();
   }
 
   @Override
@@ -164,13 +153,12 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(roleNames, that.roleNames)
-        && Objects.equals(roleIds, that.roleIds);
+        && Objects.equals(roles(), that.roles());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, roleNames, roleIds);
+    return Objects.hash(id, name, auditInfo, roles());
   }
 
   public static Builder builder() {
@@ -218,24 +206,26 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the role names of the user entity.
+     * Sets the roles of the user entity.
      *
-     * @param roles The role names of the user entity.
+     * @param roles The role entities of the user entity.
      * @return The builder instance.
      */
-    public Builder withRoleNames(List<String> roles) {
-      userEntity.roleNames = roles;
+    public Builder withRoles(List<RoleEntity> roles) {
+      if (roles != null) {
+        userEntity.rolesSupplier = () -> roles;
+      }
       return this;
     }
 
     /**
-     * Sets the role ids of the user entity.
+     * Sets the roles supplier of the user entity.
      *
-     * @param roleIds The role ids of the user entity.
+     * @param supplier The roles supplier of the user entity.
      * @return The builder instance.
      */
-    public Builder withRoleIds(List<Long> roleIds) {
-      userEntity.roleIds = roleIds;
+    public Builder withRolesSupplier(Supplier<List<RoleEntity>> supplier) {
+      userEntity.rolesSupplier = supplier;
       return this;
     }
 

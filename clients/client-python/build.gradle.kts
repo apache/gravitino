@@ -222,7 +222,8 @@ tasks {
       "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
       "START_EXTERNAL_GRAVITINO" to "true",
       "DOCKER_TEST" to dockerTest.toString(),
-      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "datastrato/gravitino-ci-hive:0.1.13",
+      "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "apache/gravitino-ci:hive-0.1.13",
+      "GRAVITINO_OAUTH2_SAMPLE_SERVER" to "datastrato/sample-authorization-server:0.3.0",
       // Set the PYTHONPATH to the client-python directory, make sure the tests can import the
       // modules from the client-python directory.
       "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
@@ -282,6 +283,16 @@ tasks {
       delete("README.md")
       generatePypiProjectHomePage()
       delete("dist")
+      copy {
+        from("${project.rootDir}/licenses") { into("licenses") }
+        from("${project.rootDir}/LICENSE.bin") { into("./") }
+        from("${project.rootDir}/NOTICE.bin") { into("./") }
+        from("${project.rootDir}/DISCLAIMER_WIP.txt") { into("./") }
+        into("${project.rootDir}/clients/client-python")
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
     }
 
     venvExec = "python"
@@ -289,6 +300,10 @@ tasks {
 
     doLast {
       delete("README.md")
+      delete("licenses")
+      delete("LICENSE")
+      delete("NOTICE")
+      delete("DISCLAIMER_WIP.txt")
     }
   }
 
@@ -305,7 +320,7 @@ tasks {
     delete("dist")
     delete("docs")
     delete("gravitino/version.ini")
-    delete("gravitino.egg-info")
+    delete("apache_gravitino.egg-info")
     delete("tests/unittests/htmlcov")
     delete("tests/unittests/.coverage")
     delete("tests/integration/htmlcov")

@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino connector - MySQL catalog"
+title: "Apache Gravitino Trino connector - MySQL catalog"
 slug: /trino-connector/catalog-mysql
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
@@ -16,10 +16,9 @@ To connect to MySQL, you need:
 
 ## Create table
 
-At present, the Apache Gravitino connector only supports basic MySQL table creation statements, which involve fields, null allowances, and comments. 
-However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
+At present, the Apache Gravitino Trino connector only supports basic MySQL table creation statements, which involve fields, null allowances, and comments. However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
 
-The Gravitino connector does not support `CREATE TABLE AS SELECT`.
+The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
 ## Alter table
 
@@ -32,7 +31,7 @@ Support for the following alter table operations:
 
 ## Select
 
-The Gravitino connector supports most SELECT statements, allowing the execution of queries successfully.
+The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as indexes and pushdowns.
 
 ## Table and Schema properties
@@ -96,7 +95,7 @@ Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
 ```
 
 The `gravitino` catalog is a catalog defined By Trino catalog configuration. 
-The `test.mysql_test` catalog is the catalog created by you in Gravitino.
+The `mysql_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
@@ -156,7 +155,7 @@ ALTER TABLE mysql_test.database_01.table_01 DROP COLUMN age;
 Rename the `table_01` table to `table_02`:
 
 ```sql
-ALTER TABLE mysql_test.database_01.table_01 RENAME TO "test.mysql_test".database_01.table_02;
+ALTER TABLE mysql_test.database_01.table_01 RENAME TO mysql_test.database_01.table_02;
 ```
 
 ### DROP

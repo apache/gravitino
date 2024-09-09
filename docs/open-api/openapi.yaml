@@ -1,4 +1,3 @@
-#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -7,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#  http://www.apache.org/licenses/LICENSE-2.0
+#   http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -15,7 +14,6 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
 
 ---
 openapi: 3.0.3
@@ -70,6 +68,9 @@ paths:
   /metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectFullName}/{tag}:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1%7Btag%7D"
 
+  /metalakes/{metalake}/tags/{tag}/objects:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D~1objects"
+
   /metalakes/{metalake}/catalogs:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs"
 
@@ -108,6 +109,40 @@ paths:
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics/{topic}:
     $ref: "./topics.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1topics~1%7Btopic%7D"
+
+
+  /metalakes/{metalake}/users:
+    $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1users"
+
+  /metalakes/{metalake}/users/{user}:
+    $ref: "./users.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1users~1%7Buser%7D"
+
+  /metalakes/{metalake}/groups:
+    $ref: "./groups.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1groups"
+
+  /metalakes/{metalake}/groups/{group}:
+    $ref: "./groups.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1groups~1%7Bgroup%7D"
+
+  /metalakes/{metalake}/roles:
+    $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1roles"
+
+  /metalakes/{metalake}/roles/{role}:
+    $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1roles~1%7Brole%7D"
+
+  /metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectFullName}:
+    $ref: "./owners.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1owners~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D"
+
+  /metalakes/{metalake}/permissions/users/{user}/grant:
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1users~1%7Buser%7D~1grant"
+
+  /metalakes/{metalake}/permissions/users/{user}/revoke:
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1users~1%7Buser%7D~1revoke"
+
+  /metalakes/{metalake}/permissions/groups/{group}/grant:
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1grant"
+
+  /metalakes/{metalake}/permissions/groups/{group}/revoke:
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1revoke"
 
 components:
 
@@ -254,6 +289,57 @@ components:
                 type: boolean
                 description: Whether the drop operation was successful
 
+    RemoveResponse:
+      description: Represents a response for a remove operation
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              removed:
+                type: boolean
+                description: Whether the remove operation was successful
+
+    DeleteResponse:
+      description: Represents a response for a delete operation
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              deleted:
+                type: boolean
+                description: Whether the delete operation was successful
+
+    SetResponse:
+      description: Represents a response for a set operation
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              set:
+                type: boolean
+                description: Whether the set operation was successful
+
   parameters:
     metalake:
       name: metalake
@@ -311,6 +397,29 @@ components:
       schema:
         type: string
 
+    user:
+      name: user
+      in: path
+      description: The name of the user
+      required: true
+      schema:
+        type: string
+
+    group:
+      name: group
+      in: path
+      description: The name of the group
+      required: true
+      schema:
+          type: string
+    role:
+      name: role
+      in: path
+      description: The name of the role
+      required: true
+      schema:
+        type: string
+
     metadataObjectType:
       name: metadataObjectType
       in: path
@@ -319,11 +428,13 @@ components:
       schema:
         type: string
         enum:
-          - "catalog"
-          - "schema"
-          - "table"
-          - "fileset"
-          - "topic"
+          - "CATALOG"
+          - "SCHEMA"
+          - "TABLE"
+          - "FILESET"
+          - "TOPIC"
+          - "ROLE"
+          - "METALAKE"
 
     metadataObjectFullName:
       name: metadataObjectFullName

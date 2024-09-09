@@ -31,7 +31,9 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
+  implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
+  implementation(project(":clients:client-java"))
   implementation(project(":core"))
   implementation(project(":common"))
   implementation(project(":iceberg:iceberg-common"))
@@ -40,6 +42,8 @@ dependencies {
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.log4j)
+  implementation(libs.caffeine)
+  implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.databind)
@@ -114,6 +118,8 @@ tasks {
         original
       }
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyConfigsToStandalonePackage", Copy::class) {
@@ -130,6 +136,8 @@ tasks {
         original
       }
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyLibAndConfigs", Copy::class) {
@@ -154,14 +162,6 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
-      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.3")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

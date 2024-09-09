@@ -20,7 +20,9 @@ package org.apache.gravitino.connector.authorization.ranger;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.User;
@@ -77,6 +79,12 @@ public class TestRangerAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public Boolean onGroupAcquired(Group group) {
+    return null;
+  }
+
+  @Override
+  public Boolean onOwnerSet(MetadataObject metadataObject, Owner preOwner, Owner newOwner)
+      throws RuntimeException {
     return null;
   }
 

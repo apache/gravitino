@@ -247,8 +247,8 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
 
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(tableIdentifier, columns, null, ImmutableMap.of());
+    tableCatalog.createTable(tableIdentifier, columns, null, ImmutableMap.of());
+    Table createdTable = tableCatalog.loadTable(tableIdentifier);
 
     Assertions.assertEquals(tableName, createdTable.name());
     Assertions.assertEquals(columns.length, createdTable.columns().length);
@@ -324,6 +324,17 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     Optional<Column> column =
         Arrays.stream(t.columns()).filter(c -> c.name().equals("binary")).findFirst();
     Assertions.assertTrue(column.isPresent());
+
+    boolean result = tableCatalog.dropTable(tableIdentifier);
+    Assertions.assertTrue(result);
+
+    Assertions.assertThrows(Exception.class, () -> tableCatalog.loadTable(tableIdentifier));
+
+    // Test drop schema with upper-case name
+    result = catalog.asSchemas().dropSchema(schemaN, false);
+
+    // Test whether drop the schema succussfully.
+    Assertions.assertTrue(result);
   }
 
   private Map<String, String> createProperties() {
@@ -483,31 +494,19 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     Map<String, String> properties = createProperties();
     TableCatalog tableCatalog = catalog.asTableCatalog();
-    Table createdTable =
-        tableCatalog.createTable(
-            tableIdentifier,
-            columns,
-            table_comment,
-            properties,
-            partitioning,
-            distribution,
-            sortOrders);
-    Assertions.assertEquals(createdTable.name(), tableName);
-    Map<String, String> resultProp = createdTable.properties();
-    for (Map.Entry<String, String> entry : properties.entrySet()) {
-      Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
-      Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
-    }
-    Assertions.assertEquals(createdTable.columns().length, columns.length);
-
-    for (int i = 0; i < columns.length; i++) {
-      ITUtils.assertColumn(columns[i], createdTable.columns()[i]);
-    }
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        sortOrders);
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals(tableName, loadTable.name());
     Assertions.assertEquals(table_comment, loadTable.comment());
-    resultProp = loadTable.properties();
+    Map<String, String> resultProp = loadTable.properties();
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertTrue(resultProp.containsKey(entry.getKey()));
       Assertions.assertEquals(entry.getValue(), resultProp.get(entry.getKey()));
@@ -795,40 +794,42 @@ public class CatalogPostgreSqlIT extends AbstractIT {
             "Index does not support complex fields in PostgreSQL"));
 
     // Test create index with empty name success.
-    table =
-        tableCatalog.createTable(
-            NameIdentifier.of(schemaName, "test_null_key"),
-            newColumns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE,
-            new SortOrder[0],
-            new Index[] {
-              Indexes.of(
-                  Index.IndexType.UNIQUE_KEY,
-                  null,
-                  new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
-              Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
-            });
+    NameIdentifier tableIdent = NameIdentifier.of(schemaName, "test_null_key");
+    tableCatalog.createTable(
+        tableIdent,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_1"}, {"col_3"}, {"col_4"}}),
+          Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_4"}}),
+        });
+    table = tableCatalog.loadTable(tableIdent);
+
     Assertions.assertEquals(2, table.index().length);
     Assertions.assertNotNull(table.index()[0].name());
     Assertions.assertNotNull(table.index()[1].name());
 
     // Test create index with same col success.
-    table =
-        tableCatalog.createTable(
-            NameIdentifier.of(schemaName, "many_index"),
-            newColumns,
-            table_comment,
-            properties,
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE,
-            new SortOrder[0],
-            new Index[] {
-              Indexes.unique("u4_key_2", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-              Indexes.unique("u5_key_3", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
-            });
+    tableIdent = NameIdentifier.of(schemaName, "many_index");
+    tableCatalog.createTable(
+        tableIdent,
+        newColumns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+          Indexes.unique("u4_key_2", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+          Indexes.unique("u5_key_3", new String[][] {{"col_2"}, {"col_3"}, {"col_4"}}),
+        });
+    table = tableCatalog.loadTable(tableIdent);
+
     Assertions.assertEquals(1, table.index().length);
     Assertions.assertEquals("u4_key_2", table.index()[0].name());
   }
@@ -873,26 +874,20 @@ public class CatalogPostgreSqlIT extends AbstractIT {
 
     Column[] newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
 
-    Table createdTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("pg_it_table")),
-                newColumns,
-                null,
-                ImmutableMap.of());
+    NameIdentifier tableIdent =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("pg_it_table"));
+    catalog.asTableCatalog().createTable(tableIdent, newColumns, null, ImmutableMap.of());
+    Table loadedTable = catalog.asTableCatalog().loadTable(tableIdent);
 
     Assertions.assertEquals(
-        UnparsedExpression.of("random()"), createdTable.columns()[0].defaultValue());
+        UnparsedExpression.of("random()"), loadedTable.columns()[0].defaultValue());
     Assertions.assertEquals(
-        DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, createdTable.columns()[1].defaultValue());
-    Assertions.assertEquals(Literals.NULL, createdTable.columns()[2].defaultValue());
-    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
+        DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, loadedTable.columns()[1].defaultValue());
+    Assertions.assertEquals(Literals.NULL, loadedTable.columns()[2].defaultValue());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, loadedTable.columns()[3].defaultValue());
     Assertions.assertEquals(
-        Literals.varcharLiteral(255, "current_timestamp"),
-        createdTable.columns()[4].defaultValue());
-    Assertions.assertEquals(
-        Literals.integerLiteral(1000), createdTable.columns()[5].defaultValue());
+        Literals.varcharLiteral(255, "current_timestamp"), loadedTable.columns()[4].defaultValue());
+    Assertions.assertEquals(Literals.integerLiteral(1000), loadedTable.columns()[5].defaultValue());
   }
 
   @Test

@@ -31,7 +31,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.ToString;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.catalog.hive.converter.HiveDataTypeConverter;
 import org.apache.gravitino.connector.BaseTable;
@@ -87,7 +86,7 @@ public class HiveTable extends BaseTable {
 
     StorageDescriptor sd = table.getSd();
     Distribution distribution = Distributions.NONE;
-    if (CollectionUtils.isNotEmpty(sd.getBucketCols())) {
+    if (sd.getBucketCols() != null && !sd.getBucketCols().isEmpty()) {
       // Hive table use hash strategy as bucketing strategy
       distribution =
           Distributions.hash(
@@ -96,7 +95,7 @@ public class HiveTable extends BaseTable {
     }
 
     SortOrder[] sortOrders = new SortOrder[0];
-    if (CollectionUtils.isNotEmpty(sd.getSortCols())) {
+    if (sd.getSortCols() != null && !sd.getSortCols().isEmpty()) {
       sortOrders =
           sd.getSortCols().stream()
               .map(

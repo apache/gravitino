@@ -1,6 +1,6 @@
 ---
 title: "Paimon catalog"
-slug: /lakehouse-Paimon-catalog
+slug: /lakehouse-paimon-catalog
 keywords:
   - lakehouse
   - Paimon
@@ -59,9 +59,9 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Schema properties
 
-- Doesn't support specify location and store any schema properties when createSchema for FilesystemCatalog now.
-- Doesn't return any schema properties when loadSchema for FilesystemCatalog now.
-- Doesn't support store schema comment for FilesystemCatalog now.
+- Doesn't support specify location and store any schema properties when createSchema for FilesystemCatalog.
+- Doesn't return any schema properties when loadSchema for FilesystemCatalog.
+- Doesn't support store schema comment for FilesystemCatalog.
 
 ### Schema operations
 
@@ -71,11 +71,15 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Table capabilities
 
-- Supporting createTable, dropTable, alterTable, loadTable and listTable.
-```
-dropTable will delete the table location directly, similar with purgeTable.
-```
+- Supporting createTable, purgeTable, alterTable, loadTable and listTable.
 - Supporting Column default value through table properties, such as `fields.{columnName}.default-value`, not column expression.
+
+- Doesn't support dropTable.
+- Doesn't support table distribution and sort orders.
+
+:::info
+Gravitino Paimon Catalog does not support dropTable, because the dropTable in Paimon will both remove the table metadata and the table location from the file system and skip the trash, we should use purgeTable instead in Gravitino.
+:::
 
 :::info
 Paimon does not support auto increment column.
@@ -83,25 +87,17 @@ Paimon does not support auto increment column.
 
 #### Table changes
 
+- RenameTable
 - AddColumn
 - DeleteColumn
 - RenameColumn
 - UpdateColumnComment
 - UpdateColumnNullability
 - UpdateColumnPosition
-```
-UpdateColumnPosition only supports update a column position with first, after position, cannot use default position.
-```
 - UpdateColumnType
 - UpdateComment
 - SetProperty
-```
-SetProperty cannot update table comment, please use UpdateComment instead.
-```
 - RemoveProperty
-```
-RemoveProperty cannot remove table comment.
-```
 
 #### Table partitions
 
@@ -115,7 +111,7 @@ Please refer to [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spa
 
 ### Table distributions
 
-- Only supporting `NoneDistribution` now.
+- Doesn't support table distributions.
 
 ### Table indexes
 

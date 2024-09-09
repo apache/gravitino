@@ -375,6 +375,24 @@ public class JDBCBackend implements RelationalBackend {
             .getOwner(nameIdentifier, identType)
             .ifPresent(e -> list.add((E) e));
         return list;
+      case METADATA_OBJECT_ROLE_REL:
+        return (List<E>)
+            RoleMetaService.getInstance()
+                .listRolesByMetadataObjectIdentAndType(nameIdentifier, identType);
+      case ROLE_GROUP_REL:
+        if (identType == Entity.EntityType.ROLE) {
+          return (List<E>) GroupMetaService.getInstance().listGroupsByRoleIdent(nameIdentifier);
+        } else {
+          throw new IllegalArgumentException(
+              String.format("ROLE_GROUP_REL doesn't support type %s", identType.name()));
+        }
+      case ROLE_USER_REL:
+        if (identType == Entity.EntityType.ROLE) {
+          return (List<E>) UserMetaService.getInstance().listUsersByRoleIdent(nameIdentifier);
+        } else {
+          throw new IllegalArgumentException(
+              String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
+        }
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -399,9 +417,10 @@ public class JDBCBackend implements RelationalBackend {
     }
   }
 
-  enum JDBCBackendType {
+  public enum JDBCBackendType {
     H2(true),
-    MYSQL(false);
+    MYSQL(false),
+    POSTGRESQL(false);
 
     private final boolean embedded;
 
@@ -414,8 +433,23 @@ public class JDBCBackend implements RelationalBackend {
         return JDBCBackendType.H2;
       } else if (jdbcURI.startsWith("jdbc:mysql")) {
         return JDBCBackendType.MYSQL;
+      } else if (jdbcURI.startsWith("jdbc:postgresql")) {
+        return JDBCBackendType.POSTGRESQL;
       } else {
         throw new IllegalArgumentException("Unknown JDBC URI: " + jdbcURI);
+      }
+    }
+
+    public static JDBCBackendType fromString(String jdbcType) {
+      switch (jdbcType) {
+        case "h2":
+          return JDBCBackendType.H2;
+        case "mysql":
+          return JDBCBackendType.MYSQL;
+        case "postgresql":
+          return JDBCBackendType.POSTGRESQL;
+        default:
+          throw new IllegalArgumentException("Unknown JDBC type: " + jdbcType);
       }
     }
   }

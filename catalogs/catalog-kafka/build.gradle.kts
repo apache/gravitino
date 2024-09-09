@@ -25,9 +25,15 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":core"))
-  implementation(project(":common"))
+  implementation(project(":api")) {
+    exclude("*")
+  }
+  implementation(project(":core")) {
+    exclude("*")
+  }
+  implementation(project(":common")) {
+    exclude("*")
+  }
 
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
@@ -45,6 +51,7 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
 
@@ -59,7 +66,11 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn(jar, runtimeJars)
-    from("build/libs")
+    from("build/libs") {
+      exclude("guava-*.jar")
+      exclude("log4j-*.jar")
+      exclude("slf4j-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/kafka/libs")
   }
 
@@ -72,6 +83,8 @@ tasks {
     exclude { details ->
       details.file.isDirectory()
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyLibAndConfig", Copy::class) {
@@ -105,12 +118,5 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }

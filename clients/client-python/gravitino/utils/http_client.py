@@ -140,7 +140,7 @@ class HTTPClient:
         except HTTPError as err:
             err_body = err.read()
 
-            if err_body is None:
+            if err_body is None or len(err_body) == 0:
                 return (
                     False,
                     ErrorResponse.generate_error_response(RESTException, err.reason),

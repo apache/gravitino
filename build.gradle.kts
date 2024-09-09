@@ -156,7 +156,7 @@ allprojects {
     }
   }
 
-  val setIntegrationTestEnvironment: (Test) -> Unit = { param ->
+  val setTestEnvironment: (Test) -> Unit = { param ->
     param.doFirst {
       param.jvmArgs(project.property("extraJvmArgs") as List<*>)
 
@@ -166,6 +166,14 @@ allprojects {
       param.environment("HADOOP_USER_NAME", "anonymous")
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
+
+      // Gravitino CI Docker image
+      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.13")
+      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.5")
+      param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
+      param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
+      param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.1")
+      param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
 
       val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
       val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
@@ -190,7 +198,7 @@ allprojects {
       } else if (testMode == "embedded") {
         param.environment("GRAVITINO_HOME", project.rootDir.path)
         param.environment("GRAVITINO_TEST", "true")
-        param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/dist/")
+        param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/web/dist/")
         param.systemProperty("testMode", "embedded")
       } else {
         throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
@@ -205,7 +213,7 @@ allprojects {
     }
   }
 
-  extra["initIntegrationTest"] = setIntegrationTestEnvironment
+  extra["initTestParam"] = setTestEnvironment
 }
 
 nexusPublishing {
@@ -409,6 +417,11 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
+    if (project.name != "server-common") {
+      val initTest = project.extra.get("initTestParam") as (Test) -> Unit
+      initTest(this)
+    }
+
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
       showExceptions = true
@@ -418,9 +431,9 @@ subprojects {
     reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
-      jvmArgs = listOf("-Xmx2G")
+      val extraArgs = project.property("extraJvmArgs") as List<String>
+      jvmArgs = listOf("-Xmx4G") + extraArgs
       useJUnitPlatform()
-      jvmArgs(project.property("extraJvmArgs") as List<*>)
       finalizedBy(tasks.getByName("jacocoTestReport"))
     }
   }
@@ -474,17 +487,17 @@ tasks.rat {
     "integration-test/**/*.txt",
     "docs/**/*.md",
     "spark-connector/spark-common/src/test/resources/**",
-    "web/.**",
-    "web/next-env.d.ts",
-    "web/dist/**/*",
-    "web/node_modules/**/*",
-    "web/src/lib/utils/axios/**/*",
-    "web/src/lib/enums/httpEnum.js",
-    "web/src/types/axios.d.ts",
-    "web/yarn.lock",
-    "web/package-lock.json",
-    "web/pnpm-lock.yaml",
-    "web/src/lib/icons/svg/**/*.svg",
+    "web/web/.**",
+    "web/web/next-env.d.ts",
+    "web/web/dist/**/*",
+    "web/web/node_modules/**/*",
+    "web/web/src/lib/utils/axios/**/*",
+    "web/web/src/lib/enums/httpEnum.js",
+    "web/web/src/types/axios.d.ts",
+    "web/web/yarn.lock",
+    "web/web/package-lock.json",
+    "web/web/pnpm-lock.yaml",
+    "web/web/src/lib/icons/svg/**/*.svg",
     "**/LICENSE.*",
     "**/NOTICE.*",
     "DISCLAIMER_WIP.txt",
@@ -493,7 +506,6 @@ tasks.rat {
     "clients/client-python/.pytest_cache/*",
     "clients/client-python/.venv/*",
     "clients/client-python/apache_gravitino.egg-info/*",
-    "clients/client-python/gravitino/utils/exceptions.py",
     "clients/client-python/gravitino/utils/http_client.py",
     "clients/client-python/tests/unittests/htmlcov/*",
     "clients/client-python/tests/integration/htmlcov/*"
@@ -507,8 +519,6 @@ tasks.rat {
     }
     exclusions.addAll(gitIgnoreExcludes)
   }
-
-  dependsOn(":web:nodeSetup")
 
   verbose.set(true)
   failOnError.set(true)
@@ -531,7 +541,7 @@ tasks {
   val outputDir = projectDir.dir("distribution")
 
   val compileDistribution by registering {
-    dependsOn("copySubprojectDependencies", "copyCatalogLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
+    dependsOn(":web:web:build", "copySubprojectDependencies", "copyCatalogLibAndConfigs", "copyAuthorizationLibAndConfigs", "copySubprojectLib", "iceberg:iceberg-rest-server:copyLibAndConfigs")
 
     group = "gravitino distribution"
     outputs.dir(projectDir.dir("distribution/package"))
@@ -539,11 +549,18 @@ tasks {
       copy {
         from(projectDir.dir("conf")) { into("package/conf") }
         from(projectDir.dir("bin")) { into("package/bin") }
-        from(projectDir.dir("web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
+        from(projectDir.dir("web/web/build/libs/${rootProject.name}-web-$version.war")) { into("package/web") }
         from(projectDir.dir("scripts")) { into("package/scripts") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".template", "")
+        }
+        eachFile {
+          if (name == "gravitino-env.sh") {
+            filter { line ->
+              line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
+            }
+          }
         }
         fileMode = 0b111101101
       }
@@ -552,6 +569,7 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("package") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -571,7 +589,7 @@ tasks {
     doLast {
       copy {
         from(projectDir.dir("conf")) {
-          include("${rootProject.name}-iceberg-rest-server.conf.template", "log4j2.properties.template")
+          include("${rootProject.name}-iceberg-rest-server.conf.template", "${rootProject.name}-env.sh.template", "log4j2.properties.template")
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
         from(projectDir.dir("bin")) {
@@ -582,6 +600,13 @@ tasks {
         rename { fileName ->
           fileName.replace(".template", "")
         }
+        eachFile {
+          if (name == "gravitino-env.sh") {
+            filter { line ->
+              line.replace("GRAVITINO_VERSION_PLACEHOLDER", "$version")
+            }
+          }
+        }
         fileMode = 0b111101101
       }
 
@@ -590,6 +615,26 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-iceberg-rest-server") }
+        into(outputDir)
+        rename { fileName ->
+          fileName.replace(".bin", "")
+        }
+      }
+    }
+  }
+
+  val compileTrinoConnector by registering {
+    dependsOn("trino-connector:trino-connector:copyLibs")
+    group = "gravitino distribution"
+    outputs.dir(projectDir.dir("distribution/${rootProject.name}-trino-connector"))
+    doLast {
+      copy {
+        from(projectDir.dir("licenses")) { into("${rootProject.name}-trino-connector/licenses") }
+        from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
+        from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-trino-connector") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -610,11 +655,11 @@ tasks {
   }
 
   val assembleTrinoConnector by registering(Tar::class) {
-    dependsOn("trino-connector:copyLibs")
+    dependsOn("compileTrinoConnector")
     group = "gravitino distribution"
     finalizedBy("checksumTrinoConnector")
     into("${rootProject.name}-trino-connector-$version")
-    from("trino-connector/build/libs")
+    from(compileTrinoConnector.map { it.outputs.files.single() })
     compression = Compression.GZIP
     archiveFileName.set("${rootProject.name}-trino-connector-$version.tar.gz")
     destinationDirectory.set(projectDir.dir("distribution"))
@@ -687,8 +732,9 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
+        !it.name.startsWith("authorization") &&
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog" && it.name != "flink-connector"
+        it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink")
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -700,13 +746,14 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
+        !it.name.startsWith("authorization") &&
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("iceberg") &&
         !it.name.startsWith("integration-test") &&
-        it.name != "trino-connector" &&
-        it.name != "bundled-catalog" &&
-        it.name != "flink-connector"
+        !it.name.startsWith("flink") &&
+        !it.name.startsWith("trino-connector") &&
+        it.name != "bundled-catalog"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
@@ -726,7 +773,13 @@ tasks {
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      "catalogs:catalog-kafka:copyLibAndConfig"
+      ":catalogs:catalog-kafka:copyLibAndConfig"
+    )
+  }
+
+  register("copyAuthorizationLibAndConfigs", Copy::class) {
+    dependsOn(
+      ":authorizations:authorization-ranger:copyLibAndConfig"
     )
   }
 

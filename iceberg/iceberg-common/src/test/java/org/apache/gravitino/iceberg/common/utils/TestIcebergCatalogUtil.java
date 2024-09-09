@@ -78,4 +78,38 @@ public class TestIcebergCatalogUtil {
           IcebergCatalogUtil.loadCatalogBackend("other");
         });
   }
+
+  @Test
+  void testValidLoadCustomCatalog() {
+    Catalog catalog;
+    Map<String, String> config = new HashMap<>();
+
+    config.put(
+        "catalog-backend-impl", "org.apache.gravitino.iceberg.common.utils.CustomCatalogForTest");
+    catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.valueOf("CUSTOM"), new IcebergConfig(config));
+    Assertions.assertTrue(catalog instanceof CustomCatalogForTest);
+  }
+
+  @Test
+  void testInvalidLoadCustomCatalog() {
+    Assertions.assertThrowsExactly(
+        NullPointerException.class,
+        () ->
+            IcebergCatalogUtil.loadCatalogBackend(
+                IcebergCatalogBackend.valueOf("CUSTOM"), new IcebergConfig(new HashMap<>())));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () ->
+            IcebergCatalogUtil.loadCatalogBackend(
+                IcebergCatalogBackend.valueOf("CUSTOM"),
+                new IcebergConfig(
+                    new HashMap<String, String>() {
+                      {
+                        put("catalog-backend-impl", "org.apache.");
+                      }
+                    })));
+  }
 }

@@ -18,21 +18,20 @@ license: "This software is licensed under the Apache License version 2."
 
 :::info Please read the following notes before trying to build Gravitino.
 
-+ Gravitino requires at least JDK8 and at most JDK17 to run Gradle, so you need to
-  install a JDK, versions 8 to 17, to launch the build environment.
-+ Gravitino itself supports using JDK8, 11, and 17 to build. The Gravitino Trino connector uses
++ Gravitino requires a minimum of JDK8, and supports up to JDK17 to run Gradle, so you need to install a JDK, version 8 to 17, to launch the build environment.
++ Gravitino itself supports using JDK8, 11, or 17 to build. The Gravitino Trino connector uses
   JDK17 to build (to avoid vendor-related issues on some platforms, Gravitino uses the specified Amazon Corretto OpenJDK 17 to build the Trino connector on macOS).
   You don't have to preinstall the specified JDK environment, as Gradle detects the JDK version needed and downloads it automatically.
-+ Gravitino uses the Gradle Java Toolchain to detect and manage JDK versions, it checks the
++ Gravitino uses the Gradle Java Toolchain to detect and manage JDK versions, and it checks the
   installed JDK by running the `./gradlew javaToolchains` command. See [Gradle Java Toolchain](https://docs.gradle.org/current/userguide/toolchains.html#sec:java_toolchain).
-+ Gravitino excludes all Docker-related tests by default. To run Docker related tests, make sure you have installed
++ Gravitino excludes all Docker-related tests by default. To run Docker-related tests, make sure you have installed
   Docker in your environment and either (1) set `skipDockerTests=false` in the `gradle.properties` file (or
-  use `-PskipDockerTests=false` in the command) or (2) `export SKIP_DOCKER_TESTS=false` in shell. Otherwise, all Docker required tests will skip.
+  use `-PskipDockerTests=false` in the command) or (2) `export SKIP_DOCKER_TESTS=false` in shell. Otherwise, all tests requiring Docker will be skipped.
 + macOS uses `docker-connector` to make the Gravitino Trino connector work with Docker
   for macOS. See [docker-connector](https://github.com/wenjunxiao/mac-docker-connector), `$GRAVITINO_HOME/dev/docker/tools/mac-docker-connector.sh`, and
   `$GRAVITINO_HOME/dev/docker/tools/README.md` for more details.
 + You can use OrbStack as a replacement for Docker for macOS. See
-  [OrbStack](https://orbstack.dev/). With OrbStack you can run Gravitino integration tests
+  [OrbStack](https://orbstack.dev/). With OrbStack, you can run Gravitino integration tests
   without needing to install `docker-connector`.
 :::
 
@@ -46,14 +45,14 @@ license: "This software is licensed under the Apache License version 2."
     git clone git@github.com:apache/gravitino.git
     ```
 
-2. Build the Gravitino project.
+2. Build the Gravitino project. Running this for the first time can take 15 minutes or more.
 
     ```shell
     cd gravitino
     ./gradlew build
     ```
 
-    The default specified JDK version is 8, if you want to use JDK 11 or 17 to build,
+    The default specified JDK version is 8, but if you want to use JDK 11 or 17 to build,
     modify the property `jdkVersion` to 11 or 17 in the `gradle.properties` file, or specify the version
     with `-P`, like:
 
@@ -68,9 +67,9 @@ license: "This software is licensed under the Apache License version 2."
     ```
 
    The `./gradlew build` command builds all the Gravitino components, including Gravitino 
-   server, Java and Python client, Trino and Spark connectors, and more.
+   server, Java and Python clients, Trino and Spark connectors, and more.
 
-   For Python client, the `./gradlew build` command builds the Python client with Python 3.8
+   For the Python client, the `./gradlew build` command builds the Python client with Python 3.8
    by default. If you want to use Python 3.9, 3.10 or 3.11 to build, please modify the property
    `pythonVersion` to 3.9, 3.10 or 3.11 in the `gradle.properties` file, or specify the version
    with `-P`, like:
@@ -109,11 +108,11 @@ license: "This software is licensed under the Apache License version 2."
 
    :::note
    The first time you build the project, downloading the dependencies may take a while. You can add
-   `-x test` to skip the tests, by using `./gradlew build -x test`.
+   `-x test` to skip the tests using `./gradlew build -x test`.
    
-   The built Gravitino libraries are Java 8 compatible, and verified under Java 8, 11, and 17
-   environments. You can use Java 8, 11, 17 runtimes to run the Gravitino server, no matter which
-   JDK version you use to build the project.
+   The built Gravitino libraries are Java 8 compatible and verified under Java 8, 11, and 17
+   environments. You can use Java 8, 11, or 17 runtimes to run the Gravitino server, no matter which
+   JDK version you used to build the project.
 
    The built jars are under the `build/libs` directory of the modules. You can publish them to your
    Maven repository to use them in your project.
@@ -173,7 +172,7 @@ license: "This software is licensed under the Apache License version 2."
 
    This creates `gravitino-iceberg-rest-server-{version}.tar.gz` and `gravitino-iceberg-rest-server-{version}.tar.gz.sha256` under the `distribution` directory. You can uncompress and deploy it to use the Gravitino Iceberg REST server.
 
-## How to Build Apache Gravitino on Windows (Using WSL)
+## How to build Apache Gravitino on Windows (Using WSL)
 
 ### Download WSL (Ubuntu)
 
@@ -183,9 +182,9 @@ Refer to this guide for installation: [WSL Installation Guide](https://learn.mic
 
 *Note: Ubuntu 22.04 can successfully run Gravitino*
 
-This step involves setting up the Windows Subsystem for Linux (WSL) on your Windows machine. WSL allows you to run a Linux distribution alongside Windows, providing a Linux-like environment for development.
+This step involves setting up your Windows machine's Windows Subsystem for Linux (WSL). WSL allows you to run a Linux distribution alongside Windows, providing a Linux-like environment for development.
 
-### Update Package List and Install Necessary Packages
+### Update package list and install necessary packages
 
 **On Ubuntu (WSL):**
 
@@ -194,9 +193,9 @@ sudo apt update
 sudo apt install apt-transport-https ca-certificates curl software-properties-common
 ```
 
-Updating the package list ensures you have the latest information on the newest versions of packages and dependencies. Installing the necessary packages sets up your system to securely download and manage additional software.
+Updating the package list ensures you have the latest information on the newest versions of packages and dependencies. Installing the necessary packages lets your system download and manage additional software securely.
 
-### Download and Setup Java SDK 17 (11 or 8 also works)
+### Download and setup Java SDK 17 (11 or 8 also works)
 
 **On Ubuntu (WSL):**
 
@@ -215,9 +214,9 @@ Updating the package list ensures you have the latest information on the newest 
 
 3. Save and quit in vim using `:wq`.
 
-4. Run `source ~/.bashrc` to update the `.bashrc` file in your current shell session.
+4. Run `source ~/.bashrc` to update your shell session's environment variables.
 
-    Editing the `~/.bashrc` file allows you to set environment variables that will be available in every terminal session. Setting `JAVA_HOME` and updating `PATH` ensures that your system uses the correct Java version for development.
+    Editing the `~/.bashrc` file allows you to set environment variables available in every terminal session. Setting `JAVA_HOME` and updating `PATH` ensures that your system uses the correct Java version for development.
 
 ### Install Docker
 
@@ -249,9 +248,9 @@ sudo apt install python3.11
 python3.11 --version
 ```
 
-These commands add a repository that provides the latest Python versions and then installs Python 3.11.
+These commands add a repository that provides the latest Python versions and installs Python 3.11.
 
-### Download Apache Gravitino Project to WSL
+### Download Apache Gravitino project to WSL
 
 **On Ubuntu (WSL):**
 
@@ -267,4 +266,6 @@ Access [http://localhost:8090](http://localhost:8090)
 
 Building the Gravitino project compiles the necessary components, and starting the server allows you to access the application in your browser.
 
-For instructions on how to run the project using VSCode or IntelliJ on Windows, please refer to [CONTRIBUTING.md](CONTRIBUTING.md).
+Please refer to [CONTRIBUTING.md](https://github.com/apache/gravitino/blob/main/CONTRIBUTING.md) for instructions on running the project using VSCode or IntelliJ on Windows.
+
+<img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToBuild" alt="" />

@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.authorization;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -30,6 +34,9 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -46,12 +53,15 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestAccessControlManagerForPermissions {
 
   private static AccessControlManager accessControlManager;
 
   private static EntityStore entityStore;
+  private static CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+  private static AuthorizationPlugin authorizationPlugin;
 
   private static Config config;
 
@@ -126,6 +136,11 @@ public class TestAccessControlManagerForPermissions {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlManager, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    BaseCatalog catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+    authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
+    Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
   }
 
   @AfterAll
@@ -138,13 +153,19 @@ public class TestAccessControlManagerForPermissions {
 
   @Test
   public void testGrantRoleToUser() {
+    reset(authorizationPlugin);
     String notExist = "not-exist";
 
     User user = accessControlManager.getUser(METALAKE, USER);
-    Assertions.assertNull(user.roles());
+    Assertions.assertTrue(user.roles().isEmpty());
+
+    reset(authorizationPlugin);
 
     user = accessControlManager.grantRolesToUser(METALAKE, ROLE, USER);
     Assertions.assertFalse(user.roles().isEmpty());
+
+    // Test authorization plugin
+    Mockito.verify(authorizationPlugin).onGrantedRolesToUser(any(), any());
 
     user = accessControlManager.getUser(METALAKE, USER);
     Assertions.assertEquals(1, user.roles().size());
@@ -181,8 +202,12 @@ public class TestAccessControlManagerForPermissions {
     User user = accessControlManager.grantRolesToUser(METALAKE, ROLE, USER);
     Assertions.assertFalse(user.roles().isEmpty());
 
+    reset(authorizationPlugin);
     user = accessControlManager.revokeRolesFromUser(METALAKE, ROLE, USER);
     Assertions.assertTrue(user.roles().isEmpty());
+
+    // Test authorization plugin
+    Mockito.verify(authorizationPlugin).onRevokedRolesFromUser(any(), any());
 
     // Throw NoSuchMetalakeException
     Assertions.assertThrows(
@@ -212,8 +237,13 @@ public class TestAccessControlManagerForPermissions {
     Group group = accessControlManager.getGroup(METALAKE, GROUP);
     Assertions.assertTrue(group.roles().isEmpty());
 
+    reset(authorizationPlugin);
+
     group = accessControlManager.grantRolesToGroup(METALAKE, ROLE, GROUP);
     Assertions.assertFalse(group.roles().isEmpty());
+
+    // Test authorization plugin
+    verify(authorizationPlugin).onGrantedRolesToGroup(any(), any());
 
     group = accessControlManager.getGroup(METALAKE, GROUP);
     Assertions.assertEquals(1, group.roles().size());
@@ -251,8 +281,12 @@ public class TestAccessControlManagerForPermissions {
     Group group = accessControlManager.grantRolesToGroup(METALAKE, ROLE, GROUP);
     Assertions.assertFalse(group.roles().isEmpty());
 
+    reset(authorizationPlugin);
     group = accessControlManager.revokeRolesFromGroup(METALAKE, ROLE, GROUP);
     Assertions.assertTrue(group.roles().isEmpty());
+
+    // Test authorization plugin
+    verify(authorizationPlugin).onRevokedRolesFromGroup(any(), any());
 
     // Throw NoSuchMetalakeException
     Assertions.assertThrows(

@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.kafka;
 
-import java.util.Collections;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
@@ -30,13 +30,16 @@ public class KafkaCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadat
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
 
   private static final Map<String, PropertyEntry<?>> KAFKA_CATALOG_PROPERTY_ENTRIES =
-      Collections.singletonMap(
-          BOOTSTRAP_SERVERS,
-          PropertyEntry.stringRequiredPropertyEntry(
+      ImmutableMap.<String, PropertyEntry<?>>builder()
+          .put(
               BOOTSTRAP_SERVERS,
-              "The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them",
-              false /* immutable */,
-              false /* hidden */));
+              PropertyEntry.stringRequiredPropertyEntry(
+                  BOOTSTRAP_SERVERS,
+                  "The Kafka broker(s) to connect to, allowing for multiple brokers by "
+                      + "comma-separating them",
+                  false /* immutable */,
+                  false /* hidden */))
+          .build();
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {

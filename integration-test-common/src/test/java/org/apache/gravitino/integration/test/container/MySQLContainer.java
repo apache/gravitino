@@ -129,7 +129,7 @@ public class MySQLContainer extends BaseContainer {
       statement.execute(query);
       LOG.info(String.format("MySQL container database %s has been created", testDatabaseName));
     } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+      throw new RuntimeException("Failed to create database", e);
     }
   }
 

@@ -39,6 +39,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,6 +53,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -701,14 +703,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     catalog.withCatalogConf(entity.getProperties()).withCatalogEntity(entity);
+    catalog.initAuthorizationPluginInstance(classLoader);
     return catalog;
   }
 
   private IsolatedClassLoader createClassLoader(String provider, Map<String, String> conf) {
     if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
-      String pkgPath = buildPkgPath(conf, provider);
-      String confPath = buildConfPath(conf, provider);
-      return IsolatedClassLoader.buildClassLoader(Lists.newArrayList(pkgPath, confPath));
+      String catalogPkgPath = buildPkgPath(conf, provider);
+      String catalogConfPath = buildConfPath(conf, provider);
+      ArrayList<String> libAndResourcesPaths = Lists.newArrayList(catalogPkgPath, catalogConfPath);
+      buildAuthorizationPkgPath(conf).ifPresent(libAndResourcesPaths::add);
+      return IsolatedClassLoader.buildClassLoader(libAndResourcesPaths);
     } else {
       // This will use the current class loader, it is mainly used for test.
       return new IsolatedClassLoader(
@@ -822,6 +827,37 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
 
     return pkgPath;
+  }
+
+  private Optional<String> buildAuthorizationPkgPath(Map<String, String> conf) {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME not set");
+    boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
+
+    String authorizationProvider = conf.get(Catalog.AUTHORIZATION_PROVIDER);
+    if (StringUtils.isBlank(authorizationProvider)) {
+      return Optional.empty();
+    }
+
+    String pkgPath;
+    if (testEnv) {
+      // In test, the authorization package is under the build directory.
+      pkgPath =
+          String.join(
+              File.separator,
+              gravitinoHome,
+              "authorizations",
+              "authorization-" + authorizationProvider,
+              "build",
+              "libs");
+    } else {
+      // In real environment, the authorization package is under the authorization directory.
+      pkgPath =
+          String.join(
+              File.separator, gravitinoHome, "authorizations", authorizationProvider, "libs");
+    }
+
+    return Optional.of(pkgPath);
   }
 
   private Class<? extends CatalogProvider> lookupCatalogProvider(String provider, ClassLoader cl) {
