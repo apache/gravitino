@@ -37,19 +37,15 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -66,7 +62,6 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
@@ -97,7 +92,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-test")
 public class TestEntityStorage {
@@ -179,57 +173,6 @@ public class TestEntityStorage {
       }
     } catch (Exception e) {
       LOG.error("Failed to init entity store", e);
-      throw new RuntimeException(e);
-    }
-  }
-
-  private static void setMySQLBackend(String mysqlUrl, String database) {
-    // Connect to the mysql docker and create a databases
-    Awaitility.await()
-        .atMost(30, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try (Connection connection =
-                      DriverManager.getConnection(
-                          StringUtils.substring(mysqlUrl, 0, mysqlUrl.lastIndexOf("/")),
-                          "root",
-                          "root");
-                  final Statement ignored = connection.createStatement()) {
-                return true;
-              } catch (Exception e) {
-                LOG.error("Failed to create database in mysql", e);
-                return false;
-              }
-            });
-
-    try (Connection connection =
-            DriverManager.getConnection(
-                StringUtils.substring(mysqlUrl, 0, mysqlUrl.lastIndexOf("/")), "root", "root");
-        final Statement statement = connection.createStatement()) {
-      statement.execute("drop database if exists " + database);
-      statement.execute("create database " + database);
-      String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
-      String mysqlContent =
-          FileUtils.readFileToString(
-              new File(
-                  gravitinoHome
-                      + String.format(
-                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_6_0)),
-              "UTF-8");
-
-      String[] initMySQLBackendSqls =
-          Arrays.stream(mysqlContent.split(";"))
-              .map(String::trim)
-              .filter(s -> !s.isEmpty())
-              .toArray(String[]::new);
-
-      initMySQLBackendSqls = ArrayUtils.addFirst(initMySQLBackendSqls, "use " + database + ";");
-      for (String sql : initMySQLBackendSqls) {
-        statement.execute(sql);
-      }
-    } catch (Exception e) {
-      LOG.error("Failed to create database in mysql", e);
       throw new RuntimeException(e);
     }
   }
