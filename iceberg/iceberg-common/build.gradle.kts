@@ -33,8 +33,10 @@ dependencies {
     exclude("*")
   }
   implementation(libs.bundles.iceberg)
-  implementation(libs.bundles.kerby)
   implementation(libs.bundles.log4j)
+  implementation(libs.bundles.metrics)
+  implementation(libs.bundles.prometheus)
+  implementation(libs.bundles.kerby)
   implementation(libs.caffeine)
   implementation(libs.cglib)
   implementation(libs.commons.lang3)
