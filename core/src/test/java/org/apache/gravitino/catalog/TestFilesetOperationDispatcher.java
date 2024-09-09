@@ -190,9 +190,29 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
       testProperties(props, fileset1.properties());
       Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
       Assertions.assertNotNull(fileset1.storageLocation());
-      String subPath = "/test/x.parquet";
-      String fileLocation = filesetOperationDispatcher.getFileLocation(filesetIdent1, subPath);
-      Assertions.assertEquals(fileset1.storageLocation() + subPath, fileLocation);
+
+      // test sub path starts with "/"
+      String subPath1 = "/test/test.parquet";
+      String fileLocation1 = filesetOperationDispatcher.getFileLocation(filesetIdent1, subPath1);
+      Assertions.assertEquals(
+          String.format("%s%s", fileset1.storageLocation(), subPath1), fileLocation1);
+
+      // test sub path not starts with "/"
+      String subPath2 = "test/test.parquet";
+      String fileLocation2 = filesetOperationDispatcher.getFileLocation(filesetIdent1, subPath2);
+      Assertions.assertEquals(
+          String.format("%s/%s", fileset1.storageLocation(), subPath2), fileLocation2);
+
+      // test sub path is null
+      String subPath3 = null;
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> filesetOperationDispatcher.getFileLocation(filesetIdent1, subPath3));
+
+      // test sub path is blank but not null
+      String subPath4 = "";
+      String fileLocation3 = filesetOperationDispatcher.getFileLocation(filesetIdent1, subPath4);
+      Assertions.assertEquals(fileset1.storageLocation(), fileLocation3);
     } finally {
       File path = new File(tmpDir);
       if (path.exists()) {

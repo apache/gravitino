@@ -20,181 +20,54 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.TagPO;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.DeleteProvider;
+import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 public interface TagMetaMapper {
 
   String TAG_TABLE_NAME = "tag_meta";
 
-  @Select(
-      "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
-          + " tm.metalake_id as metalakeId,"
-          + " tm.tag_comment as comment,"
-          + " tm.properties as properties,"
-          + " tm.audit_info as auditInfo,"
-          + " tm.current_version as currentVersion,"
-          + " tm.last_version as lastVersion,"
-          + " tm.deleted_at as deletedAt"
-          + " FROM "
-          + TAG_TABLE_NAME
-          + " tm JOIN "
-          + MetalakeMetaMapper.TABLE_NAME
-          + " mm ON tm.metalake_id = mm.metalake_id"
-          + " WHERE mm.metalake_name = #{metalakeName} AND tm.deleted_at = 0 AND mm.deleted_at = 0")
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "listTagPOsByMetalake")
   List<TagPO> listTagPOsByMetalake(@Param("metalakeName") String metalakeName);
 
-  @Select(
-      "<script>"
-          + "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
-          + " tm.metalake_id as metalakeId,"
-          + " tm.tag_comment as comment,"
-          + " tm.properties as properties,"
-          + " tm.audit_info as auditInfo,"
-          + " tm.current_version as currentVersion,"
-          + " tm.last_version as lastVersion,"
-          + " tm.deleted_at as deletedAt"
-          + " FROM "
-          + TAG_TABLE_NAME
-          + " tm JOIN "
-          + MetalakeMetaMapper.TABLE_NAME
-          + " mm ON tm.metalake_id = mm.metalake_id"
-          + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name IN "
-          + " <foreach"
-          + " item='tagName' index='index' collection='tagNames' open='(' separator=',' close=')'>"
-          + " #{tagName}"
-          + " </foreach>"
-          + " AND tm.deleted_at = 0 AND mm.deleted_at = 0"
-          + "</script>")
+  @SelectProvider(
+      type = TagMetaSQLProviderFactory.class,
+      method = "listTagPOsByMetalakeAndTagNames")
   List<TagPO> listTagPOsByMetalakeAndTagNames(
       @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames);
 
-  @Select(
-      "SELECT tm.tag_id as tagId FROM "
-          + TAG_TABLE_NAME
-          + " tm JOIN "
-          + MetalakeMetaMapper.TABLE_NAME
-          + " mm ON tm.metalake_id = mm.metalake_id"
-          + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
-          + " AND tm.deleted_at = 0 AND mm.deleted_at = 0")
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "selectTagIdByMetalakeAndName")
   Long selectTagIdByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
-  @Select(
-      "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
-          + " tm.metalake_id as metalakeId,"
-          + " tm.tag_comment as comment,"
-          + " tm.properties as properties,"
-          + " tm.audit_info as auditInfo,"
-          + " tm.current_version as currentVersion,"
-          + " tm.last_version as lastVersion,"
-          + " tm.deleted_at as deletedAt"
-          + " FROM "
-          + TAG_TABLE_NAME
-          + " tm JOIN "
-          + MetalakeMetaMapper.TABLE_NAME
-          + " mm ON tm.metalake_id = mm.metalake_id"
-          + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
-          + " AND tm.deleted_at = 0 AND mm.deleted_at = 0")
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "selectTagMetaByMetalakeAndName")
   TagPO selectTagMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
-  @Insert(
-      "INSERT INTO "
-          + TAG_TABLE_NAME
-          + " (tag_id, tag_name,"
-          + " metalake_id, tag_comment, properties, audit_info,"
-          + " current_version, last_version, deleted_at)"
-          + " VALUES("
-          + " #{tagMeta.tagId},"
-          + " #{tagMeta.tagName},"
-          + " #{tagMeta.metalakeId},"
-          + " #{tagMeta.comment},"
-          + " #{tagMeta.properties},"
-          + " #{tagMeta.auditInfo},"
-          + " #{tagMeta.currentVersion},"
-          + " #{tagMeta.lastVersion},"
-          + " #{tagMeta.deletedAt}"
-          + " )")
+  @InsertProvider(type = TagMetaSQLProviderFactory.class, method = "insertTagMeta")
   void insertTagMeta(@Param("tagMeta") TagPO tagPO);
 
-  @Insert(
-      "INSERT INTO "
-          + TAG_TABLE_NAME
-          + "(tag_id, tag_name,"
-          + " metalake_id, tag_comment, properties, audit_info,"
-          + " current_version, last_version, deleted_at)"
-          + " VALUES("
-          + " #{tagMeta.tagId},"
-          + " #{tagMeta.tagName},"
-          + " #{tagMeta.metalakeId},"
-          + " #{tagMeta.comment},"
-          + " #{tagMeta.properties},"
-          + " #{tagMeta.auditInfo},"
-          + " #{tagMeta.currentVersion},"
-          + " #{tagMeta.lastVersion},"
-          + " #{tagMeta.deletedAt}"
-          + " )"
-          + " ON DUPLICATE KEY UPDATE"
-          + " tag_name = #{tagMeta.tagName},"
-          + " metalake_id = #{tagMeta.metalakeId},"
-          + " tag_comment = #{tagMeta.comment},"
-          + " properties = #{tagMeta.properties},"
-          + " audit_info = #{tagMeta.auditInfo},"
-          + " current_version = #{tagMeta.currentVersion},"
-          + " last_version = #{tagMeta.lastVersion},"
-          + " deleted_at = #{tagMeta.deletedAt}")
+  @InsertProvider(
+      type = TagMetaSQLProviderFactory.class,
+      method = "insertTagMetaOnDuplicateKeyUpdate")
   void insertTagMetaOnDuplicateKeyUpdate(@Param("tagMeta") TagPO tagPO);
 
-  @Update(
-      "UPDATE "
-          + TAG_TABLE_NAME
-          + " SET tag_name = #{newTagMeta.tagName},"
-          + " tag_comment = #{newTagMeta.comment},"
-          + " properties = #{newTagMeta.properties},"
-          + " audit_info = #{newTagMeta.auditInfo},"
-          + " current_version = #{newTagMeta.currentVersion},"
-          + " last_version = #{newTagMeta.lastVersion},"
-          + " deleted_at = #{newTagMeta.deletedAt}"
-          + " WHERE tag_id = #{oldTagMeta.tagId}"
-          + " AND metalake_id = #{oldTagMeta.metalakeId}"
-          + " AND tag_name = #{oldTagMeta.tagName}"
-          + " AND (tag_comment IS NULL OR tag_comment = #{oldTagMeta.comment})"
-          + " AND properties = #{oldTagMeta.properties}"
-          + " AND audit_info = #{oldTagMeta.auditInfo}"
-          + " AND current_version = #{oldTagMeta.currentVersion}"
-          + " AND last_version = #{oldTagMeta.lastVersion}"
-          + " AND deleted_at = 0")
+  @UpdateProvider(type = TagMetaSQLProviderFactory.class, method = "updateTagMeta")
   Integer updateTagMeta(@Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO);
 
-  @Update(
-      "UPDATE "
-          + TAG_TABLE_NAME
-          + " tm SET tm.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE tm.metalake_id IN ("
-          + " SELECT mm.metalake_id FROM "
-          + MetalakeMetaMapper.TABLE_NAME
-          + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-          + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0")
+  @UpdateProvider(
+      type = TagMetaSQLProviderFactory.class,
+      method = "softDeleteTagMetaByMetalakeAndTagName")
   Integer softDeleteTagMetaByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
-  @Update(
-      "UPDATE "
-          + TAG_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
+  @UpdateProvider(type = TagMetaSQLProviderFactory.class, method = "softDeleteTagMetasByMetalakeId")
   void softDeleteTagMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @Delete(
-      "DELETE FROM "
-          + TAG_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  @DeleteProvider(type = TagMetaSQLProviderFactory.class, method = "deleteTagMetasByLegacyTimeline")
   Integer deleteTagMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }
