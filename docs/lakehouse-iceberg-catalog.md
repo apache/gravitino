@@ -119,6 +119,20 @@ Please make sure the credential file is accessible by Gravitino, like using `exp
 Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
 :::
 
+#### Other storages
+
+For storages that are not inherently integrated into Gravitino Iceberg REST service, you can manage them effectively through custom catalog properties.
+
+| Configuration item | Description                                                                             | Default value | Required | Since Version |
+|--------------------|-----------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `io-impl`          | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0         |
+
+For other custom properties like `security-token` to pass to `FileIO`, you could config it directly by `gravitino.bypass.security-token`.
+
+:::info
+Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the `catalogs/lakehouse-iceberg/libs/` directory.
+:::
+
 #### Catalog backend security
 
 Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
