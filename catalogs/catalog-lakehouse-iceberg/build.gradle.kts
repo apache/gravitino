@@ -154,11 +154,6 @@ tasks.test {
   }
 }
 
-tasks.register<Copy>("copy") {
-  from(configurations.testRuntimeClasspath)
-  into("build/libs-runtime")
-}
-
 tasks.clean {
   delete("spark-warehouse")
 }

@@ -27,11 +27,9 @@ plugins {
 dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":core")) {
-    //  exclude("*")
     exclude("*")
   }
   implementation(project(":common")) {
-    //  exclude("*")
     exclude("*")
   }
   implementation(libs.bundles.iceberg)
