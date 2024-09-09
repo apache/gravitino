@@ -31,6 +31,8 @@ import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.OverwriteDefaultConfig;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
@@ -105,7 +107,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .create();
 
   public static final ConfigEntry<String> S3_ENDPOINT =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_ENDPOINT)
+      new ConfigBuilder(S3Properties.GRAVITINO_S3_ENDPOINT)
           .doc(
               "An alternative endpoint of the S3 service, This could be used to for S3FileIO with "
                   + "any s3-compatible object storage service that has a different endpoint, or "
@@ -115,7 +117,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .create();
 
   public static final ConfigEntry<String> S3_REGION =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_REGION)
+      new ConfigBuilder(S3Properties.GRAVITINO_S3_REGION)
           .doc("The region of the S3 service")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
@@ -123,35 +125,35 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .create();
 
   public static final ConfigEntry<String> S3_ACCESS_KEY_ID =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID)
+      new ConfigBuilder(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID)
           .doc("The static access key ID used to access S3 data")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> S3_SECRET_ACCESS_KEY =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_SECRET_ACCESS_KEY)
+      new ConfigBuilder(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY)
           .doc("The static secret access key used to access S3 data")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> OSS_ENDPOINT =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_OSS_ENDPOINT)
+      new ConfigBuilder(OSSProperties.GRAVITINO_OSS_ENDPOINT)
           .doc("The endpoint of Aliyun OSS service")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> OSS_ACCESS_KEY_ID =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_ID)
+      new ConfigBuilder(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID)
           .doc("The static access key ID used to access OSS data")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> OSS_ACCESS_KEY_SECRET =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_SECRET)
+      new ConfigBuilder(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET)
           .doc("The static secret access key used to access OSS data")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
