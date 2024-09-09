@@ -128,3 +128,7 @@ You need to add s3 secret to the Spark configuration using `spark.sql.catalog.${
 ### OSS
 
 You need to add OSS secret key to the Spark configuration using `spark.sql.catalog.${iceberg_catalog_name}.client.access-key-id` and `spark.sql.catalog.${iceberg_catalog_name}.client.access-key-secret`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the classpath of Spark.
+
+### GCS
+
+No extra configuration is needed. Please make sure the credential file is accessible by Spark, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, and download [Iceberg gcp bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to the classpath of Spark.

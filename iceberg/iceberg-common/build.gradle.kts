@@ -37,6 +37,7 @@ dependencies {
   implementation(libs.iceberg.aliyun)
   implementation(libs.iceberg.aws)
   implementation(libs.iceberg.hive.metastore)
+  implementation(libs.iceberg.gcp)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
