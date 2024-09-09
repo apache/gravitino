@@ -508,7 +508,9 @@ tasks.rat {
     "clients/client-python/apache_gravitino.egg-info/*",
     "clients/client-python/gravitino/utils/http_client.py",
     "clients/client-python/tests/unittests/htmlcov/*",
-    "clients/client-python/tests/integration/htmlcov/*"
+    "clients/client-python/tests/integration/htmlcov/*",
+    "clients/client-python/docs/build",
+    "clients/client-python/docs/source/generated"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
