@@ -96,7 +96,7 @@ Finally, you can run the script in the distribution package directory to start t
 ### Prerequisites
 
 - PostgreSQL 12 ~ 16. For other versions, the community has not tested fully and may not be compatible.
-- Gravitino distribution package with version `0.6.0` or above.
+- Gravitino distribution package with version `0.7.0` or above.
 - PostgreSQL connector Jar (Should be compatible with the version of PostgreSQL instance).
 
 ### Step 1: Get the initialization script
@@ -116,9 +116,9 @@ If you used a legacy script, you can use `upgrade-{old version}-to-{new version}
 
 ### Step 2: Initialize the database
 
-Please create a database and scheam in PostgreSQL in advance, and execute the initialization script obtained above in the database.
+Please create a database and schema in PostgreSQL in advance, and execute the initialization script obtained above in the database.
 
-```
+```postgresql
 psql --username=postgres --password 
 password:
 
