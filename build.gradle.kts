@@ -204,6 +204,13 @@ allprojects {
         throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
       }
 
+      param.useJUnitPlatform()
+      val skipUTs = project.hasProperty("skipTests")
+      if (skipUTs) {
+        // Only run integration tests
+        param.include("**/integration/test/**")
+      }
+
       param.useJUnitPlatform {
         val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
         if (!dockerTest) {
