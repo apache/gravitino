@@ -20,7 +20,9 @@ package org.apache.gravitino.storage;
 
 // Defines the unified S3 properties for different catalogs and connectors.
 public class S3Properties {
-  // An alternative endpoint of the S3 service, This could be used to for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud
+  // An alternative endpoint of the S3 service, This could be used to for S3FileIO with any
+  // s3-compatible object storage service that has a different endpoint, or access a private S3
+  // endpoint in a virtual private cloud
   public static final String GRAVITINO_S3_ENDPOINT = "s3-endpoint";
   // The static access key ID used to access S3 data.
   public static final String GRAVITINO_S3_ACCESS_KEY_ID = "s3-access-key-id";
@@ -29,5 +31,5 @@ public class S3Properties {
   // The region of the S3 service.
   public static final String GRAVITINO_S3_REGION = "s3-region";
 
-  private S3Properties(){}
+  private S3Properties() {}
 }
