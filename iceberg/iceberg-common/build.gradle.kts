@@ -52,7 +52,7 @@ dependencies {
     exclude("org.apache.zookeeper")
     exclude("org.mortbay.jetty")
   }
-  // use hdfs-default.xml 
+  // use hdfs-default.xml
   implementation(libs.hadoop2.hdfs) {
     exclude("*")
   }
