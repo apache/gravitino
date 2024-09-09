@@ -52,6 +52,10 @@ dependencies {
     exclude("org.apache.zookeeper")
     exclude("org.mortbay.jetty")
   }
+  // use hdfs-default.xml 
+  implementation(libs.hadoop2.hdfs) {
+    exclude("*")
+  }
   implementation(libs.hadoop2.hdfs.client) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
@@ -59,7 +63,6 @@ dependencies {
     exclude("org.mortbay.jetty")
   }
   implementation(libs.hadoop2.mapreduce.client.core) {
-//    exclude("*")
     exclude("*")
   }
   implementation(libs.hive2.metastore) {
