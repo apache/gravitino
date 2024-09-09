@@ -50,7 +50,6 @@ dependencies {
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  // implementation(libs.sqlite.jdbc)
 
   annotationProcessor(libs.lombok)
 
@@ -65,7 +64,6 @@ dependencies {
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
-    //  exclude("org.apache.hadoop")
     exclude("org.apache.hive")
   }
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
@@ -78,7 +76,6 @@ dependencies {
 
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jetty)
-  // testImplementation(libs.commons.lang3)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
