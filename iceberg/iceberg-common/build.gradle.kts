@@ -96,6 +96,8 @@ dependencies {
     exclude("org.slf4j", "slf4j-log4j12")
   }
 
+  runtimeOnly(libs.bundles.kerby)
+
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
 
