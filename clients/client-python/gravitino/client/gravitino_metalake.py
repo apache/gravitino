@@ -196,14 +196,10 @@ class GravitinoMetalake(MetalakeDTO):
         Returns:
             true if the catalog is dropped successfully, false otherwise.
         """
-        try:
-            url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
-            response = self.rest_client.delete(url, error_handler=CATALOG_ERROR_HANDLER)
+        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
+        response = self.rest_client.delete(url, error_handler=CATALOG_ERROR_HANDLER)
 
-            drop_response = DropResponse.from_json(response.body, infer_missing=True)
-            drop_response.validate()
+        drop_response = DropResponse.from_json(response.body, infer_missing=True)
+        drop_response.validate()
 
-            return drop_response.dropped()
-        except Exception:
-            logger.warning("Failed to drop catalog %s", name)
-            return False
+        return drop_response.dropped()

@@ -21,6 +21,9 @@ package org.apache.gravitino.filesystem.hadoop;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -31,17 +34,14 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.shaded.com.google.common.annotations.VisibleForTesting;
-import org.apache.gravitino.shaded.com.google.common.base.Preconditions;
-import org.apache.gravitino.shaded.com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.gravitino.shaded.org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.shaded.org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -74,6 +74,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   //     /fileset_catalog/fileset_schema/fileset1/sub_dir/
   private static final Pattern IDENTIFIER_PATTERN =
       Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$");
+  private static final String SLASH = "/";
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
@@ -277,7 +278,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         identifier.name());
   }
 
-  private Path getActualPathByIdentifier(
+  @VisibleForTesting
+  Path getActualPathByIdentifier(
       NameIdentifier identifier, Pair<Fileset, FileSystem> filesetPair, Path path) {
     String virtualPath = path.toString();
     boolean withScheme =
@@ -294,7 +296,27 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
         return new Path(storageLocation);
       } else {
-        return new Path(virtualPath.replaceFirst(virtualLocation, storageLocation));
+        // if the storage location ends with "/",
+        // we should handle the conversion specially
+        if (storageLocation.endsWith(SLASH)) {
+          String subPath = virtualPath.substring(virtualLocation.length());
+          // For example, if the virtual path is `gvfs://fileset/catalog/schema/test_fileset/ttt`,
+          // and the storage location is `hdfs://cluster:8020/user/`,
+          // we should replace `gvfs://fileset/catalog/schema/test_fileset` with
+          // `hdfs://localhost:8020/user` which truncates the tailing slash.
+          // If the storage location is `hdfs://cluster:8020/user`,
+          // we can replace `gvfs://fileset/catalog/schema/test_fileset` with
+          // `hdfs://localhost:8020/user` directly.
+          if (subPath.startsWith(SLASH)) {
+            return new Path(
+                virtualPath.replaceFirst(
+                    virtualLocation, storageLocation.substring(0, storageLocation.length() - 1)));
+          } else {
+            return new Path(virtualPath.replaceFirst(virtualLocation, storageLocation));
+          }
+        } else {
+          return new Path(virtualPath.replaceFirst(virtualLocation, storageLocation));
+        }
       }
     } catch (Exception e) {
       throw new RuntimeException(
@@ -320,7 +342,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     }
   }
 
-  private FileStatus convertFileStatusPathPrefix(
+  @VisibleForTesting
+  FileStatus convertFileStatusPathPrefix(
       FileStatus fileStatus, String actualPrefix, String virtualPrefix) {
     String filePath = fileStatus.getPath().toString();
     Preconditions.checkArgument(
@@ -328,7 +351,15 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         "Path %s doesn't start with prefix \"%s\".",
         filePath,
         actualPrefix);
-    Path path = new Path(filePath.replaceFirst(actualPrefix, virtualPrefix));
+    // if the storage location is end with "/",
+    // we should truncate this to avoid replace issues.
+    Path path =
+        new Path(
+            filePath.replaceFirst(
+                actualPrefix.endsWith(SLASH) && !virtualPrefix.endsWith(SLASH)
+                    ? actualPrefix.substring(0, actualPrefix.length() - 1)
+                    : actualPrefix,
+                virtualPrefix));
     fileStatus.setPath(path);
 
     return fileStatus;
@@ -491,7 +522,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     FileStatus fileStatus = context.getFileSystem().getFileStatus(context.getActualPath());
     return convertFileStatusPathPrefix(
         fileStatus,
-        context.getFileset().storageLocation(),
+        new Path(context.getFileset().storageLocation()).toString(),
         getVirtualLocation(context.getIdentifier(), true));
   }
 

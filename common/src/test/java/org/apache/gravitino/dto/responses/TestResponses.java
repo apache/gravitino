@@ -377,4 +377,17 @@ public class TestResponses {
     Exception e = assertThrows(IllegalArgumentException.class, response1::validate);
     assertEquals("\"tag\" must not be null", e.getMessage());
   }
+
+  @Test
+  void testFileLocationResponse() {
+    String actualFileLocation = "file:/test/1";
+    FileLocationResponse response = new FileLocationResponse(actualFileLocation);
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testFileLocationResponseException() {
+    FileLocationResponse response = new FileLocationResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
+  }
 }

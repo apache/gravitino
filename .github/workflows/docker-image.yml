@@ -10,17 +10,22 @@ on:
         default: 'gravitino'
         options:
           - 'gravitino'
-          - 'gravitino-ci-hive'
-          - 'gravitino-ci-kerberos-hive'
-          - 'gravitino-ci-trino'
-          - 'gravitino-ci-doris'
-          - 'gravitino-ci-ranger'
+          - 'gravitino-ci:hive'
+          - 'gravitino-ci:kerberos-hive'
+          - 'gravitino-ci:trino'
+          - 'gravitino-ci:doris'
+          - 'gravitino-ci:ranger'
+          - 'gravitino-playground:trino'
+          - 'gravitino-playground:hive'
+          - 'gravitino-playground:ranger'
           - 'gravitino-iceberg-rest-server'
-          - 'trino'
-          - 'hive'
-          - 'ranger'
-      tag:
-        description: 'Docker tag to apply to this image'
+      version:
+        description: 'Docker version to apply to this image'
+        required: true
+        type: string
+
+      username:
+        description: 'Docker username'
         required: true
         type: string
       token:
@@ -38,36 +43,45 @@ jobs:
     steps:
       - name: Set environment variables
         run: |
-          if [ "${{ github.event.inputs.image }}" == "gravitino-ci-hive" ]; then
+          if [ "${{ github.event.inputs.image }}" == "gravitino-ci:hive" ]; then
             echo "image_type=hive" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino-ci-hive" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-kerberos-hive" ]; then
+            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "tag_name=hive" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:kerberos-hive" ]; then
             echo "image_type=kerberos-hive" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino-ci-kerberos-hive" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-trino" ]; then
+            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "tag_name=kerberos-hive" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino-ci-trino" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-doris" ]; then
+            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "tag_name=trino" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:doris" ]; then
             echo "image_type=doris" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino-ci-doris" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci-ranger" ]; then
+            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "tag_name=doris" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:ranger" ]; then
             echo "image_type=ranger" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino-ci-ranger" >> $GITHUB_ENV
+            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "tag_name=ranger" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
             echo "image_type=gravitino" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "trino" ]; then
+            echo "image_name=apache/gravitino" >> $GITHUB_ENV
+            # `apache/gravitino` is the default image name, didn't need to tag alias name
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-playground:trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
-            echo "image_name=datastrato/trino" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "hive" ]; then
+            echo "image_name=apache/gravitino-playground" >> $GITHUB_ENV
+            echo "tag_name=trino" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-playground:hive" ]; then
             echo "image_type=hive" >> $GITHUB_ENV
-            echo "image_name=datastrato/hive" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.image }}" == "ranger" ]; then
+            echo "image_name=apache/gravitino-playground" >> $GITHUB_ENV
+            echo "tag_name=hive" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.image }}" == "gravitino-playground:ranger" ]; then
             echo "image_type=ranger" >> $GITHUB_ENV
-            echo "image_name=datastrato/ranger" >> $GITHUB_ENV
+            echo "image_name=apache/gravitino-playground" >> $GITHUB_ENV
+            echo "tag_name=ranger" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-iceberg-rest-server" ]; then
             echo "image_type=iceberg-rest-server" >> $GITHUB_ENV
-            echo "image_name=datastrato/gravitino-iceberg-rest-server" >> $GITHUB_ENV
+            echo "image_name=apache/gravitino-iceberg-rest" >> $GITHUB_ENV
           fi
 
       - name: Check publish Docker token
@@ -83,7 +97,7 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: datastrato
+          username: ${{ github.event.inputs.username }}
           password: ${{ secrets.DOCKER_REPOSITORY_PASSWORD }}
 
       - name: Set up Docker Buildx
@@ -100,4 +114,9 @@ jobs:
         run: | 
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/hostedtoolcache/CodeQL
-          ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.tag }} --latest
+          
+          if [[ "${image_type}" == "gravitino" || "${image_type}" == "iceberg-rest-server" ]]; then
+            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag ${{ github.event.inputs.version }} --latest
+          else
+            ./dev/docker/build-docker.sh --platform all --type ${image_type} --image ${image_name} --tag "${tag_name}-${{ github.event.inputs.version }}"
+          fi

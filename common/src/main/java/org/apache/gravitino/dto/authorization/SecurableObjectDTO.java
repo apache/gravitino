@@ -31,9 +31,6 @@ import org.apache.gravitino.authorization.SecurableObject;
 /** Data transfer object representing a securable object. */
 public class SecurableObjectDTO implements SecurableObject {
 
-  @JsonProperty("fullName")
-  private String fullName;
-
   @JsonProperty("type")
   private Type type;
 
@@ -46,27 +43,27 @@ public class SecurableObjectDTO implements SecurableObject {
   /** Default constructor for Jackson deserialization. */
   protected SecurableObjectDTO() {}
 
+  /** @return The full name of the securable object. */
+  @JsonProperty("fullName")
+  public String getFullName() {
+    return fullName();
+  }
+
   /**
-   * Creates a new instance of SecurableObject DTO.
+   * Sets the full name of the securable object. Only used by Jackson deserializer.
    *
-   * @param privileges The privileges of the SecurableObject DTO.
-   * @param fullName The name of the SecurableObject DTO.
-   * @param type The type of the securable object.
+   * @param fullName The full name of the metadata object.
    */
-  protected SecurableObjectDTO(String fullName, Type type, PrivilegeDTO[] privileges) {
-    this.type = type;
-    this.fullName = fullName;
+  @JsonProperty("fullName")
+  public void setFullName(String fullName) {
     int index = fullName.lastIndexOf(".");
-
     if (index == -1) {
-      this.parent = null;
-      this.name = fullName;
+      parent = null;
+      name = fullName;
     } else {
-      this.parent = fullName.substring(0, index);
-      this.name = fullName.substring(index + 1);
+      parent = fullName.substring(0, index);
+      name = fullName.substring(index + 1);
     }
-
-    this.privileges = privileges;
   }
 
   @Nullable
@@ -78,11 +75,6 @@ public class SecurableObjectDTO implements SecurableObject {
   @Override
   public String name() {
     return name;
-  }
-
-  @Override
-  public String fullName() {
-    return fullName;
   }
 
   @Override
@@ -106,9 +98,12 @@ public class SecurableObjectDTO implements SecurableObject {
 
   /** Builder for {@link SecurableObjectDTO}. */
   public static class Builder {
+    private final SecurableObjectDTO securableObjectDTO = new SecurableObjectDTO();
     private String fullName;
     private Type type;
     private PrivilegeDTO[] privileges;
+
+    private Builder() {}
 
     /**
      * Sets the full name of the securable object.
@@ -158,9 +153,11 @@ public class SecurableObjectDTO implements SecurableObject {
       Preconditions.checkArgument(
           privileges != null && privileges.length != 0, "privileges can't be null or empty");
 
-      SecurableObjectDTO object = new SecurableObjectDTO(fullName, type, privileges);
+      securableObjectDTO.type = type;
+      securableObjectDTO.privileges = privileges;
+      securableObjectDTO.setFullName(fullName);
 
-      return object;
+      return securableObjectDTO;
     }
   }
 }

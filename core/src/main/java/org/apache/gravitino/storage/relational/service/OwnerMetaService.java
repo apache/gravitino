@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
-import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
@@ -30,6 +29,7 @@ import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.storage.relational.utils.SupplierUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** This class is an utilization class to retrieve owner relation. */
@@ -45,7 +45,8 @@ public class OwnerMetaService {
 
   public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(getMetalake(identifier));
+        MetalakeMetaService.getInstance()
+            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
     Long entityId = getEntityId(metalakeId, identifier, type);
 
     UserPO userPO =
@@ -57,8 +58,8 @@ public class OwnerMetaService {
       return Optional.of(
           POConverters.fromUserPO(
               userPO,
-              Collections.emptyList(),
-              AuthorizationUtils.ofUserNamespace(getMetalake(identifier))));
+              SupplierUtils.createRolePOsSupplier(userPO),
+              AuthorizationUtils.ofUserNamespace(NameIdentifierUtil.getMetalake(identifier))));
     }
 
     GroupPO groupPO =
@@ -70,8 +71,8 @@ public class OwnerMetaService {
       return Optional.of(
           POConverters.fromGroupPO(
               groupPO,
-              Collections.emptyList(),
-              AuthorizationUtils.ofGroupNamespace(getMetalake(identifier))));
+              SupplierUtils.createRolePOsSupplier(groupPO),
+              AuthorizationUtils.ofGroupNamespace(NameIdentifierUtil.getMetalake(identifier))));
     }
 
     return Optional.empty();
@@ -82,7 +83,9 @@ public class OwnerMetaService {
       Entity.EntityType entityType,
       NameIdentifier owner,
       Entity.EntityType ownerType) {
-    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(getMetalake(entity));
+    long metalakeId =
+        MetalakeMetaService.getInstance()
+            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(entity));
 
     Long entityId = getEntityId(metalakeId, entity, entityType);
     Long ownerId = getEntityId(metalakeId, owner, ownerType);
@@ -116,14 +119,6 @@ public class OwnerMetaService {
         MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
         return MetadataObjectService.getMetadataObjectId(
             metalakeId, object.fullName(), object.type());
-    }
-  }
-
-  private static String getMetalake(NameIdentifier identifier) {
-    if (identifier.hasNamespace()) {
-      return identifier.namespace().level(0);
-    } else {
-      return identifier.name();
     }
   }
 }

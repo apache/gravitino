@@ -63,8 +63,8 @@ To deploy the Gravitino server locally to run the integration tests, follow thes
    in the `distribution` directory.
 3. Use the `./gradlew test [--rerun-tasks] -PskipTests -PtestMode=deploy` command to run the
    integration tests in the `distribution` directory.
-4. Use the `bash integration-test/trino-test-tools/trino_test.sh` command to run all the
-   Trino test sets in the `integration-test/src/test/resources/trino-ci-testset/testsets` directory.
+4. Use the `bash trino-connector/integration-test/trino-test-tools/trino_test.sh` command to run all the
+   Trino test sets in the `trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets` directory.
 
 ## Skip tests
 
@@ -87,7 +87,7 @@ Some integration test cases depend on the Gravitino CI Docker image.
 If an integration test relies on the specific Gravitino CI Docker image,
 set the `@tag(gravitino-docker-test)` annotation in the test class.
 For example, the `integration-test/src/test/.../CatalogHiveIT.java` test needs to connect to
-the `datastrato/gravitino-ci-hive` Docker container for testing the Hive data source.
+the `apache/gravitino-ci:hive-{hive-version}` Docker container for testing the Hive data source.
 Therefore, it should have the following `@tag` annotation:`@tag(gravitino-docker-test)`. This annotation
 helps identify the specific Docker container required for the integration test.
 

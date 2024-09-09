@@ -21,11 +21,11 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.TablePO;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.DeleteProvider;
+import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
  * A MyBatis Mapper for table meta operation SQLs.
@@ -38,154 +38,59 @@ import org.apache.ibatis.annotations.Update;
 public interface TableMetaMapper {
   String TABLE_NAME = "table_meta";
 
-  @Select(
-      "SELECT table_id as tableId, table_name as tableName,"
-          + " metalake_id as metalakeId, catalog_id as catalogId,"
-          + " schema_id as schemaId, audit_info as auditInfo,"
-          + " current_version as currentVersion, last_version as lastVersion,"
-          + " deleted_at as deletedAt"
-          + " FROM "
-          + TABLE_NAME
-          + " WHERE schema_id = #{schemaId} AND deleted_at = 0")
+  @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsBySchemaId")
   List<TablePO> listTablePOsBySchemaId(@Param("schemaId") Long schemaId);
 
-  @Select(
-      "SELECT table_id as tableId FROM "
-          + TABLE_NAME
-          + " WHERE schema_id = #{schemaId} AND table_name = #{tableName}"
-          + " AND deleted_at = 0")
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "selectTableIdBySchemaIdAndName")
   Long selectTableIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
 
-  @Select(
-      "SELECT table_id as tableId, table_name as tableName,"
-          + " metalake_id as metalakeId, catalog_id as catalogId,"
-          + " schema_id as schemaId, audit_info as auditInfo,"
-          + " current_version as currentVersion, last_version as lastVersion,"
-          + " deleted_at as deletedAt"
-          + " FROM "
-          + TABLE_NAME
-          + " WHERE schema_id = #{schemaId} AND table_name = #{tableName} AND deleted_at = 0")
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "selectTableMetaBySchemaIdAndName")
   TablePO selectTableMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("tableName") String name);
 
-  @Select(
-      "SELECT table_id as tableId, table_name as tableName,"
-          + " metalake_id as metalakeId, catalog_id as catalogId,"
-          + " schema_id as schemaId, audit_info as auditInfo,"
-          + " current_version as currentVersion, last_version as lastVersion,"
-          + " deleted_at as deletedAt"
-          + " FROM "
-          + TABLE_NAME
-          + " WHERE table_id = #{tableId} AND deleted_at = 0")
+  @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "selectTableMetaById")
   TablePO selectTableMetaById(@Param("tableId") Long tableId);
 
-  @Insert(
-      "INSERT INTO "
-          + TABLE_NAME
-          + "(table_id, table_name, metalake_id,"
-          + " catalog_id, schema_id, audit_info,"
-          + " current_version, last_version, deleted_at)"
-          + " VALUES("
-          + " #{tableMeta.tableId},"
-          + " #{tableMeta.tableName},"
-          + " #{tableMeta.metalakeId},"
-          + " #{tableMeta.catalogId},"
-          + " #{tableMeta.schemaId},"
-          + " #{tableMeta.auditInfo},"
-          + " #{tableMeta.currentVersion},"
-          + " #{tableMeta.lastVersion},"
-          + " #{tableMeta.deletedAt}"
-          + " )")
+  @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);
 
-  @Insert(
-      "INSERT INTO "
-          + TABLE_NAME
-          + "(table_id, table_name, metalake_id,"
-          + " catalog_id, schema_id, audit_info,"
-          + " current_version, last_version, deleted_at)"
-          + " VALUES("
-          + " #{tableMeta.tableId},"
-          + " #{tableMeta.tableName},"
-          + " #{tableMeta.metalakeId},"
-          + " #{tableMeta.catalogId},"
-          + " #{tableMeta.schemaId},"
-          + " #{tableMeta.auditInfo},"
-          + " #{tableMeta.currentVersion},"
-          + " #{tableMeta.lastVersion},"
-          + " #{tableMeta.deletedAt}"
-          + " )"
-          + " ON DUPLICATE KEY UPDATE"
-          + " table_name = #{tableMeta.tableName},"
-          + " metalake_id = #{tableMeta.metalakeId},"
-          + " catalog_id = #{tableMeta.catalogId},"
-          + " schema_id = #{tableMeta.schemaId},"
-          + " audit_info = #{tableMeta.auditInfo},"
-          + " current_version = #{tableMeta.currentVersion},"
-          + " last_version = #{tableMeta.lastVersion},"
-          + " deleted_at = #{tableMeta.deletedAt}")
+  @InsertProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "insertTableMetaOnDuplicateKeyUpdate")
   void insertTableMetaOnDuplicateKeyUpdate(@Param("tableMeta") TablePO tablePO);
 
-  @Update(
-      "UPDATE "
-          + TABLE_NAME
-          + " SET table_name = #{newTableMeta.tableName},"
-          + " metalake_id = #{newTableMeta.metalakeId},"
-          + " catalog_id = #{newTableMeta.catalogId},"
-          + " schema_id = #{newTableMeta.schemaId},"
-          + " audit_info = #{newTableMeta.auditInfo},"
-          + " current_version = #{newTableMeta.currentVersion},"
-          + " last_version = #{newTableMeta.lastVersion},"
-          + " deleted_at = #{newTableMeta.deletedAt}"
-          + " WHERE table_id = #{oldTableMeta.tableId}"
-          + " AND table_name = #{oldTableMeta.tableName}"
-          + " AND metalake_id = #{oldTableMeta.metalakeId}"
-          + " AND catalog_id = #{oldTableMeta.catalogId}"
-          + " AND schema_id = #{oldTableMeta.schemaId}"
-          + " AND audit_info = #{oldTableMeta.auditInfo}"
-          + " AND current_version = #{oldTableMeta.currentVersion}"
-          + " AND last_version = #{oldTableMeta.lastVersion}"
-          + " AND deleted_at = 0")
+  @UpdateProvider(type = TableMetaSQLProviderFactory.class, method = "updateTableMeta")
   Integer updateTableMeta(
       @Param("newTableMeta") TablePO newTablePO, @Param("oldTableMeta") TablePO oldTablePO);
 
-  @Update(
-      "UPDATE "
-          + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE table_id = #{tableId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "softDeleteTableMetasByTableId")
   Integer softDeleteTableMetasByTableId(@Param("tableId") Long tableId);
 
-  @Update(
-      "UPDATE "
-          + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "softDeleteTableMetasByMetalakeId")
   Integer softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @Update(
-      "UPDATE "
-          + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE catalog_id = #{catalogId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "softDeleteTableMetasByCatalogId")
   Integer softDeleteTableMetasByCatalogId(@Param("catalogId") Long catalogId);
 
-  @Update(
-      "UPDATE "
-          + TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE schema_id = #{schemaId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "softDeleteTableMetasBySchemaId")
   Integer softDeleteTableMetasBySchemaId(@Param("schemaId") Long schemaId);
 
-  @Delete(
-      "DELETE FROM "
-          + TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  @DeleteProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "deleteTableMetasByLegacyTimeline")
   Integer deleteTableMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

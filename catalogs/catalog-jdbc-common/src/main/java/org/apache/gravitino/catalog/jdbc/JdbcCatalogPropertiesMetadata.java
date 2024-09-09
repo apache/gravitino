@@ -23,6 +23,7 @@ import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropert
 import static org.apache.gravitino.connector.PropertyEntry.stringPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
@@ -94,7 +95,10 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 JdbcConfig.POOL_MAX_SIZE.getDefaultValue(),
                 true /* hidden */,
                 false /* reserved */));
-    PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
+    PROPERTIES_METADATA =
+        ImmutableMap.<String, PropertyEntry<?>>builder()
+            .putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName))
+            .build();
   }
 
   @Override

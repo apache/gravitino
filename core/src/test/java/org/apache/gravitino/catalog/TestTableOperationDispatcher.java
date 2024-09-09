@@ -36,6 +36,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -44,8 +45,10 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -306,6 +309,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
         };
 
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableIdent.namespace().levels()), "comment", props);
+
     tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
 
     boolean dropped = tableOperationDispatcher.dropTable(tableIdent);
@@ -318,5 +324,25 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+  }
+
+  @Test
+  public void testCreateTableNeedImportingSchema() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema181");
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "topic81");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    testCatalogOperations.createSchema(
+        NameIdentifier.of(tableNs.levels()), "", Collections.emptyMap());
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
+          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props);
+    Assertions.assertTrue(entityStore.exists(NameIdentifier.of(tableNs.levels()), SCHEMA));
+    Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
   }
 }

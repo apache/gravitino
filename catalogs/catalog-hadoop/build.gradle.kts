@@ -25,20 +25,44 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":core"))
-  implementation(project(":common"))
+  implementation(project(":api")) {
+    exclude(group = "*")
+  }
 
-  implementation(libs.guava)
-  implementation(libs.hadoop3.aws)
-  implementation(libs.hadoop3.client)
+  implementation(project(":core")) {
+    exclude(group = "*")
+  }
+  implementation(project(":common")) {
+    exclude(group = "*")
+  }
+
   implementation(libs.hadoop3.common) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
+    exclude("org.eclipse.jetty", "*")
+    exclude("org.apache.hadoop", "hadoop-auth")
+    exclude("org.apache.curator", "curator-client")
+    exclude("org.apache.curator", "curator-framework")
+    exclude("org.apache.curator", "curator-recipes")
+    exclude("org.apache.avro", "avro")
+    exclude("com.sun.jersey", "jersey-servlet")
   }
+
   implementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")
+    exclude("com.google.guava", "guava")
+    exclude("commons-io", "commons-io")
+    exclude("org.eclipse.jetty", "*")
+    exclude("io.netty")
+    exclude("org.fusesource.leveldbjni")
+  }
+  implementation(libs.hadoop3.client) {
+    exclude("org.apache.hadoop", "hadoop-mapreduce-client-core")
+    exclude("org.apache.hadoop", "hadoop-mapreduce-client-jobclient")
+    exclude("org.apache.hadoop", "hadoop-yarn-api")
+    exclude("org.apache.hadoop", "hadoop-yarn-client")
+    exclude("com.squareup.okhttp", "okhttp")
   }
 
   implementation(libs.slf4j.api)
@@ -55,6 +79,7 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
@@ -71,7 +96,18 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn("jar", "runtimeJars")
-    from("build/libs")
+    from("build/libs") {
+      exclude("slf4j-*.jar")
+      exclude("guava-*.jar")
+      exclude("curator-*.jar")
+      exclude("netty-*.jar")
+      exclude("snappy-*.jar")
+      exclude("zookeeper-*.jar")
+      exclude("jetty-*.jar")
+      exclude("javax.servlet-*.jar")
+      exclude("kerb-*.jar")
+      exclude("kerby-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
 
@@ -125,15 +161,6 @@ tasks.test {
     exclude("**/integration/**")
   } else {
     dependsOn(tasks.jar)
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.13")
-      environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-kerberos-hive:0.1.5")
-      environment("GRAVITINO_CI_S3MOCK_DOCKER_IMAGE", "adobe/s3mock:3.9.1")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

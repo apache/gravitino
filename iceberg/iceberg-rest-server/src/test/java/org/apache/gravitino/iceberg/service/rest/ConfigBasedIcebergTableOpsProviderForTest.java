@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
-import org.apache.gravitino.iceberg.common.ops.ConfigBasedIcebergTableOpsProvider;
 import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergTableOpsProvider;
 
 public class ConfigBasedIcebergTableOpsProviderForTest extends ConfigBasedIcebergTableOpsProvider {
   @Override

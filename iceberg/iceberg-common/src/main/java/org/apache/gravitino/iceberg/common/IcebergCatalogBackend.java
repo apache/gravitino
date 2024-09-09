@@ -22,5 +22,6 @@ public enum IcebergCatalogBackend {
   HIVE,
   JDBC,
   MEMORY,
-  REST
+  REST,
+  CUSTOM
 }

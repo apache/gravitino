@@ -23,6 +23,7 @@ from dataclasses_json import config
 
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.auth.auth_constants import AuthConstants
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
@@ -43,13 +44,16 @@ class OAuth2TokenResponse(BaseResponse):
         Raise:
             IllegalArgumentException If the response is invalid, this exception is thrown.
         """
-        super().validate()
+        if self._access_token is None:
+            raise IllegalArgumentException("Invalid access token: None")
 
-        assert self._access_token is not None, "Invalid access token: None"
-        assert (
+        if (
             AuthConstants.AUTHORIZATION_BEARER_HEADER.strip().lower()
-            == self._token_type.lower()
-        ), f'Unsupported token type: {self._token_type} (must be "bearer")'
+            != self._token_type.lower()
+        ):
+            raise IllegalArgumentException(
+                f'Unsupported token type: {self._token_type} (must be "bearer")'
+            )
 
     def access_token(self) -> str:
         return self._access_token

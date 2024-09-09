@@ -25,38 +25,35 @@ Builds with Apache Iceberg `1.5.2`. The Apache Iceberg table format version is `
 
 ### Catalog capabilities
 
-- Works as a catalog proxy, supporting `HiveCatalog`, `JdbcCatalog` and `RESTCatalog`.
+- Works as a catalog proxy, supporting `Hive`, `JDBC` and `REST` as catalog backend.
 - Supports DDL operations for Iceberg schemas and tables.
 - Doesn't support snapshot or table management operations.
-- Supports S3 and HDFS storage.
+- Supports multi storage.
+  - S3
+  - HDFS
+  - OSS
 - Supports Kerberos or simple authentication for Iceberg catalog with Hive backend. 
 
 ### Catalog properties
 
-| Property name                                      | Description                                                                                                                                                                                     | Default value          | Required                                                    | Since Version |
-|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-------------------------------------------------------------|---------------|
-| `catalog-backend`                                  | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                              | (none)                 | Yes                                                         | 0.2.0         |
-| `uri`                                              | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001`. | (none)                 | Yes                                                         | 0.2.0         |
-| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                      | (none)                 | Yes                                                         | 0.2.0         |
-| `catalog-backend-name`                             | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                            | Gravitino catalog name | No                                                          | 0.5.2         |
-| `authentication.type`                              | The type of authentication for Iceberg catalog backend, currently Gravitino only supports `Kerberos`, `simple`.                                                                                 | `simple`               | No                                                          | 0.6.0         |
-| `authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                         | `false`                | No                                                          | 0.6.0         |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                    | (none)                 | required if the value of `authentication.type` is Kerberos. | 0.6.0         |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                          | (none)                 | required if the value of `authentication.type` is Kerberos. | 0.6.0         |
-| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                  | 60                     | No                                                          | 0.6.0         |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                      | 60                     | No                                                          | 0.6.0         |
+| Property name                                      | Description                                                                                                                                                                                                                                      | Default value          | Required                                                    | Since Version |
+|----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-------------------------------------------------------------|---------------|
+| `catalog-backend`                                  | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                                                                               | (none)                 | Yes                                                         | 0.2.0         |
+| `uri`                                              | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001`.                                                  | (none)                 | Yes                                                         | 0.2.0         |
+| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-hive/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                                                                       | (none)                 | Yes                                                         | 0.2.0         |
+| `catalog-backend-name`                             | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                                                                             | Gravitino catalog name | No                                                          | 0.5.2         |
 
 
-Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
+Any property not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
 
-When you use the Gravitino with Trino. You can pass the Trino Iceberg connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.iceberg.table-statistics-enabled` to pass the `iceberg.table-statistics-enabled` to the Gravitino Iceberg catalog in Trino runtime.
+If you are using the Gravitino with Trino, you can pass the Trino Iceberg connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.iceberg.table-statistics-enabled` to pass the `iceberg.table-statistics-enabled` to the Gravitino Iceberg catalog in Trino runtime.
 
-When you use the Gravitino with Spark. You can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector in Spark runtime.
+If you are using the Gravitino with Spark, you can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector in Spark runtime.
 
 
-#### JDBC catalog
+#### JDBC backend
 
-If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and `jdbc-driver` to catalog properties.
+If you are using JDBC backend, you must provide properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`.
 
 | Property name     | Description                                                                                             | Default value | Required | Since Version |
 |-------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -68,7 +65,7 @@ If you are using JDBC catalog, you must provide `jdbc-user`, `jdbc-password` and
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
 :::caution
-You must download the corresponding JDBC driver to the `catalogs/lakehouse-iceberg/libs` directory.
+You must download the corresponding JDBC driver and place it to the `catalogs/lakehouse-iceberg/libs` directory If you are using JDBC backend.
 :::
 
 #### S3
@@ -86,8 +83,38 @@ Supports using static access-key-id and secret-access-key to access S3 data.
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
 :::info
-Please set `gravitino.iceberg-rest.warehouse` to `s3://{bucket_name}/${prefix_name}` for JDBC catalog backend, `s3a://{bucket_name}/${prefix_name}` for Hive catalog backend.
+To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle]([Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle)) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
+
+#### OSS
+
+Gravitino Iceberg REST service supports using static access-key-id and secret-access-key to access OSS data.
+
+| Configuration item      | Description                                                                                           | Default value | Required | Since Version |
+|-------------------------|-------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `io-impl`               | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aliyun.oss.OSSFileIO` for OSS. | (none)        | No       | 0.6.0         |
+| `oss-access-key-id`     | The static access key ID used to access OSS data.                                                     | (none)        | No       | 0.7.0         |
+| `oss-secret-access-key` | The static secret access key used to access OSS data.                                                 | (none)        | No       | 0.7.0         |
+| `oss-endpoint`          | The endpoint of Aliyun OSS service.                                                                   | (none)        | No       | 0.7.0         |
+
+For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.bypass.client.security-token`.
+
+:::info
+Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the `catalogs/lakehouse-iceberg/libs/` directory.
+:::
+
+#### Catalog backend security
+
+Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
+
+| Property name                                      | Description                                                                                                                                                                                                                                      | Default value          | Required                                                    | Since Version |
+|----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-------------------------------------------------------------|---------------|
+| `authentication.type`                              | The type of authentication for Iceberg catalog backend. This configuration only applicable for for Hive backend, and only supports `Kerberos`, `simple` currently. As for JDBC backend, only username/password authentication was supported now. | `simple`               | No                                                          | 0.6.0         |
+| `authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                                                                          | `false`                | No                                                          | 0.6.0         |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                                                     | (none)                 | required if the value of `authentication.type` is Kerberos. | 0.6.0         |
+| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                                                           | (none)                 | required if the value of `authentication.type` is Kerberos. | 0.6.0         |
+| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                   | 60                     | No                                                          | 0.6.0         |
+| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                       | 60                     | No                                                          | 0.6.0         |
 
 ### Catalog operations
 
@@ -257,16 +284,21 @@ You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/co
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
-| Configuration item              | Description                                             |
-|---------------------------------|---------------------------------------------------------|
-| `comment`                       | The table comment.                                      |
-| `creator`                       | The table creator.                                      |
-| `location`                      | Iceberg location for table storage.                     |
-| `current-snapshot-id`           | The snapshot represents the current state of the table. |
-| `cherry-pick-snapshot-id`       | Selecting a specific snapshot in a merge operation.     |
-| `sort-order`                    | Selecting a specific snapshot in a merge operation.     |
-| `identifier-fields`             | The identifier fields for defining the table.           |
-| `write.distribution-mode`       | Defines distribution of write data                      |
+| Configuration item        | Description                                                                          | Since Version |
+|---------------------------|--------------------------------------------------------------------------------------|---------------|
+| `comment`                 | The table comment, please use `comment` field in table meta instead.                 | 0.2.0         |
+| `creator`                 | The table creator.                                                                   | 0.2.0         |
+| `current-snapshot-id`     | The snapshot represents the current state of the table.                              | 0.2.0         |
+| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                  | 0.2.0         |
+| `sort-order`              | Iceberg table sort order, please use `SortOrder` in table meta instead.              | 0.2.0         |
+| `identifier-fields`       | The identifier fields for defining the table.                                        | 0.2.0         |
+| `write.distribution-mode` | Defines distribution of write data, please use `distribution` in table meta instead. | 0.2.0         |
+
+Gravitino server doesn't allow to change such properties:
+
+| Configuration item | Description                                  | Default value | Required | Since Version |
+|--------------------|----------------------------------------------|---------------|----------|---------------|
+| `location`         | Iceberg location for table storage.          | None          | No       | 0.2.0         |
 
 ### Table indexes
 
