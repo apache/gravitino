@@ -32,7 +32,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -161,21 +160,12 @@ public class AbstractIT {
     }
   }
 
-  protected static void setPGBackend() throws SQLException {
+  public static String startAndInitPGBackend() {
+    META_DATA = PG_JDBC_BACKEND;
+    containerSuite.startPostgreSQLContainer(META_DATA);
+    POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
+
     String pgUrlWithoutSchema = POSTGRESQL_CONTAINER.getJdbcUrl(META_DATA);
-    customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgUrlWithoutSchema);
-    customConfigs.put(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY,
-        POSTGRESQL_CONTAINER.getDriverClassName(META_DATA));
-    customConfigs.put(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, POSTGRESQL_CONTAINER.getUsername());
-    customConfigs.put(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, POSTGRESQL_CONTAINER.getPassword());
-
-    LOG.info("PG URL: {}", pgUrlWithoutSchema);
-
     String randomSchemaName = RandomStringUtils.random(10, true, false);
     // Connect to the PostgreSQL docker and create a schema
     String currentExecuteSql = "";
@@ -216,18 +206,17 @@ public class AbstractIT {
 
     pgUrlWithoutSchema = pgUrlWithoutSchema + "?currentSchema=" + randomSchemaName;
     customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgUrlWithoutSchema);
+
+    LOG.info("PG URL: {}", pgUrlWithoutSchema);
+    return pgUrlWithoutSchema;
   }
 
-  private static void setMySQLBackend() {
-    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
-    customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, mysqlUrl);
-    customConfigs.put(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, "root");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, "root");
+  public static String startAndInitMySQLBackend() {
+    META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
+    containerSuite.startMySQLContainer(META_DATA);
+    MYSQL_CONTAINER = containerSuite.getMySQLContainer();
 
+    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
     LOG.info("MySQL URL: {}", mysqlUrl);
     // Connect to the mysql docker and create a databases
     try (Connection connection =
@@ -255,6 +244,7 @@ public class AbstractIT {
       for (String sql : initMySQLBackendSqls) {
         statement.execute(sql);
       }
+      return mysqlUrl;
     } catch (Exception e) {
       LOG.error("Failed to create database in mysql", e);
       throw new RuntimeException(e);
@@ -279,18 +269,27 @@ public class AbstractIT {
 
     if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
-      META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
-      containerSuite.startMySQLContainer(META_DATA);
-      MYSQL_CONTAINER = containerSuite.getMySQLContainer();
-
-      setMySQLBackend();
+      String jdbcURL = startAndInitMySQLBackend();
+      customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, jdbcURL);
+      customConfigs.put(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, "root");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, "root");
     } else if ("PostgreSQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
       // Start PostgreSQL docker instance.
-      META_DATA = PG_JDBC_BACKEND;
-      containerSuite.startPostgreSQLContainer(META_DATA);
-      POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
-
-      setPGBackend();
+      String pgJdbcUrl = startAndInitPGBackend();
+      customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgJdbcUrl);
+      customConfigs.put(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY,
+          POSTGRESQL_CONTAINER.getDriverClassName(META_DATA));
+      customConfigs.put(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, POSTGRESQL_CONTAINER.getUsername());
+      customConfigs.put(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, POSTGRESQL_CONTAINER.getPassword());
     }
 
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
