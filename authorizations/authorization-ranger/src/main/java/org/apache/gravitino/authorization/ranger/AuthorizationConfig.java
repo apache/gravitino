@@ -48,8 +48,7 @@ public class AuthorizationConfig extends Config {
   public static AuthorizationConfig loadConfig(String providerName) {
     AuthorizationConfig authorizationConfig = new AuthorizationConfig();
     boolean testEnv = System.getenv("GRAVITINO_TEST") != null;
-    String propertyFilePath =
-        String.format("authorization-defs/authorization-%s.properties", providerName);
+    String propertyFile = String.format("authorization-%s.properties", providerName);
 
     String confPath;
     if (testEnv) {
@@ -63,7 +62,8 @@ public class AuthorizationConfig extends Config {
               "build",
               "resources",
               "test",
-              propertyFilePath);
+              "authorization-defs",
+              propertyFile);
     } else {
       // Load from configuration directory in production environment
       confPath =
@@ -73,7 +73,7 @@ public class AuthorizationConfig extends Config {
               "authorizations",
               "ranger",
               "conf",
-              propertyFilePath);
+              propertyFile);
     }
     try {
       Properties properties = authorizationConfig.loadPropertiesFromFile(new File(confPath));

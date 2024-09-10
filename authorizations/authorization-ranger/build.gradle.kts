@@ -91,7 +91,7 @@ dependencies {
 
 tasks {
   val runtimeJars by registering(Copy::class) {
-    from(configurations.runtimeClasspath, "src/main/resources")
+    from(configurations.runtimeClasspath, "src/main/resources/authorization-defs")
     into("build/libs")
     rename { original ->
       if (original.endsWith(".template")) {
@@ -113,7 +113,7 @@ tasks {
   }
 
   val copyAuthorizationConfig by registering(Copy::class) {
-    from("src/main/resources")
+    from("src/main/resources/authorization-defs")
     into("$rootDir/distribution/package/authorizations/ranger/conf")
     rename { original ->
       if (original.endsWith(".template")) {
