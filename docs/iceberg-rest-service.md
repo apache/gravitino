@@ -25,7 +25,7 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 ## Server management
 
 There are three deployment scenarios for Gravitino Iceberg REST server:
-- A standalone server with a standalone Gravitino Iceberg REST server package.
+- A standalone server in a standalone Gravitino Iceberg REST server package.
 - A standalone server in the Gravitino server package.
 - An auxiliary service embedded in the Gravitino server.
  
