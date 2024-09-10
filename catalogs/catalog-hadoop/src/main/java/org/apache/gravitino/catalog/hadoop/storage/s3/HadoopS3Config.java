@@ -39,55 +39,55 @@ public class HadoopS3Config extends AuthenticationConfig {
   public static final ConfigEntry<String> ACCESS_KEY_ENTRY =
       new ConfigBuilder(ACCESS_KEY)
           .doc("The access key of S3")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
   public static final ConfigEntry<String> SECRET_KEY_ENTRY =
       new ConfigBuilder(SECRET_KEY)
           .doc("The secret key of S3")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> SESSION_TOKEN_ENTRY =
       new ConfigBuilder(SESSION_TOKEN)
           .doc("The session token of S3")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> CREDENTIALS_PROVIDER_ENTRY =
       new ConfigBuilder(CREDENTIALS_PROVIDER)
           .doc("The credentials provider of S3, only anonymous, token and simple are supported")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .createWithDefault("simple");
 
   public static final ConfigEntry<String> ENDPOINT_ENTRY =
       new ConfigBuilder(ENDPOINT)
           .doc("The endpoint of S3")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> REGION_ENTRY =
       new ConfigBuilder(REGION)
           .doc("The region of AWS S3")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<Boolean> SSL_ENABLED_ENTRY =
       new ConfigBuilder(SSL_ENABLED)
           .doc("Enables or disables SSL connections to S3")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_7_0)
           .booleanConf()
           .createWithDefault(false);
 
   public static final ConfigEntry<Boolean> PATH_STYLE_ENABLED_ENTRY =
       new ConfigBuilder(PATH_STYLE_ENABLED)
           .doc("Enable S3 path style access ie disabling the default virtual hosting behaviour")
-          .version(ConfigConstants.VERSION_0_5_1)
+          .version(ConfigConstants.VERSION_0_7_0)
           .booleanConf()
           .createWithDefault(false);
 
