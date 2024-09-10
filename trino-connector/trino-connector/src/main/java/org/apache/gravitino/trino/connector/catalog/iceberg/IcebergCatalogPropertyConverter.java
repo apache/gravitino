@@ -346,15 +346,18 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
 
     Map<String, String> jdbcProperties = new HashMap<>();
     jdbcProperties.put("iceberg.catalog.type", "jdbc");
-    jdbcProperties.put("iceberg.jdbc-catalog.driver-class",
+    jdbcProperties.put(
+        "iceberg.jdbc-catalog.driver-class",
         properties.get(IcebergConstants.GRAVITINO_JDBC_DRIVER));
     jdbcProperties.put("iceberg.jdbc-catalog.connection-url", properties.get(IcebergConstants.URI));
-    jdbcProperties.put("iceberg.jdbc-catalog.connection-user",
+    jdbcProperties.put(
+        "iceberg.jdbc-catalog.connection-user",
         properties.get(IcebergConstants.GRAVITINO_JDBC_USER));
-    jdbcProperties.put("iceberg.jdbc-catalog.connection-password",
+    jdbcProperties.put(
+        "iceberg.jdbc-catalog.connection-password",
         properties.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD));
-    jdbcProperties.put("iceberg.jdbc-catalog.default-warehouse-dir",
-        properties.get(IcebergConstants.WAREHOUSE));
+    jdbcProperties.put(
+        "iceberg.jdbc-catalog.default-warehouse-dir", properties.get(IcebergConstants.WAREHOUSE));
 
     jdbcProperties.put(
         "iceberg.jdbc-catalog.catalog-name",
