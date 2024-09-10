@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 
@@ -345,17 +346,19 @@ public class IcebergCatalogPropertyConverter extends PropertyConverter {
 
     Map<String, String> jdbcProperties = new HashMap<>();
     jdbcProperties.put("iceberg.catalog.type", "jdbc");
-    jdbcProperties.put("iceberg.jdbc-catalog.driver-class", properties.get("jdbc-driver"));
-    jdbcProperties.put("iceberg.jdbc-catalog.connection-url", properties.get("uri"));
-    jdbcProperties.put("iceberg.jdbc-catalog.connection-user", properties.get("jdbc-user"));
-    jdbcProperties.put("iceberg.jdbc-catalog.connection-password", properties.get("jdbc-password"));
-    jdbcProperties.put("iceberg.jdbc-catalog.default-warehouse-dir", properties.get("warehouse"));
+    jdbcProperties.put("iceberg.jdbc-catalog.driver-class",
+        properties.get(IcebergConstants.GRAVITINO_JDBC_DRIVER));
+    jdbcProperties.put("iceberg.jdbc-catalog.connection-url", properties.get(IcebergConstants.URI));
+    jdbcProperties.put("iceberg.jdbc-catalog.connection-user",
+        properties.get(IcebergConstants.GRAVITINO_JDBC_USER));
+    jdbcProperties.put("iceberg.jdbc-catalog.connection-password",
+        properties.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD));
+    jdbcProperties.put("iceberg.jdbc-catalog.default-warehouse-dir",
+        properties.get(IcebergConstants.WAREHOUSE));
 
-    // TODO (yuhui) Optimize the code for retrieve the catalogname
-    String catalogName = properties.get("catalog-name");
     jdbcProperties.put(
         "iceberg.jdbc-catalog.catalog-name",
-        properties.getOrDefault(IcebergConstants.CATALOG_BACKEND_NAME, catalogName));
+        IcebergPropertiesUtils.getCatalogBackendName(properties));
 
     return jdbcProperties;
   }

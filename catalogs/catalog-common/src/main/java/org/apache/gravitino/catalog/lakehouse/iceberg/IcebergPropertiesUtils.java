@@ -18,11 +18,15 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import com.google.common.base.Preconditions;
+import com.sun.deploy.util.StringUtils;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
+import java.util.Optional;
 
 public class IcebergPropertiesUtils {
 
@@ -73,5 +77,23 @@ public class IcebergPropertiesUtils {
           }
         });
     return icebergProperties;
+  }
+
+
+  /**
+   * Get catalog backend name from Gravitino catalog properties.
+   *
+   * @param catalogProperties a map of Gravitino catalog properties.
+   * @return catalog backend name.
+   */
+  public static String getCatalogBackendName(Map<String, String> catalogProperties) {
+    String backendName = catalogProperties.get(IcebergConstants.CATALOG_BACKEND_NAME);
+    if (backendName != null) {
+      return backendName;
+    }
+
+    String catalogBackend = catalogProperties.get(IcebergConstants.CATALOG_BACKEND);
+    return Optional.ofNullable(catalogBackend).map(s -> s.toLowerCase(Locale.ROOT))
+        .orElse("memory");
   }
 }
