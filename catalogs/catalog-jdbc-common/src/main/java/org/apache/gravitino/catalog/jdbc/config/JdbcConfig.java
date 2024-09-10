@@ -25,6 +25,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.utils.TypeValidator;
 
 public class JdbcConfig extends Config {
 
@@ -33,7 +34,7 @@ public class JdbcConfig extends Config {
           .doc("The url of the Jdbc connection")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .checkValue(TypeValidator::isJdbcURL, ConfigConstants.JDBC_URL_INVALID_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> JDBC_DATABASE =
