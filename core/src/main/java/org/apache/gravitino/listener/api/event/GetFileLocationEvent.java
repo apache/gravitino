@@ -19,40 +19,40 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.audit.CallerContext;
 
-/** Represents an event that occurs when getting a actual file location. */
+/** Represents an event that occurs when getting an actual file location. */
 @DeveloperApi
 public final class GetFileLocationEvent extends FilesetEvent {
   private final String actualFileLocation;
 
-  private final CallerContext callerContext;
+  private final Map<String, String> context;
 
   /**
    * Constructs a new {@code GetFileLocationEvent}, recording the attempt to get a file location.
    *
    * @param user The user who initiated the get file location.
    * @param identifier The identifier of the file location that was attempted to be got.
-   * @param callerContext The audit caller context, this param can be null.
+   * @param context The audit context, this param can be null.
    * @param actualFileLocation The actual file location which want to get.
    */
   public GetFileLocationEvent(
       String user,
       NameIdentifier identifier,
       String actualFileLocation,
-      CallerContext callerContext) {
+      Map<String, String> context) {
     super(user, identifier);
     this.actualFileLocation = actualFileLocation;
-    this.callerContext = callerContext;
+    this.context = context;
   }
 
   public String actualFileLocation() {
     return actualFileLocation;
   }
 
-  public CallerContext callerContext() {
-    return callerContext;
+  public Map<String, String> context() {
+    return context;
   }
 }

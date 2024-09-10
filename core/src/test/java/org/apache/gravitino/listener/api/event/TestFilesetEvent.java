@@ -157,16 +157,14 @@ public class TestFilesetEvent {
     Assertions.assertEquals(GetFileLocationEvent.class, event1.getClass());
     String actualFileLocation = ((GetFileLocationEvent) event1).actualFileLocation();
     Assertions.assertEquals(actualFileLocation, fileLocation);
-    CallerContext actualCallerContext = ((GetFileLocationEvent) event1).callerContext();
-    assertEquals(2, actualCallerContext.context().size());
+    Map<String, String> actualContext = ((GetFileLocationEvent) event1).context();
+    assertEquals(2, actualContext.size());
     Assertions.assertEquals(
         InternalClientType.HADOOP_GVFS.name(),
-        actualCallerContext.context().get(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE));
+        actualContext.get(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE));
     Assertions.assertEquals(
         FilesetDataOperation.GET_FILE_STATUS.name(),
-        actualCallerContext
-            .context()
-            .get(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION));
+        actualContext.get(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION));
   }
 
   @Test

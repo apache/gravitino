@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -148,10 +149,12 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     try {
       String actualFileLocation = dispatcher.getFileLocation(ident, subPath);
       // get the audit info from the thread local context
-      CallerContext context = CallerContext.CallerContextHolder.get();
+      CallerContext callerContext = CallerContext.CallerContextHolder.get();
+      ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+      builder.putAll(callerContext.context());
       eventBus.dispatchEvent(
           new GetFileLocationEvent(
-              PrincipalUtils.getCurrentUserName(), ident, actualFileLocation, context));
+              PrincipalUtils.getCurrentUserName(), ident, actualFileLocation, builder.build()));
       return actualFileLocation;
     } catch (Exception e) {
       eventBus.dispatchEvent(
