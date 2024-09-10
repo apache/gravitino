@@ -34,7 +34,9 @@ dependencies {
   }
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.log4j)
-  implementation(libs.bundles.kerby)
+  implementation(libs.bundles.kerby) {
+    exclude("org.jline")
+  }
   implementation(libs.caffeine)
   implementation(libs.cglib)
   implementation(libs.commons.lang3)
@@ -74,6 +76,7 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("javax.servlet")
     exclude("javax.transaction", "transaction-api")
+    exclude("jline")
     exclude("org.apache.ant")
     exclude("org.apache.avro", "avro")
     exclude("org.apache.curator")
