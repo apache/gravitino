@@ -127,7 +127,7 @@ public class HadoopS3Config extends AuthenticationConfig {
     return get(PATH_STYLE_ENABLED_ENTRY);
   }
 
-  public static final Map<String, PropertyEntry<?>> AWS_PROPERTY_ENTRIES =
+  public static final Map<String, PropertyEntry<?>> S3_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
               ACCESS_KEY,

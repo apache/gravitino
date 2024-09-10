@@ -60,7 +60,7 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* hidden */))
           // The following two are about authentication.
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
-          .putAll(HadoopS3Config.AWS_PROPERTY_ENTRIES)
+          .putAll(HadoopS3Config.S3_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
           .build();
 

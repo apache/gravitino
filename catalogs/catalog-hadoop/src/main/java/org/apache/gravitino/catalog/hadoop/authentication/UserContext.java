@@ -100,6 +100,7 @@ public abstract class UserContext implements Closeable {
           authenticationConfig.isSimpleAuth()
               ? AuthenticationType.SIMPLE
               : AuthenticationType.KERBEROS;
+
     } else if (parentContext != null) {
       authenticationType =
           parentContext instanceof SimpleUserContext
