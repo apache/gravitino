@@ -84,11 +84,12 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Authorization Integration Test (JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
+      - name: Authorization Integration Test (JDK${{ matrix.java-version }})
         id: integrationTest
         run: |
           ./gradlew -PskipTests -PtestMode=embedded -PjdbcBackend=h2 -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test --tests "org.apache.gravitino.authorization.ranger.integration.test.**"
           ./gradlew -PskipTests -PtestMode=deploy -PjdbcBackend=mysql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test --tests "org.apache.gravitino.authorization.ranger.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PjdbcBackend=postgresql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test --tests "org.apache.gravitino.authorization.ranger.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
