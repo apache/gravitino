@@ -88,4 +88,14 @@ tasks {
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")
   }
+  val copyLicenseAndNotice by creating(Copy::class) {
+    from(rootDir) {
+      include("LICENSE")
+      include("NOTICE")
+    }
+    into("$buildDir/META-INF")
+  }
+  jar {
+    dependsOn(copyLicenseAndNotice)
+  }
 }

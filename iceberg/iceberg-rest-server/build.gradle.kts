@@ -88,8 +88,19 @@ tasks {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }
+  val copyLicenseAndNotice by creating(Copy::class) {
+    from(rootDir) {
+      include("LICENSE")
+      include("NOTICE")
+    }
+    into("$buildDir/META-INF")
+  }
   jar {
     finalizedBy(copyDepends)
+    dependsOn(copyLicenseAndNotice)
+  }
+  compileTestJava {
+    dependsOn(copyLicenseAndNotice)
   }
 
   register("copyLibs", Copy::class) {
