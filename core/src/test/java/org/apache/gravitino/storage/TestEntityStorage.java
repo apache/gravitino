@@ -140,7 +140,7 @@ public class TestEntityStorage {
 
         FieldUtils.writeStaticField(
             SQLExceptionConverterFactory.class, "converter", new H2ExceptionConverter(), true);
-        
+
       } else if (type.equalsIgnoreCase("mysql")) {
         String mysqlJdbcUrl = AbstractIT.startAndInitMySQLBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(mysqlJdbcUrl);
@@ -165,7 +165,7 @@ public class TestEntityStorage {
             "converter",
             new PostgreSQLExceptionConverter(),
             true);
-        
+
       } else {
         throw new UnsupportedOperationException("Unsupported entity store type: " + type);
       }
