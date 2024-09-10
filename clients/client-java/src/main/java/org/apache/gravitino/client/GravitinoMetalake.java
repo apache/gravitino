@@ -720,6 +720,29 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   }
 
   /**
+   * Lists the role names associated with a metadata object.
+   *
+   * @param object The object associated with the role.
+   * @return The role name list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the Metadata object with the given name does not
+   *     exist.
+   */
+  public String[] listRoleNamesByObject(MetadataObject object) {
+    NameListResponse resp =
+        restClient.get(
+            String.format(
+                "api/metalakes/%s/objects/%s/%s/roles",
+                this.name(), object.type(), object.fullName()),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    resp.validate();
+
+    return resp.getNames();
+  }
+
+  /**
    * Grant roles to a user.
    *
    * @param user The name of the User.

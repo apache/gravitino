@@ -370,6 +370,20 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
+   * Lists the role names associated with a metadata object.
+   *
+   * @param object The object associated with the role.
+   * @return The role name list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the Metadata object with the given name does not
+   *     exist.
+   */
+  public String[] listRoleNamesByObject(MetadataObject object)
+      throws NoSuchMetalakeException, NoSuchMetadataObjectException {
+    return getMetalake().listRoleNamesByObject(object);
+  }
+
+  /**
    * Creates a new builder for constructing a GravitinoClient.
    *
    * @param uri The base URI for the Gravitino API.

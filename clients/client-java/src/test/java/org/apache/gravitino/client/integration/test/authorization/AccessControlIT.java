@@ -187,6 +187,12 @@ public class AccessControlIT extends AbstractIT {
     Assertions.assertEquals(
         Lists.newArrayList(anotherRoleName, roleName), Arrays.asList(roleNames));
 
+    // List roles by the object
+    roleNames = metalake.listRoleNamesByObject(metalakeObject);
+    Arrays.sort(roleNames);
+    Assertions.assertEquals(
+        Lists.newArrayList(anotherRoleName, roleName), Arrays.asList(roleNames));
+
     // Verify the object
     Assertions.assertEquals(1, role.securableObjects().size());
     createdObject = role.securableObjects().get(0);

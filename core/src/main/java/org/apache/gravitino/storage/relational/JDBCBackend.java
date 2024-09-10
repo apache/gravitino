@@ -369,9 +369,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType) {
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields) {
     switch (relType) {
       case OWNER_REL:
         List<E> list = Lists.newArrayList();
@@ -382,20 +380,23 @@ public class JDBCBackend implements RelationalBackend {
       case METADATA_OBJECT_ROLE_REL:
         return (List<E>)
             RoleMetaService.getInstance()
-                .listRolesByMetadataObjectIdentAndType(nameIdentifier, identType);
+                .listRolesByMetadataObjectIdentAndType(nameIdentifier, identType, allFields);
       case ROLE_GROUP_REL:
         if (identType == Entity.EntityType.ROLE) {
           return (List<E>) GroupMetaService.getInstance().listGroupsByRoleIdent(nameIdentifier);
         } else {
           throw new IllegalArgumentException(
-              String.format("ROLE_GROUP_REL doesn't support type %s", identType.name()));
+              String.format(
+                  "ROLE_GROUP_REL doesn't support type %s or loading all fields",
+                  identType.name()));
         }
       case ROLE_USER_REL:
         if (identType == Entity.EntityType.ROLE) {
           return (List<E>) UserMetaService.getInstance().listUsersByRoleIdent(nameIdentifier);
         } else {
           throw new IllegalArgumentException(
-              String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
+              String.format(
+                  "ROLE_USER_REL doesn't support type %s or loading all fields", identType.name()));
         }
       default:
         throw new IllegalArgumentException(
