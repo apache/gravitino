@@ -174,6 +174,7 @@ allprojects {
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
       param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.1")
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
+      param.environment("GRAVITINO_CI_S3MOCK_DOCKER_IMAGE", "adobe/s3mock:3.10.0")
 
       val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
       val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
@@ -734,7 +735,7 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("authorization") &&
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink")
+        it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink") && !it.name.startsWith("s3")
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -753,7 +754,8 @@ tasks {
         !it.name.startsWith("integration-test") &&
         !it.name.startsWith("flink") &&
         !it.name.startsWith("trino-connector") &&
-        it.name != "bundled-catalog"
+        it.name != "bundled-catalog" &&
+        !it.name.startsWith("s3")
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")

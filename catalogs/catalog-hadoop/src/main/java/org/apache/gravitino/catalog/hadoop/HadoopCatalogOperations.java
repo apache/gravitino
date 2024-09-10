@@ -40,6 +40,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.hadoop.storage.StorageSystem;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -115,7 +116,12 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this.propertiesMetadata = propertiesMetadata;
     // Initialize Hadoop Configuration.
     this.conf = config;
-    this.hadoopConf = new Configuration();
+    String storageType =
+        (String)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.STORAGE_TYPE);
+    this.hadoopConf = StorageSystem.fromString(storageType).getInitializedConfiguration(config);
     this.catalogInfo = info;
     Map<String, String> bypassConfigs =
         config.entrySet().stream()

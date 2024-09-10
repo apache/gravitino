@@ -54,12 +54,9 @@ import org.slf4j.LoggerFactory;
 public abstract class HadoopCatalogCommonIT extends AbstractIT {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopCatalogCommonIT.class);
   private static final String PROVIDER = "hadoop";
-  protected static final String METALAKE_NAME =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
-  protected static final String CATALOG_NAME =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
-  protected static final String SCHEMA_NAME =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_schema");
+  private static String metalakeName;
+  private static String catalogName;
+  private static String schemaName;
 
   protected static GravitinoMetalake metalake;
   protected static Catalog catalog;
@@ -71,13 +68,20 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
 
   protected abstract String defaultBaseLocation();
 
+  protected abstract String metalakeName();
+
+  protected abstract String catalogName();
+
+  protected abstract String schemaName();
+
   private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     assertEquals(0, gravitinoMetalakes.length);
 
+    metalakeName = metalakeName();
     GravitinoMetalake createdMetalake =
-        client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;
@@ -87,11 +91,12 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
     String[] catalogs = metalake.listCatalogs();
     assertEquals(0, catalogs.length);
 
+    catalogName = catalogName();
     Map<String, String> catalogProperties = catalogProperties();
     metalake.createCatalog(
-        CATALOG_NAME, Catalog.Type.FILESET, PROVIDER, "comment", catalogProperties);
+        catalogName, Catalog.Type.FILESET, PROVIDER, "comment", catalogProperties);
 
-    catalog = metalake.loadCatalog(CATALOG_NAME);
+    catalog = metalake.loadCatalog(catalogName);
   }
 
   protected Map<String, String> catalogProperties() {
@@ -102,8 +107,9 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
     String[] schemas = catalog.asSchemas().listSchemas();
     assertEquals(0, schemas.length);
 
+    schemaName = schemaName();
     Map<String, String> schemaProperties = schemaProperties();
-    catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperties);
+    catalog.asSchemas().createSchema(schemaName, "comment", schemaProperties);
   }
 
   protected Map<String, String> schemaProperties() {
@@ -269,12 +275,12 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
 
     // drop fileset
     assertTrue(
-        catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, filesetName)),
+        catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, filesetName)),
         "fileset should be dropped");
 
     // verify fileset is dropped
     assertFalse(
-        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(SCHEMA_NAME, filesetName)),
+        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, filesetName)),
         "fileset should not exist");
     assertFalse(fs.exists(new Path(storageLocation)), "storage location should not exist");
   }
@@ -294,12 +300,12 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
 
     // drop fileset
     assertTrue(
-        catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, filesetName)),
+        catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, filesetName)),
         "fileset should be dropped");
 
     // verify fileset is dropped
     assertFalse(
-        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(SCHEMA_NAME, filesetName)),
+        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, filesetName)),
         "fileset should not exist");
     assertTrue(fs.exists(new Path(storageLocation)), "storage location should exist");
   }
@@ -320,7 +326,7 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
 
     // test load fileset
     Fileset loadFileset =
-        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(SCHEMA_NAME, filesetName));
+        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetName));
     assertEquals(fileset.name(), loadFileset.name(), "fileset should be loaded");
     assertEquals(fileset.comment(), loadFileset.comment(), "comment should be loaded");
     assertEquals(fileset.type(), loadFileset.type(), "type should be loaded");
@@ -332,20 +338,20 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
 
     assertThrows(
         NoSuchFilesetException.class,
-        () -> catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(SCHEMA_NAME, "not_exist")),
+        () -> catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, "not_exist")),
         "Should throw NoSuchFilesetException when fileset does not exist");
   }
 
   @Test
   void testListFilesets() throws IOException {
     // clear schema
-    catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
-    assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
+    catalog.asSchemas().dropSchema(schemaName, true);
+    assertFalse(catalog.asSchemas().schemaExists(schemaName));
     createSchema();
 
     // assert no fileset exists
     NameIdentifier[] nameIdentifiers =
-        catalog.asFilesetCatalog().listFilesets(Namespace.of(SCHEMA_NAME));
+        catalog.asFilesetCatalog().listFilesets(Namespace.of(schemaName));
     assertEquals(0, nameIdentifiers.length, "should have no fileset");
 
     // create fileset1
@@ -374,7 +380,7 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
 
     // list filesets
     NameIdentifier[] nameIdentifiers1 =
-        catalog.asFilesetCatalog().listFilesets(Namespace.of(SCHEMA_NAME));
+        catalog.asFilesetCatalog().listFilesets(Namespace.of(schemaName));
     Arrays.sort(nameIdentifiers1, Comparator.comparing(NameIdentifier::name));
     assertEquals(2, nameIdentifiers1.length, "should have 2 filesets");
     assertEquals(fileset1.name(), nameIdentifiers1[0].name());
@@ -396,7 +402,7 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(SCHEMA_NAME, filesetName), FilesetChange.rename(newFilesetName));
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.rename(newFilesetName));
 
     // verify fileset is updated
     assertNotNull(newFileset, "fileset should be created");
@@ -426,7 +432,7 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(SCHEMA_NAME, filesetName),
+                NameIdentifier.of(schemaName, filesetName),
                 FilesetChange.updateComment(newComment));
     assertFilesetExists(filesetName, storageLocation);
 
@@ -455,7 +461,7 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(SCHEMA_NAME, filesetName), FilesetChange.removeComment());
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.removeComment());
     assertFilesetExists(filesetName, storageLocation);
 
     // verify fileset is updated
@@ -483,7 +489,7 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(SCHEMA_NAME, filesetName), FilesetChange.setProperty("k1", "v2"));
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.setProperty("k1", "v2"));
     assertFilesetExists(filesetName, storageLocation);
 
     // verify fileset is updated
@@ -511,7 +517,7 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(SCHEMA_NAME, filesetName), FilesetChange.removeProperty("k1"));
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.removeProperty("k1"));
     assertFilesetExists(filesetName, storageLocation);
 
     // verify fileset is updated
@@ -549,7 +555,7 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
   @Test
   void testNameSpec() {
     String illegalName = "/%~?*";
-    NameIdentifier nameIdentifier = NameIdentifier.of(SCHEMA_NAME, illegalName);
+    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, illegalName);
 
     assertThrows(
         NoSuchFilesetException.class, () -> catalog.asFilesetCatalog().loadFileset(nameIdentifier));
@@ -598,26 +604,22 @@ public abstract class HadoopCatalogCommonIT extends AbstractIT {
     return catalog
         .asFilesetCatalog()
         .createFileset(
-            NameIdentifier.of(SCHEMA_NAME, filesetName),
-            comment,
-            type,
-            storageLocation,
-            properties);
+            NameIdentifier.of(schemaName, filesetName), comment, type, storageLocation, properties);
   }
 
   private void assertFilesetExists(String filesetName, String storageLocation) throws IOException {
     assertTrue(
-        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(SCHEMA_NAME, filesetName)),
+        catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, filesetName)),
         "fileset should exist");
     assertTrue(fs.exists(new Path(storageLocation)), "storage location should exist");
   }
 
   @AfterAll
   void stop() throws IOException {
-    Catalog catalog = metalake.loadCatalog(CATALOG_NAME);
-    catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
-    metalake.dropCatalog(CATALOG_NAME);
-    client.dropMetalake(METALAKE_NAME);
+    Catalog catalog = metalake.loadCatalog(catalogName);
+    catalog.asSchemas().dropSchema(schemaName, true);
+    metalake.dropCatalog(catalogName);
+    client.dropMetalake(metalakeName);
 
     if (fs != null) {
       fs.close();

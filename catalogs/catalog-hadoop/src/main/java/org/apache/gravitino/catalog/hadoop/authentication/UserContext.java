@@ -96,17 +96,15 @@ public abstract class UserContext implements Closeable {
     // If we do not set the authentication type explicitly, we will use the parent context. If the
     // parent is null, then we will use the default value.
     if (properties.containsKey(AuthenticationConfig.AUTH_TYPE_KEY)) {
-      authenticationType = authenticationConfig.getAuthType();
+      authenticationType =
+          authenticationConfig.isSimpleAuth()
+              ? AuthenticationType.SIMPLE
+              : AuthenticationType.KERBEROS;
     } else if (parentContext != null) {
-      if (parentContext instanceof SimpleUserContext) {
-        authenticationType = AuthenticationType.SIMPLE;
-      } else if (parentContext instanceof KerberosUserContext) {
-        authenticationType = AuthenticationType.KERBEROS;
-      } else if (parentContext instanceof AwsHadoopUserContext) {
-        authenticationType = AuthenticationType.AWS;
-      } else {
-        throw new RuntimeException("Unknown authentication type " + parentContext.getClass());
-      }
+      authenticationType =
+          parentContext instanceof SimpleUserContext
+              ? AuthenticationType.SIMPLE
+              : AuthenticationType.KERBEROS;
     }
 
     UserGroupInformation currentUser;
@@ -126,8 +124,7 @@ public abstract class UserContext implements Closeable {
     } else if (authenticationType == AuthenticationType.KERBEROS) {
       // if the kerberos authentication is inherited from the parent context, we will use the
       // parent context's kerberos configuration.
-      if (parentContext != null
-          && authenticationConfig.getAuthType() == AuthenticationType.SIMPLE) {
+      if (parentContext != null && authenticationConfig.isSimpleAuth()) {
         KerberosUserContext kerberosUserContext = ((KerberosUserContext) parentContext).deepCopy();
         kerberosUserContext.setEnableUserImpersonation(enableUserImpersonation);
         addUserContext(nameIdentifier, kerberosUserContext);
@@ -143,20 +140,6 @@ public abstract class UserContext implements Closeable {
       kerberosUserContext.initKerberos(properties, configuration, parentContext == null);
       addUserContext(nameIdentifier, kerberosUserContext);
       return kerberosUserContext;
-    } else if (authenticationType == AuthenticationType.AWS) {
-      if (authenticationConfig.getAuthType() == AuthenticationType.SIMPLE) {
-        AwsHadoopUserContext awsHadoopUserContext =
-            ((AwsHadoopUserContext) parentContext).deepCopy();
-        addUserContext(nameIdentifier, awsHadoopUserContext);
-        return awsHadoopUserContext;
-      }
-      UserGroupInformation userGroupInformation =
-          parentContext != null ? parentContext.getUser() : currentUser;
-      AwsHadoopUserContext awsHadoopUserContext =
-          new AwsHadoopUserContext(userGroupInformation, enableUserImpersonation);
-      awsHadoopUserContext.init(properties, configuration);
-      addUserContext(nameIdentifier, awsHadoopUserContext);
-      return awsHadoopUserContext;
     } else {
       throw new RuntimeException("Unsupported authentication type: " + authenticationType);
     }

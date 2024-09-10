@@ -36,8 +36,7 @@ public class AuthenticationConfig extends Config {
 
   enum AuthenticationType {
     SIMPLE,
-    KERBEROS,
-    AWS;
+    KERBEROS;
 
     public static AuthenticationType fromString(String type) {
       return AuthenticationType.valueOf(type.toUpperCase());
@@ -66,17 +65,20 @@ public class AuthenticationConfig extends Config {
           .booleanConf()
           .createWithDefault(KERBEROS_DEFAULT_IMPERSONATION_ENABLE);
 
-  public AuthenticationType getAuthType() {
-    String authType = get(AUTH_TYPE_ENTRY);
-    try {
-      return AuthenticationType.fromString(authType);
-    } catch (IllegalArgumentException e) {
-      throw new RuntimeException("Unsupported authentication type: " + authType);
-    }
+  public String getAuthType() {
+    return get(AUTH_TYPE_ENTRY);
   }
 
   public boolean isImpersonationEnabled() {
     return get(ENABLE_IMPERSONATION_ENTRY);
+  }
+
+  public boolean isSimpleAuth() {
+    return AuthenticationType.SIMPLE.name().equalsIgnoreCase(getAuthType());
+  }
+
+  public boolean isKerberosAuth() {
+    return AuthenticationType.KERBEROS.name().equalsIgnoreCase(getAuthType());
   }
 
   public static final Map<String, PropertyEntry<?>> AUTHENTICATION_PROPERTY_ENTRIES =

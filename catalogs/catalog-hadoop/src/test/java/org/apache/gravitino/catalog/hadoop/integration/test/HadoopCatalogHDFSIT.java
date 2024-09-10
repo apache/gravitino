@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.hadoop.integration.test;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
@@ -28,6 +29,12 @@ import org.junit.jupiter.api.TestInstance;
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class HadoopCatalogHDFSIT extends HadoopCatalogCommonIT {
+  private static final String METALAKE_NAME =
+      GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake_hdfs");
+  private static final String CATALOG_NAME =
+      GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog_hdfs");
+  private static final String SCHEMA_NAME =
+      GravitinoITUtils.genRandomName("CatalogFilesetIT_schema_hdfs");
   private static String defaultBaseLocation;
 
   @Override
@@ -62,5 +69,20 @@ public class HadoopCatalogHDFSIT extends HadoopCatalogCommonIT {
         .put("key2", "val2")
         .put("location", defaultBaseLocation)
         .build();
+  }
+
+  @Override
+  protected String metalakeName() {
+    return METALAKE_NAME;
+  }
+
+  @Override
+  protected String catalogName() {
+    return CATALOG_NAME;
+  }
+
+  @Override
+  protected String schemaName() {
+    return SCHEMA_NAME;
   }
 }

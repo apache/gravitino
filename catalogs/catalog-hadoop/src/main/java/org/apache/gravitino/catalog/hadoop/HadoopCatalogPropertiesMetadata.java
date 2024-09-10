@@ -21,8 +21,8 @@ package org.apache.gravitino.catalog.hadoop;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.hadoop.authentication.aws.AwsConfig;
 import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.catalog.hadoop.storage.s3.HadoopS3Config;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -35,6 +35,11 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   // If not, users have to specify the storage location in the Schema or Fileset level.
   public static final String LOCATION = "location";
 
+  // Property "storage-type" is used to specify the actual storage system of the filesets under the
+  // catalog.
+  // If not specified, the default storage type is HDFS.
+  public static final String STORAGE_TYPE = "storage-type";
+
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
@@ -45,9 +50,17 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* immutable */,
                   null,
                   false /* hidden */))
+          .put(
+              STORAGE_TYPE,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  STORAGE_TYPE,
+                  "The storage type of the filesets under the catalog, currently only Local, HDFS and S3 is supported",
+                  false /* immutable */,
+                  "HDFS",
+                  false /* hidden */))
           // The following two are about authentication.
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
-          .putAll(AwsConfig.AWS_PROPERTY_ENTRIES)
+          .putAll(HadoopS3Config.AWS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
           .build();
 

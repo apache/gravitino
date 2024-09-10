@@ -22,8 +22,7 @@ import static org.apache.gravitino.integration.test.container.S3MockContainer.HT
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.hadoop.authentication.aws.AwsConfig;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
@@ -31,6 +30,12 @@ import org.junit.jupiter.api.TestInstance;
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class HadoopCatalogS3IT extends HadoopCatalogCommonIT {
+  private static final String METALAKE_NAME =
+      GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake_s3");
+  private static final String CATALOG_NAME =
+      GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog_s3");
+  private static final String SCHEMA_NAME =
+      GravitinoITUtils.genRandomName("CatalogFilesetIT_schema_s3");
   private static final String DEFAULT_BASE_LOCATION = "s3a://gravitino-fileset-IT/";
   private static final String DEFAULT_AK = "foo";
   private static final String DEFAULT_SK = "bar";
@@ -67,12 +72,28 @@ public class HadoopCatalogS3IT extends HadoopCatalogCommonIT {
   }
 
   @Override
+  protected String metalakeName() {
+    return METALAKE_NAME;
+  }
+
+  @Override
+  protected String catalogName() {
+    return CATALOG_NAME;
+  }
+
+  @Override
+  protected String schemaName() {
+    return SCHEMA_NAME;
+  }
+
+  @Override
   protected Map<String, String> catalogProperties() {
     return ImmutableMap.<String, String>builder()
-        .put(AuthenticationConfig.AUTH_TYPE_KEY, "aws")
-        .put(AwsConfig.ENDPOINT, s3Endpoint)
-        .put(AwsConfig.ACCESS_KEY, DEFAULT_AK)
-        .put(AwsConfig.SECRET_KEY, DEFAULT_SK)
+        .put("storage-type", "s3")
+        .put("s3-endpoint", s3Endpoint)
+        .put("s3-access-key-id", DEFAULT_AK)
+        .put("s3-secret-access-key", DEFAULT_SK)
+        .put("s3-path-style-enabled", "true")
         .build();
   }
 
