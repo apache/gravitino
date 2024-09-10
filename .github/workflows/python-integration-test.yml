@@ -54,7 +54,7 @@ jobs:
       matrix:
         # Integration test for AMD64 architecture
         architecture: [linux/amd64]
-        java-version: [ 8 ]
+        java-version: [ 17 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
