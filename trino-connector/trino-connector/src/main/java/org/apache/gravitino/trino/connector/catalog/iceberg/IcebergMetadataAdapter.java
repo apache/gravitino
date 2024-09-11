@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -147,13 +146,13 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
     if (ArrayUtils.isNotEmpty(gravitinoTable.getPartitioning())) {
       properties.put(
           IcebergPropertyMeta.ICEBERG_PARTITIONING_PROPERTY,
-              ExpressionUtil.expressionToPartitionFiled(gravitinoTable.getPartitioning()));
+          ExpressionUtil.expressionToPartitionFiled(gravitinoTable.getPartitioning()));
     }
 
     if (ArrayUtils.isNotEmpty(gravitinoTable.getSortOrders())) {
       properties.put(
           IcebergPropertyMeta.ICEBERG_SORTED_BY_PROPERTY,
-              ExpressionUtil.expressionToSortOrderFiled(gravitinoTable.getSortOrders()));
+          ExpressionUtil.expressionToSortOrderFiled(gravitinoTable.getSortOrders()));
     }
 
     return new ConnectorTableMetadata(
