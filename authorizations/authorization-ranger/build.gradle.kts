@@ -86,6 +86,7 @@ dependencies {
     exclude("org.eclipse.jetty.aggregate")
   }
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
 }
 
 tasks {
