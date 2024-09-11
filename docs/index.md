@@ -59,8 +59,7 @@ REST API and the Java SDK. You can use either to manage metadata. See
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
-Java SDK definition in [Gravitino Java doc](pathname:///docs/0.6.0-incubating/api/java/index.html),
-and Python SDK definition in [Gravitino Python doc](pathname:///docs/0.6.0-incubating/api/python/gravitino.html).
+Java SDK definition in [Gravitino Java doc](pathname:///docs/0.6.0-incubating/api/java/index.html).
 
 Gravitino provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`. See [Gravitino web UI](./webui.md) for details.
 
@@ -90,9 +89,9 @@ integrates Apache Hadoop, Apache Hive, Trino, MySQL, PostgreSQL, and Gravitino t
 complete environment. To experience all the features, see
 [Getting started](./getting-started.md) and [How to use the Gravitino playground](./how-to-use-the-playground.md).
 
-* [Install Gravitino playground on AWS or GCP](./getting-started.md#installing-gravitino-playground-on-aws-or-google-cloud-platform):
+* [Install Gravitino playground on AWS or GCP](./getting-started.md#installing-apache-gravitino-playground-on-aws-or-google-cloud-platform):
   a quick guide to starting and using the Gravitino playground on AWS or GCP.
-* [Install Gravitino playground locally](./getting-started.md#installing-gravitino-playground-locally):
+* [Install Gravitino playground locally](./getting-started.md#installing-apache-gravitino-playground-locally):
   a quick guide to starting and using the Gravitino playground locally.
 * [How to use the Gravitino playground](./how-to-use-the-playground.md): provides an example of how
   to use Gravitino and other components together.
@@ -165,7 +164,6 @@ Gravitino provides security configurations for Gravitino, including HTTPS, authe
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of Gravitino.
 * [Gravitino Java doc](pathname:///docs/0.6.0-incubating/api/java/index.html): provides the Javadoc for the Gravitino API.
-* [Gravitino Python doc](pathname:///docs/0.6.0-incubating/api/python/gravitino.html) provides the Pydoc for the Gravitino API.
 
 ### Development guides
 
