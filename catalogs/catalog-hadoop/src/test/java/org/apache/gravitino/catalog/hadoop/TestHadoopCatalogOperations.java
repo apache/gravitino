@@ -762,6 +762,46 @@ public class TestHadoopCatalogOperations {
                 ImmutableMap.of()));
   }
 
+  @Test
+  public void testGetFileLocation() throws IOException {
+    String schemaName = "schema1024";
+    String comment = "comment1024";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, comment, null, schemaPath);
+
+    String catalogName = "c1";
+    String name = "fileset1024";
+    String storageLocation = TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + name;
+    Fileset fileset =
+        createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, storageLocation);
+
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      // test sub path starts with "/"
+      String subPath1 = "/test/test.parquet";
+      String fileLocation1 = ops.getFileLocation(filesetIdent, subPath1);
+      Assertions.assertEquals(
+          String.format("%s%s", fileset.storageLocation(), subPath1), fileLocation1);
+
+      // test sub path not starts with "/"
+      String subPath2 = "test/test.parquet";
+      String fileLocation2 = ops.getFileLocation(filesetIdent, subPath2);
+      Assertions.assertEquals(
+          String.format("%s/%s", fileset.storageLocation(), subPath2), fileLocation2);
+
+      // test sub path is null
+      String subPath3 = null;
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> ops.getFileLocation(filesetIdent, subPath3));
+
+      // test sub path is blank but not null
+      String subPath4 = "";
+      String fileLocation3 = ops.getFileLocation(filesetIdent, subPath4);
+      Assertions.assertEquals(fileset.storageLocation(), fileLocation3);
+    }
+  }
+
   private static Stream<Arguments> locationArguments() {
     return Stream.of(
         // Honor the catalog location
