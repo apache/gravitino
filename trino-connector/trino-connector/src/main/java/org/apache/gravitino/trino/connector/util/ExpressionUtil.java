@@ -26,6 +26,13 @@ import java.util.List;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
+import org.apache.gravitino.rel.expressions.sorts.SortDirection;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 
@@ -53,6 +60,23 @@ public class ExpressionUtil {
   private static final Pattern IDENTIFILER_PATTERN =
       Pattern.compile(IDENTIFIER, Pattern.CASE_INSENSITIVE);
 
+  private static final String SORT_DIRECTION_ASC = "ASC";
+  private static final String SORT_DIRECTION_DESC = "DESC";
+  private static final String NULL_ORDERING_FIRST = "NULLS FIRST";
+  private static final String NULL_ORDERING_LAST = "NULLS LAST";
+  private static final String SORT_DIRECTION =
+      "(" + SORT_DIRECTION_ASC + "|" + SORT_DIRECTION_DESC + ")";
+  private static final String NULL_ORDERING =
+      "(" + NULL_ORDERING_FIRST + "|" + NULL_ORDERING_LAST + ")";
+  private static final Pattern SROT_ORDER_PATTERN =
+      Pattern.compile(IDENTIFIER, Pattern.CASE_INSENSITIVE);
+  private static final Pattern SORT_ORDER_WITH_SORT_DIRECTION_PATTERN =
+      Pattern.compile("(" + IDENTIFIER + ")\\s+" + SORT_DIRECTION, Pattern.CASE_INSENSITIVE);
+  private static final Pattern SORT_ORDER_WITH_SORT_DIRECTION_AND_NULL_ORDERING_PATTERN =
+      Pattern.compile(
+          "(" + IDENTIFIER + ")\\s+" + SORT_DIRECTION + "\\s+" + NULL_ORDERING,
+          Pattern.CASE_INSENSITIVE);
+
   public static List<String> expressionToPartitionFiled(Transform[] transforms) {
     try {
       List<String> partitionFields = new ArrayList<>();
@@ -68,17 +92,44 @@ public class ExpressionUtil {
 
   public static Transform[] partitionFiledToExpression(List<String> partitions) {
     try {
-      List<Transform> partitionTransForms = new ArrayList<>();
+      List<Transform> partitionTransforms = new ArrayList<>();
       for (String partition : partitions) {
-        parseTransForm(partitionTransForms, partition);
+        parseTransform(partitionTransforms, partition);
       }
-      return partitionTransForms.toArray(new Transform[0]);
+      return partitionTransforms.toArray(new Transform[0]);
     } catch (IllegalArgumentException e) {
-      throw new TrinoException(GRAVITINO_EXPRESSION_ERROR, "Error parsing partition field: ", e);
+      throw new TrinoException(
+          GRAVITINO_EXPRESSION_ERROR, "Error parsing the partition field: ", e);
     }
   }
 
-  private static void parseTransForm(List<Transform> transforms, String value) {
+  public static List<String> expressionToSortOrderFiled(SortOrder[] orders) {
+    try {
+      List<String> orderFields = new ArrayList<>();
+      for (SortOrder order : orders) {
+        orderFields.add(sortOrderToString(order));
+      }
+      return orderFields;
+    } catch (IllegalArgumentException e) {
+      throw new TrinoException(
+          GRAVITINO_EXPRESSION_ERROR, "Error to handle order Expressions : ", e);
+    }
+  }
+
+  public static SortOrder[] sortOrderFiledToExpression(List<String> orderFields) {
+    try {
+      List<SortOrder> sortOrders = new ArrayList<>();
+      for (String orderField : orderFields) {
+        parseSortOrder(sortOrders, orderField);
+      }
+      return sortOrders.toArray(new SortOrder[0]);
+    } catch (IllegalArgumentException e) {
+      throw new TrinoException(
+          GRAVITINO_EXPRESSION_ERROR, "Error parsing the sort order field: ", e);
+    }
+  }
+
+  private static void parseTransform(List<Transform> transforms, String value) {
     boolean match =
         false
             || tryMatch(
@@ -142,22 +193,109 @@ public class ExpressionUtil {
   private static String transFormToString(Transform transform) {
     if (transform instanceof Transforms.IdentityTransform) {
       return ((Transforms.IdentityTransform) transform).fieldName()[0];
-    } else {
-      return functionTransFormToString(transform);
-    }
-  }
 
-  private static String functionTransFormToString(Transform transform) {
-    if (transform.arguments().length == 1) {
-      return String.format("%s(%s)", transform.name(), transform.arguments()[0]);
-    } else if (transform.arguments().length == 2) {
+    } else if (transform instanceof Transforms.YearTransform
+        || transform instanceof Transforms.MonthTransform
+        || transform instanceof Transforms.DayTransform
+        || transform instanceof Transforms.HourTransform) {
       return String.format(
-          "%s(%s, %s)", transform.name(), transform.arguments()[0], transform.arguments()[1]);
+          "%s(%s)", transform.name(), expressionToString(transform.arguments()[0]));
+
+    } else if (transform instanceof Transforms.BucketTransform) {
+      Transforms.BucketTransform bucketTransform = (Transforms.BucketTransform) transform;
+      return String.format(
+          "%s(%s, %s)",
+          bucketTransform.name(), bucketTransform.fieldNames()[0][0], bucketTransform.numBuckets());
+
+    } else if (transform instanceof Transforms.TruncateTransform) {
+      Transforms.TruncateTransform truncateTransform = (Transforms.TruncateTransform) transform;
+      return String.format(
+          "%s(%s, %s)",
+          truncateTransform.name(), truncateTransform.fieldName()[0], truncateTransform.width());
     }
+
     throw new IllegalArgumentException(
         String.format(
             "Unsupported transform %s with %d parameters: ",
             transform, transform.arguments().length));
+  }
+
+  private static String expressionToString(Expression expression) {
+    if (expression instanceof NamedReference) {
+      return ((NamedReference) expression).fieldName()[0];
+    } else if (expression instanceof Literal<?>) {
+      return ((Literal<?>) expression).value().toString();
+    }
+    throw new IllegalArgumentException("Unsupported expression: " + expression);
+  }
+
+  private static String sortOrderToString(SortOrder order) {
+    Expression orderExpression = order.expression();
+    if (!(orderExpression instanceof NamedReference)) {
+      throw new IllegalArgumentException(
+          "Only supported sort expression of NamedReference, the expression: " + orderExpression);
+    }
+
+    String columnName = ((NamedReference) orderExpression).fieldName()[0];
+    if (order.direction() == SortDirection.ASCENDING) {
+      if (order.nullOrdering() == NullOrdering.NULLS_LAST) {
+        return String.format("%s ASC NULLS LAST", columnName);
+      } else {
+        return columnName;
+      }
+    } else if (order.direction() == SortDirection.DESCENDING) {
+      if (order.nullOrdering() == NullOrdering.NULLS_FIRST) {
+        return String.format("%s DESC NULLS FIRST", columnName);
+      } else {
+        return columnName + " DESC";
+      }
+    }
+    throw new IllegalArgumentException("Unsupported sort order: " + order);
+  }
+
+  private static void parseSortOrder(List<SortOrder> sortOrders, String value) {
+    boolean match =
+        false
+            || tryMatch(
+                value,
+                SROT_ORDER_PATTERN,
+                (m) -> {
+                  NamedReference.FieldReference sortField = NamedReference.field(m.group(0));
+                  sortOrders.add(SortOrders.ascending(sortField));
+                })
+            || tryMatch(
+                value,
+                SORT_ORDER_WITH_SORT_DIRECTION_PATTERN,
+                (m) -> {
+                  NamedReference.FieldReference sortField = NamedReference.field(m.group(1));
+                  SortDirection sortDirection =
+                      m.group(1).toUpperCase().equals(SORT_DIRECTION_ASC)
+                          ? SortDirection.ASCENDING
+                          : SortDirection.DESCENDING;
+                  NullOrdering nullOrdering =
+                      sortDirection.equals(SortDirection.ASCENDING)
+                          ? NullOrdering.NULLS_FIRST
+                          : NullOrdering.NULLS_LAST;
+                  sortOrders.add(SortOrders.of(sortField, sortDirection, nullOrdering));
+                })
+            || tryMatch(
+                value,
+                SORT_ORDER_WITH_SORT_DIRECTION_AND_NULL_ORDERING_PATTERN,
+                (m) -> {
+                  NamedReference.FieldReference sortField = NamedReference.field(m.group(1));
+                  SortDirection sortDirection =
+                      m.group(2).toUpperCase().equals(SORT_DIRECTION_ASC)
+                          ? SortDirection.ASCENDING
+                          : SortDirection.DESCENDING;
+                  NullOrdering nullOrdering =
+                      m.group(3).toUpperCase().equals(NULL_ORDERING_FIRST)
+                          ? NullOrdering.NULLS_FIRST
+                          : NullOrdering.NULLS_LAST;
+                  sortOrders.add(SortOrders.of(sortField, sortDirection, nullOrdering));
+                });
+    if (!match) {
+      throw new IllegalArgumentException("Unparsed expression: " + value);
+    }
   }
 
   interface MatcherHandler {
