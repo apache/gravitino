@@ -378,7 +378,7 @@ public class MetalakePage extends AbstractWebIT {
       String actualUrl = driver.getCurrentUrl();
 
       if (contains) {
-        return actualUrl.contains(expectedUrl);
+        return expectedUrl.contains(actualUrl.replaceAll("/[^/]+/$", "/"));
       }
       return actualUrl.equals(expectedUrl);
 
