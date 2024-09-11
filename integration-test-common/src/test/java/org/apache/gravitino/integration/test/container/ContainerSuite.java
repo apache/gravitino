@@ -70,6 +70,7 @@ public class ContainerSuite implements Closeable {
   private static volatile MySQLContainer mySQLVersion5Container;
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
       new EnumMap<>(PGImageName.class);
+  private static volatile OceanBaseContainer oceanBaseContainer;
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
@@ -361,6 +362,36 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  public void startOceanBaseContainer() {
+    if (oceanBaseContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (oceanBaseContainer == null) {
+          // Start OceanBase container
+          OceanBaseContainer.Builder oceanBaseBuilder =
+              OceanBaseContainer.builder()
+                  .withHostName("gravitino-ci-oceanbase")
+                  .withEnvVars(
+                      ImmutableMap.of(
+                          "MODE",
+                          "mini",
+                          "OB_SYS_PASSWORD",
+                          OceanBaseContainer.PASSWORD,
+                          "OB_TENANT_PASSWORD",
+                          OceanBaseContainer.PASSWORD,
+                          "OB_DATAFILE_SIZE",
+                          "2G",
+                          "OB_LOG_DISK_SIZE",
+                          "4G"))
+                  .withNetwork(network)
+                  .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
+          OceanBaseContainer container = closer.register(oceanBaseBuilder.build());
+          container.start();
+          oceanBaseContainer = container;
+        }
+      }
+    }
+  }
+
   public KafkaContainer getKafkaContainer() {
     return kafkaContainer;
   }
@@ -438,6 +469,10 @@ public class ContainerSuite implements Closeable {
               pgImageName));
     }
     return pgContainerMap.get(pgImageName);
+  }
+
+  public OceanBaseContainer getOceanBaseContainer() {
+    return oceanBaseContainer;
   }
 
   // Let containers assign addresses in a fixed subnet to avoid
