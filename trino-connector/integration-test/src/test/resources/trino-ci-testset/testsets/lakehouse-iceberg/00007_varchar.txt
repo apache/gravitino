@@ -1,0 +1,24 @@
+CREATE SCHEMA
+
+USE
+
+<QUERY_FAILED> Iceberg does not support the datatype CHAR
+
+<QUERY_FAILED> Iceberg does not support the datatype CHAR
+
+<QUERY_FAILED> Iceberg does not support the datatype VARCHAR with length
+
+CREATE TABLE
+
+"CREATE TABLE %.gt_db2.tb04 (
+   id integer,
+   name varchar
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb04'
+)"
+
+DROP TABLE
+
+DROP SCHEMA

@@ -301,6 +301,7 @@
    Apache Iceberg AWS
    Apache Iceberg core
    Apache Iceberg Hive metastore
+   Apache Iceberg GCP
    Apache Ivy
    Apache Log4j 1.x Compatibility API
    Apache Log4j API
