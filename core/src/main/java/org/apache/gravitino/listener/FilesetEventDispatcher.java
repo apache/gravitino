@@ -154,7 +154,11 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
       builder.putAll(callerContext.context());
       eventBus.dispatchEvent(
           new GetFileLocationEvent(
-              PrincipalUtils.getCurrentUserName(), ident, actualFileLocation, builder.build()));
+              PrincipalUtils.getCurrentUserName(),
+              ident,
+              actualFileLocation,
+              subPath,
+              builder.build()));
       return actualFileLocation;
     } catch (Exception e) {
       eventBus.dispatchEvent(

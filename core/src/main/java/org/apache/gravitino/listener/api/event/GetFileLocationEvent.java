@@ -27,7 +27,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 @DeveloperApi
 public final class GetFileLocationEvent extends FilesetEvent {
   private final String actualFileLocation;
-
+  private final String subPath;
   private final Map<String, String> context;
 
   /**
@@ -35,16 +35,19 @@ public final class GetFileLocationEvent extends FilesetEvent {
    *
    * @param user The user who initiated the get file location.
    * @param identifier The identifier of the file location that was attempted to be got.
-   * @param context The audit context, this param can be null.
    * @param actualFileLocation The actual file location which want to get.
+   * @param subPath The accessing sub path of the get file location operation.
+   * @param context The audit context, this param can be null.
    */
   public GetFileLocationEvent(
       String user,
       NameIdentifier identifier,
       String actualFileLocation,
+      String subPath,
       Map<String, String> context) {
     super(user, identifier);
     this.actualFileLocation = actualFileLocation;
+    this.subPath = subPath;
     this.context = context;
   }
 
@@ -55,6 +58,15 @@ public final class GetFileLocationEvent extends FilesetEvent {
    */
   public String actualFileLocation() {
     return actualFileLocation;
+  }
+
+  /**
+   * Get the accessing sub path of the get file location operation.
+   *
+   * @return The accessing sub path.
+   */
+  public String subPath() {
+    return subPath;
   }
 
   /**

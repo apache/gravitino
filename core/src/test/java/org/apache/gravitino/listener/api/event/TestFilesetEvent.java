@@ -165,6 +165,7 @@ public class TestFilesetEvent {
     Assertions.assertEquals(
         FilesetDataOperation.GET_FILE_STATUS.name(),
         actualContext.get(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION));
+    Assertions.assertEquals("test", ((GetFileLocationEvent) event1).subPath());
   }
 
   @Test
