@@ -24,21 +24,16 @@ import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.catalog.property.PropertyConverter;
-import org.apache.gravitino.rel.expressions.Expression;
-import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
-import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
-import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
@@ -126,20 +121,12 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
         new GravitinoTable(schemaName, tableName, columns, comment, properties);
 
     if (!partitionColumns.isEmpty()) {
-      Transform[] partitioning =
-          partitionColumns.stream().map(Transforms::identity).toArray(Transform[]::new);
+      Transform[] partitioning = ExpressionUtil.partitionFiledToExpression(partitionColumns);
       gravitinoTable.setPartitioning(partitioning);
     }
 
     if (!sortColumns.isEmpty()) {
-      SortOrder[] sorting =
-          sortColumns.stream()
-              .map(
-                  sortingColumn -> {
-                    Expression expression = NamedReference.field(sortingColumn);
-                    return SortOrders.ascending(expression);
-                  })
-              .toArray(SortOrder[]::new);
+      SortOrder[] sorting = ExpressionUtil.sortOrderFiledToExpression(sortColumns);
       gravitinoTable.setSortOrders(sorting);
     }
 
@@ -158,28 +145,15 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
     Map<String, Object> properties = toTrinoTableProperties(gravitinoTable.getProperties());
 
     if (ArrayUtils.isNotEmpty(gravitinoTable.getPartitioning())) {
-      // Only support simple partition now like partition by a, b, c.
-      // Format like partition like partition by year(a), b, c is NOT supported now.
       properties.put(
           IcebergPropertyMeta.ICEBERG_PARTITIONING_PROPERTY,
-          gravitinoTable.getPartitioning().length > 0
-              ? Arrays.stream(gravitinoTable.getPartitioning())
-                  .map(ts -> ((Transform.SingleFieldTransform) ts).fieldName()[0])
-                  .collect(Collectors.toList())
-              : Collections.emptyList());
+              ExpressionUtil.expressionToPartitionFiled(gravitinoTable.getPartitioning()));
     }
 
     if (ArrayUtils.isNotEmpty(gravitinoTable.getSortOrders())) {
-      // Only support the simple format
       properties.put(
           IcebergPropertyMeta.ICEBERG_SORTED_BY_PROPERTY,
-          Arrays.stream(gravitinoTable.getSortOrders())
-              .map(
-                  sortOrder -> {
-                    Expression expression = sortOrder.expression();
-                    return ((NamedReference) expression).fieldName()[0];
-                  })
-              .collect(Collectors.toList()));
+              ExpressionUtil.expressionToSortOrderFiled(gravitinoTable.getSortOrders()));
     }
 
     return new ConnectorTableMetadata(

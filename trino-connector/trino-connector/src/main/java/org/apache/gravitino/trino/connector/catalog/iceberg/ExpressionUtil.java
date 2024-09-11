@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.util;
+package org.apache.gravitino.trino.connector.catalog.iceberg;
 
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_EXPRESSION_ERROR;
 
@@ -181,7 +181,7 @@ public class ExpressionUtil {
     }
   }
 
-  private static boolean tryMatch(String value, Pattern pattern, MatcherHandler handler) {
+  private static boolean tryMatch(String value, Pattern pattern, MatchHandler handler) {
     Matcher matcher = pattern.matcher(value);
     if (matcher.matches()) {
       handler.invoke(matcher.toMatchResult());
@@ -298,7 +298,7 @@ public class ExpressionUtil {
     }
   }
 
-  interface MatcherHandler {
+  interface MatchHandler {
     void invoke(MatchResult matchResult);
   }
 }

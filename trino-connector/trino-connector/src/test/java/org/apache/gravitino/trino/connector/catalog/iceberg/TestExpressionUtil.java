@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.util;
+package org.apache.gravitino.trino.connector.catalog.iceberg;
 
 import io.trino.spi.TrinoException;
 import java.util.List;
