@@ -27,12 +27,11 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 public class RoleMetaSQLProviderFactory {
-  private static final Map<JDBCBackendType, RoleMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
-          ImmutableMap.of(
-              JDBCBackendType.MYSQL, new RoleMetaMySQLProvider(),
-              JDBCBackendType.H2, new RoleMetaH2Provider(),
-              JDBCBackendType.POSTGRESQL, new RoleMetaPostgreSQLProvider());
+  private static final Map<JDBCBackendType, RoleMetaBaseSQLProvider> ROLE_META_SQL_PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL, new RoleMetaMySQLProvider(),
+          JDBCBackendType.H2, new RoleMetaH2Provider(),
+          JDBCBackendType.POSTGRESQL, new RoleMetaPostgreSQLProvider());
 
   public static RoleMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -42,7 +41,7 @@ public class RoleMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return ROLE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class RoleMetaMySQLProvider extends RoleMetaBaseSQLProvider {}

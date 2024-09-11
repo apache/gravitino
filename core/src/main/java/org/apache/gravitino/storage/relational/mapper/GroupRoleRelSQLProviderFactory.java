@@ -30,7 +30,7 @@ import org.apache.ibatis.annotations.Param;
 public class GroupRoleRelSQLProviderFactory {
 
   private static final Map<JDBCBackendType, GroupRoleRelBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      GROUP_ROLE_RELATION_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new GroupRoleRelMySQLProvider(),
               JDBCBackendType.H2, new GroupRoleRelH2Provider(),
@@ -44,7 +44,7 @@ public class GroupRoleRelSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return GROUP_ROLE_RELATION_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class GroupRoleRelMySQLProvider extends GroupRoleRelBaseSQLProvider {}
