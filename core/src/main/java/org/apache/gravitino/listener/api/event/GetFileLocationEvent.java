@@ -48,10 +48,20 @@ public final class GetFileLocationEvent extends FilesetEvent {
     this.context = context;
   }
 
+  /**
+   * Get the actual file location after processing of the get file location operation.
+   *
+   * @return The actual file location.
+   */
   public String actualFileLocation() {
     return actualFileLocation;
   }
 
+  /**
+   * Get the audit context map of the get file location operation.
+   *
+   * @return The audit context map.
+   */
   public Map<String, String> context() {
     return context;
   }

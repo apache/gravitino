@@ -29,6 +29,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 @DeveloperApi
 public final class GetFileLocationFailureEvent extends FilesetFailureEvent {
   private final String subPath;
+
   /**
    * Constructs a new {@code GetFileLocationFailureEvent}.
    *
@@ -45,6 +46,11 @@ public final class GetFileLocationFailureEvent extends FilesetFailureEvent {
     this.subPath = subPath;
   }
 
+  /**
+   * Get the audit context map of the get file location operation.
+   *
+   * @return The audit context map.
+   */
   public String subPath() {
     return subPath;
   }
