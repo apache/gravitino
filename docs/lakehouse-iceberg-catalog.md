@@ -121,13 +121,13 @@ Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Ice
 
 #### Other storages
 
-For storages that are not inherently integrated into Gravitino Iceberg REST service, you can manage them effectively through custom catalog properties.
+For other storages that are managed by Gravitino directly, you can manage them through custom catalog properties.
 
 | Configuration item | Description                                                                             | Default value | Required | Since Version |
 |--------------------|-----------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `io-impl`          | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0         |
 
-For other custom properties like `security-token` to pass to `FileIO`, you could config it directly by `gravitino.bypass.security-token`.
+To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.bypass.security-token`. This security-token will be included in the properties when the initialize method of `FileIO` is invoked.
 
 :::info
 Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the `catalogs/lakehouse-iceberg/libs/` directory.
