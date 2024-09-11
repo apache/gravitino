@@ -598,6 +598,17 @@ public class ContainerSuite implements Closeable {
   public void close() throws IOException {
     try {
       closer.close();
+      mySQLContainer = null;
+      mySQLVersion5Container = null;
+      hiveContainer = null;
+      hiveRangerContainer = null;
+      trinoContainer = null;
+      trinoITContainers = null;
+      rangerContainer = null;
+      kafkaContainer = null;
+      dorisContainer = null;
+      kerberosHiveContainer = null;
+      pgContainerMap.clear();
     } catch (Exception e) {
       LOG.error("Failed to close ContainerEnvironment", e);
     }

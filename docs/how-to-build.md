@@ -6,7 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
-- [How to Build Apache Gravitino on Windows (Using WSL)](#how-to-build-gravitino-on-windows-using-wsl)
+- [How to Build Apache Gravitino on Windows (Using WSL)](#how-to-build-apache-gravitino-on-windows-using-wsl)
 
 ## Prerequisites
 

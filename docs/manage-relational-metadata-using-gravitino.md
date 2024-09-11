@@ -162,12 +162,12 @@ Catalog catalog = gravitinoClient.alterCatalog("catalog",
 
 Currently, Gravitino supports the following changes to a catalog:
 
-| Supported modification | JSON                                                         | Java                                           |
-|------------------------|--------------------------------------------------------------|------------------------------------------------|
-| Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `CatalogChange.rename("catalog_renamed")`      |
-| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `CatalogChange.updateComment("new_comment")`   |
-| Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `CatalogChange.setProperty("key1", "value1")`  |
-| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `CatalogChange.removeProperty("key1")`         |
+| Supported modification | JSON                                                         | Java                                          |
+|------------------------|--------------------------------------------------------------|-----------------------------------------------|
+| Rename catalog         | `{"@type":"rename","newName":"catalog_renamed"}`             | `CatalogChange.rename("catalog_renamed")`     |
+| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `CatalogChange.updateComment("new_comment")`  |
+| Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `CatalogChange.setProperty("key1", "value1")` |
+| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `CatalogChange.removeProperty("key1")`        |
 
 :::warning
 
