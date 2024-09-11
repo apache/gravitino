@@ -135,4 +135,4 @@ No extra configuration is needed. Please make sure the credential file is access
 
 ### Other storage
 
-You need to add custom configuration with the format `spark.sql.catalog.${iceberg_catalog_name}.{configuration_key}`. Additionally, place corresponding jars which implement `FileIO` in the classpath of Spark.
+You may need to add custom configurations with the format `spark.sql.catalog.${iceberg_catalog_name}.{configuration_key}`. Additionally, place corresponding jars which implement `FileIO` in the classpath of Spark.
