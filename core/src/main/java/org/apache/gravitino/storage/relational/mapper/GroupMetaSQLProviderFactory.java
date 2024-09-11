@@ -27,12 +27,11 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaSQLProviderFactory {
-  private static final Map<JDBCBackendType, GroupMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
-          ImmutableMap.of(
-              JDBCBackendType.MYSQL, new GroupMetaMySQLProvider(),
-              JDBCBackendType.H2, new GroupMetaH2Provider(),
-              JDBCBackendType.POSTGRESQL, new GroupMetaPostgreSQLProvider());
+  private static final Map<JDBCBackendType, GroupMetaBaseSQLProvider> GROUP_META_SQL_PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL, new GroupMetaMySQLProvider(),
+          JDBCBackendType.H2, new GroupMetaH2Provider(),
+          JDBCBackendType.POSTGRESQL, new GroupMetaPostgreSQLProvider());
 
   public static GroupMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -42,7 +41,7 @@ public class GroupMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return GROUP_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class GroupMetaMySQLProvider extends GroupMetaBaseSQLProvider {}

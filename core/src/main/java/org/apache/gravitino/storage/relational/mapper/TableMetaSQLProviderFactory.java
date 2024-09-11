@@ -28,12 +28,11 @@ import org.apache.ibatis.annotations.Param;
 
 public class TableMetaSQLProviderFactory {
 
-  private static final Map<JDBCBackendType, TableMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
-          ImmutableMap.of(
-              JDBCBackendType.MYSQL, new TableMetaMySQLProvider(),
-              JDBCBackendType.H2, new TableMetaH2Provider(),
-              JDBCBackendType.POSTGRESQL, new TableMetaPostgreSQLProvider());
+  private static final Map<JDBCBackendType, TableMetaBaseSQLProvider> TABLE_META_SQL_PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL, new TableMetaMySQLProvider(),
+          JDBCBackendType.H2, new TableMetaH2Provider(),
+          JDBCBackendType.POSTGRESQL, new TableMetaPostgreSQLProvider());
 
   public static TableMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -43,7 +42,7 @@ public class TableMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return TABLE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class TableMetaMySQLProvider extends TableMetaBaseSQLProvider {}

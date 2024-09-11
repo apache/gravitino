@@ -30,7 +30,7 @@ import org.apache.ibatis.annotations.Param;
 public class CatalogMetaSQLProviderFactory {
 
   private static final Map<JDBCBackendType, CatalogMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      CATALOG_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new CatalogMetaMySQLProvider(),
               JDBCBackendType.H2, new CatalogMetaH2Provider(),
@@ -44,7 +44,7 @@ public class CatalogMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return CATALOG_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class CatalogMetaMySQLProvider extends CatalogMetaBaseSQLProvider {}

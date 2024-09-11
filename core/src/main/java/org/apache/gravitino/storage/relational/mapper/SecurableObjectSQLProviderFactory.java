@@ -30,7 +30,7 @@ import org.apache.ibatis.annotations.Param;
 public class SecurableObjectSQLProviderFactory {
 
   private static final Map<JDBCBackendType, SecurableObjectBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      SECURABLE_OBJECTS_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new SecurableObjectMySQLProvider(),
               JDBCBackendType.H2, new SecurableObjectH2Provider(),
@@ -44,7 +44,7 @@ public class SecurableObjectSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return SECURABLE_OBJECTS_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class SecurableObjectMySQLProvider extends SecurableObjectBaseSQLProvider {}
