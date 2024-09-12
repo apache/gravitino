@@ -29,7 +29,7 @@ public class HttpUtils {
   private static final Logger LOG = LoggerFactory.getLogger(HttpUtils.class);
 
   /**
-   * Check if the http server is up, If http response status code is 200, then we're assuming the
+   * Check if the http server is up. If http response status code is 200, then we're assuming the
    * server is up. Or else we assume the server is not ready.
    *
    * <p>Note: The method will ignore the response body and only check the status code.
