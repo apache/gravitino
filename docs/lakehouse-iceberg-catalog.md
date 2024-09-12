@@ -121,7 +121,7 @@ Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Ice
 
 #### Other storages
 
-For other storages that are managed by Gravitino directly, you can manage them through custom catalog properties.
+For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.
 
 | Configuration item | Description                                                                             | Default value | Required | Since Version |
 |--------------------|-----------------------------------------------------------------------------------------|---------------|----------|---------------|
