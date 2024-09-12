@@ -70,6 +70,14 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
+tasks.build {
+  dependsOn(":trino-connector:trino-connector:jar")
+  dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
+  dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
+  dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
+  dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
+}
+
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
@@ -114,7 +122,7 @@ tasks.test {
 
 tasks.register<JavaExec>("TrinoTest") {
   classpath = sourceSets["test"].runtimeClasspath
-  mainClass.set("org.apache.gravitino.integration.test.trino.TrinoQueryTestTool")
+  mainClass.set("org.apache.gravitino.trino.connector.integration.test.TrinoQueryTestTool")
 
   if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
     jvmArgs = listOf(

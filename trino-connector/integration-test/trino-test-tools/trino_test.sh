@@ -19,7 +19,7 @@
 
 set -e
 
-DIR=$(cd "$(dirname "$0")" && pwd)/../..
+DIR=$(cd "$(dirname "$0")" && pwd)/../../..
 export GRAVITINO_ROOT_DIR=$(cd "$DIR" && pwd)
 export GRAVITINO_HOME=$GRAVITINO_ROOT_DIR
 export GRAVITINO_TEST=true
