@@ -221,7 +221,7 @@ public class SecureHadoopCatalogOperations
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
-    throw new UnsupportedOperationException("Not implemented");
+    return hadoopCatalogOperations.getFileLocation(ident, subPath);
   }
 
   @Override
