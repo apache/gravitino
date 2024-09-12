@@ -29,7 +29,5 @@ public interface CredentialProvider {
 
   String credentialType();
 
-  Credential getScopedToken(Context context);
-
-  Credential getGlobalCredential(Context context);
+  Credential getCredential(Context context);
 }

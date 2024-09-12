@@ -19,22 +19,27 @@
 
 package org.apache.gravitino.credential;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 
-public interface Credential {
+public class TestCredentialProvider implements CredentialProvider {
+  Map<String, String> properties;
+  static final String CREDENTIAL_TYPE = "test";
 
-  String getCredentialType();
+  @Override
+  public void initialize(Map<String, String> properties) {
+    this.properties = properties;
+  }
 
-  long getExpireTime();
+  @Override
+  public void stop() {}
 
-  Map<String, String> getCredentialInfo();
+  @Override
+  public String credentialType() {
+    return CREDENTIAL_TYPE;
+  }
 
-  default Map<String, String> toProperties() {
-    return new ImmutableMap.Builder<String, String>()
-        .putAll(getCredentialInfo())
-        .put(CredentialConstants.CREDENTIAL_TYPE, getCredentialType())
-        .put(CredentialConstants.EXPIRE_TIME, String.valueOf(getExpireTime()))
-        .build();
+  @Override
+  public Credential getCredential(Context context) {
+    return new TestCredential((LocationContext) context);
   }
 }
