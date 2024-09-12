@@ -33,7 +33,8 @@ jobs:
               - dev/**
               - flink-connector/**
               - gradle/**
-              - iceberg/**
+              # todo: uncomment the following line after the flink-connector support Iceberg
+              # - iceberg/**
               - integration-test-common/**
               - meta/**
               - scripts/**
