@@ -20,64 +20,49 @@ package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.Map;
-import javax.annotation.Nullable;
+import java.util.List;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to create a role. */
+/** Request to grant a privilege to a role. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
-public class RoleCreateRequest implements RESTRequest {
+public class PrivilegeGrantRequest implements RESTRequest {
 
-  @JsonProperty("name")
-  private final String name;
-
-  @Nullable
-  @JsonProperty("properties")
-  private Map<String, String> properties;
-
-  @Nullable
-  @JsonProperty("securableObjects")
-  private SecurableObjectDTO[] securableObjects;
-
-  /** Default constructor for RoleCreateRequest. (Used for Jackson deserialization.) */
-  public RoleCreateRequest() {
-    this(null, null, null);
-  }
+  @JsonProperty("privileges")
+  private final List<PrivilegeDTO> privileges;
 
   /**
-   * Creates a new RoleCreateRequest.
+   * Constructor for privilegeGrantRequest.
    *
-   * @param name The name of the role.
-   * @param properties The properties of the role.
-   * @param securableObjects The securable objects of the role.
+   * @param privileges The privileges for the PrivilegeGrantRequest.
    */
-  public RoleCreateRequest(
-      String name, Map<String, String> properties, SecurableObjectDTO[] securableObjects) {
-    super();
-    this.name = name;
-    this.properties = properties;
-    this.securableObjects = securableObjects;
+  public PrivilegeGrantRequest(List<PrivilegeDTO> privileges) {
+    this.privileges = privileges;
+  }
+
+  /** Default constructor for PrivilegeGrantRequest. */
+  public PrivilegeGrantRequest() {
+    this(null);
   }
 
   /**
-   * Validates the {@link RoleCreateRequest} request.
+   * Validates the fields of the request.
    *
-   * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+   * @throws IllegalArgumentException if the privileges field is not set or empty.
    */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
+        privileges != null && !privileges.isEmpty(),
+        "\"privileges\" field is required and cannot be empty");
   }
 }

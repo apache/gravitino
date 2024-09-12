@@ -18,12 +18,19 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -158,6 +165,96 @@ public class RoleMetaService {
           re, Entity.EntityType.ROLE, roleEntity.nameIdentifier().toString());
       throw re;
     }
+  }
+
+  public <E extends Entity & HasIdentifier> RoleEntity updateRole(
+      NameIdentifier identifier, Function<E, E> updater) throws IOException {
+    AuthorizationUtils.checkRole(identifier);
+
+    try {
+      String metalake = identifier.namespace().level(0);
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+
+      RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
+      RoleEntity oldRoleEntity =
+          POConverters.fromRolePO(
+              rolePO, listSecurableObjects(rolePO), AuthorizationUtils.ofRoleNamespace(metalake));
+
+      RoleEntity newRoleEntity = (RoleEntity) updater.apply((E) oldRoleEntity);
+
+      Preconditions.checkArgument(
+          Objects.equals(oldRoleEntity.id(), newRoleEntity.id()),
+          "The updated role entity id: %s should be same with the role entity id before: %s",
+          newRoleEntity.id(),
+          oldRoleEntity.id());
+
+      Set<SecurableObject> oldObjects = new HashSet<>(oldRoleEntity.securableObjects());
+      Set<SecurableObject> newObjects = new HashSet<>(newRoleEntity.securableObjects());
+      Set<SecurableObject> insertObjects = Sets.difference(newObjects, oldObjects);
+      Set<SecurableObject> deleteObjects = Sets.difference(oldObjects, newObjects);
+
+      if (insertObjects.isEmpty() && deleteObjects.isEmpty()) {
+        return newRoleEntity;
+      }
+
+      List<SecurableObjectPO> deleteSecurableObjectPOS =
+          toSecurablePOs(deleteObjects, oldRoleEntity, metalakeId);
+
+      List<SecurableObjectPO> insertSecurableObjectPOs =
+          toSecurablePOs(insertObjects, oldRoleEntity, metalakeId);
+
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  RoleMetaMapper.class,
+                  mapper ->
+                      mapper.updateRoleMeta(
+                          POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO)),
+          () -> {
+            if (deleteSecurableObjectPOS.isEmpty()) {
+              return;
+            }
+
+            for (SecurableObjectPO objectPO : deleteSecurableObjectPOS) {
+              SessionUtils.doWithoutCommit(
+                  SecurableObjectMapper.class,
+                  mapper ->
+                      mapper.softDeleteSecurableObjectsByObjectIdAndPrivileges(
+                          objectPO.getRoleId(),
+                          objectPO.getMetadataObjectId(),
+                          objectPO.getPrivilegeConditions(),
+                          objectPO.getPrivilegeNames()));
+            }
+          },
+          () -> {
+            if (insertSecurableObjectPOs.isEmpty()) {
+              return;
+            }
+
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper -> mapper.batchInsertSecurableObjects(insertSecurableObjectPOs));
+          });
+
+      return newRoleEntity;
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(re, Entity.EntityType.ROLE, identifier.toString());
+      throw re;
+    }
+  }
+
+  private List<SecurableObjectPO> toSecurablePOs(
+      Set<SecurableObject> deleteObjects, RoleEntity oldRoleEntity, Long metalakeId) {
+    List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
+    for (SecurableObject object : deleteObjects) {
+      SecurableObjectPO.Builder objectBuilder =
+          POConverters.initializeSecurablePOBuilderWithVersion(
+              oldRoleEntity.id(), object, getEntityType(object));
+      objectBuilder.withMetadataObjectId(
+          MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type()));
+      securableObjectPOs.add(objectBuilder.build());
+    }
+    return securableObjectPOs;
   }
 
   public RoleEntity getRoleByIdentifier(NameIdentifier identifier) {

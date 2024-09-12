@@ -30,6 +30,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Privilege;
@@ -394,6 +396,57 @@ public class AccessControlIT extends AbstractIT {
 
     // Clean up
     metalake.removeGroup(groupName);
+    metalake.deleteRole(roleName);
+  }
+
+  @Test
+  void testManageRolePermissions() {
+    String roleName = "role#123";
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("k1", "v1");
+    metalake.createRole(roleName, properties, Lists.newArrayList());
+    MetadataObject metadataObject =
+        MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE);
+
+    // grant a privilege
+    Role role =
+        metalake.grantPrivilegesToRole(
+            roleName, metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertEquals(1, role.securableObjects().size());
+
+    // repeat to grant a privilege
+    role =
+        metalake.grantPrivilegesToRole(
+            roleName, metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertEquals(1, role.securableObjects().size());
+
+    // grant a not-existing role
+    Assertions.assertThrows(
+        NoSuchRoleException.class,
+        () ->
+            metalake.grantPrivilegesToRole(
+                "not-exist", metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow())));
+
+    // revoke a privilege
+    role =
+        metalake.revokePrivilegesFromRole(
+            roleName, metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertTrue(role.securableObjects().isEmpty());
+
+    // repeat to revoke a privilege
+    role =
+        metalake.revokePrivilegesFromRole(
+            roleName, metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertTrue(role.securableObjects().isEmpty());
+
+    // revoke a not-existing role
+    Assertions.assertThrows(
+        NoSuchRoleException.class,
+        () ->
+            metalake.revokePrivilegesFromRole(
+                "not-exist", metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow())));
+
+    // Cleanup
     metalake.deleteRole(roleName);
   }
 

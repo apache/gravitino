@@ -47,6 +47,15 @@ public interface SecurableObjectMapper {
 
   @UpdateProvider(
       type = SecurableObjectSQLProviderFactory.class,
+      method = "softDeleteSecurableObjectsByObjectIdAndPrivileges")
+  void softDeleteSecurableObjectsByObjectIdAndPrivileges(
+      @Param("roleId") Long roleId,
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("privilegeConditions") String privilegeConditions,
+      @Param("privilegeNames") String privilegeNames);
+
+  @UpdateProvider(
+      type = SecurableObjectSQLProviderFactory.class,
       method = "softDeleteSecurableObjectsByRoleId")
   void softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId);
 

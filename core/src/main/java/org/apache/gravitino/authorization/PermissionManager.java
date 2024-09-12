@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.authorization.AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG;
+import static org.apache.gravitino.authorization.AuthorizationUtils.ROLE_DOES_NOT_EXIST_MSG;
 import static org.apache.gravitino.authorization.AuthorizationUtils.USER_DOES_NOT_EXIST_MSG;
 
 import com.google.common.collect.Lists;
@@ -30,8 +31,10 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -373,11 +376,174 @@ class PermissionManager {
     }
   }
 
-  private List<String> toRoleNames(List<RoleEntity> roleEntities) {
-    return roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList());
+  Role grantPrivilegeToRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges) {
+    try {
+      return store.update(
+          AuthorizationUtils.ofRole(metalake, role),
+          RoleEntity.class,
+          Entity.EntityType.ROLE,
+          roleEntity -> {
+            List<SecurableObject> securableObjects = roleEntity.securableObjects();
+
+            boolean objectExist = false;
+
+            List<SecurableObject> updateSecurableObjects = Lists.newArrayList();
+            // Only update the first matched securable object privilege
+            for (SecurableObject securableObject : securableObjects) {
+              if (!objectExist
+                  && securableObject.type() == object.type()
+                  && securableObject.fullName().equals(object.fullName())) {
+                objectExist = true;
+                Set<Privilege> updatePrivileges = Sets.newHashSet();
+                updatePrivileges.addAll(securableObject.privileges());
+                // If privileges has granted, we won't generate the new securable object.
+                if (updatePrivileges.containsAll(privileges)) {
+                  updateSecurableObjects.add(securableObject);
+                } else {
+                  updatePrivileges.addAll(privileges);
+                  SecurableObject newSecurableObject =
+                      SecurableObjects.parse(
+                          securableObject.fullName(),
+                          securableObject.type(),
+                          Lists.newArrayList(updatePrivileges));
+
+                  updateSecurableObjects.add(newSecurableObject);
+                  AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                      metalake,
+                      object,
+                      authorizationPlugin -> {
+                        authorizationPlugin.onRoleUpdated(
+                            roleEntity,
+                            RoleChange.updateSecurableObject(
+                                role, securableObject, newSecurableObject));
+                      });
+                }
+
+              } else {
+                updateSecurableObjects.add(securableObject);
+              }
+            }
+
+            // If the role doesn't contain the securable object, the role appends a new securable
+            // object.
+            if (!objectExist) {
+              SecurableObject securableObject =
+                  SecurableObjects.parse(
+                      object.fullName(), object.type(), Lists.newArrayList(privileges));
+              AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                  metalake,
+                  object,
+                  authorizationPlugin -> {
+                    authorizationPlugin.onRoleUpdated(
+                        roleEntity, RoleChange.addSecurableObject(role, securableObject));
+                  });
+              updateSecurableObjects.add(securableObject);
+            }
+
+            AuditInfo auditInfo =
+                AuditInfo.builder()
+                    .withCreator(roleEntity.auditInfo().creator())
+                    .withCreateTime(roleEntity.auditInfo().createTime())
+                    .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withLastModifiedTime(Instant.now())
+                    .build();
+
+            return RoleEntity.builder()
+                .withId(roleEntity.id())
+                .withName(roleEntity.name())
+                .withNamespace(roleEntity.namespace())
+                .withProperties(roleEntity.properties())
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(updateSecurableObjects)
+                .build();
+          });
+    } catch (NoSuchEntityException nse) {
+      LOG.warn("Failed to grant, role {} does not exist in the metalake {}", role, metalake, nse);
+      throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
+    } catch (IOException ioe) {
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  Role revokePrivilegeFromRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges) {
+    try {
+      return store.update(
+          AuthorizationUtils.ofRole(metalake, role),
+          RoleEntity.class,
+          Entity.EntityType.ROLE,
+          roleEntity -> {
+            List<SecurableObject> securableObjects = roleEntity.securableObjects();
+
+            List<SecurableObject> updateSecurableObjects = Lists.newArrayList();
+            // Remove all the matching securable object privileges
+            for (SecurableObject securableObject : securableObjects) {
+              if (securableObject.type() == object.type()
+                  && securableObject.fullName().equals(object.fullName())) {
+                Set<Privilege> updatePrivileges = Sets.newHashSet();
+                updatePrivileges.addAll(securableObject.privileges());
+                privileges.forEach(updatePrivileges::remove);
+                if (!updatePrivileges.isEmpty()) {
+                  SecurableObject newSecurableObject =
+                      SecurableObjects.parse(
+                          securableObject.fullName(),
+                          securableObject.type(),
+                          Lists.newArrayList(updatePrivileges));
+                  AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                      metalake,
+                      object,
+                      authorizationPlugin -> {
+                        authorizationPlugin.onRoleUpdated(
+                            roleEntity,
+                            RoleChange.updateSecurableObject(
+                                role, securableObject, newSecurableObject));
+                      });
+                  updateSecurableObjects.add(newSecurableObject);
+                } else {
+                  AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                      metalake,
+                      object,
+                      authorizationPlugin -> {
+                        authorizationPlugin.onRoleUpdated(
+                            roleEntity, RoleChange.removeSecurableObject(role, securableObject));
+                      });
+                }
+              } else {
+                updateSecurableObjects.add(securableObject);
+              }
+            }
+
+            AuditInfo auditInfo =
+                AuditInfo.builder()
+                    .withCreator(roleEntity.auditInfo().creator())
+                    .withCreateTime(roleEntity.auditInfo().createTime())
+                    .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withLastModifiedTime(Instant.now())
+                    .build();
+
+            return RoleEntity.builder()
+                .withId(roleEntity.id())
+                .withName(roleEntity.name())
+                .withNamespace(roleEntity.namespace())
+                .withProperties(roleEntity.properties())
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(updateSecurableObjects)
+                .build();
+          });
+    } catch (NoSuchEntityException nse) {
+      LOG.warn("Failed to revoke, role {} does not exist in the metalake {}", role, metalake, nse);
+      throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
+    } catch (IOException ioe) {
+      throw new RuntimeException(ioe);
+    }
   }
 
   private List<Long> toRoleIds(List<RoleEntity> roleEntities) {
     return roleEntities.stream().map(RoleEntity::id).collect(Collectors.toList());
+  }
+
+  private List<String> toRoleNames(List<RoleEntity> roleEntities) {
+    return roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList());
   }
 }

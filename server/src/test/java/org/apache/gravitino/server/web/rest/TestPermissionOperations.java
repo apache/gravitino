@@ -39,12 +39,20 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
+import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
+import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
+import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -52,7 +60,9 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -66,6 +76,7 @@ import org.mockito.Mockito;
 public class TestPermissionOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
+  private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -84,6 +95,8 @@ public class TestPermissionOperations extends JerseyTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
   }
 
   @Override
@@ -383,6 +396,118 @@ public class TestPermissionOperations extends JerseyTest {
         .revokeRolesFromGroup(any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/permissions/groups/group1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testGrantPrivilegesToRole() {
+    RoleEntity roleEntity =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("role")
+            .withSecurableObjects(
+                Lists.newArrayList(
+                    SecurableObjects.ofMetalake(
+                        "metalake1", Lists.newArrayList(Privileges.CreateTable.allow()))))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    when(manager.grantPrivilegeToRole(any(), any(), any(), any())).thenReturn(roleEntity);
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+    PrivilegeGrantRequest request =
+        new PrivilegeGrantRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.CREATE_TABLE)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+
+    Response resp =
+        target("/metalakes/metalake1/permissions/roles/role1/metalake/metalake1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    RoleResponse grantResponse = resp.readEntity(RoleResponse.class);
+    Assertions.assertEquals(0, grantResponse.getCode());
+
+    Role role = grantResponse.getRole();
+    Assertions.assertEquals(roleEntity.name(), role.name());
+    Assertions.assertEquals(1, role.securableObjects().size());
+    Assertions.assertEquals("metalake1", role.securableObjects().get(0).name());
+    Assertions.assertEquals(
+        Privilege.Name.CREATE_TABLE, role.securableObjects().get(0).privileges().get(0).name());
+    Assertions.assertEquals(
+        Privilege.Condition.ALLOW, role.securableObjects().get(0).privileges().get(0).condition());
+    Assertions.assertEquals(roleEntity.properties(), role.properties());
+
+    doThrow(new RuntimeException("mock error"))
+        .when(manager)
+        .grantPrivilegeToRole(any(), any(), any(), any());
+    Response resp3 =
+        target("/metalakes/metalake1/permissions/roles/role1/metalake/metalake1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testRevokePrivilegesFromRole() {
+    RoleEntity roleEntity =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("role")
+            .withSecurableObjects(Lists.newArrayList())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    when(manager.revokePrivilegeFromRole(any(), any(), any(), any())).thenReturn(roleEntity);
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+    PrivilegeRevokeRequest request =
+        new PrivilegeRevokeRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.CREATE_TABLE)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+
+    Response resp =
+        target("/metalakes/metalake1/permissions/roles/role1/metalake/metalake1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    RoleResponse revokeResponse = resp.readEntity(RoleResponse.class);
+    Assertions.assertEquals(0, revokeResponse.getCode());
+
+    Role role = revokeResponse.getRole();
+    Assertions.assertEquals(roleEntity.name(), role.name());
+    Assertions.assertEquals(roleEntity.securableObjects(), role.securableObjects());
+    Assertions.assertEquals(roleEntity.properties(), role.properties());
+
+    doThrow(new RuntimeException("mock error"))
+        .when(manager)
+        .revokePrivilegeFromRole(any(), any(), any(), any());
+    Response resp3 =
+        target("/metalakes/metalake1/permissions/roles/role1/metalake/metalake1/revoke")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));

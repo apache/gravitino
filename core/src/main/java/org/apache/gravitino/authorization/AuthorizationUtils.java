@@ -33,6 +33,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -205,6 +206,67 @@ public class AuthorizationUtils {
       }
     }
     return false;
+  }
+
+  // Check every securable object whether exists and is imported.
+  public static void checkSecurableObject(String metalake, MetadataObject object) {
+    NameIdentifier identifier;
+
+    // Securable object ignores the metalake namespace, so we should add it back.
+    if (object.type() == MetadataObject.Type.METALAKE) {
+      identifier = NameIdentifier.parse(object.fullName());
+    } else {
+      identifier = NameIdentifier.parse(String.format("%s.%s", metalake, object.fullName()));
+    }
+
+    String existErrMsg = "Securable object %s doesn't exist";
+
+    switch (object.type()) {
+      case METALAKE:
+        if (!GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
+
+        break;
+
+      case CATALOG:
+        if (!GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
+
+        break;
+
+      case SCHEMA:
+        if (!GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
+
+        break;
+
+      case FILESET:
+        if (!GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
+
+        break;
+      case TABLE:
+        if (!GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
+
+        break;
+
+      case TOPIC:
+        if (!GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
+
+        break;
+
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the type %s", object.type()));
+    }
   }
 
   private static boolean needApplyAuthorizationPluginAllCatalogs(MetadataObject.Type type) {
