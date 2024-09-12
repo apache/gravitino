@@ -28,12 +28,11 @@ import org.apache.ibatis.annotations.Param;
 
 public class OwnerMetaSQLProviderFactory {
 
-  private static final Map<JDBCBackendType, OwnerMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
-          ImmutableMap.of(
-              JDBCBackendType.MYSQL, new OwnerMetaMySQLProvider(),
-              JDBCBackendType.H2, new OwnerMetaH2Provider(),
-              JDBCBackendType.POSTGRESQL, new OwnerMetaPostgreSQLProvider());
+  private static final Map<JDBCBackendType, OwnerMetaBaseSQLProvider> OWNER_META_SQL_PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL, new OwnerMetaMySQLProvider(),
+          JDBCBackendType.H2, new OwnerMetaH2Provider(),
+          JDBCBackendType.POSTGRESQL, new OwnerMetaPostgreSQLProvider());
 
   public static OwnerMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -43,7 +42,7 @@ public class OwnerMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return OWNER_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class OwnerMetaMySQLProvider extends OwnerMetaBaseSQLProvider {}

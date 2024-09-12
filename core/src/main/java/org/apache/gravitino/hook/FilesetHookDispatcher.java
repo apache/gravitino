@@ -97,6 +97,6 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
-    throw new UnsupportedOperationException("Not implemented");
+    return dispatcher.getFileLocation(ident, subPath);
   }
 }
