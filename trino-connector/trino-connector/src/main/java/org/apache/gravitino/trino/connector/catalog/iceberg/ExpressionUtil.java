@@ -86,7 +86,9 @@ public class ExpressionUtil {
       return partitionFields;
     } catch (IllegalArgumentException e) {
       throw new TrinoException(
-          GRAVITINO_EXPRESSION_ERROR, "Error to handle Transform Expressions : ", e);
+          GRAVITINO_EXPRESSION_ERROR,
+          "Error to handle Transform Expressions :" + e.getMessage(),
+          e);
     }
   }
 
@@ -99,7 +101,7 @@ public class ExpressionUtil {
       return partitionTransforms.toArray(new Transform[0]);
     } catch (IllegalArgumentException e) {
       throw new TrinoException(
-          GRAVITINO_EXPRESSION_ERROR, "Error parsing the partition field: ", e);
+          GRAVITINO_EXPRESSION_ERROR, "Error parsing the partition field: " + e.getMessage(), e);
     }
   }
 

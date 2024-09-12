@@ -185,7 +185,7 @@ public class TrinoQueryTestTool {
 
       if (testSetsDir.isEmpty()) {
         testSetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
-        testSetsDir = ITUtils.joinPath(testSetsDir, "trino-ci-testset/testsets");
+        testSetsDir = ITUtils.joinPath(testSetsDir, "testsets");
       } else {
         TrinoQueryIT.testsetsDir = testSetsDir;
       }
