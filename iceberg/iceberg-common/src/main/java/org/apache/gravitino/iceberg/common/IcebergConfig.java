@@ -32,6 +32,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
@@ -232,6 +233,13 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .toSequence()
           .createWithDefault(Collections.emptyList());
+
+  public static final ConfigEntry<String> CREDENTIAL_TYPE =
+      new ConfigBuilder(CredentialConstants.CREDENTIAL_TYPE)
+          .doc("The credential type for Iceberg")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
 
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);

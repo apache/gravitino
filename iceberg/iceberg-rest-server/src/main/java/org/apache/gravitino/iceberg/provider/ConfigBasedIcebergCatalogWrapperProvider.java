@@ -75,7 +75,7 @@ public class ConfigBasedIcebergCatalogWrapperProvider implements IcebergCatalogW
       LOG.warn(errorMsg);
       throw new RuntimeException(errorMsg);
     }
-    return new IcebergCatalogWrapper(icebergConfig);
+    return new IcebergCatalogWrapper(icebergConfig, true);
   }
 
   private Optional<String> getCatalogName(String catalogConfigKey) {

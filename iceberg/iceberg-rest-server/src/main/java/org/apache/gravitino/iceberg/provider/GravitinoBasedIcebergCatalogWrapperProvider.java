@@ -81,7 +81,7 @@ public class GravitinoBasedIcebergCatalogWrapperProvider
 
     Map<String, String> properties =
         IcebergPropertiesUtils.toIcebergCatalogProperties(catalog.properties());
-    return new IcebergCatalogWrapper(new IcebergConfig(properties));
+    return new IcebergCatalogWrapper(new IcebergConfig(properties), true);
   }
 
   @VisibleForTesting

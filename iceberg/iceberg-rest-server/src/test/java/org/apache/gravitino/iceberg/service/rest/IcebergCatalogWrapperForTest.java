@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import java.util.Collections;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -31,6 +33,10 @@ import org.apache.iceberg.types.Types.StringType;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class IcebergCatalogWrapperForTest extends IcebergCatalogWrapper {
+  public IcebergCatalogWrapperForTest() {
+    super(new IcebergConfig(Collections.emptyMap()), false);
+  }
+
   @Override
   public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
     if (request.name().contains("fail")) {
