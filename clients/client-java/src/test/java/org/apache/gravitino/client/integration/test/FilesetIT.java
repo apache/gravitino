@@ -28,6 +28,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -128,11 +130,35 @@ public class FilesetIT extends AbstractIT {
                 generateLocation(catalogName, schemaName, filesetName),
                 Maps.newHashMap());
     Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(filesetIdent));
+    // test without caller context
+    try {
+      String actualFileLocation =
+          catalog.asFilesetCatalog().getFileLocation(filesetIdent, "/test1.par");
 
-    String actualFileLocation =
-        catalog.asFilesetCatalog().getFileLocation(filesetIdent, "/test.par");
+      Assertions.assertEquals(expectedFileset.storageLocation() + "/test1.par", actualFileLocation);
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
 
-    Assertions.assertEquals(expectedFileset.storageLocation() + "/test.par", actualFileLocation);
+    // test with caller context
+    try {
+      Map<String, String> context = new HashMap<>();
+      context.put(
+          FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
+          InternalClientType.HADOOP_GVFS.name());
+      context.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.CREATE.name());
+      CallerContext callerContext = CallerContext.builder().withContext(context).build();
+      CallerContext.CallerContextHolder.set(callerContext);
+
+      String actualFileLocation =
+          catalog.asFilesetCatalog().getFileLocation(filesetIdent, "/test2.par");
+
+      Assertions.assertEquals(expectedFileset.storageLocation() + "/test2.par", actualFileLocation);
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
   }
 
   @Test
@@ -151,7 +177,7 @@ public class FilesetIT extends AbstractIT {
       Assertions.assertTrue(metalake.catalogExists(catalogName));
 
       Map<String, String> context = new HashMap<>();
-      // this is a invalid internal client type.
+      // this is an invalid internal client type.
       context.put(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE, "test");
       CallerContext callerContext = CallerContext.builder().withContext(context).build();
       CallerContext.CallerContextHolder.set(callerContext);
