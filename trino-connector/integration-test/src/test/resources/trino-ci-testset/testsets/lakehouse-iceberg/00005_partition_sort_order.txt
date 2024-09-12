@@ -24,7 +24,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
-   location = 'hdfs://gt01.orb.local:9000/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/lineitem',
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/lineitem',
    partitioning = ARRAY['year(commitdate)'],
    sorted_by = ARRAY['partkey','extendedprice DESC']
 )"
@@ -59,7 +59,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
-   location = 'hdfs://gt01.orb.local:9000/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01',
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01',
    partitioning = ARRAY['day(commitdate)','month(shipdate)','bucket(partkey, 2)','truncate(shipinstruct, 2)'],
    sorted_by = ARRAY['partkey ASC NULLS LAST','extendedprice DESC NULLS FIRST']
 )"
