@@ -21,12 +21,16 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.junit.jupiter.api.Assertions;
@@ -213,6 +217,74 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
       String subPath4 = "";
       String fileLocation3 = filesetOperationDispatcher.getFileLocation(filesetIdent1, subPath4);
       Assertions.assertEquals(fileset1.storageLocation(), fileLocation3);
+
+      // test mount a single file
+      String filesetName2 = "test_get_file_location_2";
+      String filesetLocation2 = "/tmp/test_get_file_location_" + UUID.randomUUID();
+      NameIdentifier filesetIdent2 = NameIdentifier.of(filesetNs, filesetName2);
+      filesetOperationDispatcher.createFileset(
+          filesetIdent2, "comment", Fileset.Type.MANAGED, filesetLocation2, props);
+      File localFile2 = new File(filesetLocation2);
+      try {
+        // replace dir to file
+        if (localFile2.exists()) {
+          localFile2.delete();
+        }
+        localFile2.createNewFile();
+
+        String subPath = "/year=2024/month=07/day=22/test.parquet";
+        Map<String, String> contextMap = Maps.newHashMap();
+        contextMap.put(
+            FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+            FilesetDataOperation.RENAME.name());
+        CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+        CallerContext.CallerContextHolder.set(callerContext);
+
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> filesetOperationDispatcher.getFileLocation(filesetIdent2, subPath));
+      } catch (IOException e) {
+        // ignore
+      } finally {
+        CallerContext.CallerContextHolder.remove();
+        if (localFile2.exists()) {
+          localFile2.delete();
+        }
+      }
+
+      // test rename with an empty subPath
+      String filesetName3 = "test_get_file_location_3";
+      String filesetLocation3 = "/tmp/test_get_file_location_" + UUID.randomUUID();
+      NameIdentifier filesetIdent3 = NameIdentifier.of(filesetNs, filesetName3);
+      filesetOperationDispatcher.createFileset(
+          filesetIdent3, "comment", Fileset.Type.MANAGED, filesetLocation3, props);
+      File localFile3 = new File(filesetLocation3);
+      try {
+        // replace dir to file
+        if (localFile3.exists()) {
+          localFile3.delete();
+        }
+        localFile3.createNewFile();
+
+        String subPath = "";
+        Map<String, String> contextMap = Maps.newHashMap();
+        contextMap.put(
+            FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+            FilesetDataOperation.RENAME.name());
+        CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+        CallerContext.CallerContextHolder.set(callerContext);
+
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> filesetOperationDispatcher.getFileLocation(filesetIdent2, subPath));
+      } catch (IOException e) {
+        // ignore
+      } finally {
+        CallerContext.CallerContextHolder.remove();
+        if (localFile3.exists()) {
+          localFile3.delete();
+        }
+      }
     } finally {
       File path = new File(tmpDir);
       if (path.exists()) {

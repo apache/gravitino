@@ -59,6 +59,9 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -799,6 +802,66 @@ public class TestHadoopCatalogOperations {
       String subPath4 = "";
       String fileLocation3 = ops.getFileLocation(filesetIdent, subPath4);
       Assertions.assertEquals(fileset.storageLocation(), fileLocation3);
+    }
+
+    // test mount a single file
+    String filesetName2 = "test_get_file_location_2";
+    String filesetLocation2 =
+        TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName2;
+    Path filesetLocationPath2 = new Path(filesetLocation2);
+    createFileset(filesetName2, schemaName, comment, Fileset.Type.MANAGED, null, filesetLocation2);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store);
+        FileSystem localFileSystem = filesetLocationPath2.getFileSystem(new Configuration())) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName2);
+      // replace fileset location to a single file
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath2));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath2).isDirectory());
+      localFileSystem.delete(filesetLocationPath2, true);
+      localFileSystem.create(filesetLocationPath2);
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath2));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath2).isFile());
+
+      String subPath = "/year=2024/month=07/day=22/test.parquet";
+      Map<String, String> contextMap = Maps.newHashMap();
+      contextMap.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.RENAME.name());
+      CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+      CallerContext.CallerContextHolder.set(callerContext);
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> ops.getFileLocation(filesetIdent, subPath));
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
+
+    // test rename with an empty subPath
+    String filesetName3 = "test_get_file_location_3";
+    String filesetLocation3 =
+        TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName3;
+    Path filesetLocationPath3 = new Path(filesetLocation3);
+    createFileset(filesetName3, schemaName, comment, Fileset.Type.MANAGED, null, filesetLocation3);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store);
+        FileSystem localFileSystem = filesetLocationPath3.getFileSystem(new Configuration())) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName3);
+      // replace fileset location to a single file
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath3));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath3).isDirectory());
+      localFileSystem.delete(filesetLocationPath3, true);
+      localFileSystem.create(filesetLocationPath3);
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath3));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath3).isFile());
+
+      Map<String, String> contextMap = Maps.newHashMap();
+      contextMap.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.RENAME.name());
+      CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+      CallerContext.CallerContextHolder.set(callerContext);
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> ops.getFileLocation(filesetIdent, ""));
     }
   }
 

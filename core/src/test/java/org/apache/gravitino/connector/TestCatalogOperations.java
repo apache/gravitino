@@ -20,6 +20,7 @@ package org.apache.gravitino.connector;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.HashMap;
@@ -34,6 +35,9 @@ import org.apache.gravitino.TestFileset;
 import org.apache.gravitino.TestSchema;
 import org.apache.gravitino.TestTable;
 import org.apache.gravitino.TestTopic;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -446,11 +450,46 @@ public class TestCatalogOperations
 
     Fileset fileset = loadFileset(ident);
 
+    boolean isMountSingleFile = checkMountsSingleFile(fileset);
+    if (isMountSingleFile) {
+      // if the storage location is a single file, it cannot have sub path to access.
+      Preconditions.checkArgument(
+          StringUtils.isBlank(processedSubPath),
+          "Sub path should always be blank, because the fileset only mounts a single file.");
+    }
+
+    // do checks for some data operations.
+    CallerContext callerContext = CallerContext.CallerContextHolder.get();
+    if (callerContext != null
+        && callerContext.context() != null
+        && !callerContext.context().isEmpty()) {
+      Map<String, String> contextMap = CallerContext.CallerContextHolder.get().context();
+      String operation = contextMap.get(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION);
+      if (StringUtils.isNotBlank(operation)) {
+        Preconditions.checkArgument(
+            FilesetDataOperation.checkValid(operation),
+            String.format("The data operation: %s is not valid.", operation));
+        FilesetDataOperation dataOperation = FilesetDataOperation.valueOf(operation);
+        if (dataOperation == FilesetDataOperation.RENAME) {
+          Preconditions.checkArgument(
+              subPath.startsWith(SLASH) && subPath.length() > 1,
+              "subPath cannot be blank when need to rename a file or a directory.");
+          Preconditions.checkArgument(
+              !isMountSingleFile,
+              String.format(
+                  "Cannot rename the fileset: %s which only mounts to a single file.", ident));
+        }
+      }
+    }
+
     String fileLocation;
-    // subPath cannot be null, so we only need check if it is blank
-    if (StringUtils.isBlank(processedSubPath)) {
+    // 1. if the storage location is a single file, we pass the storage location directly
+    // 2. if the processed sub path is blank, we pass the storage location directly
+    if (isMountSingleFile || StringUtils.isBlank(processedSubPath)) {
       fileLocation = fileset.storageLocation();
     } else {
+      // the processed sub path always starts with "/" if it is not blank,
+      // so we can safely remove the tailing slash if storage location ends with "/".
       String storageLocation =
           fileset.storageLocation().endsWith(SLASH)
               ? fileset.storageLocation().substring(0, fileset.storageLocation().length() - 1)
@@ -564,6 +603,15 @@ public class TestCatalogOperations
       Map<String, String> properties) {
     if ("true".equals(properties.get(FAIL_TEST))) {
       throw new ConnectionFailedException("Connection failed");
+    }
+  }
+
+  private boolean checkMountsSingleFile(Fileset fileset) {
+    try {
+      File locationPath = new File(fileset.storageLocation());
+      return locationPath.isFile();
+    } catch (Exception e) {
+      return false;
     }
   }
 }

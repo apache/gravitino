@@ -23,6 +23,7 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -40,12 +41,16 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -358,7 +363,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
-    // TODO we need move some check logics in the Hadoop / Python GVFS to here.
     Preconditions.checkArgument(subPath != null, "subPath must not be null");
     String processedSubPath;
     if (!subPath.trim().isEmpty() && !subPath.trim().startsWith(SLASH)) {
@@ -369,11 +373,51 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
     Fileset fileset = loadFileset(ident);
 
+    boolean isMountSingleFile = checkMountsSingleFile(fileset);
+    if (isMountSingleFile) {
+      // if the storage location is a single file, it cannot have sub path to access.
+      Preconditions.checkArgument(
+          StringUtils.isBlank(processedSubPath),
+          "Sub path should always be blank, because the fileset only mounts a single file.");
+    }
+
+    // do checks for some data operations.
+    CallerContext callerContext = CallerContext.CallerContextHolder.get();
+    if (callerContext != null
+        && callerContext.context() != null
+        && !callerContext.context().isEmpty()) {
+      Map<String, String> contextMap = CallerContext.CallerContextHolder.get().context();
+      String operation = contextMap.get(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION);
+      if (StringUtils.isNotBlank(operation)) {
+        Preconditions.checkArgument(
+            FilesetDataOperation.checkValid(operation),
+            String.format("The data operation: %s is not valid.", operation));
+        FilesetDataOperation dataOperation = FilesetDataOperation.valueOf(operation);
+        if (dataOperation == FilesetDataOperation.RENAME) {
+          // Fileset only mounts a single file, the storage location of the fileset cannot be
+          // renamed;
+          // Otherwise the metadata in the Gravitino server may be inconsistent.
+          Preconditions.checkArgument(
+              StringUtils.isNotBlank(processedSubPath)
+                  && processedSubPath.startsWith(SLASH)
+                  && processedSubPath.length() > 1,
+              "subPath cannot be blank when need to rename a file or a directory.");
+          Preconditions.checkArgument(
+              !isMountSingleFile,
+              String.format(
+                  "Cannot rename the fileset: %s which only mounts to a single file.", ident));
+        }
+      }
+    }
+
     String fileLocation;
-    // subPath cannot be null, so we only need check if it is blank
-    if (StringUtils.isBlank(processedSubPath)) {
+    // 1. if the storage location is a single file, we pass the storage location directly
+    // 2. if the processed sub path is blank, we pass the storage location directly
+    if (isMountSingleFile || StringUtils.isBlank(processedSubPath)) {
       fileLocation = fileset.storageLocation();
     } else {
+      // the processed sub path always starts with "/" if it is not blank,
+      // so we can safely remove the tailing slash if storage location ends with "/".
       String storageLocation =
           fileset.storageLocation().endsWith(SLASH)
               ? fileset.storageLocation().substring(0, fileset.storageLocation().length() - 1)
@@ -671,5 +715,19 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   static Path formalizePath(Path path, Configuration configuration) throws IOException {
     FileSystem defaultFs = FileSystem.get(configuration);
     return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
+  }
+
+  private boolean checkMountsSingleFile(Fileset fileset) {
+    try {
+      Path locationPath = new Path(fileset.storageLocation());
+      return locationPath.getFileSystem(hadoopConf).getFileStatus(locationPath).isFile();
+    } catch (FileNotFoundException e) {
+      // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
+      return false;
+    } catch (IOException e) {
+      throw new GravitinoRuntimeException(
+          "Exception occurs when checking whether fileset: %s mounts a single file, exception: %s",
+          fileset.name(), e.getCause());
+    }
   }
 }
