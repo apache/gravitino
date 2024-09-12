@@ -23,7 +23,7 @@ DIR=$(cd "$(dirname "$0")" && pwd)/../../..
 export GRAVITINO_ROOT_DIR=$(cd "$DIR" && pwd)
 export GRAVITINO_HOME=$GRAVITINO_ROOT_DIR
 export GRAVITINO_TEST=true
-export HADOOP_USER_NAME=root
+export HADOOP_USER_NAME=anonymous
 
 echo $GRAVITINO_ROOT_DIR
 cd $GRAVITINO_ROOT_DIR

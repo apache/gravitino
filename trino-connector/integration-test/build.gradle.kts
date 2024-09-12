@@ -70,7 +70,7 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
-tasks.build {
+tasks.register("setupDependencies") {
   dependsOn(":trino-connector:trino-connector:jar")
   dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
   dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
@@ -78,17 +78,16 @@ tasks.build {
   dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
 }
 
+tasks.build {
+  dependsOn("setupDependencies")
+}
+
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
-    dependsOn(":trino-connector:trino-connector:jar")
-    dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
-    dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
-    dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
-    dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
-
+    dependsOn("setupDependencies")
     doFirst {
       copy {
         from("${project.rootDir}/dev/docker/trino/conf")
@@ -121,6 +120,7 @@ tasks.test {
 }
 
 tasks.register<JavaExec>("TrinoTest") {
+  dependsOn("build")
   classpath = sourceSets["test"].runtimeClasspath
   mainClass.set("org.apache.gravitino.trino.connector.integration.test.TrinoQueryTestTool")
 
