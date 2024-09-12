@@ -167,7 +167,7 @@ For other storages that are not managed by Gravitino directly, you can manage th
 |----------------------------------|-----------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0         |
 
-To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.iceberg-rest.security-token`. This security-token will be included in the properties when the initialize method of `FileIO` is invoked.
+To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.iceberg-rest.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
 
 :::info
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the classpath of Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
