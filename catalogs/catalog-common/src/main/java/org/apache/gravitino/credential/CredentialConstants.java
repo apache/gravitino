@@ -19,32 +19,9 @@
 
 package org.apache.gravitino.credential;
 
-import java.util.Map;
+public class CredentialConstants {
+  public static final String CREDENTIAL_TYPE = "credential-type";
+  public static final String EXPIRE_TIME = "expire-time";
 
-public class TestCredentialProvider implements CredentialProvider {
-  Map<String, String> properties;
-  static final String CREDENTIAL_TYPE = "test";
-
-  @Override
-  public void initialize(Map<String, String> properties) {
-    this.properties = properties;
-  }
-
-  @Override
-  public void stop() {}
-
-  @Override
-  public String credentialType() {
-    return CREDENTIAL_TYPE;
-  }
-
-  @Override
-  public Credential getScopedToken(Context context) {
-    return null;
-  }
-
-  @Override
-  public Credential getGlobalCredential(Context context) {
-    return null;
-  }
+  private CredentialConstants() {}
 }

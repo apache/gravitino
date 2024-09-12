@@ -19,10 +19,31 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.base.Preconditions;
+import java.util.Set;
+import javax.validation.constraints.NotNull;
+
 public class LocationContext implements Context {
+  @NotNull private Set<String> writeLocations;
+  @NotNull private Set<String> readLocations;
+
+  public LocationContext(Set<String> writeLocations, Set<String> readLocations) {
+    Preconditions.checkNotNull(writeLocations, "write locations should not be null");
+    Preconditions.checkNotNull(readLocations, "write locations should not be null");
+    this.writeLocations = writeLocations;
+    this.readLocations = readLocations;
+  }
 
   @Override
   public String getUserName() {
     return null;
+  }
+
+  public Set<String> getWriteLocations() {
+    return writeLocations;
+  }
+
+  public Set<String> getReadLocations() {
+    return readLocations;
   }
 }
