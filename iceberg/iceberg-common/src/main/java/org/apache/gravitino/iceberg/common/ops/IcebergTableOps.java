@@ -43,9 +43,11 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.CreateViewRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
@@ -55,6 +57,7 @@ import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -114,6 +117,13 @@ public class IcebergTableOps implements AutoCloseable {
       throw new UnsupportedOperationException(
           "The underlying catalog doesn't support namespace operation");
     }
+  }
+
+  private ViewCatalog getViewCatalog() {
+    if (!(catalog instanceof ViewCatalog)) {
+      throw new UnsupportedOperationException(catalog.name() + " is not support view");
+    }
+    return (ViewCatalog) catalog;
   }
 
   public CreateNamespaceResponse createNamespace(CreateNamespaceRequest request) {
@@ -201,6 +211,37 @@ public class IcebergTableOps implements AutoCloseable {
     Transaction transaction = icebergTableChange.getTransaction();
     transaction.commitTransaction();
     return loadTable(icebergTableChange.getTableIdentifier());
+  }
+
+  public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {
+    request.validate();
+    return CatalogHandlers.createView(getViewCatalog(), namespace, request);
+  }
+
+  public LoadViewResponse updateView(TableIdentifier viewIdentifier, UpdateTableRequest request) {
+    request.validate();
+    return CatalogHandlers.updateView(getViewCatalog(), viewIdentifier, request);
+  }
+
+  public LoadViewResponse loadView(TableIdentifier viewIdentifier) {
+    return CatalogHandlers.loadView(getViewCatalog(), viewIdentifier);
+  }
+
+  public void dropView(TableIdentifier viewIdentifier) {
+    CatalogHandlers.dropView(getViewCatalog(), viewIdentifier);
+  }
+
+  public void renameView(RenameTableRequest request) {
+    request.validate();
+    CatalogHandlers.renameView(getViewCatalog(), request);
+  }
+
+  public boolean existView(TableIdentifier viewIdentifier) {
+    return getViewCatalog().viewExists(viewIdentifier);
+  }
+
+  public ListTablesResponse listView(Namespace namespace) {
+    return CatalogHandlers.listViews(getViewCatalog(), namespace);
   }
 
   @Override
