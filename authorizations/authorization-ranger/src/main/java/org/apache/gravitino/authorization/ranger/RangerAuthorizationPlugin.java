@@ -85,10 +85,10 @@ public abstract class RangerAuthorizationPlugin extends RangerAuthorizationConfi
     RangerHelper.check(rangerServiceName != null, "Ranger service name is required");
     rangerClient = new RangerClientExtend(rangerUrl, authType, rangerAdminName, password);
 
-    // Initialize and use the configuration to update the privilegesMapping and ownerPrivileges
+    // Initialize privilegesMapping and ownerPrivileges
     initializeOwnerPrivilegesConfig();
     initializePrivilegesMappingConfig();
-    policyResourceDefines = initializePolicyResourceDefinesConfig();
+    initializePolicyResourceDefinesConfig();
 
     rangerHelper =
         new RangerHelper(

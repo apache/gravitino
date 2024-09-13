@@ -51,7 +51,7 @@ public abstract class RangerAuthorizationConfig {
   abstract void initializeOwnerPrivilegesConfig();
 
   /** Initialize the policy resource defines configuration. */
-  abstract List<String> initializePolicyResourceDefinesConfig();
+  abstract void initializePolicyResourceDefinesConfig();
 
   public final Map<Privilege.Name, Set<RangerPrivilege>> getPrivilegesMapping() {
     return privilegesMapping;

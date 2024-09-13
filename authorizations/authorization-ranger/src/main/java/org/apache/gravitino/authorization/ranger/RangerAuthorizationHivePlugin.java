@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.ranger.RangerPrivilege.RangerHivePrivilege;
@@ -54,10 +53,11 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
 
   /** Initial Ranger policy resource defines. */
   @Override
-  public List<String> initializePolicyResourceDefinesConfig() {
-    return ImmutableList.of(
-        PolicyResource.DATABASE.toString(),
-        PolicyResource.TABLE.toString(),
-        PolicyResource.COLUMN.toString());
+  public void initializePolicyResourceDefinesConfig() {
+    policyResourceDefines =
+        ImmutableList.of(
+            PolicyResource.DATABASE.toString(),
+            PolicyResource.TABLE.toString(),
+            PolicyResource.COLUMN.toString());
   }
 }
