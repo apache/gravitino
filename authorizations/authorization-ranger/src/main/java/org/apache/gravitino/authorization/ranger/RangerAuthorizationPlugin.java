@@ -20,12 +20,9 @@ package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,7 +41,6 @@ import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -66,7 +62,8 @@ import org.slf4j.LoggerFactory;
  * 4. The Ranger policy also supports multiple users and groups, But we only use a user or group to
  * implement Gravitino Owner concept. <br>
  */
-public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
+public abstract class RangerAuthorizationPlugin extends RangerAuthorizationConfig
+    implements AuthorizationPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
 
   protected String rangerServiceName;
@@ -74,20 +71,7 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
   private RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
 
-  /** Mapping Gravitino privilege name to the Ranger privileges configuration. */
-  protected Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping = new HashMap<>();
-  /** The owner privileges, the owner can do anything on the metadata object configuration */
-  protected Set<RangerPrivilege> ownerPrivileges = new HashSet<>();
-  /**
-   * Because Ranger doesn't support the precise search, Ranger will return the policy meets the
-   * wildcard(*,?) conditions, If you use `db.table` condition to search policy, the Ranger will
-   * match `db1.table1`, `db1.table2`, `db*.table*`, So we need to manually precisely filter this
-   * research results. <br>
-   * policyResourceDefines: The Ranger policy resource defines configuration. <br>
-   */
-  protected final List<String> policyResourceDefines;
-
-  public RangerAuthorizationPlugin(String catalogProvider, Map<String, String> config) {
+  public RangerAuthorizationPlugin(Map<String, String> config) {
     String rangerUrl = config.get(AuthorizationPropertiesMeta.RANGER_ADMIN_URL);
     String authType = config.get(AuthorizationPropertiesMeta.RANGER_AUTH_TYPE);
     rangerAdminName = config.get(AuthorizationPropertiesMeta.RANGER_USERNAME);
@@ -105,8 +89,6 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
     initializeOwnerPrivilegesConfig();
     initializePrivilegesMappingConfig();
     policyResourceDefines = initializePolicyResourceDefinesConfig();
-    AuthorizationConfig authorizationConfig = AuthorizationConfig.loadConfig(catalogProvider);
-    overrideAuthorizationConfig(authorizationConfig);
 
     rangerHelper =
         new RangerHelper(
@@ -116,63 +98,6 @@ public abstract class RangerAuthorizationPlugin implements AuthorizationPlugin {
             privilegesMapping,
             ownerPrivileges,
             policyResourceDefines);
-  }
-
-  /** override the default ranger authorization configuration. <br> */
-  protected void overrideAuthorizationConfig(AuthorizationConfig authorizationConfig) {
-    // Update mapping Gravitino privilege name to the Ranger privileges.
-    try {
-      authorizationConfig
-          .getConfigsWithPrefix(AuthorizationConfig.PRIVILEGE_MAPPING_PREFIX)
-          .forEach(
-              (key, value) -> {
-                Privilege.Name gravitinoPrivilege =
-                    Privilege.Name.valueOf(key.trim().toUpperCase());
-                Set<String> strRangerPrivileges = Sets.newHashSet(value.split(","));
-                // Check the privilege mapping configured if support in the Ranger
-                RangerHelper.check(
-                    strRangerPrivileges.size() > 0,
-                    "The privilege mapping value should not be empty");
-                Set<RangerPrivilege> rangerPrivileges =
-                    strRangerPrivileges.stream()
-                        .map(v -> RangerPrivileges.valueOf(v))
-                        .collect(Collectors.toSet());
-                privilegesMapping.put(gravitinoPrivilege, rangerPrivileges);
-              });
-    } catch (IllegalArgumentException e) {
-      throw new AuthorizationPluginException(e);
-    }
-
-    // Update Owner privileges
-    List<RangerPrivilege> ownerPrivileges =
-        authorizationConfig.get(AuthorizationConfig.AUTHORIZATION_OWNER_PRIVILEGES).stream()
-            .map(RangerPrivileges::valueOf)
-            .collect(Collectors.toList());
-    if (ownerPrivileges.size() > 0) {
-      this.ownerPrivileges.clear();
-      this.ownerPrivileges.addAll(ownerPrivileges);
-    }
-  }
-
-  /** Initialize the mapping Gravitino privilege name to the Ranger privileges configuration */
-  protected abstract void initializePrivilegesMappingConfig();
-
-  /** Initialize the owner privileges configuration. */
-  protected abstract void initializeOwnerPrivilegesConfig();
-
-  /** Initialize the policy resource defines configuration. */
-  protected abstract List<String> initializePolicyResourceDefinesConfig();
-
-  public final Map<Privilege.Name, Set<RangerPrivilege>> getPrivilegesMapping() {
-    return privilegesMapping;
-  }
-
-  public final Set<RangerPrivilege> getOwnerPrivileges() {
-    return ownerPrivileges;
-  }
-
-  public final List<String> getPolicyResourceDefines() {
-    return policyResourceDefines;
   }
 
   /**

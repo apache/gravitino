@@ -28,7 +28,7 @@ import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyR
 
 public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
   public RangerAuthorizationHivePlugin(Map<String, String> config) {
-    super("hive", config);
+    super(config);
   }
 
   /** Initialize the default mapping Gravitino privilege name to the Ranger privileges */
