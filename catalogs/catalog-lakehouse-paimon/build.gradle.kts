@@ -85,7 +85,6 @@ dependencies {
   testImplementation(libs.paimon.spark)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.localstack)
-//  testImplementation(libs.hadoop.aws)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
