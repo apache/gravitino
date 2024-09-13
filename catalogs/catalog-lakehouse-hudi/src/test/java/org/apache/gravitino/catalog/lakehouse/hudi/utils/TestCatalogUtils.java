@@ -16,27 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
+package org.apache.gravitino.catalog.lakehouse.hudi.utils;
 
-import static org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType.HMS;
+import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.CATALOG_BACKEND;
 
-import java.util.Map;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType;
+import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
-import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.HudiHMSBackend;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.HudiHMSBackendOps;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class HudiHMSBackend extends HudiCatalogBackend {
-
-  public HudiHMSBackend() {
-    this(HMS, new HudiHMSBackendOps());
-  }
-
-  private HudiHMSBackend(BackendType backendType, HudiCatalogBackendOps catalogOps) {
-    super(backendType, catalogOps);
-  }
-
-  @Override
-  public void initialize(Map<String, String> properties) {
-    backendOps().initialize(properties);
+public class TestCatalogUtils {
+  @Test
+  public void testLoadHudiCatalogBackend() {
+    HudiCatalogBackend catalogBackend =
+        CatalogUtils.loadHudiCatalogBackend(ImmutableMap.of(CATALOG_BACKEND, "hms"));
+    Assertions.assertInstanceOf(HudiHMSBackend.class, catalogBackend);
+    Assertions.assertInstanceOf(HudiHMSBackendOps.class, catalogBackend.backendOps());
   }
 }

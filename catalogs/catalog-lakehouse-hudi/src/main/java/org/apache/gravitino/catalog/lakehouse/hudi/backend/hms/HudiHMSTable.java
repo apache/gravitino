@@ -18,7 +18,12 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
+import static org.apache.gravitino.catalog.lakehouse.hudi.HudiTablePropertiesMetadata.COMMENT;
+import static org.apache.gravitino.catalog.lakehouse.hudi.HudiTablePropertiesMetadata.LOCATION;
+
+import org.apache.gravitino.catalog.lakehouse.hudi.HudiColumn;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
+import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.hadoop.hive.metastore.api.Table;
 
 public class HudiHMSTable extends HudiTable<Table> {
@@ -44,6 +49,7 @@ public class HudiHMSTable extends HudiTable<Table> {
       table.columns = columns;
       table.indexes = indexes;
       table.partitioning = partitioning;
+      table.sortOrders = sortOrders;
       table.distribution = distribution;
       table.properties = properties;
       table.auditInfo = auditInfo;
@@ -51,8 +57,16 @@ public class HudiHMSTable extends HudiTable<Table> {
     }
 
     @Override
-    protected HudiTable buildFromTable(Table backendTable) {
-      // todo: convert HMS table to HudiTable
+    protected HudiHMSTable buildFromTable(Table hmsTable) {
+      name = hmsTable.getTableName();
+      comment = hmsTable.getParameters().get(COMMENT);
+      columns = HiveTableConverter.getColumns(hmsTable, HudiColumn.builder());
+      partitioning = HiveTableConverter.getPartitioning(hmsTable);
+      sortOrders = HiveTableConverter.getSortOrders(hmsTable);
+      distribution = HiveTableConverter.getDistribution(hmsTable);
+      auditInfo = HiveTableConverter.getAuditInfo(hmsTable);
+      properties = hmsTable.getParameters();
+      properties.put(LOCATION, hmsTable.getSd().getLocation());
       return simpleBuild();
     }
   }
