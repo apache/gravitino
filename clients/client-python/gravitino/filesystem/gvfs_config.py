@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+
 class GVFSConfig:
     CACHE_SIZE = "cache_size"
     DEFAULT_CACHE_SIZE = 20

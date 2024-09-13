@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+
 class GravitinoRuntimeException(RuntimeError):
     """Base class for all Gravitino runtime exceptions."""
 
