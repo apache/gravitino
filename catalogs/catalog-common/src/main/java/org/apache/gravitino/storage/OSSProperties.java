@@ -25,7 +25,7 @@ public class OSSProperties {
   public static final String GRAVITINO_OSS_ENDPOINT = "oss-endpoint";
   // The static access key ID used to access OSS data.
   public static final String GRAVITINO_OSS_ACCESS_KEY_ID = "oss-access-key-id";
-  // The static secret access key used to access OSS data.
+  // The static access key secret used to access OSS data.
   public static final String GRAVITINO_OSS_ACCESS_KEY_SECRET = "oss-access-key-secret";
 
   private OSSProperties() {}

@@ -87,25 +87,25 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* hidden */),
             stringOptionalPropertyEntry(
                 S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
-                "s3 access-key-id",
+                "s3 access key ID",
                 false /* immutable */,
                 null /* defaultValue */,
                 true /* hidden */),
             stringOptionalPropertyEntry(
                 S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
-                "s3 secret-access-key",
+                "s3 secret access key",
                 false /* immutable */,
                 null /* defaultValue */,
                 true /* hidden */),
             stringOptionalPropertyEntry(
                 OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
-                "OSS access-key-id",
+                "OSS access key ID",
                 false /* immutable */,
                 null /* defaultValue */,
                 true /* hidden */),
             stringOptionalPropertyEntry(
                 OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
-                "OSS access-key-secret",
+                "OSS access key secret",
                 false /* immutable */,
                 null /* defaultValue */,
                 true /* hidden */));

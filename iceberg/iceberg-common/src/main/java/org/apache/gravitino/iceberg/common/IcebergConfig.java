@@ -154,7 +154,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<String> OSS_ACCESS_KEY_SECRET =
       new ConfigBuilder(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET)
-          .doc("The static secret access key used to access OSS data")
+          .doc("The static access key secret used to access OSS data")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
