@@ -39,6 +39,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
+import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
 import org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -114,7 +115,9 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
 
-    this.paimonCatalogOps = new PaimonCatalogOps(new PaimonConfig(resultConf));
+    PaimonConfig paimonConfig = new PaimonConfig(resultConf);
+    CatalogUtils.checkWarehouseConfig(paimonConfig, resultConf);
+    this.paimonCatalogOps = new PaimonCatalogOps(paimonConfig);
   }
 
   /**

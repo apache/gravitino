@@ -82,6 +82,10 @@ dependencies {
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.paimon.s3)
+  testImplementation(libs.paimon.spark)
+  testImplementation(libs.hadoop.aws)
+  testImplementation(libs.testcontainers.localstack)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

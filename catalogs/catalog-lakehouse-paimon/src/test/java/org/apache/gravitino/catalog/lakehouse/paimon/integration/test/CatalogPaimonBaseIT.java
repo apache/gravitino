@@ -114,12 +114,16 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
   @BeforeAll
   public void startup() {
-    containerSuite.startHiveContainer();
+    startNecessaryContainers();
     catalogProperties = initPaimonCatalogProperties();
     createMetalake();
     createCatalog();
     createSchema();
     initSparkEnv();
+  }
+
+  protected void startNecessaryContainers() {
+    containerSuite.startHiveContainer();
   }
 
   @AfterAll
