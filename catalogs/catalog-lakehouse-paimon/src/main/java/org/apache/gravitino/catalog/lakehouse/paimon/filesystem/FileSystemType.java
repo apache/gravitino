@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.paimon.filesystem;
 
 public enum FileSystemType {
+  LOCAL_FILE,
   HDFS,
   S3,
   OSS;
@@ -40,6 +41,8 @@ public enum FileSystemType {
       return OSS;
     } else if (storagePath.startsWith("hdfs://")) {
       return HDFS;
+    } else if (storagePath.startsWith("/")) {
+      return LOCAL_FILE;
     }
 
     throw new IllegalArgumentException("Unsupported storage path: " + storagePath);
