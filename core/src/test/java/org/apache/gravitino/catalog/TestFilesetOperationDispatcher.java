@@ -285,6 +285,17 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
           localFile3.delete();
         }
       }
+
+      // test storage location end with "/"
+      String filesetName4 = "test_get_file_location_4";
+      String filesetLocation4 = "/tmp/test_get_file_location_" + UUID.randomUUID() + "/";
+      NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, filesetName4);
+      filesetOperationDispatcher.createFileset(
+          filesetIdent, "comment", Fileset.Type.MANAGED, filesetLocation4, props);
+      String subPath = "/test/test.parquet";
+      String fileLocation = filesetOperationDispatcher.getFileLocation(filesetIdent, subPath);
+      Assertions.assertEquals(
+          String.format("%s%s", filesetLocation4, subPath.substring(1)), fileLocation);
     } finally {
       File path = new File(tmpDir);
       if (path.exists()) {

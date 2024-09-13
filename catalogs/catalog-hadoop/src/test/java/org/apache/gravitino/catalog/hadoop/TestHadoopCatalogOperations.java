@@ -863,6 +863,25 @@ public class TestHadoopCatalogOperations {
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> ops.getFileLocation(filesetIdent, ""));
     }
+
+    // test storage location end with "/"
+    String filesetName4 = "test_get_file_location_4";
+    String filesetLocation4 =
+        TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName4 + "/";
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+    Fileset mockFileset = Mockito.mock(Fileset.class);
+    when(mockFileset.name()).thenReturn(filesetName4);
+    when(mockFileset.storageLocation()).thenReturn(filesetLocation4);
+
+    try (HadoopCatalogOperations mockOps = Mockito.mock(HadoopCatalogOperations.class)) {
+      mockOps.hadoopConf = new Configuration();
+      when(mockOps.loadFileset(filesetIdent)).thenReturn(mockFileset);
+      String subPath = "/test/test.parquet";
+      when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
+      String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
+      Assertions.assertEquals(
+          String.format("%s%s", mockFileset.storageLocation(), subPath.substring(1)), fileLocation);
+    }
   }
 
   private static Stream<Arguments> locationArguments() {
