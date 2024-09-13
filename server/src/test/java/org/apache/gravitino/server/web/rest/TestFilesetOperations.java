@@ -517,9 +517,13 @@ public class TestFilesetOperations extends JerseyTest {
           .thenAnswer(
               (Answer<String>)
                   invocation -> {
-                    CallerContext context = CallerContext.CallerContextHolder.get();
-                    callerContextMap.putAll(context.context());
-                    return subPath2;
+                    try {
+                      CallerContext context = CallerContext.CallerContextHolder.get();
+                      callerContextMap.putAll(context.context());
+                      return subPath2;
+                    } finally {
+                      CallerContext.CallerContextHolder.remove();
+                    }
                   });
       Response resp4 =
           target(filesetPath(metalake, catalog, schema) + "fileset3/location")
