@@ -91,15 +91,8 @@ dependencies {
 
 tasks {
   val runtimeJars by registering(Copy::class) {
-    from(configurations.runtimeClasspath, "src/main/resources/authorization-defs")
+    from(configurations.runtimeClasspath)
     into("build/libs")
-    rename { original ->
-      if (original.endsWith(".template")) {
-        original.replace(".template", "")
-      } else {
-        original
-      }
-    }
   }
 
   val copyAuthorizationLibs by registering(Copy::class) {
@@ -112,22 +105,8 @@ tasks {
     into("$rootDir/distribution/package/authorizations/ranger/libs")
   }
 
-  val copyAuthorizationConfig by registering(Copy::class) {
-    from("src/main/resources/authorization-defs")
-    into("$rootDir/distribution/package/authorizations/ranger/conf")
-    rename { original ->
-      if (original.endsWith(".template")) {
-        original.replace(".template", "")
-      } else {
-        original
-      }
-    }
-    exclude("META-INF")
-    fileMode = 0b111101101
-  }
-
   register("copyLibAndConfig", Copy::class) {
-    dependsOn(copyAuthorizationLibs, copyAuthorizationConfig)
+    dependsOn(copyAuthorizationLibs)
   }
 
   jar {
