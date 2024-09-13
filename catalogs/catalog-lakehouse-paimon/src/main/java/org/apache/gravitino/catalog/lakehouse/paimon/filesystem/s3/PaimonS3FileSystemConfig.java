@@ -81,7 +81,7 @@ public class PaimonS3FileSystemConfig extends Config {
               PropertyEntry.stringOptionalPropertyEntry(
                   S3_ENDPOINT,
                   "The endpoint of the AWS s3",
-                  false/* immutable */,
+                  false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
           .put(

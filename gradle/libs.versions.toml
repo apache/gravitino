@@ -97,7 +97,6 @@ mail = "1.4.1"
 rome = "1.0"
 jettison = "1.1"
 thrift = "0.12.0"
-hadoop-s3 = "3.3.6"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -145,7 +144,6 @@ hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref 
 hadoop3-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop3"}
 hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.ref = "hadoop3"}
 hadoop3-minicluster = { group = "org.apache.hadoop", name = "hadoop-minicluster", version.ref = "hadoop-minikdc"}
-hadoop-aws = { group = "org.apache.hadoop", name = "hadoop-aws", version.ref = "hadoop-s3"}
 htrace-core4 = { group = "org.apache.htrace", name = "htrace-core4", version.ref = "htrace-core4" }
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}

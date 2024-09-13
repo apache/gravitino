@@ -81,11 +81,11 @@ dependencies {
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.testcontainers)
   testImplementation(libs.paimon.s3)
   testImplementation(libs.paimon.spark)
-  testImplementation(libs.hadoop.aws)
+  testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.localstack)
+//  testImplementation(libs.hadoop.aws)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

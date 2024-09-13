@@ -109,7 +109,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   private GravitinoMetalake metalake;
   private Catalog catalog;
   private org.apache.paimon.catalog.Catalog paimonCatalog;
-  private SparkSession spark;
+  protected SparkSession spark;
   private Map<String, String> catalogProperties;
 
   @BeforeAll
@@ -930,7 +930,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     return properties;
   }
 
-  private void initSparkEnv() {
+  protected void initSparkEnv() {
     spark =
         SparkSession.builder()
             .master("local[1]")

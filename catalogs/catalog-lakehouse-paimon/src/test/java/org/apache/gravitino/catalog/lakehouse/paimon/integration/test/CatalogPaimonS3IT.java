@@ -26,9 +26,9 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.s3.PaimonS3FileSystemConfig;
+import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.localstack.LocalStackContainer;
@@ -43,6 +43,9 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
   // GravitinoITUtils.genRandomName("paimon-s3-bucket-");
   private static final String S3_BUCKET_NAME = "my-test-bucket";
   private static LocalStackContainer localStackContainer;
+  private String accessKey;
+  private String secretKey;
+  private String endpoint;
 
   @Override
   protected Map<String, String> initPaimonCatalogProperties() {
@@ -54,9 +57,9 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
     TYPE = "filesystem";
     WAREHOUSE = "s3://" + S3_BUCKET_NAME + "/";
 
-    String accessKey = localStackContainer.getAccessKey();
-    String secretKey = localStackContainer.getSecretKey();
-    String endpoint = localStackContainer.getEndpointOverride(S3).toString();
+    accessKey = localStackContainer.getAccessKey();
+    secretKey = localStackContainer.getSecretKey();
+    endpoint = localStackContainer.getEndpointOverride(S3).toString();
 
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
@@ -95,8 +98,21 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
     localStackContainer.stop();
   }
 
-  @Test
-  void testOperationDataOfPaimonTable() {
-    // Something wrong to use spark to read data from paimon with s3
+  protected void initSparkEnv() {
+    spark =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("Paimon Catalog integration test")
+            .config("spark.sql.warehouse.dir", WAREHOUSE)
+            .config("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
+            .config("spark.sql.catalog.paimon.warehouse", WAREHOUSE)
+            .config(
+                "spark.sql.extensions",
+                "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
+            .config("spark.sql.catalog.paimon.s3.access-key", accessKey)
+            .config("spark.sql.catalog.paimon.s3.secret-key", secretKey)
+            .config("spark.sql.catalog.paimon.s3.endpoint", endpoint)
+            .enableHiveSupport()
+            .getOrCreate();
   }
 }
