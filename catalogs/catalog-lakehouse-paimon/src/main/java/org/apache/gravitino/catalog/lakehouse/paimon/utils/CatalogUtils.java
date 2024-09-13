@@ -34,6 +34,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
 import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.FileSystemType;
+import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.oss.PaimonOSSFileSystemConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.s3.PaimonS3FileSystemConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.hadoop.conf.Configuration;
@@ -134,9 +135,11 @@ public class CatalogUtils {
       case S3:
         checkS3FileSystemConfig(resultConf);
         break;
-      case HDFS:
       case OSS:
+        checkOSSFileSystemConfig(resultConf);
+        break;
       case LOCAL_FILE:
+      case HDFS:
         break;
       default:
         throw new IllegalArgumentException("Unsupported file system type: " + fileSystemType);
@@ -154,5 +157,18 @@ public class CatalogUtils {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(s3FileSystemConfig.getS3Endpoint()),
         "S3 endpoint can not be null or empty.");
+  }
+
+  private static void checkOSSFileSystemConfig(Map<String, String> resultConf) {
+    PaimonOSSFileSystemConfig ossFileSystemConfig = new PaimonOSSFileSystemConfig(resultConf);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(ossFileSystemConfig.getOSSAccessKey()),
+        "OSS access key can not be null or empty.");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(ossFileSystemConfig.getOSSSecretKey()),
+        "OSS secret key can not be null or empty.");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(ossFileSystemConfig.getOSSEndpoint()),
+        "OSS endpoint can not be null or empty.");
   }
 }

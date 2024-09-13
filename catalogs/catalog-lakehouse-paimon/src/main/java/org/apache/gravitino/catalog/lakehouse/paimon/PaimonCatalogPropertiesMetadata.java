@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.oss.PaimonOSSFileSystemConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.s3.PaimonS3FileSystemConfig;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -68,6 +69,12 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           PaimonS3FileSystemConfig.S3_SECRET_KEY, PaimonS3FileSystemConfig.S3_SECRET_KEY,
           PaimonS3FileSystemConfig.S3_ENDPOINT, PaimonS3FileSystemConfig.S3_ENDPOINT);
 
+  private static final Map<String, String> OSS_CONFIGURATION =
+      ImmutableMap.of(
+          PaimonOSSFileSystemConfig.OSS_ACCESS_KEY, PaimonOSSFileSystemConfig.OSS_ACCESS_KEY,
+          PaimonOSSFileSystemConfig.OSS_SECRET_KEY, PaimonOSSFileSystemConfig.OSS_SECRET_KEY,
+          PaimonOSSFileSystemConfig.OSS_ENDPOINT, PaimonOSSFileSystemConfig.OSS_ENDPOINT);
+
   static {
     List<PropertyEntry<?>> propertyEntries =
         ImmutableList.of(
@@ -96,6 +103,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
     result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
     result.putAll(PaimonS3FileSystemConfig.S3_FILESYSTEM_PROPERTY_ENTRIES);
+    result.putAll(PaimonOSSFileSystemConfig.OSS_FILESYSTEM_PROPERTY_ENTRIES);
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);
   }
 
@@ -118,6 +126,10 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
 
           if (S3_CONFIGURATION.containsKey(key)) {
             gravitinoConfig.put(S3_CONFIGURATION.get(key), value);
+          }
+
+          if (OSS_CONFIGURATION.containsKey(key)) {
+            gravitinoConfig.put(OSS_CONFIGURATION.get(key), value);
           }
         });
     return gravitinoConfig;
