@@ -136,6 +136,7 @@ public class CatalogUtils {
         break;
       case HDFS:
       case OSS:
+      case LOCAL_FILE:
         break;
       default:
         throw new IllegalArgumentException("Unsupported file system type: " + fileSystemType);
