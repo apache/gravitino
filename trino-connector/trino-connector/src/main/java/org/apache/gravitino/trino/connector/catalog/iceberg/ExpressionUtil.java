@@ -87,7 +87,7 @@ public class ExpressionUtil {
     } catch (IllegalArgumentException e) {
       throw new TrinoException(
           GRAVITINO_EXPRESSION_ERROR,
-          "Error to handle Transform Expressions :" + e.getMessage(),
+          "Error to handle transform Expressions :" + e.getMessage(),
           e);
     }
   }
@@ -114,7 +114,9 @@ public class ExpressionUtil {
       return orderFields;
     } catch (IllegalArgumentException e) {
       throw new TrinoException(
-          GRAVITINO_EXPRESSION_ERROR, "Error to handle order Expressions : ", e);
+          GRAVITINO_EXPRESSION_ERROR,
+          "Error to handle the sort order expressions : " + e.getMessage(),
+          e);
     }
   }
 
@@ -127,7 +129,7 @@ public class ExpressionUtil {
       return sortOrders.toArray(new SortOrder[0]);
     } catch (IllegalArgumentException e) {
       throw new TrinoException(
-          GRAVITINO_EXPRESSION_ERROR, "Error parsing the sort order field: ", e);
+          GRAVITINO_EXPRESSION_ERROR, "Error parsing the sort order field: " + e.getMessage(), e);
     }
   }
 
