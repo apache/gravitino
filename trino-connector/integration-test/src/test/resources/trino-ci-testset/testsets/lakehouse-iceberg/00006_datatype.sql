@@ -2,7 +2,7 @@ CREATE SCHEMA gt_db2;
 
 USE gt_db2;
 
--- Unsupported Type: TINYINT, SMALLINT
+-- Unsupported Type: CHAR TINYINT, SMALLINT
 CREATE TABLE tb01 (
     f1 VARCHAR,
     f3 VARBINARY,
