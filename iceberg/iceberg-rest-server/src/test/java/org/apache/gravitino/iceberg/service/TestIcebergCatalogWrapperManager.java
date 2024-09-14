@@ -21,12 +21,12 @@ package org.apache.gravitino.iceberg.service;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-public class TestIcebergTableOpsManager {
+public class TestIcebergCatalogWrapperManager {
 
   private static final String DEFAULT_CATALOG = "memory";
 
@@ -39,9 +39,9 @@ public class TestIcebergTableOpsManager {
     }
     Map<String, String> config = Maps.newHashMap();
     config.put(String.format("catalog.%s.catalog-backend-name", prefix), prefix);
-    IcebergTableOpsManager manager = new IcebergTableOpsManager(config);
+    IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config);
 
-    IcebergTableOps ops = manager.getOps(rawPrefix);
+    IcebergCatalogWrapper ops = manager.getOps(rawPrefix);
 
     if (StringUtils.isBlank(prefix)) {
       Assertions.assertEquals(ops.getCatalog().name(), DEFAULT_CATALOG);
@@ -55,7 +55,7 @@ public class TestIcebergTableOpsManager {
       strings = {"hello", "\\\n\t\\\'", "\u0024", "\100", "[_~", "__gravitino_default_catalog/"})
   public void testInvalidGetOps(String rawPrefix) {
     Map<String, String> config = Maps.newHashMap();
-    IcebergTableOpsManager manager = new IcebergTableOpsManager(config);
+    IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config);
 
     Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> manager.getOps(rawPrefix));
   }

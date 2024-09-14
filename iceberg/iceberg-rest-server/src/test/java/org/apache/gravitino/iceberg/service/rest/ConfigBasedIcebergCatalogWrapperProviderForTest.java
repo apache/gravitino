@@ -18,12 +18,13 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
-import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergTableOpsProvider;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergCatalogWrapperProvider;
 
-public class ConfigBasedIcebergTableOpsProviderForTest extends ConfigBasedIcebergTableOpsProvider {
+public class ConfigBasedIcebergCatalogWrapperProviderForTest extends
+    ConfigBasedIcebergCatalogWrapperProvider {
   @Override
-  public IcebergTableOps getIcebergTableOps(String prefix) {
-    return new IcebergTableOpsForTest();
+  public IcebergCatalogWrapper getIcebergTableOps(String prefix) {
+    return new IcebergCatalogWrapperForTest();
   }
 }

@@ -22,7 +22,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-public class TestConfigBasedIcebergTableOpsProvider {
+public class TestConfigBasedIcebergCatalogWrapperProvider {
   @Test
   public void testValidIcebergTableOps() {
     String hiveCatalogName = "hive_backend";
@@ -58,15 +58,15 @@ public class TestConfigBasedIcebergTableOpsProvider {
     config.put("catalog-backend", "memory");
     config.put("warehouse", "/tmp/");
 
-    ConfigBasedIcebergTableOpsProvider provider = new ConfigBasedIcebergTableOpsProvider();
+    ConfigBasedIcebergCatalogWrapperProvider provider = new ConfigBasedIcebergCatalogWrapperProvider();
     provider.initialize(config);
 
     IcebergConfig hiveIcebergConfig = provider.catalogConfigs.get(hiveCatalogName);
     IcebergConfig jdbcIcebergConfig = provider.catalogConfigs.get(jdbcCatalogName);
     IcebergConfig defaultIcebergConfig = provider.catalogConfigs.get(defaultCatalogName);
-    IcebergTableOps hiveOps = provider.getIcebergTableOps(hiveCatalogName);
-    IcebergTableOps jdbcOps = provider.getIcebergTableOps(jdbcCatalogName);
-    IcebergTableOps defaultOps = provider.getIcebergTableOps(defaultCatalogName);
+    IcebergCatalogWrapper hiveOps = provider.getIcebergTableOps(hiveCatalogName);
+    IcebergCatalogWrapper jdbcOps = provider.getIcebergTableOps(jdbcCatalogName);
+    IcebergCatalogWrapper defaultOps = provider.getIcebergTableOps(defaultCatalogName);
 
     Assertions.assertEquals(
         hiveCatalogName, hiveIcebergConfig.get(IcebergConfig.CATALOG_BACKEND_NAME));
@@ -101,7 +101,7 @@ public class TestConfigBasedIcebergTableOpsProvider {
   @ParameterizedTest
   @ValueSource(strings = {"", "not_match"})
   public void testInvalidIcebergTableOps(String catalogName) {
-    ConfigBasedIcebergTableOpsProvider provider = new ConfigBasedIcebergTableOpsProvider();
+    ConfigBasedIcebergCatalogWrapperProvider provider = new ConfigBasedIcebergCatalogWrapperProvider();
     provider.initialize(Maps.newHashMap());
 
     Assertions.assertThrowsExactly(

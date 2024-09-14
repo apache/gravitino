@@ -37,9 +37,9 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
-import org.apache.gravitino.iceberg.service.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -57,7 +57,7 @@ public class IcebergTableOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperations.class);
 
-  private IcebergTableOpsManager icebergTableOpsManager;
+  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
 
   private ObjectMapper icebergObjectMapper;
@@ -68,8 +68,8 @@ public class IcebergTableOperations {
 
   @Inject
   public IcebergTableOperations(
-      IcebergTableOpsManager icebergTableOpsManager, IcebergMetricsManager icebergMetricsManager) {
-    this.icebergTableOpsManager = icebergTableOpsManager;
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager, IcebergMetricsManager icebergMetricsManager) {
+    this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
     this.icebergMetricsManager = icebergMetricsManager;
   }
@@ -81,7 +81,7 @@ public class IcebergTableOperations {
   public Response listTable(
       @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
     return IcebergRestUtils.ok(
-        icebergTableOpsManager.getOps(prefix).listTable(RESTUtil.decodeNamespace(namespace)));
+        icebergCatalogWrapperManager.getOps(prefix).listTable(RESTUtil.decodeNamespace(namespace)));
   }
 
   @POST
@@ -97,7 +97,7 @@ public class IcebergTableOperations {
         namespace,
         createTableRequest);
     return IcebergRestUtils.ok(
-        icebergTableOpsManager
+        icebergCatalogWrapperManager
             .getOps(prefix)
             .createTable(RESTUtil.decodeNamespace(namespace), createTableRequest));
   }
@@ -122,7 +122,7 @@ public class IcebergTableOperations {
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
     return IcebergRestUtils.ok(
-        icebergTableOpsManager.getOps(prefix).updateTable(tableIdentifier, updateTableRequest));
+        icebergCatalogWrapperManager.getOps(prefix).updateTable(tableIdentifier, updateTableRequest));
   }
 
   @DELETE
@@ -143,9 +143,9 @@ public class IcebergTableOperations {
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
     if (purgeRequested) {
-      icebergTableOpsManager.getOps(prefix).purgeTable(tableIdentifier);
+      icebergCatalogWrapperManager.getOps(prefix).purgeTable(tableIdentifier);
     } else {
-      icebergTableOpsManager.getOps(prefix).dropTable(tableIdentifier);
+      icebergCatalogWrapperManager.getOps(prefix).dropTable(tableIdentifier);
     }
     return IcebergRestUtils.noContent();
   }
@@ -163,7 +163,7 @@ public class IcebergTableOperations {
     // todo support snapshots
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    return IcebergRestUtils.ok(icebergTableOpsManager.getOps(prefix).loadTable(tableIdentifier));
+    return IcebergRestUtils.ok(icebergCatalogWrapperManager.getOps(prefix).loadTable(tableIdentifier));
   }
 
   @HEAD
@@ -177,7 +177,7 @@ public class IcebergTableOperations {
       @PathParam("table") String table) {
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    if (icebergTableOpsManager.getOps(prefix).tableExists(tableIdentifier)) {
+    if (icebergCatalogWrapperManager.getOps(prefix).tableExists(tableIdentifier)) {
       return IcebergRestUtils.okWithoutContent();
     } else {
       return IcebergRestUtils.notExists();

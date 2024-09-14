@@ -23,14 +23,14 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestGravitinoBasedIcebergTableOpsProvider {
+public class TestGravitinoBasedIcebergCatalogWrapperProvider {
   @Test
   public void testValidIcebergTableOps() {
     String hiveCatalogName = "hive_backend";
@@ -71,13 +71,13 @@ public class TestGravitinoBasedIcebergTableOpsProvider {
               }
             });
 
-    GravitinoBasedIcebergTableOpsProvider provider = new GravitinoBasedIcebergTableOpsProvider();
+    GravitinoBasedIcebergCatalogWrapperProvider provider = new GravitinoBasedIcebergCatalogWrapperProvider();
     GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
     provider.setClient(client);
 
-    IcebergTableOps hiveOps = provider.getIcebergTableOps(hiveCatalogName);
-    IcebergTableOps jdbcOps = provider.getIcebergTableOps(jdbcCatalogName);
+    IcebergCatalogWrapper hiveOps = provider.getIcebergTableOps(hiveCatalogName);
+    IcebergCatalogWrapper jdbcOps = provider.getIcebergTableOps(jdbcCatalogName);
 
     Assertions.assertEquals(hiveCatalogName, hiveOps.getCatalog().name());
     Assertions.assertEquals(jdbcCatalogName, jdbcOps.getCatalog().name());
@@ -100,7 +100,7 @@ public class TestGravitinoBasedIcebergTableOpsProvider {
     GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
 
-    GravitinoBasedIcebergTableOpsProvider provider = new GravitinoBasedIcebergTableOpsProvider();
+    GravitinoBasedIcebergCatalogWrapperProvider provider = new GravitinoBasedIcebergCatalogWrapperProvider();
     provider.setClient(client);
 
     Assertions.assertThrowsExactly(

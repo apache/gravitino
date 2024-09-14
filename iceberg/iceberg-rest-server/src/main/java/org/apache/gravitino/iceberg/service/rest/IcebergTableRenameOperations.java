@@ -30,8 +30,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
-import org.apache.gravitino.iceberg.service.IcebergTableOpsManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
@@ -44,11 +44,12 @@ public class IcebergTableRenameOperations {
   @Context
   private HttpServletRequest httpRequest;
 
-  private IcebergTableOpsManager icebergTableOpsManager;
+  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
 
   @Inject
-  public IcebergTableRenameOperations(IcebergTableOpsManager icebergTableOpsManager) {
-    this.icebergTableOpsManager = icebergTableOpsManager;
+  public IcebergTableRenameOperations(
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+    this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
   }
 
   @POST
@@ -57,7 +58,7 @@ public class IcebergTableRenameOperations {
   @ResponseMetered(name = "rename-table", absolute = true)
   public Response renameTable(
       @PathParam("prefix") String prefix, RenameTableRequest renameTableRequest) {
-    icebergTableOpsManager.getOps(prefix).renameTable(renameTableRequest);
+    icebergCatalogWrapperManager.getOps(prefix).renameTable(renameTableRequest);
     return IcebergRestUtils.okWithoutContent();
   }
 }

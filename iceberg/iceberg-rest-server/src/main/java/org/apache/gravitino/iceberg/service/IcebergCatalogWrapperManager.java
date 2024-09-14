@@ -30,28 +30,28 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsProvider;
-import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergTableOpsProvider;
-import org.apache.gravitino.iceberg.provider.GravitinoBasedIcebergTableOpsProvider;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperProvider;
+import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergCatalogWrapperProvider;
+import org.apache.gravitino.iceberg.provider.GravitinoBasedIcebergCatalogWrapperProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class IcebergTableOpsManager implements AutoCloseable {
-  public static final Logger LOG = LoggerFactory.getLogger(IcebergTableOpsManager.class);
+public class IcebergCatalogWrapperManager implements AutoCloseable {
+  public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapperManager.class);
 
   private static final ImmutableMap<String, String> ICEBERG_TABLE_OPS_PROVIDER_NAMES =
       ImmutableMap.of(
-          ConfigBasedIcebergTableOpsProvider.CONFIG_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
-          ConfigBasedIcebergTableOpsProvider.class.getCanonicalName(),
-          GravitinoBasedIcebergTableOpsProvider.GRAVITINO_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
-          GravitinoBasedIcebergTableOpsProvider.class.getCanonicalName());
+          ConfigBasedIcebergCatalogWrapperProvider.CONFIG_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
+          ConfigBasedIcebergCatalogWrapperProvider.class.getCanonicalName(),
+          GravitinoBasedIcebergCatalogWrapperProvider.GRAVITINO_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
+          GravitinoBasedIcebergCatalogWrapperProvider.class.getCanonicalName());
 
-  private final Cache<String, IcebergTableOps> icebergTableOpsCache;
+  private final Cache<String, IcebergCatalogWrapper> icebergTableOpsCache;
 
-  private final IcebergTableOpsProvider provider;
+  private final IcebergCatalogWrapperProvider provider;
 
-  public IcebergTableOpsManager(Map<String, String> properties) {
+  public IcebergCatalogWrapperManager(Map<String, String> properties) {
     this.provider = createProvider(properties);
     this.provider.initialize(properties);
     this.icebergTableOpsCache =
@@ -62,8 +62,8 @@ public class IcebergTableOpsManager implements AutoCloseable {
                 TimeUnit.MILLISECONDS)
             .removalListener(
                 (k, v, c) -> {
-                  LOG.info("Remove IcebergTableOps cache {}.", k);
-                  closeIcebergTableOps((IcebergTableOps) v);
+                  LOG.info("Remove IcebergCatalogWrapper cache {}.", k);
+                  closeIcebergTableOps((IcebergCatalogWrapper) v);
                 })
             .scheduler(
                 Scheduler.forScheduledExecutorService(
@@ -79,11 +79,11 @@ public class IcebergTableOpsManager implements AutoCloseable {
   /**
    * @param rawPrefix The path parameter is passed by a Jetty handler. The pattern is matching
    *     ([^/]*\/), end with /
-   * @return the instance of IcebergTableOps.
+   * @return the instance of IcebergCatalogWrapper.
    */
-  public IcebergTableOps getOps(String rawPrefix) {
+  public IcebergCatalogWrapper getOps(String rawPrefix) {
     String catalogName = getCatalogName(rawPrefix);
-    IcebergTableOps tableOps =
+    IcebergCatalogWrapper tableOps =
         icebergTableOpsCache.get(catalogName, k -> provider.getIcebergTableOps(catalogName));
     // Reload conf to reset UserGroupInformation or icebergTableOps will always use
     // Simple auth.
@@ -102,14 +102,14 @@ public class IcebergTableOpsManager implements AutoCloseable {
     return prefix;
   }
 
-  private IcebergTableOpsProvider createProvider(Map<String, String> properties) {
+  private IcebergCatalogWrapperProvider createProvider(Map<String, String> properties) {
     String providerName =
         (new IcebergConfig(properties)).get(IcebergConfig.ICEBERG_REST_CATALOG_PROVIDER);
     String className = ICEBERG_TABLE_OPS_PROVIDER_NAMES.getOrDefault(providerName, providerName);
     LOG.info("Load Iceberg catalog provider: {}.", className);
     try {
       Class<?> providerClz = Class.forName(className);
-      return (IcebergTableOpsProvider) providerClz.getDeclaredConstructor().newInstance();
+      return (IcebergCatalogWrapperProvider) providerClz.getDeclaredConstructor().newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -126,7 +126,7 @@ public class IcebergTableOpsManager implements AutoCloseable {
     }
   }
 
-  private void closeIcebergTableOps(IcebergTableOps ops) {
+  private void closeIcebergTableOps(IcebergCatalogWrapper ops) {
     try {
       ops.close();
     } catch (Exception ex) {

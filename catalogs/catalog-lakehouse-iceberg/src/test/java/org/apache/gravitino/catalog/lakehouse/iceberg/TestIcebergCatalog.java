@@ -30,7 +30,7 @@ import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
@@ -87,10 +87,10 @@ public class TestIcebergCatalog {
     CatalogOperations catalogOperations = icebergCatalog.ops();
     Assertions.assertTrue(catalogOperations instanceof IcebergCatalogOperations);
 
-    IcebergTableOps icebergTableOps =
-        ((IcebergCatalogOperations) catalogOperations).icebergTableOps;
+    IcebergCatalogWrapper icebergCatalogWrapper =
+        ((IcebergCatalogOperations) catalogOperations).icebergCatalogWrapper;
     ListNamespacesResponse listNamespacesResponse =
-        icebergTableOps.listNamespace(org.apache.iceberg.catalog.Namespace.empty());
+        icebergCatalogWrapper.listNamespace(org.apache.iceberg.catalog.Namespace.empty());
     Assertions.assertTrue(listNamespacesResponse.namespaces().isEmpty());
   }
 
