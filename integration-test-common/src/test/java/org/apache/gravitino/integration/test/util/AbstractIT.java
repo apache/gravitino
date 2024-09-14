@@ -65,7 +65,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
-@ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
+@ExtendWith({
+  PrintFuncNameExtension.class,
+  CloseContainerExtension.class,
+  EnableIfDockerTestExtension.class
+})
 public class AbstractIT {
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
