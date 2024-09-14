@@ -24,7 +24,7 @@ import java.util.Map;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.hms.ClientPropertiesMetadata;
+import org.apache.gravitino.hive.ClientPropertiesMetadata;
 
 public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 

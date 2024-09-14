@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.hms.converter;
+package org.apache.gravitino.hive.converter;
 
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
 
@@ -37,7 +37,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 
-public class ConvertUtil {
+public class HiveTableConverter {
   public static AuditInfo getAuditInfo(Table table) {
     // Get audit info from Hive's Table object. Because Hive's table doesn't store last modifier
     // and last modified time, we only get creator and create time from Hive's table.

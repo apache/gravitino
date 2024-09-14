@@ -31,9 +31,9 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.TableOperations;
-import org.apache.gravitino.hms.CachedClientPool;
-import org.apache.gravitino.hms.converter.ConvertUtil;
-import org.apache.gravitino.hms.converter.HiveDataTypeConverter;
+import org.apache.gravitino.hive.CachedClientPool;
+import org.apache.gravitino.hive.converter.HiveDataTypeConverter;
+import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -72,15 +72,15 @@ public class HiveTable extends BaseTable {
    * @return A new HiveTable instance Builder.
    */
   public static HiveTable.Builder fromHiveTable(Table table) {
-    AuditInfo auditInfo = ConvertUtil.getAuditInfo(table);
+    AuditInfo auditInfo = HiveTableConverter.getAuditInfo(table);
 
-    Distribution distribution = ConvertUtil.getDistribution(table);
+    Distribution distribution = HiveTableConverter.getDistribution(table);
 
-    SortOrder[] sortOrders = ConvertUtil.getSortOrders(table);
+    SortOrder[] sortOrders = HiveTableConverter.getSortOrders(table);
 
-    Column[] columns = ConvertUtil.getColumns(table, HiveColumn.builder());
+    Column[] columns = HiveTableConverter.getColumns(table, HiveColumn.builder());
 
-    Transform[] partitioning = ConvertUtil.getPartitioning(table);
+    Transform[] partitioning = HiveTableConverter.getPartitioning(table);
 
     return HiveTable.builder()
         .withName(table.getTableName())

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.hms.miniHMS;
+package org.apache.gravitino.hive.hms;
 
 import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.attribute.PosixFilePermissions.asFileAttribute;
@@ -33,9 +33,9 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.gravitino.hms.HiveClientPool;
-import org.apache.gravitino.hms.dyn.DynConstructors;
-import org.apache.gravitino.hms.dyn.DynMethods;
+import org.apache.gravitino.hive.HiveClientPool;
+import org.apache.gravitino.hive.dyn.DynConstructors;
+import org.apache.gravitino.hive.dyn.DynMethods;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;

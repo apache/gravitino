@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.hms;
+package org.apache.gravitino.hive;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;

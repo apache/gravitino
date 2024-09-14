@@ -36,7 +36,7 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
-import org.apache.gravitino.hms.HiveClientPool;
+import org.apache.gravitino.hive.HiveClientPool;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.AbstractIT;

@@ -30,7 +30,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.hms.miniHMS.MiniHiveMetastoreService;
+import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.hadoop.hive.conf.HiveConf;

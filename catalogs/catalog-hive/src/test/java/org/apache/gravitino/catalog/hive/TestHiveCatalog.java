@@ -31,7 +31,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
-import org.apache.gravitino.hms.miniHMS.MiniHiveMetastoreService;
+import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;

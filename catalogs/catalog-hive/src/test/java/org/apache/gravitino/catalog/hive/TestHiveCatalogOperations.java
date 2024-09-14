@@ -46,7 +46,7 @@ import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
-import org.apache.gravitino.hms.CachedClientPool;
+import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.Assertions;

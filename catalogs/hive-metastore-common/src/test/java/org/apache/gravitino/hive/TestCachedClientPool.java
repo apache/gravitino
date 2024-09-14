@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package org.apache.gravitino.hms;
+package org.apache.gravitino.hive;
 
 import com.google.common.collect.ImmutableMap;
 import java.security.PrivilegedAction;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.catalog.hive.HiveConstants;
-import org.apache.gravitino.hms.miniHMS.MiniHiveMetastoreService;
+import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

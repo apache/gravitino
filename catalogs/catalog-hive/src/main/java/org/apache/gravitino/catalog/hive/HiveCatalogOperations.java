@@ -27,7 +27,7 @@ import static org.apache.gravitino.catalog.hive.HiveTable.TABLE_TYPE_PROP;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static org.apache.gravitino.hms.converter.HiveDataTypeConverter.CONVERTER;
+import static org.apache.gravitino.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -69,7 +69,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
-import org.apache.gravitino.hms.CachedClientPool;
+import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;

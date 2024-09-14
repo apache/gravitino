@@ -32,7 +32,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
-import org.apache.gravitino.hms.miniHMS.MiniHiveMetastoreService;
+import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.expressions.literals.Literal;

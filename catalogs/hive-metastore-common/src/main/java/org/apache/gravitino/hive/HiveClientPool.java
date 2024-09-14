@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.hms;
+package org.apache.gravitino.hive;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.gravitino.hms.dyn.DynMethods;
-import org.apache.gravitino.hms.dyn.DynMethods.StaticMethod;
+import org.apache.gravitino.hive.dyn.DynMethods;
+import org.apache.gravitino.hive.dyn.DynMethods.StaticMethod;
 import org.apache.gravitino.utils.ClientPoolImpl;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
