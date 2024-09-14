@@ -119,6 +119,8 @@ class UserGroupManager {
 
   User[] listUsers(String metalake) {
     try {
+      AuthorizationUtils.checkMetalakeExists(metalake);
+
       Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
       return store.list(namespace, UserEntity.class, Entity.EntityType.USER).stream()
           .map(entity -> (User) entity)
