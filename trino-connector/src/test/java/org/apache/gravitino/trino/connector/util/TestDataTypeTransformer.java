@@ -38,6 +38,7 @@ import io.trino.spi.type.RowType.Field;
 import io.trino.spi.type.SmallintType;
 import io.trino.spi.type.TimeType;
 import io.trino.spi.type.TimestampType;
+import io.trino.spi.type.TimestampWithTimeZoneType;
 import io.trino.spi.type.TinyintType;
 import io.trino.spi.type.TypeOperators;
 import io.trino.spi.type.UuidType;
@@ -91,6 +92,9 @@ public class TestDataTypeTransformer {
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(TimestampType.TIMESTAMP_MILLIS),
         Types.TimestampType.withoutTimeZone());
+    Assertions.assertEquals(
+        dataTypeTransformer.getGravitinoType(TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS),
+        Types.TimestampType.withTimeZone());
 
     Assertions.assertEquals(
         dataTypeTransformer.getGravitinoType(new ArrayType(IntegerType.INTEGER)),
@@ -168,6 +172,9 @@ public class TestDataTypeTransformer {
     Assertions.assertEquals(
         dataTypeTransformer.getTrinoType(Types.TimestampType.withoutTimeZone()),
         TimestampType.TIMESTAMP_MILLIS);
+    Assertions.assertEquals(
+        dataTypeTransformer.getTrinoType(Types.TimestampType.withTimeZone()),
+        TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS);
 
     Assertions.assertEquals(
         dataTypeTransformer.getTrinoType(Types.ListType.nullable(Types.IntegerType.get())),
