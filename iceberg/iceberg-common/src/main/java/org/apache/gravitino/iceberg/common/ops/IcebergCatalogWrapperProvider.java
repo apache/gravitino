@@ -21,8 +21,8 @@ package org.apache.gravitino.iceberg.common.ops;
 import java.util.Map;
 
 /**
- * IcebergCatalogWrapperProvider is an interface defining how Iceberg REST catalog server gets Iceberg
- * catalogs.
+ * IcebergCatalogWrapperProvider is an interface defining how Iceberg REST catalog server gets
+ * Iceberg catalogs.
  */
 public interface IcebergCatalogWrapperProvider {
 

@@ -74,7 +74,8 @@ public class IcebergRestTestUtil {
       catalogConf.put(
           IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
           ConfigBasedIcebergCatalogWrapperProviderForTest.class.getName());
-      IcebergCatalogWrapperManager icebergCatalogWrapperManager = new IcebergCatalogWrapperManager(catalogConf);
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager =
+          new IcebergCatalogWrapperManager(catalogConf);
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(

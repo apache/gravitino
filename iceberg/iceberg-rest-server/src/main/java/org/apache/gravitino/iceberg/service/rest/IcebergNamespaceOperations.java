@@ -64,8 +64,7 @@ public class IcebergNamespaceOperations {
   private HttpServletRequest httpRequest;
 
   @Inject
-  public IcebergNamespaceOperations(
-      IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+  public IcebergNamespaceOperations(IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
   }
 
@@ -90,7 +89,9 @@ public class IcebergNamespaceOperations {
   public Response loadNamespace(
       @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
     GetNamespaceResponse getNamespaceResponse =
-        icebergCatalogWrapperManager.getOps(prefix).loadNamespace(RESTUtil.decodeNamespace(namespace));
+        icebergCatalogWrapperManager
+            .getOps(prefix)
+            .loadNamespace(RESTUtil.decodeNamespace(namespace));
     return IcebergRestUtils.ok(getNamespaceResponse);
   }
 

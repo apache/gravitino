@@ -58,7 +58,8 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
     config.put("catalog-backend", "memory");
     config.put("warehouse", "/tmp/");
 
-    ConfigBasedIcebergCatalogWrapperProvider provider = new ConfigBasedIcebergCatalogWrapperProvider();
+    ConfigBasedIcebergCatalogWrapperProvider provider =
+        new ConfigBasedIcebergCatalogWrapperProvider();
     provider.initialize(config);
 
     IcebergConfig hiveIcebergConfig = provider.catalogConfigs.get(hiveCatalogName);
@@ -101,7 +102,8 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
   @ParameterizedTest
   @ValueSource(strings = {"", "not_match"})
   public void testInvalidIcebergTableOps(String catalogName) {
-    ConfigBasedIcebergCatalogWrapperProvider provider = new ConfigBasedIcebergCatalogWrapperProvider();
+    ConfigBasedIcebergCatalogWrapperProvider provider =
+        new ConfigBasedIcebergCatalogWrapperProvider();
     provider.initialize(Maps.newHashMap());
 
     Assertions.assertThrowsExactly(

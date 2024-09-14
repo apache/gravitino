@@ -71,7 +71,8 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
               }
             });
 
-    GravitinoBasedIcebergCatalogWrapperProvider provider = new GravitinoBasedIcebergCatalogWrapperProvider();
+    GravitinoBasedIcebergCatalogWrapperProvider provider =
+        new GravitinoBasedIcebergCatalogWrapperProvider();
     GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
     provider.setClient(client);
@@ -100,7 +101,8 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
     GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
 
-    GravitinoBasedIcebergCatalogWrapperProvider provider = new GravitinoBasedIcebergCatalogWrapperProvider();
+    GravitinoBasedIcebergCatalogWrapperProvider provider =
+        new GravitinoBasedIcebergCatalogWrapperProvider();
     provider.setClient(client);
 
     Assertions.assertThrowsExactly(

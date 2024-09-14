@@ -47,8 +47,7 @@ public class IcebergTableRenameOperations {
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
 
   @Inject
-  public IcebergTableRenameOperations(
-      IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+  public IcebergTableRenameOperations(IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
   }
 

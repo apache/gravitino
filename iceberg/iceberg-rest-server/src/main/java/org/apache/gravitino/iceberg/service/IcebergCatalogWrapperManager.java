@@ -44,7 +44,8 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
       ImmutableMap.of(
           ConfigBasedIcebergCatalogWrapperProvider.CONFIG_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
           ConfigBasedIcebergCatalogWrapperProvider.class.getCanonicalName(),
-          GravitinoBasedIcebergCatalogWrapperProvider.GRAVITINO_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
+          GravitinoBasedIcebergCatalogWrapperProvider
+              .GRAVITINO_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME,
           GravitinoBasedIcebergCatalogWrapperProvider.class.getCanonicalName());
 
   private final Cache<String, IcebergCatalogWrapper> icebergTableOpsCache;

@@ -68,7 +68,8 @@ public class IcebergTableOperations {
 
   @Inject
   public IcebergTableOperations(
-      IcebergCatalogWrapperManager icebergCatalogWrapperManager, IcebergMetricsManager icebergMetricsManager) {
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager,
+      IcebergMetricsManager icebergMetricsManager) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
     this.icebergMetricsManager = icebergMetricsManager;
@@ -122,7 +123,9 @@ public class IcebergTableOperations {
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
     return IcebergRestUtils.ok(
-        icebergCatalogWrapperManager.getOps(prefix).updateTable(tableIdentifier, updateTableRequest));
+        icebergCatalogWrapperManager
+            .getOps(prefix)
+            .updateTable(tableIdentifier, updateTableRequest));
   }
 
   @DELETE
@@ -163,7 +166,8 @@ public class IcebergTableOperations {
     // todo support snapshots
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    return IcebergRestUtils.ok(icebergCatalogWrapperManager.getOps(prefix).loadTable(tableIdentifier));
+    return IcebergRestUtils.ok(
+        icebergCatalogWrapperManager.getOps(prefix).loadTable(tableIdentifier));
   }
 
   @HEAD

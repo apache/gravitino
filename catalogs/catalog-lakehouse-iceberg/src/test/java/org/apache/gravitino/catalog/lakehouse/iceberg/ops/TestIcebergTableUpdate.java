@@ -80,8 +80,8 @@ public class TestIcebergTableUpdate {
   @BeforeEach
   public void init() {
     icebergCatalogWrapper = new IcebergCatalogWrapper();
-    icebergCatalogWrapperHelper = new IcebergCatalogWrapperHelper(
-        icebergCatalogWrapper.getCatalog());
+    icebergCatalogWrapperHelper =
+        new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
     createNamespace(TEST_NAMESPACE_NAME);
     createTable(TEST_NAMESPACE_NAME, TEST_TABLE_NAME);
   }
@@ -480,9 +480,11 @@ public class TestIcebergTableUpdate {
         "a.b", IcebergCatalogWrapperHelper.getParentName(new String[] {"a", "b", "c"}));
 
     Assertions.assertEquals("a", IcebergCatalogWrapperHelper.getLeafName(new String[] {"a"}));
-    Assertions.assertEquals("c", IcebergCatalogWrapperHelper.getLeafName(new String[] {"a", "b", "c"}));
+    Assertions.assertEquals(
+        "c", IcebergCatalogWrapperHelper.getLeafName(new String[] {"a", "b", "c"}));
 
-    Assertions.assertEquals("p", IcebergCatalogWrapperHelper.getSiblingName(new String[] {"a"}, "p"));
+    Assertions.assertEquals(
+        "p", IcebergCatalogWrapperHelper.getSiblingName(new String[] {"a"}, "p"));
     Assertions.assertEquals(
         "a.b.p", IcebergCatalogWrapperHelper.getSiblingName(new String[] {"a", "b", "c"}, "p"));
   }
