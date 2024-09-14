@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.s3.PaimonS3FileSystemConfig;
+import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.gravitino.integration.test.util.JdbcDriverDownloader;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Tag;
@@ -47,6 +49,9 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
   private String secretKey;
   private String endpoint;
 
+  private static final String PAIMON_S3_JAR_URL =
+      "https://repo1.maven.org/maven2/org/apache/paimon/paimon-s3/0.8.0/paimon-s3-0.8.0.jar";
+
   @Override
   protected Map<String, String> initPaimonCatalogProperties() {
 
@@ -67,7 +72,24 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
     catalogProperties.put(PaimonS3FileSystemConfig.S3_SECRET_KEY, secretKey);
     catalogProperties.put(PaimonS3FileSystemConfig.S3_ENDPOINT, endpoint);
 
+    // Need to download the S3 dependency in the deploy mode.
+    downloadS3Dependency();
+
     return catalogProperties;
+  }
+
+  private void downloadS3Dependency() {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    try {
+      if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
+        String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
+        String paimonCatalogPath =
+            ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-paimon", "libs");
+        JdbcDriverDownloader.downloadJdbcDriver(PAIMON_S3_JAR_URL, serverPath, paimonCatalogPath);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to download the S3 dependency", e);
+    }
   }
 
   @Override
