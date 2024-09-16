@@ -16,18 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.storage;
 
-package org.apache.gravitino.server.web;
+// Defines the unified OSS properties for different catalogs and connectors.
+public class OSSProperties {
 
-import java.util.Map;
+  // The endpoint of Aliyun OSS service.
+  public static final String GRAVITINO_OSS_ENDPOINT = "oss-endpoint";
+  // The static access key ID used to access OSS data.
+  public static final String GRAVITINO_OSS_ACCESS_KEY_ID = "oss-access-key-id";
+  // The static access key secret used to access OSS data.
+  public static final String GRAVITINO_OSS_ACCESS_KEY_SECRET = "oss-access-key-secret";
 
-/** Provide methods to overwrite the default config. */
-public interface OverwriteDefaultConfig {
-
-  /**
-   * Returns key value pairs to overwrite the config which are not set explicitly.
-   *
-   * @return a Map of Config key and value pairs
-   */
-  Map<String, String> getOverwriteDefaultConfig();
+  private OSSProperties() {}
 }

@@ -20,7 +20,6 @@ package org.apache.gravitino.iceberg.provider;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import java.util.UUID;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
@@ -33,9 +32,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestConfigBasedIcebergTableOpsProvider {
-  private static final String STORE_PATH =
-      "/tmp/gravitino_test_iceberg_jdbc_backend_" + UUID.randomUUID().toString().replace("-", "");
-
   @Test
   public void testValidIcebergTableOps() {
     String hiveCatalogName = "hive_backend";
@@ -51,13 +47,11 @@ public class TestConfigBasedIcebergTableOpsProvider {
     // jdbc backend catalog
     config.put("catalog.jdbc_backend.catalog-backend-name", jdbcCatalogName);
     config.put("catalog.jdbc_backend.catalog-backend", "jdbc");
-    config.put(
-        "catalog.jdbc_backend.uri",
-        String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", STORE_PATH));
+    config.put("catalog.jdbc_backend.uri", "jdbc:sqlite::memory:");
     config.put("catalog.jdbc_backend.warehouse", "/tmp/usr/jdbc/warehouse");
     config.put("catalog.jdbc_backend.jdbc.password", "gravitino");
     config.put("catalog.jdbc_backend.jdbc.user", "gravitino");
-    config.put("catalog.jdbc_backend.jdbc-driver", "org.h2.Driver");
+    config.put("catalog.jdbc_backend.jdbc-driver", "org.sqlite.JDBC");
     config.put("catalog.jdbc_backend.jdbc-initialize", "true");
     // default catalog
     config.put("catalog-backend-name", defaultCatalogName);
@@ -87,7 +81,7 @@ public class TestConfigBasedIcebergTableOpsProvider {
     Assertions.assertEquals("jdbc", jdbcIcebergConfig.get(IcebergConfig.CATALOG_BACKEND));
     Assertions.assertEquals(
         "/tmp/usr/jdbc/warehouse", jdbcIcebergConfig.get(IcebergConfig.CATALOG_WAREHOUSE));
-    Assertions.assertEquals("org.h2.Driver", jdbcIcebergConfig.get(IcebergConfig.JDBC_DRIVER));
+    Assertions.assertEquals("org.sqlite.JDBC", jdbcIcebergConfig.get(IcebergConfig.JDBC_DRIVER));
     Assertions.assertEquals(true, jdbcIcebergConfig.get(IcebergConfig.JDBC_INIT_TABLES));
 
     Assertions.assertEquals(

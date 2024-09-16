@@ -149,9 +149,11 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     try {
       String actualFileLocation = dispatcher.getFileLocation(ident, subPath);
       // get the audit info from the thread local context
-      CallerContext callerContext = CallerContext.CallerContextHolder.get();
       ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
-      builder.putAll(callerContext.context());
+      CallerContext callerContext = CallerContext.CallerContextHolder.get();
+      if (callerContext != null && callerContext.context() != null) {
+        builder.putAll(callerContext.context());
+      }
       eventBus.dispatchEvent(
           new GetFileLocationEvent(
               PrincipalUtils.getCurrentUserName(),
