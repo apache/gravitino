@@ -268,12 +268,7 @@ public class TestAccessControlManager {
             SecurableObjects.ofCatalog(
                 "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
 
-    Role cachedRole = accessControlManager.getRole("metalake", "loadRole");
-    accessControlManager.getRoleManager().getCache().invalidateAll();
     Role role = accessControlManager.getRole("metalake", "loadRole");
-
-    // Verify the cached roleEntity is correct
-    Assertions.assertEquals(role, cachedRole);
 
     Assertions.assertEquals("loadRole", role.name());
     testProperties(props, role.properties());

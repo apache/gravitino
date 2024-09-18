@@ -36,6 +36,7 @@ import io.trino.spi.type.RowType.Field;
 import io.trino.spi.type.SmallintType;
 import io.trino.spi.type.TimeType;
 import io.trino.spi.type.TimestampType;
+import io.trino.spi.type.TimestampWithTimeZoneType;
 import io.trino.spi.type.TinyintType;
 import io.trino.spi.type.Type;
 import io.trino.spi.type.TypeOperators;
@@ -103,7 +104,11 @@ public class GeneralDataTypeTransformer {
       case TIME:
         return TimeType.TIME_MILLIS;
       case TIMESTAMP:
-        return TimestampType.TIMESTAMP_MILLIS;
+        if (((Types.TimestampType) type).hasTimeZone()) {
+          return TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
+        } else {
+          return TimestampType.TIMESTAMP_MILLIS;
+        }
       case LIST:
         return new ArrayType(getTrinoType(((Types.ListType) type).elementType()));
       case MAP:
@@ -173,10 +178,12 @@ public class GeneralDataTypeTransformer {
       return Types.BinaryType.get();
     } else if (typeClass == io.trino.spi.type.DateType.class) {
       return Types.DateType.get();
-    } else if (typeClass == io.trino.spi.type.TimeType.class) {
+    } else if (io.trino.spi.type.TimeType.class.isAssignableFrom(typeClass)) {
       return Types.TimeType.get();
     } else if (io.trino.spi.type.TimestampType.class.isAssignableFrom(typeClass)) {
       return Types.TimestampType.withoutTimeZone();
+    } else if (io.trino.spi.type.TimestampWithTimeZoneType.class.isAssignableFrom(typeClass)) {
+      return Types.TimestampType.withTimeZone();
     } else if (typeClass == io.trino.spi.type.ArrayType.class) {
       // Ignore nullability for the type, we could only get nullability from column metadata
       return Types.ListType.of(

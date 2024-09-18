@@ -19,10 +19,7 @@
 
 package org.apache.gravitino.storage;
 
-import static org.apache.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
-import static org.apache.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
-import static org.apache.gravitino.Configs.ENTITY_KV_STORE;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
@@ -32,7 +29,6 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
-import static org.apache.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 
 import com.google.common.base.Preconditions;
@@ -46,11 +42,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -68,6 +64,8 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -79,14 +77,25 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.relational.converters.H2ExceptionConverter;
+import org.apache.gravitino.storage.relational.converters.MySQLExceptionConverter;
+import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
+import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+@Tag("gravitino-docker-test")
 public class TestEntityStorage {
+  private static final Logger LOG = LoggerFactory.getLogger(TestEntityStorage.class);
+
   public static final String KV_STORE_PATH =
       "/tmp/gravitino_kv_entityStore_" + UUID.randomUUID().toString().replace("-", "");
 
@@ -96,50 +105,72 @@ public class TestEntityStorage {
   private static final String H2_FILE = DB_DIR + ".mv.db";
 
   static Object[] storageProvider() {
-    return new Object[] {Configs.RELATIONAL_ENTITY_STORE};
+    return new Object[] {"h2", "mysql", "postgresql"};
+  }
+
+  @AfterEach
+  void closeSuit() throws IOException {
+    ContainerSuite.getInstance().close();
   }
 
   private void init(String type, Config config) {
     Preconditions.checkArgument(StringUtils.isNotBlank(type));
-    if (type.equals(Configs.KV_STORE_KEY)) {
-      try {
-        FileUtils.deleteDirectory(FileUtils.getFile(KV_STORE_PATH));
-      } catch (Exception e) {
-        // Ignore
+    File dir = new File(DB_DIR);
+    if (dir.exists() || !dir.isDirectory()) {
+      dir.delete();
+    }
+    dir.mkdirs();
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
+    Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(DB_DIR);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+
+    try {
+      if (type.equalsIgnoreCase("h2")) {
+        // The following properties are used to create the JDBC connection; they are just for test,
+        // in the real world, they will be set automatically by the configuration file if you set
+        // ENTITY_RELATIONAL_STOR as EMBEDDED_ENTITY_RELATIONAL_STORE.
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
+            .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+
+        FieldUtils.writeStaticField(
+            SQLExceptionConverterFactory.class, "converter", new H2ExceptionConverter(), true);
+
+      } else if (type.equalsIgnoreCase("mysql")) {
+        String mysqlJdbcUrl = AbstractIT.startAndInitMySQLBackend();
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(mysqlJdbcUrl);
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
+            .thenReturn("com.mysql.cj.jdbc.Driver");
+
+        FieldUtils.writeStaticField(
+            SQLExceptionConverterFactory.class, "converter", new MySQLExceptionConverter(), true);
+
+      } else if (type.equalsIgnoreCase("postgresql")) {
+        String postgreSQLJdbcUrl = AbstractIT.startAndInitPGBackend();
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(postgreSQLJdbcUrl);
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
+            .thenReturn("org.postgresql.Driver");
+
+        FieldUtils.writeStaticField(
+            SQLExceptionConverterFactory.class,
+            "converter",
+            new PostgreSQLExceptionConverter(),
+            true);
+
+      } else {
+        throw new UnsupportedOperationException("Unsupported entity store type: " + type);
       }
-      Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-      Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-      Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-      Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(KV_STORE_PATH);
-
-      Assertions.assertEquals(KV_STORE_PATH, config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
-      Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
-      Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
-    } else if (type.equals(Configs.RELATIONAL_ENTITY_STORE)) {
-      File dir = new File(DB_DIR);
-      if (dir.exists() || !dir.isDirectory()) {
-        dir.delete();
-      }
-      dir.mkdirs();
-      Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
-      Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(DB_DIR);
-
-      // The following properties are used to create the JDBC connection; they are just for test, in
-      // the real world,
-      // they will be set automatically by the configuration file if you set ENTITY_RELATIONAL_STORE
-      // as EMBEDDED_ENTITY_RELATIONAL_STORE.
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-          .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
-
-      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
-      Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
-    } else {
-      throw new UnsupportedOperationException("Unsupported entity store type: " + type);
+    } catch (Exception e) {
+      LOG.error("Failed to init entity store", e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -151,7 +182,7 @@ public class TestEntityStorage {
       } catch (Exception e) {
         // Ignore
       }
-    } else if (type.equals(Configs.RELATIONAL_ENTITY_STORE)) {
+    } else if (type.equalsIgnoreCase("h2") || type.equalsIgnoreCase("mysql")) {
       dropAllTables();
       File dir = new File(DB_DIR);
       if (dir.exists()) {
@@ -159,6 +190,8 @@ public class TestEntityStorage {
       }
 
       FileUtils.deleteQuietly(new File(H2_FILE));
+    } else if (type.equalsIgnoreCase("postgresql")) {
+      // Do nothing
     } else {
       throw new UnsupportedOperationException("Unsupported entity store type: " + type);
     }
@@ -876,6 +909,8 @@ public class TestEntityStorage {
       store.get(identifier, Entity.EntityType.TABLE, TableEntity.class);
       store.get(identifier, Entity.EntityType.FILESET, FilesetEntity.class);
       store.get(changedNameIdentifier, Entity.EntityType.TOPIC, TopicEntity.class);
+
+      destroy(type);
     }
   }
 
@@ -1235,7 +1270,7 @@ public class TestEntityStorage {
         .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(null)
         .build();
   }
 
@@ -1246,7 +1281,7 @@ public class TestEntityStorage {
         .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(null)
         .build();
   }
 
@@ -2104,7 +2139,7 @@ public class TestEntityStorage {
   @ParameterizedTest
   @MethodSource("storageProvider")
   void testOptimizedDeleteForKv(String type) throws IOException {
-    if ("relational".equalsIgnoreCase(type)) {
+    if (!"kv".equalsIgnoreCase(type)) {
       return;
     }
 
@@ -2182,6 +2217,8 @@ public class TestEntityStorage {
       Assertions.assertDoesNotThrow(
           () ->
               store.get(filesetEntity1.nameIdentifier(), EntityType.FILESET, FilesetEntity.class));
+
+      destroy(type);
     }
   }
 }

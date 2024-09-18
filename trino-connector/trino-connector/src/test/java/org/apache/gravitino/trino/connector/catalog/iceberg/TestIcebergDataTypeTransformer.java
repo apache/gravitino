@@ -20,6 +20,9 @@
 package org.apache.gravitino.trino.connector.catalog.iceberg;
 
 import io.trino.spi.TrinoException;
+import io.trino.spi.type.TimeType;
+import io.trino.spi.type.TimestampType;
+import io.trino.spi.type.TimestampWithTimeZoneType;
 import io.trino.spi.type.VarcharType;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
@@ -51,5 +54,16 @@ public class TestIcebergDataTypeTransformer {
     Assertions.assertEquals(
         generalDataTypeTransformer.getGravitinoType(varcharTypeWithoutLength),
         Types.StringType.get());
+
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(Types.TimeType.get()), TimeType.TIME_MICROS);
+
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(Types.TimestampType.withoutTimeZone()),
+        TimestampType.TIMESTAMP_MICROS);
+
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(Types.TimestampType.withTimeZone()),
+        TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS);
   }
 }

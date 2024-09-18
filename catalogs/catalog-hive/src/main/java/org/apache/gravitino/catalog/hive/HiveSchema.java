@@ -24,25 +24,21 @@ import java.util.Optional;
 import lombok.ToString;
 import org.apache.gravitino.connector.BaseSchema;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.PrincipalType;
 
 /** Represents an Apache Hive Schema (Database) entity in the Hive Metastore catalog. */
 @ToString
 public class HiveSchema extends BaseSchema {
-  private Configuration conf;
-
   private HiveSchema() {}
 
   /**
    * Creates a new HiveSchema instance from a Database and a Builder.
    *
    * @param db The Database representing the HiveSchema.
-   * @param hiveConf The HiveConf used to construct the HiveSchema.
    * @return A new HiveSchema instance.
    */
-  public static HiveSchema fromHiveDB(Database db, Configuration hiveConf) {
+  public static HiveSchema fromHiveDB(Database db) {
     Map<String, String> properties = buildSchemaProperties(db);
 
     // Get audit info from Hive's Database object. Because Hive's database doesn't store create
@@ -55,7 +51,6 @@ public class HiveSchema extends BaseSchema {
         .withComment(db.getDescription())
         .withProperties(properties)
         .withAuditInfo(auditInfoBuilder.build())
-        .withConf(hiveConf)
         .build();
   }
 
@@ -98,19 +93,6 @@ public class HiveSchema extends BaseSchema {
   /** A builder class for constructing HiveSchema instances. */
   public static class Builder extends BaseSchemaBuilder<Builder, HiveSchema> {
 
-    protected Configuration conf;
-
-    /**
-     * Sets the Configuration to be used for building the HiveSchema.
-     *
-     * @param conf The Configuration.
-     * @return The Builder instance.
-     */
-    public Builder withConf(Configuration conf) {
-      this.conf = conf;
-      return this;
-    }
-
     /** Creates a new instance of {@link Builder}. */
     private Builder() {}
 
@@ -126,7 +108,6 @@ public class HiveSchema extends BaseSchema {
       hiveSchema.comment = comment;
       hiveSchema.properties = properties;
       hiveSchema.auditInfo = auditInfo;
-      hiveSchema.conf = conf;
 
       return hiveSchema;
     }

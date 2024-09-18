@@ -63,7 +63,7 @@ class UserGroupManager {
               .withId(idGenerator.nextId())
               .withName(name)
               .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
-              .withRoles(Lists.newArrayList())
+              .withRoleNames(Lists.newArrayList())
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -117,7 +117,7 @@ class UserGroupManager {
               .withId(idGenerator.nextId())
               .withName(group)
               .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
-              .withRoles(Collections.emptyList())
+              .withRoleNames(Collections.emptyList())
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(PrincipalUtils.getCurrentPrincipal().getName())

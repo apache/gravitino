@@ -28,7 +28,7 @@ import org.apache.ibatis.annotations.Param;
 
 public class SchemaMetaSQLProviderFactory {
   private static final Map<JDBCBackendType, SchemaMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      SCHEMA_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new SchemaMetaMySQLProvider(),
               JDBCBackendType.H2, new SchemaMetaH2Provider(),
@@ -42,7 +42,7 @@ public class SchemaMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return SCHEMA_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class SchemaMetaMySQLProvider extends SchemaMetaBaseSQLProvider {}

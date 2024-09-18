@@ -24,17 +24,21 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.OverwriteDefaultConfig;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.server.web.JettyServerConfig;
-import org.apache.gravitino.server.web.OverwriteDefaultConfig;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final String ICEBERG_CONFIG_PREFIX = "gravitino.iceberg-rest.";
+
+  public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
+  public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
 
   public static final ConfigEntry<String> CATALOG_BACKEND =
       new ConfigBuilder(IcebergConstants.CATALOG_BACKEND)
@@ -105,7 +109,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .create();
 
   public static final ConfigEntry<String> S3_ENDPOINT =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_ENDPOINT)
+      new ConfigBuilder(S3Properties.GRAVITINO_S3_ENDPOINT)
           .doc(
               "An alternative endpoint of the S3 service, This could be used to for S3FileIO with "
                   + "any s3-compatible object storage service that has a different endpoint, or "
@@ -115,7 +119,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .create();
 
   public static final ConfigEntry<String> S3_REGION =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_REGION)
+      new ConfigBuilder(S3Properties.GRAVITINO_S3_REGION)
           .doc("The region of the S3 service")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
@@ -123,36 +127,36 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .create();
 
   public static final ConfigEntry<String> S3_ACCESS_KEY_ID =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID)
+      new ConfigBuilder(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID)
           .doc("The static access key ID used to access S3 data")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> S3_SECRET_ACCESS_KEY =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_S3_SECRET_ACCESS_KEY)
+      new ConfigBuilder(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY)
           .doc("The static secret access key used to access S3 data")
           .version(ConfigConstants.VERSION_0_6_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> OSS_ENDPOINT =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_OSS_ENDPOINT)
+      new ConfigBuilder(OSSProperties.GRAVITINO_OSS_ENDPOINT)
           .doc("The endpoint of Aliyun OSS service")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> OSS_ACCESS_KEY_ID =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_ID)
+      new ConfigBuilder(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID)
           .doc("The static access key ID used to access OSS data")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
 
   public static final ConfigEntry<String> OSS_ACCESS_KEY_SECRET =
-      new ConfigBuilder(IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_SECRET)
-          .doc("The static secret access key used to access OSS data")
+      new ConfigBuilder(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET)
+          .doc("The static access key secret used to access OSS data")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
@@ -197,7 +201,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> ICEBERG_REST_CATALOG_PROVIDER =
       new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER)
           .doc(
-              "Catalog provider class name, you can develop a class that implements `IcebergTableOpsProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
+              "Catalog provider class name, you can develop a class that implements `IcebergCatalogWrapperProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .createWithDefault("config-based-provider");
@@ -246,9 +250,9 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   @Override
   public Map<String, String> getOverwriteDefaultConfig() {
     return ImmutableMap.of(
-        JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
-        String.valueOf(JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT),
-        JettyServerConfig.WEBSERVER_HTTPS_PORT.getKey(),
-        String.valueOf(JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT));
+        ConfigConstants.WEBSERVER_HTTP_PORT,
+        String.valueOf(DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT),
+        ConfigConstants.WEBSERVER_HTTPS_PORT,
+        String.valueOf(DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT));
   }
 }

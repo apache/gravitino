@@ -18,17 +18,14 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
   - multi table transaction
   - pagination
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
-- Supports multi storage.
-  - HDFS
-  - S3
-  - OSS
+- Supports different storages like `S3`, `HDFS`, `OSS`, `GCS` and provides the capability to support other storages.
 - Supports OAuth2 and HTTPS.
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 
 ## Server management
 
 There are three deployment scenarios for Gravitino Iceberg REST server:
-- A standalone server with a standalone Gravitino Iceberg REST server package.
+- A standalone server in a standalone Gravitino Iceberg REST server package.
 - A standalone server in the Gravitino server package.
 - An auxiliary service embedded in the Gravitino server.
  
@@ -138,12 +135,42 @@ For other Iceberg OSS properties not managed by Gravitino like `client.security-
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the classpath of Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
 :::
 
+#### GCS
+
+Supports using google credential file to access GCS data.
+
+| Configuration item               | Description                                                                                        | Default value | Required | Since Version |
+|----------------------------------|----------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.io-impl` | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.gcp.gcs.GCSFileIO` for GCS. | (none)        | No       | 0.6.0         |
+
+For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.iceberg-rest.gcs.project-id`.
+
+Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino Iceberg REST server is started.
+
+:::info
+Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to the classpath of Gravitino Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
+:::
+
 #### HDFS configuration
 
 You should place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
 
 :::info
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
+:::
+
+#### Other storages
+
+For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.
+
+| Configuration item               | Description                                                                             | Default value | Required | Since Version |
+|----------------------------------|-----------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0         |
+
+To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.iceberg-rest.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
+
+:::info
+Please set the `gravitino.iceberg-rest.warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the classpath of Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
 :::
 
 ### Catalog backend configuration
@@ -321,7 +348,9 @@ For example, we can configure Spark catalog options to use Gravitino Iceberg RES
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/
 ```
 
-You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in S3, you need to download [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) jar and place it in the classpath of Spark, no extra config is needed because S3 related properties is transferred from Iceberg REST server to Iceberg REST client automaticly. 
+You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in cloud, you need to download corresponding jars (please refer to the cloud storage part) and place it in the classpath of Spark, no extra config is needed because related properties is transferred from Iceberg REST server to Iceberg REST client automatically.
+
+For other storages not managed by Gravitino, the properties wouldn't transfer from the server to client automatically, if you want to pass custom properties to initialize `FileIO`, you could add it by `spark.sql.catalog.${iceberg_catalog_name}.${configuration_key}` = `{property_value}`.
 
 ### Exploring Apache Iceberg with Apache Spark SQL
 

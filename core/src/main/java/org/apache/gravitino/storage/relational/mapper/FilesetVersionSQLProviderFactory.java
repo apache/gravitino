@@ -28,7 +28,7 @@ import org.apache.ibatis.annotations.Param;
 
 public class FilesetVersionSQLProviderFactory {
   private static final Map<JDBCBackendType, FilesetVersionBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      FILESET_VERSION_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new FilesetVersionMySQLProvider(),
               JDBCBackendType.H2, new FilesetVersionH2Provider(),
@@ -42,7 +42,7 @@ public class FilesetVersionSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return FILESET_VERSION_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class FilesetVersionMySQLProvider extends FilesetVersionBaseSQLProvider {}

@@ -37,20 +37,13 @@ public class IcebergConstants {
 
   // IO properties
   public static final String IO_IMPL = "io-impl";
-  public static final String GRAVITINO_S3_ENDPOINT = "s3-endpoint";
   public static final String ICEBERG_S3_ENDPOINT = "s3.endpoint";
-  public static final String GRAVITINO_S3_ACCESS_KEY_ID = "s3-access-key-id";
   public static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
-  public static final String GRAVITINO_S3_SECRET_ACCESS_KEY = "s3-secret-access-key";
   public static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
-  public static final String GRAVITINO_S3_REGION = "s3-region";
   public static final String AWS_S3_REGION = "client.region";
 
-  public static final String GRAVITINO_OSS_ENDPOINT = "oss-endpoint";
   public static final String ICEBERG_OSS_ENDPOINT = "oss.endpoint";
-  public static final String GRAVITINO_OSS_ACCESS_KEY_ID = "oss-access-key-id";
   public static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
-  public static final String GRAVITINO_OSS_ACCESS_KEY_SECRET = "oss-access-key-secret";
   public static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
 
   // Iceberg Table properties constants
