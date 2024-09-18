@@ -84,7 +84,11 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   private static FileSystem hdfs;
   private static String originHadoopUser;
   private static GravitinoAdminClient anotherClient;
+  private static GravitinoAdminClient anotherClientWithUsername;
+  private static GravitinoAdminClient anotherClientWithNotExistingName;
   private static Catalog anotherCatalog;
+  private static Catalog anotherCatalogWithUsername;
+  private static Catalog anotherCatatlogWithNotExistingName;
 
   @BeforeAll
   public static void startIntegrationTest() throws Exception {
@@ -123,6 +127,10 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     String uri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
     System.setProperty("user.name", "test");
     anotherClient = GravitinoAdminClient.builder(uri).withSimpleAuth().build();
+    anotherClientWithUsername =
+        GravitinoAdminClient.builder(uri).withSimpleAuth(EXPECT_USER).build();
+    anotherClientWithNotExistingName =
+        GravitinoAdminClient.builder(uri).withSimpleAuth("not-exist").build();
     createMetalake();
     createCatalog();
     loadCatalogWithAnotherClient();
@@ -132,6 +140,8 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   public static void stop() {
     setEnv(HADOOP_USER_NAME, originHadoopUser);
     anotherClient.close();
+    anotherClientWithUsername.close();
+    anotherClientWithNotExistingName.close();
 
     AbstractIT.client = null;
   }
@@ -164,6 +174,30 @@ public class ProxyCatalogHiveIT extends AbstractIT {
         Assertions.assertThrows(
             RuntimeException.class,
             () -> schemas.createSchema(anotherSchemaName, comment, properties));
+    Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
+
+    // Test the client using `withSimpleAuth(expectUser)`.
+    anotherCatalogWithUsername.asSchemas().createSchema(anotherSchemaName, comment, properties);
+    db = hiveClientPool.run(client -> client.getDatabase(schemaName));
+    Assertions.assertEquals(EXPECT_USER, db.getOwnerName());
+    Assertions.assertEquals(
+        EXPECT_USER, hdfs.getFileStatus(new Path(db.getLocationUri())).getOwner());
+
+    // Test the client using `withSimpleAuth(unknownUser)`
+    properties.put(
+        "location",
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse/%s.db",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT,
+            "new_schema"));
+    e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                anotherCatatlogWithNotExistingName
+                    .asSchemas()
+                    .createSchema("new_schema", comment, properties));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
@@ -201,6 +235,35 @@ public class ProxyCatalogHiveIT extends AbstractIT {
             () -> {
               tableCatalog.createTable(
                   anotherNameIdentifier, columns, comment, of, Partitioning.EMPTY_PARTITIONING);
+            });
+    Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
+
+    // Test the client using `withSimpleAuth(String)`.
+    anotherCatalogWithUsername
+        .asTableCatalog()
+        .createTable(anotherNameIdentifier, columns, comment, of, Partitioning.EMPTY_PARTITIONING);
+    Table anotherCreatedTable =
+        anotherCatalogWithUsername.asTableCatalog().loadTable(nameIdentifier);
+    String anotherLocation = anotherCreatedTable.properties().get("location");
+    Assertions.assertEquals(EXPECT_USER, hdfs.getFileStatus(new Path(anotherLocation)).getOwner());
+    org.apache.hadoop.hive.metastore.api.Table anotherHiveTab =
+        hiveClientPool.run(client -> client.getTable(schemaName, anotherTableName));
+    Assertions.assertEquals(EXPECT_USER, anotherHiveTab.getOwner());
+
+    // Test the client using `withSimpleAuth(not-existing)`
+    NameIdentifier anotherIdentWithNotExisting = NameIdentifier.of(schemaName, "new_table");
+    e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> {
+              anotherCatatlogWithNotExistingName
+                  .asTableCatalog()
+                  .createTable(
+                      anotherIdentWithNotExisting,
+                      columns,
+                      comment,
+                      of,
+                      Partitioning.EMPTY_PARTITIONING);
             });
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
@@ -281,6 +344,38 @@ public class ProxyCatalogHiveIT extends AbstractIT {
                     .supportPartitions()
                     .addPartition(anotherIdentity));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
+
+    // Test the client using `withSimpleAuth(String)`.
+    Partition anotherPartition =
+        anotherCatalogWithUsername
+            .asTableCatalog()
+            .loadTable(nameIdentifier)
+            .supportPartitions()
+            .addPartition(anotherIdentity);
+    org.apache.hadoop.hive.metastore.api.Partition anotherPartitionGot =
+        hiveClientPool.run(
+            client -> client.getPartition(schemaName, tableName, anotherPartition.name()));
+
+    Assertions.assertEquals(
+        EXPECT_USER,
+        hdfs.getFileStatus(new Path(anotherPartitionGot.getSd().getLocation())).getOwner());
+
+    // Test the client using `withSimpleAuth(not-existing)`.
+    Literal<?> anotherNewSecondaryPartition = Literals.stringLiteral("gravitino_it_test4");
+    Partition anotherNewIdentity =
+        Partitions.identity(
+            new String[][] {field1, field2},
+            new Literal<?>[] {primaryPartition, anotherNewSecondaryPartition});
+    e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                anotherCatatlogWithNotExistingName
+                    .asTableCatalog()
+                    .loadTable(nameIdentifier)
+                    .supportPartitions()
+                    .addPartition(anotherNewIdentity));
+    Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
   }
 
   private Column[] createColumns() {
@@ -322,6 +417,12 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   private static void loadCatalogWithAnotherClient() {
     GravitinoMetalake metaLake = anotherClient.loadMetalake(METALAKE_NAME);
     anotherCatalog = metaLake.loadCatalog(CATALOG_NAME);
+
+    anotherCatalogWithUsername =
+        anotherClientWithUsername.loadMetalake(METALAKE_NAME).loadCatalog(CATALOG_NAME);
+
+    anotherCatatlogWithNotExistingName =
+        anotherClientWithNotExistingName.loadMetalake(METALAKE_NAME).loadCatalog(CATALOG_NAME);
   }
 
   public static void setEnv(String key, String value) {
