@@ -23,5 +23,8 @@ public class CredentialConstants {
   public static final String CREDENTIAL_TYPE = "credential-type";
   public static final String EXPIRE_TIME = "expire-time";
 
+  public static final String S3_TOKEN_CREDENTIAL_TYPE = "s3-token";
+  public static final String S3_SECRET_KEY_CREDENTIAL_TYPE = "s3-secret-key";
+
   private CredentialConstants() {}
 }
