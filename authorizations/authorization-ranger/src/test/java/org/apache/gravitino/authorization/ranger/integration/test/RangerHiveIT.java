@@ -106,7 +106,7 @@ public class RangerHiveIT {
                 adminUser)));
 
     rangerAuthPlugin =
-        new RangerAuthorizationHivePlugin(
+        RangerAuthorizationHivePlugin.getInstance(
             ImmutableMap.of(
                 AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
                 String.format(
@@ -126,9 +126,9 @@ public class RangerHiveIT {
             rangerClient,
             RangerContainer.rangerUserName,
             RangerITEnv.RANGER_HIVE_REPO_NAME,
-            rangerAuthPlugin.getPrivilegesMapping(),
-            rangerAuthPlugin.getOwnerPrivileges(),
-            rangerAuthPlugin.getPolicyResourceDefines());
+            rangerAuthPlugin.privilegesMappingRule(),
+            rangerAuthPlugin.ownerMappingRule(),
+            rangerAuthPlugin.policyResourceDefinesRule());
 
     // Create hive connection
     String url =
@@ -1159,7 +1159,7 @@ public class RangerHiveIT {
                   .anyMatch(
                       access -> {
                         return rangerAuthPlugin
-                            .getOwnerPrivileges()
+                            .ownerMappingRule()
                             .contains(RangerPrivileges.valueOf(access.getType()));
                       });
             })

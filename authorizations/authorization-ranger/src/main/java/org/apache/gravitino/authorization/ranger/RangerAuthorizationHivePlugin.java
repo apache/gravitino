@@ -29,8 +29,21 @@ import org.apache.gravitino.authorization.ranger.RangerPrivilege.RangerHivePrivi
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
 
 public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
-  public RangerAuthorizationHivePlugin(Map<String, String> config) {
+  private static volatile RangerAuthorizationHivePlugin instance = null;
+
+  private RangerAuthorizationHivePlugin(Map<String, String> config) {
     super(config);
+  }
+
+  public static synchronized RangerAuthorizationHivePlugin getInstance(Map<String, String> config) {
+    if (instance == null) {
+      synchronized (RangerAuthorizationHivePlugin.class) {
+        if (instance == null) {
+          instance = new RangerAuthorizationHivePlugin(config);
+        }
+      }
+    }
+    return instance;
   }
 
   /** Set the default mapping Gravitino privilege name to the Ranger rule */

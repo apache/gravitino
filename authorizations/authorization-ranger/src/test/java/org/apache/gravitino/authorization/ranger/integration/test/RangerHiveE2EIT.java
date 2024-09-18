@@ -150,7 +150,7 @@ public class RangerHiveE2EIT extends AbstractIT {
 
   private static void createCatalogAndRangerAuthPlugin() {
     rangerAuthPlugin =
-        new RangerAuthorizationHivePlugin(
+        RangerAuthorizationHivePlugin.getInstance(
             ImmutableMap.of(
                 AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
                 String.format(

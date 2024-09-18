@@ -32,7 +32,7 @@ public class RangerPrivileges {
     String strPrivilege = string.trim().toLowerCase();
     for (Class<? extends Enum<? extends RangerPrivilege>> enumClass : allRangerPrivileges) {
       for (Enum<? extends RangerPrivilege> privilege : enumClass.getEnumConstants()) {
-        if (((RangerPrivilege) privilege).isEquals(strPrivilege)) {
+        if (((RangerPrivilege) privilege).equalsTo(strPrivilege)) {
           return (RangerPrivilege) privilege;
         }
       }

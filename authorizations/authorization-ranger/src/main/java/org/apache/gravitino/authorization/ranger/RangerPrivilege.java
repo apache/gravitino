@@ -22,7 +22,7 @@ package org.apache.gravitino.authorization.ranger;
 public interface RangerPrivilege {
   String getName();
 
-  boolean isEquals(String value);
+  boolean equalsTo(String value);
 
   /** Ranger Hive privileges enumeration. */
   enum RangerHivePrivilege implements RangerPrivilege {
@@ -51,7 +51,7 @@ public interface RangerPrivilege {
     }
 
     @Override
-    public boolean isEquals(String value) {
+    public boolean equalsTo(String value) {
       return name.equalsIgnoreCase(value);
     }
   }
@@ -74,7 +74,7 @@ public interface RangerPrivilege {
     }
 
     @Override
-    public boolean isEquals(String value) {
+    public boolean equalsTo(String value) {
       return name.equalsIgnoreCase(value);
     }
   }

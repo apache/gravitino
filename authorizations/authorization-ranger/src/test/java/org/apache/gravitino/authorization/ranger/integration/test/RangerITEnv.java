@@ -29,7 +29,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
-import org.apache.gravitino.authorization.ranger.RangerClientExtend;
+import org.apache.gravitino.authorization.ranger.RangerClientExtension;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
@@ -54,7 +54,7 @@ public class RangerITEnv {
   private static final String RANGER_HIVE_TYPE = "hive";
   protected static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";
-  protected static RangerClientExtend rangerClient;
+  protected static RangerClientExtension rangerClient;
   private static volatile boolean initRangerService = false;
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 

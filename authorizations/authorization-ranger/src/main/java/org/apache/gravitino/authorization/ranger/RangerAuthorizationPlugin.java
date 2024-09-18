@@ -66,19 +66,12 @@ public abstract class RangerAuthorizationPlugin
     implements AuthorizationPlugin, RangerPrivilegesMappingProvider {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
 
-  /** Mapping Gravitino privilege name to the Ranger privileges configuration. */
-  private Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping;
-  /** The owner privileges, the owner can do anything on the metadata object configuration */
-  private Set<RangerPrivilege> ownerPrivileges;
-  /** The Ranger policy resource defines configuration. */
-  private List<String> policyResourceDefines;
-
-  protected String rangerServiceName;
-  protected RangerClientExtend rangerClient;
-  private RangerHelper rangerHelper;
+  protected final String rangerServiceName;
+  protected final RangerClientExtension rangerClient;
+  private final RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
 
-  public RangerAuthorizationPlugin(Map<String, String> config) {
+  protected RangerAuthorizationPlugin(Map<String, String> config) {
     String rangerUrl = config.get(AuthorizationPropertiesMeta.RANGER_ADMIN_URL);
     String authType = config.get(AuthorizationPropertiesMeta.RANGER_AUTH_TYPE);
     rangerAdminName = config.get(AuthorizationPropertiesMeta.RANGER_USERNAME);
@@ -90,33 +83,16 @@ public abstract class RangerAuthorizationPlugin
     RangerHelper.check(rangerAdminName != null, "Ranger username is required");
     RangerHelper.check(password != null, "Ranger password is required");
     RangerHelper.check(rangerServiceName != null, "Ranger service name is required");
-    rangerClient = new RangerClientExtend(rangerUrl, authType, rangerAdminName, password);
-
-    // Initialize privilegesMapping and ownerPrivileges
-    ownerPrivileges = ownerMappingRule();
-    privilegesMapping = privilegesMappingRule();
-    policyResourceDefines = policyResourceDefinesRule();
+    rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
 
     rangerHelper =
         new RangerHelper(
             rangerClient,
             rangerAdminName,
             rangerServiceName,
-            privilegesMapping,
-            ownerPrivileges,
-            policyResourceDefines);
-  }
-
-  public final Map<Privilege.Name, Set<RangerPrivilege>> getPrivilegesMapping() {
-    return privilegesMapping;
-  }
-
-  public final Set<RangerPrivilege> getOwnerPrivileges() {
-    return ownerPrivileges;
-  }
-
-  public final List<String> getPolicyResourceDefines() {
-    return policyResourceDefines;
+            privilegesMappingRule(),
+            ownerMappingRule(),
+            policyResourceDefinesRule());
   }
 
   /**

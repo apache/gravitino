@@ -54,18 +54,18 @@ public class RangerHelper {
   public static final String MANAGED_BY_GRAVITINO = "MANAGED_BY_GRAVITINO";
 
   /** Mapping Gravitino privilege name to the underlying authorization system privileges. */
-  protected final Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping;
+  private final Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping;
   /** The owner privileges, the owner can do anything on the metadata object */
   private final Set<RangerPrivilege> ownerPrivileges;
   /** The policy search keys */
   private final List<String> policyResourceDefines;
 
-  private final RangerClientExtend rangerClient;
+  private final RangerClientExtension rangerClient;
   private final String rangerAdminName;
   private final String rangerServiceName;
 
   public RangerHelper(
-      RangerClientExtend rangerClient,
+      RangerClientExtension rangerClient,
       String rangerAdminName,
       String rangerServiceName,
       Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping,
@@ -362,7 +362,7 @@ public class RangerHelper {
                             return ownerPrivileges.stream()
                                 .anyMatch(
                                     ownerPrivilege -> {
-                                      return ownerPrivilege.isEquals(policyItemAccess.getType());
+                                      return ownerPrivilege.equalsTo(policyItemAccess.getType());
                                     });
                           });
                 })
@@ -400,7 +400,7 @@ public class RangerHelper {
                         return policyItem.getAccesses().stream()
                             .anyMatch(
                                 policyItemAccess -> {
-                                  return ownerPrivilege.isEquals(policyItemAccess.getType());
+                                  return ownerPrivilege.equalsTo(policyItemAccess.getType());
                                 });
                       });
             })

@@ -33,7 +33,7 @@ public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> 
   protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
     switch (catalogProvider) {
       case "hive":
-        return new RangerAuthorizationHivePlugin(config);
+        return RangerAuthorizationHivePlugin.getInstance(config);
       default:
         throw new IllegalArgumentException("Unknown catalog provider: " + catalogProvider);
     }
