@@ -20,9 +20,9 @@ package org.apache.gravitino.authorization.ranger;
 
 /** RangerPrivilege interface is used to define the Ranger privileges. */
 public interface RangerPrivilege {
-  String toString();
+  String getName();
 
-  boolean equals(String value);
+  boolean isEquals(String value);
 
   /** Ranger Hive privileges enumeration. */
   enum RangerHivePrivilege implements RangerPrivilege {
@@ -39,20 +39,20 @@ public interface RangerPrivilege {
     REPLADMIN("repladmin"),
     SERVICEADMIN("serviceadmin");
 
-    private final String string; // Access a type in the Ranger policy item
+    private final String name; // Access a type in the Ranger policy item
 
-    RangerHivePrivilege(String str) {
-      this.string = str;
+    RangerHivePrivilege(String name) {
+      this.name = name;
     }
 
     @Override
-    public String toString() {
-      return string;
+    public String getName() {
+      return name;
     }
 
     @Override
-    public boolean equals(String value) {
-      return this.string.equalsIgnoreCase(value);
+    public boolean isEquals(String value) {
+      return name.equalsIgnoreCase(value);
     }
   }
 
@@ -62,20 +62,20 @@ public interface RangerPrivilege {
     WRITE("write"),
     EXECUTE("execute");
 
-    private final String string; // Access a type in the Ranger policy item
+    private final String name; // Access a type in the Ranger policy item
 
-    RangerHdfsPrivilege(String str) {
-      this.string = str;
+    RangerHdfsPrivilege(String name) {
+      this.name = name;
     }
 
     @Override
-    public String toString() {
-      return string;
+    public String getName() {
+      return name;
     }
 
     @Override
-    public boolean equals(String value) {
-      return this.string.equalsIgnoreCase(value);
+    public boolean isEquals(String value) {
+      return name.equalsIgnoreCase(value);
     }
   }
 }

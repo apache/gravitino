@@ -30,9 +30,8 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
     super(config);
   }
 
-  /** Initialize the default mapping Gravitino privilege name to the Ranger privileges */
-  @Override
-  public void initializePrivilegesMappingConfig() {
+  /** Set the default mapping Gravitino privilege name to the Ranger rule */
+  public void privilegesMappingRule() {
     privilegesMapping.put(
         Privilege.Name.CREATE_SCHEMA, ImmutableSet.of(RangerHivePrivilege.CREATE));
     privilegesMapping.put(Privilege.Name.CREATE_TABLE, ImmutableSet.of(RangerHivePrivilege.CREATE));
@@ -45,19 +44,17 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
         ImmutableSet.of(RangerHivePrivilege.READ, RangerHivePrivilege.SELECT));
   }
 
-  /** Initialize the default owner privileges. */
-  @Override
-  public void initializeOwnerPrivilegesConfig() {
+  /** Set the default owner rule. */
+  public void ownerMappingRule() {
     ownerPrivileges.add(RangerHivePrivilege.ALL);
   }
 
-  /** Initial Ranger policy resource defines. */
-  @Override
-  public void initializePolicyResourceDefinesConfig() {
+  /** Set Ranger policy resource rule. */
+  public void policyResourceDefinesRule() {
     policyResourceDefines =
         ImmutableList.of(
-            PolicyResource.DATABASE.toString(),
-            PolicyResource.TABLE.toString(),
-            PolicyResource.COLUMN.toString());
+            PolicyResource.DATABASE.getName(),
+            PolicyResource.TABLE.getName(),
+            PolicyResource.COLUMN.getName());
   }
 }

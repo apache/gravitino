@@ -39,14 +39,14 @@ public class RangerDefines {
     TABLE("table"),
     COLUMN("column");
 
-    private final String string;
+    private final String name;
 
-    PolicyResource(String str) {
-      this.string = str;
+    PolicyResource(String name) {
+      this.name = name;
     }
 
-    public String toString() {
-      return string;
+    public String getName() {
+      return name;
     }
   }
 }

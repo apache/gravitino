@@ -87,7 +87,7 @@ public class RangerHelper {
    */
   public Set<String> translatePrivilege(Privilege.Name name) {
     return privilegesMapping.get(name).stream()
-        .map(RangerPrivilege::toString)
+        .map(RangerPrivilege::getName)
         .collect(Collectors.toSet());
   }
 
@@ -362,7 +362,7 @@ public class RangerHelper {
                             return ownerPrivileges.stream()
                                 .anyMatch(
                                     ownerPrivilege -> {
-                                      return ownerPrivilege.equals(policyItemAccess.getType());
+                                      return ownerPrivilege.isEquals(policyItemAccess.getType());
                                     });
                           });
                 })
@@ -400,7 +400,7 @@ public class RangerHelper {
                         return policyItem.getAccesses().stream()
                             .anyMatch(
                                 policyItemAccess -> {
-                                  return ownerPrivilege.equals(policyItemAccess.getType());
+                                  return ownerPrivilege.isEquals(policyItemAccess.getType());
                                 });
                       });
             })
@@ -410,7 +410,7 @@ public class RangerHelper {
               RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
               policyItem
                   .getAccesses()
-                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.toString()));
+                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
               if (newOwner != null) {
                 if (newOwner.type() == Owner.Type.USER) {
                   policyItem.getUsers().add(newOwner.name());
@@ -458,7 +458,7 @@ public class RangerHelper {
           RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
           policyItem
               .getAccesses()
-              .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.toString()));
+              .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
           if (newOwner != null) {
             if (newOwner.type() == Owner.Type.USER) {
               policyItem.getUsers().add(newOwner.name());

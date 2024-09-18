@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -62,9 +64,16 @@ import org.slf4j.LoggerFactory;
  * 4. The Ranger policy also supports multiple users and groups, But we only use a user or group to
  * implement Gravitino Owner concept. <br>
  */
-public abstract class RangerAuthorizationPlugin extends RangerAuthorizationConfig
-    implements AuthorizationPlugin {
+public abstract class RangerAuthorizationPlugin
+    implements AuthorizationPlugin, RangerPrivilegesMappingProvider {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
+
+  /** Mapping Gravitino privilege name to the Ranger privileges configuration. */
+  protected Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping = new HashMap<>();
+  /** The owner privileges, the owner can do anything on the metadata object configuration */
+  protected Set<RangerPrivilege> ownerPrivileges = new HashSet<>();
+  /** The Ranger policy resource defines configuration. */
+  protected List<String> policyResourceDefines;
 
   protected String rangerServiceName;
   protected RangerClientExtend rangerClient;
@@ -86,9 +95,9 @@ public abstract class RangerAuthorizationPlugin extends RangerAuthorizationConfi
     rangerClient = new RangerClientExtend(rangerUrl, authType, rangerAdminName, password);
 
     // Initialize privilegesMapping and ownerPrivileges
-    initializeOwnerPrivilegesConfig();
-    initializePrivilegesMappingConfig();
-    initializePolicyResourceDefinesConfig();
+    ownerMappingRule();
+    privilegesMappingRule();
+    policyResourceDefinesRule();
 
     rangerHelper =
         new RangerHelper(
@@ -98,6 +107,18 @@ public abstract class RangerAuthorizationPlugin extends RangerAuthorizationConfi
             privilegesMapping,
             ownerPrivileges,
             policyResourceDefines);
+  }
+
+  public final Map<Privilege.Name, Set<RangerPrivilege>> getPrivilegesMapping() {
+    return privilegesMapping;
+  }
+
+  public final Set<RangerPrivilege> getOwnerPrivileges() {
+    return ownerPrivileges;
+  }
+
+  public final List<String> getPolicyResourceDefines() {
+    return policyResourceDefines;
   }
 
   /**
