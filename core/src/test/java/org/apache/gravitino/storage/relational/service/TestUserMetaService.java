@@ -178,10 +178,14 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(expectUsers.size(), actualUsers.size());
     for (int index = 0; index < expectUsers.size(); index++) {
       Assertions.assertEquals(expectUsers.get(index).name(), actualUsers.get(index).name());
-      Assertions.assertEquals(
-          expectUsers.get(index).roleNames().size(), actualUsers.get(index).roleNames().size());
-      for (String roleName : expectUsers.get(index).roleNames()) {
-        Assertions.assertTrue(actualUsers.get(index).roleNames().contains(roleName));
+      if (expectUsers.get(index).roleNames() == null) {
+        Assertions.assertNull(actualUsers.get(index).roleNames());
+      } else {
+        Assertions.assertEquals(
+                expectUsers.get(index).roleNames().size(), actualUsers.get(index).roleNames().size());
+        for (String roleName : expectUsers.get(index).roleNames()) {
+          Assertions.assertTrue(actualUsers.get(index).roleNames().contains(roleName));
+        }
       }
     }
   }
