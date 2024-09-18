@@ -27,8 +27,8 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsProvider;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,10 +39,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The catalogName is iceberg_catalog
  */
-public class GravitinoBasedIcebergTableOpsProvider
-    implements IcebergTableOpsProvider, AutoCloseable {
+public class GravitinoBasedIcebergCatalogWrapperProvider
+    implements IcebergCatalogWrapperProvider, AutoCloseable {
   public static final Logger LOG =
-      LoggerFactory.getLogger(GravitinoBasedIcebergTableOpsProvider.class);
+      LoggerFactory.getLogger(GravitinoBasedIcebergCatalogWrapperProvider.class);
 
   public static final String GRAVITINO_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME =
       "gravitino-based-provider";
@@ -66,7 +66,7 @@ public class GravitinoBasedIcebergTableOpsProvider
   }
 
   @Override
-  public IcebergTableOps getIcebergTableOps(String catalogName) {
+  public IcebergCatalogWrapper getIcebergTableOps(String catalogName) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogName), "blank catalogName is illegal");
     Preconditions.checkArgument(
@@ -81,7 +81,7 @@ public class GravitinoBasedIcebergTableOpsProvider
 
     Map<String, String> properties =
         IcebergPropertiesUtils.toIcebergCatalogProperties(catalog.properties());
-    return new IcebergTableOps(new IcebergConfig(properties));
+    return new IcebergCatalogWrapper(new IcebergConfig(properties));
   }
 
   @VisibleForTesting

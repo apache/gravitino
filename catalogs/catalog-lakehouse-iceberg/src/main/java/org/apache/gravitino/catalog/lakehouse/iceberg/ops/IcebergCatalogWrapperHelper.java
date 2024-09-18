@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.AddColumn;
 import org.apache.gravitino.rel.TableChange.After;
@@ -55,7 +55,7 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.types.Type.PrimitiveType;
 import org.apache.iceberg.types.Types.NestedField;
 
-public class IcebergTableOpsHelper {
+public class IcebergCatalogWrapperHelper {
   @VisibleForTesting public static final Joiner DOT = Joiner.on(".");
   private static final Set<String> IcebergReservedProperties =
       ImmutableSet.of(
@@ -68,7 +68,7 @@ public class IcebergTableOpsHelper {
 
   private Catalog icebergCatalog;
 
-  public IcebergTableOpsHelper(Catalog icebergCatalog) {
+  public IcebergCatalogWrapperHelper(Catalog icebergCatalog) {
     this.icebergCatalog = icebergCatalog;
   }
 

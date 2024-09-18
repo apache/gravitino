@@ -21,10 +21,10 @@ package org.apache.gravitino.iceberg.common.ops;
 import java.util.Map;
 
 /**
- * IcebergTableOpsProvider is an interface defining how Iceberg REST catalog server gets Iceberg
- * catalogs.
+ * IcebergCatalogWrapperProvider is an interface defining how Iceberg REST catalog server gets
+ * Iceberg catalogs.
  */
-public interface IcebergTableOpsProvider {
+public interface IcebergCatalogWrapperProvider {
 
   /**
    * @param properties The parameters for creating Provider which from configurations whose prefix
@@ -34,7 +34,7 @@ public interface IcebergTableOpsProvider {
 
   /**
    * @param catalogName a param send by clients.
-   * @return the instance of IcebergTableOps.
+   * @return the instance of IcebergCatalogWrapper.
    */
-  IcebergTableOps getIcebergTableOps(String catalogName);
+  IcebergCatalogWrapper getIcebergTableOps(String catalogName);
 }

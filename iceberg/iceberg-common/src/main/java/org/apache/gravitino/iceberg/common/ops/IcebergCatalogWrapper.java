@@ -59,9 +59,9 @@ import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class IcebergTableOps implements AutoCloseable {
+public class IcebergCatalogWrapper implements AutoCloseable {
 
-  public static final Logger LOG = LoggerFactory.getLogger(IcebergTableOps.class);
+  public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapper.class);
 
   @Getter protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
@@ -80,7 +80,7 @@ public class IcebergTableOps implements AutoCloseable {
           IcebergConstants.ICEBERG_OSS_ACCESS_KEY_ID,
           IcebergConstants.ICEBERG_OSS_ACCESS_KEY_SECRET);
 
-  public IcebergTableOps(IcebergConfig icebergConfig) {
+  public IcebergCatalogWrapper(IcebergConfig icebergConfig) {
     this.catalogBackend =
         IcebergCatalogBackend.valueOf(
             icebergConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
@@ -101,7 +101,7 @@ public class IcebergTableOps implements AutoCloseable {
     this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
   }
 
-  public IcebergTableOps() {
+  public IcebergCatalogWrapper() {
     this(new IcebergConfig(Collections.emptyMap()));
   }
 

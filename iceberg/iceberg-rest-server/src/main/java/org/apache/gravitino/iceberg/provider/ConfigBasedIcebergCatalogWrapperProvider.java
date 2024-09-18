@@ -24,8 +24,8 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOpsProvider;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperProvider;
 import org.apache.gravitino.utils.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,9 +40,9 @@ import org.slf4j.LoggerFactory;
  * gravitino.iceberg-rest.catalog.hive_proxy.catalog-backend = hive
  * gravitino.iceberg-rest.catalog.hive_proxy.uri = thrift://{host}:{port} ...
  */
-public class ConfigBasedIcebergTableOpsProvider implements IcebergTableOpsProvider {
+public class ConfigBasedIcebergCatalogWrapperProvider implements IcebergCatalogWrapperProvider {
   public static final Logger LOG =
-      LoggerFactory.getLogger(ConfigBasedIcebergTableOpsProvider.class);
+      LoggerFactory.getLogger(ConfigBasedIcebergCatalogWrapperProvider.class);
 
   public static final String CONFIG_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME = "config-based-provider";
 
@@ -68,14 +68,14 @@ public class ConfigBasedIcebergTableOpsProvider implements IcebergTableOpsProvid
   }
 
   @Override
-  public IcebergTableOps getIcebergTableOps(String catalogName) {
+  public IcebergCatalogWrapper getIcebergTableOps(String catalogName) {
     IcebergConfig icebergConfig = this.catalogConfigs.get(catalogName);
     if (icebergConfig == null) {
       String errorMsg = String.format("%s can not match any catalog", catalogName);
       LOG.warn(errorMsg);
       throw new RuntimeException(errorMsg);
     }
-    return new IcebergTableOps(icebergConfig);
+    return new IcebergCatalogWrapper(icebergConfig);
   }
 
   private Optional<String> getCatalogName(String catalogConfigKey) {
