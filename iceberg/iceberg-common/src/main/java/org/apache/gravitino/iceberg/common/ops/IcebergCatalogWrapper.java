@@ -36,6 +36,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialManager;
 import org.apache.gravitino.credential.CredentialProvider;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.credential.LocationContext;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -83,8 +84,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       ImmutableSet.of(
           IcebergConstants.IO_IMPL,
           IcebergConstants.AWS_S3_REGION,
-          IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID,
-          IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY,
           IcebergConstants.ICEBERG_S3_ENDPOINT,
           IcebergConstants.ICEBERG_OSS_ENDPOINT,
           IcebergConstants.ICEBERG_OSS_ACCESS_KEY_ID,
@@ -337,7 +336,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     credentialProvider.ifPresent(
         provider -> {
           Credential credential = provider.getCredential(locationContext);
-          configs.putAll(credential.toProperties());
+          if (credential != null) {
+            configs.putAll(CredentialUtils.toIcebergProperties(credential));
+          }
         });
     return configs;
   }

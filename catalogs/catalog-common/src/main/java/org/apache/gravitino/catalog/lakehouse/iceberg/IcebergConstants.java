@@ -40,6 +40,7 @@ public class IcebergConstants {
   public static final String ICEBERG_S3_ENDPOINT = "s3.endpoint";
   public static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
   public static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
+  public static final String ICEBERG_S3_TOKEN = "s3.session-token";
   public static final String AWS_S3_REGION = "client.region";
 
   public static final String ICEBERG_OSS_ENDPOINT = "oss.endpoint";
