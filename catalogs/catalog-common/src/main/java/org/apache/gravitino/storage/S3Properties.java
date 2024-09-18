@@ -30,6 +30,10 @@ public class S3Properties {
   public static final String GRAVITINO_S3_SECRET_ACCESS_KEY = "s3-secret-access-key";
   // The region of the S3 service.
   public static final String GRAVITINO_S3_REGION = "s3-region";
+  // S3 role arn
+  public static final String GRAVITINO_S3_ROLE_ARN = "s3-role-arn";
+  // S3 external id
+  public static final String GRAVITINO_S3_EXTERNAL_ID = "s3-external-id";
 
   private S3Properties() {}
 }

@@ -17,6 +17,7 @@
 # under the License.
 #
 [versions]
+awssdk = "2.28.3"
 junit = "5.8.1"
 protoc = "3.24.4"
 jackson = "2.15.2"
@@ -110,6 +111,11 @@ hudi = "0.15.0"
 google-auth = "1.28.0"
 
 [libraries]
+aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
+aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", version.ref = "awssdk" }
+aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awssdk" }
+aws-sts = { group = "software.amazon.awssdk", name = "sts", version.ref = "awssdk" }
+aws-kms = { group = "software.amazon.awssdk", name = "kms", version.ref = "awssdk" }
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
 protobuf-java-util = { group = "com.google.protobuf", name = "protobuf-java-util", version.ref = "protoc" }
 jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-databind", version.ref = "jackson" }
@@ -177,6 +183,7 @@ commons-collections3 = { group = "commons-collections", name = "commons-collecti
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }
 iceberg-aliyun = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg" }
 iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg" }
+iceberg-aws-bundle = { group = "org.apache.iceberg", name = "iceberg-aws-bundle", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
