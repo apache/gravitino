@@ -26,8 +26,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.s3.PaimonS3FileSystemConfig;
+import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.gravitino.integration.test.util.JdbcDriverDownloader;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Tag;
@@ -85,7 +85,7 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
         String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
         String paimonCatalogPath =
             ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-paimon", "libs");
-        JdbcDriverDownloader.downloadJdbcDriver(PAIMON_S3_JAR_URL, serverPath, paimonCatalogPath);
+        DownloaderUtils.downloadFile(PAIMON_S3_JAR_URL, serverPath, paimonCatalogPath);
       }
     } catch (Exception e) {
       throw new RuntimeException("Failed to download the S3 dependency", e);
