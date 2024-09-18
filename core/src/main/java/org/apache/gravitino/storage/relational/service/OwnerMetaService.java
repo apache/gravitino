@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
@@ -29,7 +30,6 @@ import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.storage.relational.utils.SupplierUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** This class is an utilization class to retrieve owner relation. */
@@ -58,7 +58,7 @@ public class OwnerMetaService {
       return Optional.of(
           POConverters.fromUserPO(
               userPO,
-              SupplierUtils.createRolePOsSupplier(userPO),
+              Collections.emptyList(),
               AuthorizationUtils.ofUserNamespace(NameIdentifierUtil.getMetalake(identifier))));
     }
 
@@ -71,7 +71,7 @@ public class OwnerMetaService {
       return Optional.of(
           POConverters.fromGroupPO(
               groupPO,
-              SupplierUtils.createRolePOsSupplier(groupPO),
+              Collections.emptyList(),
               AuthorizationUtils.ofGroupNamespace(NameIdentifierUtil.getMetalake(identifier))));
     }
 

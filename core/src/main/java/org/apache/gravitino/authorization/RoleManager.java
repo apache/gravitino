@@ -19,19 +19,10 @@
 
 package org.apache.gravitino.authorization;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Scheduler;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -57,32 +48,10 @@ class RoleManager {
   private static final Logger LOG = LoggerFactory.getLogger(RoleManager.class);
   private final EntityStore store;
   private final IdGenerator idGenerator;
-  private final Cache<NameIdentifier, RoleEntity> cache;
 
-  RoleManager(EntityStore store, IdGenerator idGenerator, Config config) {
+  RoleManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;
-
-    long cacheEvictionIntervalInMs = config.get(Configs.ROLE_CACHE_EVICTION_INTERVAL_MS);
-    // One role entity is about 40 bytes using jol estimate, there are usually about 100w+
-    // roles in the production environment, this won't bring too much memory cost, but it
-    // can improve the performance significantly.
-    this.cache =
-        Caffeine.newBuilder()
-            .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
-            .removalListener(
-                (k, v, c) -> {
-                  LOG.info("Remove role {} from the cache.", k);
-                })
-            .scheduler(
-                Scheduler.forScheduledExecutorService(
-                    new ScheduledThreadPoolExecutor(
-                        1,
-                        new ThreadFactoryBuilder()
-                            .setDaemon(true)
-                            .setNameFormat("role-cleaner-%d")
-                            .build())))
-            .build();
   }
 
   RoleEntity createRole(
@@ -107,7 +76,6 @@ class RoleManager {
             .build();
     try {
       store.put(roleEntity, false /* overwritten */);
-      cache.put(roleEntity.nameIdentifier(), roleEntity);
 
       AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
           metalake,
@@ -141,7 +109,6 @@ class RoleManager {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);
-      cache.invalidate(ident);
 
       try {
         RoleEntity roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
@@ -163,20 +130,11 @@ class RoleManager {
   }
 
   private RoleEntity getRoleEntity(NameIdentifier identifier) {
-    return cache.get(
-        identifier,
-        id -> {
-          try {
-            return store.get(identifier, Entity.EntityType.ROLE, RoleEntity.class);
-          } catch (IOException ioe) {
-            LOG.error("Failed to get roles {} due to storage issues", identifier, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
-  }
-
-  @VisibleForTesting
-  Cache<NameIdentifier, RoleEntity> getCache() {
-    return cache;
+    try {
+      return store.get(identifier, Entity.EntityType.ROLE, RoleEntity.class);
+    } catch (IOException ioe) {
+      LOG.error("Failed to get roles {} due to storage issues", identifier, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 }

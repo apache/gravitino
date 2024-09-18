@@ -30,7 +30,7 @@ import org.apache.ibatis.annotations.Param;
 public class TagMetadataObjectRelSQLProviderFactory {
 
   private static final Map<JDBCBackendType, TagMetadataObjectRelBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      TAG_METADATA_OBJECT_RELATION_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new TagMetadataObjectRelMySQLProvider(),
               JDBCBackendType.H2, new TagMetadataObjectRelH2Provider(),
@@ -44,7 +44,7 @@ public class TagMetadataObjectRelSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return TAG_METADATA_OBJECT_RELATION_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class TagMetadataObjectRelMySQLProvider extends TagMetadataObjectRelBaseSQLProvider {}

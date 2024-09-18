@@ -194,7 +194,8 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
           UserEntity.builder()
               .withId(1L)
               .withName(newOwner.name())
-              .withRoles(Collections.emptyList())
+              .withRoleNames(Collections.emptyList())
+              .withRoleIds(Collections.emptyList())
               .withAuditInfo(auditInfo)
               .build();
       onUserAdded(userEntity);
@@ -203,7 +204,8 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
           GroupEntity.builder()
               .withId(1L)
               .withName(newOwner.name())
-              .withRoles(Collections.emptyList())
+              .withRoleNames(Collections.emptyList())
+              .withRoleIds(Collections.emptyList())
               .withAuditInfo(auditInfo)
               .build();
       onGroupAdded(groupEntity);

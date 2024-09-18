@@ -157,7 +157,7 @@ public class TestAccessControlManagerForPermissions {
     String notExist = "not-exist";
 
     User user = accessControlManager.getUser(METALAKE, USER);
-    Assertions.assertTrue(user.roles().isEmpty());
+    Assertions.assertNull(user.roles());
 
     reset(authorizationPlugin);
 

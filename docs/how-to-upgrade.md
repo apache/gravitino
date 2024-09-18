@@ -40,6 +40,13 @@ using the `--host` and `--user` command line switches.
 The easiest way of accomplishing this task is
 by creating a copy of the directory containing your database.
 
+#### PostgreSQL
+For PostgreSQL, you can use the following command to backup your database:
+
+```shell
+pg_dump -U username -h hostname -d database_name -n schema_name -a -F c -f data_backup.sql
+```
+
 ### Step 3: Dump your Gravitino database
 Dump your Gravitino database schema to a file
 
@@ -59,6 +66,12 @@ java -cp h2-1.4.200.jar org.h2.tools.Script -url "jdbc:h2:file:<db_file>;DB_CLOS
 ```
 Note that you may need to specify your h2 file path, username and password
 
+#### PostgreSQL
+For PostgreSQL, you can use the following command to dump the database schema to a file:
+
+```shell
+pg_dump -U username -h hostname -d database_name -n schema_name -s -F c -f schema-x.y.z-postgresql.sql
+```
 
 ### Step 4: Determine differences between your schema and the official schema
 The schema upgrade scripts assume that the schema you are upgrading
@@ -96,6 +109,15 @@ For H2, you can use the `RunScript` tool to apply the upgrade script:
 java -cp h2-1.4.200.jar org.h2.tools.RunScript -url "jdbc:h2:file:<db_file>;DB_CLOSE_DELAY=-1;MODE=MYSQL" -user <user> -password <password> -script upgrade-0.6.0-to-0.7.0-h2.sql
 java -cp h2-1.4.200.jar org.h2.tools.RunScript -url "jdbc:h2:file:<db_file>;DB_CLOSE_DELAY=-1;MODE=MYSQL" -user <user> -password <password> -script upgrade-0.7.0-to-0.8.0-h2.sql
 ```
+
+#### PostgreSQL
+For PostgreSQL, you can use the following command to apply the upgrade script:
+
+```shell
+psql -U username -h hostname -d database_name -c "SET search_path TO schema_name;" -f upgrade-0.6.0-to-0.7.0-postgresql.sql
+psql -U username -h hostname -d database_name -c "SET search_path TO schema_name;" -f upgrade-0.7.0-to-0.8.0-postgresql.sql
+```
+
 
 These scripts should run to completion without any errors. If you
 do encounter errors you need to analyze the cause and attempt to

@@ -1,0 +1,66 @@
+name: Flink Integration Test Action
+
+# run flink integration test
+on:
+  workflow_call:
+    inputs:
+      architecture:
+        required: true
+        description: 'Architecture of the platform'
+        type: string
+      java-version:
+        required: true
+        description: 'Java version'
+        type: string
+
+jobs:
+  start-runner:
+    name: JDK${{ inputs.java-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PLATFORM: ${{ inputs.architecture }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Check required command
+        run: |
+          dev/ci/check_commands.sh
+
+      - name: Package Gravitino
+        run: |
+          ./gradlew compileDistribution -x test -PjdkVersion=${{ inputs.java-version }}
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Flink Integration Test
+        id: integrationTest
+        # run embedded mode and deploy mode integration tests
+        run: |
+          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ inputs.java-version }} -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ inputs.java-version }} -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
+
+      - name: Upload integrate tests reports
+        uses: actions/upload-artifact@v3
+        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        with:
+          name: flink-connector-integrate-test-reports-${{ inputs.java-version }}
+          path: |
+            build/reports
+            flink-connector/flink/build/*.log
+            flink-connector/flink/build/*.tar
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
+            catalogs/**/*.log
+            catalogs/**/*.tar

@@ -327,13 +327,6 @@ public class Configs {
               ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
-  public static final ConfigEntry<Long> ROLE_CACHE_EVICTION_INTERVAL_MS =
-      new ConfigBuilder("gravitino.authorization.roleCacheEvictionIntervalMs")
-          .doc("The interval in milliseconds to evict the role cache")
-          .version(ConfigConstants.VERSION_0_5_0)
-          .longConf()
-          .createWithDefault(60 * 60 * 1000L);
-
   public static final int DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS = 60;
   public static final ConfigEntry<Integer> METRICS_TIME_SLIDING_WINDOW_SECONDS =
       new ConfigBuilder("gravitino.metrics.timeSlidingWindowSecs")

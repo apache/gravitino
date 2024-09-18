@@ -47,10 +47,9 @@ public class TestIcebergConfig {
     IcebergConfig icebergConfig = new IcebergConfig(properties);
     JettyServerConfig jettyServerConfig = JettyServerConfig.fromConfig(icebergConfig);
     Assertions.assertEquals(
-        JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT, jettyServerConfig.getHttpPort());
+        IcebergConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT, jettyServerConfig.getHttpPort());
     Assertions.assertEquals(
-        JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT,
-        jettyServerConfig.getHttpsPort());
+        IcebergConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT, jettyServerConfig.getHttpsPort());
 
     properties =
         ImmutableMap.of(
