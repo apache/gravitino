@@ -18,17 +18,16 @@
  */
 package org.apache.gravitino.catalog.oceanbase.operation;
 
-import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableChange;
@@ -41,20 +40,7 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
 
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
-    final List<String> names = Lists.newArrayList();
-
-    try (Connection connection = getConnection(databaseName);
-        ResultSet tables = getTables(connection)) {
-      while (tables.next()) {
-        if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
-          names.add(tables.getString("TABLE_NAME"));
-        }
-      }
-      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
-      return names;
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
-    }
+    throw new GravitinoRuntimeException("Not implemented yet.");
   }
 
   @Override

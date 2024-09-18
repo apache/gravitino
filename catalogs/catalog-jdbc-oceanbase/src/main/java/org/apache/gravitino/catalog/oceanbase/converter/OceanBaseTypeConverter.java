@@ -19,8 +19,8 @@
 package org.apache.gravitino.catalog.oceanbase.converter;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.rel.types.Types;
 
 /** Type converter for OceanBase. */
 public class OceanBaseTypeConverter extends JdbcTypeConverter {
@@ -30,24 +30,11 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
-    switch (typeBean.getTypeName().toLowerCase()) {
-      case TINYINT:
-        return Types.ByteType.get();
-      default:
-        return Types.ExternalType.of(typeBean.getTypeName());
-    }
+    throw new GravitinoRuntimeException("Not implemented yet.");
   }
 
   @Override
   public String fromGravitino(Type type) {
-    if (type instanceof Types.ByteType) {
-      if (((Types.ByteType) type).signed()) {
-        return TINYINT;
-      }
-    } else if (type instanceof Types.ExternalType) {
-      return ((Types.ExternalType) type).catalogString();
-    }
-    throw new IllegalArgumentException(
-        String.format("Couldn't convert Gravitino type %s to OceanBase type", type.simpleString()));
+    throw new GravitinoRuntimeException("Not implemented yet.");
   }
 }

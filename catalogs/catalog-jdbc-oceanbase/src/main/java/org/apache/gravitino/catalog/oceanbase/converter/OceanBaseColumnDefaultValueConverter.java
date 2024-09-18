@@ -18,15 +18,10 @@
  */
 package org.apache.gravitino.catalog.oceanbase.converter;
 
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
-import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
-
-import java.util.Objects;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.rel.expressions.Expression;
-import org.apache.gravitino.rel.expressions.UnparsedExpression;
-import org.apache.gravitino.rel.expressions.literals.Literals;
 
 public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
 
@@ -36,28 +31,6 @@ public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValue
       String columnDefaultValue,
       boolean isExpression,
       boolean nullable) {
-    if (Objects.isNull(columnDefaultValue)) {
-      return nullable ? Literals.NULL : DEFAULT_VALUE_NOT_SET;
-    }
-
-    if (columnDefaultValue.equalsIgnoreCase(NULL)) {
-      return Literals.NULL;
-    }
-
-    if (isExpression) {
-      if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
-        return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
-      }
-      // The parsing of OceanBase expressions is complex, so we are not currently undertaking the
-      // parsing.
-      return UnparsedExpression.of(columnDefaultValue);
-    }
-
-    switch (type.getTypeName().toLowerCase()) {
-      case OceanBaseTypeConverter.TINYINT:
-        return Literals.byteLiteral(Byte.valueOf(columnDefaultValue));
-      default:
-        return UnparsedExpression.of(columnDefaultValue);
-    }
+    throw new GravitinoRuntimeException("Not implemented yet.");
   }
 }
