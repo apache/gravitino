@@ -483,7 +483,8 @@ public class RangerHiveIT {
         UserEntity.builder()
             .withId(1L)
             .withName(userName1)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -501,7 +502,8 @@ public class RangerHiveIT {
         UserEntity.builder()
             .withId(1L)
             .withName(userName2)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -523,7 +525,8 @@ public class RangerHiveIT {
         UserEntity.builder()
             .withId(1L)
             .withName(userName1)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -552,7 +555,8 @@ public class RangerHiveIT {
         GroupEntity.builder()
             .withId(1L)
             .withName(groupName1)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -570,7 +574,8 @@ public class RangerHiveIT {
         GroupEntity.builder()
             .withId(1L)
             .withName(groupName2)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -593,7 +598,8 @@ public class RangerHiveIT {
         GroupEntity.builder()
             .withId(1L)
             .withName(groupName1)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -674,7 +680,8 @@ public class RangerHiveIT {
             .withId(0L)
             .withName(currentFunName())
             .withAuditInfo(auditInfo)
-            .withRoles(Collections.emptyList())
+            .withRoleIds(null)
+            .withRoleNames(null)
             .build();
     Assertions.assertTrue(rangerAuthPlugin.onUserAdded(user));
     Assertions.assertTrue(rangerAuthPlugin.onUserAcquired(user));
@@ -689,7 +696,8 @@ public class RangerHiveIT {
             .withId(0L)
             .withName(currentFunName())
             .withAuditInfo(auditInfo)
-            .withRoles(Collections.emptyList())
+            .withRoleIds(null)
+            .withRoleNames(null)
             .build();
 
     Assertions.assertTrue(rangerAuthPlugin.onGroupAdded(group));
@@ -761,7 +769,8 @@ public class RangerHiveIT {
         UserEntity.builder()
             .withId(1L)
             .withName(userName1)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -777,7 +786,8 @@ public class RangerHiveIT {
         UserEntity.builder()
             .withId(1L)
             .withName(userName2)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -790,7 +800,8 @@ public class RangerHiveIT {
         UserEntity.builder()
             .withId(1L)
             .withName(userName3)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -822,7 +833,8 @@ public class RangerHiveIT {
         GroupEntity.builder()
             .withId(1L)
             .withName(groupName1)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -840,7 +852,8 @@ public class RangerHiveIT {
         GroupEntity.builder()
             .withId(1L)
             .withName(groupName2)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
@@ -858,7 +871,8 @@ public class RangerHiveIT {
         GroupEntity.builder()
             .withId(1L)
             .withName(groupName3)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
