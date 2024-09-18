@@ -52,6 +52,12 @@ dependencies {
     exclude("org.mortbay.jetty:jetty-sslengine")
     exclude("org.eclipse.jetty.aggregate:jetty-all")
   }
+  implementation(libs.hadoop2.mapreduce.client.core) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet")
+    exclude(group = "org.mortbay.jetty", module = "jetty-util")
+    exclude(group = "com.sun.jersey.contribs", module = "jersey-guice")
+  }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
