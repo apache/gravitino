@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hive.miniHMS;
+package org.apache.gravitino.hive.hms;
 
 import com.google.common.collect.Maps;
 import java.util.Collections;

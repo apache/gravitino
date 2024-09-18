@@ -17,11 +17,14 @@
  * under the License.
  */
 
-package org.apache.gravitino.catalog.hive;
+package org.apache.gravitino.hive;
 
+import com.google.common.collect.ImmutableMap;
 import java.security.PrivilegedAction;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
+import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -31,7 +34,13 @@ import org.junit.jupiter.api.Test;
 public class TestCachedClientPool extends MiniHiveMetastoreService {
   @Test
   public void testClientPoolCleaner() throws InterruptedException {
-    CachedClientPool clientPool = new CachedClientPool(1, hiveConf, 5000);
+    Map<String, String> props =
+        ImmutableMap.of(
+            HiveConstants.CLIENT_POOL_SIZE,
+            "1",
+            HiveConstants.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
+            "5000");
+    CachedClientPool clientPool = new CachedClientPool(MiniHiveMetastoreService.hiveConf, props);
     HiveClientPool clientPool1 = clientPool.clientPool();
     HiveClientPool cachedClientPool =
         clientPool.clientPoolCache().getIfPresent(CachedClientPool.extractKey());

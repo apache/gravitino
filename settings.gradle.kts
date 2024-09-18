@@ -28,6 +28,7 @@ val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion
 include("api", "common", "core", "meta", "server", "server-common")
 include("catalogs:catalog-common")
 include("catalogs:catalog-hive")
+include("catalogs:hive-metastore-common")
 include("catalogs:catalog-lakehouse-iceberg")
 include("catalogs:catalog-lakehouse-paimon")
 include("catalogs:catalog-lakehouse-hudi")

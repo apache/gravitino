@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hive.converter;
+package org.apache.gravitino.hive.converter;
 
-import static org.apache.gravitino.catalog.hive.converter.HiveDataTypeConverter.CONVERTER;
+import static org.apache.gravitino.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.hadoop.hive.serde.serdeConstants.BIGINT_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.BINARY_TYPE_NAME;
 import static org.apache.hadoop.hive.serde.serdeConstants.BOOLEAN_TYPE_NAME;

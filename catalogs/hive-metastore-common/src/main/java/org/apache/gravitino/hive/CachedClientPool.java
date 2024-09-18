@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hive;
+package org.apache.gravitino.hive;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -27,10 +27,12 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.utils.ClientPool;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -49,6 +51,8 @@ import org.immutables.value.Value;
  * <p>A ClientPool that caches the underlying HiveClientPool instances.
  */
 public class CachedClientPool implements ClientPool<IMetaStoreClient, TException> {
+  private static final ClientPropertiesMetadata PROPERTIES_METADATA =
+      new ClientPropertiesMetadata();
 
   private final Cache<Key, HiveClientPool> clientPoolCache;
 
@@ -56,8 +60,15 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
   private final int clientPoolSize;
   private final ScheduledThreadPoolExecutor scheduler;
 
-  CachedClientPool(int clientPoolSize, Configuration conf, long evictionInterval) {
-    this.conf = conf;
+  public CachedClientPool(Configuration hiveConf, Map<String, String> properties) {
+    int clientPoolSize =
+        (int) PROPERTIES_METADATA.getOrDefault(properties, HiveConstants.CLIENT_POOL_SIZE);
+    long evictionInterval =
+        (long)
+            PROPERTIES_METADATA.getOrDefault(
+                properties, HiveConstants.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
+
+    this.conf = hiveConf;
     this.clientPoolSize = clientPoolSize;
     // Since Caffeine does not ensure that removalListener will be involved after expiration
     // We use a scheduler with one thread to clean up expired clients.
@@ -71,13 +82,13 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
   }
 
   @VisibleForTesting
-  HiveClientPool clientPool() {
+  public HiveClientPool clientPool() {
     Key key = extractKey();
     return clientPoolCache.get(key, k -> new HiveClientPool(clientPoolSize, conf));
   }
 
   @VisibleForTesting
-  Cache<Key, HiveClientPool> clientPoolCache() {
+  public Cache<Key, HiveClientPool> clientPoolCache() {
     return clientPoolCache;
   }
 
@@ -94,7 +105,7 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
   }
 
   @VisibleForTesting
-  static Key extractKey() {
+  public static Key extractKey() {
     List<Object> elements = Lists.newArrayList();
     try {
       elements.add(UserGroupInformation.getCurrentUser().getUserName());
@@ -106,7 +117,7 @@ public class CachedClientPool implements ClientPool<IMetaStoreClient, TException
   }
 
   @Value.Immutable
-  abstract static class Key {
+  public abstract static class Key {
 
     abstract List<Object> elements();
 
