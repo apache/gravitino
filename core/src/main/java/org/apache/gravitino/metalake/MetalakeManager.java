@@ -72,7 +72,7 @@ public class MetalakeManager implements MetalakeDispatcher {
   @Override
   public BaseMetalake[] listMetalakes() {
     try {
-      return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
+      return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE, true).stream()
           .toArray(BaseMetalake[]::new);
     } catch (IOException ioe) {
       LOG.error("Listing Metalakes failed due to storage issues.", ioe);

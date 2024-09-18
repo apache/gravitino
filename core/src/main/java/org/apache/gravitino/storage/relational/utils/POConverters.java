@@ -48,6 +48,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.CombinedUserPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
@@ -721,6 +722,44 @@ public class POConverters {
       }
       if (!roleIds.isEmpty()) {
         builder.withRoleIds(roleIds);
+      }
+      return builder.build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static UserEntity fromCombinedUserPO(CombinedUserPO userPO, Namespace namespace) {
+    try {
+      UserEntity.Builder builder =
+          UserEntity.builder()
+              .withId(userPO.getUserId())
+              .withName(userPO.getUserName())
+              .withNamespace(namespace)
+              .withAuditInfo(
+                  JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
+      if (StringUtils.isNotBlank(userPO.getRoleNames())) {
+        List<String> roleNamesFromJson =
+            JsonUtils.anyFieldMapper().readValue(userPO.getRoleNames(), List.class);
+        List<String> roleNames =
+            roleNamesFromJson.stream().filter(StringUtils::isNotBlank).collect(Collectors.toList());
+        if (!roleNames.isEmpty()) {
+          builder.withRoleNames(roleNames);
+        }
+      }
+
+      if (StringUtils.isNotBlank(userPO.getRoleIds())) {
+        List<String> roleIdsFromJson =
+            JsonUtils.anyFieldMapper().readValue(userPO.getRoleIds(), List.class);
+        List<Long> roleIds =
+            roleIdsFromJson.stream()
+                .filter(StringUtils::isNotBlank)
+                .map(Long::valueOf)
+                .collect(Collectors.toList());
+        ;
+        if (!roleIds.isEmpty()) {
+          builder.withRoleIds(roleIds);
+        }
       }
       return builder.build();
     } catch (JsonProcessingException e) {

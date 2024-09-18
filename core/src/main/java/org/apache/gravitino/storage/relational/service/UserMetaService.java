@@ -40,6 +40,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import org.apache.gravitino.storage.relational.po.CombinedUserPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
@@ -247,22 +248,34 @@ public class UserMetaService {
     return newEntity;
   }
 
-  public List<UserEntity> listUsersByNamespace(Namespace namespace) {
+  public List<UserEntity> listUsersByNamespace(Namespace namespace, boolean includeAllFields) {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
 
-    List<UserPO> userPOs =
-        SessionUtils.getWithoutCommit(
-            UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalake(metalakeName));
-
-    return userPOs.stream()
-        .map(
-            po ->
-                POConverters.fromUserPO(
-                    po,
-                    SupplierUtils.createRolePOsSupplier(po),
-                    AuthorizationUtils.ofUserNamespace(metalakeName)))
-        .collect(Collectors.toList());
+    if (includeAllFields) {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
+      List<CombinedUserPO> userPOs =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.listCombinedUserPOsByMetalakeId(metalakeId));
+      return userPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromCombinedUserPO(
+                      po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    } else {
+      List<UserPO> userPOs =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalake(metalakeName));
+      return userPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromUserPO(
+                      po,
+                      Collections.emptyList(),
+                      AuthorizationUtils.ofUserNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    }
   }
 
   public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {

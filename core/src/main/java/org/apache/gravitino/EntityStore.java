@@ -55,15 +55,19 @@ public interface EntityStore extends Closeable {
    * <p>Note. Depends on the isolation levels provided by the underlying storage, the returned list
    * may not be consistent.
    *
-   * @param namespace the namespace of the entities
    * @param <E> class of the entity
+   * @param namespace the namespace of the entities
    * @param type the detailed type of the entity
    * @param entityType the general type of the entity
-   * @throws IOException if the list operation fails
+   * @param includeAllFields Some fields will have heavier cost, EntityStore provide an option to
+   *     avoid fetching them to improve the performance. If true, the store fetch all the fields,
+   *     otherwise false.
    * @return the list of entities
+   * @throws IOException if the list operation fails
    */
   <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, EntityType entityType) throws IOException;
+      Namespace namespace, Class<E> type, EntityType entityType, boolean includeAllFields)
+      throws IOException;
 
   /**
    * Check if the entity with the specified {@link org.apache.gravitino.NameIdentifier} exists.

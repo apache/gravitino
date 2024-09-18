@@ -276,7 +276,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     checkMetalakeExists(metalakeIdent);
 
     try {
-      return store.list(namespace, CatalogEntity.class, EntityType.CATALOG).stream()
+      return store.list(namespace, CatalogEntity.class, EntityType.CATALOG, true).stream()
           .map(entity -> NameIdentifier.of(namespace, entity.name()))
           .toArray(NameIdentifier[]::new);
 
@@ -293,7 +293,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     try {
       List<CatalogEntity> catalogEntities =
-          store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
+          store.list(namespace, CatalogEntity.class, EntityType.CATALOG, true);
 
       // Using provider as key to avoid loading the same type catalog instance multiple times
       Map<String, Set<String>> hiddenProps = new HashMap<>();
@@ -573,7 +573,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             store.list(
                 Namespace.of(ident.namespace().level(0), ident.name()),
                 SchemaEntity.class,
-                EntityType.SCHEMA);
+                EntityType.SCHEMA,
+                true);
         // If there is only one schema, it must be the default schema, because we don't allow to
         // drop the default schema.
         if (schemas.size() == 1) {

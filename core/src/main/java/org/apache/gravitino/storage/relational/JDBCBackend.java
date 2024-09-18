@@ -88,7 +88,8 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType) throws IOException {
+      Namespace namespace, Entity.EntityType entityType, boolean includeAllFields)
+      throws IOException {
     switch (entityType) {
       case METALAKE:
         return (List<E>) MetalakeMetaService.getInstance().listMetalakes();
@@ -105,7 +106,8 @@ public class JDBCBackend implements RelationalBackend {
       case TAG:
         return (List<E>) TagMetaService.getInstance().listTagsByNamespace(namespace);
       case USER:
-        return (List<E>) UserMetaService.getInstance().listUsersByNamespace(namespace);
+        return (List<E>)
+            UserMetaService.getInstance().listUsersByNamespace(namespace, includeAllFields);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);

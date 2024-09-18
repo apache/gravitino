@@ -134,7 +134,7 @@ public class TestKvEntityStorage extends TestEntityStorage {
 
       // Test scan and store list interface
       List<CatalogEntity> catalogEntityList =
-          store.list(catalog.namespace(), CatalogEntity.class, Entity.EntityType.CATALOG);
+          store.list(catalog.namespace(), CatalogEntity.class, Entity.EntityType.CATALOG, true);
       Assertions.assertEquals(3, catalogEntityList.size());
       Assertions.assertTrue(catalogEntityList.contains(catalog));
       Assertions.assertTrue(catalogEntityList.contains(catalogCopy));

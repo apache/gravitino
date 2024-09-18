@@ -27,6 +27,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -126,6 +127,11 @@ class TestUserMetaService extends TestJDBCBackend {
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
     backend.insert(metalake, false);
 
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
     UserEntity user1 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
@@ -133,20 +139,43 @@ class TestUserMetaService extends TestJDBCBackend {
             "user1",
             auditInfo);
 
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace("metalake"),
+            "role1",
+            auditInfo,
+            "catalog");
+    backend.insert(role1, false);
+
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace("metalake"),
+            "role2",
+            auditInfo,
+            "catalog");
+    backend.insert(role2, false);
+
     UserEntity user2 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofUserNamespace("metalake"),
             "user2",
-            auditInfo);
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
 
     backend.insert(user1, false);
     backend.insert(user2, false);
 
     UserMetaService userMetaService = UserMetaService.getInstance();
-    Assertions.assertEquals(
-        Lists.newArrayList(user1, user2),
-        userMetaService.listUsersByNamespace(AuthorizationUtils.ofUserNamespace(metalakeName)));
+    List<UserEntity> actualUsers =
+        userMetaService.listUsersByNamespace(
+            AuthorizationUtils.ofUserNamespace(metalakeName), true);
+    actualUsers.sort(Comparator.comparing(UserEntity::name));
+
+    Assertions.assertEquals(Lists.newArrayList(user1, user2), actualUsers);
   }
 
   @Test

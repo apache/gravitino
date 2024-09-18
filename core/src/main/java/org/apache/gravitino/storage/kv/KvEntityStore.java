@@ -126,7 +126,8 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> e, EntityType type) throws IOException {
+      Namespace namespace, Class<E> e, EntityType type, boolean includeAllFields)
+      throws IOException {
     // Star means it's a wildcard
     List<E> entities = Lists.newArrayList();
     NameIdentifier identifier = NameIdentifier.of(namespace, BinaryEntityKeyEncoder.WILD_CARD);

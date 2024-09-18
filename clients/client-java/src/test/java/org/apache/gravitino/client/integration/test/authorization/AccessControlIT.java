@@ -79,13 +79,17 @@ public class AccessControlIT extends AbstractIT {
     String anotherUser = "another-user";
     metalake.addUser(anotherUser);
     String[] usernames = metalake.listUserNames();
+    Arrays.sort(usernames);
     Assertions.assertEquals(
         Lists.newArrayList(AuthConstants.ANONYMOUS_USER, anotherUser, username),
         Arrays.asList(usernames));
     User[] users = metalake.listUsers();
     Assertions.assertEquals(
         Lists.newArrayList(AuthConstants.ANONYMOUS_USER, anotherUser, username),
-        Arrays.stream(users).map(User::name).collect(Collectors.toList()));
+        Arrays.stream(users)
+            .map(User::name)
+            .sorted(String::compareTo)
+            .collect(Collectors.toList()));
 
     // Get a not-existed user
     Assertions.assertThrows(NoSuchUserException.class, () -> metalake.getUser("not-existed"));

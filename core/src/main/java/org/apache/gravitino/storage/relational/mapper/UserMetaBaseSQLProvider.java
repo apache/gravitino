@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
+import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
@@ -151,6 +152,27 @@ public class UserMetaBaseSQLProvider {
         + " mt ON ut.metalake_id = mt.metalake_id"
         + " WHERE mt.metalake_name = #{metalakeName}"
         + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
+  public String listCombinedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.audit_info as auditInfo,"
+        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
+        + " ut.deleted_at as deletedAt,"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + USER_ROLE_RELATION_TABLE_NAME
+        + " rt ON rt.user_id = ut.user_id"
+        + " JOIN "
+        + ROLE_TABLE_NAME
+        + " rot ON rot.role_id = rt.role_id"
+        + " WHERE "
+        + " ut.deleted_at = 0 AND rot.deleted_at = 0 AND rt.deleted_at = 0  AND ut.metalake_id = #{metalakeId}"
+        + " GROUP BY ut.user_id";
   }
 
   public String deleteUserMetasByLegacyTimeline(

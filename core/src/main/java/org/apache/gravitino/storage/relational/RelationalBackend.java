@@ -48,13 +48,17 @@ public interface RelationalBackend
    *
    * @param namespace The parent namespace of these entities.
    * @param entityType The type of these entities.
+   * @param includeAllFields Some fields will have heavier cost, EntityStore provide an option to
+   *     avoid fetching them to improve the performance. If true, the store fetch all the fields,
+   *     otherwise false.
    * @return The list of entities associated with the given parent namespace and entityType, or null
    *     if the entities does not exist.
    * @throws NoSuchEntityException If the corresponding parent entity of these list entities cannot
    *     be found.
    * @throws IOException If the store operation fails
    */
-  <E extends Entity & HasIdentifier> List<E> list(Namespace namespace, Entity.EntityType entityType)
+  <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Entity.EntityType entityType, boolean includeAllFields)
       throws NoSuchEntityException, IOException;
 
   /**
