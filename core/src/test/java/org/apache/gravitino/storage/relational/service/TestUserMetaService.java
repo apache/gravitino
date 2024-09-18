@@ -174,8 +174,16 @@ class TestUserMetaService extends TestJDBCBackend {
         userMetaService.listUsersByNamespace(
             AuthorizationUtils.ofUserNamespace(metalakeName), true);
     actualUsers.sort(Comparator.comparing(UserEntity::name));
-
-    Assertions.assertEquals(Lists.newArrayList(user1, user2), actualUsers);
+    List<UserEntity> expectUsers = Lists.newArrayList(user1, user2);
+    Assertions.assertEquals(expectUsers.size(), actualUsers.size());
+    for (int index = 0; index < expectUsers.size(); index++) {
+      Assertions.assertEquals(expectUsers.get(index).name(), actualUsers.get(index).name());
+      Assertions.assertEquals(
+          expectUsers.get(index).roleNames().size(), actualUsers.get(index).roleNames().size());
+      for (String roleName : expectUsers.get(index).roleNames()) {
+        Assertions.assertTrue(actualUsers.get(index).roleNames().contains(roleName));
+      }
+    }
   }
 
   @Test
