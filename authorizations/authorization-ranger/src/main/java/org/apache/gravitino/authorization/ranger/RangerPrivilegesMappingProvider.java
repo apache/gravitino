@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.gravitino.authorization.Privilege;
+
 /**
  * Ranger authorization use this provider to mapping Gravitino privilege to the Ranger privileges.
  * We can use this it to support the different Ranger authorization components, such as Hive, HDFS,
@@ -25,11 +30,11 @@ package org.apache.gravitino.authorization.ranger;
  */
 public interface RangerPrivilegesMappingProvider {
   /** Set the mapping Gravitino privilege name to the Ranger privileges rule. */
-  void privilegesMappingRule();
+  Map<Privilege.Name, Set<RangerPrivilege>> privilegesMappingRule();
 
   /** Set the owner privileges rule. */
-  void ownerMappingRule();
+  Set<RangerPrivilege> ownerMappingRule();
 
   /** Set the policy resource defines rule. */
-  void policyResourceDefinesRule();
+  List<String> policyResourceDefinesRule();
 }

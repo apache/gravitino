@@ -23,8 +23,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -69,11 +67,11 @@ public abstract class RangerAuthorizationPlugin
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
 
   /** Mapping Gravitino privilege name to the Ranger privileges configuration. */
-  protected Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping = new HashMap<>();
+  private Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping;
   /** The owner privileges, the owner can do anything on the metadata object configuration */
-  protected Set<RangerPrivilege> ownerPrivileges = new HashSet<>();
+  private Set<RangerPrivilege> ownerPrivileges;
   /** The Ranger policy resource defines configuration. */
-  protected List<String> policyResourceDefines;
+  private List<String> policyResourceDefines;
 
   protected String rangerServiceName;
   protected RangerClientExtend rangerClient;
@@ -95,9 +93,9 @@ public abstract class RangerAuthorizationPlugin
     rangerClient = new RangerClientExtend(rangerUrl, authType, rangerAdminName, password);
 
     // Initialize privilegesMapping and ownerPrivileges
-    ownerMappingRule();
-    privilegesMappingRule();
-    policyResourceDefinesRule();
+    ownerPrivileges = ownerMappingRule();
+    privilegesMapping = privilegesMappingRule();
+    policyResourceDefines = policyResourceDefinesRule();
 
     rangerHelper =
         new RangerHelper(

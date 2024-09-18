@@ -19,8 +19,11 @@
 package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.ranger.RangerPrivilege.RangerHivePrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
@@ -31,30 +34,29 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
   }
 
   /** Set the default mapping Gravitino privilege name to the Ranger rule */
-  public void privilegesMappingRule() {
-    privilegesMapping.put(
-        Privilege.Name.CREATE_SCHEMA, ImmutableSet.of(RangerHivePrivilege.CREATE));
-    privilegesMapping.put(Privilege.Name.CREATE_TABLE, ImmutableSet.of(RangerHivePrivilege.CREATE));
-    privilegesMapping.put(
+  public Map<Privilege.Name, Set<RangerPrivilege>> privilegesMappingRule() {
+    return ImmutableMap.of(
+        Privilege.Name.CREATE_SCHEMA,
+        ImmutableSet.of(RangerHivePrivilege.CREATE),
+        Privilege.Name.CREATE_TABLE,
+        ImmutableSet.of(RangerHivePrivilege.CREATE),
         Privilege.Name.MODIFY_TABLE,
         ImmutableSet.of(
-            RangerHivePrivilege.UPDATE, RangerHivePrivilege.ALTER, RangerHivePrivilege.WRITE));
-    privilegesMapping.put(
+            RangerHivePrivilege.UPDATE, RangerHivePrivilege.ALTER, RangerHivePrivilege.WRITE),
         Privilege.Name.SELECT_TABLE,
         ImmutableSet.of(RangerHivePrivilege.READ, RangerHivePrivilege.SELECT));
   }
 
   /** Set the default owner rule. */
-  public void ownerMappingRule() {
-    ownerPrivileges.add(RangerHivePrivilege.ALL);
+  public Set<RangerPrivilege> ownerMappingRule() {
+    return ImmutableSet.of(RangerHivePrivilege.ALL);
   }
 
   /** Set Ranger policy resource rule. */
-  public void policyResourceDefinesRule() {
-    policyResourceDefines =
-        ImmutableList.of(
-            PolicyResource.DATABASE.getName(),
-            PolicyResource.TABLE.getName(),
-            PolicyResource.COLUMN.getName());
+  public List<String> policyResourceDefinesRule() {
+    return ImmutableList.of(
+        PolicyResource.DATABASE.getName(),
+        PolicyResource.TABLE.getName(),
+        PolicyResource.COLUMN.getName());
   }
 }
