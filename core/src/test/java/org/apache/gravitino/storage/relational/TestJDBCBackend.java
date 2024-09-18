@@ -45,7 +45,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -601,7 +600,8 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace("metalake"),
             "user",
             auditInfo,
-            Lists.newArrayList(role));
+            Lists.newArrayList(role.name()),
+            Lists.newArrayList(role.id()));
     backend.insert(user, false);
 
     GroupEntity group =
@@ -610,7 +610,8 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace("metalake"),
             "group",
             auditInfo,
-            Lists.newArrayList(role));
+            Lists.newArrayList(role.name()),
+            Lists.newArrayList(role.id()));
     backend.insert(group, false);
 
     TagEntity tag =
@@ -687,7 +688,8 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace("another-metalake"),
             "another-user",
             auditInfo,
-            Lists.newArrayList(anotherRole));
+            Lists.newArrayList(anotherRole.name()),
+            Lists.newArrayList(anotherRole.id()));
     backend.insert(anotherUser, false);
 
     GroupEntity anotherGroup =
@@ -696,7 +698,8 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace("another-metalake"),
             "another-group",
             auditInfo,
-            Lists.newArrayList(anotherRole));
+            Lists.newArrayList(anotherRole.name()),
+            Lists.newArrayList(anotherRole.id()));
     backend.insert(anotherGroup, false);
 
     TagEntity anotherTagEntity =
@@ -1109,7 +1112,8 @@ public class TestJDBCBackend {
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(null)
+        .withRoleIds(null)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -1119,12 +1123,14 @@ public class TestJDBCBackend {
       Namespace namespace,
       String name,
       AuditInfo auditInfo,
-      List<RoleEntity> roleEntities) {
+      List<String> roleNames,
+      List<Long> roleIds) {
     return UserEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoles(roleEntities)
+        .withRoleNames(roleNames)
+        .withRoleIds(roleIds)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -1150,18 +1156,25 @@ public class TestJDBCBackend {
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(null)
+        .withRoleIds(null)
         .withAuditInfo(auditInfo)
         .build();
   }
 
   public static GroupEntity createGroupEntity(
-      Long id, Namespace namespace, String name, AuditInfo auditInfo, List<RoleEntity> roles) {
+      Long id,
+      Namespace namespace,
+      String name,
+      AuditInfo auditInfo,
+      List<String> roleNames,
+      List<Long> roleIds) {
     return GroupEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoles(roles)
+        .withRoleNames(roleNames)
+        .withRoleIds(roleIds)
         .withAuditInfo(auditInfo)
         .build();
   }

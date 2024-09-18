@@ -30,7 +30,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
@@ -110,11 +109,13 @@ class TestUserMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user2",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     userMetaService.insertUser(user2, false);
     UserEntity actualUser = userMetaService.getUserByIdentifier(user2.nameIdentifier());
     Assertions.assertEquals(user2.name(), actualUser.name());
-    Assertions.assertEquals(Sets.newHashSet(user2.roles()), Sets.newHashSet(actualUser.roles()));
+    Assertions.assertEquals(
+        Sets.newHashSet(user2.roleNames()), Sets.newHashSet(actualUser.roleNames()));
   }
 
   @Test
@@ -192,11 +193,13 @@ class TestUserMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user2",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     Assertions.assertDoesNotThrow(() -> userMetaService.insertUser(user2, false));
     UserEntity actualUser = userMetaService.getUserByIdentifier(user2.nameIdentifier());
     Assertions.assertEquals(user2.name(), actualUser.name());
-    Assertions.assertEquals(Sets.newHashSet(user2.roles()), Sets.newHashSet(actualUser.roles()));
+    Assertions.assertEquals(
+        Sets.newHashSet(user2.roleNames()), Sets.newHashSet(actualUser.roleNames()));
 
     // insert duplicate user with roles
     UserEntity user2Exist =
@@ -215,15 +218,17 @@ class TestUserMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user2Overwrite",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     Assertions.assertDoesNotThrow(() -> userMetaService.insertUser(user2Overwrite, true));
 
     UserEntity actualOverwriteUser2 =
         userMetaService.getUserByIdentifier(user2Overwrite.nameIdentifier());
     Assertions.assertEquals("user2Overwrite", actualOverwriteUser2.name());
-    Assertions.assertEquals(2, actualOverwriteUser2.roles().size());
+    Assertions.assertEquals(2, actualOverwriteUser2.roleNames().size());
     Assertions.assertEquals(
-        Sets.newHashSet(role1.name(), role2.name()), Sets.newHashSet(actualOverwriteUser2.roles()));
+        Sets.newHashSet(role1.name(), role2.name()),
+        Sets.newHashSet(actualOverwriteUser2.roleNames()));
 
     // insert overwrite user with 1 role
     RoleEntity role3 =
@@ -240,14 +245,15 @@ class TestUserMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user3Overwrite",
             auditInfo,
-            Lists.newArrayList(role3));
+            Lists.newArrayList(role3.name()),
+            Lists.newArrayList(role3.id()));
     Assertions.assertDoesNotThrow(() -> userMetaService.insertUser(user3Overwrite, true));
 
     UserEntity actualOverwriteUser3 =
         userMetaService.getUserByIdentifier(user3Overwrite.nameIdentifier());
     Assertions.assertEquals("user3Overwrite", actualOverwriteUser3.name());
-    Assertions.assertEquals(1, actualOverwriteUser3.roles().size());
-    Assertions.assertEquals("role3", actualOverwriteUser3.roles().get(0));
+    Assertions.assertEquals(1, actualOverwriteUser3.roleNames().size());
+    Assertions.assertEquals("role3", actualOverwriteUser3.roleNames().get(0));
 
     // insert overwrite user with 0 roles
     UserEntity user4Overwrite =
@@ -261,7 +267,7 @@ class TestUserMetaService extends TestJDBCBackend {
     UserEntity actualOverwriteUser4 =
         userMetaService.getUserByIdentifier(user4Overwrite.nameIdentifier());
     Assertions.assertEquals("user4Overwrite", actualOverwriteUser4.name());
-    Assertions.assertTrue(actualOverwriteUser4.roles().isEmpty());
+    Assertions.assertNull(actualOverwriteUser4.roleNames());
   }
 
   @Test
@@ -332,7 +338,8 @@ class TestUserMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user2",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     userMetaService.insertUser(user2, false);
     List<RolePO> rolePOs =
         SessionUtils.doWithCommitAndFetchResult(
@@ -340,7 +347,8 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(2, rolePOs.size());
     UserEntity actualUser = userMetaService.getUserByIdentifier(user2.nameIdentifier());
     Assertions.assertEquals(user2.name(), actualUser.name());
-    Assertions.assertEquals(Sets.newHashSet(user2.roles()), Sets.newHashSet(actualUser.roles()));
+    Assertions.assertEquals(
+        Sets.newHashSet(user2.roleNames()), Sets.newHashSet(actualUser.roleNames()));
 
     Assertions.assertTrue(userMetaService.deleteUser(user2.nameIdentifier()));
     Assertions.assertThrows(
@@ -389,11 +397,13 @@ class TestUserMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user1",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     userMetaService.insertUser(user1, false);
     UserEntity actualUser = userMetaService.getUserByIdentifier(user1.nameIdentifier());
     Assertions.assertEquals(user1.name(), actualUser.name());
-    Assertions.assertEquals(Sets.newHashSet(user1.roles()), Sets.newHashSet(actualUser.roles()));
+    Assertions.assertEquals(
+        Sets.newHashSet(user1.roleNames()), Sets.newHashSet(actualUser.roleNames()));
 
     RoleEntity role3 =
         createRoleEntity(
@@ -415,14 +425,17 @@ class TestUserMetaService extends TestJDBCBackend {
                   .withLastModifiedTime(Instant.now())
                   .build();
 
-          List<RoleEntity> roleEntities = Lists.newArrayList(user.roleEntities());
-          roleEntities.add(role3);
+          List<String> roleNames = Lists.newArrayList(user.roleNames());
+          List<Long> roleIds = Lists.newArrayList(user.roleIds());
+          roleNames.add(role3.name());
+          roleIds.add(role3.id());
 
           return UserEntity.builder()
               .withNamespace(user.namespace())
               .withId(user.id())
               .withName(user.name())
-              .withRoles(roleEntities)
+              .withRoleNames(roleNames)
+              .withRoleIds(roleIds)
               .withAuditInfo(updateAuditInfo)
               .build();
         };
@@ -433,10 +446,9 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(user1.id(), grantUser.id());
     Assertions.assertEquals(user1.name(), grantUser.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role2", "role3"), Sets.newHashSet(grantUser.roles()));
+        Sets.newHashSet("role1", "role2", "role3"), Sets.newHashSet(grantUser.roleNames()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role2.id(), role3.id()),
-        grantUser.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet()));
+        Sets.newHashSet(role1.id(), role2.id(), role3.id()), Sets.newHashSet(grantUser.roleIds()));
     Assertions.assertEquals("creator", grantUser.auditInfo().creator());
     Assertions.assertEquals("grantUser", grantUser.auditInfo().lastModifier());
 
@@ -451,15 +463,17 @@ class TestUserMetaService extends TestJDBCBackend {
                   .withLastModifiedTime(Instant.now())
                   .build();
 
-          List<String> roleNames = Lists.newArrayList(user.roles());
-          List<RoleEntity> roleEntities = Lists.newArrayList(user.roleEntities());
-          roleEntities.remove(roleNames.indexOf("role2"));
+          List<String> roleNames = Lists.newArrayList(user.roleNames());
+          List<Long> roleIds = Lists.newArrayList(user.roleIds());
+          roleIds.remove(roleNames.indexOf("role2"));
+          roleNames.remove("role2");
 
           return UserEntity.builder()
               .withNamespace(user.namespace())
               .withId(user.id())
               .withName(user.name())
-              .withRoles(roleEntities)
+              .withRoleNames(roleNames)
+              .withRoleIds(roleIds)
               .withAuditInfo(updateAuditInfo)
               .build();
         };
@@ -469,10 +483,10 @@ class TestUserMetaService extends TestJDBCBackend {
         UserMetaService.getInstance().getUserByIdentifier(user1.nameIdentifier());
     Assertions.assertEquals(user1.id(), revokeUser.id());
     Assertions.assertEquals(user1.name(), revokeUser.name());
-    Assertions.assertEquals(Sets.newHashSet("role1", "role3"), Sets.newHashSet(revokeUser.roles()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role3.id()),
-        revokeUser.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet()));
+        Sets.newHashSet("role1", "role3"), Sets.newHashSet(revokeUser.roleNames()));
+    Assertions.assertEquals(
+        Sets.newHashSet(role1.id(), role3.id()), Sets.newHashSet(revokeUser.roleIds()));
     Assertions.assertEquals("creator", revokeUser.auditInfo().creator());
     Assertions.assertEquals("revokeUser", revokeUser.auditInfo().lastModifier());
 
@@ -496,16 +510,19 @@ class TestUserMetaService extends TestJDBCBackend {
                   .withLastModifiedTime(Instant.now())
                   .build();
 
-          List<String> roleNames = Lists.newArrayList(user.roles());
-          List<RoleEntity> roleEntities = Lists.newArrayList(user.roleEntities());
-          roleEntities.remove(roleNames.indexOf("role3"));
-          roleEntities.add(role4);
+          List<String> roleNames = Lists.newArrayList(user.roleNames());
+          List<Long> roleIds = Lists.newArrayList(user.roleIds());
+          roleIds.remove(roleNames.indexOf("role3"));
+          roleNames.remove("role3");
+          roleIds.add(role4.id());
+          roleNames.add(role4.name());
 
           return UserEntity.builder()
               .withNamespace(user.namespace())
               .withId(user.id())
               .withName(user.name())
-              .withRoles(roleEntities)
+              .withRoleNames(roleNames)
+              .withRoleIds(roleIds)
               .withAuditInfo(updateAuditInfo)
               .build();
         };
@@ -516,10 +533,9 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(user1.id(), grantRevokeUser.id());
     Assertions.assertEquals(user1.name(), grantRevokeUser.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role4"), Sets.newHashSet(grantRevokeUser.roles()));
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(grantRevokeUser.roleNames()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role4.id()),
-        grantRevokeUser.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet()));
+        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(grantRevokeUser.roleIds()));
     Assertions.assertEquals("creator", grantRevokeUser.auditInfo().creator());
     Assertions.assertEquals("grantRevokeUser", grantRevokeUser.auditInfo().lastModifier());
 
@@ -533,13 +549,15 @@ class TestUserMetaService extends TestJDBCBackend {
                   .withLastModifiedTime(Instant.now())
                   .build();
 
-          List<RoleEntity> roleEntities = Lists.newArrayList(user.roleEntities());
+          List<String> roleNames = Lists.newArrayList(user.roleNames());
+          List<Long> roleIds = Lists.newArrayList(user.roleIds());
 
           return UserEntity.builder()
               .withNamespace(user.namespace())
               .withId(user.id())
               .withName(user.name())
-              .withRoles(roleEntities)
+              .withRoleNames(roleNames)
+              .withRoleIds(roleIds)
               .withAuditInfo(updateAuditInfo)
               .build();
         };
@@ -549,10 +567,9 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(user1.id(), noUpdaterUser.id());
     Assertions.assertEquals(user1.name(), noUpdaterUser.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role4"), Sets.newHashSet(noUpdaterUser.roles()));
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(noUpdaterUser.roleNames()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role4.id()),
-        noUpdaterUser.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet()));
+        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(noUpdaterUser.roleIds()));
     Assertions.assertEquals("creator", noUpdaterUser.auditInfo().creator());
     Assertions.assertEquals("grantRevokeUser", noUpdaterUser.auditInfo().lastModifier());
 
@@ -560,7 +577,7 @@ class TestUserMetaService extends TestJDBCBackend {
     RoleMetaService.getInstance().deleteRole(role1.nameIdentifier());
     UserEntity userEntity =
         UserMetaService.getInstance().getUserByIdentifier(user1.nameIdentifier());
-    Assertions.assertEquals(Sets.newHashSet("role4"), Sets.newHashSet(userEntity.roles()));
+    Assertions.assertEquals(Sets.newHashSet("role4"), Sets.newHashSet(userEntity.roleNames()));
   }
 
   @Test
@@ -608,14 +625,16 @@ class TestUserMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user1",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     UserEntity user2 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user2",
             auditInfo,
-            Lists.newArrayList(role3));
+            Lists.newArrayList(role3.name()),
+            Lists.newArrayList(role3.id()));
     userMetaService.insertUser(user1, false);
     userMetaService.insertUser(user2, false);
 
@@ -687,14 +706,16 @@ class TestUserMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user1",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     UserEntity user2 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user2",
             auditInfo,
-            Lists.newArrayList(role3));
+            Lists.newArrayList(role3.name()),
+            Lists.newArrayList(role3.id()));
     userMetaService.insertUser(user1, false);
     userMetaService.insertUser(user2, false);
 
@@ -757,28 +778,32 @@ class TestUserMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user1",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     UserEntity user2 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user2",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     UserEntity user3 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user3",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     UserEntity user4 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user4",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     userMetaService.insertUser(user1, false);
     userMetaService.insertUser(user2, false);
     userMetaService.insertUser(user3, false);
