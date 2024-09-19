@@ -40,8 +40,8 @@ import org.slf4j.LoggerFactory;
  * The class extends the RangerClient class and provides additional methods to create, search and
  * delete users and groups
  */
-public class RangerClientExtend extends RangerClient {
-  private static final Logger LOG = LoggerFactory.getLogger(RangerClientExtend.class);
+public class RangerClientExtension extends RangerClient {
+  private static final Logger LOG = LoggerFactory.getLogger(RangerClientExtension.class);
   private static final String URI_USER_BASE = "/service/xusers/users";
   private static final String URI_USER_BY_ID = URI_USER_BASE + "/%d";
   private static final String URI_GROUP_BASE = "/service/xusers/groups";
@@ -75,7 +75,7 @@ public class RangerClientExtend extends RangerClient {
   // private void callAPI(API api, Map<String, String> params) throws RangerServiceException
   private Method callAPIMethodNonResponse;
 
-  public RangerClientExtend(String hostName, String authType, String username, String password) {
+  public RangerClientExtension(String hostName, String authType, String username, String password) {
     super(hostName, authType, username, password, null);
 
     // initialize callAPI method

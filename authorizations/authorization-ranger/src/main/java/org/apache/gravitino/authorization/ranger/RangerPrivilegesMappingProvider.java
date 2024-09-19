@@ -18,24 +18,23 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
+import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.connector.authorization.BaseAuthorization;
+import java.util.Set;
+import org.apache.gravitino.authorization.Privilege;
 
-/** Implementation of a Ranger authorization in Gravitino. */
-public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> {
-  @Override
-  public String shortName() {
-    return "ranger";
-  }
+/**
+ * Ranger authorization use this provider to mapping Gravitino privilege to the Ranger privileges.
+ * We can use this it to support the different Ranger authorization components, such as Hive, HDFS,
+ * HBase, etc.
+ */
+public interface RangerPrivilegesMappingProvider {
+  /** Set the mapping Gravitino privilege name to the Ranger privileges rule. */
+  Map<Privilege.Name, Set<RangerPrivilege>> privilegesMappingRule();
 
-  @Override
-  protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
-    switch (catalogProvider) {
-      case "hive":
-        return RangerAuthorizationHivePlugin.getInstance(config);
-      default:
-        throw new IllegalArgumentException("Unknown catalog provider: " + catalogProvider);
-    }
-  }
+  /** Set the owner privileges rule. */
+  Set<RangerPrivilege> ownerMappingRule();
+
+  /** Set the policy resource defines rule. */
+  List<String> policyResourceDefinesRule();
 }
