@@ -25,6 +25,7 @@ import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -48,10 +49,9 @@ public interface RelationalBackend
    *
    * @param namespace The parent namespace of these entities.
    * @param entityType The type of these entities.
-   * @param includeAllFields Some fields may have a relatively high acquisition cost, EntityStore
+   * @param allowMissingFields Some fields may have a relatively high acquisition cost, EntityStore
    *     provide an optional setting to avoid fetching these high-cost fields to improve the
-   *     performance. If true, the store fetches all the fields, Otherwise, it will avoid fetch
-   *     specific high-cost fields.
+   *     performance.
    * @return The list of entities associated with the given parent namespace and entityType, or null
    *     if the entities does not exist.
    * @throws NoSuchEntityException If the corresponding parent entity of these list entities cannot
@@ -59,7 +59,7 @@ public interface RelationalBackend
    * @throws IOException If the store operation fails
    */
   <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType, boolean includeAllFields)
+      Namespace namespace, Entity.EntityType entityType, List<Field> allowMissingFields)
       throws NoSuchEntityException, IOException;
 
   /**

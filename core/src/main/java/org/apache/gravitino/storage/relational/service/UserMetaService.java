@@ -30,6 +30,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -248,22 +249,13 @@ public class UserMetaService {
     return newEntity;
   }
 
-  public List<UserEntity> listUsersByNamespace(Namespace namespace, boolean includeAllFields) {
+  public List<UserEntity> listUsersByNamespace(
+      Namespace namespace, List<Field> allowMissingFields) {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
 
-    if (includeAllFields) {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
-      List<CombinedUserPO> userPOs =
-          SessionUtils.getWithoutCommit(
-              UserMetaMapper.class, mapper -> mapper.listCombinedUserPOsByMetalakeId(metalakeId));
-      return userPOs.stream()
-          .map(
-              po ->
-                  POConverters.fromCombinedUserPO(
-                      po, AuthorizationUtils.ofUserNamespace(metalakeName)))
-          .collect(Collectors.toList());
-    } else {
+    if (allowMissingFields.contains(UserEntity.ROLE_IDS)
+        && allowMissingFields.contains(UserEntity.ROLE_NAMES)) {
       List<UserPO> userPOs =
           SessionUtils.getWithoutCommit(
               UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalake(metalakeName));
@@ -274,6 +266,18 @@ public class UserMetaService {
                       po,
                       Collections.emptyList(),
                       AuthorizationUtils.ofUserNamespace(metalakeName)))
+          .collect(Collectors.toList());
+
+    } else {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
+      List<CombinedUserPO> userPOs =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.listCombinedUserPOsByMetalakeId(metalakeId));
+      return userPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromCombinedUserPO(
+                      po, AuthorizationUtils.ofUserNamespace(metalakeName)))
           .collect(Collectors.toList());
     }
   }

@@ -23,9 +23,11 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -114,19 +116,23 @@ class UserGroupManager {
   }
 
   String[] listUserNames(String metalake) {
-    return Arrays.stream(listUsersInternal(metalake, false)).map(User::name).toArray(String[]::new);
+    return Arrays.stream(
+            listUsersInternal(
+                metalake, Lists.newArrayList(UserEntity.ROLE_NAMES, UserEntity.ROLE_IDS)))
+        .map(User::name)
+        .toArray(String[]::new);
   }
 
   User[] listUsers(String metalake) {
-    return listUsersInternal(metalake, true);
+    return listUsersInternal(metalake, Collections.emptyList());
   }
 
-  private User[] listUsersInternal(String metalake, boolean includeAllFields) {
+  private User[] listUsersInternal(String metalake, List<Field> allowMissingFields) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
 
       Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
-      return store.list(namespace, UserEntity.class, Entity.EntityType.USER, includeAllFields)
+      return store.list(namespace, UserEntity.class, Entity.EntityType.USER, allowMissingFields)
           .stream()
           .map(entity -> (User) entity)
           .toArray(User[]::new);

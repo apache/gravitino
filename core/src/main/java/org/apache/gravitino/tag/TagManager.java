@@ -98,7 +98,11 @@ public class TagManager {
 
           try {
             return entityStore
-                .list(ofTagNamespace(metalake), TagEntity.class, Entity.EntityType.TAG, true)
+                .list(
+                    ofTagNamespace(metalake),
+                    TagEntity.class,
+                    Entity.EntityType.TAG,
+                    Collections.emptyList())
                 .stream()
                 .toArray(Tag[]::new);
           } catch (IOException ioe) {

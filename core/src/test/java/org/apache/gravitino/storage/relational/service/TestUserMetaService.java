@@ -27,6 +27,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -172,7 +173,7 @@ class TestUserMetaService extends TestJDBCBackend {
     UserMetaService userMetaService = UserMetaService.getInstance();
     List<UserEntity> actualUsers =
         userMetaService.listUsersByNamespace(
-            AuthorizationUtils.ofUserNamespace(metalakeName), true);
+            AuthorizationUtils.ofUserNamespace(metalakeName), Collections.emptyList());
     actualUsers.sort(Comparator.comparing(UserEntity::name));
     List<UserEntity> expectUsers = Lists.newArrayList(user1, user2);
     Assertions.assertEquals(expectUsers.size(), actualUsers.size());

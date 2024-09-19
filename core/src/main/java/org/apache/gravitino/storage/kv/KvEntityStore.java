@@ -47,6 +47,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntitySerDe;
 import org.apache.gravitino.EntitySerDeFactory;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -126,7 +127,7 @@ public class KvEntityStore implements EntityStore {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> e, EntityType type, boolean includeAllFields)
+      Namespace namespace, Class<E> e, EntityType type, List<Field> allowMissingFields)
       throws IOException {
     // Star means it's a wildcard
     List<E> entities = Lists.newArrayList();

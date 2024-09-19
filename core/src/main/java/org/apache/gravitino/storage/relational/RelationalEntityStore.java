@@ -30,6 +30,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntitySerDe;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -88,9 +89,12 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean includeAllFields)
+      Namespace namespace,
+      Class<E> type,
+      Entity.EntityType entityType,
+      List<Field> allowMissingFields)
       throws IOException {
-    return backend.list(namespace, entityType, true);
+    return backend.list(namespace, entityType, allowMissingFields);
   }
 
   @Override

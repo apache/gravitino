@@ -59,15 +59,14 @@ public interface EntityStore extends Closeable {
    * @param namespace the namespace of the entities
    * @param type the detailed type of the entity
    * @param entityType the general type of the entity
-   * @param includeAllFields Some fields may have a relatively high acquisition cost, EntityStore
+   * @param allowMissingFields Some fields may have a relatively high acquisition cost, EntityStore
    *     provide an optional setting to avoid fetching these high-cost fields to improve the
-   *     performance. If true, the store fetches all the fields, Otherwise, it will avoid fetch
-   *     specific high-cost fields.
+   *     performance.
    * @return the list of entities
    * @throws IOException if the list operation fails
    */
   <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, EntityType entityType, boolean includeAllFields)
+      Namespace namespace, Class<E> type, EntityType entityType, List<Field> allowMissingFields)
       throws IOException;
 
   /**

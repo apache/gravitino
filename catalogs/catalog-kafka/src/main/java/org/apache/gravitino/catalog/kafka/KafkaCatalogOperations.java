@@ -391,7 +391,8 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     try {
       List<SchemaEntity> schemas =
-          store.list(namespace, SchemaEntity.class, Entity.EntityType.SCHEMA, true);
+          store.list(
+              namespace, SchemaEntity.class, Entity.EntityType.SCHEMA, Collections.emptyList());
       return schemas.stream()
           .map(s -> NameIdentifier.of(namespace, s.name()))
           .toArray(NameIdentifier[]::new);

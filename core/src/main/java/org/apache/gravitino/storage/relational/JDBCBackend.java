@@ -31,6 +31,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -88,7 +89,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType, boolean includeAllFields)
+      Namespace namespace, Entity.EntityType entityType, List<Field> allowMissingFields)
       throws IOException {
     switch (entityType) {
       case METALAKE:
@@ -107,7 +108,7 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) TagMetaService.getInstance().listTagsByNamespace(namespace);
       case USER:
         return (List<E>)
-            UserMetaService.getInstance().listUsersByNamespace(namespace, includeAllFields);
+            UserMetaService.getInstance().listUsersByNamespace(namespace, allowMissingFields);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);

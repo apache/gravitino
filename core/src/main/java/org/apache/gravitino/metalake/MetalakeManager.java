@@ -21,6 +21,7 @@ package org.apache.gravitino.metalake;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -72,7 +73,9 @@ public class MetalakeManager implements MetalakeDispatcher {
   @Override
   public BaseMetalake[] listMetalakes() {
     try {
-      return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE, true).stream()
+      return store
+          .list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE, Collections.emptyList())
+          .stream()
           .toArray(BaseMetalake[]::new);
     } catch (IOException ioe) {
       LOG.error("Listing Metalakes failed due to storage issues.", ioe);
