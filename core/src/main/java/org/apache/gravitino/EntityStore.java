@@ -59,9 +59,10 @@ public interface EntityStore extends Closeable {
    * @param namespace the namespace of the entities
    * @param type the detailed type of the entity
    * @param entityType the general type of the entity
-   * @param includeAllFields Some fields will have heavier cost, EntityStore provide an option to
-   *     avoid fetching them to improve the performance. If true, the store fetch all the fields,
-   *     otherwise false.
+   * @param includeAllFields Some fields may have a relatively high acquisition cost, EntityStore
+   *     provide an optional setting to avoid fetching these high-cost fields to improve the
+   *     performance. If true, the store fetches all the fields, Otherwise, it will avoid fetch
+   *     specific high-cost fields.
    * @return the list of entities
    * @throws IOException if the list operation fails
    */

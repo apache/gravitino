@@ -729,6 +729,13 @@ public class POConverters {
     }
   }
 
+  /**
+   * Convert {@link CombinedUserPO} to {@link UserEntity}
+   *
+   * @param userPO CombinedUserPo object to be converted
+   * @param namespace Namespace object to be associated with the user
+   * @return UserEntity object from CombinedUserPO object
+   */
   public static UserEntity fromCombinedUserPO(CombinedUserPO userPO, Namespace namespace) {
     try {
       UserEntity.Builder builder =
