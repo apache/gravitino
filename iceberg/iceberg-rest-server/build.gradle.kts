@@ -106,12 +106,12 @@ tasks {
   )
 
   val copyLicenseAndNotice by creating(Copy::class) {
-    from(icebergLicense) {
-      rename { "LICENSE" }
+    from(icebergLicense)  {
+      rename {"LICENSE"}
     }
     into("$buildDir/META-INF")
     from(icebergNotice) {
-      rename { "NOTICE" }
+      rename {"NOTICE"}
     }
     into("$buildDir/META-INF")
   }
