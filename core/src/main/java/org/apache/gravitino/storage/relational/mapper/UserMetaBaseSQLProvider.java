@@ -164,14 +164,16 @@ public class UserMetaBaseSQLProvider {
         + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM "
         + USER_TABLE_NAME
-        + " ut JOIN "
+        + " ut LEFT OUTER JOIN "
         + USER_ROLE_RELATION_TABLE_NAME
         + " rt ON rt.user_id = ut.user_id"
-        + " JOIN "
+        + " LEFT OUTER JOIN "
         + ROLE_TABLE_NAME
         + " rot ON rot.role_id = rt.role_id"
         + " WHERE "
-        + " ut.deleted_at = 0 AND rot.deleted_at = 0 AND rt.deleted_at = 0  AND ut.metalake_id = #{metalakeId}"
+        + " ut.deleted_at = 0 AND"
+        + " (rot.deleted_at = 0 OR rot.deleted_at is NULL) AND"
+        + " (rt.deleted_at = 0 OR rt.deleted_at is NULL) AND ut.metalake_id = #{metalakeId}"
         + " GROUP BY ut.user_id";
   }
 
