@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.hive;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
@@ -28,8 +26,8 @@ import static org.apache.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static org.apache.gravitino.catalog.hive.HiveTable.TABLE_TYPE_PROP;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
-import static org.apache.gravitino.catalog.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.apache.gravitino.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -71,6 +69,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -167,8 +166,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     initKerberosIfNecessary(conf, hadoopConf);
 
-    this.clientPool =
-        new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
+    this.clientPool = new CachedClientPool(hiveConf, conf);
 
     this.listAllTables = enableListAllTables(conf);
   }
@@ -282,19 +280,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  @VisibleForTesting
-  int getClientPoolSize(Map<String, String> conf) {
-    return (int)
-        propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, CLIENT_POOL_SIZE);
-  }
-
-  long getCacheEvictionInterval(Map<String, String> conf) {
-    return (long)
-        propertiesMetadata
-            .catalogPropertiesMetadata()
-            .getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
-  }
-
   boolean enableListAllTables(Map<String, String> conf) {
     return (boolean)
         propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, LIST_ALL_TABLES);
@@ -372,7 +357,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withName(ident.name())
               .withComment(comment)
               .withProperties(properties)
-              .withConf(hiveConf)
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(UserGroupInformation.getCurrentUser().getUserName())
@@ -413,7 +397,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public HiveSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     try {
       Database database = clientPool.run(client -> client.getDatabase(ident.name()));
-      HiveSchema hiveSchema = HiveSchema.fromHiveDB(database, hiveConf);
+      HiveSchema hiveSchema = HiveSchema.fromHiveDB(database);
 
       LOG.info("Loaded Hive schema (database) {} from Hive Metastore ", ident.name());
       return hiveSchema;
@@ -477,7 +461,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           });
 
       LOG.info("Altered Hive schema (database) {} in Hive Metastore", ident.name());
-      return HiveSchema.fromHiveDB(alteredDatabase, hiveConf);
+      return HiveSchema.fromHiveDB(alteredDatabase);
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchSchemaException(

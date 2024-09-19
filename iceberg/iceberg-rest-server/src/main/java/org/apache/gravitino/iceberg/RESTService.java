@@ -23,9 +23,9 @@ import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
-import org.apache.gravitino.iceberg.service.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
@@ -48,7 +48,7 @@ public class RESTService implements GravitinoAuxiliaryService {
   public static final String SERVICE_NAME = "iceberg-rest";
   public static final String ICEBERG_SPEC = "/iceberg/*";
 
-  private IcebergTableOpsManager icebergTableOpsManager;
+  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
 
   private void initServer(IcebergConfig icebergConfig) {
@@ -66,13 +66,13 @@ public class RESTService implements GravitinoAuxiliaryService {
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);
 
-    icebergTableOpsManager = new IcebergTableOpsManager(icebergConfig.getAllConfig());
+    icebergCatalogWrapperManager = new IcebergCatalogWrapperManager(icebergConfig.getAllConfig());
     icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
     config.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(icebergTableOpsManager).to(IcebergTableOpsManager.class).ranked(1);
+            bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
           }
         });
@@ -114,8 +114,8 @@ public class RESTService implements GravitinoAuxiliaryService {
       server.stop();
       LOG.info("Iceberg REST service stopped");
     }
-    if (icebergTableOpsManager != null) {
-      icebergTableOpsManager.close();
+    if (icebergCatalogWrapperManager != null) {
+      icebergCatalogWrapperManager.close();
     }
     if (icebergMetricsManager != null) {
       icebergMetricsManager.close();
