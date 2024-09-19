@@ -96,26 +96,13 @@ tasks {
     from(configurations.runtimeClasspath)
     into("build/libs")
   }
-
-  val icebergLicense: TextResource = resources.text.fromUri(
-    "https://raw.githubusercontent.com/apache/iceberg/refs/heads/main/LICENSE"
-  )
-
-  val icebergNotice: TextResource = resources.text.fromUri(
-    "https://raw.githubusercontent.com/apache/iceberg/refs/heads/main/NOTICE"
-  )
-
   val copyLicenseAndNotice by creating(Copy::class) {
-    from(icebergLicense)  {
-      rename {"LICENSE"}
-    }
-    into("$buildDir/META-INF")
-    from(icebergNotice) {
-      rename {"NOTICE"}
+    from(rootDir) {
+      include("LICENSE")
+      include("NOTICE")
     }
     into("$buildDir/META-INF")
   }
-
   jar {
     finalizedBy(copyDepends)
     dependsOn(copyLicenseAndNotice)
