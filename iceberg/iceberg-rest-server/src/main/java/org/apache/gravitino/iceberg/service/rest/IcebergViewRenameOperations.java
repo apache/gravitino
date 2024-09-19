@@ -30,8 +30,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
-import org.apache.gravitino.iceberg.service.IcebergTableOpsManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
@@ -44,11 +44,11 @@ public class IcebergViewRenameOperations {
   @Context
   private HttpServletRequest httpRequest;
 
-  private IcebergTableOpsManager icebergTableOpsManager;
+  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
 
   @Inject
-  public IcebergViewRenameOperations(IcebergTableOpsManager icebergTableOpsManager) {
-    this.icebergTableOpsManager = icebergTableOpsManager;
+  public IcebergViewRenameOperations(IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+    this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
   }
 
   @POST
@@ -56,7 +56,7 @@ public class IcebergViewRenameOperations {
   @Timed(name = "rename-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "rename-view", absolute = true)
   public Response renameView(@PathParam("prefix") String prefix, RenameTableRequest request) {
-    icebergTableOpsManager.getOps(prefix).renameView(request);
+    icebergCatalogWrapperManager.getOps(prefix).renameView(request);
     return IcebergRestUtils.noContent();
   }
 }

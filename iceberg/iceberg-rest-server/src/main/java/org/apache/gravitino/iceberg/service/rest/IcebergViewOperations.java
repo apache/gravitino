@@ -33,8 +33,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
-import org.apache.gravitino.iceberg.service.IcebergTableOpsManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
@@ -48,15 +48,15 @@ import org.apache.iceberg.rest.responses.LoadViewResponse;
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergViewOperations {
 
-  private IcebergTableOpsManager icebergTableOpsManager;
+  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
 
   @SuppressWarnings("UnusedVariable")
   @Context
   private HttpServletRequest httpRequest;
 
   @Inject
-  public IcebergViewOperations(IcebergTableOpsManager icebergTableOpsManager) {
-    this.icebergTableOpsManager = icebergTableOpsManager;
+  public IcebergViewOperations(IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+    this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
   }
 
   @GET
@@ -66,7 +66,7 @@ public class IcebergViewOperations {
   public Response listView(
       @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
     ListTablesResponse response =
-        icebergTableOpsManager.getOps(prefix).listView(RESTUtil.decodeNamespace(namespace));
+        icebergCatalogWrapperManager.getOps(prefix).listView(RESTUtil.decodeNamespace(namespace));
     return IcebergRestUtils.ok(response);
   }
 
@@ -79,7 +79,7 @@ public class IcebergViewOperations {
       @PathParam("namespace") String namespace,
       CreateViewRequest request) {
     LoadViewResponse response =
-        icebergTableOpsManager
+        icebergCatalogWrapperManager
             .getOps(prefix)
             .createView(RESTUtil.decodeNamespace(namespace), request);
     return IcebergRestUtils.ok(response);
@@ -95,7 +95,8 @@ public class IcebergViewOperations {
       @PathParam("namespace") String namespace,
       @PathParam("view") String view) {
     TableIdentifier viewIdentifier = TableIdentifier.of(RESTUtil.decodeNamespace(namespace), view);
-    LoadViewResponse response = icebergTableOpsManager.getOps(prefix).loadView(viewIdentifier);
+    LoadViewResponse response =
+        icebergCatalogWrapperManager.getOps(prefix).loadView(viewIdentifier);
     return IcebergRestUtils.ok(response);
   }
 
@@ -111,7 +112,7 @@ public class IcebergViewOperations {
       UpdateTableRequest request) {
     TableIdentifier viewIdentifier = TableIdentifier.of(RESTUtil.decodeNamespace(namespace), view);
     LoadViewResponse response =
-        icebergTableOpsManager.getOps(prefix).updateView(viewIdentifier, request);
+        icebergCatalogWrapperManager.getOps(prefix).updateView(viewIdentifier, request);
     return IcebergRestUtils.ok(response);
   }
 
@@ -125,7 +126,7 @@ public class IcebergViewOperations {
       @PathParam("namespace") String namespace,
       @PathParam("view") String view) {
     TableIdentifier viewIdentifier = TableIdentifier.of(RESTUtil.decodeNamespace(namespace), view);
-    icebergTableOpsManager.getOps(prefix).dropView(viewIdentifier);
+    icebergCatalogWrapperManager.getOps(prefix).dropView(viewIdentifier);
     return IcebergRestUtils.noContent();
   }
 
@@ -139,7 +140,7 @@ public class IcebergViewOperations {
       @PathParam("namespace") String namespace,
       @PathParam("view") String view) {
     TableIdentifier tableIdentifier = TableIdentifier.of(RESTUtil.decodeNamespace(namespace), view);
-    if (icebergTableOpsManager.getOps(prefix).existView(tableIdentifier)) {
+    if (icebergCatalogWrapperManager.getOps(prefix).existView(tableIdentifier)) {
       return IcebergRestUtils.noContent();
     } else {
       return IcebergRestUtils.notExists();
