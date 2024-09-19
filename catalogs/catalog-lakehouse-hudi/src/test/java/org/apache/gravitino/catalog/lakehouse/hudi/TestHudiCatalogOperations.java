@@ -75,7 +75,9 @@ public class TestHudiCatalogOperations {
         InMemoryBackendOps inMemoryBackendOps = new InMemoryBackendOps()) {
       ops.hudiCatalogBackendOps = inMemoryBackendOps;
 
-      Assertions.assertDoesNotThrow(() -> ops.testConnection(null, null, null, null, null));
+      Assertions.assertDoesNotThrow(
+          () ->
+              ops.testConnection(NameIdentifier.of("metalake", "catalog"), null, null, null, null));
     }
   }
 
