@@ -20,10 +20,12 @@ package org.apache.gravitino.meta;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
@@ -46,8 +48,14 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the role entity.");
 
-  public static final Field SECURABLE_OBJECT =
-      Field.required("securable_objects", List.class, "The securable objects of the role entity.");
+  public static final Field SECURABLE_OBJECTS =
+      Field.optional("securable_objects", List.class, "The securable objects of the role entity.");
+
+  public static final Field SECURABLE_OBJECTS_COUNT =
+      Field.optional(
+          "securable_objects_count",
+          Integer.class,
+          "The securable objects count of the role entity.");
 
   private Long id;
   private String name;
@@ -55,6 +63,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   private AuditInfo auditInfo;
   private Namespace namespace;
   private List<SecurableObject> securableObjects;
+  private Integer securableObjectsCount;
 
   /**
    * The name of the role.
@@ -91,16 +100,20 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
    */
   @Override
   public List<SecurableObject> securableObjects() {
-    // The securable object is a special kind of entities. Some entity types aren't the securable
-    // object, such as
-    // User, Role, etc.
-    // The securable object identifier must be unique.
-    // Gravitino assumes that the identifiers of the entities may be the same if they have different
-    // types.
-    // So one type of them can't be the securable object at least if there are the two same
-    // identifier
-    // entities .
     return securableObjects;
+  }
+
+  @Override
+  public int securableObjectsCount() {
+    if (securableObjects != null) {
+      return securableObjects.size();
+    }
+
+    if (securableObjectsCount == null) {
+      return 0;
+    }
+
+    return securableObjectsCount;
   }
 
   /**
@@ -115,9 +128,23 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
-    fields.put(SECURABLE_OBJECT, securableObjects);
+    fields.put(SECURABLE_OBJECTS, securableObjects);
+    fields.put(SECURABLE_OBJECTS_COUNT, securableObjectsCount);
 
     return Collections.unmodifiableMap(fields);
+  }
+
+  /**
+   * Get the set of all the fields.
+   *
+   * @return The set of all the fields.
+   */
+  public static Set<Field> fieldSet() {
+    Set<Field> fields =
+        Sets.newHashSet(
+            ID, NAME, AUDIT_INFO, PROPERTIES, SECURABLE_OBJECTS, SECURABLE_OBJECTS_COUNT);
+
+    return Collections.unmodifiableSet(fields);
   }
 
   /**
@@ -232,6 +259,11 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
      */
     public Builder withSecurableObjects(List<SecurableObject> securableObjects) {
       roleEntity.securableObjects = ImmutableList.copyOf(securableObjects);
+      return this;
+    }
+
+    public Builder withSecurableObjectsCount(int securableObjectsCount) {
+      roleEntity.securableObjectsCount = securableObjectsCount;
       return this;
     }
 

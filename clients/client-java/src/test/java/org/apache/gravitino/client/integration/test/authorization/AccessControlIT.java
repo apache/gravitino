@@ -176,6 +176,25 @@ public class AccessControlIT extends AbstractIT {
 
     Assertions.assertEquals(roleName, role.name());
     Assertions.assertEquals(properties, role.properties());
+    assertSecurableObjects(Lists.newArrayList(metalakeObject), role.securableObjects());
+
+    // List roles
+    String anotherRoleName = "another-role";
+    Role anotherRole =
+        metalake.createRole(anotherRoleName, properties, Lists.newArrayList(metalakeObject));
+    String[] roleNames = metalake.listRoleNames();
+    Arrays.sort(roleNames);
+
+    Assertions.assertEquals(
+        Lists.newArrayList(anotherRoleName, roleName), Arrays.asList(roleNames));
+
+    Role[] roles = metalake.listRoles();
+    Arrays.sort(roles, Comparator.comparing(Role::name));
+    Assertions.assertEquals(
+        Lists.newArrayList(anotherRoleName, roleName),
+        Arrays.stream(roles).map(Role::name).collect(Collectors.toList()));
+    assertSecurableObjects(anotherRole.securableObjects(), roles[0].securableObjects());
+    assertSecurableObjects(role.securableObjects(), roles[1].securableObjects());
 
     // Verify the object
     Assertions.assertEquals(1, role.securableObjects().size());
@@ -302,5 +321,23 @@ public class AccessControlIT extends AbstractIT {
     // Clean up
     metalake.removeGroup(groupName);
     metalake.deleteRole(roleName);
+  }
+
+  private static void assertSecurableObjects(
+      List<SecurableObject> expect, List<SecurableObject> actual) {
+    Assertions.assertEquals(expect.size(), actual.size());
+    for (int index = 0; index < expect.size(); index++) {
+      Assertions.assertEquals(expect.get(index).fullName(), actual.get(index).fullName());
+      Assertions.assertEquals(expect.get(index).type(), actual.get(index).type());
+      List<Privilege> expectPrivileges = expect.get(index).privileges();
+      List<Privilege> actualPrivileges = actual.get(index).privileges();
+      Assertions.assertEquals(expectPrivileges.size(), actualPrivileges.size());
+      for (int priIndex = 0; priIndex < expectPrivileges.size(); priIndex++) {
+        Assertions.assertEquals(
+            expectPrivileges.get(priIndex).name(), actualPrivileges.get(priIndex).name());
+        Assertions.assertEquals(
+            actualPrivileges.get(priIndex).condition(), actualPrivileges.get(priIndex).condition());
+      }
+    }
   }
 }

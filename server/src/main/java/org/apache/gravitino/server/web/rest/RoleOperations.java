@@ -25,11 +25,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
@@ -44,6 +46,8 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.responses.DeleteResponse;
+import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.RoleListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -69,6 +73,35 @@ public class RoleOperations {
   }
 
   @GET
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-role", absolute = true)
+  public Response listRoles(
+      @PathParam("metalake") String metalake,
+      @QueryParam("details") @DefaultValue("false") boolean details) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () ->
+              TreeLockUtils.doWithTreeLock(
+                  NameIdentifier.of(metalake),
+                  LockType.READ,
+                  () -> {
+                    if (details) {
+                      return Utils.ok(
+                          new RoleListResponse(
+                              DTOConverters.toDTOs(accessControlManager.listRoles(metalake))));
+                    } else {
+                      String[] names = accessControlManager.listRoleNames(metalake);
+                      return Utils.ok(new NameListResponse(names));
+                    }
+                  }));
+    } catch (Exception e) {
+      return ExceptionHandlers.handleRoleException(OperationType.LIST, "", metalake, e);
+    }
+  }
+
+  @GET
   @Path("{role}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -84,7 +117,8 @@ public class RoleOperations {
                   () ->
                       Utils.ok(
                           new RoleResponse(
-                              DTOConverters.toDTO(accessControlManager.getRole(metalake, role))))));
+                              DTOConverters.toDTO(
+                                  accessControlManager.getRole(metalake, role), true)))));
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.GET, role, metalake, e);
     }
@@ -134,7 +168,8 @@ public class RoleOperations {
                                     metalake,
                                     request.getName(),
                                     request.getProperties(),
-                                    securableObjects)))));
+                                    securableObjects),
+                                true))));
           });
 
     } catch (Exception e) {

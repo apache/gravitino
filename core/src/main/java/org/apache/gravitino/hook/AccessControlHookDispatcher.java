@@ -157,4 +157,14 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
     return dispatcher.deleteRole(metalake, role);
   }
+
+  @Override
+  public String[] listRoleNames(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listRoleNames(metalake);
+  }
+
+  @Override
+  public Role[] listRoles(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listRoles(metalake);
+  }
 }

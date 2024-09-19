@@ -19,6 +19,7 @@
 package org.apache.gravitino.meta;
 
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,6 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.User;
-import org.glassfish.jersey.internal.guava.Sets;
 
 /** A class representing a user metadata entity in Apache Gravitino. */
 @ToString
@@ -162,12 +162,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
    * @return The set of all the fields.
    */
   public static Set<Field> fieldSet() {
-    Set<Field> fields = Sets.newHashSet();
-    fields.add(ID);
-    fields.add(NAME);
-    fields.add(AUDIT_INFO);
-    fields.add(ROLE_IDS);
-    fields.add(ROLE_NAMES);
+    Set<Field> fields = Sets.newHashSet(ID, NAME, AUDIT_INFO, ROLE_IDS, ROLE_NAMES);
 
     return Collections.unmodifiableSet(fields);
   }

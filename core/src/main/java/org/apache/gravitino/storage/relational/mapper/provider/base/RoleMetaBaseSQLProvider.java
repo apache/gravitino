@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.GROUP_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -91,6 +92,40 @@ public class RoleMetaBaseSQLProvider {
         + " WHERE se.metadata_object_id = #{metadataObjectId}"
         + " AND se.type = #{metadataObjectType}"
         + " AND ro.deleted_at = 0 AND se.deleted_at = 0";
+  }
+
+  public String listRolePOsByMetalake(@Param("metalakeName") String metalakeName) {
+    return "SELECT rt.role_id as roleId, rt.role_name as roleName,"
+        + " rt.metalake_id as metalakeId, rt.properties as properties,"
+        + " rt.audit_info as auditInfo, rt.current_version as currentVersion,"
+        + " rt.last_version as lastVersion, rt.deleted_at as deletedAt"
+        + " FROM "
+        + ROLE_TABLE_NAME
+        + " rt JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON rt.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND rt.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
+  public String listExtendedRolePOsByMetalake(@Param("metalakeName") String metalakeName) {
+    return "SELECT rt.role_id as roleId, rt.role_name as roleName,"
+        + " rt.metalake_id as metalakeId, rt.properties as properties,"
+        + " rt.audit_info as auditInfo, rt.current_version as currentVersion,"
+        + " rt.last_version as lastVersion, rt.deleted_at as deletedAt,"
+        + " count(st.metadata_object_id) as securableObjectsCount"
+        + " FROM "
+        + ROLE_TABLE_NAME
+        + " rt JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON rt.metalake_id = mt.metalake_id"
+        + " LEFT OUTER JOIN "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " st ON st.role_id = rt.role_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND rt.deleted_at = 0 AND mt.deleted_at = 0"
+        + " AND (st.deleted_at = 0 OR st.deleted_at is NULL)"
+        + " GROUP BY rt.role_id";
   }
 
   public String insertRoleMeta(@Param("roleMeta") RolePO rolePO) {

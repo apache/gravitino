@@ -23,46 +23,44 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 
-/** Represents a response for a role. */
+/** Represents a response for a list of roles with their information. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class RoleResponse extends BaseResponse {
-
-  @JsonProperty("role")
-  private final RoleDTO role;
+public class RoleListResponse extends BaseResponse {
+  @JsonProperty("roles")
+  private final RoleDTO[] roles;
 
   /**
-   * Constructor for RoleResponse.
+   * Creates a new RoleListResponse.
    *
-   * @param role The role data transfer object.
+   * @param roles The list of roles.
    */
-  public RoleResponse(RoleDTO role) {
+  public RoleListResponse(RoleDTO[] roles) {
     super(0);
-    this.role = role;
+    this.roles = roles;
   }
 
-  /** Default constructor for RoleResponse. (Used for Jackson deserialization.) */
-  public RoleResponse() {
-    super();
-    this.role = null;
+  /**
+   * This is the constructor that is used by Jackson deserializer to create an instance of
+   * RoleListResponse.
+   */
+  public RoleListResponse() {
+    super(0);
+    this.roles = null;
   }
 
   /**
    * Validates the response data.
    *
-   * @throws IllegalArgumentException if the name or audit is not set.
+   * @throws IllegalArgumentException if roles are not set.
    */
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(role != null, "role must not be null");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(role.name()), "role 'name' must not be null and empty");
-    Preconditions.checkArgument(role.auditInfo() != null, "role 'auditInfo' must not be null");
+    Preconditions.checkArgument(roles != null, "roles must be non-null");
   }
 }

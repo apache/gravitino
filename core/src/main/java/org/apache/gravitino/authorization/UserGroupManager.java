@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -40,7 +41,6 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,9 +117,7 @@ class UserGroupManager {
   }
 
   String[] listUserNames(String metalake) {
-    Set<Field> skippingFields = Sets.newHashSet();
-    skippingFields.add(UserEntity.ROLE_NAMES);
-    skippingFields.add(UserEntity.ROLE_IDS);
+    Set<Field> skippingFields = Sets.newHashSet(UserEntity.ROLE_NAMES, UserEntity.ROLE_IDS);
 
     return Arrays.stream(listUsersInternal(metalake, skippingFields))
         .map(User::name)

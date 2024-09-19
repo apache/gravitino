@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -29,7 +30,9 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
@@ -104,6 +107,62 @@ class TestRoleMetaService extends TestJDBCBackend {
 
     roleMetaService.insertRole(role1, false);
     Assertions.assertEquals(role1, roleMetaService.getRoleByIdentifier(role1.nameIdentifier()));
+  }
+
+  @Test
+  void testListRoles() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo,
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
+            ImmutableMap.of("k1", "v1"));
+
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo,
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
+            ImmutableMap.of("k1", "v1"));
+
+    backend.insert(role1, false);
+    backend.insert(role2, false);
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    Set<Field> skippingFields = Sets.newHashSet();
+    skippingFields.add(RoleEntity.SECURABLE_OBJECTS);
+    List<RoleEntity> actualRoles =
+        roleMetaService.listRolesByNamespace(
+            AuthorizationUtils.ofRoleNamespace(metalakeName), skippingFields);
+    actualRoles.sort(Comparator.comparing(RoleEntity::name));
+    List<RoleEntity> expectRoles = Lists.newArrayList(role1, role2);
+    Assertions.assertEquals(expectRoles.size(), actualRoles.size());
+    for (int index = 0; index < expectRoles.size(); index++) {
+      RoleEntity expectRole = expectRoles.get(index);
+      RoleEntity actualRole = actualRoles.get(index);
+      Assertions.assertEquals(expectRole.name(), actualRole.name());
+      Assertions.assertEquals(expectRole.properties(), actualRole.properties());
+      Assertions.assertEquals(expectRole.auditInfo(), actualRole.auditInfo());
+      Assertions.assertEquals(
+          expectRole.securableObjectsCount(), actualRole.securableObjectsCount());
+    }
   }
 
   @Test

@@ -19,12 +19,17 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -34,6 +39,7 @@ import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import org.apache.gravitino.storage.relational.po.ExtendedRolePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -237,6 +243,21 @@ public class RoleMetaService {
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
 
+  public List<RoleEntity> listRolesByNamespace(Namespace namespace, Set<Field> skippingFields) {
+    AuthorizationUtils.checkRoleNamespace(namespace);
+    String metalakeName = namespace.level(0);
+
+    SupportsDesiredFieldsHandlers<List<RoleEntity>> handlers =
+        new SupportsDesiredFieldsHandlers<>();
+    handlers.addHandler(new ListSkippingObjectsAndCountHandler(metalakeName));
+    handlers.addHandler(new ListSkippingObjectsHandler(metalakeName));
+
+    Set<Field> desiredFields = Sets.newHashSet(RoleEntity.fieldSet());
+    desiredFields.removeAll(skippingFields);
+
+    return handlers.execute(desiredFields);
+  }
+
   public int deleteRoleMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] roleDeletedCount = new int[] {0};
     int[] userRoleRelDeletedCount = new int[] {0};
@@ -271,6 +292,71 @@ public class RoleMetaService {
         + userRoleRelDeletedCount[0]
         + groupRoleRelDeletedCount[0]
         + securableObjectsCount[0];
+  }
+
+  private static class ListSkippingObjectsHandler
+      implements SupportsDesiredFields<List<RoleEntity>> {
+    private final String metalakeName;
+
+    public ListSkippingObjectsHandler(String metalakeName) {
+      this.metalakeName = metalakeName;
+    }
+
+    @Override
+    public Set<Field> desiredFields() {
+      Set<Field> desiredFields = Sets.newHashSet(RoleEntity.fieldSet());
+      desiredFields.remove(RoleEntity.SECURABLE_OBJECTS);
+
+      return desiredFields;
+    }
+
+    @Override
+    public List<RoleEntity> execute() {
+      List<ExtendedRolePO> rolePOs =
+          SessionUtils.getWithoutCommit(
+              RoleMetaMapper.class, mapper -> mapper.listExtendedRolePOsByMetalake(metalakeName));
+
+      return rolePOs.stream()
+          .map(
+              po ->
+                  POConverters.fromExtendedRolePO(
+                      po, AuthorizationUtils.ofRoleNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    }
+  }
+
+  private static class ListSkippingObjectsAndCountHandler
+      implements SupportsDesiredFields<List<RoleEntity>> {
+    private final String metalakeName;
+
+    public ListSkippingObjectsAndCountHandler(String metalakeName) {
+      this.metalakeName = metalakeName;
+    }
+
+    @Override
+    public Set<Field> desiredFields() {
+      Set<Field> desiredFields = Sets.newHashSet(RoleEntity.fieldSet());
+      desiredFields.remove(RoleEntity.SECURABLE_OBJECTS);
+      desiredFields.remove(RoleEntity.SECURABLE_OBJECTS_COUNT);
+
+      return desiredFields;
+    }
+
+    @Override
+    public List<RoleEntity> execute() {
+      List<RolePO> rolePOs =
+          SessionUtils.getWithoutCommit(
+              RoleMetaMapper.class, mapper -> mapper.listRolePOsByMetalake(metalakeName));
+
+      return rolePOs.stream()
+          .map(
+              po ->
+                  POConverters.fromRolePO(
+                      po,
+                      Collections.emptyList(),
+                      AuthorizationUtils.ofRoleNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    }
   }
 
   private MetadataObject.Type getType(String type) {

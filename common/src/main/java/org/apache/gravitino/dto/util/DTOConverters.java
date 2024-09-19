@@ -426,22 +426,32 @@ public class DTOConverters {
    * Converts a role implementation to a RoleDTO.
    *
    * @param role The role implementation.
+   * @param includeObjects True, the roleDTO will contain the securable objects field, otherwise the
+   *     roleDTO won't contain the filed.
    * @return The role DTO.
    */
-  public static RoleDTO toDTO(Role role) {
+  public static RoleDTO toDTO(Role role, boolean includeObjects) {
     if (role instanceof RoleDTO) {
       return (RoleDTO) role;
     }
 
-    return RoleDTO.builder()
-        .withName(role.name())
-        .withSecurableObjects(
-            role.securableObjects().stream()
-                .map(DTOConverters::toDTO)
-                .toArray(SecurableObjectDTO[]::new))
-        .withProperties(role.properties())
-        .withAudit(toDTO(role.auditInfo()))
-        .build();
+    RoleDTO.Builder builder =
+        RoleDTO.builder()
+            .withName(role.name())
+            .withProperties(role.properties())
+            .withAudit(toDTO(role.auditInfo()));
+
+    if (includeObjects) {
+      return builder
+          .withSecurableObjects(
+              role.securableObjects().stream()
+                  .map(DTOConverters::toDTO)
+                  .toArray(SecurableObjectDTO[]::new))
+          .withSecurableObjectsCount(role.securableObjectsCount())
+          .build();
+    } else {
+      return builder.withSecurableObjectsCount(role.securableObjectsCount()).build();
+    }
   }
 
   /**
@@ -689,6 +699,19 @@ public class DTOConverters {
       return new UserDTO[0];
     }
     return Arrays.stream(users).map(DTOConverters::toDTO).toArray(UserDTO[]::new);
+  }
+
+  /**
+   * Converts an array of Roles to an array of RoleDTOs.
+   *
+   * @param roles The roles to be converted.
+   * @return The array of RoleDTOs.
+   */
+  public static RoleDTO[] toDTOs(Role[] roles) {
+    if (ArrayUtils.isEmpty(roles)) {
+      return new RoleDTO[0];
+    }
+    return Arrays.stream(roles).map(role -> toDTO(role, false)).toArray(RoleDTO[]::new);
   }
 
   /**

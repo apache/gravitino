@@ -64,6 +64,7 @@ import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.dto.responses.RoleListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
@@ -100,9 +101,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
   private static final String API_METALAKES_OWNERS_PATH = "api/metalakes/%s/owners/%s";
-  private static final String BLANK_PLACE_HOLDER = "";
 
   private static final String API_METALAKES_TAGS_PATH = "api/metalakes/%s/tags";
+  private static final String BLANK_PLACE_HOLDER = "";
 
   private final RESTClient restClient;
 
@@ -699,6 +700,46 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     resp.validate();
 
     return resp.getRole();
+  }
+
+  /**
+   * Lists the role names.
+   *
+   * @return The role name list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listRoleNames() {
+    NameListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_ROLES_PATH, this.name(), BLANK_PLACE_HOLDER),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    resp.validate();
+
+    return resp.getNames();
+  }
+
+  /**
+   * Lists the roles.
+   *
+   * @return The Role list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public Role[] listRoles() {
+    Map<String, String> params = ImmutableMap.of("details", "true");
+    RoleListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_ROLES_PATH, this.name(), BLANK_PLACE_HOLDER),
+            params,
+            RoleListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    resp.validate();
+
+    return Arrays.stream(resp.getRoles())
+        .map(dto -> new GenericRole(dto, this))
+        .toArray(Role[]::new);
   }
 
   /**

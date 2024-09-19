@@ -72,6 +72,14 @@ public class RoleMetaSQLProviderFactory {
     return getProvider().listRolesByMetadataObjectIdAndType(metadataObjectId, type);
   }
 
+  public static String listRolePOsByMetalake(@Param("metalakeName") String metalakeName) {
+    return getProvider().listRolePOsByMetalake(metalakeName);
+  }
+
+  public static String listExtendedRolePOsByMetalake(@Param("metalakeName") String metalakeName) {
+    return getProvider().listExtendedRolePOsByMetalake(metalakeName);
+  }
+
   public static String insertRoleMeta(@Param("roleMeta") RolePO rolePO) {
     return getProvider().insertRoleMeta(rolePO);
   }
