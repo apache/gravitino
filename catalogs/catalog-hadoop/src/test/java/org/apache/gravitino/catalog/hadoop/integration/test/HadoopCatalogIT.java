@@ -664,16 +664,25 @@ public class HadoopCatalogIT extends AbstractIT {
     try {
       String filesetName = GravitinoITUtils.genRandomName("fileset");
       NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+      Assertions.assertFalse(catalog.asFilesetCatalog().filesetExists(filesetIdent));
+      Fileset expectedFileset =
+          catalog
+              .asFilesetCatalog()
+              .createFileset(
+                  filesetIdent,
+                  "fileset comment",
+                  Fileset.Type.MANAGED,
+                  generateLocation(filesetName),
+                  Maps.newHashMap());
 
       Map<String, String> context = new HashMap<>();
-      // this is an invalid internal client type.
+      // this is an invalid internal client type, but the server will return normally
       context.put(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE, "test");
       CallerContext callerContext = CallerContext.builder().withContext(context).build();
       CallerContext.CallerContextHolder.set(callerContext);
 
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> catalog.asFilesetCatalog().getFileLocation(filesetIdent, "/test.par"));
+      String fileLocation = catalog.asFilesetCatalog().getFileLocation(filesetIdent, "/test.par");
+      Assertions.assertEquals(expectedFileset.storageLocation() + "/test.par", fileLocation);
     } finally {
       CallerContext.CallerContextHolder.remove();
     }
