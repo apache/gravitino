@@ -301,36 +301,41 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group1",
             auditInfo,
-            Lists.newArrayList(role2));
+            Lists.newArrayList(role2.name()),
+            Lists.newArrayList(role2.id()));
     GroupEntity group2 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2",
             auditInfo,
-            Lists.newArrayList(role2));
+            Lists.newArrayList(role2.name()),
+            Lists.newArrayList(role2.id()));
     groupMetaService.insertGroup(group1, false);
     groupMetaService.insertGroup(group2, false);
     Assertions.assertEquals(
         group1.name(), groupMetaService.getGroupByIdentifier(group1.nameIdentifier()).name());
     Assertions.assertEquals(
-        group1.roles(), groupMetaService.getGroupByIdentifier(group1.nameIdentifier()).roles());
+        group1.roleNames(),
+        groupMetaService.getGroupByIdentifier(group1.nameIdentifier()).roleNames());
     Assertions.assertEquals(
         group2.name(), groupMetaService.getGroupByIdentifier(group2.nameIdentifier()).name());
     Assertions.assertEquals(
-        group2.roles(), groupMetaService.getGroupByIdentifier(group2.nameIdentifier()).roles());
+        group2.roleNames(),
+        groupMetaService.getGroupByIdentifier(group2.nameIdentifier()).roleNames());
     UserEntity user1 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user1",
             auditInfo,
-            Lists.newArrayList(role2));
+            Lists.newArrayList(role2.name()),
+            Lists.newArrayList(role2.id()));
     userMetaService.insertUser(user1, false);
     Assertions.assertEquals(
         user1.name(), userMetaService.getUserByIdentifier(user1.nameIdentifier()).name());
     Assertions.assertEquals(
-        user1.roles(), userMetaService.getUserByIdentifier(user1.nameIdentifier()).roles());
+        user1.roleNames(), userMetaService.getUserByIdentifier(user1.nameIdentifier()).roleNames());
 
     Assertions.assertTrue(roleMetaService.deleteRole(role2.nameIdentifier()));
     Assertions.assertThrows(
@@ -429,14 +434,16 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group1",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     UserEntity user1 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user1",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     roleMetaService.insertRole(role1, false);
     roleMetaService.insertRole(role2, false);
     groupMetaService.insertGroup(group1, false);
@@ -539,14 +546,16 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group1",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     UserEntity user1 =
         createUserEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user1",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     roleMetaService.insertRole(role1, false);
     roleMetaService.insertRole(role2, false);
     groupMetaService.insertGroup(group1, false);
@@ -649,7 +658,8 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "user1",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     userMetaService.insertUser(user1, false);
 
     GroupEntity group1 =
@@ -658,7 +668,8 @@ class TestRoleMetaService extends TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace(metalakeName),
             "group1",
             auditInfo,
-            Lists.newArrayList(role1, role2));
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
     groupMetaService.insertGroup(group1, false);
 
     // hard delete before soft delete

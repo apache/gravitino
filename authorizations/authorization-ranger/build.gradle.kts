@@ -86,6 +86,7 @@ dependencies {
     exclude("org.eclipse.jetty.aggregate")
   }
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
 }
 
 tasks {
@@ -95,7 +96,7 @@ tasks {
   }
 
   val copyAuthorizationLibs by registering(Copy::class) {
-    dependsOn("jar", "runtimeJars")
+    dependsOn("jar", runtimeJars)
     from("build/libs") {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
@@ -107,20 +108,19 @@ tasks {
   register("copyLibAndConfig", Copy::class) {
     dependsOn(copyAuthorizationLibs)
   }
+
+  jar {
+    dependsOn(runtimeJars)
+  }
 }
 
 tasks.test {
   dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
 
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
   }

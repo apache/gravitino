@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -63,18 +62,16 @@ import org.slf4j.LoggerFactory;
  * 4. The Ranger policy also supports multiple users and groups, But we only use a user or group to
  * implement Gravitino Owner concept. <br>
  */
-public class RangerAuthorizationPlugin implements AuthorizationPlugin {
+public abstract class RangerAuthorizationPlugin
+    implements AuthorizationPlugin, RangerPrivilegesMappingProvider {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
 
-  protected String catalogProvider;
-  protected String rangerServiceName;
-  protected RangerClientExtend rangerClient;
-  private RangerHelper rangerHelper;
+  protected final String rangerServiceName;
+  protected final RangerClientExtension rangerClient;
+  private final RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
 
-  public RangerAuthorizationPlugin(String catalogProvider, Map<String, String> config) {
-    super();
-    this.catalogProvider = catalogProvider;
+  protected RangerAuthorizationPlugin(Map<String, String> config) {
     String rangerUrl = config.get(AuthorizationPropertiesMeta.RANGER_ADMIN_URL);
     String authType = config.get(AuthorizationPropertiesMeta.RANGER_AUTH_TYPE);
     rangerAdminName = config.get(AuthorizationPropertiesMeta.RANGER_USERNAME);
@@ -86,23 +83,26 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
     RangerHelper.check(rangerAdminName != null, "Ranger username is required");
     RangerHelper.check(password != null, "Ranger password is required");
     RangerHelper.check(rangerServiceName != null, "Ranger service name is required");
-    rangerClient = new RangerClientExtend(rangerUrl, authType, rangerAdminName, password);
-    rangerHelper = new RangerHelper(this, catalogProvider);
+    rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
+
+    rangerHelper =
+        new RangerHelper(
+            rangerClient,
+            rangerAdminName,
+            rangerServiceName,
+            privilegesMappingRule(),
+            ownerMappingRule(),
+            policyResourceDefinesRule());
   }
 
   /**
-   * Translate the privilege name to the corresponding privilege name in the underlying permission
+   * Translate the privilege name to the corresponding privilege name in the Ranger
    *
    * @param name The privilege name to translate
-   * @return The corresponding privilege name in the underlying permission system
+   * @return The corresponding Ranger privilege name in the underlying permission system
    */
   public Set<String> translatePrivilege(Privilege.Name name) {
-    return rangerHelper.privilegesMapping.get(name);
-  }
-
-  @VisibleForTesting
-  public List<String> getOwnerPrivileges() {
-    return Lists.newArrayList(rangerHelper.ownerPrivileges);
+    return rangerHelper.translatePrivilege(name);
   }
 
   /**
@@ -194,7 +194,8 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
           UserEntity.builder()
               .withId(1L)
               .withName(newOwner.name())
-              .withRoles(Collections.emptyList())
+              .withRoleNames(Collections.emptyList())
+              .withRoleIds(Collections.emptyList())
               .withAuditInfo(auditInfo)
               .build();
       onUserAdded(userEntity);
@@ -203,7 +204,8 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
           GroupEntity.builder()
               .withId(1L)
               .withName(newOwner.name())
-              .withRoles(Collections.emptyList())
+              .withRoleNames(Collections.emptyList())
+              .withRoleIds(Collections.emptyList())
               .withAuditInfo(auditInfo)
               .build();
       onGroupAdded(groupEntity);

@@ -97,6 +97,11 @@ mail = "1.4.1"
 rome = "1.0"
 jettison = "1.1"
 thrift = "0.12.0"
+derby = "10.14.2.0"
+datanucleus-core = "4.1.17"
+datanucleus-api-jdo = "4.2.4"
+datanucleus-rdbms = "4.1.19"
+datanucleus-jdo = "3.2.0-m3"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -138,6 +143,7 @@ hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = 
 hive2-jdbc = { group = "org.apache.hive", name = "hive-jdbc", version.ref = "hive2"}
 hadoop2-auth = { group = "org.apache.hadoop", name = "hadoop-auth", version.ref = "hadoop2" }
 hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
+hadoop2-hdfs-client = { group = "org.apache.hadoop", name = "hadoop-hdfs-client", version.ref = "hadoop2" }
 hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
 hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop3" }
@@ -162,6 +168,7 @@ iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref 
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
+iceberg-gcp = { group = "org.apache.iceberg", name = "iceberg-gcp", version.ref = "iceberg" }
 paimon-core = { group = "org.apache.paimon", name = "paimon-core", version.ref = "paimon" }
 paimon-format = { group = "org.apache.paimon", name = "paimon-format", version.ref = "paimon" }
 paimon-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog", version.ref = "paimon" }
@@ -203,6 +210,11 @@ curator-test = { group = "org.apache.curator", name = "curator-test", version.re
 cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
 woodstox-core = { group = "com.fasterxml.woodstox", name = "woodstox-core", version.ref = "woodstox-core"}
 thrift = { group = "org.apache.thrift", name = "libthrift", version.ref = "thrift"}
+derby = { group = "org.apache.derby", name = "derby", version.ref = "derby"}
+datanucleus-core = { group = "org.datanucleus", name = "datanucleus-core", version.ref = "datanucleus-core" }
+datanucleus-api-jdo = { group = "org.datanucleus", name = "datanucleus-api-jdo", version.ref = "datanucleus-api-jdo" }
+datanucleus-rdbms = { group = "org.datanucleus", name = "datanucleus-rdbms", version.ref = "datanucleus-rdbms" }
+datanucleus-jdo = { group = "org.datanucleus", name = "javax.jdo", version.ref = "datanucleus-jdo" }
 
 ranger-intg = { group = "org.apache.ranger", name = "ranger-intg", version.ref = "ranger" }
 javax-jaxb-api = { group = "javax.xml.bind", name = "jaxb-api", version.ref = "javax-jaxb-api" }

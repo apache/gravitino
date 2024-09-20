@@ -1,0 +1,77 @@
+name: Backend Integration Test Action
+
+# run backend integration test
+on:
+  workflow_call:
+    inputs:
+      architecture:
+        required: true
+        description: 'Architecture of the platform'
+        type: string
+      java-version:
+        required: true
+        description: 'Java version'
+        type: string
+      backend:
+        required: true
+        description: 'Backend storage for Gravitino'
+        type: string
+      test-mode:
+        required: true
+        description: 'run on embedded or deploy mode'
+        type: string
+
+jobs:
+  start-runner:
+    name: JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PLATFORM: ${{ inputs.architecture }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Check required command
+        run: |
+          dev/ci/check_commands.sh
+
+      - name: Package Gravitino
+        if: ${{ inputs.test-mode == 'deploy' }}
+        run: |
+          ./gradlew compileDistribution -x test -PjdkVersion=${{ inputs.java-version }}
+
+      - name: Free up disk space
+        run: |
+          dev/ci/util_free_space.sh
+
+      - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
+        id: integrationTest
+        run: >
+          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdkVersion=${{ inputs.java-version }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false
+          -x :web:web:test -x :web:integration-test:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:spark-common:test 
+          -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
+          -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
+          -x :authorizations:authorization-ranger:test -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test
+
+      - name: Upload integrate tests reports
+        uses: actions/upload-artifact@v3
+        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        with:
+          name: integrate-test-reports-${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}
+          path: |
+            build/reports
+            iceberg/iceberg-rest-server/build/*.log
+            distribution/package/logs/*.out
+            distribution/package/logs/*.log
+            catalogs/**/*.log
+            catalogs/**/*.tar
+            distribution/**/*.log

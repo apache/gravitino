@@ -34,8 +34,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
-import org.apache.gravitino.iceberg.service.IcebergTableOpsManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
@@ -57,15 +57,15 @@ public class IcebergNamespaceOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergNamespaceOperations.class);
 
-  private IcebergTableOpsManager icebergTableOpsManager;
+  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
 
   @SuppressWarnings("UnusedVariable")
   @Context
   private HttpServletRequest httpRequest;
 
   @Inject
-  public IcebergNamespaceOperations(IcebergTableOpsManager icebergTableOpsManager) {
-    this.icebergTableOpsManager = icebergTableOpsManager;
+  public IcebergNamespaceOperations(IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+    this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
   }
 
   @GET
@@ -77,7 +77,7 @@ public class IcebergNamespaceOperations {
     Namespace parentNamespace =
         parent.isEmpty() ? Namespace.empty() : RESTUtil.decodeNamespace(parent);
     ListNamespacesResponse response =
-        icebergTableOpsManager.getOps(prefix).listNamespace(parentNamespace);
+        icebergCatalogWrapperManager.getOps(prefix).listNamespace(parentNamespace);
     return IcebergRestUtils.ok(response);
   }
 
@@ -89,7 +89,9 @@ public class IcebergNamespaceOperations {
   public Response loadNamespace(
       @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
     GetNamespaceResponse getNamespaceResponse =
-        icebergTableOpsManager.getOps(prefix).loadNamespace(RESTUtil.decodeNamespace(namespace));
+        icebergCatalogWrapperManager
+            .getOps(prefix)
+            .loadNamespace(RESTUtil.decodeNamespace(namespace));
     return IcebergRestUtils.ok(getNamespaceResponse);
   }
 
@@ -102,7 +104,7 @@ public class IcebergNamespaceOperations {
       @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
     // todo check if table exists in namespace after table ops is added
     LOG.info("Drop Iceberg namespace: {}, prefix: {}", namespace, prefix);
-    icebergTableOpsManager.getOps(prefix).dropNamespace(RESTUtil.decodeNamespace(namespace));
+    icebergCatalogWrapperManager.getOps(prefix).dropNamespace(RESTUtil.decodeNamespace(namespace));
     return IcebergRestUtils.noContent();
   }
 
@@ -114,7 +116,7 @@ public class IcebergNamespaceOperations {
       @PathParam("prefix") String prefix, CreateNamespaceRequest namespaceRequest) {
     LOG.info("Create Iceberg namespace: {}, prefix: {}", namespaceRequest, prefix);
     CreateNamespaceResponse response =
-        icebergTableOpsManager.getOps(prefix).createNamespace(namespaceRequest);
+        icebergCatalogWrapperManager.getOps(prefix).createNamespace(namespaceRequest);
     return IcebergRestUtils.ok(response);
   }
 
@@ -129,7 +131,7 @@ public class IcebergNamespaceOperations {
       UpdateNamespacePropertiesRequest request) {
     LOG.info("Update Iceberg namespace: {}, request: {}, prefix: {}", namespace, request, prefix);
     UpdateNamespacePropertiesResponse response =
-        icebergTableOpsManager
+        icebergCatalogWrapperManager
             .getOps(prefix)
             .updateNamespaceProperties(RESTUtil.decodeNamespace(namespace), request);
     return IcebergRestUtils.ok(response);
@@ -146,7 +148,7 @@ public class IcebergNamespaceOperations {
       RegisterTableRequest request) {
     LOG.info("Register table, namespace: {}, request: {}", namespace, request);
     LoadTableResponse response =
-        icebergTableOpsManager
+        icebergCatalogWrapperManager
             .getOps(prefix)
             .registerTable(RESTUtil.decodeNamespace(namespace), request);
     return IcebergRestUtils.ok(response);

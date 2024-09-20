@@ -19,9 +19,11 @@
 
 package org.apache.gravitino.listener;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -34,6 +36,8 @@ import org.apache.gravitino.listener.api.event.CreateFilesetEvent;
 import org.apache.gravitino.listener.api.event.CreateFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetFailureEvent;
+import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
+import org.apache.gravitino.listener.api.event.GetFileLocationFailureEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadFilesetEvent;
@@ -142,6 +146,26 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
-    throw new UnsupportedOperationException("Not implemented");
+    try {
+      String actualFileLocation = dispatcher.getFileLocation(ident, subPath);
+      // get the audit info from the thread local context
+      ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+      CallerContext callerContext = CallerContext.CallerContextHolder.get();
+      if (callerContext != null && callerContext.context() != null) {
+        builder.putAll(callerContext.context());
+      }
+      eventBus.dispatchEvent(
+          new GetFileLocationEvent(
+              PrincipalUtils.getCurrentUserName(),
+              ident,
+              actualFileLocation,
+              subPath,
+              builder.build()));
+      return actualFileLocation;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new GetFileLocationFailureEvent(PrincipalUtils.getCurrentUserName(), ident, subPath, e));
+      throw e;
+    }
   }
 }

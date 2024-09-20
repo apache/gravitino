@@ -20,6 +20,9 @@
 package org.apache.gravitino.trino.connector.catalog.iceberg;
 
 import io.trino.spi.TrinoException;
+import io.trino.spi.type.TimeType;
+import io.trino.spi.type.TimestampType;
+import io.trino.spi.type.TimestampWithTimeZoneType;
 import io.trino.spi.type.VarbinaryType;
 import io.trino.spi.type.VarcharType;
 import org.apache.gravitino.rel.types.Type;
@@ -45,7 +48,6 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
             "Iceberg does not support the datatype VARCHAR with length");
       }
-
       return Types.StringType.get();
     }
 
@@ -56,7 +58,17 @@ public class IcebergDataTypeTransformer extends GeneralDataTypeTransformer {
   public io.trino.spi.type.Type getTrinoType(Type type) {
     if (Name.FIXED == type.name()) {
       return VarbinaryType.VARBINARY;
+    } else if (Name.TIME == type.name()) {
+      return TimeType.TIME_MICROS;
+    } else if (Name.TIMESTAMP == type.name()) {
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasTimeZone()) {
+        return TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS;
+      } else {
+        return TimestampType.TIMESTAMP_MICROS;
+      }
     }
+
     return super.getTrinoType(type);
   }
 }
