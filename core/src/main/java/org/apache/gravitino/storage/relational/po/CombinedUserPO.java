@@ -47,28 +47,14 @@ public class CombinedUserPO extends UserPO {
       return false;
     }
     CombinedUserPO combinedUserPO = (CombinedUserPO) o;
-    return Objects.equal(getUserId(), combinedUserPO.getUserId())
-        && Objects.equal(getUserName(), combinedUserPO.getUserName())
-        && Objects.equal(getMetalakeId(), combinedUserPO.getMetalakeId())
-        && Objects.equal(getAuditInfo(), combinedUserPO.getAuditInfo())
-        && Objects.equal(getCurrentVersion(), combinedUserPO.getCurrentVersion())
-        && Objects.equal(getLastVersion(), combinedUserPO.getLastVersion())
-        && Objects.equal(getDeletedAt(), combinedUserPO.getDeletedAt())
+
+    return super.equals(o)
         && Objects.equal(getRoleIds(), combinedUserPO.getRoleIds())
         && Objects.equal(getRoleNames(), combinedUserPO.getRoleNames());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(
-        getUserId(),
-        getUserName(),
-        getMetalakeId(),
-        getAuditInfo(),
-        getCurrentVersion(),
-        getLastVersion(),
-        getDeletedAt(),
-        getRoleIds(),
-        getRoleNames());
+    return Objects.hashCode(super.hashCode(), getRoleIds(), getRoleNames());
   }
 }

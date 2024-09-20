@@ -253,32 +253,12 @@ public class UserMetaService {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
 
-    if (skippingFields.contains(UserEntity.ROLE_IDS)
-        && skippingFields.contains(UserEntity.ROLE_NAMES)) {
-      List<UserPO> userPOs =
-          SessionUtils.getWithoutCommit(
-              UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalake(metalakeName));
-      return userPOs.stream()
-          .map(
-              po ->
-                  POConverters.fromUserPO(
-                      po,
-                      Collections.emptyList(),
-                      AuthorizationUtils.ofUserNamespace(metalakeName)))
-          .collect(Collectors.toList());
+    SupportsSkippingFieldsHandlers<List<UserEntity>> handlers =
+        new SupportsSkippingFieldsHandlers<>();
+    handlers.addHandler(new ListSkippingRolesHandler(metalakeName));
+    handlers.addHandler(new listAllFieldsHandler(metalakeName));
 
-    } else {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(namespace.level(0));
-      List<CombinedUserPO> userPOs =
-          SessionUtils.getWithoutCommit(
-              UserMetaMapper.class, mapper -> mapper.listCombinedUserPOsByMetalakeId(metalakeId));
-      return userPOs.stream()
-          .map(
-              po ->
-                  POConverters.fromCombinedUserPO(
-                      po, AuthorizationUtils.ofUserNamespace(metalakeName)))
-          .collect(Collectors.toList());
-    }
+    return handlers.executeHandler(skippingFields);
   }
 
   public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
@@ -299,5 +279,61 @@ public class UserMetaService {
                         mapper.deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
+  }
+
+  private static class ListSkippingRolesHandler
+      implements SupportsSkippingFields<List<UserEntity>> {
+    private final String metalakeName;
+
+    ListSkippingRolesHandler(String metalakeName) {
+      this.metalakeName = metalakeName;
+    }
+
+    @Override
+    public List<Field> supportsSkippingFields() {
+      return Lists.newArrayList(UserEntity.ROLE_IDS, UserEntity.ROLE_NAMES);
+    }
+
+    @Override
+    public List<UserEntity> execute() {
+      List<UserPO> userPOs =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalake(metalakeName));
+      return userPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromUserPO(
+                      po,
+                      Collections.emptyList(),
+                      AuthorizationUtils.ofUserNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    }
+  }
+
+  private static class listAllFieldsHandler implements SupportsSkippingFields<List<UserEntity>> {
+    final String metalakeName;
+
+    listAllFieldsHandler(String metalakeName) {
+      this.metalakeName = metalakeName;
+    }
+
+    @Override
+    public List<Field> supportsSkippingFields() {
+      return Collections.emptyList();
+    }
+
+    @Override
+    public List<UserEntity> execute() {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      List<CombinedUserPO> userPOs =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.listCombinedUserPOsByMetalakeId(metalakeId));
+      return userPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromCombinedUserPO(
+                      po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    }
   }
 }
