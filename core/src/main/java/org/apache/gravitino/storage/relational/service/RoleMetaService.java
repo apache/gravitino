@@ -39,12 +39,14 @@ import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.storage.relational.utils.SupplierUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The service class for role metadata. It provides the basic database operations for role. */
 public class RoleMetaService {
 
+  private static final Logger LOG = LoggerFactory.getLogger(RoleMetaService.class);
   private static final RoleMetaService INSTANCE = new RoleMetaService();
 
   public static RoleMetaService getInstance() {
@@ -107,10 +109,31 @@ public class RoleMetaService {
         .map(
             po ->
                 POConverters.fromRolePO(
-                    po,
-                    SupplierUtils.createSecurableObjectsSupplier(po),
-                    AuthorizationUtils.ofRoleNamespace(metalake)))
+                    po, listSecurableObjects(po), AuthorizationUtils.ofRoleNamespace(metalake)))
         .collect(Collectors.toList());
+  }
+
+  private List<SecurableObject> listSecurableObjects(RolePO po) {
+    List<SecurableObjectPO> securableObjectPOs = listSecurableObjectsByRoleId(po.getRoleId());
+    List<SecurableObject> securableObjects = Lists.newArrayList();
+
+    for (SecurableObjectPO securableObjectPO : securableObjectPOs) {
+      String fullName =
+          MetadataObjectService.getMetadataObjectFullName(
+              securableObjectPO.getType(), securableObjectPO.getMetadataObjectId());
+      if (fullName != null) {
+        securableObjects.add(
+            POConverters.fromSecurableObjectPO(
+                fullName, securableObjectPO, getType(securableObjectPO.getType())));
+      } else {
+        LOG.info(
+            "The securable object {} {} may be deleted",
+            securableObjectPO.getMetadataObjectId(),
+            securableObjectPO.getType());
+      }
+    }
+
+    return securableObjects;
   }
 
   public List<RolePO> listRolesByGroupId(Long groupId) {
@@ -174,8 +197,9 @@ public class RoleMetaService {
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
 
-    return POConverters.fromRolePO(
-        rolePO, SupplierUtils.createSecurableObjectsSupplier(rolePO), identifier.namespace());
+    List<SecurableObject> securableObjects = listSecurableObjects(rolePO);
+
+    return POConverters.fromRolePO(rolePO, securableObjects, identifier.namespace());
   }
 
   public boolean deleteRole(NameIdentifier identifier) {
@@ -208,7 +232,7 @@ public class RoleMetaService {
     return true;
   }
 
-  public List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
+  private List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
     return SessionUtils.getWithoutCommit(
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
@@ -247,6 +271,10 @@ public class RoleMetaService {
         + userRoleRelDeletedCount[0]
         + groupRoleRelDeletedCount[0]
         + securableObjectsCount[0];
+  }
+
+  private MetadataObject.Type getType(String type) {
+    return MetadataObject.Type.valueOf(type);
   }
 
   private String getEntityType(SecurableObject securableObject) {

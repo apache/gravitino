@@ -54,8 +54,7 @@ dependencies {
 
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
-  val skipWebITs = project.hasProperty("skipWebITs")
-  if (skipITs || skipWebITs) {
+  if (skipITs) {
     exclude("*")
   } else {
     dependsOn(":trino-connector:trino-connector:jar")

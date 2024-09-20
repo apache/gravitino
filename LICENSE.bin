@@ -286,6 +286,7 @@
    Apache Hadoop Auth
    Apache Hadoop Client Aggregator
    Apache Hadoop Common
+   Apache Hadoop HDFS
    Apache Hadoop HDFS Client
    Apache Hadoop MapReduce Common
    Apache Hadoop MapReduce Core

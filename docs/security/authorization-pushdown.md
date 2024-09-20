@@ -30,8 +30,8 @@ Once you have used the correct configuration, you can perform authorization oper
 
 #### Example of using the Authorization Ranger Hive Plugin
 
-Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions. 
-The Ranger service is accessible at `172.0.0.100:6080`, with the username `Jack` and the password `PWD123`. 
+Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions.
+The Ranger service is accessible at `172.0.0.100:6080`, with the username `Jack` and the password `PWD123`.
 To add this Hive service to Gravitino using the Hive catalog, you'll need to configure the following parameters.
 
 ```properties

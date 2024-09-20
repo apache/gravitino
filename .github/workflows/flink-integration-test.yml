@@ -2,7 +2,6 @@ name: Flink Integration Test
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main", "branch-*" ]
   pull_request:
@@ -28,18 +27,19 @@ jobs:
               - catalogs/**
               - clients/client-java/**
               - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
               - dev/**
+              - flink-connector/**
               - gradle/**
+              # todo: uncomment the following line after the flink-connector support Iceberg
+              # - iceberg/**
+              - integration-test-common/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
-              - flink-connector/**
-              - docs/open-api/**
               - build.gradle.kts
               - gradle.properties
               - gradlew
@@ -47,58 +47,26 @@ jobs:
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  # Integration test for AMD64 architecture
-  test-amd64-arch:
+  FlinkIT-on-push:
     needs: changes
-    if: needs.changes.outputs.source_changes == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    if: (github.event_name == 'push' && needs.changes.outputs.source_changes == 'true')
     strategy:
       matrix:
         architecture: [linux/amd64]
         java-version: [ 8, 11, 17 ]
-    env:
-      PLATFORM: ${{ matrix.architecture }}
-    steps:
-      - uses: actions/checkout@v3
+    uses: ./.github/workflows/flink-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
 
-      - uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java-version }}
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
-      - name: Check required command
-        run: |
-          dev/ci/check_commands.sh
-
-      - name: Package Gravitino
-        run: |
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
-
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
-
-      - name: Flink Integration Test
-        id: integrationTest
-        run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
-
-      - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v3
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
-        with:
-          name: flink-connector-integrate-test-reports-${{ matrix.java-version }}
-          path: |
-            build/reports
-            flink-connector/flink/build/*.log
-            flink-connector/flink/build/*.tar
-            distribution/package/logs/gravitino-server.out
-            distribution/package/logs/gravitino-server.log
-            catalogs/**/*.log
-            catalogs/**/*.tar
+  FlinkIT-on-pr:
+    needs: changes
+    if: (github.event_name == 'pull_request' && needs.changes.outputs.source_changes == 'true')
+    strategy:
+      matrix:
+        architecture: [linux/amd64]
+        java-version: [ 17 ]
+    uses: ./.github/workflows/flink-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
