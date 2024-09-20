@@ -308,7 +308,7 @@ public class TestAccessControlManager {
     Assertions.assertTrue(removed);
 
     // Test to remove non-existed group
-    boolean removed1 = accessControlManager.removeUser(METALAKE, "no-exist");
+    boolean removed1 = accessControlManager.removeGroup(METALAKE, "no-exist");
     Assertions.assertFalse(removed1);
   }
 
@@ -366,7 +366,7 @@ public class TestAccessControlManager {
     Assertions.assertEquals("loadRole", role.name());
     testProperties(props, role.properties());
 
-    // Test load non-existed group
+    // Test load non-existed role
     Throwable exception =
         Assertions.assertThrows(
             NoSuchRoleException.class, () -> accessControlManager.getRole(METALAKE, "not-exist"));
