@@ -132,10 +132,9 @@ class UserGroupManager {
       AuthorizationUtils.checkMetalakeExists(metalake);
 
       Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
-      return store.list(namespace, UserEntity.class, Entity.EntityType.USER, skippingFields)
-          .stream()
-          .map(entity -> (User) entity)
-          .toArray(User[]::new);
+      return store
+          .list(namespace, UserEntity.class, Entity.EntityType.USER, skippingFields)
+          .toArray(new User[0]);
     } catch (NoSuchEntityException e) {
       LOG.warn("Metalake {} does not exist", metalake, e);
       throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
