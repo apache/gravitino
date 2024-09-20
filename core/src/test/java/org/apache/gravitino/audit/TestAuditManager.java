@@ -46,6 +46,10 @@ public class TestAuditManager {
     DummyAuditWriter dummyAuditWriter = (DummyAuditWriter) auditLogManager.getAuditLogWriter();
     Assertions.assertEquals(1, dummyAuditWriter.getAuditLogs().size());
     Assertions.assertInstanceOf(Map.class, dummyAuditWriter.getAuditLogs().get(0));
+    Map<String, String> auditInfo = (Map<String, String>) dummyAuditWriter.getAuditLogs().get(0);
+    Assertions.assertEquals(dummyEvent.getClass().getSimpleName(), auditInfo.get("eventName"));
+    Assertions.assertEquals(dummyEvent.user(), auditInfo.get("identifier"));
+    Assertions.assertEquals(String.valueOf(dummyEvent.eventTime()), auditInfo.get("timestamp"));
   }
 
   private Map<String, String> createManagerConfig() {

@@ -33,6 +33,8 @@ public class AuditLogManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditLogManager.class);
 
+  public static final String AUDIT_LOG_PREFIX = "gravitino.audit.";
+
   @VisibleForTesting private AuditLogWriter auditLogWriter;
 
   public void init(Map<String, String> properties, EventListenerManager eventBusManager) {
@@ -42,7 +44,6 @@ public class AuditLogManager {
       return;
     }
 
-    LOG.info("Audit log config {}", auditLogConfig);
     String writerClassName = auditLogConfig.getWriterClassName();
     String formatterClassName = auditLogConfig.getAuditLogFormatterClassName();
     Formatter formatter = loadFormatter(formatterClassName);

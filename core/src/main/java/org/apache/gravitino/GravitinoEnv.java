@@ -19,6 +19,8 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.audit.AuditLogConfig;
+import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
@@ -108,6 +110,8 @@ public class GravitinoEnv {
   private LockManager lockManager;
 
   private EventListenerManager eventListenerManager;
+
+  private AuditLogManager auditLogManager;
 
   private TagManager tagManager;
   private EventBus eventBus;
@@ -356,6 +360,10 @@ public class GravitinoEnv {
     eventListenerManager.init(
         config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
     this.eventBus = eventListenerManager.createEventBus();
+
+    this.auditLogManager = new AuditLogManager();
+    auditLogManager.init(
+            config.getConfigsWithPrefix(AuditLogManager.AUDIT_LOG_PREFIX), eventListenerManager);
   }
 
   private void initGravitinoServerComponents() {

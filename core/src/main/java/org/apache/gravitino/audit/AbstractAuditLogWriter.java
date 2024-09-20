@@ -31,13 +31,11 @@ public abstract class AbstractAuditLogWriter implements AuditLogWriter {
   }
 
   public void write(Event event) {
-    Object formatted = this.formatter.format(event);
+    Object formatted = formatter.format(event);
     doWrite(formatted);
   }
 
-  public abstract void doWrite(Object event);
-
-  public abstract void close();
+  protected abstract void doWrite(Object event);
 
   @VisibleForTesting
   Formatter getFormatter() {
