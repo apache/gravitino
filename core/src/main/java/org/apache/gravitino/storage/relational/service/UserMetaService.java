@@ -256,7 +256,7 @@ public class UserMetaService {
     SupportsSkippingFieldsHandlers<List<UserEntity>> handlers =
         new SupportsSkippingFieldsHandlers<>();
     handlers.addHandler(new ListSkippingRolesHandler(metalakeName));
-    handlers.addHandler(new listAllFieldsHandler(metalakeName));
+    handlers.addHandler(new ListAllFieldsHandler(metalakeName));
 
     return handlers.executeHandler(skippingFields);
   }
@@ -310,10 +310,10 @@ public class UserMetaService {
     }
   }
 
-  private static class listAllFieldsHandler implements SupportsSkippingFields<List<UserEntity>> {
+  private static class ListAllFieldsHandler implements SupportsSkippingFields<List<UserEntity>> {
     final String metalakeName;
 
-    listAllFieldsHandler(String metalakeName) {
+    ListAllFieldsHandler(String metalakeName) {
       this.metalakeName = metalakeName;
     }
 
