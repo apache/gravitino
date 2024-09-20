@@ -65,6 +65,7 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -831,7 +832,7 @@ public class TestHadoopCatalogOperations {
       CallerContext.CallerContextHolder.set(callerContext);
 
       Assertions.assertThrows(
-          IllegalArgumentException.class, () -> ops.getFileLocation(filesetIdent, subPath));
+          GravitinoRuntimeException.class, () -> ops.getFileLocation(filesetIdent, subPath));
     } finally {
       CallerContext.CallerContextHolder.remove();
     }
@@ -861,7 +862,7 @@ public class TestHadoopCatalogOperations {
       CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
       CallerContext.CallerContextHolder.set(callerContext);
       Assertions.assertThrows(
-          IllegalArgumentException.class, () -> ops.getFileLocation(filesetIdent, ""));
+          GravitinoRuntimeException.class, () -> ops.getFileLocation(filesetIdent, ""));
     }
 
     // test storage location end with "/"

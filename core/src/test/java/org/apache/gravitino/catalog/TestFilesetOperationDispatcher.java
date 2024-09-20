@@ -31,6 +31,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.junit.jupiter.api.Assertions;
@@ -241,7 +242,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
         CallerContext.CallerContextHolder.set(callerContext);
 
         Assertions.assertThrows(
-            IllegalArgumentException.class,
+            GravitinoRuntimeException.class,
             () -> filesetOperationDispatcher.getFileLocation(filesetIdent2, subPath));
       } catch (IOException e) {
         // ignore
@@ -275,7 +276,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
         CallerContext.CallerContextHolder.set(callerContext);
 
         Assertions.assertThrows(
-            IllegalArgumentException.class,
+            GravitinoRuntimeException.class,
             () -> filesetOperationDispatcher.getFileLocation(filesetIdent2, subPath));
       } catch (IOException e) {
         // ignore
