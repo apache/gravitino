@@ -98,12 +98,7 @@ public class TagManager {
 
           try {
             return entityStore
-                .list(
-                    ofTagNamespace(metalake),
-                    TagEntity.class,
-                    Entity.EntityType.TAG,
-                    Collections.emptyList())
-                .stream()
+                .list(ofTagNamespace(metalake), TagEntity.class, Entity.EntityType.TAG).stream()
                 .toArray(Tag[]::new);
           } catch (IOException ioe) {
             LOG.error("Failed to list tags under metalake {}", metalake, ioe);

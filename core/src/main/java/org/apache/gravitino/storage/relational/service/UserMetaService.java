@@ -249,13 +249,12 @@ public class UserMetaService {
     return newEntity;
   }
 
-  public List<UserEntity> listUsersByNamespace(
-      Namespace namespace, List<Field> allowMissingFields) {
+  public List<UserEntity> listUsersByNamespace(Namespace namespace, List<Field> skippingFields) {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
 
-    if (allowMissingFields.contains(UserEntity.ROLE_IDS)
-        && allowMissingFields.contains(UserEntity.ROLE_NAMES)) {
+    if (skippingFields.contains(UserEntity.ROLE_IDS)
+        && skippingFields.contains(UserEntity.ROLE_NAMES)) {
       List<UserPO> userPOs =
           SessionUtils.getWithoutCommit(
               UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalake(metalakeName));

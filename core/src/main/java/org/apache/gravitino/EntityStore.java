@@ -59,15 +59,34 @@ public interface EntityStore extends Closeable {
    * @param namespace the namespace of the entities
    * @param type the detailed type of the entity
    * @param entityType the general type of the entity
-   * @param allowMissingFields Some fields may have a relatively high acquisition cost, EntityStore
+   * @return the list of entities
+   * @throws IOException if the list operation fails
+   */
+  <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, EntityType entityType) throws IOException;
+
+  /**
+   * List all the entities with the specified {@link org.apache.gravitino.Namespace}, and
+   * deserialize them into the specified {@link Entity} object.
+   *
+   * <p>Note. Depends on the isolation levels provided by the underlying storage, the returned list
+   * may not be consistent.
+   *
+   * @param <E> class of the entity
+   * @param namespace the namespace of the entities
+   * @param type the detailed type of the entity
+   * @param entityType the general type of the entity
+   * @param skippingFields Some fields may have a relatively high acquisition cost, EntityStore
    *     provide an optional setting to avoid fetching these high-cost fields to improve the
    *     performance.
    * @return the list of entities
    * @throws IOException if the list operation fails
    */
-  <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, EntityType entityType, List<Field> allowMissingFields)
-      throws IOException;
+  default <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, EntityType entityType, List<Field> skippingFields)
+      throws IOException {
+    throw new UnsupportedOperationException("Don't support to skip fields");
+  }
 
   /**
    * Check if the entity with the specified {@link org.apache.gravitino.NameIdentifier} exists.

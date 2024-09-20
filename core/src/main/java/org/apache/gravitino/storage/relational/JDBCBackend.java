@@ -89,7 +89,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType, List<Field> allowMissingFields)
+      Namespace namespace, Entity.EntityType entityType, List<Field> skippingFields)
       throws IOException {
     switch (entityType) {
       case METALAKE:
@@ -108,7 +108,7 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) TagMetaService.getInstance().listTagsByNamespace(namespace);
       case USER:
         return (List<E>)
-            UserMetaService.getInstance().listUsersByNamespace(namespace, allowMissingFields);
+            UserMetaService.getInstance().listUsersByNamespace(namespace, skippingFields);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);

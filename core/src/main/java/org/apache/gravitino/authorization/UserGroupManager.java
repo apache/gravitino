@@ -127,12 +127,12 @@ class UserGroupManager {
     return listUsersInternal(metalake, Collections.emptyList());
   }
 
-  private User[] listUsersInternal(String metalake, List<Field> allowMissingFields) {
+  private User[] listUsersInternal(String metalake, List<Field> skippingFields) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
 
       Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
-      return store.list(namespace, UserEntity.class, Entity.EntityType.USER, allowMissingFields)
+      return store.list(namespace, UserEntity.class, Entity.EntityType.USER, skippingFields)
           .stream()
           .map(entity -> (User) entity)
           .toArray(User[]::new);

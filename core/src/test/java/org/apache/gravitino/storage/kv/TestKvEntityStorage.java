@@ -31,7 +31,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
@@ -135,11 +134,7 @@ public class TestKvEntityStorage extends TestEntityStorage {
 
       // Test scan and store list interface
       List<CatalogEntity> catalogEntityList =
-          store.list(
-              catalog.namespace(),
-              CatalogEntity.class,
-              Entity.EntityType.CATALOG,
-              Collections.emptyList());
+          store.list(catalog.namespace(), CatalogEntity.class, Entity.EntityType.CATALOG);
       Assertions.assertEquals(3, catalogEntityList.size());
       Assertions.assertTrue(catalogEntityList.contains(catalog));
       Assertions.assertTrue(catalogEntityList.contains(catalogCopy));

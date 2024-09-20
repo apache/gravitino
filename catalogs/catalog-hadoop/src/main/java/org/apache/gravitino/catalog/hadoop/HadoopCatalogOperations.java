@@ -149,8 +149,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       }
 
       List<FilesetEntity> filesets =
-          store.list(
-              namespace, FilesetEntity.class, Entity.EntityType.FILESET, Collections.emptyList());
+          store.list(namespace, FilesetEntity.class, Entity.EntityType.FILESET);
       return filesets.stream()
           .map(f -> NameIdentifier.of(namespace, f.name()))
           .toArray(NameIdentifier[]::new);
@@ -388,8 +387,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     try {
       List<SchemaEntity> schemas =
-          store.list(
-              namespace, SchemaEntity.class, Entity.EntityType.SCHEMA, Collections.emptyList());
+          store.list(namespace, SchemaEntity.class, Entity.EntityType.SCHEMA);
       return schemas.stream()
           .map(s -> NameIdentifier.of(namespace, s.name()))
           .toArray(NameIdentifier[]::new);

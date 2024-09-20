@@ -34,7 +34,6 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntitySerDe;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
@@ -83,8 +82,7 @@ public class TestMemoryEntityStore {
 
     @Override
     public <E extends Entity & HasIdentifier> List<E> list(
-        Namespace namespace, Class<E> cl, EntityType entityType, List<Field> allowMissingFields)
-        throws IOException {
+        Namespace namespace, Class<E> cl, EntityType entityType) throws IOException {
       return entityMap.entrySet().stream()
           .filter(e -> e.getKey().namespace().equals(namespace))
           .map(entry -> (E) entry.getValue())
