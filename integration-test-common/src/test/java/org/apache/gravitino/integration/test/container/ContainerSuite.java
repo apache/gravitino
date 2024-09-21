@@ -71,6 +71,7 @@ public class ContainerSuite implements Closeable {
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
       new EnumMap<>(PGImageName.class);
 
+  private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
   protected static final CloseableGroup closer = CloseableGroup.create();
 
   private static void initIfNecessary() {
@@ -112,7 +113,11 @@ public class ContainerSuite implements Closeable {
     return network;
   }
 
-  public void startHiveContainer() {
+  public void startHiveContainer(Map<String, String> env) {
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    builder.putAll(env);
+    builder.put("HADOOP_USER_NAME", "anonymous");
+
     if (hiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainer == null) {
@@ -121,10 +126,7 @@ public class ContainerSuite implements Closeable {
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
                   .withHostName("gravitino-ci-hive")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "anonymous")
-                          .build())
+                  .withEnvVars(builder.build())
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
@@ -132,6 +134,10 @@ public class ContainerSuite implements Closeable {
         }
       }
     }
+  }
+
+  public void startHiveContainer() {
+    startHiveContainer(ImmutableMap.of());
   }
 
   /**
@@ -359,6 +365,29 @@ public class ContainerSuite implements Closeable {
         }
       }
     }
+  }
+
+  public void startLocalStackContainer() {
+    if (gravitinoLocalStackContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (gravitinoLocalStackContainer == null) {
+          GravitinoLocalStackContainer.Builder builder =
+              GravitinoLocalStackContainer.builder().withNetwork(network);
+          GravitinoLocalStackContainer container = closer.register(builder.build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start LocalStack container", e);
+            throw new RuntimeException("Failed to start LocalStack container", e);
+          }
+          gravitinoLocalStackContainer = container;
+        }
+      }
+    }
+  }
+
+  public GravitinoLocalStackContainer getLocalStackContainer() {
+    return gravitinoLocalStackContainer;
   }
 
   public KafkaContainer getKafkaContainer() {

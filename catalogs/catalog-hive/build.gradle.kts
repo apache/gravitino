@@ -148,6 +148,8 @@ dependencies {
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.localstack)
+  testImplementation(libs.hadoop2.s3)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
