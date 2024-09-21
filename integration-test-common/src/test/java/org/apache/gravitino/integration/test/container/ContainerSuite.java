@@ -72,6 +72,8 @@ public class ContainerSuite implements Closeable {
       new EnumMap<>(PGImageName.class);
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
+  private static volatile HiveContainer hiveContainerWithS3;
+
   protected static final CloseableGroup closer = CloseableGroup.create();
 
   private static void initIfNecessary() {
@@ -131,6 +133,29 @@ public class ContainerSuite implements Closeable {
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
           hiveContainer = container;
+        }
+      }
+    }
+  }
+
+  public void startHiveContainerWithS3(Map<String, String> env) {
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    builder.putAll(env);
+    builder.put("HADOOP_USER_NAME", "anonymous");
+
+    if (hiveContainerWithS3 == null) {
+      synchronized (ContainerSuite.class) {
+        if (hiveContainerWithS3 == null) {
+          initIfNecessary();
+          // Start Hive container
+          HiveContainer.Builder hiveBuilder =
+              HiveContainer.builder()
+                  .withHostName("gravitino-ci-hive")
+                  .withEnvVars(builder.build())
+                  .withNetwork(network);
+          HiveContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          hiveContainerWithS3 = container;
         }
       }
     }
@@ -388,6 +413,10 @@ public class ContainerSuite implements Closeable {
 
   public GravitinoLocalStackContainer getLocalStackContainer() {
     return gravitinoLocalStackContainer;
+  }
+
+  public HiveContainer getHiveContainerWithS3() {
+    return hiveContainerWithS3;
   }
 
   public KafkaContainer getKafkaContainer() {

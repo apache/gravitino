@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.hive.integration.test;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
@@ -109,7 +110,13 @@ public class CatalogHiveS3IT extends CatalogHiveIT {
             HiveContainer.HIVE_RUNTIME_VERSION,
             HiveContainer.HIVE3);
 
-    containerSuite.startHiveContainer(hiveContainerEnv);
+    containerSuite.startHiveContainerWithS3(hiveContainerEnv);
+
+    HIVE_METASTORE_URIS =
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
   }
 
   @Override
@@ -138,7 +145,7 @@ public class CatalogHiveS3IT extends CatalogHiveIT {
                 "spark.sql.warehouse.dir",
                 String.format(
                     "hdfs://%s:%d/user/hive/warehouse",
-                    containerSuite.getHiveContainer().getContainerIpAddress(),
+                    containerSuite.getHiveContainerWithS3().getContainerIpAddress(),
                     HiveContainer.HDFS_DEFAULTFS_PORT))
             .config("spark.hadoop.fs.s3a.access.key", accessKey)
             .config("spark.hadoop.fs.s3a.secret.key", secretKey)
@@ -157,7 +164,9 @@ public class CatalogHiveS3IT extends CatalogHiveIT {
 
   @Override
   protected Map<String, String> createSchemaProperties() {
-    Map<String, String> properties = super.createSchemaProperties();
+    Map<String, String> properties = new HashMap<>();
+    properties.put("key1", "val1");
+    properties.put("key2", "val2");
     properties.put("location", "s3a://" + S3_BUCKET_NAME + "/test-" + System.currentTimeMillis());
     return properties;
   }

@@ -163,6 +163,12 @@ public class CatalogHiveIT extends AbstractIT {
 
   protected void startNecessaryContainer() {
     containerSuite.startHiveContainer();
+
+    HIVE_METASTORE_URIS =
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
   }
 
   protected void initSparkSession() {
@@ -197,12 +203,6 @@ public class CatalogHiveIT extends AbstractIT {
   @BeforeAll
   public void startup() throws Exception {
     startNecessaryContainer();
-
-    HIVE_METASTORE_URIS =
-        String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
 
     HiveConf hiveConf = new HiveConf();
     hiveConf.set(HiveConf.ConfVars.METASTOREURIS.varname, HIVE_METASTORE_URIS);
