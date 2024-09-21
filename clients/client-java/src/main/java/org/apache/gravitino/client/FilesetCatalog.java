@@ -244,20 +244,25 @@ class FilesetCatalog extends BaseSchemaCatalog implements org.apache.gravitino.f
     checkFilesetNameIdentifier(ident);
     Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
 
-    CallerContext callerContext = CallerContext.CallerContextHolder.get();
+    try {
+      CallerContext callerContext = CallerContext.CallerContextHolder.get();
 
-    Map<String, String> params = new HashMap<>();
-    params.put("sub_path", RESTUtils.encodeString(subPath));
-    FileLocationResponse resp =
-        restClient.get(
-            formatFileLocationRequestPath(fullNamespace, ident.name()),
-            params,
-            FileLocationResponse.class,
-            callerContext != null ? callerContext.context() : Collections.emptyMap(),
-            ErrorHandlers.filesetErrorHandler());
-    resp.validate();
+      Map<String, String> params = new HashMap<>();
+      params.put("sub_path", RESTUtils.encodeString(subPath));
+      FileLocationResponse resp =
+          restClient.get(
+              formatFileLocationRequestPath(fullNamespace, ident.name()),
+              params,
+              FileLocationResponse.class,
+              callerContext != null ? callerContext.context() : Collections.emptyMap(),
+              ErrorHandlers.filesetErrorHandler());
+      resp.validate();
 
-    return resp.getFileLocation();
+      return resp.getFileLocation();
+    } finally {
+      // Clear the caller context
+      CallerContext.CallerContextHolder.remove();
+    }
   }
 
   @VisibleForTesting

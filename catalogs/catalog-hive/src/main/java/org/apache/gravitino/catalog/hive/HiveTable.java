@@ -18,34 +18,30 @@
  */
 package org.apache.gravitino.catalog.hive;
 
-import static org.apache.gravitino.rel.expressions.transforms.Transforms.identity;
-
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.ToString;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.gravitino.catalog.hive.converter.HiveDataTypeConverter;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.hive.CachedClientPool;
+import org.apache.gravitino.hive.converter.HiveDataTypeConverter;
+import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
-import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
-import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -76,55 +72,15 @@ public class HiveTable extends BaseTable {
    * @return A new HiveTable instance Builder.
    */
   public static HiveTable.Builder fromHiveTable(Table table) {
-    // Get audit info from Hive's Table object. Because Hive's table doesn't store last modifier
-    // and last modified time, we only get creator and create time from Hive's table.
-    AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
-    Optional.ofNullable(table.getOwner()).ifPresent(auditInfoBuilder::withCreator);
-    if (table.isSetCreateTime()) {
-      auditInfoBuilder.withCreateTime(Instant.ofEpochSecond(table.getCreateTime()));
-    }
+    AuditInfo auditInfo = HiveTableConverter.getAuditInfo(table);
 
-    StorageDescriptor sd = table.getSd();
-    Distribution distribution = Distributions.NONE;
-    if (sd.getBucketCols() != null && !sd.getBucketCols().isEmpty()) {
-      // Hive table use hash strategy as bucketing strategy
-      distribution =
-          Distributions.hash(
-              sd.getNumBuckets(),
-              sd.getBucketCols().stream().map(NamedReference::field).toArray(Expression[]::new));
-    }
+    Distribution distribution = HiveTableConverter.getDistribution(table);
 
-    SortOrder[] sortOrders = new SortOrder[0];
-    if (sd.getSortCols() != null && !sd.getSortCols().isEmpty()) {
-      sortOrders =
-          sd.getSortCols().stream()
-              .map(
-                  f ->
-                      SortOrders.of(
-                          NamedReference.field(f.getCol()),
-                          f.getOrder() == 1 ? SortDirection.ASCENDING : SortDirection.DESCENDING))
-              .toArray(SortOrder[]::new);
-    }
+    SortOrder[] sortOrders = HiveTableConverter.getSortOrders(table);
 
-    Column[] columns =
-        Stream.concat(
-                sd.getCols().stream()
-                    .map(
-                        f ->
-                            HiveColumn.builder()
-                                .withName(f.getName())
-                                .withType(HiveDataTypeConverter.CONVERTER.toGravitino(f.getType()))
-                                .withComment(f.getComment())
-                                .build()),
-                table.getPartitionKeys().stream()
-                    .map(
-                        p ->
-                            HiveColumn.builder()
-                                .withName(p.getName())
-                                .withType(HiveDataTypeConverter.CONVERTER.toGravitino(p.getType()))
-                                .withComment(p.getComment())
-                                .build()))
-            .toArray(Column[]::new);
+    Column[] columns = HiveTableConverter.getColumns(table, HiveColumn.builder());
+
+    Transform[] partitioning = HiveTableConverter.getPartitioning(table);
 
     return HiveTable.builder()
         .withName(table.getTableName())
@@ -133,11 +89,8 @@ public class HiveTable extends BaseTable {
         .withColumns(columns)
         .withDistribution(distribution)
         .withSortOrders(sortOrders)
-        .withAuditInfo(auditInfoBuilder.build())
-        .withPartitioning(
-            table.getPartitionKeys().stream()
-                .map(p -> identity(p.getName()))
-                .toArray(Transform[]::new))
+        .withAuditInfo(auditInfo)
+        .withPartitioning(partitioning)
         .withSchemaName(table.getDbName())
         .withStorageDescriptor(table.getSd());
   }

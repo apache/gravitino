@@ -291,6 +291,9 @@ public class FilesetOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleFilesetException(OperationType.GET, fileset, schema, e);
+    } finally {
+      // Clear the caller context
+      CallerContext.CallerContextHolder.remove();
     }
   }
 }

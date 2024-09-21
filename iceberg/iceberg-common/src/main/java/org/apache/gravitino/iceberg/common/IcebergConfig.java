@@ -24,19 +24,21 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.OverwriteDefaultConfig;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.server.web.JettyServerConfig;
-import org.apache.gravitino.server.web.OverwriteDefaultConfig;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final String ICEBERG_CONFIG_PREFIX = "gravitino.iceberg-rest.";
+
+  public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
+  public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
 
   public static final ConfigEntry<String> CATALOG_BACKEND =
       new ConfigBuilder(IcebergConstants.CATALOG_BACKEND)
@@ -199,7 +201,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> ICEBERG_REST_CATALOG_PROVIDER =
       new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER)
           .doc(
-              "Catalog provider class name, you can develop a class that implements `IcebergTableOpsProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
+              "Catalog provider class name, you can develop a class that implements `IcebergCatalogWrapperProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .createWithDefault("config-based-provider");
@@ -248,9 +250,9 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   @Override
   public Map<String, String> getOverwriteDefaultConfig() {
     return ImmutableMap.of(
-        JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
-        String.valueOf(JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT),
-        JettyServerConfig.WEBSERVER_HTTPS_PORT.getKey(),
-        String.valueOf(JettyServerConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT));
+        ConfigConstants.WEBSERVER_HTTP_PORT,
+        String.valueOf(DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT),
+        ConfigConstants.WEBSERVER_HTTPS_PORT,
+        String.valueOf(DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT));
   }
 }

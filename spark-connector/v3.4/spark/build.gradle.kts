@@ -49,6 +49,9 @@ dependencies {
     exclude("org.apache.logging.log4j")
     exclude("org.slf4j")
   }
+  testImplementation(project(":catalogs:hive-metastore-common")) {
+    exclude("*")
+  }
   testImplementation(project(":clients:client-java")) {
     exclude("org.apache.logging.log4j")
     exclude("org.slf4j")

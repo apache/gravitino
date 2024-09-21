@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.lang.math.RandomUtils;
+import java.util.Random;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -53,6 +53,8 @@ public class TestBaseConvert {
 
   protected static final Map<String, Type> GRAVITINO_TYPE = new HashMap<>();
   protected static final Map<String, org.apache.iceberg.types.Type> ICEBERG_TYPE = new HashMap<>();
+
+  private static Random random = new Random(System.currentTimeMillis());
 
   static {
     GRAVITINO_TYPE.put("BOOLEAN", org.apache.gravitino.rel.types.Types.BooleanType.get());
@@ -113,8 +115,8 @@ public class TestBaseConvert {
       results.add(
           SortOrders.of(
               field(colName),
-              RandomUtils.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
-              RandomUtils.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST));
+              random.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
+              random.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST));
     }
     return results.toArray(new SortOrder[0]);
   }
@@ -122,15 +124,15 @@ public class TestBaseConvert {
   protected static SortOrder createSortOrder(String name, String colName) {
     return SortOrders.of(
         FunctionExpression.of(name, field(colName)),
-        RandomUtils.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
-        RandomUtils.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST);
+        random.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
+        random.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST);
   }
 
   protected static SortOrder createSortOrder(String name, int width, String colName) {
     return SortOrders.of(
         FunctionExpression.of(name, Literals.integerLiteral(width), field(colName)),
-        RandomUtils.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
-        RandomUtils.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST);
+        random.nextBoolean() ? SortDirection.DESCENDING : SortDirection.ASCENDING,
+        random.nextBoolean() ? NullOrdering.NULLS_FIRST : NullOrdering.NULLS_LAST);
   }
 
   protected static Types.NestedField createNestedField(
@@ -143,7 +145,7 @@ public class TestBaseConvert {
     for (int i = 0; i < colNames.length; i++) {
       results.add(
           Types.NestedField.of(
-              i + 1, RandomUtils.nextBoolean(), colNames[i], getRandomIcebergType(), TEST_COMMENT));
+              i + 1, random.nextBoolean(), colNames[i], getRandomIcebergType(), TEST_COMMENT));
     }
     return results.toArray(new Types.NestedField[0]);
   }
@@ -211,7 +213,7 @@ public class TestBaseConvert {
   private static Type getRandomGravitinoType() {
     Collection<Type> values = GRAVITINO_TYPE.values();
     return values.stream()
-        .skip(RandomUtils.nextInt(values.size()))
+        .skip(random.nextInt(values.size()))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("No type found"));
   }
@@ -219,7 +221,7 @@ public class TestBaseConvert {
   private static org.apache.iceberg.types.Type getRandomIcebergType() {
     Collection<org.apache.iceberg.types.Type> values = ICEBERG_TYPE.values();
     return values.stream()
-        .skip(RandomUtils.nextInt(values.size()))
+        .skip(random.nextInt(values.size()))
         .findFirst()
         .orElseThrow(() -> new RuntimeException("No type found"));
   }
