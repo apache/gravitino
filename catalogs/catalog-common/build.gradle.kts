@@ -25,4 +25,9 @@ plugins {
 dependencies {
   implementation(libs.slf4j.api)
   implementation(libs.guava)
+
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
