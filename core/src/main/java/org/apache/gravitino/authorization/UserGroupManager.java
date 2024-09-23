@@ -136,7 +136,7 @@ class UserGroupManager {
           .list(namespace, UserEntity.class, Entity.EntityType.USER, skippingFields)
           .toArray(new User[0]);
     } catch (NoSuchEntityException e) {
-      LOG.warn("Metalake {} does not exist", metalake, e);
+      LOG.error("Metalake {} does not exist", metalake, e);
       throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
     } catch (IOException ioe) {
       LOG.error("Listing user under metalake {} failed due to storage issues", metalake, ioe);
