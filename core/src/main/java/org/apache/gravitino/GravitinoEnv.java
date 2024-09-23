@@ -19,7 +19,6 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
-import org.apache.gravitino.audit.AuditLogConfig;
 import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -363,7 +362,7 @@ public class GravitinoEnv {
 
     this.auditLogManager = new AuditLogManager();
     auditLogManager.init(
-            config.getConfigsWithPrefix(AuditLogManager.AUDIT_LOG_PREFIX), eventListenerManager);
+        config.getConfigsWithPrefix(AuditLogManager.AUDIT_LOG_PREFIX), eventListenerManager);
   }
 
   private void initGravitinoServerComponents() {

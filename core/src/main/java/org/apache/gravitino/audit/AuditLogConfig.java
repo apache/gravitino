@@ -20,7 +20,6 @@
 package org.apache.gravitino.audit;
 
 import java.util.Map;
-
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
