@@ -169,7 +169,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     fields.add(ROLE_IDS);
     fields.add(ROLE_NAMES);
 
-    return fields;
+    return Collections.unmodifiableSet(fields);
   }
 
   @Override
