@@ -283,8 +283,7 @@ public class UserMetaService {
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }
 
-  private static class ListDesiredRolesHandler
-      implements SupportsDesiredFields<List<UserEntity>> {
+  private static class ListDesiredRolesHandler implements SupportsDesiredFields<List<UserEntity>> {
     private final String metalakeName;
 
     ListDesiredRolesHandler(String metalakeName) {

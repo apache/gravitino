@@ -24,8 +24,8 @@ import java.util.Set;
 import org.apache.gravitino.Field;
 
 /**
- * This class is the collection wrapper of SupportsDesiredFields handler. The class will contain
- * all the handlers can proceed the data. We can choose different handlers according to the desired
+ * This class is the collection wrapper of SupportsDesiredFields handler. The class will contain all
+ * the handlers can proceed the data. We can choose different handlers according to the desired
  * fields to acquire better performance.
  *
  * @param <T> The value type which the handler will return.
@@ -40,7 +40,7 @@ class SupportsDesiredFieldsHandlers<T> {
 
   T execute(Set<Field> desiredFields) {
     for (SupportsDesiredFields<T> method : methods) {
-      if (desiredFields.containsAll(method.desiredFields())) {
+      if (method.desiredFields().containsAll(desiredFields)) {
         return method.execute();
       }
     }
