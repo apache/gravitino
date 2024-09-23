@@ -42,21 +42,16 @@ dependencies {
   implementation(libs.bundles.paimon) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
+    exclude("org.apache.curator")
     exclude("org.apache.hive")
     exclude("org.apache.hbase")
-    exclude("it.unimi.dsi")
+    exclude("org.apache.zookeeper")
+    exclude("org.eclipse.jetty.aggregate:jetty-all")
     exclude("org.mortbay.jetty")
-    exclude("org.apache.parquet")
     exclude("org.mortbay.jetty:jetty")
     exclude("org.mortbay.jetty:jetty-util")
     exclude("org.mortbay.jetty:jetty-sslengine")
-    exclude("org.eclipse.jetty.aggregate:jetty-all")
-  }
-  implementation(libs.hadoop2.mapreduce.client.core) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
-    exclude(group = "org.mortbay.jetty", module = "jetty-util")
-    exclude(group = "com.sun.jersey.contribs", module = "jersey-guice")
+    exclude("it.unimi.dsi")
   }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
@@ -68,9 +63,10 @@ dependencies {
     exclude("org.mortbay.jetty")
   }
   implementation(libs.hadoop2.hdfs) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet")
-    exclude("org.mortbay.jetty")
+    exclude("*")
+  }
+  implementation(libs.hadoop2.mapreduce.client.core) {
+    exclude("*")
   }
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
