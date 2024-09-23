@@ -150,7 +150,7 @@ public class DorisTableOperations extends JdbcTableOperations {
               .map(column -> BACK_QUOTE + column.toString() + BACK_QUOTE)
               .collect(Collectors.joining(", ")));
       sqlBuilder.append(")");
-    } else if (distribution.strategy() == Strategy.EVEN) {
+    } else if (distribution.strategy() == Strategy.RANDOM) {
       sqlBuilder.append(NEW_LINE).append(" DISTRIBUTED BY ").append("RANDOM");
     }
 
@@ -220,8 +220,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     Preconditions.checkArgument(null != distribution, "Doris must set distribution");
 
     Preconditions.checkArgument(
-        Strategy.HASH == distribution.strategy() || Strategy.EVEN == distribution.strategy(),
-        "Doris only supports HASH or EVEN distribution strategy");
+        Strategy.HASH == distribution.strategy() || Strategy.RANDOM == distribution.strategy(),
+        "Doris only supports HASH or RANDOM distribution strategy");
 
     if (distribution.strategy() == Strategy.HASH) {
       // Check if the distribution column exists

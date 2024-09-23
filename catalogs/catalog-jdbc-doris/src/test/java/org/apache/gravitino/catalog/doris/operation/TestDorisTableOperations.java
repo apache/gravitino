@@ -95,6 +95,43 @@ public class TestDorisTableOperations extends TestDoris {
   }
 
   @Test
+  void testRandomDistribution() {
+    String tableName = GravitinoITUtils.genRandomName("doris_basic_test_table");
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    JdbcColumn col_1 =
+        JdbcColumn.builder().withName("col_1").withType(INT).withComment("id").build();
+    columns.add(col_1);
+    JdbcColumn col_2 =
+        JdbcColumn.builder().withName("col_2").withType(VARCHAR_255).withComment("col_2").build();
+    columns.add(col_2);
+    JdbcColumn col_3 =
+        JdbcColumn.builder().withName("col_3").withType(VARCHAR_255).withComment("col_3").build();
+    columns.add(col_3);
+    Map<String, String> properties = new HashMap<>();
+
+    Distribution distribution =
+        Distributions.random(DEFAULT_BUCKET_SIZE, NamedReference.field("col_1"));
+    Index[] indexes = new Index[] {};
+
+    // create table
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        createProperties(),
+        null,
+        distribution,
+        indexes);
+    List<String> listTables = TABLE_OPERATIONS.listTables(databaseName);
+    assertTrue(listTables.contains(tableName));
+    JdbcTable load = TABLE_OPERATIONS.load(databaseName, tableName);
+    assertionsTableInfo(
+        tableName, tableComment, columns, properties, indexes, Transforms.EMPTY_TRANSFORM, load);
+  }
+
+  @Test
   public void testBasicTableOperation() {
     String tableName = GravitinoITUtils.genRandomName("doris_basic_test_table");
     String tableComment = "test_comment";
