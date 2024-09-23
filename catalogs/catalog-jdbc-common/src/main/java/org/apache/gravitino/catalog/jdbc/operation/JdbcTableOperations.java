@@ -49,6 +49,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -204,6 +205,9 @@ public abstract class JdbcTableOperations implements TableOperation {
       Transform[] tablePartitioning = getTablePartitioning(connection, databaseName, tableName);
       jdbcTableBuilder.withPartitioning(tablePartitioning);
 
+      Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
+      jdbcTableBuilder.withDistribution(distribution);
+
       // 5.Get table properties
       Map<String, String> tableProperties = getTableProperties(connection, tableName);
       jdbcTableBuilder.withProperties(tableProperties);
@@ -234,6 +238,11 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected Transform[] getTablePartitioning(
       Connection connection, String databaseName, String tableName) throws SQLException {
     return Transforms.EMPTY_TRANSFORM;
+  }
+
+  protected Distribution getDistributionInfo(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    return Distributions.NONE;
   }
 
   protected boolean getAutoIncrementInfo(ResultSet resultSet) throws SQLException {

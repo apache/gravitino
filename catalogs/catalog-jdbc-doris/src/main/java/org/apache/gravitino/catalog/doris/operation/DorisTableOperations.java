@@ -806,4 +806,17 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
     return "DROP INDEX " + deleteIndex.getName();
   }
+
+  @Override
+  protected Distribution getDistributionInfo(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+
+    String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    try (Statement statement = connection.createStatement();
+        ResultSet result = statement.executeQuery(showCreateTableSql)) {
+      result.next();
+      String createTableSyntax = result.getString("Create Table");
+      return DorisUtils.extractDistributionInfoFromSql(createTableSyntax);
+    }
+  }
 }
