@@ -67,6 +67,12 @@ dependencies {
   implementation(libs.hadoop2.hdfs) {
     exclude("*")
   }
+  implementation(libs.hadoop2.hdfs.client) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet")
+    exclude("org.fusesource.leveldbjni")
+    exclude("org.mortbay.jetty")
+  }
   implementation(libs.hadoop2.mapreduce.client.core) {
     exclude("*")
   }
