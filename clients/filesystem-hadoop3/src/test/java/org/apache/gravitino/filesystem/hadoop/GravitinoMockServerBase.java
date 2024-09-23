@@ -59,8 +59,6 @@ public abstract class GravitinoMockServerBase {
   protected static final String metalakeName = "metalake_1";
   protected static final String catalogName = "fileset_catalog_1";
   protected static final String schemaName = "schema_1";
-  protected static final String managedFilesetName = "managed_fileset";
-  protected static final String externalFilesetName = "external_fileset";
   protected static final String provider = "test";
 
   @BeforeAll
