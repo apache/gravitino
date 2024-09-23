@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -96,7 +97,7 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, Entity.EntityType entityType, List<Field> skippingFields)
+      Namespace namespace, Class<E> type, Entity.EntityType entityType, Set<Field> skippingFields)
       throws IOException {
     return backend.list(namespace, entityType, skippingFields);
   }

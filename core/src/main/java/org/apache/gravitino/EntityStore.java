@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -65,7 +66,7 @@ public interface EntityStore extends Closeable {
    */
   default <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, EntityType entityType) throws IOException {
-    return list(namespace, type, entityType, Collections.emptyList());
+    return list(namespace, type, entityType, Collections.emptySet());
   }
 
   /**
@@ -86,7 +87,7 @@ public interface EntityStore extends Closeable {
    * @throws IOException if the list operation fails
    */
   default <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, EntityType entityType, List<Field> skippingFields)
+      Namespace namespace, Class<E> type, EntityType entityType, Set<Field> skippingFields)
       throws IOException {
     throw new UnsupportedOperationException("Don't support to skip fields");
   }

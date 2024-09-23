@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -40,6 +40,7 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,18 +117,20 @@ class UserGroupManager {
   }
 
   String[] listUserNames(String metalake) {
-    return Arrays.stream(
-            listUsersInternal(
-                metalake, Lists.newArrayList(UserEntity.ROLE_NAMES, UserEntity.ROLE_IDS)))
+    Set<Field> skippingFields = Sets.newHashSet();
+    skippingFields.add(UserEntity.ROLE_NAMES);
+    skippingFields.add(UserEntity.ROLE_IDS);
+
+    return Arrays.stream(listUsersInternal(metalake, skippingFields))
         .map(User::name)
         .toArray(String[]::new);
   }
 
   User[] listUsers(String metalake) {
-    return listUsersInternal(metalake, Collections.emptyList());
+    return listUsersInternal(metalake, Collections.emptySet());
   }
 
-  private User[] listUsersInternal(String metalake, List<Field> skippingFields) {
+  private User[] listUsersInternal(String metalake, Set<Field> skippingFields) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
 
