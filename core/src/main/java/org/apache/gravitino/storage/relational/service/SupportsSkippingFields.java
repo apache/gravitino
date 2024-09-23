@@ -18,18 +18,18 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
-import java.util.List;
+import java.util.Set;
 import org.apache.gravitino.Field;
 
 /** The handler supports to skip fields. */
 interface SupportsSkippingFields<R> {
 
   /**
-   * The fields which could be skipped.
+   * The fields which could be required.
    *
-   * @return The fields which could be skipped.
+   * @return The fields which are required.
    */
-  List<Field> allSkippingFields();
+  Set<Field> requiredFields();
 
   /**
    * The return value of the handler.

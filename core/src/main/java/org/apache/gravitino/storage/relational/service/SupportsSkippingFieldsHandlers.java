@@ -38,18 +38,10 @@ class SupportsSkippingFieldsHandlers<T> {
     methods.add(supportsSkippingFields);
   }
 
-  T execute(Set<Field> necessaryFields) {
+  T execute(Set<Field> reuiredFields) {
     for (SupportsSkippingFields<T> method : methods) {
-      boolean hasAllNecessaryFields = true;
 
-      for (Field skipField : method.allSkippingFields()) {
-        if (necessaryFields.contains(skipField)) {
-          hasAllNecessaryFields = false;
-          break;
-        }
-      }
-
-      if (hasAllNecessaryFields) {
+      if (reuiredFields.containsAll(method.requiredFields())) {
         return method.execute();
       }
     }
