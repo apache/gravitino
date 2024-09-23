@@ -57,7 +57,7 @@ public enum FilesetDataOperation {
       FilesetDataOperation.valueOf(operation);
       return true;
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Unknown fileset data operation: " + operation, e);
+      return false;
     }
   }
 }

@@ -180,15 +180,19 @@ public class TestUtils {
     HttpServletRequest mockRequest1 = Mockito.mock(HttpServletRequest.class);
     when(mockRequest1.getHeader(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE))
         .thenReturn("test");
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> Utils.filterFilesetAuditHeaders(mockRequest1));
+    Map<String, String> auditMap1 = Utils.filterFilesetAuditHeaders(mockRequest1);
+    Assertions.assertEquals(
+        InternalClientType.UNKNOWN.name(),
+        auditMap1.get(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE));
 
     // test invalid fileset data operation
     HttpServletRequest mockRequest2 = Mockito.mock(HttpServletRequest.class);
     when(mockRequest2.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION))
         .thenReturn("test");
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> Utils.filterFilesetAuditHeaders(mockRequest2));
+    Map<String, String> auditMap2 = Utils.filterFilesetAuditHeaders(mockRequest2);
+    Assertions.assertEquals(
+        FilesetDataOperation.UNKNOWN.name(),
+        auditMap2.get(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION));
 
     // test normal audit headers
     HttpServletRequest mockRequest3 = Mockito.mock(HttpServletRequest.class);

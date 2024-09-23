@@ -160,18 +160,23 @@ public class Utils {
 
     String internalClientType =
         httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE);
-    if (StringUtils.isNotBlank(internalClientType)
-        && InternalClientType.checkValid(internalClientType)) {
+    if (StringUtils.isNotBlank(internalClientType)) {
       filteredHeaders.put(
-          FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE, internalClientType);
+          FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
+          InternalClientType.checkValid(internalClientType)
+              ? internalClientType
+              : InternalClientType.UNKNOWN.name());
     }
 
     String dataOperation =
         httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION);
     if (StringUtils.isNotBlank(
-            httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION))
-        && FilesetDataOperation.checkValid(dataOperation)) {
-      filteredHeaders.put(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION, dataOperation);
+        httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION))) {
+      filteredHeaders.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.checkValid(dataOperation)
+              ? dataOperation
+              : FilesetDataOperation.UNKNOWN.name());
     }
     return filteredHeaders;
   }
