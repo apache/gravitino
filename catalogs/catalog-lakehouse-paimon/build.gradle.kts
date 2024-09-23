@@ -33,6 +33,7 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(libs.bundles.paimon) {
     exclude("com.sun.jersey")
     exclude("javax.servlet")

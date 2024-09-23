@@ -25,9 +25,9 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
-import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.s3.PaimonS3FileSystemConfig;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.JdbcDriverDownloader;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Tag;
@@ -68,9 +68,9 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
 
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
-    catalogProperties.put(PaimonS3FileSystemConfig.S3_ACCESS_KEY, accessKey);
-    catalogProperties.put(PaimonS3FileSystemConfig.S3_SECRET_KEY, secretKey);
-    catalogProperties.put(PaimonS3FileSystemConfig.S3_ENDPOINT, endpoint);
+    catalogProperties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
+    catalogProperties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
+    catalogProperties.put(S3Properties.GRAVITINO_S3_ENDPOINT, endpoint);
 
     // Need to download the S3 dependency in the deploy mode.
     downloadS3Dependency();

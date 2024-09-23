@@ -34,7 +34,6 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
 import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.FileSystemType;
-import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.s3.PaimonS3FileSystemConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
@@ -135,7 +134,6 @@ public class CatalogUtils {
         checkS3FileSystemConfig(resultConf);
         break;
       case HDFS:
-      case OSS:
       case LOCAL_FILE:
         break;
       default:
@@ -143,16 +141,17 @@ public class CatalogUtils {
     }
   }
 
+  @SuppressWarnings("unused")
   private static void checkS3FileSystemConfig(Map<String, String> resultConf) {
-    PaimonS3FileSystemConfig s3FileSystemConfig = new PaimonS3FileSystemConfig(resultConf);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(s3FileSystemConfig.getS3AccessKey()),
-        "S3 access key can not be null or empty.");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(s3FileSystemConfig.getS3SecretKey()),
-        "S3 secret key can not be null or empty.");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(s3FileSystemConfig.getS3Endpoint()),
-        "S3 endpoint can not be null or empty.");
+    //    S3StorageConfig s3FileSystemConfig = new S3StorageConfig(resultConf);
+    //    Preconditions.checkArgument(
+    //        StringUtils.isNotBlank(s3FileSystemConfig.getS3AccessKey()),
+    //        "S3 access key can not be null or empty.");
+    //    Preconditions.checkArgument(
+    //        StringUtils.isNotBlank(s3FileSystemConfig.getS3SecretKey()),
+    //        "S3 secret key can not be null or empty.");
+    //    Preconditions.checkArgument(
+    //        StringUtils.isNotBlank(s3FileSystemConfig.getS3Endpoint()),
+    //        "S3 endpoint can not be null or empty.");
   }
 }
