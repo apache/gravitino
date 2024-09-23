@@ -20,6 +20,8 @@
 package org.apache.gravitino.iceberg.common;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -221,6 +223,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();
+
+  public static final ConfigEntry<List<String>> REST_API_EXTENSION_PACKAGES =
+      new ConfigBuilder("extension-packages")
+          .doc("Comma-separated list of Iceberg REST API packages to expand")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
 
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
