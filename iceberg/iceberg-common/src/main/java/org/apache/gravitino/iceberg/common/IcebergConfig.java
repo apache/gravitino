@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.common;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -162,8 +161,8 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
     return get(JDBC_DRIVER);
   }
 
-  public String getCatalogBackendName(String defaultCatalogBackendName) {
-    return Optional.ofNullable(get(CATALOG_BACKEND_NAME)).orElse(defaultCatalogBackendName);
+  public String getCatalogBackendName() {
+    return IcebergPropertiesUtils.getCatalogBackendName(getAllConfig());
   }
 
   public IcebergConfig(Map<String, String> properties) {
