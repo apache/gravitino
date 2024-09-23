@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
@@ -59,7 +60,7 @@ public interface RelationalBackend
    * @throws IOException If the store operation fails
    */
   <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType, List<Field> skippingFields)
+      Namespace namespace, Entity.EntityType entityType, Set<Field> skippingFields)
       throws NoSuchEntityException, IOException;
 
   /**

@@ -26,6 +26,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -89,7 +90,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType, List<Field> skippingFields)
+      Namespace namespace, Entity.EntityType entityType, Set<Field> skippingFields)
       throws IOException {
     switch (entityType) {
       case METALAKE:

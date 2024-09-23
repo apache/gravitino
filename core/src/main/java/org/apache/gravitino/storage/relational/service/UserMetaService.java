@@ -250,7 +250,7 @@ public class UserMetaService {
     return newEntity;
   }
 
-  public List<UserEntity> listUsersByNamespace(Namespace namespace, List<Field> skippingFields) {
+  public List<UserEntity> listUsersByNamespace(Namespace namespace, Set<Field> skippingFields) {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
 
