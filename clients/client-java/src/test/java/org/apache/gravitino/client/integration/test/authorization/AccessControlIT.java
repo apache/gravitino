@@ -22,6 +22,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Configs;
@@ -93,14 +95,14 @@ public class AccessControlIT extends AbstractIT {
     Assertions.assertEquals(
         Lists.newArrayList(AuthConstants.ANONYMOUS_USER, anotherUser, username),
         Arrays.asList(usernames));
-    User[] users = metalake.listUsers();
+    List<User> users =
+        Arrays.stream(metalake.listUsers())
+            .sorted(Comparator.comparing(User::name))
+            .collect(Collectors.toList());
     Assertions.assertEquals(
         Lists.newArrayList(AuthConstants.ANONYMOUS_USER, anotherUser, username),
-        Arrays.stream(users)
-            .map(User::name)
-            .sorted(String::compareTo)
-            .collect(Collectors.toList()));
-    Assertions.assertEquals(Lists.newArrayList("role1"), users[2].roles());
+        users.stream().map(User::name).collect(Collectors.toList()));
+    Assertions.assertEquals(Lists.newArrayList("role1"), users.get(2).roles());
 
     // Get a not-existed user
     Assertions.assertThrows(NoSuchUserException.class, () -> metalake.getUser("not-existed"));
