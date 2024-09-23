@@ -40,11 +40,11 @@ class SupportsSkippingFieldsHandlers<T> {
 
   T execute(Set<Field> reuiredFields) {
     for (SupportsSkippingFields<T> method : methods) {
-
       if (reuiredFields.containsAll(method.requiredFields())) {
         return method.execute();
       }
     }
+
     throw new IllegalArgumentException("Don't support skip fields");
   }
 }
