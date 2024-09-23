@@ -258,9 +258,9 @@ public class UserMetaService {
     handlers.addHandler(new ListSkippingRolesHandler(metalakeName));
     handlers.addHandler(new ListAllFieldsHandler(metalakeName));
 
-    Set<Field> requiredFields = Sets.newHashSet(UserEntity.fieldSet());
-    requiredFields.removeAll(skippingFields);
-    return handlers.execute(requiredFields);
+    Set<Field> desiredFields = Sets.newHashSet(UserEntity.fieldSet());
+    desiredFields.removeAll(skippingFields);
+    return handlers.execute(desiredFields);
   }
 
   public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
@@ -292,7 +292,7 @@ public class UserMetaService {
     }
 
     @Override
-    public Set<Field> requiredFields() {
+    public Set<Field> desiredFields() {
       Set<Field> requiredFields = Sets.newHashSet(UserEntity.fieldSet());
       requiredFields.remove(UserEntity.ROLE_IDS);
       requiredFields.remove(UserEntity.ROLE_NAMES);
@@ -324,7 +324,7 @@ public class UserMetaService {
     }
 
     @Override
-    public Set<Field> requiredFields() {
+    public Set<Field> desiredFields() {
       return UserEntity.fieldSet();
     }
 

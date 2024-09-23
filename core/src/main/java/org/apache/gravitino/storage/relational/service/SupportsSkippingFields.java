@@ -25,11 +25,11 @@ import org.apache.gravitino.Field;
 interface SupportsSkippingFields<R> {
 
   /**
-   * The fields which could be required.
+   * The fields which could be desired.
    *
-   * @return The fields which are required.
+   * @return The fields which are desired.
    */
-  Set<Field> requiredFields();
+  Set<Field> desiredFields();
 
   /**
    * The return value of the handler.
