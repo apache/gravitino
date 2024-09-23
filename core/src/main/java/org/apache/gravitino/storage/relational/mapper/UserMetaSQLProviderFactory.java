@@ -88,8 +88,8 @@ public class UserMetaSQLProviderFactory {
     return getProvider().listUserPOsByMetalake(metalakeName);
   }
 
-  public static String listCombinedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return getProvider().listCombinedUserPOsByMetalakeId(metalakeId);
+  public static String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return getProvider().listExtendedUserPOsByMetalakeId(metalakeId);
   }
 
   public static String deleteUserMetasByLegacyTimeline(

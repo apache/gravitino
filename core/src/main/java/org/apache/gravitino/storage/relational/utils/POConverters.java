@@ -49,7 +49,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
-import org.apache.gravitino.storage.relational.po.CombinedUserPO;
+import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
@@ -731,13 +731,13 @@ public class POConverters {
   }
 
   /**
-   * Convert {@link CombinedUserPO} to {@link UserEntity}
+   * Convert {@link ExtendedUserPO} to {@link UserEntity}
    *
    * @param userPO CombinedUserPo object to be converted
    * @param namespace Namespace object to be associated with the user
-   * @return UserEntity object from CombinedUserPO object
+   * @return UserEntity object from ExtendedUserPO object
    */
-  public static UserEntity fromCombinedUserPO(CombinedUserPO userPO, Namespace namespace) {
+  public static UserEntity fromExtendedUserPO(ExtendedUserPO userPO, Namespace namespace) {
     try {
       UserEntity.Builder builder =
           UserEntity.builder()

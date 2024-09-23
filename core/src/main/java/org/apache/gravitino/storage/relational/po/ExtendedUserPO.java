@@ -25,7 +25,7 @@ import com.google.common.base.Objects;
  * data from multiple joined tables. The PO won't be written to database. So we don't need the inner
  * class Builder.
  */
-public class CombinedUserPO extends UserPO {
+public class ExtendedUserPO extends UserPO {
 
   private String roleNames;
   private String roleIds;
@@ -43,14 +43,14 @@ public class CombinedUserPO extends UserPO {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof CombinedUserPO)) {
+    if (!(o instanceof ExtendedUserPO)) {
       return false;
     }
-    CombinedUserPO combinedUserPO = (CombinedUserPO) o;
+    ExtendedUserPO extendedUserPO = (ExtendedUserPO) o;
 
     return super.equals(o)
-        && Objects.equal(getRoleIds(), combinedUserPO.getRoleIds())
-        && Objects.equal(getRoleNames(), combinedUserPO.getRoleNames());
+        && Objects.equal(getRoleIds(), extendedUserPO.getRoleIds())
+        && Objects.equal(getRoleNames(), extendedUserPO.getRoleNames());
   }
 
   @Override

@@ -70,7 +70,7 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   }
 
   @Override
-  public String listCombinedUserPOsByMetalakeId(Long metalakeId) {
+  public String listExtendedUserPOsByMetalakeId(Long metalakeId) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
         + " ut.audit_info as auditInfo,"

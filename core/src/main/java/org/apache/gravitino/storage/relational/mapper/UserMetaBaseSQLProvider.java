@@ -154,7 +154,7 @@ public class UserMetaBaseSQLProvider {
         + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
   }
 
-  public String listCombinedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
         + " ut.audit_info as auditInfo,"

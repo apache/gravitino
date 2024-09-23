@@ -42,7 +42,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
-import org.apache.gravitino.storage.relational.po.CombinedUserPO;
+import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
@@ -326,13 +326,13 @@ public class UserMetaService {
     @Override
     public List<UserEntity> execute() {
       Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-      List<CombinedUserPO> userPOs =
+      List<ExtendedUserPO> userPOs =
           SessionUtils.getWithoutCommit(
-              UserMetaMapper.class, mapper -> mapper.listCombinedUserPOsByMetalakeId(metalakeId));
+              UserMetaMapper.class, mapper -> mapper.listExtendedUserPOsByMetalakeId(metalakeId));
       return userPOs.stream()
           .map(
               po ->
-                  POConverters.fromCombinedUserPO(
+                  POConverters.fromExtendedUserPO(
                       po, AuthorizationUtils.ofUserNamespace(metalakeName)))
           .collect(Collectors.toList());
     }
