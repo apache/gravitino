@@ -43,6 +43,18 @@ public enum FilesetDataOperation {
   GET_DEFAULT_BLOCK_SIZE,
   /** This data operation means that set current working directory. */
   SET_WORKING_DIR,
+  /** This data operation means that get the current working directory. */
+  EXISTS,
+  /** This data operation means that get the created time of a file. */
+  CREATED_TIME,
+  /** This data operation means that get the modified time of a file. */
+  MODIFIED_TIME,
+  /** This data operation means that copy a file. */
+  COPY_FILE,
+  /** This data operation means that get the content of a file. */
+  CAT_FILE,
+  /** This data operation means that copy a remote file to local. */
+  GET_FILE,
   /** This data operation means that it is an unknown data operation. */
   UNKNOWN;
 
