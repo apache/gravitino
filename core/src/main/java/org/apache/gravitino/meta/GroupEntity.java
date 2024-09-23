@@ -23,8 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
@@ -40,8 +38,11 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
   public static final Field NAME =
       Field.required("name", String.class, "The name of the group entity.");
 
-  public static final Field ROLES_SUPPLIER =
-      Field.required("roles_supplier", Supplier.class, "The roles supplier of the group entity.");
+  public static final Field ROLE_NAMES =
+      Field.optional("role_names", List.class, "The role names of the group entity.");
+
+  public static final Field ROLE_IDS =
+      Field.optional("role_ids", List.class, "The role names of the group entity.");
 
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the group entity.");
@@ -49,9 +50,9 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
   private Long id;
   private String name;
   private AuditInfo auditInfo;
+  private List<String> roleNames;
+  private List<Long> roleIds;
   private Namespace namespace;
-  // The roles is a lazy field to avoid unnecessary cost.
-  private Supplier<List<RoleEntity>> rolesSupplier = Collections::emptyList;
 
   private GroupEntity() {}
 
@@ -66,7 +67,8 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     fields.put(ID, id);
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
-    fields.put(ROLES_SUPPLIER, rolesSupplier);
+    fields.put(ROLE_NAMES, roleNames);
+    fields.put(ROLE_IDS, roleIds);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -128,20 +130,25 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
    */
   @Override
   public List<String> roles() {
-    if (roleEntities() == null) {
-      return null;
-    }
-
-    return roleEntities().stream().map(RoleEntity::name).collect(Collectors.toList());
+    return roleNames;
   }
 
   /**
-   * Returns the role entities of the group entity.
+   * Returns the role names of the group entity.
    *
-   * @return The role entities of the group entity.
+   * @return The role names of the group entity.
    */
-  public List<RoleEntity> roleEntities() {
-    return rolesSupplier.get();
+  public List<String> roleNames() {
+    return roleNames;
+  }
+
+  /**
+   * Returns the role ids of the group entity.
+   *
+   * @return The role ids of the group entity.
+   */
+  public List<Long> roleIds() {
+    return roleIds;
   }
 
   @Override
@@ -154,12 +161,13 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
-        && Objects.equals(roles(), that.roles());
+        && Objects.equals(roleNames, that.roleNames)
+        && Objects.equals(roleIds, that.roleIds);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, roles());
+    return Objects.hash(id, name, auditInfo, roleNames, roleIds);
   }
 
   public static Builder builder() {
@@ -207,26 +215,24 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the roles of the group entity.
+     * Sets the role names of the group entity.
      *
      * @param roles The role names of the group entity.
      * @return The builder instance.
      */
-    public Builder withRoles(List<RoleEntity> roles) {
-      if (roles != null) {
-        groupEntity.rolesSupplier = () -> roles;
-      }
+    public Builder withRoleNames(List<String> roles) {
+      groupEntity.roleNames = roles;
       return this;
     }
 
     /**
-     * Sets the roles supplier of the group entity.
+     * Sets the role ids of the group entity.
      *
-     * @param supplier The roles supplier of the group entity.
+     * @param roleIds The role ids of the group entity.
      * @return The builder instance.
      */
-    public Builder withRolesSupplier(Supplier<List<RoleEntity>> supplier) {
-      groupEntity.rolesSupplier = supplier;
+    public Builder withRoleIds(List<Long> roleIds) {
+      groupEntity.roleIds = roleIds;
       return this;
     }
 

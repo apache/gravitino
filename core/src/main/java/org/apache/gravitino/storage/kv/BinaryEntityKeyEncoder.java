@@ -20,10 +20,13 @@ package org.apache.gravitino.storage.kv;
 
 import static org.apache.gravitino.Entity.EntityType.CATALOG;
 import static org.apache.gravitino.Entity.EntityType.FILESET;
+import static org.apache.gravitino.Entity.EntityType.GROUP;
 import static org.apache.gravitino.Entity.EntityType.METALAKE;
+import static org.apache.gravitino.Entity.EntityType.ROLE;
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
 import static org.apache.gravitino.Entity.EntityType.TOPIC;
+import static org.apache.gravitino.Entity.EntityType.USER;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -90,6 +93,12 @@ public class BinaryEntityKeyEncoder implements EntityKeyEncoder<byte[]> {
           new String[] {TABLE.getShortName() + "/", "/", "/", "/"},
           FILESET,
           new String[] {FILESET.getShortName() + "/", "/", "/", "/"},
+          USER,
+          new String[] {USER.getShortName() + "/", "/", "/", "/"},
+          GROUP,
+          new String[] {GROUP.getShortName() + "/", "/", "/", "/"},
+          ROLE,
+          new String[] {ROLE.getShortName() + "/", "/", "/", "/"},
           TOPIC,
           new String[] {TOPIC.getShortName() + "/", "/", "/", "/"});
 

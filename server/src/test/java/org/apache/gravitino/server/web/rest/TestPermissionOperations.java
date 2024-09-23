@@ -52,7 +52,6 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
-import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -111,18 +110,12 @@ public class TestPermissionOperations extends JerseyTest {
 
   @Test
   public void testGrantRolesToUser() {
-    RoleEntity roleEntity =
-        RoleEntity.builder()
-            .withId(1L)
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .withName("roles")
-            .build();
     UserEntity userEntity =
         UserEntity.builder()
             .withId(1L)
             .withName("user")
-            .withRoles(Lists.newArrayList(roleEntity))
+            .withRoleNames(Lists.newArrayList("roles"))
+            .withRoleIds(Lists.newArrayList(1L))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
@@ -214,18 +207,12 @@ public class TestPermissionOperations extends JerseyTest {
 
   @Test
   public void testGrantRolesToGroup() {
-    RoleEntity roleEntity =
-        RoleEntity.builder()
-            .withId(1L)
-            .withName("roles")
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-            .build();
     GroupEntity groupEntity =
         GroupEntity.builder()
             .withId(1L)
             .withName("group")
-            .withRoles(Lists.newArrayList(roleEntity))
+            .withRoleNames(Lists.newArrayList("roles"))
+            .withRoleIds(Lists.newArrayList(1L))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
@@ -324,7 +311,8 @@ public class TestPermissionOperations extends JerseyTest {
         UserEntity.builder()
             .withId(1L)
             .withName("user")
-            .withRoles(Lists.newArrayList())
+            .withRoleNames(Lists.newArrayList())
+            .withRoleIds(Lists.newArrayList(1L))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
@@ -368,7 +356,8 @@ public class TestPermissionOperations extends JerseyTest {
         GroupEntity.builder()
             .withId(1L)
             .withName("group")
-            .withRoles(Lists.newArrayList())
+            .withRoleNames(Lists.newArrayList())
+            .withRoleIds(Lists.newArrayList(1L))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();

@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.common;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.OverwriteDefaultConfig;
@@ -201,7 +200,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
   public static final ConfigEntry<String> ICEBERG_REST_CATALOG_PROVIDER =
       new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER)
           .doc(
-              "Catalog provider class name, you can develop a class that implements `IcebergTableOpsProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
+              "Catalog provider class name, you can develop a class that implements `IcebergCatalogWrapperProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .createWithDefault("config-based-provider");
@@ -226,8 +225,8 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
     return get(JDBC_DRIVER);
   }
 
-  public String getCatalogBackendName(String defaultCatalogBackendName) {
-    return Optional.ofNullable(get(CATALOG_BACKEND_NAME)).orElse(defaultCatalogBackendName);
+  public String getCatalogBackendName() {
+    return IcebergPropertiesUtils.getCatalogBackendName(getAllConfig());
   }
 
   public IcebergConfig(Map<String, String> properties) {
