@@ -30,14 +30,14 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergTableOps;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.iceberg.metrics.MetricsReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class IcebergMetricsManager {
-  private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOps.class);
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapper.class);
 
   // Register IcebergMetricsStore's short name to its full qualified class name in the map. So
   // that user doesn't need to specify the full qualified class name when creating an

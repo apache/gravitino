@@ -22,8 +22,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -39,10 +41,10 @@ import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
+import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.storage.relational.utils.SupplierUtils;
 
 /** The service class for group metadata. It provides the basic database operations for group. */
 public class GroupMetaService {
@@ -90,9 +92,9 @@ public class GroupMetaService {
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
 
-    return POConverters.fromGroupPO(
-        groupPO, SupplierUtils.createRolePOsSupplier(groupPO), identifier.namespace());
+    return POConverters.fromGroupPO(groupPO, rolePOs, identifier.namespace());
   }
 
   public List<GroupEntity> listGroupsByRoleIdent(NameIdentifier roleIdent) {
@@ -105,7 +107,7 @@ public class GroupMetaService {
             po ->
                 POConverters.fromGroupPO(
                     po,
-                    SupplierUtils.createRolePOsSupplier(po),
+                    Collections.emptyList(),
                     AuthorizationUtils.ofGroupNamespace(roleIdent.namespace().level(0))))
         .collect(Collectors.toList());
   }
@@ -119,8 +121,7 @@ public class GroupMetaService {
       GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakeId);
       GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
 
-      List<Long> roleIds =
-          groupEntity.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toList());
+      List<Long> roleIds = Optional.ofNullable(groupEntity.roleIds()).orElse(Lists.newArrayList());
       List<GroupRoleRelPO> groupRoleRelPOS =
           POConverters.initializeGroupRoleRelsPOWithVersion(groupEntity, roleIds);
 
@@ -185,10 +186,10 @@ public class GroupMetaService {
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
     GroupPO oldGroupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
-
+    List<RolePO> rolePOs =
+        RoleMetaService.getInstance().listRolesByGroupId(oldGroupPO.getGroupId());
     GroupEntity oldGroupEntity =
-        POConverters.fromGroupPO(
-            oldGroupPO, SupplierUtils.createRolePOsSupplier(oldGroupPO), identifier.namespace());
+        POConverters.fromGroupPO(oldGroupPO, rolePOs, identifier.namespace());
 
     GroupEntity newEntity = (GroupEntity) updater.apply((E) oldGroupEntity);
     Preconditions.checkArgument(
@@ -198,10 +199,11 @@ public class GroupMetaService {
         oldGroupEntity.id());
 
     Set<Long> oldRoleIds =
-        oldGroupEntity.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet());
-
+        oldGroupEntity.roleIds() == null
+            ? Sets.newHashSet()
+            : Sets.newHashSet(oldGroupEntity.roleIds());
     Set<Long> newRoleIds =
-        newEntity.roleEntities().stream().map(RoleEntity::id).collect(Collectors.toSet());
+        newEntity.roleIds() == null ? Sets.newHashSet() : Sets.newHashSet(newEntity.roleIds());
 
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);

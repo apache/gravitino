@@ -53,6 +53,11 @@ public class ProtoEntitySerDe implements EntitySerDe {
           .put(
               "org.apache.gravitino.meta.TopicEntity",
               "org.apache.gravitino.proto.TopicEntitySerDe")
+          .put("org.apache.gravitino.meta.UserEntity", "org.apache.gravitino.proto.UserEntitySerDe")
+          .put(
+              "org.apache.gravitino.meta.GroupEntity",
+              "org.apache.gravitino.proto.GroupEntitySerDe")
+          .put("org.apache.gravitino.meta.RoleEntity", "org.apache.gravitino.proto.RoleEntitySerDe")
           .build();
 
   private static final Map<String, String> ENTITY_TO_PROTO =
@@ -70,7 +75,13 @@ public class ProtoEntitySerDe implements EntitySerDe {
           "org.apache.gravitino.meta.FilesetEntity",
           "org.apache.gravitino.proto.Fileset",
           "org.apache.gravitino.meta.TopicEntity",
-          "org.apache.gravitino.proto.Topic");
+          "org.apache.gravitino.proto.Topic",
+          "org.apache.gravitino.meta.UserEntity",
+          "org.apache.gravitino.proto.User",
+          "org.apache.gravitino.meta.GroupEntity",
+          "org.apache.gravitino.proto.Group",
+          "org.apache.gravitino.meta.RoleEntity",
+          "org.apache.gravitino.proto.Role");
 
   private final Map<Class<? extends Entity>, ProtoSerDe<? extends Entity, ? extends Message>>
       entityToSerDe;
