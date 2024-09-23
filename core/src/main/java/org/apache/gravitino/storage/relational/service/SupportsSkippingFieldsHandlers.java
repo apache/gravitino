@@ -19,8 +19,8 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.Lists;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.gravitino.Field;
 
 /**
@@ -38,9 +38,9 @@ class SupportsSkippingFieldsHandlers<T> {
     methods.add(supportsSkippingFields);
   }
 
-  T executeHandler(List<Field> skippingFields) {
+  T execute(Set<Field> skippingFields) {
     for (SupportsSkippingFields<T> method : methods) {
-      if (new HashSet<>(skippingFields).containsAll(method.supportsSkippingFields())) {
+      if (skippingFields.containsAll(method.supportsSkippingFields())) {
         return method.execute();
       }
     }
