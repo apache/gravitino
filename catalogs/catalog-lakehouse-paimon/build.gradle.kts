@@ -60,6 +60,8 @@ dependencies {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
     exclude("javax.servlet")
+    exclude("org.apache.curator")
+    exclude("org.apache.zookeeper")
     exclude("org.mortbay.jetty")
   }
   implementation(libs.hadoop2.hdfs) {
