@@ -146,16 +146,6 @@ public class IcebergCatalogUtil {
     return restCatalog;
   }
 
-  private static Catalog loadCustomCatalog(IcebergConfig icebergConfig) {
-    String customCatalogName = icebergConfig.getCatalogBackendName();
-    String className = icebergConfig.get(IcebergConfig.CATALOG_BACKEND_IMPL);
-    return CatalogUtil.loadCatalog(
-        className,
-        customCatalogName,
-        icebergConfig.getIcebergCatalogProperties(),
-        new HdfsConfiguration());
-  }
-
   @VisibleForTesting
   static Catalog loadCatalogBackend(String catalogType) {
     return loadCatalogBackend(
