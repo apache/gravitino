@@ -29,7 +29,7 @@ interface SupportsSkippingFields<R> {
    *
    * @return The fields which could be skipped.
    */
-  List<Field> supportsSkippingFields();
+  List<Field> allSkippingFields();
 
   /**
    * The return value of the handler.

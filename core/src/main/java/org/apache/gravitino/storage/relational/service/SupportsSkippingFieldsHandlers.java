@@ -24,7 +24,7 @@ import java.util.Set;
 import org.apache.gravitino.Field;
 
 /**
- * This class is the collection wrapper of SupportsSkippingFields handler. The class will contains
+ * This class is the collection wrapper of SupportsSkippingFields handler. The class will contain
  * all the handlers can proceed the data. We can choose different handlers according to the skipping
  * fields to acquire better performance.
  *
@@ -38,9 +38,18 @@ class SupportsSkippingFieldsHandlers<T> {
     methods.add(supportsSkippingFields);
   }
 
-  T execute(Set<Field> skippingFields) {
+  T execute(Set<Field> necessaryFields) {
     for (SupportsSkippingFields<T> method : methods) {
-      if (skippingFields.containsAll(method.supportsSkippingFields())) {
+      boolean hasAllNecessaryFields = true;
+
+      for (Field skipField : method.allSkippingFields()) {
+        if (necessaryFields.contains(skipField)) {
+          hasAllNecessaryFields = false;
+          break;
+        }
+      }
+
+      if (hasAllNecessaryFields) {
         return method.execute();
       }
     }
