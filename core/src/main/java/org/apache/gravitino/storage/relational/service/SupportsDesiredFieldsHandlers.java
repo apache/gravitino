@@ -24,22 +24,22 @@ import java.util.Set;
 import org.apache.gravitino.Field;
 
 /**
- * This class is the collection wrapper of SupportsSkippingFields handler. The class will contain
- * all the handlers can proceed the data. We can choose different handlers according to the skipping
+ * This class is the collection wrapper of SupportsDesiredFields handler. The class will contain
+ * all the handlers can proceed the data. We can choose different handlers according to the desired
  * fields to acquire better performance.
  *
  * @param <T> The value type which the handler will return.
  */
-class SupportsSkippingFieldsHandlers<T> {
-  private final List<SupportsSkippingFields<T>> methods = Lists.newArrayList();
+class SupportsDesiredFieldsHandlers<T> {
+  private final List<SupportsDesiredFields<T>> methods = Lists.newArrayList();
 
   // We should put the low-cost handler into the front of the list.
-  void addHandler(SupportsSkippingFields<T> supportsSkippingFields) {
+  void addHandler(SupportsDesiredFields<T> supportsSkippingFields) {
     methods.add(supportsSkippingFields);
   }
 
   T execute(Set<Field> desiredFields) {
-    for (SupportsSkippingFields<T> method : methods) {
+    for (SupportsDesiredFields<T> method : methods) {
       if (desiredFields.containsAll(method.desiredFields())) {
         return method.execute();
       }

@@ -253,9 +253,9 @@ public class UserMetaService {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
 
-    SupportsSkippingFieldsHandlers<List<UserEntity>> handlers =
-        new SupportsSkippingFieldsHandlers<>();
-    handlers.addHandler(new ListSkippingRolesHandler(metalakeName));
+    SupportsDesiredFieldsHandlers<List<UserEntity>> handlers =
+        new SupportsDesiredFieldsHandlers<>();
+    handlers.addHandler(new ListDesiredRolesHandler(metalakeName));
     handlers.addHandler(new ListAllFieldsHandler(metalakeName));
 
     Set<Field> desiredFields = Sets.newHashSet(UserEntity.fieldSet());
@@ -283,11 +283,11 @@ public class UserMetaService {
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }
 
-  private static class ListSkippingRolesHandler
-      implements SupportsSkippingFields<List<UserEntity>> {
+  private static class ListDesiredRolesHandler
+      implements SupportsDesiredFields<List<UserEntity>> {
     private final String metalakeName;
 
-    ListSkippingRolesHandler(String metalakeName) {
+    ListDesiredRolesHandler(String metalakeName) {
       this.metalakeName = metalakeName;
     }
 
@@ -316,7 +316,7 @@ public class UserMetaService {
     }
   }
 
-  private static class ListAllFieldsHandler implements SupportsSkippingFields<List<UserEntity>> {
+  private static class ListAllFieldsHandler implements SupportsDesiredFields<List<UserEntity>> {
     final String metalakeName;
 
     ListAllFieldsHandler(String metalakeName) {

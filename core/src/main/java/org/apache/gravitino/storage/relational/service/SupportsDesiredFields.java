@@ -21,8 +21,8 @@ package org.apache.gravitino.storage.relational.service;
 import java.util.Set;
 import org.apache.gravitino.Field;
 
-/** The handler supports to skip fields. */
-interface SupportsSkippingFields<R> {
+/** The handler supports to skip fields to acquire part desired fields. */
+interface SupportsDesiredFields<R> {
 
   /**
    * The fields which could be desired.
