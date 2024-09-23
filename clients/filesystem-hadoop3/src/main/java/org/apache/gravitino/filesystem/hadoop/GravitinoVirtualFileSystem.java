@@ -366,9 +366,12 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
     URI uri = new Path(actualFileLocation).toUri();
     // we cache the fs for the same scheme, so we can reuse it
+    String scheme = uri.getScheme();
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(scheme), "Scheme of the actual file location cannot be null.");
     FileSystem fs =
         internalFileSystemCache.get(
-            uri.getScheme(),
+            scheme,
             str -> {
               try {
                 return FileSystem.newInstance(uri, getConf());

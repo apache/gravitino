@@ -737,8 +737,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       return false;
     } catch (IOException e) {
       throw new GravitinoRuntimeException(
-          "Exception occurs when checking whether fileset: %s mounts a single file, exception: %s",
-          fileset.name(), e.getCause());
+          e,
+          "Exception occurs when checking whether fileset: %s mounts a single file",
+          fileset.name());
     }
   }
 }
