@@ -127,7 +127,7 @@ public class CatalogDorisIT extends AbstractIT {
   public void stop() {
     clearTableAndSchema();
     metalake.dropCatalog(catalogName);
-    AbstractIT.client.dropMetalake(metalakeName);
+    client.dropMetalake(metalakeName);
   }
 
   @AfterEach
@@ -141,12 +141,12 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private void createMetalake() {
-    GravitinoMetalake[] gravitinoMetaLakes = AbstractIT.client.listMetalakes();
+    GravitinoMetalake[] gravitinoMetaLakes = client.listMetalakes();
     assertEquals(0, gravitinoMetaLakes.length);
 
     GravitinoMetalake createdMetalake =
-        AbstractIT.client.createMetalake(metalakeName, "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = AbstractIT.client.loadMetalake(metalakeName);
+        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
     assertEquals(createdMetalake, loadMetalake);
 
     metalake = loadMetalake;

@@ -54,12 +54,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.utility.MountableFile;
 import sun.security.krb5.KrbException;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class HadoopUserAuthenticationIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopUserAuthenticationIT.class);
 
@@ -104,7 +106,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
   private static final String TABLE_NAME = "test_table";
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     containerSuite.startKerberosHiveContainer();
     kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
 
@@ -122,7 +124,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     addKerberosConfig();
 
     // Start Gravitino server
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
   }
 
   @AfterAll
@@ -222,14 +224,12 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
         .copyFileFromContainer(HADOOP_FILESET_KEYTAB, TMP_DIR + HADOOP_FILESET_KEYTAB);
   }
 
-  private static void addKerberosConfig() {
-    AbstractIT.customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
+  private void addKerberosConfig() {
+    customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
+    customConfigs.put("gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
+    customConfigs.put("gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
   }
 
   @Test

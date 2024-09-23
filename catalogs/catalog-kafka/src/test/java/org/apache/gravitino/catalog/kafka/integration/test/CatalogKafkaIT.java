@@ -68,10 +68,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogKafkaIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogKafkaIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
@@ -87,7 +89,7 @@ public class CatalogKafkaIT extends AbstractIT {
   private static AdminClient adminClient;
 
   @BeforeAll
-  public static void startUp() throws ExecutionException, InterruptedException {
+  public void startUp() throws ExecutionException, InterruptedException {
     CONTAINER_SUITE.startKafkaContainer();
     kafkaBootstrapServers =
         String.format(
@@ -112,7 +114,7 @@ public class CatalogKafkaIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void shutdown() {
+  public void shutdown() {
     Catalog catalog = metalake.loadCatalog(CATALOG_NAME);
     Arrays.stream(catalog.asSchemas().listSchemas())
         .filter(ident -> !ident.equals("default"))
@@ -552,7 +554,7 @@ public class CatalogKafkaIT extends AbstractIT {
         .get();
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake createdMetalake =
         client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);

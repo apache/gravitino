@@ -110,10 +110,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogHiveIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
   public static final String metalakeName =
@@ -162,7 +164,7 @@ public class CatalogHiveIT extends AbstractIT {
           "'gravitino_it_test'");
 
   @BeforeAll
-  public static void startup() throws Exception {
+  public void startup() throws Exception {
     containerSuite.startHiveContainer();
 
     HIVE_METASTORE_URIS =
@@ -210,7 +212,7 @@ public class CatalogHiveIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() throws IOException {
+  public void stop() throws IOException {
     if (client != null) {
       Arrays.stream(catalog.asSchemas().listSchemas())
           .filter(schema -> !schema.equals("default"))
@@ -242,7 +244,7 @@ public class CatalogHiveIT extends AbstractIT {
       LOG.error("Failed to close CloseableGroup", e);
     }
 
-    AbstractIT.client = null;
+    client = null;
   }
 
   @AfterEach
@@ -254,7 +256,7 @@ public class CatalogHiveIT extends AbstractIT {
     createSchema();
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 

@@ -62,8 +62,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class ProxyCatalogHiveIT extends AbstractIT {
 
   public static final String METALAKE_NAME =
@@ -88,10 +90,10 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   private static GravitinoAdminClient anotherClientWithNotExistingName;
   private static Catalog anotherCatalog;
   private static Catalog anotherCatalogWithUsername;
-  private static Catalog anotherCatatlogWithNotExistingName;
+  private static Catalog anotherCatalogWithNotExistingName;
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     originHadoopUser = System.getenv(HADOOP_USER_NAME);
     setEnv(HADOOP_USER_NAME, null);
 
@@ -100,7 +102,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
     containerSuite.startHiveContainer();
     HIVE_METASTORE_URIS =
         String.format(
@@ -137,13 +139,13 @@ public class ProxyCatalogHiveIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() {
+  public void stop() {
     setEnv(HADOOP_USER_NAME, originHadoopUser);
     anotherClient.close();
     anotherClientWithUsername.close();
     anotherClientWithNotExistingName.close();
 
-    AbstractIT.client = null;
+    client = null;
   }
 
   @Test
@@ -195,7 +197,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
         Assertions.assertThrows(
             RuntimeException.class,
             () ->
-                anotherCatatlogWithNotExistingName
+                anotherCatalogWithNotExistingName
                     .asSchemas()
                     .createSchema("new_schema", comment, properties));
     Assertions.assertTrue(e.getMessage().contains("AccessControlException Permission denied"));
@@ -256,7 +258,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
         Assertions.assertThrows(
             RuntimeException.class,
             () -> {
-              anotherCatatlogWithNotExistingName
+              anotherCatalogWithNotExistingName
                   .asTableCatalog()
                   .createTable(
                       anotherIdentWithNotExisting,
@@ -370,7 +372,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
         Assertions.assertThrows(
             RuntimeException.class,
             () ->
-                anotherCatatlogWithNotExistingName
+                anotherCatalogWithNotExistingName
                     .asTableCatalog()
                     .loadTable(nameIdentifier)
                     .supportPartitions()
@@ -385,7 +387,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     return new Column[] {col1, col2, col3};
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
@@ -421,7 +423,7 @@ public class ProxyCatalogHiveIT extends AbstractIT {
     anotherCatalogWithUsername =
         anotherClientWithUsername.loadMetalake(METALAKE_NAME).loadCatalog(CATALOG_NAME);
 
-    anotherCatatlogWithNotExistingName =
+    anotherCatalogWithNotExistingName =
         anotherClientWithNotExistingName.loadMetalake(METALAKE_NAME).loadCatalog(CATALOG_NAME);
   }
 

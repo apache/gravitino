@@ -68,14 +68,17 @@ public class TrinoQueryITBase {
   protected static final String metalakeName = "test";
   protected static GravitinoMetalake metalake;
 
-  private static void setEnv() throws Exception {
+  private static AbstractIT abstractIT;
+
+  private void setEnv() throws Exception {
+    abstractIT = new AbstractIT();
     if (autoStart) {
-      AbstractIT.startIntegrationTest();
-      gravitinoClient = AbstractIT.getGravitinoClient();
-      gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+      abstractIT.startIntegrationTest();
+      gravitinoClient = abstractIT.getGravitinoClient();
+      gravitinoUri = String.format("http://127.0.0.1:%d", abstractIT.getGravitinoServerPort());
 
       trinoITContainers = ContainerSuite.getTrinoITContainers();
-      trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
+      trinoITContainers.launch(abstractIT.getGravitinoServerPort());
 
       trinoUri = trinoITContainers.getTrinoUri();
       hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
@@ -84,16 +87,16 @@ public class TrinoQueryITBase {
       postgresqlUri = trinoITContainers.getPostgresqlUri();
 
     } else if (autoStartGravitino) {
-      AbstractIT.startIntegrationTest();
-      gravitinoClient = AbstractIT.getGravitinoClient();
-      gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+      abstractIT.startIntegrationTest();
+      gravitinoClient = abstractIT.getGravitinoClient();
+      gravitinoUri = String.format("http://127.0.0.1:%d", abstractIT.getGravitinoServerPort());
 
     } else {
       gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
     }
   }
 
-  public static void setup() throws Exception {
+  public void setup() throws Exception {
     if (started) {
       return;
     }
@@ -113,7 +116,7 @@ public class TrinoQueryITBase {
     try {
       if (autoStart) {
         if (trinoITContainers != null) trinoITContainers.shutdown();
-        AbstractIT.stopIntegrationTest();
+        abstractIT.stopIntegrationTest();
       }
     } catch (Exception e) {
       LOG.error("Error in cleanup", e);

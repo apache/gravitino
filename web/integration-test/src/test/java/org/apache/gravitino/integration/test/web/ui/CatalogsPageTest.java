@@ -33,7 +33,6 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.TrinoITContainers;
-import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
 import org.apache.gravitino.integration.test.web.ui.utils.AbstractWebIT;
@@ -55,11 +54,13 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.openqa.selenium.By;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogsPageTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage();
   CatalogsPage catalogsPage = new CatalogsPage();
@@ -115,13 +116,13 @@ public class CatalogsPageTest extends AbstractWebIT {
   private static String defaultBaseLocation;
 
   @BeforeAll
-  public static void before() throws Exception {
-    gravitinoClient = AbstractIT.getGravitinoClient();
+  public void before() throws Exception {
+    gravitinoClient = getGravitinoClient();
 
-    gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+    gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
 
     trinoITContainers = ContainerSuite.getTrinoITContainers();
-    trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
+    trinoITContainers.launch(getGravitinoServerPort());
 
     hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
     hdfsUri = trinoITContainers.getHdfsUri();

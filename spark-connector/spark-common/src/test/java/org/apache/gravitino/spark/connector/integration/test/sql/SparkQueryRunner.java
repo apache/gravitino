@@ -61,6 +61,7 @@ public class SparkQueryRunner {
   private Map<CatalogType, String> catalogs = new HashMap<>();
   private boolean isGravitinoEnvSetup;
   private String dataDir;
+  private AbstractIT abstractIT;
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -83,6 +84,7 @@ public class SparkQueryRunner {
     }
     initSparkEnv();
 
+    abstractIT = new AbstractIT();
     catalogs.put(CatalogType.HIVE, HIVE_CATALOG_NAME);
     catalogs.put(CatalogType.ICEBERG, ICEBERG_CATALOG_NAME);
     catalogs.put(CatalogType.UNKNOWN, HIVE_CATALOG_NAME);
@@ -134,12 +136,12 @@ public class SparkQueryRunner {
             HiveContainer.HDFS_DEFAULTFS_PORT);
 
     // Start Gravitino server
-    AbstractIT.startIntegrationTest();
-    int gravitinoPort = AbstractIT.getGravitinoServerPort();
+    abstractIT.stopIntegrationTest();
+    int gravitinoPort = abstractIT.getGravitinoServerPort();
     this.gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
 
     // Init metalake and catalog
-    GravitinoAdminClient client = AbstractIT.getGravitinoClient();
+    GravitinoAdminClient client = abstractIT.getGravitinoClient();
     client.createMetalake(metalakeName, "", Collections.emptyMap());
     GravitinoMetalake metalake = client.loadMetalake(metalakeName);
     metalake.createCatalog(
@@ -177,7 +179,7 @@ public class SparkQueryRunner {
   }
 
   private void closeGravitinoEnv() throws Exception {
-    AbstractIT.stopIntegrationTest();
+    abstractIT.stopIntegrationTest();
   }
 
   private void writeQueryOutput(Path outputFile, List<QueryOutput> queryOutputs)

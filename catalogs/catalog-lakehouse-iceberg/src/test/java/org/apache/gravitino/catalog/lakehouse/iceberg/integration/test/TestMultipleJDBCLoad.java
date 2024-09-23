@@ -43,8 +43,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestMultipleJDBCLoad extends AbstractIT {
   private static final TestDatabaseName TEST_DB_NAME =
       TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD;
@@ -55,7 +57,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
   public static final String DEFAULT_POSTGRES_IMAGE = "postgres:13";
 
   @BeforeAll
-  public static void startup() throws IOException {
+  public void startup() throws IOException {
     containerSuite.startMySQLContainer(TEST_DB_NAME);
     mySQLContainer = containerSuite.getMySQLContainer();
     containerSuite.startPostgreSQLContainer(TEST_DB_NAME);

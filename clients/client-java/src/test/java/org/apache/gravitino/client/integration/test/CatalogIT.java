@@ -37,11 +37,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogIT extends AbstractIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogIT.class);
@@ -55,7 +57,7 @@ public class CatalogIT extends AbstractIT {
   private static String hmsUri;
 
   @BeforeAll
-  public static void startUp() {
+  public void startUp() {
     containerSuite.startHiveContainer();
     hmsUri =
         String.format(
@@ -69,7 +71,7 @@ public class CatalogIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void tearDown() {
+  public void tearDown() {
     client.dropMetalake(metalakeName);
 
     if (client != null) {

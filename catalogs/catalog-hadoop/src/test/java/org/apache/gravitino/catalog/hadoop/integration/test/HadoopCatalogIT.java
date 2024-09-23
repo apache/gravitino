@@ -53,10 +53,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class HadoopCatalogIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -74,7 +76,7 @@ public class HadoopCatalogIT extends AbstractIT {
   private static String defaultBaseLocation;
 
   @BeforeAll
-  public static void setup() throws IOException {
+  public void setup() throws IOException {
     containerSuite.startHiveContainer();
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", defaultBaseLocation());
@@ -86,7 +88,7 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() throws IOException {
+  public void stop() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName);
@@ -102,7 +104,7 @@ public class HadoopCatalogIT extends AbstractIT {
     }
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 

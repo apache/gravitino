@@ -62,11 +62,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class HadoopUserImpersonationIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
 
@@ -111,7 +113,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
   }
 
   @BeforeAll
-  public static void setup() throws Exception {
+  public void setup() throws Exception {
     if (!isEmbedded()) {
       return;
     }
@@ -254,7 +256,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
             });
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 

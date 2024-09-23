@@ -47,8 +47,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 @org.junit.jupiter.api.Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TagIT extends AbstractIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -61,7 +63,7 @@ public class TagIT extends AbstractIT {
   private static Table table;
 
   @BeforeAll
-  public static void setUp() {
+  public void setUp() {
     containerSuite.startHiveContainer();
     String hmsUri =
         String.format(
@@ -108,7 +110,7 @@ public class TagIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void tearDown() {
+  public void tearDown() {
     relationalCatalog.asTableCatalog().dropTable(NameIdentifier.of(schema.name(), table.name()));
     relationalCatalog.asSchemas().dropSchema(schema.name(), true);
     metalake.dropCatalog(relationalCatalog.name());

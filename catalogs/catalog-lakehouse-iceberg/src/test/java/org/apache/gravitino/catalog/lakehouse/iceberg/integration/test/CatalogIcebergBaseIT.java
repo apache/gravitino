@@ -125,7 +125,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   @BeforeAll
   public void startup() throws Exception {
     ignoreIcebergRestService = false;
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
     containerSuite.startHiveContainer();
     initIcebergCatalogProperties();
     createMetalake();
@@ -144,12 +144,12 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
       if (spark != null) {
         spark.close();
       }
-      AbstractIT.stopIntegrationTest();
+      super.stopIntegrationTest();
     }
   }
 
   @AfterEach
-  private void resetSchema() {
+  public void resetSchema() {
     clearTableAndSchema();
     createSchema();
   }
@@ -158,10 +158,10 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   // if startIntegrationTest() is auto invoked by Junit. So here we override
   // startIntegrationTest() to disable the auto invoke by junit.
   @BeforeAll
-  public static void startIntegrationTest() {}
+  public void startIntegrationTest() {}
 
   @AfterAll
-  public static void stopIntegrationTest() {}
+  public void stopIntegrationTest() {}
 
   protected abstract void initIcebergCatalogProperties();
 

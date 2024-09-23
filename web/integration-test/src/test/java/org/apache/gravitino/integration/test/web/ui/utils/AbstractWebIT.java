@@ -113,7 +113,7 @@ public class AbstractWebIT extends AbstractIT {
   }
 
   @BeforeAll
-  public static void startUp() {
+  public void startUp() {
     driver = WebDriverManager.getWebDriver(getGravitinoServerPort());
   }
 

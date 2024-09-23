@@ -48,8 +48,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class AuditCatalogMysqlIT extends AbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final String metalakeName = GravitinoITUtils.genRandomName("audit_mysql_metalake");
@@ -62,11 +64,11 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   private static GravitinoMetalake metalake;
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
     containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT);
     MYSQL_CONTAINER = containerSuite.getMySQLContainer();
@@ -76,10 +78,10 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stopIntegrationTest() throws IOException, InterruptedException {
+  public void stopIntegrationTest() throws IOException, InterruptedException {
     client.dropMetalake(metalakeName);
     mysqlService.close();
-    AbstractIT.stopIntegrationTest();
+    super.stopIntegrationTest();
   }
 
   @Test
@@ -165,7 +167,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
         catalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 

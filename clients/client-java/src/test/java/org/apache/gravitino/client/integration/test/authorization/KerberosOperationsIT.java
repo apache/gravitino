@@ -41,8 +41,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class KerberosOperationsIT extends AbstractIT {
 
   private static final KerberosSecurityTestcase kdc =
@@ -65,7 +67,7 @@ public class KerberosOperationsIT extends AbstractIT {
   private static final String clientPrincipal = "client@EXAMPLE.COM";
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     kdc.startMiniKdc();
     initKeyTab();
 
@@ -78,7 +80,7 @@ public class KerberosOperationsIT extends AbstractIT {
 
     registerCustomConfigs(configs);
 
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
     client =
         GravitinoAdminClient.builder(serverUri)
@@ -91,8 +93,8 @@ public class KerberosOperationsIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stopIntegrationTest() throws IOException, InterruptedException {
-    AbstractIT.stopIntegrationTest();
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    super.stopIntegrationTest();
     kdc.stopMiniKdc();
   }
 

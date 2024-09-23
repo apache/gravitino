@@ -41,8 +41,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestMultipleJDBCLoad extends AbstractIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final TestDatabaseName TEST_DB_NAME =
@@ -52,7 +54,7 @@ public class TestMultipleJDBCLoad extends AbstractIT {
   private static PostgreSQLContainer postgreSQLContainer;
 
   @BeforeAll
-  public static void startup() throws IOException {
+  public void startup() throws IOException {
     containerSuite.startMySQLContainer(TEST_DB_NAME);
     mySQLContainer = containerSuite.getMySQLContainer();
     containerSuite.startPostgreSQLContainer(TEST_DB_NAME);

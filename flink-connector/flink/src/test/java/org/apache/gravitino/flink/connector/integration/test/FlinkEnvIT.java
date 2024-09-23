@@ -40,9 +40,11 @@ import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class FlinkEnvIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
@@ -61,7 +63,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
   private static String gravitinoUri = "http://127.0.0.1:8090";
 
   @BeforeAll
-  static void startUp() {
+  void startUp() {
     // Start Gravitino server
     initGravitinoEnv();
     initMetalake();
@@ -82,13 +84,13 @@ public abstract class FlinkEnvIT extends AbstractIT {
     return PropertiesConverter.FLINK_PROPERTY_PREFIX + key;
   }
 
-  private static void initGravitinoEnv() {
+  private void initGravitinoEnv() {
     // Gravitino server is already started by AbstractIT, just construct gravitinoUrl
     int gravitinoPort = getGravitinoServerPort();
     gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
   }
 
-  private static void initMetalake() {
+  private void initMetalake() {
     metalake = client.createMetalake(GRAVITINO_METALAKE, "", Collections.emptyMap());
   }
 

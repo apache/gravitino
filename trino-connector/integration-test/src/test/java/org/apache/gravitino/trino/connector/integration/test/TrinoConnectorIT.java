@@ -62,12 +62,14 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Disabled
 @Deprecated
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TrinoConnectorIT extends AbstractIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);
 
@@ -88,7 +90,7 @@ public class TrinoConnectorIT extends AbstractIT {
   private static Catalog catalog;
 
   @BeforeAll
-  public static void startDockerContainer() throws TException, InterruptedException {
+  public void startDockerContainer() throws TException, InterruptedException {
     String trinoConfDir = System.getenv("TRINO_CONF_DIR");
 
     containerSuite.startHiveContainer();
@@ -1379,7 +1381,7 @@ public class TrinoConnectorIT extends AbstractIT {
     }
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 

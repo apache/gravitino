@@ -52,9 +52,11 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class MultiAuthOperationsIT extends AbstractIT {
   private static final KerberosSecurityTestcase kdc =
       new KerberosSecurityTestcase() {
@@ -73,7 +75,7 @@ public class MultiAuthOperationsIT extends AbstractIT {
   private static GravitinoAdminClient kerberosClient;
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(
         Configs.AUTHENTICATORS.getKey(),
@@ -86,7 +88,7 @@ public class MultiAuthOperationsIT extends AbstractIT {
     configKerberos(configs);
 
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
     oauthClient =
         GravitinoAdminClient.builder(serverUri)
@@ -107,8 +109,8 @@ public class MultiAuthOperationsIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stopIntegrationTest() throws IOException, InterruptedException {
-    AbstractIT.stopIntegrationTest();
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    super.stopIntegrationTest();
     kdc.stopMiniKdc();
   }
 

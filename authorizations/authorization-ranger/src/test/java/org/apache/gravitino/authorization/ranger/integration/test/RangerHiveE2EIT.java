@@ -68,10 +68,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class RangerHiveE2EIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveE2EIT.class);
 
@@ -95,12 +97,12 @@ public class RangerHiveE2EIT extends AbstractIT {
   private static String HIVE_METASTORE_URIS;
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), String.valueOf(true));
     configs.put(Configs.SERVICE_ADMINS.getKey(), AuthConstants.ANONYMOUS_USER);
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
     RangerITEnv.setup();
     containerSuite.startHiveContainer();
@@ -117,8 +119,8 @@ public class RangerHiveE2EIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() throws IOException {
-    AbstractIT.client = null;
+  public void stop() throws IOException {
+    client = null;
   }
 
   @Test
@@ -136,7 +138,7 @@ public class RangerHiveE2EIT extends AbstractIT {
     RangerITEnv.verifyRoleInRanger(rangerAuthPlugin, role);
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 

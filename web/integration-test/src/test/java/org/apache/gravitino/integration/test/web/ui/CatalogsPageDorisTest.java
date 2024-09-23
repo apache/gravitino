@@ -29,7 +29,6 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
 import org.apache.gravitino.integration.test.web.ui.utils.AbstractWebIT;
@@ -44,10 +43,12 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogsPageDorisTest extends AbstractWebIT {
   MetalakePage metalakePage = new MetalakePage();
   CatalogsPage catalogsPage = new CatalogsPage();
@@ -77,9 +78,9 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
   private static final String PROPERTIES_VALUE1 = "val1";
 
   @BeforeAll
-  public static void before() throws Exception {
-    gravitinoClient = AbstractIT.getGravitinoClient();
-    gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+  public void before() throws Exception {
+    gravitinoClient = getGravitinoClient();
+    gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
 
     containerSuite.startDorisContainer();
 

@@ -50,10 +50,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class GravitinoVirtualFileSystemIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -64,7 +66,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
   private static Configuration conf = new Configuration();
 
   @BeforeAll
-  public static void startUp() {
+  public void startUp() {
     containerSuite.startHiveContainer();
     Assertions.assertFalse(client.metalakeExists(metalakeName));
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
@@ -87,7 +89,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
+  public void tearDown() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName);

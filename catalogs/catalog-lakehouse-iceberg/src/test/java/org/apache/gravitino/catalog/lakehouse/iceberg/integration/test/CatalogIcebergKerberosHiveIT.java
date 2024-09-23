@@ -59,10 +59,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogIcebergKerberosHiveIT extends AbstractIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogIcebergKerberosHiveIT.class);
@@ -101,7 +103,7 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
   private static final String HIVE_COL_NAME3 = "col3";
 
   @BeforeAll
-  public static void startIntegrationTest() {
+  public void startIntegrationTest() {
     containerSuite.startKerberosHiveContainer();
     kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
 
@@ -129,14 +131,14 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
 
       ignoreIcebergRestService = false;
       // Start Gravitino server
-      AbstractIT.startIntegrationTest();
+      super.startIntegrationTest();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
   @AfterAll
-  public static void stop() {
+  public void stop() {
     // Reset the UGI
     UserGroupInformation.reset();
 
@@ -145,7 +147,7 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
     System.clearProperty("java.security.krb5.conf");
     System.clearProperty("sun.security.krb5.debug");
 
-    AbstractIT.client = null;
+    client = null;
   }
 
   private static void prepareKerberosConfig() throws Exception {
@@ -201,14 +203,12 @@ public class CatalogIcebergKerberosHiveIT extends AbstractIT {
     }
   }
 
-  private static void addKerberosConfig() {
-    AbstractIT.customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
+  private void addKerberosConfig() {
+    customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
+    customConfigs.put("gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
+    customConfigs.put("gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
   }
 
   @Test
