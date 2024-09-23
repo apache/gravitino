@@ -24,6 +24,7 @@ import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
@@ -756,14 +757,19 @@ public class POConverters {
       }
 
       if (StringUtils.isNotBlank(userPO.getRoleIds())) {
-        List<String> roleIdsFromJson =
+        // Different JSON AGG from backends will produce different types data, we
+        // can only use Object. PostSQL produces the data with type Long. H2 produces
+        // the data with type String.
+        List<Object> roleIdsFromJson =
             JsonUtils.anyFieldMapper().readValue(userPO.getRoleIds(), List.class);
         List<Long> roleIds =
             roleIdsFromJson.stream()
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
                 .filter(StringUtils::isNotBlank)
                 .map(Long::valueOf)
                 .collect(Collectors.toList());
-        ;
+
         if (!roleIds.isEmpty()) {
           builder.withRoleIds(roleIds);
         }
