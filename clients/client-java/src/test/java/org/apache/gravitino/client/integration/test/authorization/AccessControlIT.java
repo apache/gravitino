@@ -75,6 +75,16 @@ public class AccessControlIT extends AbstractIT {
     Assertions.assertEquals(username, user.name());
     Assertions.assertTrue(user.roles().isEmpty());
 
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("k1", "v1");
+    SecurableObject metalakeObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+
+    // Test the user with the role
+    metalake.createRole("role1", properties, Lists.newArrayList(metalakeObject));
+    metalake.grantRolesToUser(Lists.newArrayList("role1"), username);
+
     // List users
     String anotherUser = "another-user";
     metalake.addUser(anotherUser);
@@ -90,6 +100,7 @@ public class AccessControlIT extends AbstractIT {
             .map(User::name)
             .sorted(String::compareTo)
             .collect(Collectors.toList()));
+    Assertions.assertEquals(Lists.newArrayList("role1"), users[2].roles());
 
     // Get a not-existed user
     Assertions.assertThrows(NoSuchUserException.class, () -> metalake.getUser("not-existed"));
@@ -100,6 +111,7 @@ public class AccessControlIT extends AbstractIT {
 
     // clean up
     metalake.removeUser(anotherUser);
+    metalake.deleteRole("role1");
   }
 
   @Test
