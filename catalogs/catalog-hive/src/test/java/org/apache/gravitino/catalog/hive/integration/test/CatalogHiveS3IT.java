@@ -39,8 +39,6 @@ public class CatalogHiveS3IT extends CatalogHiveIT {
   private static final Logger LOGGER = LoggerFactory.getLogger(CatalogHiveS3IT.class);
 
   private static final String S3_BUCKET_NAME = "my-test-bucket";
-  // private static final String S3_BUCKET_NAME = "paimon-bucket/test1";
-  //  private LocalStackContainer localStackContainer;
   private GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
   private static final String S3_ACCESS_KEY = "S3_ACCESS_KEY";

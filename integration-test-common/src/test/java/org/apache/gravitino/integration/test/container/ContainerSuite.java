@@ -72,6 +72,13 @@ public class ContainerSuite implements Closeable {
       new EnumMap<>(PGImageName.class);
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
+
+  /**
+   * We can share the same Hive container as Hive container with S3 contains the following
+   * differences: 1. Configuration of S3 and corresponding environment variables 2. The Hive
+   * container with S3 is Hive3 container and the Hive container is Hive2 container. There is
+   * something wrong with the hive2 container to access the S3.
+   */
   private static volatile HiveContainer hiveContainerWithS3;
 
   protected static final CloseableGroup closer = CloseableGroup.create();
