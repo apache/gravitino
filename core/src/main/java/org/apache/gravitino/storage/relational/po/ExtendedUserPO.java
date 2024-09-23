@@ -21,7 +21,7 @@ package org.apache.gravitino.storage.relational.po;
 import com.google.common.base.Objects;
 
 /**
- * CombinedUserPO add extra roleNames and roleIds for UserPO. This PO is only used for reading the
+ * ExtendedUserPO add extra roleNames and roleIds for UserPO. This PO is only used for reading the
  * data from multiple joined tables. The PO won't be written to database. So we don't need the inner
  * class Builder.
  */
