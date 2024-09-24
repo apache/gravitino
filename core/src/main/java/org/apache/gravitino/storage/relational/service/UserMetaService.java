@@ -30,8 +30,10 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
@@ -39,6 +41,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
@@ -246,6 +249,20 @@ public class UserMetaService {
     return newEntity;
   }
 
+  public List<UserEntity> listUsersByNamespace(Namespace namespace, Set<Field> skippingFields) {
+    AuthorizationUtils.checkUserNamespace(namespace);
+    String metalakeName = namespace.level(0);
+
+    SupportsDesiredFieldsHandlers<List<UserEntity>> handlers =
+        new SupportsDesiredFieldsHandlers<>();
+    handlers.addHandler(new ListDesiredRolesHandler(metalakeName));
+    handlers.addHandler(new ListAllFieldsHandler(metalakeName));
+
+    Set<Field> desiredFields = Sets.newHashSet(UserEntity.fieldSet());
+    desiredFields.removeAll(skippingFields);
+    return handlers.execute(desiredFields);
+  }
+
   public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] userDeletedCount = new int[] {0};
     int[] userRoleRelDeletedCount = new int[] {0};
@@ -264,5 +281,64 @@ public class UserMetaService {
                         mapper.deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
+  }
+
+  private static class ListDesiredRolesHandler implements SupportsDesiredFields<List<UserEntity>> {
+    private final String metalakeName;
+
+    ListDesiredRolesHandler(String metalakeName) {
+      this.metalakeName = metalakeName;
+    }
+
+    @Override
+    public Set<Field> desiredFields() {
+      Set<Field> requiredFields = Sets.newHashSet(UserEntity.fieldSet());
+      requiredFields.remove(UserEntity.ROLE_IDS);
+      requiredFields.remove(UserEntity.ROLE_NAMES);
+
+      return requiredFields;
+    }
+
+    @Override
+    public List<UserEntity> execute() {
+      List<UserPO> userPOs =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalake(metalakeName));
+      return userPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromUserPO(
+                      po,
+                      Collections.emptyList(),
+                      AuthorizationUtils.ofUserNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    }
+  }
+
+  private static class ListAllFieldsHandler implements SupportsDesiredFields<List<UserEntity>> {
+    final String metalakeName;
+
+    ListAllFieldsHandler(String metalakeName) {
+      this.metalakeName = metalakeName;
+    }
+
+    @Override
+    public Set<Field> desiredFields() {
+      return UserEntity.fieldSet();
+    }
+
+    @Override
+    public List<UserEntity> execute() {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      List<ExtendedUserPO> userPOs =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.listExtendedUserPOsByMetalakeId(metalakeId));
+      return userPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromExtendedUserPO(
+                      po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    }
   }
 }
