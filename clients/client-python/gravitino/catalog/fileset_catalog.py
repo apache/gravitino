@@ -1,21 +1,19 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import logging
 from typing import List, Dict
@@ -235,6 +233,18 @@ class FilesetCatalog(BaseSchemaCatalog):
         drop_resp.validate()
 
         return drop_resp.dropped()
+
+    def get_file_location(self, ident: NameIdentifier, sub_path: str) -> str:
+        """Get the actual location of a file or directory based on the storage location of Fileset and the sub path.
+
+        Args:
+             ident: A fileset identifier, which should be "schema.fileset" format.
+             sub_path: The sub path of the file or directory.
+
+        Returns:
+             The actual location of the file or directory.
+        """
+        raise NotImplementedError("Not implemented yet")
 
     @staticmethod
     def check_fileset_namespace(namespace: Namespace):

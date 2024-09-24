@@ -24,13 +24,12 @@ import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -50,6 +49,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
@@ -701,12 +701,43 @@ public class POConverters {
    * Convert {@link UserPO} to {@link UserEntity}
    *
    * @param userPO UserPo object to be converted
-   * @param rolePOsSupplier Supplier for the list of rolePO
+   * @param rolePOs list of rolePO
    * @param namespace Namespace object to be associated with the user
    * @return UserEntity object from UserPO object
    */
-  public static UserEntity fromUserPO(
-      UserPO userPO, Supplier<List<RolePO>> rolePOsSupplier, Namespace namespace) {
+  public static UserEntity fromUserPO(UserPO userPO, List<RolePO> rolePOs, Namespace namespace) {
+    try {
+      List<String> roleNames =
+          rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
+      List<Long> roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
+
+      UserEntity.Builder builder =
+          UserEntity.builder()
+              .withId(userPO.getUserId())
+              .withName(userPO.getUserName())
+              .withNamespace(namespace)
+              .withAuditInfo(
+                  JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
+      if (!roleNames.isEmpty()) {
+        builder.withRoleNames(roleNames);
+      }
+      if (!roleIds.isEmpty()) {
+        builder.withRoleIds(roleIds);
+      }
+      return builder.build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert {@link ExtendedUserPO} to {@link UserEntity}
+   *
+   * @param userPO CombinedUserPo object to be converted
+   * @param namespace Namespace object to be associated with the user
+   * @return UserEntity object from ExtendedUserPO object
+   */
+  public static UserEntity fromExtendedUserPO(ExtendedUserPO userPO, Namespace namespace) {
     try {
       UserEntity.Builder builder =
           UserEntity.builder()
@@ -714,18 +745,35 @@ public class POConverters {
               .withName(userPO.getUserName())
               .withNamespace(namespace)
               .withAuditInfo(
-                  JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class))
-              .withRolesSupplier(
-                  () ->
-                      rolePOsSupplier.get().stream()
-                          .map(
-                              po ->
-                                  fromRolePO(
-                                      po,
-                                      SupplierUtils.createSecurableObjectsSupplier(po),
-                                      AuthorizationUtils.ofRoleNamespace(namespace.level(0))))
-                          .collect(Collectors.toList()));
+                  JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
+      if (StringUtils.isNotBlank(userPO.getRoleNames())) {
+        List<String> roleNamesFromJson =
+            JsonUtils.anyFieldMapper().readValue(userPO.getRoleNames(), List.class);
+        List<String> roleNames =
+            roleNamesFromJson.stream().filter(StringUtils::isNotBlank).collect(Collectors.toList());
+        if (!roleNames.isEmpty()) {
+          builder.withRoleNames(roleNames);
+        }
+      }
 
+      if (StringUtils.isNotBlank(userPO.getRoleIds())) {
+        // Different JSON AGG from backends will produce different types data, we
+        // can only use Object. PostSQL produces the data with type Long. H2 produces
+        // the data with type String.
+        List<Object> roleIdsFromJson =
+            JsonUtils.anyFieldMapper().readValue(userPO.getRoleIds(), List.class);
+        List<Long> roleIds =
+            roleIdsFromJson.stream()
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .filter(StringUtils::isNotBlank)
+                .map(Long::valueOf)
+                .collect(Collectors.toList());
+
+        if (!roleIds.isEmpty()) {
+          builder.withRoleIds(roleIds);
+        }
+      }
       return builder.build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
@@ -736,31 +784,30 @@ public class POConverters {
    * Convert {@link GroupPO} to {@link GroupEntity}
    *
    * @param groupPO GroupPO object to be converted
-   * @param rolePOsSupplier Supplier for the list of rolePO
+   * @param rolePOs list of rolePO
    * @param namespace Namespace object to be associated with the group
    * @return GroupEntity object from GroupPO object
    */
   public static GroupEntity fromGroupPO(
-      GroupPO groupPO, Supplier<List<RolePO>> rolePOsSupplier, Namespace namespace) {
+      GroupPO groupPO, List<RolePO> rolePOs, Namespace namespace) {
     try {
+      List<String> roleNames =
+          rolePOs.stream().map(RolePO::getRoleName).collect(Collectors.toList());
+      List<Long> roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
+
       GroupEntity.Builder builder =
           GroupEntity.builder()
               .withId(groupPO.getGroupId())
               .withName(groupPO.getGroupName())
               .withNamespace(namespace)
               .withAuditInfo(
-                  JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class))
-              .withRolesSupplier(
-                  () ->
-                      rolePOsSupplier.get().stream()
-                          .map(
-                              po ->
-                                  fromRolePO(
-                                      po,
-                                      SupplierUtils.createSecurableObjectsSupplier(po),
-                                      AuthorizationUtils.ofRoleNamespace(namespace.level(0))))
-                          .collect(Collectors.toList()));
-
+                  JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
+      if (!roleNames.isEmpty()) {
+        builder.withRoleNames(roleNames);
+      }
+      if (!roleIds.isEmpty()) {
+        builder.withRoleIds(roleIds);
+      }
       return builder.build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
@@ -923,16 +970,14 @@ public class POConverters {
   }
 
   public static RoleEntity fromRolePO(
-      RolePO rolePO,
-      Supplier<List<SecurableObject>> securableObjectsSupplier,
-      Namespace namespace) {
+      RolePO rolePO, List<SecurableObject> securableObjects, Namespace namespace) {
     try {
       return RoleEntity.builder()
           .withId(rolePO.getRoleId())
           .withName(rolePO.getRoleName())
           .withNamespace(namespace)
           .withProperties(JsonUtils.anyFieldMapper().readValue(rolePO.getProperties(), Map.class))
-          .withSecurableObjectsSupplier(securableObjectsSupplier)
+          .withSecurableObjects(securableObjects)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(rolePO.getAuditInfo(), AuditInfo.class))
           .build();
