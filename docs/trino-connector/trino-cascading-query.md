@@ -6,7 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 ---
 
 # Background
-With `Apache Gravitino Trino connector` and `Gravitino Trino cascading connector`, you can implement cascading queries in Trino.
+With the `Apache Gravitino Trino connector` and the `Gravitino Trino cascading connector`, you can implement cascading queries in Trino.
 These connectors allow you to treat other Trino clusters as data sources for the current Trino cluster,
 enabling queries across catalogs in different Trino clusters.
 
@@ -19,19 +19,19 @@ where large volumes of data need to be transmitted across networks.
 
 ## Deploying Trino
 
-To setup the Apache Gravitino Trino cascading query environment, you should first deploy tow Trino environment,
+To setup the Apache Gravitino Trino cascading query environment, you should first deploy at lease two Trino environment,
 and then install the Apache Gravitino Trino connector plugin and Gravitino Trino cascading connector plugin into Trino.
 Please refer to the [Deploying Trino documentation](installation.md) and do the following steps:
 
 1. [Download](https://github.com/apache/gravitino/releases) the Gravitino Trino connector tarball and unpack it.
-   The tarball contains a single top-level directory `gravitino-trino-connector-<version>`, and rename the directory to `gravitino`.
+   The tarball contains a single top-level directory named `gravitino-trino-connector-<version>`. Rename this directory to `gravitino`.
 2. [Download](https://github.com/datastrato/trino-cascading-connector/releases) the Gravitino Trino cascading connector tarball and unpack it.
    The tarball contains a single top-level directory `gravitino-trino-cascading-connector-<version>`, and rename the directory to `trino`.
 3. Copy the two connector directories to the Trino's plugin directory.
    Normally, the directory location is `Trino-server-<version>/plugin`, and the directory contains other catalogs used by Trino.
 
-Ensure that the `plugin` directory contains `gravitino` and 
-`trino` subdirectories. Two Trino clusters need to be deployed on machines with hostnames `c1-trino` and `c2-trino`. 
+Ensure that the `plugin` directory contains `gravitino` and `trino` subdirectories.
+Assuming the hostnames of the machines in which the two Trino cluster deployed are `c1-trino` and `c2-trino` 
 Ensure network connectivity between these machines. 
 
 ## Deploying Trino in Containers
@@ -50,7 +50,7 @@ docker run --name c1-trino -d -p 8080:8080 <image-name> -v `gravitino-trino-conn
 To start Trino on the host `c2-trino` and mount the plugins. execute the following command:
 
 ```bash
-docker run --name c1-trino -d -p 8080:8080 <image-name> -v `gravitino-trino-connector-<version>`:/usr/lib/trino/plugin/gravitino   
+docker run --name c2-trino -d -p 8080:8080 <image-name> -v `gravitino-trino-connector-<version>`:/usr/lib/trino/plugin/gravitino   
 -v `gravitino-trino-cascading-connector-<version>`:/usr/lib/trino/plugin/trino
 ```
 
@@ -60,7 +60,7 @@ Ensure that the Trino containers on `c1-trino` and `c2-trino` can communicate wi
 ## Configuring Trino
 
 For detailed instructions on configuring Trino, 
-please refer to the (documentation)[https://trino.io/docs/current/installation/deployment.html#configuring-trino]. 
+please refer to the [documentation](https://trino.io/docs/current/installation/deployment.html#configuring-trino). 
 After basic configuration, create a `gravitino.properties` configuration file in the `etc/catalog` directory 
 on the `c1-trino` host to configure the Gravitino connector:
 
@@ -88,7 +88,7 @@ The `gravitino.cloud.region-code=c2` indicates that the `c2-trino` host belongs 
 and only queries in catalogs in the `c2` region will execute on `c2-trino`. 
 
 Ensure that the `gravitino.uri` configuration on `c1-trino` and `c2-trino` points to the same Gravitino server and 
-that the service is running and connected properly. Restart Trino after configuration.
+that the service is running and connected properly. Restart Trino after configuration changes.
 
 ## Creating Catalogs
 
@@ -152,4 +152,4 @@ Verify the query results using the `c2-trino` CLI:
 SELECT * FROM gt_mysql.gt_db1.tb01 ORDER BY name;
 ```
 
-The `c2-trino` CLI output is the same as `c1-trino`
+The output of the `c1-trino` CLI is the same as `c2-trino`.
