@@ -68,6 +68,7 @@ import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
+import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -513,6 +514,46 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     resp.validate();
 
     return resp.getUser();
+  }
+
+  /**
+   * Lists the users.
+   *
+   * @return The User list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public User[] listUsers() throws NoSuchMetalakeException {
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+
+    UserListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_USERS_PATH, name(), BLANK_PLACE_HOLDER),
+            params,
+            UserListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    resp.validate();
+
+    return resp.getUsers();
+  }
+
+  /**
+   * Lists the usernames.
+   *
+   * @return The username list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listUserNames() throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_USERS_PATH, name(), BLANK_PLACE_HOLDER),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    resp.validate();
+
+    return resp.getNames();
   }
 
   /**

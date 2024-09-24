@@ -20,7 +20,9 @@ package org.apache.gravitino;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -55,15 +57,40 @@ public interface EntityStore extends Closeable {
    * <p>Note. Depends on the isolation levels provided by the underlying storage, the returned list
    * may not be consistent.
    *
-   * @param namespace the namespace of the entities
    * @param <E> class of the entity
+   * @param namespace the namespace of the entities
    * @param type the detailed type of the entity
    * @param entityType the general type of the entity
-   * @throws IOException if the list operation fails
    * @return the list of entities
+   * @throws IOException if the list operation fails
    */
-  <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, EntityType entityType) throws IOException;
+  default <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, EntityType entityType) throws IOException {
+    return list(namespace, type, entityType, Collections.emptySet());
+  }
+
+  /**
+   * List all the entities with the specified {@link org.apache.gravitino.Namespace}, and
+   * deserialize them into the specified {@link Entity} object.
+   *
+   * <p>Note. Depends on the isolation levels provided by the underlying storage, the returned list
+   * may not be consistent.
+   *
+   * @param <E> class of the entity
+   * @param namespace the namespace of the entities
+   * @param type the detailed type of the entity
+   * @param entityType the general type of the entity
+   * @param skippingFields Some fields may have a relatively high acquisition cost, EntityStore
+   *     provides an optional setting to avoid fetching these high-cost fields to improve the
+   *     performance.
+   * @return the list of entities
+   * @throws IOException if the list operation fails
+   */
+  default <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, EntityType entityType, Set<Field> skippingFields)
+      throws IOException {
+    throw new UnsupportedOperationException("Don't support to skip fields");
+  }
 
   /**
    * Check if the entity with the specified {@link org.apache.gravitino.NameIdentifier} exists.
