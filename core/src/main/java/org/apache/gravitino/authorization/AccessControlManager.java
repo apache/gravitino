@@ -69,6 +69,15 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public String[] listUserNames(String metalake) throws NoSuchMetalakeException {
+    return userGroupManager.listUserNames(metalake);
+  }
+
+  @Override
+  public User[] listUsers(String metalake) throws NoSuchMetalakeException {
+    return userGroupManager.listUsers(metalake);
+  }
+
   public Group addGroup(String metalake, String group)
       throws GroupAlreadyExistsException, NoSuchMetalakeException {
     return userGroupManager.addGroup(metalake, group);
@@ -130,16 +139,6 @@ public class AccessControlManager implements AccessControlDispatcher {
     return roleManager.getRole(metalake, role);
   }
 
-  /**
-   * Deletes a Role.
-   *
-   * @param metalake The Metalake of the Role.
-   * @param role The name of the Role.
-   * @return True if the Role was successfully deleted, false only when there's no such role,
-   *     otherwise it will throw an exception.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If deleting the Role encounters storage issues.
-   */
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
     return roleManager.deleteRole(metalake, role);
   }

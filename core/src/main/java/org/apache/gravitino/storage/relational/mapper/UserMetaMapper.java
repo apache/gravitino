@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -53,6 +54,14 @@ public interface UserMetaMapper {
 
   @InsertProvider(type = UserMetaSQLProviderFactory.class, method = "insertUserMeta")
   void insertUserMeta(@Param("userMeta") UserPO userPO);
+
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "listUserPOsByMetalake")
+  List<UserPO> listUserPOsByMetalake(@Param("metalakeName") String metalakeName);
+
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "listExtendedUserPOsByMetalakeId")
+  List<ExtendedUserPO> listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @InsertProvider(
       type = UserMetaSQLProviderFactory.class,

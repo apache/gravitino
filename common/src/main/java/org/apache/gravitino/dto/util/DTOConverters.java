@@ -679,6 +679,19 @@ public class DTOConverters {
   }
 
   /**
+   * Converts an array of Users to an array of UserDTOs.
+   *
+   * @param users The users to be converted.
+   * @return The array of UserDTOs.
+   */
+  public static UserDTO[] toDTOs(User[] users) {
+    if (ArrayUtils.isEmpty(users)) {
+      return new UserDTO[0];
+    }
+    return Arrays.stream(users).map(DTOConverters::toDTO).toArray(UserDTO[]::new);
+  }
+
+  /**
    * Converts a DistributionDTO to a Distribution.
    *
    * @param distributionDTO The distribution DTO.
