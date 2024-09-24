@@ -891,15 +891,23 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     // Why needs this conversion? Because PaimonCatalogOperations#initialize will try to convert
     // Gravitino general S3 properties to Paimon specific S3 properties.
     Map<String, String> copy = Maps.newHashMap(catalogProperties);
-    copy.put(
-        PaimonCatalogPropertiesMetadata.S3_ENDPOINT,
-        catalogProperties.get(S3Properties.GRAVITINO_S3_ENDPOINT));
-    copy.put(
-        PaimonCatalogPropertiesMetadata.S3_ACCESS_KEY,
-        catalogProperties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
-    copy.put(
-        PaimonCatalogPropertiesMetadata.S3_SECRET_KEY,
-        catalogProperties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    if (catalogProperties.containsKey(S3Properties.GRAVITINO_S3_ENDPOINT)) {
+      copy.put(
+          PaimonCatalogPropertiesMetadata.S3_ENDPOINT,
+          catalogProperties.get(S3Properties.GRAVITINO_S3_ENDPOINT));
+    }
+
+    if (catalogProperties.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID)) {
+      copy.put(
+          PaimonCatalogPropertiesMetadata.S3_ACCESS_KEY,
+          catalogProperties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    }
+
+    if (catalogProperties.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY)) {
+      copy.put(
+          PaimonCatalogPropertiesMetadata.S3_SECRET_KEY,
+          catalogProperties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    }
 
     PaimonBackendCatalogWrapper paimonBackendCatalogWrapper =
         CatalogUtils.loadCatalogBackend(new PaimonConfig(copy));
