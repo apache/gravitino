@@ -103,6 +103,36 @@ For other Iceberg OSS properties not managed by Gravitino like `client.security-
 Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
+#### GCS
+
+Supports using google credential file to access GCS data.
+
+| Configuration item     | Description                                                                                        | Default value | Required | Since Version |
+|------------------------|----------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `io-impl`              | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.gcp.gcs.GCSFileIO` for GCS. | (none)        | No       | 0.6.0         |
+
+For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.bypass.gcs.project-id`.
+
+Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino server is started.
+
+:::info
+Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+:::
+
+#### Other storages
+
+For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.
+
+| Configuration item | Description                                                                             | Default value | Required | Since Version |
+|--------------------|-----------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `io-impl`          | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0         |
+
+To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.bypass.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
+
+:::info
+Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the `catalogs/lakehouse-iceberg/libs/` directory.
+:::
+
 #### Catalog backend security
 
 Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
@@ -284,16 +314,21 @@ You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/co
 
 The Gravitino server doesn't allow passing the following reserved fields.
 
-| Configuration item              | Description                                             |
-|---------------------------------|---------------------------------------------------------|
-| `comment`                       | The table comment.                                      |
-| `creator`                       | The table creator.                                      |
-| `location`                      | Iceberg location for table storage.                     |
-| `current-snapshot-id`           | The snapshot represents the current state of the table. |
-| `cherry-pick-snapshot-id`       | Selecting a specific snapshot in a merge operation.     |
-| `sort-order`                    | Selecting a specific snapshot in a merge operation.     |
-| `identifier-fields`             | The identifier fields for defining the table.           |
-| `write.distribution-mode`       | Defines distribution of write data                      |
+| Configuration item        | Description                                                                          | Since Version |
+|---------------------------|--------------------------------------------------------------------------------------|---------------|
+| `comment`                 | The table comment, please use `comment` field in table meta instead.                 | 0.2.0         |
+| `creator`                 | The table creator.                                                                   | 0.2.0         |
+| `current-snapshot-id`     | The snapshot represents the current state of the table.                              | 0.2.0         |
+| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                  | 0.2.0         |
+| `sort-order`              | Iceberg table sort order, please use `SortOrder` in table meta instead.              | 0.2.0         |
+| `identifier-fields`       | The identifier fields for defining the table.                                        | 0.2.0         |
+| `write.distribution-mode` | Defines distribution of write data, please use `distribution` in table meta instead. | 0.2.0         |
+
+Gravitino server doesn't allow to change such properties:
+
+| Configuration item | Description                                  | Default value | Required | Since Version |
+|--------------------|----------------------------------------------|---------------|----------|---------------|
+| `location`         | Iceberg location for table storage.          | None          | No       | 0.2.0         |
 
 ### Table indexes
 

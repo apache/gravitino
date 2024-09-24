@@ -42,18 +42,41 @@ dependencies {
   testCompileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
 
+  testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
+
+  testImplementation(libs.bundles.jersey)
+  testImplementation(libs.bundles.jwt)
+  testImplementation(libs.commons.lang3)
+  testImplementation(libs.hadoop3.client)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.minikdc)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockserver.netty)
   testImplementation(libs.mockserver.client.java)
-  testImplementation(libs.bundles.jwt)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.build {
   dependsOn("javadoc")
+}
+
+tasks.test {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
+    dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
+    dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
+  }
 }
 
 tasks.javadoc {
@@ -66,4 +89,9 @@ tasks.javadoc {
   classpath = configurations["compileClasspath"] +
     project(":api").configurations["runtimeClasspath"] +
     project(":common").configurations["runtimeClasspath"]
+}
+
+tasks.clean {
+  delete("target")
+  delete("tmp")
 }

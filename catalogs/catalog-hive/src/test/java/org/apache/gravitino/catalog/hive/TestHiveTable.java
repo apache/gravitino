@@ -32,9 +32,9 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.catalog.hive.miniHMS.MiniHiveMetastoreService;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.rel.Column;
@@ -73,21 +73,25 @@ public class TestHiveTable extends MiniHiveMetastoreService {
   private static void setup() {
     hiveCatalog = initHiveCatalog();
     hiveCatalogOperations = (HiveCatalogOperations) hiveCatalog.ops();
-    hiveSchema = initHiveSchema(hiveCatalog);
+    hiveSchema = initHiveSchema();
   }
 
   @AfterEach
   private void resetSchema() {
     hiveCatalogOperations.dropSchema(schemaIdent, true);
-    hiveSchema = initHiveSchema(hiveCatalog);
+    hiveSchema = initHiveSchema();
   }
 
-  protected static HiveSchema initHiveSchema(HiveCatalog hiveCatalog) {
+  protected static HiveSchema initHiveSchema() {
+    return initHiveSchema(hiveCatalogOperations);
+  }
+
+  protected static HiveSchema initHiveSchema(HiveCatalogOperations ops) {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
 
-    return hiveCatalogOperations.createSchema(schemaIdent, HIVE_COMMENT, properties);
+    return ops.createSchema(schemaIdent, HIVE_COMMENT, properties);
   }
 
   protected static HiveCatalog initHiveCatalog() {

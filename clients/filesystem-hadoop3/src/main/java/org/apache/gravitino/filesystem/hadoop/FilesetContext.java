@@ -19,9 +19,9 @@
 package org.apache.gravitino.filesystem.hadoop;
 
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.shaded.com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 

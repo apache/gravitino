@@ -27,7 +27,7 @@ Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
 
 ## How to use it
 
-1. [Build](../how-to-build.md) or download ([gravitino-spark-connector-runtime-3.3](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.3), [gravitino-spark-connector-runtime-3.4](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.4), [gravitino-spark-connector-runtime-3.5](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5)) (https://mvnrepository.com/artifact/org.apache.gravitino/spark-connector-runtime), and place it to the classpath of Spark.
+1. [Build](../how-to-build.md) or download the package ([gravitino-spark-connector-runtime-3.3](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.3), [gravitino-spark-connector-runtime-3.4](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.4), [gravitino-spark-connector-runtime-3.5](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5)), and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
 
 | Property                                 | Type   | Default Value | Description                                                                                     | Required | Since Version |

@@ -78,6 +78,7 @@ dependencies {
   testImplementation(libs.slf4j.api)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
@@ -126,16 +127,10 @@ tasks {
 }
 
 tasks.test {
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
-
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
   }

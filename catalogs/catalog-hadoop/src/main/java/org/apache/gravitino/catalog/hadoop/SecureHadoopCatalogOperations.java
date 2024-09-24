@@ -219,6 +219,12 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
+  public String getFileLocation(NameIdentifier ident, String subPath)
+      throws NoSuchFilesetException {
+    return hadoopCatalogOperations.getFileLocation(ident, subPath);
+  }
+
+  @Override
   public void close() throws IOException {
     hadoopCatalogOperations.close();
 

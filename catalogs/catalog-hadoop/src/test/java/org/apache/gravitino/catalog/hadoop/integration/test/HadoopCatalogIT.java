@@ -24,12 +24,17 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
@@ -71,7 +76,6 @@ public class HadoopCatalogIT extends AbstractIT {
   @BeforeAll
   public static void setup() throws IOException {
     containerSuite.startHiveContainer();
-
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", defaultBaseLocation());
     hdfs = FileSystem.get(conf);
@@ -607,6 +611,82 @@ public class HadoopCatalogIT extends AbstractIT {
     dropped = metalake.dropCatalog(catalogName);
     Assertions.assertTrue(dropped, "catalog should be dropped");
     Assertions.assertFalse(metalake.catalogExists(catalogName), "catalog should not be exists");
+  }
+
+  @Test
+  public void testGetFileLocation() {
+    String filesetName = GravitinoITUtils.genRandomName("fileset");
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    Assertions.assertFalse(catalog.asFilesetCatalog().filesetExists(filesetIdent));
+    Fileset expectedFileset =
+        catalog
+            .asFilesetCatalog()
+            .createFileset(
+                filesetIdent,
+                "fileset comment",
+                Fileset.Type.MANAGED,
+                generateLocation(filesetName),
+                Maps.newHashMap());
+    Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(filesetIdent));
+    // test without caller context
+    try {
+      String actualFileLocation =
+          catalog.asFilesetCatalog().getFileLocation(filesetIdent, "/test1.par");
+
+      Assertions.assertEquals(expectedFileset.storageLocation() + "/test1.par", actualFileLocation);
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
+
+    // test with caller context
+    try {
+      Map<String, String> context = new HashMap<>();
+      context.put(
+          FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
+          InternalClientType.HADOOP_GVFS.name());
+      context.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.CREATE.name());
+      CallerContext callerContext = CallerContext.builder().withContext(context).build();
+      CallerContext.CallerContextHolder.set(callerContext);
+
+      String actualFileLocation =
+          catalog.asFilesetCatalog().getFileLocation(filesetIdent, "/test2.par");
+
+      Assertions.assertEquals(expectedFileset.storageLocation() + "/test2.par", actualFileLocation);
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
+  }
+
+  @Test
+  public void testGetFileLocationWithInvalidAuditHeaders() {
+    try {
+      String filesetName = GravitinoITUtils.genRandomName("fileset");
+      NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+
+      Map<String, String> context = new HashMap<>();
+      // this is an invalid internal client type.
+      context.put(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE, "test");
+      CallerContext callerContext = CallerContext.builder().withContext(context).build();
+      CallerContext.CallerContextHolder.set(callerContext);
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> catalog.asFilesetCatalog().getFileLocation(filesetIdent, "/test.par"));
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
+  }
+
+  private static String generateLocation(String filesetName) {
+    return String.format(
+        "hdfs://%s:%d/user/hadoop/%s/%s/%s",
+        containerSuite.getHiveContainer().getContainerIpAddress(),
+        HiveContainer.HDFS_DEFAULTFS_PORT,
+        catalogName,
+        schemaName,
+        filesetName);
   }
 
   private Fileset createFileset(

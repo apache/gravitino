@@ -33,6 +33,8 @@ import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
   public static final String CATALOG_BACKEND = IcebergConstants.CATALOG_BACKEND;
@@ -84,26 +86,26 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 null /* defaultValue */,
                 false /* hidden */),
             stringOptionalPropertyEntry(
-                IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID,
-                "s3 access-key-id",
+                S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+                "s3 access key ID",
                 false /* immutable */,
                 null /* defaultValue */,
                 true /* hidden */),
             stringOptionalPropertyEntry(
-                IcebergConstants.GRAVITINO_S3_SECRET_ACCESS_KEY,
-                "s3 secret-access-key",
+                S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+                "s3 secret access key",
                 false /* immutable */,
                 null /* defaultValue */,
                 true /* hidden */),
             stringOptionalPropertyEntry(
-                IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_ID,
-                "OSS access-key-id",
+                OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
+                "OSS access key ID",
                 false /* immutable */,
                 null /* defaultValue */,
                 true /* hidden */),
             stringOptionalPropertyEntry(
-                IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_SECRET,
-                "OSS access-key-secret",
+                OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+                "OSS access key secret",
                 false /* immutable */,
                 null /* defaultValue */,
                 true /* hidden */));

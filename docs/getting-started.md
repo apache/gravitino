@@ -19,10 +19,10 @@ If you have your own Apache Gravitino setup and want to use Apache Hive:
 
 If you prefer to get started quickly and use Docker for Gravitino, Apache Hive, Trino, and others:
 
-  - on AWS or Google Cloud Platform, see [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-gravitino-playground-on-aws-or-google-cloud-platform)
-  - locally, see [Installing Gravitino playground locally](#installing-gravitino-playground-locally)
+  - on AWS or Google Cloud Platform, see [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-apache-gravitino-playground-on-aws-or-google-cloud-platform)
+  - locally, see [Installing Gravitino playground locally](#installing-apache-gravitino-playground-locally)
 
-If you are using AWS and want to access the instance remotely, be sure to read [Accessing Gravitino on AWS externally](#accessing-gravitino-on-aws-externally)
+If you are using AWS and want to access the instance remotely, be sure to read [Accessing Gravitino on AWS externally](#accessing-apache-gravitino-on-aws-externally)
 
 ### Index
 
@@ -228,7 +228,7 @@ how to run the playground, see [how-to-use-the-playground](./how-to-use-the-play
 
 ## Installing Apache Gravitino playground locally
 
-The same steps for installing the playground on AWS or Google Cloud Platform apply when installing it locally. Follow [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-gravitino-playground-on-aws-or-google-cloud-platform).
+The same steps for installing the playground on AWS or Google Cloud Platform apply when installing it locally. Follow [Installing Gravitino playground on AWS or Google Cloud Platform](#installing-apache-gravitino-playground-on-aws-or-google-cloud-platform).
 
 ## Using REST to interact with Apache Gravitino
 

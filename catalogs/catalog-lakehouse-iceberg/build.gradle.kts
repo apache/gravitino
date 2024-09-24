@@ -31,22 +31,25 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":api"))
+  implementation(project(":api")) {
+    exclude("*")
+  }
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":common"))
-  implementation(project(":core"))
+  implementation(project(":common")) {
+    exclude("*")
+  }
+  implementation(project(":core")) {
+    exclude("*")
+  }
   implementation(project(":iceberg:iceberg-common"))
-  implementation(project(":server-common"))
   implementation(libs.bundles.iceberg)
-  implementation(libs.bundles.jersey)
-  implementation(libs.bundles.jetty)
+
   implementation(libs.bundles.log4j)
   implementation(libs.cglib)
   implementation(libs.commons.collections4)
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.sqlite.jdbc)
 
   annotationProcessor(libs.lombok)
 
@@ -60,7 +63,9 @@ dependencies {
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.hive")
+  }
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
     exclude("org.apache.avro")
     exclude("org.apache.hadoop")
@@ -69,22 +74,12 @@ dependencies {
     exclude("org.rocksdb")
   }
 
-  testImplementation(libs.hadoop2.common) {
-    exclude("com.github.spotbugs")
-  }
-  testImplementation(libs.jersey.test.framework.core) {
-    exclude(group = "org.junit.jupiter")
-  }
-  testImplementation(libs.jersey.test.framework.provider.jetty) {
-    exclude(group = "org.junit.jupiter")
-  }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
   // For test TestMultipleJDBCLoad, it was depended on testcontainers.mysql and testcontainers.postgresql
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
-
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
@@ -105,7 +100,11 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn("jar", "runtimeJars")
-    from("build/libs")
+    from("build/libs") {
+      exclude("guava-*.jar")
+      exclude("log4j-*.jar")
+      exclude("slf4j-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/lakehouse-iceberg/libs")
   }
 
@@ -138,16 +137,10 @@ tasks {
 }
 
 tasks.test {
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
-
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
   }

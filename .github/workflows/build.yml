@@ -25,6 +25,7 @@ jobs:
             source_changes:
               - .github/**
               - api/**
+              - authorizations/**
               - bin/**
               - catalogs/**
               - clients/client-java/**
@@ -35,22 +36,28 @@ jobs:
               - conf/**
               - core/**
               - dev/**
+              - docs/open-api/**
+              - docs/build.gradle.kts
+              - flink-connector/**
               - gradle/**
-              - integration-test/**
+              - iceberg/**
+              - integration-test-common/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
               - spark-connector/**
-              - flink-connector/**
               - trino-connector/**
               - web/**
-              - docs/open-api/**
               - build.gradle.kts
               - gradle.properties
               - gradlew
               - setting.gradle.kts
+            spark_connector_changes:
+              - spark-connector/**
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
+      spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
 
   compile-check:
     runs-on: ubuntu-latest
@@ -73,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: changes
-    if: needs.changes.outputs.source_changes == 'true'
+    if: needs.changes.outputs.spark_connector_changes == 'true'
     steps:
       - uses: actions/checkout@v3
 

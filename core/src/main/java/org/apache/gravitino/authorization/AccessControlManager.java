@@ -46,7 +46,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   private final List<String> serviceAdmins;
 
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
-    this.roleManager = new RoleManager(store, idGenerator, config);
+    this.roleManager = new RoleManager(store, idGenerator);
     this.userGroupManager = new UserGroupManager(store, idGenerator);
     this.permissionManager = new PermissionManager(store, roleManager);
     this.serviceAdmins = config.get(Configs.SERVICE_ADMINS);
