@@ -21,61 +21,61 @@ class FilesetDataOperation(Enum):
     """An enum class containing fileset data operations that supported."""
 
     CREATE = "CREATE"
-    """ This data operation means that create a new file.
+    """ Create a new file.
     """
 
     OPEN = "OPEN"
-    """This data operation means that open a file.
+    """Open a file.
     """
 
     APPEND = "APPEND"
-    """This data operation means that append some content into a file.
+    """Append some content into a file.
     """
 
     RENAME = "RENAME"
-    """This data operation means that rename a file or a directory.
+    """Rename a file or a directory.
     """
 
     DELETE = "DELETE"
-    """This data operation means that delete a file or a directory.
+    """Delete a file or a directory.
     """
 
     GET_FILE_STATUS = "GET_FILE_STATUS"
-    """This data operation means that get a file status from a file or a directory.
+    """Get a file status from a file or a directory.
     """
 
     LIST_STATUS = "LIST_STATUS"
-    """This data operation means that list file statuses under a directory.
+    """List file statuses under a directory.
     """
 
     MKDIRS = "MKDIRS"
-    """This data operation means that create a directory.
+    """Create a directory.
     """
 
     EXISTS = "EXISTS"
-    """This data operation means that check if a file or a directory exists.
+    """Check if a file or a directory exists.
     """
 
     CREATED_TIME = "CREATED_TIME"
-    """This data operation means that get the created time of a file.
+    """Get the created time of a file.
     """
 
     MODIFIED_TIME = "MODIFIED_TIME"
-    """This data operation means that get the modified time of a file.
+    """Get the modified time of a file.
     """
 
     COPY_FILE = "COPY_FILE"
-    """This data operation means that copy a file.
+    """Copy a file.
     """
 
     CAT_FILE = "CAT_FILE"
-    """This data operation means that get the content of a file.
+    """Get the content of a file.
     """
 
     GET_FILE = "GET_FILE"
-    """This data operation means that copy a remote file to local.
+    """Copy a remote file to local.
     """
 
     UNKNOWN = "UNKNOWN"
-    """This data operation means that it is an unknown data operation.
+    """Unknown data operation.
     """

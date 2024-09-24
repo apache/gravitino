@@ -21,41 +21,41 @@ package org.apache.gravitino.audit;
 
 /** An enum class containing fileset data operations that supported. */
 public enum FilesetDataOperation {
-  /** This data operation means that create a new file. */
+  /** Create a new file. */
   CREATE,
-  /** This data operation means that open a file. */
+  /** Open a file. */
   OPEN,
-  /** This data operation means that append some content into a file. */
+  /** Append some content into a file. */
   APPEND,
-  /** This data operation means that rename a file or a directory. */
+  /** Rename a file or a directory. */
   RENAME,
-  /** This data operation means that delete a file or a directory. */
+  /** Delete a file or a directory. */
   DELETE,
-  /** This data operation means that get a file status from a file or a directory. */
+  /** Get a file status from a file or a directory. */
   GET_FILE_STATUS,
-  /** This data operation means that list file statuses under a directory. */
+  /** List file statuses under a directory. */
   LIST_STATUS,
-  /** This data operation means that create a directory. */
+  /** Create a directory. */
   MKDIRS,
-  /** This data operation means that get the default replication of a file system. */
+  /** Get the default replication of a file system. */
   GET_DEFAULT_REPLICATION,
-  /** This data operation means that get the default block size of a file system. */
+  /** Get the default block size of a file system. */
   GET_DEFAULT_BLOCK_SIZE,
-  /** This data operation means that set current working directory. */
+  /** Set current working directory. */
   SET_WORKING_DIR,
-  /** This data operation means that get the current working directory. */
+  /** Get the current working directory. */
   EXISTS,
-  /** This data operation means that get the created time of a file. */
+  /** Get the created time of a file. */
   CREATED_TIME,
-  /** This data operation means that get the modified time of a file. */
+  /** Get the modified time of a file. */
   MODIFIED_TIME,
-  /** This data operation means that copy a file. */
+  /** Copy a file. */
   COPY_FILE,
-  /** This data operation means that get the content of a file. */
+  /** Get the content of a file. */
   CAT_FILE,
-  /** This data operation means that copy a remote file to local. */
+  /** Copy a remote file to local. */
   GET_FILE,
-  /** This data operation means that it is an unknown data operation. */
+  /** Unknown data operation. */
   UNKNOWN;
 
   /**
