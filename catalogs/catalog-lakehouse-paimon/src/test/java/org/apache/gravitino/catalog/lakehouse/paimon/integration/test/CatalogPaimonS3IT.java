@@ -19,32 +19,26 @@
 
 package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
-import static org.testcontainers.containers.localstack.LocalStackContainer.Service.S3;
-
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
+import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.spark.sql.SparkSession;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 import org.testcontainers.containers.Container;
-import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
-import org.testcontainers.utility.DockerImageName;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
 
-  // private static final String S3_BUCKET_NAME =
-  // GravitinoITUtils.genRandomName("paimon-s3-bucket-");
   private static final String S3_BUCKET_NAME = "my-test-bucket";
-  private static LocalStackContainer localStackContainer;
+  private static GravitinoLocalStackContainer localStackContainer;
   private String accessKey;
   private String secretKey;
   private String endpoint;
@@ -62,9 +56,9 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
     TYPE = "filesystem";
     WAREHOUSE = "s3://" + S3_BUCKET_NAME + "/";
 
-    accessKey = localStackContainer.getAccessKey();
-    secretKey = localStackContainer.getSecretKey();
-    endpoint = localStackContainer.getEndpointOverride(S3).toString();
+    accessKey = "accessKey";
+    secretKey = "secretKey";
+    endpoint = String.format("http://%s:%d", localStackContainer.getContainerIpAddress(), 4566);
 
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
@@ -94,9 +88,8 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
 
   @Override
   protected void startNecessaryContainers() {
-    localStackContainer =
-        new LocalStackContainer(DockerImageName.parse("localstack/localstack")).withServices(S3);
-    localStackContainer.start();
+    containerSuite.startLocalStackContainer();
+    localStackContainer = containerSuite.getLocalStackContainer();
 
     Awaitility.await()
         .atMost(60, TimeUnit.SECONDS)
@@ -105,19 +98,13 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
             () -> {
               try {
                 Container.ExecResult result =
-                    localStackContainer.execInContainer(
+                    localStackContainer.executeInContainer(
                         "awslocal", "s3", "mb", "s3://" + S3_BUCKET_NAME);
                 return result.getExitCode() == 0;
               } catch (Exception e) {
                 return false;
               }
             });
-  }
-
-  @AfterAll
-  public void stop() {
-    super.stop();
-    localStackContainer.stop();
   }
 
   protected void initSparkEnv() {
