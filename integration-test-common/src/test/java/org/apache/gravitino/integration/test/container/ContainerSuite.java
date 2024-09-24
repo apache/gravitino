@@ -70,6 +70,7 @@ public class ContainerSuite implements Closeable {
   private static volatile MySQLContainer mySQLVersion5Container;
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
       new EnumMap<>(PGImageName.class);
+  private static volatile OceanBaseContainer oceanBaseContainer;
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
@@ -380,6 +381,36 @@ public class ContainerSuite implements Closeable {
     startPostgreSQLContainer(testDatabaseName, PGImageName.VERSION_13);
   }
 
+  public void startOceanBaseContainer() {
+    if (oceanBaseContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (oceanBaseContainer == null) {
+          // Start OceanBase container
+          OceanBaseContainer.Builder oceanBaseBuilder =
+              OceanBaseContainer.builder()
+                  .withHostName("gravitino-ci-oceanbase")
+                  .withEnvVars(
+                      ImmutableMap.of(
+                          "MODE",
+                          "mini",
+                          "OB_SYS_PASSWORD",
+                          OceanBaseContainer.PASSWORD,
+                          "OB_TENANT_PASSWORD",
+                          OceanBaseContainer.PASSWORD,
+                          "OB_DATAFILE_SIZE",
+                          "2G",
+                          "OB_LOG_DISK_SIZE",
+                          "4G"))
+                  .withNetwork(network)
+                  .withExposePorts(ImmutableSet.of(OceanBaseContainer.OCEANBASE_PORT));
+          OceanBaseContainer container = closer.register(oceanBaseBuilder.build());
+          container.start();
+          oceanBaseContainer = container;
+        }
+      }
+    }
+  }
+
   public void startKafkaContainer() {
     if (kafkaContainer == null) {
       synchronized (ContainerSuite.class) {
@@ -503,6 +534,10 @@ public class ContainerSuite implements Closeable {
               pgImageName));
     }
     return pgContainerMap.get(pgImageName);
+  }
+
+  public OceanBaseContainer getOceanBaseContainer() {
+    return oceanBaseContainer;
   }
 
   // Let containers assign addresses in a fixed subnet to avoid
