@@ -197,3 +197,7 @@ As Gravitino has a separate interface for updating the comment of a table, the H
 :::note
 Support for altering partitions is under development.
 :::
+
+## Hive catalog with S3 storage
+
+To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-s3.md) documentation. 
