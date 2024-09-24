@@ -36,14 +36,16 @@ class GenericRole implements Role {
     this.roleDTO = roleDTO;
     this.securableObjectsSupplier =
         new Supplier<List<SecurableObject>>() {
-          private boolean waitToRequest = true;
+          private boolean waitForRequest = true;
           private List<SecurableObject> securableObjects;
 
           @Override
           public List<SecurableObject> get() {
-            if (waitToRequest) {
-              securableObjects = gravitinoMetalake.getRole(roleDTO.name()).securableObjects();
-              waitToRequest = false;
+            synchronized (this) {
+              if (waitForRequest) {
+                securableObjects = gravitinoMetalake.getRole(roleDTO.name()).securableObjects();
+                waitForRequest = false;
+              }
             }
 
             return securableObjects;
