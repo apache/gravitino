@@ -21,7 +21,7 @@ caller_context_holder = threading.local()
 
 
 class CallerContext:
-    """A class defining the caller context for auditing coarse granularity operations."""
+    """A class defining the caller context for auditing coarse-grained operations."""
 
     _context: Dict[str, str]
 
