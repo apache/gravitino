@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.config;
+package org.apache.gravitino.catalog.lakehouse.paimon.filesystem;
 
 import static org.apache.gravitino.storage.S3Properties.GRAVITINO_S3_ACCESS_KEY_ID;
 import static org.apache.gravitino.storage.S3Properties.GRAVITINO_S3_ENDPOINT;
