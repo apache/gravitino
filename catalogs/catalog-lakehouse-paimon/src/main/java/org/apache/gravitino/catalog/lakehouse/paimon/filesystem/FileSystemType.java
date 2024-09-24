@@ -21,8 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon.filesystem;
 public enum FileSystemType {
   LOCAL_FILE,
   HDFS,
-  S3,
-  OSS;
+  S3;
 
   public static FileSystemType fromString(String type) {
     for (FileSystemType fileSystemType : FileSystemType.values()) {
@@ -37,11 +36,9 @@ public enum FileSystemType {
   public static FileSystemType fromStoragePath(String storagePath) {
     if (storagePath.startsWith("s3://")) {
       return S3;
-    } else if (storagePath.startsWith("oss://")) {
-      return OSS;
     } else if (storagePath.startsWith("hdfs://")) {
       return HDFS;
-    } else if (storagePath.startsWith("/")) {
+    } else if (storagePath.startsWith("/") || storagePath.startsWith("file://")) {
       return LOCAL_FILE;
     }
 

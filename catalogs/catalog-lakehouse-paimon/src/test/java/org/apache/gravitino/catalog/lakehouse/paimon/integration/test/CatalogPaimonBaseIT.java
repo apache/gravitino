@@ -67,6 +67,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.paimon.catalog.Catalog.DatabaseNotExistException;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.schema.TableSchema;
@@ -886,8 +887,22 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(type), "Paimon Catalog backend type can not be null or empty.");
     catalogProperties.put(PaimonCatalogPropertiesMetadata.PAIMON_METASTORE, type);
+
+    // Why needs this conversion? Because PaimonCatalogOperations#initialize will try to convert
+    // Gravitino general S3 properties to Paimon specific S3 properties.
+    Map<String, String> copy = Maps.newHashMap(catalogProperties);
+    copy.put(
+        PaimonCatalogPropertiesMetadata.S3_ENDPOINT,
+        catalogProperties.get(S3Properties.GRAVITINO_S3_ENDPOINT));
+    copy.put(
+        PaimonCatalogPropertiesMetadata.S3_ACCESS_KEY,
+        catalogProperties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    copy.put(
+        PaimonCatalogPropertiesMetadata.S3_SECRET_KEY,
+        catalogProperties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+
     PaimonBackendCatalogWrapper paimonBackendCatalogWrapper =
-        CatalogUtils.loadCatalogBackend(new PaimonConfig(catalogProperties));
+        CatalogUtils.loadCatalogBackend(new PaimonConfig(copy));
     paimonCatalog = paimonBackendCatalogWrapper.getCatalog();
   }
 

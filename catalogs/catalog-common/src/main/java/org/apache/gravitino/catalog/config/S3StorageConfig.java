@@ -16,7 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.lakehouse.paimon.filesystem.s3;
+package org.apache.gravitino.catalog.config;
+
+import static org.apache.gravitino.storage.S3Properties.GRAVITINO_S3_ACCESS_KEY_ID;
+import static org.apache.gravitino.storage.S3Properties.GRAVITINO_S3_ENDPOINT;
+import static org.apache.gravitino.storage.S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -27,19 +31,16 @@ import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.connector.PropertyEntry;
 
-public class PaimonS3FileSystemConfig extends Config {
-  // S3 related properties
-  public static final String S3_ENDPOINT = "s3.endpoint";
-  public static final String S3_ACCESS_KEY = "s3.access-key";
-  public static final String S3_SECRET_KEY = "s3.secret-key";
+public class S3StorageConfig extends Config {
 
-  public PaimonS3FileSystemConfig(Map<String, String> properties) {
+  public S3StorageConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
   }
 
+  // Unified S3
   public static final ConfigEntry<String> PAIMON_S3_ENDPOINT_ENTRY =
-      new ConfigBuilder(S3_ENDPOINT)
+      new ConfigBuilder(GRAVITINO_S3_ENDPOINT)
           .doc("The endpoint of the AWS s3")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
@@ -47,7 +48,7 @@ public class PaimonS3FileSystemConfig extends Config {
           .create();
 
   public static final ConfigEntry<String> PAIMON_S3_ACCESS_KEY_ENTRY =
-      new ConfigBuilder(S3_ACCESS_KEY)
+      new ConfigBuilder(GRAVITINO_S3_ACCESS_KEY_ID)
           .doc("The access key of the AWS s3")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
@@ -55,7 +56,7 @@ public class PaimonS3FileSystemConfig extends Config {
           .create();
 
   public static final ConfigEntry<String> PAIMON_S3_SECRET_KEY_ENTRY =
-      new ConfigBuilder(S3_SECRET_KEY)
+      new ConfigBuilder(GRAVITINO_S3_SECRET_ACCESS_KEY)
           .doc("The secret key of the AWS s3")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
@@ -77,25 +78,25 @@ public class PaimonS3FileSystemConfig extends Config {
   public static final Map<String, PropertyEntry<?>> S3_FILESYSTEM_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
-              S3_ENDPOINT,
+              GRAVITINO_S3_ENDPOINT,
               PropertyEntry.stringOptionalPropertyEntry(
-                  S3_ENDPOINT,
+                  GRAVITINO_S3_ENDPOINT,
                   "The endpoint of the AWS s3",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
           .put(
-              S3_ACCESS_KEY,
+              GRAVITINO_S3_ACCESS_KEY_ID,
               PropertyEntry.stringOptionalPropertyEntry(
-                  S3_ACCESS_KEY,
+                  GRAVITINO_S3_ACCESS_KEY_ID,
                   "The access key of the AWS s3",
                   false /* immutable */,
                   null /* defaultValue */,
                   false /* hidden */))
           .put(
-              S3_SECRET_KEY,
+              GRAVITINO_S3_SECRET_ACCESS_KEY,
               PropertyEntry.stringOptionalPropertyEntry(
-                  S3_SECRET_KEY,
+                  GRAVITINO_S3_SECRET_ACCESS_KEY,
                   "The secret key of the AWS s3",
                   false /* immutable */,
                   null /* defaultValue */,
