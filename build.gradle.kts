@@ -178,6 +178,7 @@ allprojects {
 
       val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
       val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
+      val isOrbStack = project.rootProject.extra["isOrbStack"] as? Boolean ?: false
       if (OperatingSystem.current().isMacOsX() &&
         dockerRunning &&
         macDockerConnector
@@ -214,9 +215,10 @@ allprojects {
 
       param.useJUnitPlatform {
         val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
-        if (!dockerTest) {
-          excludeTags("gravitino-docker-test")
-        }
+        param.systemProperty("gravitino-docker-test:dockerTest", dockerTest)
+        param.systemProperty("gravitino-docker-test:dockerRunning", dockerRunning)
+        param.systemProperty("gravitino-docker-test:macDockerConnector", macDockerConnector)
+        param.systemProperty("gravitino-docker-test:isOrbStack", isOrbStack)
       }
     }
   }
