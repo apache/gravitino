@@ -21,59 +21,59 @@ class FilesetDataOperation(Enum):
     """An enum class containing fileset data operations that supported."""
 
     CREATE = "CREATE"
-    """ Create a new file.
+    """Creates a new file.
     """
 
     OPEN = "OPEN"
-    """Open a file.
+    """Opens a file.
     """
 
     APPEND = "APPEND"
-    """Append some content into a file.
+    """Appends some content into a file.
     """
 
     RENAME = "RENAME"
-    """Rename a file or a directory.
+    """Renames a file or a directory.
     """
 
     DELETE = "DELETE"
-    """Delete a file or a directory.
+    """Deletes a file or a directory.
     """
 
     GET_FILE_STATUS = "GET_FILE_STATUS"
-    """Get a file status from a file or a directory.
+    """Gets a file status from a file or a directory.
     """
 
     LIST_STATUS = "LIST_STATUS"
-    """List file statuses under a directory.
+    """Lists file statuses under a directory.
     """
 
     MKDIRS = "MKDIRS"
-    """Create a directory.
+    """Creates a directory.
     """
 
     EXISTS = "EXISTS"
-    """Check if a file or a directory exists.
+    """Checks if a file or a directory exists.
     """
 
     CREATED_TIME = "CREATED_TIME"
-    """Get the created time of a file.
+    """Gets the created time of a file.
     """
 
     MODIFIED_TIME = "MODIFIED_TIME"
-    """Get the modified time of a file.
+    """Gets the modified time of a file.
     """
 
     COPY_FILE = "COPY_FILE"
-    """Copy a file.
+    """Copies a file.
     """
 
     CAT_FILE = "CAT_FILE"
-    """Get the content of a file.
+    """Gets the content of a file.
     """
 
     GET_FILE = "GET_FILE"
-    """Copy a remote file to local.
+    """Copies a remote file to local.
     """
 
     UNKNOWN = "UNKNOWN"

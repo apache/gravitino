@@ -21,39 +21,39 @@ package org.apache.gravitino.audit;
 
 /** An enum class containing fileset data operations that supported. */
 public enum FilesetDataOperation {
-  /** Create a new file. */
+  /** Creates a new file. */
   CREATE,
-  /** Open a file. */
+  /** Opens a file. */
   OPEN,
-  /** Append some content into a file. */
+  /** Appends some content into a file. */
   APPEND,
-  /** Rename a file or a directory. */
+  /** Renames a file or a directory. */
   RENAME,
-  /** Delete a file or a directory. */
+  /** Deletes a file or a directory. */
   DELETE,
-  /** Get a file status from a file or a directory. */
+  /** Gets a file status from a file or a directory. */
   GET_FILE_STATUS,
-  /** List file statuses under a directory. */
+  /** Lists file statuses under a directory. */
   LIST_STATUS,
-  /** Create a directory. */
+  /** Creates a directory. */
   MKDIRS,
-  /** Get the default replication of a file system. */
+  /** Gets the default replication of a file system. */
   GET_DEFAULT_REPLICATION,
-  /** Get the default block size of a file system. */
+  /** Gets the default block size of a file system. */
   GET_DEFAULT_BLOCK_SIZE,
-  /** Set current working directory. */
+  /** Sets current working directory. */
   SET_WORKING_DIR,
-  /** Get the current working directory. */
+  /** Gets the current working directory. */
   EXISTS,
-  /** Get the created time of a file. */
+  /** Gets the created time of a file. */
   CREATED_TIME,
-  /** Get the modified time of a file. */
+  /** Gets the modified time of a file. */
   MODIFIED_TIME,
-  /** Copy a file. */
+  /** Copies a file. */
   COPY_FILE,
-  /** Get the content of a file. */
+  /** Gets the content of a file. */
   CAT_FILE,
-  /** Copy a remote file to local. */
+  /** Copies a remote file to local. */
   GET_FILE,
   /** Unknown data operation. */
   UNKNOWN;
