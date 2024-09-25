@@ -64,7 +64,7 @@ gravitino_admin_client.create_metalake(name="metalake",
 
 ### Load a metalake
 
-You can create a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a metalake:
+You can load a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a metalake:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
