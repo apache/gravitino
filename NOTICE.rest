@@ -151,7 +151,7 @@ This product also includes software developed by the TJDO project
 (http://tjdo.sourceforge.net/).
 ===================================================================
 
-ache Derby
+Aache Derby
 Copyright 2004-2014 The Apache Software Foundation
 
 =========================================================================
