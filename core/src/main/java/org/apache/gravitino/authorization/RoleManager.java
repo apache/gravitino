@@ -137,7 +137,7 @@ class RoleManager {
     return Arrays.stream(listRolesInternal(metalake)).map(Role::name).toArray(String[]::new);
   }
 
-  Role[] listRolesInternal(String metalake) {
+  private Role[] listRolesInternal(String metalake) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       Namespace namespace = AuthorizationUtils.ofRoleNamespace(metalake);
