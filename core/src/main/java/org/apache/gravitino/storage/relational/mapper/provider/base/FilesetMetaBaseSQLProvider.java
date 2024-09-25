@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.storage.relational.mapper;
+package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.META_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.VERSION_TABLE_NAME;

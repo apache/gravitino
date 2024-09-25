@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.mapper.h2;
+package org.apache.gravitino.storage.relational.mapper.provider.h2;
 
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
-import org.apache.gravitino.storage.relational.mapper.UserMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
 public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
