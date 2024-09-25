@@ -22,7 +22,6 @@ package org.apache.gravitino.authorization;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
@@ -134,16 +133,12 @@ class RoleManager {
   }
 
   String[] listRoleNames(String metalake) {
-    return Arrays.stream(listRolesInternal(metalake)).map(Role::name).toArray(String[]::new);
-  }
-
-  private Role[] listRolesInternal(String metalake) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       Namespace namespace = AuthorizationUtils.ofRoleNamespace(metalake);
       return store.list(namespace, RoleEntity.class, Entity.EntityType.ROLE, false).stream()
-          .map(entity -> (Role) entity)
-          .toArray(Role[]::new);
+          .map(Role::name)
+          .toArray(String[]::new);
     } catch (NoSuchEntityException e) {
       LOG.warn("Metalake {} does not exist", metalake, e);
       throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);

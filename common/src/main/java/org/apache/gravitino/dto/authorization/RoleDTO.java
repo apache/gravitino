@@ -21,7 +21,6 @@ package org.apache.gravitino.dto.authorization;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -44,7 +43,6 @@ public class RoleDTO implements Role {
   @JsonProperty("properties")
   private Map<String, String> properties;
 
-  @Nullable
   @JsonProperty("securableObjects")
   private SecurableObjectDTO[] securableObjects;
 
@@ -95,10 +93,6 @@ public class RoleDTO implements Role {
    */
   @Override
   public List<SecurableObject> securableObjects() {
-    if (securableObjects == null) {
-      return Collections.emptyList();
-    }
-
     return Arrays.asList(securableObjects);
   }
 
@@ -192,6 +186,7 @@ public class RoleDTO implements Role {
     public RoleDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
+      Preconditions.checkArgument(securableObjects != null, "securable objects can't null");
 
       return new RoleDTO(name, properties, securableObjects, audit);
     }
