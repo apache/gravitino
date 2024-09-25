@@ -426,23 +426,21 @@ public class DTOConverters {
    * Converts a role implementation to a RoleDTO.
    *
    * @param role The role implementation.
-   * @param includeObjects True, the roleDTO will contain the securable objects field, otherwise the
-   *     roleDTO won't contain the filed.
    * @return The role DTO.
    */
-  public static RoleDTO toDTO(Role role, boolean includeObjects) {
+  public static RoleDTO toDTO(Role role) {
     if (role instanceof RoleDTO) {
       return (RoleDTO) role;
     }
 
     return RoleDTO.builder()
         .withName(role.name())
-        .withProperties(role.properties())
-        .withAudit(toDTO(role.auditInfo()))
         .withSecurableObjects(
             role.securableObjects().stream()
                 .map(DTOConverters::toDTO)
                 .toArray(SecurableObjectDTO[]::new))
+        .withProperties(role.properties())
+        .withAudit(toDTO(role.auditInfo()))
         .build();
   }
 

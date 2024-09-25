@@ -106,8 +106,7 @@ public class RoleOperations {
                   () ->
                       Utils.ok(
                           new RoleResponse(
-                              DTOConverters.toDTO(
-                                  accessControlManager.getRole(metalake, role), true)))));
+                              DTOConverters.toDTO(accessControlManager.getRole(metalake, role))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.GET, role, metalake, e);
     }
@@ -157,8 +156,7 @@ public class RoleOperations {
                                     metalake,
                                     request.getName(),
                                     request.getProperties(),
-                                    securableObjects),
-                                true))));
+                                    securableObjects)))));
           });
 
     } catch (Exception e) {
