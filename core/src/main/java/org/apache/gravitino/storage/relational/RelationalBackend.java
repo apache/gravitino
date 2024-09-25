@@ -50,7 +50,7 @@ public interface RelationalBackend
    * @param entityType The type of these entities.
    * @param skippingFields Some fields may have a relatively high acquisition cost, EntityStore
    *     provide an optional setting to avoid fetching these high-cost fields to improve the
-   *     performance.
+   *     performance. If true, the methods will skip the fields. Otherwise, false.
    * @return The list of entities associated with the given parent namespace and entityType, or null
    *     if the entities does not exist.
    * @throws NoSuchEntityException If the corresponding parent entity of these list entities cannot
