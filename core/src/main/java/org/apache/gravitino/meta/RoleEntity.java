@@ -20,12 +20,10 @@ package org.apache.gravitino.meta;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
@@ -111,17 +109,6 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     fields.put(SECURABLE_OBJECTS, securableObjects);
 
     return Collections.unmodifiableMap(fields);
-  }
-
-  /**
-   * Get the set of all the fields.
-   *
-   * @return The set of all the fields.
-   */
-  public static Set<Field> fieldSet() {
-    Set<Field> fields = Sets.newHashSet(ID, NAME, AUDIT_INFO, PROPERTIES, SECURABLE_OBJECTS);
-
-    return Collections.unmodifiableSet(fields);
   }
 
   /**

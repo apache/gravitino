@@ -19,12 +19,10 @@
 package org.apache.gravitino.meta;
 
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
@@ -154,17 +152,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
    */
   public List<Long> roleIds() {
     return roleIds;
-  }
-
-  /**
-   * Get the set of all the fields.
-   *
-   * @return The set of all the fields.
-   */
-  public static Set<Field> fieldSet() {
-    Set<Field> fields = Sets.newHashSet(ID, NAME, AUDIT_INFO, ROLE_IDS, ROLE_NAMES);
-
-    return Collections.unmodifiableSet(fields);
   }
 
   @Override
