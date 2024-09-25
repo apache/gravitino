@@ -48,10 +48,10 @@ public interface RelationalBackend
    *
    * @param namespace The parent namespace of these entities.
    * @param entityType The type of these entities.
-   * @param skippingFields Some fields may have a relatively high acquisition cost, EntityStore
-   *     provide an optional setting to avoid fetching these high-cost fields to improve the
-   *     performance. If true, the method will fetch all the fields, Otherwise, the method won't
-   *     fetch all the fields except for high-cost fields.
+   * @param allFields Some fields may have a relatively high acquisition cost, EntityStore provide
+   *     an optional setting to avoid fetching these high-cost fields to improve the performance. If
+   *     true, the method will fetch all the fields, Otherwise, the method will fetch all the fields
+   *     except for high-cost fields.
    * @return The list of entities associated with the given parent namespace and entityType, or null
    *     if the entities does not exist.
    * @throws NoSuchEntityException If the corresponding parent entity of these list entities cannot

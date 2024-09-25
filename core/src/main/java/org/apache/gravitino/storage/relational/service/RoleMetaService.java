@@ -244,7 +244,7 @@ public class RoleMetaService {
     String metalakeName = namespace.level(0);
 
     if (allFields) {
-      throw new IllegalArgumentException("Don't support list all the fields");
+      throw new IllegalArgumentException("Don't support list all the fields of roles");
     }
 
     List<RolePO> rolePOs =

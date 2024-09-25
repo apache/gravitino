@@ -80,8 +80,8 @@ public interface EntityStore extends Closeable {
    * @param entityType the general type of the entity
    * @param allFields Some fields may have a relatively high acquisition cost, EntityStore provides
    *     an optional setting to avoid fetching these high-cost fields to improve the performance. If
-   *     true, the method will fetch all the fields, Otherwise, the method won't fetch all the
-   *     fields except for high-cost fields.
+   *     true, the method will fetch all the fields, Otherwise, the method will fetch all the fields
+   *     except for high-cost fields.
    * @return the list of entities
    * @throws IOException if the list operation fails
    */

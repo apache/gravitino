@@ -145,7 +145,7 @@ class TestRoleMetaService extends TestJDBCBackend {
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
     List<RoleEntity> actualRoles =
         roleMetaService.listRolesByNamespace(
-            AuthorizationUtils.ofRoleNamespace(metalakeName), true);
+            AuthorizationUtils.ofRoleNamespace(metalakeName), false);
     actualRoles.sort(Comparator.comparing(RoleEntity::name));
     List<RoleEntity> expectRoles = Lists.newArrayList(role1, role2);
     Assertions.assertEquals(expectRoles.size(), actualRoles.size());

@@ -172,7 +172,7 @@ class TestUserMetaService extends TestJDBCBackend {
     UserMetaService userMetaService = UserMetaService.getInstance();
     List<UserEntity> actualUsers =
         userMetaService.listUsersByNamespace(
-            AuthorizationUtils.ofUserNamespace(metalakeName), false);
+            AuthorizationUtils.ofUserNamespace(metalakeName), true);
     actualUsers.sort(Comparator.comparing(UserEntity::name));
     List<UserEntity> expectUsers = Lists.newArrayList(user1, user2);
     Assertions.assertEquals(expectUsers.size(), actualUsers.size());
