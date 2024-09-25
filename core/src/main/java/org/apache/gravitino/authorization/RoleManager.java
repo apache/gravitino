@@ -136,7 +136,7 @@ class RoleManager {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       Namespace namespace = AuthorizationUtils.ofRoleNamespace(metalake);
-      return store.list(namespace, RoleEntity.class, Entity.EntityType.ROLE, false).stream()
+      return store.list(namespace, RoleEntity.class, Entity.EntityType.ROLE).stream()
           .map(Role::name)
           .toArray(String[]::new);
     } catch (NoSuchEntityException e) {
