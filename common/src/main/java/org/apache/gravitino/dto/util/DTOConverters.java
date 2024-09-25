@@ -435,13 +435,10 @@ public class DTOConverters {
       return (RoleDTO) role;
     }
 
-    RoleDTO.Builder builder =
-        RoleDTO.builder()
-            .withName(role.name())
-            .withProperties(role.properties())
-            .withAudit(toDTO(role.auditInfo()));
-
-    return builder
+    return RoleDTO.builder()
+        .withName(role.name())
+        .withProperties(role.properties())
+        .withAudit(toDTO(role.auditInfo()))
         .withSecurableObjects(
             role.securableObjects().stream()
                 .map(DTOConverters::toDTO)
