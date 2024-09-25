@@ -421,13 +421,6 @@ public class TestAccessControlManager {
     String[] actualRoles = accessControlManager.listRoleNames("metalake_list");
     Arrays.sort(actualRoles);
     Assertions.assertArrayEquals(new String[] {"testList1", "testList2"}, actualRoles);
-    Role[] roles = accessControlManager.listRoles("metalake_list");
-    Arrays.sort(roles, Comparator.comparing(Role::name));
-    Assertions.assertEquals(2, roles.length);
-    Assertions.assertEquals("testList1", roles[0].name());
-    Assertions.assertEquals("testList2", roles[1].name());
-    Assertions.assertEquals(props, roles[1].properties());
-    Assertions.assertEquals(props, roles[0].properties());
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

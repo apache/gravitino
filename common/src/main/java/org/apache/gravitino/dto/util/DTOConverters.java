@@ -441,14 +441,12 @@ public class DTOConverters {
             .withProperties(role.properties())
             .withAudit(toDTO(role.auditInfo()));
 
-    if (includeObjects) {
-      return builder
-          .withSecurableObjects(
-              role.securableObjects().stream()
-                  .map(DTOConverters::toDTO)
-                  .toArray(SecurableObjectDTO[]::new))
-          .build();
-    }
+    return builder
+        .withSecurableObjects(
+            role.securableObjects().stream()
+                .map(DTOConverters::toDTO)
+                .toArray(SecurableObjectDTO[]::new))
+        .build();
   }
 
   /**
@@ -697,7 +695,6 @@ public class DTOConverters {
     }
     return Arrays.stream(users).map(DTOConverters::toDTO).toArray(UserDTO[]::new);
   }
-
 
   /**
    * Converts a DistributionDTO to a Distribution.

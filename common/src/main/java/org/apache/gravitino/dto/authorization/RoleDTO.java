@@ -48,9 +48,6 @@ public class RoleDTO implements Role {
   @JsonProperty("securableObjects")
   private SecurableObjectDTO[] securableObjects;
 
-  @JsonProperty("securableObjectsCount")
-  private int securableObjectsCount;
-
   /** Default constructor for Jackson deserialization. */
   protected RoleDTO() {}
 
@@ -60,20 +57,17 @@ public class RoleDTO implements Role {
    * @param name The name of the Role DTO.
    * @param properties The properties of the Role DTO.
    * @param securableObjects The securable objects of the Role DTO.
-   * @param securableObjectsCount The securable objects count of the Role DTO.
    * @param audit The audit information of the Role DTO.
    */
   protected RoleDTO(
       String name,
       Map<String, String> properties,
       SecurableObjectDTO[] securableObjects,
-      int securableObjectsCount,
       AuditDTO audit) {
     this.name = name;
     this.audit = audit;
     this.properties = properties;
     this.securableObjects = securableObjects;
-    this.securableObjectsCount = securableObjectsCount;
   }
 
   /** @return The name of the Role DTO. */
@@ -106,11 +100,6 @@ public class RoleDTO implements Role {
     }
 
     return Arrays.asList(securableObjects);
-  }
-
-  @Override
-  public int securableObjectsCount() {
-    return securableObjectsCount;
   }
 
   /** @return The audit information of the Role DTO. */
@@ -146,9 +135,6 @@ public class RoleDTO implements Role {
 
     /** The securable objects of the role. */
     protected SecurableObjectDTO[] securableObjects;
-
-    /** The securable objects count of the role. */
-    protected int securableObjectsCount;
 
     /**
      * Sets the name of the role.
@@ -187,17 +173,6 @@ public class RoleDTO implements Role {
     }
 
     /**
-     * Sets the securable objects count of the role
-     *
-     * @param securableObjectsCount The securable objects of the role.
-     * @return The builder instance.
-     */
-    public S withSecurableObjectsCount(int securableObjectsCount) {
-      this.securableObjectsCount = securableObjectsCount;
-      return (S) this;
-    }
-
-    /**
      * Sets the audit information of the role.
      *
      * @param audit The audit information of the role.
@@ -218,7 +193,7 @@ public class RoleDTO implements Role {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
-      return new RoleDTO(name, properties, securableObjects, securableObjectsCount, audit);
+      return new RoleDTO(name, properties, securableObjects, audit);
     }
   }
 }

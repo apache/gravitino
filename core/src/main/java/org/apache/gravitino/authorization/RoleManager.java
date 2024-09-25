@@ -136,8 +136,7 @@ class RoleManager {
   }
 
   String[] listRoleNames(String metalake) {
-    Set<Field> skippingFields =
-        Sets.newHashSet(RoleEntity.SECURABLE_OBJECTS, RoleEntity.SECURABLE_OBJECTS_COUNT);
+    Set<Field> skippingFields = Sets.newHashSet(RoleEntity.SECURABLE_OBJECTS);
 
     return Arrays.stream(listRolesInternal(metalake, skippingFields))
         .map(Role::name)

@@ -180,21 +180,12 @@ public class AccessControlIT extends AbstractIT {
 
     // List roles
     String anotherRoleName = "another-role";
-    Role anotherRole =
-        metalake.createRole(anotherRoleName, properties, Lists.newArrayList(metalakeObject));
+    metalake.createRole(anotherRoleName, properties, Lists.newArrayList(metalakeObject));
     String[] roleNames = metalake.listRoleNames();
     Arrays.sort(roleNames);
 
     Assertions.assertEquals(
         Lists.newArrayList(anotherRoleName, roleName), Arrays.asList(roleNames));
-
-    Role[] roles = metalake.listRoles();
-    Arrays.sort(roles, Comparator.comparing(Role::name));
-    Assertions.assertEquals(
-        Lists.newArrayList(anotherRoleName, roleName),
-        Arrays.stream(roles).map(Role::name).collect(Collectors.toList()));
-    assertSecurableObjects(anotherRole.securableObjects(), roles[0].securableObjects());
-    assertSecurableObjects(role.securableObjects(), roles[1].securableObjects());
 
     // Verify the object
     Assertions.assertEquals(1, role.securableObjects().size());

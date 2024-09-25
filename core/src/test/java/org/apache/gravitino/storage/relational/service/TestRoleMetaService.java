@@ -160,8 +160,6 @@ class TestRoleMetaService extends TestJDBCBackend {
       Assertions.assertEquals(expectRole.name(), actualRole.name());
       Assertions.assertEquals(expectRole.properties(), actualRole.properties());
       Assertions.assertEquals(expectRole.auditInfo(), actualRole.auditInfo());
-      Assertions.assertEquals(
-          expectRole.securableObjectsCount(), actualRole.securableObjectsCount());
     }
   }
 

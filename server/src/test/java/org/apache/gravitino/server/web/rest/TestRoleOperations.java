@@ -55,7 +55,6 @@ import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.RoleListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -492,59 +491,6 @@ public class TestRoleOperations extends JerseyTest {
     doThrow(new RuntimeException("mock error")).when(manager).listRoleNames(any());
     Response resp3 =
         target("/metalakes/metalake1/roles")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
-
-    ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
-  }
-
-  @Test
-  public void testListRoles() {
-    Role role = buildRole("role");
-    when(manager.listRoles(any())).thenReturn(new Role[] {role});
-
-    Response resp =
-        target("/metalakes/metalake1/roles/")
-            .queryParam("details", "true")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-
-    RoleListResponse listResponse = resp.readEntity(RoleListResponse.class);
-    Assertions.assertEquals(0, listResponse.getCode());
-
-    Assertions.assertEquals(1, listResponse.getRoles().length);
-    Assertions.assertEquals(role.name(), listResponse.getRoles()[0].name());
-    Assertions.assertEquals(
-        role.securableObjectsCount(), listResponse.getRoles()[0].securableObjectsCount());
-
-    // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listRoles(any());
-    Response resp1 =
-        target("/metalakes/metalake1/roles/")
-            .queryParam("details", "true")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
-
-    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
-    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
-
-    // Test to throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).listRoles(any());
-    Response resp3 =
-        target("/metalakes/metalake1/roles")
-            .queryParam("details", "true")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
