@@ -40,3 +40,7 @@ tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
 }
+
+tasks.build {
+  dependsOn(tasks.named(":catalogs:catalog-hadoop:runtimeJars"))
+}
