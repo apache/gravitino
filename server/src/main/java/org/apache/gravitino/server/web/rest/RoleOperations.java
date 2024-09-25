@@ -25,13 +25,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
@@ -75,9 +73,7 @@ public class RoleOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-role", absolute = true)
-  public Response listRoles(
-      @PathParam("metalake") String metalake,
-      @QueryParam("details") @DefaultValue("false") boolean details) {
+  public Response listRoles(@PathParam("metalake") String metalake) {
     try {
       return Utils.doAs(
           httpRequest,
