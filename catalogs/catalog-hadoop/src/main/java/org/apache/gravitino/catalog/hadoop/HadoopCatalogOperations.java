@@ -132,6 +132,20 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                     Map.Entry::getValue));
     bypassConfigs.forEach(hadoopConf::set);
 
+    String configProviderClass =
+        config.getOrDefault(
+            HadoopCatalogPropertiesMetadata.CONFIGURATION_PROVIDER,
+            DefaultConfigurationProvider.class.getCanonicalName());
+    try {
+      Class<?> providerClass = Class.forName(configProviderClass);
+      ConfigurationProvider provider =
+          (ConfigurationProvider) providerClass.getDeclaredConstructor().newInstance();
+      provider.initialize(bypassConfigs);
+      this.hadoopConf = provider.getConfiguration(bypassConfigs);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to initialize Hadoop configuration", e);
+    }
+
     String catalogLocation =
         (String)
             propertiesMetadata

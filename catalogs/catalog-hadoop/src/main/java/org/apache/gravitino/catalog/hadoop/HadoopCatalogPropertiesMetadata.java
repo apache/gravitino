@@ -34,6 +34,11 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   // If not, users have to specify the storage location in the Schema or Fileset level.
   public static final String LOCATION = "location";
 
+  /**
+   * The configuration provider class name, default value is {@link DefaultConfigurationProvider}.
+   */
+  public static final String CONFIGURATION_PROVIDER = "configuration.provider";
+
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
@@ -43,6 +48,14 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   "The storage location managed by Hadoop fileset catalog",
                   false /* immutable */,
                   null,
+                  false /* hidden */))
+          .put(
+              CONFIGURATION_PROVIDER,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  CONFIGURATION_PROVIDER,
+                  "The configuration provider class name",
+                  false /* immutable */,
+                  DefaultConfigurationProvider.class.getCanonicalName(),
                   false /* hidden */))
           // The following two are about authentication.
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
