@@ -94,9 +94,9 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean skippingFields)
+      Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean allFields)
       throws IOException {
-    return backend.list(namespace, entityType, skippingFields);
+    return backend.list(namespace, entityType, allFields);
   }
 
   @Override

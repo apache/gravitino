@@ -248,11 +248,22 @@ public class UserMetaService {
     return newEntity;
   }
 
-  public List<UserEntity> listUsersByNamespace(Namespace namespace, boolean skippingFields) {
+  public List<UserEntity> listUsersByNamespace(Namespace namespace, boolean allFields) {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
 
-    if (skippingFields) {
+    if (allFields) {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      List<ExtendedUserPO> userPOs =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.listExtendedUserPOsByMetalakeId(metalakeId));
+      return userPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromExtendedUserPO(
+                      po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    } else {
       List<UserPO> userPOs =
           SessionUtils.getWithoutCommit(
               UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalake(metalakeName));
@@ -263,17 +274,6 @@ public class UserMetaService {
                       po,
                       Collections.emptyList(),
                       AuthorizationUtils.ofUserNamespace(metalakeName)))
-          .collect(Collectors.toList());
-    } else {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-      List<ExtendedUserPO> userPOs =
-          SessionUtils.getWithoutCommit(
-              UserMetaMapper.class, mapper -> mapper.listExtendedUserPOsByMetalakeId(metalakeId));
-      return userPOs.stream()
-          .map(
-              po ->
-                  POConverters.fromExtendedUserPO(
-                      po, AuthorizationUtils.ofUserNamespace(metalakeName)))
           .collect(Collectors.toList());
     }
   }

@@ -239,26 +239,24 @@ public class RoleMetaService {
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
 
-  public List<RoleEntity> listRolesByNamespace(Namespace namespace, boolean skippingFields) {
+  public List<RoleEntity> listRolesByNamespace(Namespace namespace, boolean allFields) {
     AuthorizationUtils.checkRoleNamespace(namespace);
     String metalakeName = namespace.level(0);
 
-    if (skippingFields) {
-      List<RolePO> rolePOs =
-          SessionUtils.getWithoutCommit(
-              RoleMetaMapper.class, mapper -> mapper.listRolePOsByMetalake(metalakeName));
-
-      return rolePOs.stream()
-          .map(
-              po ->
-                  POConverters.fromRolePO(
-                      po,
-                      Collections.emptyList(),
-                      AuthorizationUtils.ofRoleNamespace(metalakeName)))
-          .collect(Collectors.toList());
-    } else {
+    if (allFields) {
       throw new IllegalArgumentException("Don't support list all the fields");
     }
+
+    List<RolePO> rolePOs =
+        SessionUtils.getWithoutCommit(
+            RoleMetaMapper.class, mapper -> mapper.listRolePOsByMetalake(metalakeName));
+
+    return rolePOs.stream()
+        .map(
+            po ->
+                POConverters.fromRolePO(
+                    po, Collections.emptyList(), AuthorizationUtils.ofRoleNamespace(metalakeName)))
+        .collect(Collectors.toList());
   }
 
   public int deleteRoleMetasByLegacyTimeline(long legacyTimeline, int limit) {

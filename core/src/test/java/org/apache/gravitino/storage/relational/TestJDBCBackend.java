@@ -714,26 +714,26 @@ public class TestJDBCBackend {
 
     // meta data list
     List<BaseMetalake> metaLakes =
-        backend.list(metalake.namespace(), Entity.EntityType.METALAKE, false);
+        backend.list(metalake.namespace(), Entity.EntityType.METALAKE, true);
     assertTrue(metaLakes.contains(metalake));
 
     List<CatalogEntity> catalogs =
-        backend.list(catalog.namespace(), Entity.EntityType.CATALOG, false);
+        backend.list(catalog.namespace(), Entity.EntityType.CATALOG, true);
     assertTrue(catalogs.contains(catalog));
 
-    List<SchemaEntity> schemas = backend.list(schema.namespace(), Entity.EntityType.SCHEMA, false);
+    List<SchemaEntity> schemas = backend.list(schema.namespace(), Entity.EntityType.SCHEMA, true);
     assertTrue(schemas.contains(schema));
 
-    List<TableEntity> tables = backend.list(table.namespace(), Entity.EntityType.TABLE, false);
+    List<TableEntity> tables = backend.list(table.namespace(), Entity.EntityType.TABLE, true);
     assertTrue(tables.contains(table));
 
     List<FilesetEntity> filesets =
-        backend.list(fileset.namespace(), Entity.EntityType.FILESET, false);
+        backend.list(fileset.namespace(), Entity.EntityType.FILESET, true);
     assertFalse(filesets.contains(fileset));
     assertTrue(filesets.contains(filesetV2));
     assertEquals("2", filesets.get(filesets.indexOf(filesetV2)).properties().get("version"));
 
-    List<TopicEntity> topics = backend.list(topic.namespace(), Entity.EntityType.TOPIC, false);
+    List<TopicEntity> topics = backend.list(topic.namespace(), Entity.EntityType.TOPIC, true);
     assertTrue(topics.contains(topic));
 
     RoleEntity roleEntity = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
@@ -759,7 +759,7 @@ public class TestJDBCBackend {
 
     TagEntity tagEntity = backend.get(tag.nameIdentifier(), Entity.EntityType.TAG);
     assertEquals(tag, tagEntity);
-    List<TagEntity> tags = backend.list(tag.namespace(), Entity.EntityType.TAG, false);
+    List<TagEntity> tags = backend.list(tag.namespace(), Entity.EntityType.TAG, true);
     assertTrue(tags.contains(tag));
     assertEquals(1, tags.size());
 

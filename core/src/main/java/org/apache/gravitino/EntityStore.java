@@ -64,7 +64,7 @@ public interface EntityStore extends Closeable {
    */
   default <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, EntityType entityType) throws IOException {
-    return list(namespace, type, entityType, false);
+    return list(namespace, type, entityType, true);
   }
 
   /**
@@ -78,14 +78,15 @@ public interface EntityStore extends Closeable {
    * @param namespace the namespace of the entities
    * @param type the detailed type of the entity
    * @param entityType the general type of the entity
-   * @param skippingFields Some fields may have a relatively high acquisition cost, EntityStore
-   *     provides an optional setting to avoid fetching these high-cost fields to improve the
-   *     performance. If true, the method will skip the fields, Otherwise, false.
+   * @param allFields Some fields may have a relatively high acquisition cost, EntityStore provides
+   *     an optional setting to avoid fetching these high-cost fields to improve the performance. If
+   *     true, the method will fetch all the fields, Otherwise, the method won't fetch all the
+   *     fields except for high-cost fields.
    * @return the list of entities
    * @throws IOException if the list operation fails
    */
   default <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, EntityType entityType, boolean skippingFields)
+      Namespace namespace, Class<E> type, EntityType entityType, boolean allFields)
       throws IOException {
     throw new UnsupportedOperationException("Don't support to skip fields");
   }
