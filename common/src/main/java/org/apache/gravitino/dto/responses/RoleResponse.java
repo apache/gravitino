@@ -64,5 +64,7 @@ public class RoleResponse extends BaseResponse {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(role.name()), "role 'name' must not be null and empty");
     Preconditions.checkArgument(role.auditInfo() != null, "role 'auditInfo' must not be null");
+    Preconditions.checkArgument(
+        role.securableObjects() != null, "role 'securable objects' can't null");
   }
 }
