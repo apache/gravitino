@@ -64,7 +64,7 @@ public interface EntityStore extends Closeable {
    */
   default <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, EntityType entityType) throws IOException {
-    return list(namespace, type, entityType, true);
+    return list(namespace, type, entityType, true /* allFields */);
   }
 
   /**

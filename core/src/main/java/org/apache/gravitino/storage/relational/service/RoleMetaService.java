@@ -239,13 +239,9 @@ public class RoleMetaService {
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
 
-  public List<RoleEntity> listRolesByNamespace(Namespace namespace, boolean allFields) {
+  public List<RoleEntity> listRolesByNamespace(Namespace namespace) {
     AuthorizationUtils.checkRoleNamespace(namespace);
     String metalakeName = namespace.level(0);
-
-    if (allFields) {
-      throw new IllegalArgumentException("Don't support list all the fields of roles");
-    }
 
     List<RolePO> rolePOs =
         SessionUtils.getWithoutCommit(

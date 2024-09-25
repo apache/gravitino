@@ -115,11 +115,11 @@ class UserGroupManager {
 
   String[] listUserNames(String metalake) {
 
-    return Arrays.stream(listUsersInternal(metalake, false)).map(User::name).toArray(String[]::new);
+    return Arrays.stream(listUsersInternal(metalake, false /* allFields */)).map(User::name).toArray(String[]::new);
   }
 
   User[] listUsers(String metalake) {
-    return listUsersInternal(metalake, true);
+    return listUsersInternal(metalake, true /* allFields */);
   }
 
   private User[] listUsersInternal(String metalake, boolean allFields) {
