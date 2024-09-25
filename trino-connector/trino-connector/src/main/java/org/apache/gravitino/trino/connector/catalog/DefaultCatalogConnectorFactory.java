@@ -76,7 +76,7 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
     String catalogProvider = catalog.getProvider();
 
     if (!catalog.isSameRegion(region)) {
-      catalogProvider = "trino-cluster";
+      catalogProvider = TRINO_CLUSTER_CONNECTOR_PROVIDER_NAME;
     }
 
     CatalogConnectorContext.Builder builder = catalogBuilders.get(catalogProvider);
