@@ -20,7 +20,6 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
-import org.apache.gravitino.storage.relational.po.ExtendedRolePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -68,9 +67,6 @@ public interface RoleMetaMapper {
 
   @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listRolePOsByMetalake")
   List<RolePO> listRolePOsByMetalake(@Param("metalakeName") String metalakeName);
-
-  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listExtendedRolePOsByMetalake")
-  List<ExtendedRolePO> listExtendedRolePOsByMetalake(@Param("metalakeName") String metalakeName);
 
   @InsertProvider(type = RoleMetaSQLProviderFactory.class, method = "insertRoleMeta")
   void insertRoleMeta(@Param("roleMeta") RolePO rolePO);
