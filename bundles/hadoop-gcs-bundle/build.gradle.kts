@@ -41,6 +41,6 @@ tasks.jar {
   archiveClassifier.set("empty")
 }
 
-tasks.build {
-  dependsOn(tasks.named(":catalogs:catalog-hadoop:runtimeJars"))
+tasks.compileJava {
+  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
 }
