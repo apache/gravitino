@@ -21,12 +21,10 @@ package org.apache.gravitino.storage.relational;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -60,7 +58,7 @@ public interface RelationalBackend
    * @throws IOException If the store operation fails
    */
   <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType, Set<Field> skippingFields)
+      Namespace namespace, Entity.EntityType entityType, boolean skippingFields)
       throws NoSuchEntityException, IOException;
 
   /**

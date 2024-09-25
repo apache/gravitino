@@ -45,7 +45,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -715,29 +714,26 @@ public class TestJDBCBackend {
 
     // meta data list
     List<BaseMetalake> metaLakes =
-        backend.list(metalake.namespace(), Entity.EntityType.METALAKE, Collections.emptySet());
+        backend.list(metalake.namespace(), Entity.EntityType.METALAKE, false);
     assertTrue(metaLakes.contains(metalake));
 
     List<CatalogEntity> catalogs =
-        backend.list(catalog.namespace(), Entity.EntityType.CATALOG, Collections.emptySet());
+        backend.list(catalog.namespace(), Entity.EntityType.CATALOG, false);
     assertTrue(catalogs.contains(catalog));
 
-    List<SchemaEntity> schemas =
-        backend.list(schema.namespace(), Entity.EntityType.SCHEMA, Collections.emptySet());
+    List<SchemaEntity> schemas = backend.list(schema.namespace(), Entity.EntityType.SCHEMA, false);
     assertTrue(schemas.contains(schema));
 
-    List<TableEntity> tables =
-        backend.list(table.namespace(), Entity.EntityType.TABLE, Collections.emptySet());
+    List<TableEntity> tables = backend.list(table.namespace(), Entity.EntityType.TABLE, false);
     assertTrue(tables.contains(table));
 
     List<FilesetEntity> filesets =
-        backend.list(fileset.namespace(), Entity.EntityType.FILESET, Collections.emptySet());
+        backend.list(fileset.namespace(), Entity.EntityType.FILESET, false);
     assertFalse(filesets.contains(fileset));
     assertTrue(filesets.contains(filesetV2));
     assertEquals("2", filesets.get(filesets.indexOf(filesetV2)).properties().get("version"));
 
-    List<TopicEntity> topics =
-        backend.list(topic.namespace(), Entity.EntityType.TOPIC, Collections.emptySet());
+    List<TopicEntity> topics = backend.list(topic.namespace(), Entity.EntityType.TOPIC, false);
     assertTrue(topics.contains(topic));
 
     RoleEntity roleEntity = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
@@ -763,8 +759,7 @@ public class TestJDBCBackend {
 
     TagEntity tagEntity = backend.get(tag.nameIdentifier(), Entity.EntityType.TAG);
     assertEquals(tag, tagEntity);
-    List<TagEntity> tags =
-        backend.list(tag.namespace(), Entity.EntityType.TAG, Collections.emptySet());
+    List<TagEntity> tags = backend.list(tag.namespace(), Entity.EntityType.TAG, false);
     assertTrue(tags.contains(tag));
     assertEquals(1, tags.size());
 

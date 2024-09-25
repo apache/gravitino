@@ -19,14 +19,11 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.Field;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -242,18 +239,26 @@ public class RoleMetaService {
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
 
-  public List<RoleEntity> listRolesByNamespace(Namespace namespace, Set<Field> skippingFields) {
+  public List<RoleEntity> listRolesByNamespace(Namespace namespace, boolean skippingFields) {
     AuthorizationUtils.checkRoleNamespace(namespace);
     String metalakeName = namespace.level(0);
 
-    SupportsDesiredFieldsHandlers<List<RoleEntity>> handlers =
-        new SupportsDesiredFieldsHandlers<>();
-    handlers.addHandler(new ListSkippingObjectsHandler(metalakeName));
+    if (skippingFields) {
+      List<RolePO> rolePOs =
+          SessionUtils.getWithoutCommit(
+              RoleMetaMapper.class, mapper -> mapper.listRolePOsByMetalake(metalakeName));
 
-    Set<Field> desiredFields = Sets.newHashSet(RoleEntity.fieldSet());
-    desiredFields.removeAll(skippingFields);
-
-    return handlers.execute(desiredFields);
+      return rolePOs.stream()
+          .map(
+              po ->
+                  POConverters.fromRolePO(
+                      po,
+                      Collections.emptyList(),
+                      AuthorizationUtils.ofRoleNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    } else {
+      throw new IllegalArgumentException("Don't support list all the fields");
+    }
   }
 
   public int deleteRoleMetasByLegacyTimeline(long legacyTimeline, int limit) {
@@ -290,39 +295,6 @@ public class RoleMetaService {
         + userRoleRelDeletedCount[0]
         + groupRoleRelDeletedCount[0]
         + securableObjectsCount[0];
-  }
-
-  private static class ListSkippingObjectsHandler
-      implements SupportsDesiredFields<List<RoleEntity>> {
-    private final String metalakeName;
-
-    public ListSkippingObjectsHandler(String metalakeName) {
-      this.metalakeName = metalakeName;
-    }
-
-    @Override
-    public Set<Field> desiredFields() {
-      Set<Field> desiredFields = Sets.newHashSet(RoleEntity.fieldSet());
-      desiredFields.remove(RoleEntity.SECURABLE_OBJECTS);
-
-      return desiredFields;
-    }
-
-    @Override
-    public List<RoleEntity> execute() {
-      List<RolePO> rolePOs =
-          SessionUtils.getWithoutCommit(
-              RoleMetaMapper.class, mapper -> mapper.listRolePOsByMetalake(metalakeName));
-
-      return rolePOs.stream()
-          .map(
-              po ->
-                  POConverters.fromRolePO(
-                      po,
-                      Collections.emptyList(),
-                      AuthorizationUtils.ofRoleNamespace(metalakeName)))
-          .collect(Collectors.toList());
-    }
   }
 
   private MetadataObject.Type getType(String type) {

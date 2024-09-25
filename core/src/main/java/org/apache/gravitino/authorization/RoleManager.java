@@ -25,11 +25,9 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.Field;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -136,19 +134,14 @@ class RoleManager {
   }
 
   String[] listRoleNames(String metalake) {
-    Set<Field> skippingFields = Sets.newHashSet(RoleEntity.SECURABLE_OBJECTS);
-
-    return Arrays.stream(listRolesInternal(metalake, skippingFields))
-        .map(Role::name)
-        .toArray(String[]::new);
+    return Arrays.stream(listRolesInternal(metalake)).map(Role::name).toArray(String[]::new);
   }
 
-  Role[] listRolesInternal(String metalake, Set<Field> skippingFields) {
+  Role[] listRolesInternal(String metalake) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       Namespace namespace = AuthorizationUtils.ofRoleNamespace(metalake);
-      return store.list(namespace, RoleEntity.class, Entity.EntityType.ROLE, skippingFields)
-          .stream()
+      return store.list(namespace, RoleEntity.class, Entity.EntityType.ROLE, true).stream()
           .map(entity -> (Role) entity)
           .toArray(Role[]::new);
     } catch (NoSuchEntityException e) {

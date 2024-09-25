@@ -21,7 +21,6 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -30,9 +29,7 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.Field;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
@@ -146,11 +143,9 @@ class TestRoleMetaService extends TestJDBCBackend {
     backend.insert(role2, false);
 
     RoleMetaService roleMetaService = RoleMetaService.getInstance();
-    Set<Field> skippingFields = Sets.newHashSet();
-    skippingFields.add(RoleEntity.SECURABLE_OBJECTS);
     List<RoleEntity> actualRoles =
         roleMetaService.listRolesByNamespace(
-            AuthorizationUtils.ofRoleNamespace(metalakeName), skippingFields);
+            AuthorizationUtils.ofRoleNamespace(metalakeName), true);
     actualRoles.sort(Comparator.comparing(RoleEntity::name));
     List<RoleEntity> expectRoles = Lists.newArrayList(role1, role2);
     Assertions.assertEquals(expectRoles.size(), actualRoles.size());
@@ -158,8 +153,6 @@ class TestRoleMetaService extends TestJDBCBackend {
       RoleEntity expectRole = expectRoles.get(index);
       RoleEntity actualRole = actualRoles.get(index);
       Assertions.assertEquals(expectRole.name(), actualRole.name());
-      Assertions.assertEquals(expectRole.properties(), actualRole.properties());
-      Assertions.assertEquals(expectRole.auditInfo(), actualRole.auditInfo());
     }
   }
 

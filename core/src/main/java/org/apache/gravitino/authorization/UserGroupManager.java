@@ -19,16 +19,13 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.Field;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -117,18 +114,15 @@ class UserGroupManager {
   }
 
   String[] listUserNames(String metalake) {
-    Set<Field> skippingFields = Sets.newHashSet(UserEntity.ROLE_NAMES, UserEntity.ROLE_IDS);
 
-    return Arrays.stream(listUsersInternal(metalake, skippingFields))
-        .map(User::name)
-        .toArray(String[]::new);
+    return Arrays.stream(listUsersInternal(metalake, true)).map(User::name).toArray(String[]::new);
   }
 
   User[] listUsers(String metalake) {
-    return listUsersInternal(metalake, Collections.emptySet());
+    return listUsersInternal(metalake, false);
   }
 
-  private User[] listUsersInternal(String metalake, Set<Field> skippingFields) {
+  private User[] listUsersInternal(String metalake, boolean skippingFields) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
 
