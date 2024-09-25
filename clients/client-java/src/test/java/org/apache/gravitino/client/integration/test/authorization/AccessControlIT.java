@@ -20,8 +20,12 @@ package org.apache.gravitino.client.integration.test.authorization;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Group;
@@ -97,8 +101,21 @@ public class AccessControlIT extends AbstractIT {
     // Get a not-existed group
     Assertions.assertThrows(NoSuchGroupException.class, () -> metalake.getGroup("not-existed"));
 
+
+    // List groups
+    String anotherGroups = "group2#456";
+    metalake.addGroup(anotherGroups);
+    String[] groupNames = metalake.listGroupNames();
+    Arrays.sort(groupNames);
+    Assertions.assertEquals(Lists.newArrayList(groupName,anotherGroups),Arrays.asList(groupNames));
+
+
+
+
     Assertions.assertTrue(metalake.removeGroup(groupName));
+    Assertions.assertTrue(metalake.removeGroup(anotherGroups));
     Assertions.assertFalse(metalake.removeGroup(groupName));
+    Assertions.assertFalse(metalake.removeGroup(anotherGroups));
   }
 
   @Test

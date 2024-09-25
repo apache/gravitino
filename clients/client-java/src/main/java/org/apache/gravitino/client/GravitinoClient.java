@@ -207,6 +207,15 @@ public class GravitinoClient extends GravitinoClientBase
     return getMetalake().getGroup(group);
   }
 
+
+  public Group[] listGroups(){
+    return getMetalake().listGroups();
+  }
+
+  public String[] listGroupNames(){
+    return getMetalake().listGroupNames();
+  }
+
   /**
    * Gets a Role.
    *

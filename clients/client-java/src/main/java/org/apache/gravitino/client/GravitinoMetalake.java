@@ -60,6 +60,7 @@ import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
@@ -580,6 +581,43 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     resp.validate();
 
     return resp.getGroup();
+  }
+
+
+  /**
+   * Lists the groups
+   *
+   * @return The Group list
+   */
+  public Group[] listGroups() {
+    Map<String,String> params = new HashMap<>();
+    GroupListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_GROUPS_PATH,name(),BLANK_PLACE_HOLDER),
+            params,
+            GroupListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler()
+        );
+    resp.validate();
+    return resp.getGroups();
+  }
+
+  /**
+   * Lists the group names
+   *
+   * @return The Group Name List
+   */
+  public String[] listGroupNames(){
+    NameListResponse resp = restClient.get(
+        String.format(API_METALAKES_GROUPS_PATH,name(),
+            BLANK_PLACE_HOLDER),
+        NameListResponse.class,
+        Collections.emptyMap(),
+        ErrorHandlers.groupErrorHandler()
+    );
+    resp.validate();
+    return resp.getNames();
   }
 
   /**

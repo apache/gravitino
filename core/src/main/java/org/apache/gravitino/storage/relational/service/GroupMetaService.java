@@ -32,10 +32,12 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -45,6 +47,7 @@ import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.h2.engine.Session;
 
 /** The service class for group metadata. It provides the basic database operations for group. */
 public class GroupMetaService {
@@ -247,6 +250,17 @@ public class GroupMetaService {
       throw re;
     }
     return newEntity;
+  }
+
+  public List<GroupEntity> listGroupsByNamespace(Namespace namespace){
+    AuthorizationUtils.checkUserNamespace(namespace);
+    String metalakeName = namespace.level(0);
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      List<GroupPO> groupPOS = SessionUtils.getWithoutCommit(
+          GroupMetaMapper.class, mapper->mapper.selectGroupsMetaByMetalakeId(metalakeId)
+      );
+    return groupPOS.stream().map(po->POConverters.fromGroupPO(po,AuthorizationUtils.ofUserNamespace(metalakeName))).collect(
+        Collectors.toList());
   }
 
   public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {

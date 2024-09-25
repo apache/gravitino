@@ -259,9 +259,8 @@ public class TestGroupOperations extends JerseyTest {
     Group group = buildGroup("group0");
     Group group2 = buildGroup("group1");
     Group[] groups = {group, group2};
-    Namespace groupNS = AuthorizationUtils.ofGroupNamespace("metalake1");
 
-    when(manager.listGroup(groupNS)).thenReturn(groups);
+    when(manager.listGroup("metalake1")).thenReturn(groups);
 
     Response resp =
         target("/metalakes/metalake1/groups")
@@ -281,7 +280,7 @@ public class TestGroupOperations extends JerseyTest {
     }
 
     // Test to throw NoSuchMetalakeException
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listGroup(groupNS);
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listGroup("metalake1");
     Response resp1 =
         target("/metalakes/metalake1/groups")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -295,7 +294,7 @@ public class TestGroupOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw internal RuntimeException
-    doThrow(new RuntimeException("mock error")).when(manager).listGroup(groupNS);
+    doThrow(new RuntimeException("mock error")).when(manager).listGroup("metalake1");
     Response resp2 =
         target("/metalakes/metalake1/groups")
             .request(MediaType.APPLICATION_JSON_TYPE)

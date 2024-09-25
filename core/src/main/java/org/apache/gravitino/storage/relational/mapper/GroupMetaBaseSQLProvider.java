@@ -34,6 +34,13 @@ public class GroupMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  public String listGroupsByMetalakeId(@Param("metalakeId") Long metalakeId){
+    return "SELECT group_id as groupId, group_name as groupName, metalake_id as metalakeId,"
+        + " audit_info as auditInfo, current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt FROM " + GROUP_TABLE_NAME + " WHERE metalake_id = #{metalakeId}"
+        + " AND deleted_at = 0";
+  }
+
   public String selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name) {
     return "SELECT group_id as groupId, group_name as groupName,"

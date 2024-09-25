@@ -82,6 +82,10 @@ public class GroupMetaSQLProviderFactory {
   public static String listGroupsByRoleId(@Param("roleId") Long roleId) {
     return getProvider().listGroupsByRoleId(roleId);
   }
+  public static String listGroupsByMetalake(@Param("metalakeId")Long metalakeId){
+
+    return getProvider().listGroupsByMetalakeId(metalakeId);
+  }
 
   public static String deleteGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {

@@ -88,9 +88,15 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
-  public Group[] listGroup(Namespace namespace) {
-    return dispatcher.listGroup(namespace);
+  public Group[] listGroup(String metalake) {
+    return dispatcher.listGroup(metalake);
   }
+
+  @Override
+  public String[] listGroupNames(String metalake) {
+    return dispatcher.listGroupNames(metalake);
+  }
+
 
   @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)

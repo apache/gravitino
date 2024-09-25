@@ -87,8 +87,13 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
-  public Group[] listGroup(Namespace namespace) {
-    return userGroupManager.listGroups(namespace);
+  public Group[] listGroup(String metalake) {
+    return userGroupManager.listGroups(metalake);
+  }
+
+  @Override
+  public String[] listGroupNames(String metalake) {
+    return userGroupManager.listGroupNames(metalake);
   }
 
   @Override

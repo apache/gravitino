@@ -115,7 +115,9 @@ public interface AccessControlDispatcher {
    *
    * @return The list of groups
    */
-  Group[] listGroup(Namespace namespace);
+  Group[] listGroup(String metalake);
+
+  String[] listGroupNames(String metalake);
 
   /**
    * Grant roles to a user.

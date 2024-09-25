@@ -21,11 +21,14 @@ package org.apache.gravitino.authorization;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -39,6 +42,7 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -182,9 +186,10 @@ class UserGroupManager {
     }
   }
 
-  Group[] listGroups(Namespace namespace) {
-    NameIdentifier groupIdent = NameIdentifier.of(namespace.levels());
-    checkMetalakeExists(groupIdent);
+  Group[] listGroups(String metalake) {
+    AuthorizationUtils.checkMetalakeExists(metalake);
+    Namespace namespace = AuthorizationUtils.ofGroupNamespace(metalake);
+
     try {
       return store.list(namespace, GroupEntity.class, EntityType.GROUP).toArray(new Group[0]);
     } catch (Exception ioe) {
@@ -192,4 +197,9 @@ class UserGroupManager {
       throw new RuntimeException(ioe);
     }
   }
+
+  String[] listGroupNames(String metalake){
+    return Arrays.stream(listGroups(metalake)).map(Group::name).toArray(String[]::new);
+  }
+
 }

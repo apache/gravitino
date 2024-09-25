@@ -150,12 +150,11 @@ public class GroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace groupNS = AuthorizationUtils.ofGroupNamespace(metalake);
             Group[] groups =
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifier.of(metalake),
                     LockType.READ,
-                    () -> accessControlManager.listGroup(groupNS));
+                    () -> accessControlManager.listGroup(metalake));
             GroupDTO[] groupDTOS;
             if (groups == null) {
               groupDTOS = new GroupDTO[0];
