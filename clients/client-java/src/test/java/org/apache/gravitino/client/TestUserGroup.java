@@ -28,6 +28,8 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Collections;
+import java.util.Map;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
@@ -42,6 +44,7 @@ import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -180,6 +183,56 @@ public class TestUserGroup extends TestBase {
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.DELETE, userPath, null, errResp, SC_SERVER_ERROR);
     Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.removeUser(username));
+  }
+
+  @Test
+  public void testListUserNames() throws Exception {
+    String userPath = withSlash(String.format(API_METALAKES_USERS_PATH, metalakeName, ""));
+
+    NameListResponse listResponse = new NameListResponse(new String[] {"user1", "user2"});
+    buildMockResource(Method.GET, userPath, null, listResponse, SC_OK);
+
+    Assertions.assertArrayEquals(new String[] {"user1", "user2"}, gravitinoClient.listUserNames());
+
+    ErrorResponse errRespNoMetalake =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "metalake not found");
+    buildMockResource(Method.GET, userPath, null, errRespNoMetalake, SC_NOT_FOUND);
+    Exception ex =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class, () -> gravitinoClient.listUserNames());
+    Assertions.assertEquals("metalake not found", ex.getMessage());
+
+    // Test RuntimeException
+    ErrorResponse errResp = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.GET, userPath, null, errResp, SC_SERVER_ERROR);
+    Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.listUserNames());
+  }
+
+  @Test
+  public void testListUsers() throws Exception {
+    String userPath = withSlash(String.format(API_METALAKES_USERS_PATH, metalakeName, ""));
+    UserDTO user1 = mockUserDTO("user1");
+    UserDTO user2 = mockUserDTO("user2");
+    Map<String, String> params = Collections.singletonMap("details", "true");
+    UserListResponse listResponse = new UserListResponse(new UserDTO[] {user1, user2});
+    buildMockResource(Method.GET, userPath, params, null, listResponse, SC_OK);
+
+    User[] users = gravitinoClient.listUsers();
+    Assertions.assertEquals(2, users.length);
+    assertUser(user1, users[0]);
+    assertUser(user2, users[1]);
+
+    ErrorResponse errRespNoMetalake =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "metalake not found");
+    buildMockResource(Method.GET, userPath, params, null, errRespNoMetalake, SC_NOT_FOUND);
+    Exception ex =
+        Assertions.assertThrows(NoSuchMetalakeException.class, () -> gravitinoClient.listUsers());
+    Assertions.assertEquals("metalake not found", ex.getMessage());
+
+    // Test RuntimeException
+    ErrorResponse errResp = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.GET, userPath, params, null, errResp, SC_SERVER_ERROR);
+    Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.listUsers());
   }
 
   @Test

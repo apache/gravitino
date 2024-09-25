@@ -96,7 +96,7 @@ tasks {
   }
 
   val copyAuthorizationLibs by registering(Copy::class) {
-    dependsOn("jar", "runtimeJars")
+    dependsOn("jar", runtimeJars)
     from("build/libs") {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
@@ -107,6 +107,10 @@ tasks {
 
   register("copyLibAndConfig", Copy::class) {
     dependsOn(copyAuthorizationLibs)
+  }
+
+  jar {
+    dependsOn(runtimeJars)
   }
 }
 

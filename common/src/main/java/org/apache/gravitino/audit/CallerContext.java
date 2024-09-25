@@ -24,7 +24,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 
 /**
- * A class defining the caller context for auditing coarse granularity operations.
+ * A class defining the caller context for auditing coarse-grained operations.
  *
  * <p>Reference:
  *

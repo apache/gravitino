@@ -45,7 +45,7 @@ public enum InternalClientType {
       InternalClientType.valueOf(clientType);
       return true;
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Unknown internal client type: " + clientType, e);
+      return false;
     }
   }
 }

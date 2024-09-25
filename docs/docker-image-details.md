@@ -147,6 +147,12 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
+- apache/gravitino-ci:hive-0.1.14 
+  - Add amazon S3 related configurations in the `hive-site.xml` file.
+    - `fs.s3a.access.key` The access key for the S3 bucket.
+    - `fs.s3a.secret.key` The secret key for the S3 bucket.
+    - `fs.s3a.endpoint` The endpoint for the S3 bucket.
+
 - apache/gravitino-ci:hive-0.1.13 (Switch to Apache official DockerHub repository)
   - Use Gravitino release 0.6.0 Dockerfile to build the image.
 

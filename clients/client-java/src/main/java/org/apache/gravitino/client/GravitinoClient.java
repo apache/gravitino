@@ -169,6 +169,26 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
+   * Lists the users.
+   *
+   * @return The User list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public User[] listUsers() {
+    return getMetalake().listUsers();
+  }
+
+  /**
+   * Lists the usernames.
+   *
+   * @return The username list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listUserNames() {
+    return getMetalake().listUserNames();
+  }
+
+  /**
    * Adds a new Group.
    *
    * @param group The name of the Group.

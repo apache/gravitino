@@ -77,11 +77,43 @@ public class AccessControlIT extends AbstractIT {
     Assertions.assertEquals(username, user.name());
     Assertions.assertTrue(user.roles().isEmpty());
 
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("k1", "v1");
+    SecurableObject metalakeObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+
+    // Test the user with the role
+    metalake.createRole("role1", properties, Lists.newArrayList(metalakeObject));
+    metalake.grantRolesToUser(Lists.newArrayList("role1"), username);
+
+    // List users
+    String anotherUser = "another-user";
+    metalake.addUser(anotherUser);
+    String[] usernames = metalake.listUserNames();
+    Arrays.sort(usernames);
+    Assertions.assertEquals(
+        Lists.newArrayList(AuthConstants.ANONYMOUS_USER, anotherUser, username),
+        Arrays.asList(usernames));
+    List<User> users =
+        Arrays.stream(metalake.listUsers())
+            .sorted(Comparator.comparing(User::name))
+            .collect(Collectors.toList());
+    Assertions.assertEquals(
+        Lists.newArrayList(AuthConstants.ANONYMOUS_USER, anotherUser, username),
+        users.stream().map(User::name).collect(Collectors.toList()));
+    Assertions.assertEquals(Lists.newArrayList("role1"), users.get(2).roles());
+
     // Get a not-existed user
     Assertions.assertThrows(NoSuchUserException.class, () -> metalake.getUser("not-existed"));
 
     Assertions.assertTrue(metalake.removeUser(username));
+
     Assertions.assertFalse(metalake.removeUser(username));
+
+    // clean up
+    metalake.removeUser(anotherUser);
+    metalake.deleteRole("role1");
   }
 
   @Test
