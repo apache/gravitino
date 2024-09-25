@@ -39,7 +39,6 @@ import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
-import org.apache.gravitino.storage.relational.po.ExtendedRolePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -249,7 +248,6 @@ public class RoleMetaService {
 
     SupportsDesiredFieldsHandlers<List<RoleEntity>> handlers =
         new SupportsDesiredFieldsHandlers<>();
-    handlers.addHandler(new ListSkippingObjectsAndCountHandler(metalakeName));
     handlers.addHandler(new ListSkippingObjectsHandler(metalakeName));
 
     Set<Field> desiredFields = Sets.newHashSet(RoleEntity.fieldSet());
@@ -306,38 +304,6 @@ public class RoleMetaService {
     public Set<Field> desiredFields() {
       Set<Field> desiredFields = Sets.newHashSet(RoleEntity.fieldSet());
       desiredFields.remove(RoleEntity.SECURABLE_OBJECTS);
-
-      return desiredFields;
-    }
-
-    @Override
-    public List<RoleEntity> execute() {
-      List<ExtendedRolePO> rolePOs =
-          SessionUtils.getWithoutCommit(
-              RoleMetaMapper.class, mapper -> mapper.listExtendedRolePOsByMetalake(metalakeName));
-
-      return rolePOs.stream()
-          .map(
-              po ->
-                  POConverters.fromExtendedRolePO(
-                      po, AuthorizationUtils.ofRoleNamespace(metalakeName)))
-          .collect(Collectors.toList());
-    }
-  }
-
-  private static class ListSkippingObjectsAndCountHandler
-      implements SupportsDesiredFields<List<RoleEntity>> {
-    private final String metalakeName;
-
-    public ListSkippingObjectsAndCountHandler(String metalakeName) {
-      this.metalakeName = metalakeName;
-    }
-
-    @Override
-    public Set<Field> desiredFields() {
-      Set<Field> desiredFields = Sets.newHashSet(RoleEntity.fieldSet());
-      desiredFields.remove(RoleEntity.SECURABLE_OBJECTS);
-      desiredFields.remove(RoleEntity.SECURABLE_OBJECTS_COUNT);
 
       return desiredFields;
     }

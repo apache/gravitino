@@ -144,13 +144,6 @@ class RoleManager {
         .toArray(String[]::new);
   }
 
-  Role[] listRoles(String metalake) {
-    Set<Field> skippingFields = Sets.newHashSet();
-    skippingFields.add(RoleEntity.SECURABLE_OBJECTS);
-
-    return listRolesInternal(metalake, skippingFields);
-  }
-
   Role[] listRolesInternal(String metalake, Set<Field> skippingFields) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);

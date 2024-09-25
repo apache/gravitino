@@ -51,19 +51,12 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   public static final Field SECURABLE_OBJECTS =
       Field.optional("securable_objects", List.class, "The securable objects of the role entity.");
 
-  public static final Field SECURABLE_OBJECTS_COUNT =
-      Field.optional(
-          "securable_objects_count",
-          Integer.class,
-          "The securable objects count of the role entity.");
-
   private Long id;
   private String name;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
   private Namespace namespace;
   private List<SecurableObject> securableObjects;
-  private Integer securableObjectsCount;
 
   /**
    * The name of the role.
@@ -103,19 +96,6 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     return securableObjects;
   }
 
-  @Override
-  public int securableObjectsCount() {
-    if (securableObjects != null) {
-      return securableObjects.size();
-    }
-
-    if (securableObjectsCount == null) {
-      return 0;
-    }
-
-    return securableObjectsCount;
-  }
-
   /**
    * Retrieves the fields and their associated values of the entity.
    *
@@ -129,7 +109,6 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
     fields.put(SECURABLE_OBJECTS, securableObjects);
-    fields.put(SECURABLE_OBJECTS_COUNT, securableObjectsCount);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -140,9 +119,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
    * @return The set of all the fields.
    */
   public static Set<Field> fieldSet() {
-    Set<Field> fields =
-        Sets.newHashSet(
-            ID, NAME, AUDIT_INFO, PROPERTIES, SECURABLE_OBJECTS, SECURABLE_OBJECTS_COUNT);
+    Set<Field> fields = Sets.newHashSet(ID, NAME, AUDIT_INFO, PROPERTIES, SECURABLE_OBJECTS);
 
     return Collections.unmodifiableSet(fields);
   }
@@ -259,11 +236,6 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
      */
     public Builder withSecurableObjects(List<SecurableObject> securableObjects) {
       roleEntity.securableObjects = ImmutableList.copyOf(securableObjects);
-      return this;
-    }
-
-    public Builder withSecurableObjectsCount(int securableObjectsCount) {
-      roleEntity.securableObjectsCount = securableObjectsCount;
       return this;
     }
 

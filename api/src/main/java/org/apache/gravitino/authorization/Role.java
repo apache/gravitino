@@ -52,13 +52,4 @@ public interface Role extends Auditable {
    * @return The securable objects of the role.
    */
   List<SecurableObject> securableObjects();
-
-  /**
-   * The securable objects count of the role.
-   *
-   * @return The scecurable objects count of the role.
-   */
-  default int securableObjectsCount() {
-    return securableObjects().size();
-  }
 }

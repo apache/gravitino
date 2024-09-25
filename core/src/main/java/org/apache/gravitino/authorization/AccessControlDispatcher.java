@@ -246,13 +246,4 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   String[] listRoleNames(String metalake) throws NoSuchMetalakeException;
-
-  /**
-   * Lists the roles.
-   *
-   * @param metalake The Metalake of the Role.
-   * @return The role list.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   */
-  Role[] listRoles(String metalake) throws NoSuchMetalakeException;
 }

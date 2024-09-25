@@ -64,7 +64,6 @@ import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
-import org.apache.gravitino.dto.responses.RoleListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
@@ -718,28 +717,6 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     resp.validate();
 
     return resp.getNames();
-  }
-
-  /**
-   * Lists the roles.
-   *
-   * @return The Role list.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   */
-  public Role[] listRoles() {
-    Map<String, String> params = ImmutableMap.of("details", "true");
-    RoleListResponse resp =
-        restClient.get(
-            String.format(API_METALAKES_ROLES_PATH, this.name(), BLANK_PLACE_HOLDER),
-            params,
-            RoleListResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.roleErrorHandler());
-    resp.validate();
-
-    return Arrays.stream(resp.getRoles())
-        .map(dto -> new GenericRole(dto, this))
-        .toArray(Role[]::new);
   }
 
   /**

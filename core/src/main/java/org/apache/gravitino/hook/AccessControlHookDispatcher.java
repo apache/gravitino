@@ -162,9 +162,4 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public String[] listRoleNames(String metalake) throws NoSuchMetalakeException {
     return dispatcher.listRoleNames(metalake);
   }
-
-  @Override
-  public Role[] listRoles(String metalake) throws NoSuchMetalakeException {
-    return dispatcher.listRoles(metalake);
-  }
 }

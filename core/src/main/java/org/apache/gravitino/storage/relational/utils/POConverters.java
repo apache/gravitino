@@ -49,7 +49,6 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
-import org.apache.gravitino.storage.relational.po.ExtendedRolePO;
 import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
@@ -979,22 +978,6 @@ public class POConverters {
           .withNamespace(namespace)
           .withProperties(JsonUtils.anyFieldMapper().readValue(rolePO.getProperties(), Map.class))
           .withSecurableObjects(securableObjects)
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().readValue(rolePO.getAuditInfo(), AuditInfo.class))
-          .build();
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Failed to deserialize json object:", e);
-    }
-  }
-
-  public static RoleEntity fromExtendedRolePO(ExtendedRolePO rolePO, Namespace namespace) {
-    try {
-      return RoleEntity.builder()
-          .withId(rolePO.getRoleId())
-          .withName(rolePO.getRoleName())
-          .withNamespace(namespace)
-          .withProperties(JsonUtils.anyFieldMapper().readValue(rolePO.getProperties(), Map.class))
-          .withSecurableObjectsCount(rolePO.getSecurableObjectsCount())
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(rolePO.getAuditInfo(), AuditInfo.class))
           .build();

@@ -47,7 +47,6 @@ import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.RoleListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -87,14 +86,8 @@ public class RoleOperations {
                   NameIdentifier.of(metalake),
                   LockType.READ,
                   () -> {
-                    if (details) {
-                      return Utils.ok(
-                          new RoleListResponse(
-                              DTOConverters.toDTOs(accessControlManager.listRoles(metalake))));
-                    } else {
-                      String[] names = accessControlManager.listRoleNames(metalake);
-                      return Utils.ok(new NameListResponse(names));
-                    }
+                    String[] names = accessControlManager.listRoleNames(metalake);
+                    return Utils.ok(new NameListResponse(names));
                   }));
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.LIST, "", metalake, e);

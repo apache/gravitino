@@ -447,10 +447,7 @@ public class DTOConverters {
               role.securableObjects().stream()
                   .map(DTOConverters::toDTO)
                   .toArray(SecurableObjectDTO[]::new))
-          .withSecurableObjectsCount(role.securableObjectsCount())
           .build();
-    } else {
-      return builder.withSecurableObjectsCount(role.securableObjectsCount()).build();
     }
   }
 
@@ -701,18 +698,6 @@ public class DTOConverters {
     return Arrays.stream(users).map(DTOConverters::toDTO).toArray(UserDTO[]::new);
   }
 
-  /**
-   * Converts an array of Roles to an array of RoleDTOs.
-   *
-   * @param roles The roles to be converted.
-   * @return The array of RoleDTOs.
-   */
-  public static RoleDTO[] toDTOs(Role[] roles) {
-    if (ArrayUtils.isEmpty(roles)) {
-      return new RoleDTO[0];
-    }
-    return Arrays.stream(roles).map(role -> toDTO(role, false)).toArray(RoleDTO[]::new);
-  }
 
   /**
    * Converts a DistributionDTO to a Distribution.
