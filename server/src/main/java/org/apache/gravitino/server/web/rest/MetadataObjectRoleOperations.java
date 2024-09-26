@@ -39,6 +39,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 @NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/objects/{type}/{fullName}/roles")
@@ -68,11 +69,12 @@ public class MetadataObjectRoleOperations {
           MetadataObjects.parse(
               fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
 
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
       return Utils.doAs(
           httpRequest,
           () ->
               TreeLockUtils.doWithTreeLock(
-                  NameIdentifier.of(metalake),
+                  identifier,
                   LockType.READ,
                   () -> {
                     String[] names = accessControlManager.listRoleNamesByObject(metalake, object);
