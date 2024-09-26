@@ -86,25 +86,24 @@ public class RoleMetaService {
     long metadataObjectId =
         MetadataObjectService.getMetadataObjectId(
             metalakeId, metadataObject.fullName(), metadataObject.type());
-      List<RolePO> rolePOs =
-          SessionUtils.getWithoutCommit(
-              RoleMetaMapper.class,
-              mapper ->
-                  mapper.listRolesByMetadataObjectIdAndType(
-                      metadataObjectId, metadataObject.type().name()));
-      return rolePOs.stream()
-          .map(
-              po -> {
-                if (allFields) {
-                  return POConverters.fromRolePO(
-                          po, listSecurableObjects(po), AuthorizationUtils.ofRoleNamespace(metalake));
-                } else {
-                  return POConverters.fromRolePO(
-                          po, Collections.emptyList(), AuthorizationUtils.ofRoleNamespace(metalake));
-                }
-              })
-          .collect(Collectors.toList());
-
+    List<RolePO> rolePOs =
+        SessionUtils.getWithoutCommit(
+            RoleMetaMapper.class,
+            mapper ->
+                mapper.listRolesByMetadataObjectIdAndType(
+                    metadataObjectId, metadataObject.type().name()));
+    return rolePOs.stream()
+        .map(
+            po -> {
+              if (allFields) {
+                return POConverters.fromRolePO(
+                    po, listSecurableObjects(po), AuthorizationUtils.ofRoleNamespace(metalake));
+              } else {
+                return POConverters.fromRolePO(
+                    po, Collections.emptyList(), AuthorizationUtils.ofRoleNamespace(metalake));
+              }
+            })
+        .collect(Collectors.toList());
   }
 
   public List<RolePO> listRolesByGroupId(Long groupId) {
