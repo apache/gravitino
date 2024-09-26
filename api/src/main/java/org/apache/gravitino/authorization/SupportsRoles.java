@@ -28,7 +28,9 @@ import org.apache.gravitino.annotation.Evolving;
 public interface SupportsRoles {
 
   /**
-   * List all the role names associated with this metadata object.
+   * List all the role names associated with this metadata object. For the metalake metadata object,
+   * this method will only return the roles contains metalake object instead of all the roles in the
+   * metalake.
    *
    * @return The role name list associated with this metadata object.
    */
