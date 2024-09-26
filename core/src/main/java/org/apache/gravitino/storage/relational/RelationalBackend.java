@@ -21,10 +21,12 @@ package org.apache.gravitino.storage.relational;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -48,13 +50,17 @@ public interface RelationalBackend
    *
    * @param namespace The parent namespace of these entities.
    * @param entityType The type of these entities.
+   * @param skippingFields Some fields may have a relatively high acquisition cost, EntityStore
+   *     provide an optional setting to avoid fetching these high-cost fields to improve the
+   *     performance.
    * @return The list of entities associated with the given parent namespace and entityType, or null
    *     if the entities does not exist.
    * @throws NoSuchEntityException If the corresponding parent entity of these list entities cannot
    *     be found.
    * @throws IOException If the store operation fails
    */
-  <E extends Entity & HasIdentifier> List<E> list(Namespace namespace, Entity.EntityType entityType)
+  <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Entity.EntityType entityType, Set<Field> skippingFields)
       throws NoSuchEntityException, IOException;
 
   /**

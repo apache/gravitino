@@ -234,6 +234,18 @@ class FilesetCatalog(BaseSchemaCatalog):
 
         return drop_resp.dropped()
 
+    def get_file_location(self, ident: NameIdentifier, sub_path: str) -> str:
+        """Get the actual location of a file or directory based on the storage location of Fileset and the sub path.
+
+        Args:
+             ident: A fileset identifier, which should be "schema.fileset" format.
+             sub_path: The sub path of the file or directory.
+
+        Returns:
+             The actual location of the file or directory.
+        """
+        raise NotImplementedError("Not implemented yet")
+
     @staticmethod
     def check_fileset_namespace(namespace: Namespace):
         Namespace.check(
