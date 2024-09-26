@@ -397,6 +397,32 @@ public class TestAccessControlManager {
     Assertions.assertFalse(dropped1);
   }
 
+  @Test
+  public void testListRoles() {
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+
+    accessControlManager.createRole(
+        "metalake_list",
+        "testList1",
+        props,
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
+
+    accessControlManager.createRole(
+        "metalake_list",
+        "testList2",
+        props,
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
+
+    // Test to list roles
+    String[] actualRoles = accessControlManager.listRoleNames("metalake_list");
+    Arrays.sort(actualRoles);
+    Assertions.assertArrayEquals(new String[] {"testList1", "testList2"}, actualRoles);
+  }
+
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
     expectedProps.forEach(
         (k, v) -> {
