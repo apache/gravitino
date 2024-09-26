@@ -360,6 +360,16 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
+   * Lists the role names.
+   *
+   * @return The role name list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listRoleNames() throws NoSuchMetalakeException {
+    return getMetalake().listRoleNames();
+  }
+
+  /**
    * Creates a new builder for constructing a GravitinoClient.
    *
    * @param uri The base URI for the Gravitino API.

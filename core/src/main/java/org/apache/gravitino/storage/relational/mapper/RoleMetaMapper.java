@@ -65,6 +65,9 @@ public interface RoleMetaMapper {
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listRolePOsByMetalake")
+  List<RolePO> listRolePOsByMetalake(@Param("metalakeName") String metalakeName);
+
   @InsertProvider(type = RoleMetaSQLProviderFactory.class, method = "insertRoleMeta")
   void insertRoleMeta(@Param("roleMeta") RolePO rolePO);
 

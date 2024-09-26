@@ -236,5 +236,14 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If deleting the Role encounters storage issues.
    */
-  public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException;
+  boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException;
+
+  /**
+   * Lists the role names.
+   *
+   * @param metalake The Metalake of the Role.
+   * @return The role name list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  String[] listRoleNames(String metalake) throws NoSuchMetalakeException;
 }
