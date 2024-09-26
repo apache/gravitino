@@ -67,155 +67,6 @@ public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
     return resourceConfig;
   }
 
-  private Response doCreateView(String name) {
-    CreateViewRequest createViewRequest =
-        ImmutableCreateViewRequest.builder()
-            .name(name)
-            .schema(viewSchema)
-            .viewVersion(
-                ImmutableViewVersion.builder()
-                    .versionId(1)
-                    .timestampMillis(System.currentTimeMillis())
-                    .schemaId(1)
-                    .defaultNamespace(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME))
-                    .addRepresentations(
-                        ImmutableSQLViewRepresentation.builder()
-                            .sql(VIEW_QUERY)
-                            .dialect("spark")
-                            .build())
-                    .build())
-            .build();
-    return getViewClientBuilder()
-        .post(Entity.entity(createViewRequest, MediaType.APPLICATION_JSON_TYPE));
-  }
-
-  private Response doLoadView(String name) {
-    return getViewClientBuilder(Optional.of(name)).get();
-  }
-
-  private void verifyLoadViewSucc(String name) {
-    Response response = doLoadView(name);
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-
-    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
-    Assertions.assertEquals(viewSchema.columns(), loadViewResponse.metadata().schema().columns());
-  }
-
-  private void verifyCreateViewFail(String name, int status) {
-    Response response = doCreateView(name);
-    Assertions.assertEquals(status, response.getStatus());
-  }
-
-  private void verifyCreateViewSucc(String name) {
-    Response response = doCreateView(name);
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
-    Schema schema = loadViewResponse.metadata().schema();
-    Assertions.assertEquals(schema.columns(), viewSchema.columns());
-  }
-
-  private void verifyLoadViewFail(String name, int status) {
-    Response response = doLoadView(name);
-    Assertions.assertEquals(status, response.getStatus());
-  }
-
-  private void verifyReplaceSucc(String name, ViewMetadata base) {
-    Response response = doReplaceView(name, base);
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
-    Assertions.assertEquals(
-        newViewSchema.columns(), loadViewResponse.metadata().schema().columns());
-  }
-
-  private Response doReplaceView(String name, ViewMetadata base) {
-    ViewMetadata.Builder builder =
-        ViewMetadata.buildFrom(base).setCurrentVersion(base.currentVersion(), newViewSchema);
-    ViewMetadata replacement = builder.build();
-    UpdateTableRequest updateTableRequest =
-        UpdateTableRequest.create(
-            null,
-            UpdateRequirements.forReplaceView(base, replacement.changes()),
-            replacement.changes());
-    return getViewClientBuilder(Optional.of(name))
-        .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
-  }
-
-  private ViewMetadata getViewMeta(String viewName) {
-    Response response = doLoadView(viewName);
-    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
-    return loadViewResponse.metadata();
-  }
-
-  private void verifyUpdateViewFail(String name, int status, ViewMetadata base) {
-    Response response = doReplaceView(name, base);
-    Assertions.assertEquals(status, response.getStatus());
-  }
-
-  private void verifyDropViewSucc(String name) {
-    Response response = doDropView(name);
-    Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
-  }
-
-  private Response doDropView(String name) {
-    return getViewClientBuilder(Optional.of(name)).delete();
-  }
-
-  private void verifyDropViewFail(String name, int status) {
-    Response response = doDropView(name);
-    Assertions.assertEquals(status, response.getStatus());
-  }
-
-  private void verifyViewExistsStatusCode(String name, int status) {
-    Response response = doViewExists(name);
-    Assertions.assertEquals(status, response.getStatus());
-  }
-
-  private Response doViewExists(String name) {
-    return getViewClientBuilder(Optional.of(name)).head();
-  }
-
-  private void verifyListViewFail(int status) {
-    Response response = doListView();
-    Assertions.assertEquals(status, response.getStatus());
-  }
-
-  private Response doListView() {
-    return getViewClientBuilder().get();
-  }
-
-  private void verifyLisViewSucc(Set<String> expectedTableNames) {
-    Response response = doListView();
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    ListTablesResponse listTablesResponse = response.readEntity(ListTablesResponse.class);
-    Set<String> tableNames =
-        listTablesResponse.identifiers().stream()
-            .map(identifier -> identifier.name())
-            .collect(Collectors.toSet());
-    Assertions.assertEquals(expectedTableNames, tableNames);
-  }
-
-  private void verifyRenameViewFail(String source, String dest, int status) {
-    Response response = doRenameView(source, dest);
-    Assertions.assertEquals(status, response.getStatus());
-  }
-
-  private Response doRenameView(String source, String dest) {
-    RenameTableRequest renameTableRequest =
-        RenameTableRequest.builder()
-            .withSource(
-                TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), source))
-            .withDestination(
-                TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), dest))
-            .build();
-    return getRenameViewClientBuilder()
-        .post(Entity.entity(renameTableRequest, MediaType.APPLICATION_JSON_TYPE));
-  }
-
-  private void verifyRenameViewSucc(String source, String dest) {
-    Response response = doRenameView(source, dest);
-    Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
-  }
-
   @ParameterizedTest
   @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
   void testListTables(String prefix) {
@@ -307,5 +158,154 @@ public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
     // dest view exists
     verifyCreateViewSucc("rename_foo3");
     verifyRenameViewFail("rename_foo2", "rename_foo3", 409);
+  }
+
+  private Response doCreateView(String name) {
+    CreateViewRequest createViewRequest =
+            ImmutableCreateViewRequest.builder()
+                    .name(name)
+                    .schema(viewSchema)
+                    .viewVersion(
+                            ImmutableViewVersion.builder()
+                                    .versionId(1)
+                                    .timestampMillis(System.currentTimeMillis())
+                                    .schemaId(1)
+                                    .defaultNamespace(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME))
+                                    .addRepresentations(
+                                            ImmutableSQLViewRepresentation.builder()
+                                                    .sql(VIEW_QUERY)
+                                                    .dialect("spark")
+                                                    .build())
+                                    .build())
+                    .build();
+    return getViewClientBuilder()
+            .post(Entity.entity(createViewRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response doLoadView(String name) {
+    return getViewClientBuilder(Optional.of(name)).get();
+  }
+
+  private void verifyLoadViewSucc(String name) {
+    Response response = doLoadView(name);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+
+    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
+    Assertions.assertEquals(viewSchema.columns(), loadViewResponse.metadata().schema().columns());
+  }
+
+  private void verifyCreateViewFail(String name, int status) {
+    Response response = doCreateView(name);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyCreateViewSucc(String name) {
+    Response response = doCreateView(name);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
+    Schema schema = loadViewResponse.metadata().schema();
+    Assertions.assertEquals(schema.columns(), viewSchema.columns());
+  }
+
+  private void verifyLoadViewFail(String name, int status) {
+    Response response = doLoadView(name);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyReplaceSucc(String name, ViewMetadata base) {
+    Response response = doReplaceView(name, base);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
+    Assertions.assertEquals(
+            newViewSchema.columns(), loadViewResponse.metadata().schema().columns());
+  }
+
+  private Response doReplaceView(String name, ViewMetadata base) {
+    ViewMetadata.Builder builder =
+            ViewMetadata.buildFrom(base).setCurrentVersion(base.currentVersion(), newViewSchema);
+    ViewMetadata replacement = builder.build();
+    UpdateTableRequest updateTableRequest =
+            UpdateTableRequest.create(
+                    null,
+                    UpdateRequirements.forReplaceView(base, replacement.changes()),
+                    replacement.changes());
+    return getViewClientBuilder(Optional.of(name))
+            .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private ViewMetadata getViewMeta(String viewName) {
+    Response response = doLoadView(viewName);
+    LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
+    return loadViewResponse.metadata();
+  }
+
+  private void verifyUpdateViewFail(String name, int status, ViewMetadata base) {
+    Response response = doReplaceView(name, base);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyDropViewSucc(String name) {
+    Response response = doDropView(name);
+    Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
+  }
+
+  private Response doDropView(String name) {
+    return getViewClientBuilder(Optional.of(name)).delete();
+  }
+
+  private void verifyDropViewFail(String name, int status) {
+    Response response = doDropView(name);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyViewExistsStatusCode(String name, int status) {
+    Response response = doViewExists(name);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private Response doViewExists(String name) {
+    return getViewClientBuilder(Optional.of(name)).head();
+  }
+
+  private void verifyListViewFail(int status) {
+    Response response = doListView();
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private Response doListView() {
+    return getViewClientBuilder().get();
+  }
+
+  private void verifyLisViewSucc(Set<String> expectedTableNames) {
+    Response response = doListView();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    ListTablesResponse listTablesResponse = response.readEntity(ListTablesResponse.class);
+    Set<String> tableNames =
+            listTablesResponse.identifiers().stream()
+                    .map(identifier -> identifier.name())
+                    .collect(Collectors.toSet());
+    Assertions.assertEquals(expectedTableNames, tableNames);
+  }
+
+  private void verifyRenameViewFail(String source, String dest, int status) {
+    Response response = doRenameView(source, dest);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private Response doRenameView(String source, String dest) {
+    RenameTableRequest renameTableRequest =
+            RenameTableRequest.builder()
+                    .withSource(
+                            TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), source))
+                    .withDestination(
+                            TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), dest))
+                    .build();
+    return getRenameViewClientBuilder()
+            .post(Entity.entity(renameTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private void verifyRenameViewSucc(String source, String dest) {
+    Response response = doRenameView(source, dest);
+    Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 }
