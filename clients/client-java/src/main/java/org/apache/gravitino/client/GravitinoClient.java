@@ -169,6 +169,26 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
+   * Lists the users.
+   *
+   * @return The User list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public User[] listUsers() {
+    return getMetalake().listUsers();
+  }
+
+  /**
+   * Lists the usernames.
+   *
+   * @return The username list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listUserNames() {
+    return getMetalake().listUserNames();
+  }
+
+  /**
    * Adds a new Group.
    *
    * @param group The name of the Group.
@@ -337,6 +357,16 @@ public class GravitinoClient extends GravitinoClientBase
   public void setOwner(MetadataObject object, String ownerName, Owner.Type ownerType)
       throws NotFoundException {
     getMetalake().setOwner(object, ownerName, ownerType);
+  }
+
+  /**
+   * Lists the role names.
+   *
+   * @return The role name list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listRoleNames() throws NoSuchMetalakeException {
+    return getMetalake().listRoleNames();
   }
 
   /**

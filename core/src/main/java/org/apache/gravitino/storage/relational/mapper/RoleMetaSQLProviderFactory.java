@@ -21,7 +21,8 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.RoleMetaPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.RoleMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.RoleMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -69,6 +70,10 @@ public class RoleMetaSQLProviderFactory {
   public static String listRolesByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId, @Param("metadataObjectType") String type) {
     return getProvider().listRolesByMetadataObjectIdAndType(metadataObjectId, type);
+  }
+
+  public static String listRolePOsByMetalake(@Param("metalakeName") String metalakeName) {
+    return getProvider().listRolePOsByMetalake(metalakeName);
   }
 
   public static String insertRoleMeta(@Param("roleMeta") RolePO rolePO) {
