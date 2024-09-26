@@ -28,12 +28,12 @@ class MetadataObjectRoleOperations implements SupportsRoles {
 
   private final RESTClient restClient;
 
-  private final String tagRequestPath;
+  private final String roleRequestPath;
 
   MetadataObjectRoleOperations(
       String metalakeName, MetadataObject metadataObject, RESTClient restClient) {
     this.restClient = restClient;
-    this.tagRequestPath =
+    this.roleRequestPath =
         String.format(
             "api/metalakes/%s/objects/%s/%s/roles",
             metalakeName,
@@ -45,7 +45,7 @@ class MetadataObjectRoleOperations implements SupportsRoles {
   public String[] listBindingRoleNames() {
     NameListResponse resp =
         restClient.get(
-            tagRequestPath,
+            roleRequestPath,
             NameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.roleErrorHandler());
