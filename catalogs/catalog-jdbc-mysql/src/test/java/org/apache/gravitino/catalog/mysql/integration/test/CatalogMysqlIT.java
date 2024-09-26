@@ -1148,7 +1148,7 @@ public class CatalogMysqlIT extends AbstractIT {
             UnsupportedOperationException.class,
             () -> catalog.asSchemas().createSchema(testSchemaName, "comment", null));
     Assertions.assertTrue(
-        exception.getMessage().contains("MySQL doesn't support set schema comment: comment"));
+        exception.getMessage().contains("Doesn't support setting schema comment: comment"));
 
     // test null comment
     String testSchemaName2 = "test2";

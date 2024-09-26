@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -53,6 +55,12 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   public void create(String databaseName, String comment, Map<String, String> properties)
       throws SchemaAlreadyExistsException {
     LOG.info("Beginning to create database {}", databaseName);
+    String originComment = StringIdentifier.removeIdFromComment(comment);
+    if (!supportSchemaComment() && StringUtils.isNotEmpty(originComment)) {
+      throw new UnsupportedOperationException(
+          "Doesn't support setting schema comment: " + originComment);
+    }
+
     try (final Connection connection = getConnection()) {
       JdbcConnectorUtils.executeUpdate(
           connection, generateCreateDatabaseSql(databaseName, comment, properties));
@@ -128,5 +136,14 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    */
   protected boolean isSystemDatabase(String dbName) {
     return false;
+  }
+
+  /**
+   * Check whether support setting schema comment.
+   *
+   * @return true for all cases.
+   */
+  protected boolean supportSchemaComment() {
+    return true;
   }
 }

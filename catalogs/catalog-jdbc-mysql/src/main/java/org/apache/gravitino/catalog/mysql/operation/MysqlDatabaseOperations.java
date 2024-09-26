@@ -30,8 +30,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -54,13 +52,7 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
-    String originComment = StringIdentifier.removeIdFromComment(comment);
-    if (StringUtils.isNotEmpty(originComment)) {
-      throw new UnsupportedOperationException(
-          "MySQL doesn't support set schema comment: " + originComment);
-    }
     StringBuilder sqlBuilder = new StringBuilder("CREATE DATABASE ");
-
     // Append database name
     sqlBuilder.append("`").append(databaseName).append("`");
     // Append options
@@ -119,5 +111,10 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   protected boolean isSystemDatabase(String dbName) {
     return SYS_MYSQL_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
+  }
+
+  @Override
+  protected boolean supportSchemaComment() {
+    return false;
   }
 }
