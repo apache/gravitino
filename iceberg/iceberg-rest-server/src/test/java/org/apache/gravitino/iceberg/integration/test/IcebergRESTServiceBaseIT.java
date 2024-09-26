@@ -76,6 +76,11 @@ public abstract class IcebergRESTServiceBaseIT {
     return !catalogType.equals(IcebergCatalogBackend.MEMORY);
   }
 
+  boolean catalogTypeNotHive() {
+    return !catalogType.equals(IcebergCatalogBackend.HIVE);
+  }
+
+
   abstract void initEnv();
 
   abstract Map<String, String> getCatalogConfig();
