@@ -39,6 +39,8 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 dependencies {
   implementation(project(":catalogs:catalog-common"))
   implementation(libs.guava)
+  implementation(project(mapOf("path" to ":api")))
+  implementation(project(mapOf("path" to ":clients:client-java")))
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")

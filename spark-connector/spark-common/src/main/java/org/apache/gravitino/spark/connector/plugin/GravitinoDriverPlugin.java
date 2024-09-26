@@ -32,6 +32,11 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.auth.AuthProperties;
+import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
+import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
@@ -83,7 +88,9 @@ public class GravitinoDriverPlugin implements DriverPlugin {
       gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
     }
 
-    this.catalogManager = GravitinoCatalogManager.create(gravitinoUri, metalake);
+    this.catalogManager =
+        GravitinoCatalogManager.create(
+            () -> createGravitinoAdminClient(gravitinoUri, metalake, conf));
     catalogManager.loadRelationalCatalogs();
     registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
     registerSqlExtensions(conf);
@@ -154,5 +161,36 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     } else {
       conf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), extensionString);
     }
+  }
+
+  private static GravitinoClient createGravitinoAdminClient(
+      String uri, String metalake, SparkConf sparkConf) {
+    ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
+    String authType =
+        sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
+    if (AuthProperties.isSimple(authType)) {
+      String username = sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_USER_NAME, null);
+      if (StringUtils.isNotBlank(username)) {
+        builder.withSimpleAuth(username.trim());
+      } else {
+        builder.withSimpleAuth();
+      }
+    } else if (AuthProperties.isOAuth2(authType)) {
+      DefaultOAuth2TokenProvider oAuth2TokenProvider =
+          DefaultOAuth2TokenProvider.builder()
+              .withUri("")
+              .withCredential("")
+              .withPath("")
+              .withScope("")
+              .build();
+      builder.withOAuth(oAuth2TokenProvider);
+    } else if (AuthProperties.isSimple(authType)) {
+      KerberosTokenProvider kerberosTokenProvider =
+          KerberosTokenProvider.builder().withClientPrincipal("").withKeyTabFile(null).build();
+      builder.withKerberosAuth(kerberosTokenProvider);
+    } else {
+      throw new UnsupportedOperationException("Doesn't support auth: " + authType);
+    }
+    return builder.build();
   }
 }
