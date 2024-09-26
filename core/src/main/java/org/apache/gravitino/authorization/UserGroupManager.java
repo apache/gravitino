@@ -27,7 +27,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -221,15 +220,16 @@ class UserGroupManager {
     skippingFields.add(GroupEntity.ROLE_IDS);
     skippingFields.add(GroupEntity.ROLE_NAMES);
     try {
-      return store.list(namespace, GroupEntity.class, EntityType.GROUP, skippingFields).toArray(new Group[0]);
+      return store
+          .list(namespace, GroupEntity.class, EntityType.GROUP, skippingFields)
+          .toArray(new Group[0]);
     } catch (Exception ioe) {
       LOG.error("Listing Groups failed due to storage issues.", ioe);
       throw new RuntimeException(ioe);
     }
   }
 
-  String[] listGroupNames(String metalake){
+  String[] listGroupNames(String metalake) {
     return Arrays.stream(listGroups(metalake)).map(Group::name).toArray(String[]::new);
   }
-
 }

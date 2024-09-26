@@ -83,7 +83,8 @@ public class GroupMetaSQLProviderFactory {
   public static String listGroupsByRoleId(@Param("roleId") Long roleId) {
     return getProvider().listGroupsByRoleId(roleId);
   }
-  public static String listGroupsByMetalake(@Param("metalakeId")Long metalakeId){
+
+  public static String listGroupsByMetalake(@Param("metalakeId") Long metalakeId) {
 
     return getProvider().listGroupsByMetalakeId(metalakeId);
   }

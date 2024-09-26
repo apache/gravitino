@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Group;
@@ -106,7 +105,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public String[] listGroupNames(String metalake) {
     return dispatcher.listGroupNames(metalake);
   }
-
 
   @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)

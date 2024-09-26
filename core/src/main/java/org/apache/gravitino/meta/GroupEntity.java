@@ -75,7 +75,7 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     return Collections.unmodifiableMap(fields);
   }
 
-  public static Set<Field> fieldSet(){
+  public static Set<Field> fieldSet() {
     Set<Field> fields = Sets.newHashSet();
     fields.add(ID);
     fields.add(NAME);

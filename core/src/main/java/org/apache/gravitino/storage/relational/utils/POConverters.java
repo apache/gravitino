@@ -814,7 +814,6 @@ public class POConverters {
     }
   }
 
-
   /**
    * Initialize UserRoleRelPO
    *

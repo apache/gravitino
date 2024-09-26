@@ -20,7 +20,6 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
-import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -52,11 +51,8 @@ public interface GroupMetaMapper {
   GroupPO selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
 
-  @SelectProvider(
-      type = GroupMetaSQLProviderFactory.class,
-      method = "listGroupsByMetalakeId")
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "listGroupsByMetalakeId")
   List<GroupPO> selectGroupsMetaByMetalakeId(@Param("metalakeId") Long metalakeId);
-
 
   @InsertProvider(type = GroupMetaSQLProviderFactory.class, method = "insertGroupMeta")
   void insertGroupMeta(@Param("groupMeta") GroupPO groupPO);

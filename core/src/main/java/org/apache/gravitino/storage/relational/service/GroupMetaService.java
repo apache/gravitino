@@ -37,7 +37,6 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -47,7 +46,6 @@ import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.h2.engine.Session;
 
 /** The service class for group metadata. It provides the basic database operations for group. */
 public class GroupMetaService {
@@ -252,15 +250,19 @@ public class GroupMetaService {
     return newEntity;
   }
 
-  public List<GroupEntity> listGroupsByNamespace(Namespace namespace){
+  public List<GroupEntity> listGroupsByNamespace(Namespace namespace) {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
     Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-      List<GroupPO> groupPOS = SessionUtils.getWithoutCommit(
-          GroupMetaMapper.class, mapper->mapper.selectGroupsMetaByMetalakeId(metalakeId)
-      );
-    return groupPOS.stream().map(po->POConverters.fromGroupPO(po,Collections.emptyList(),AuthorizationUtils.ofUserNamespace(metalakeName))).collect(
-        Collectors.toList());
+    List<GroupPO> groupPOS =
+        SessionUtils.getWithoutCommit(
+            GroupMetaMapper.class, mapper -> mapper.selectGroupsMetaByMetalakeId(metalakeId));
+    return groupPOS.stream()
+        .map(
+            po ->
+                POConverters.fromGroupPO(
+                    po, Collections.emptyList(), AuthorizationUtils.ofUserNamespace(metalakeName)))
+        .collect(Collectors.toList());
   }
 
   public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {

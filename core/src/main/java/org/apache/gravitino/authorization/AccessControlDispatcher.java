@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;

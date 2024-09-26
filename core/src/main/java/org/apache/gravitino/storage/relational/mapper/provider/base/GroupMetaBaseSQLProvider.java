@@ -35,11 +35,14 @@ public class GroupMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String listGroupsByMetalake(@Param("metalakeName") String metalakeName){
+  public String listGroupsByMetalake(@Param("metalakeName") String metalakeName) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName, gt.metalake_id as metalakeId,"
         + " gt.audit_info as auditInfo, gt.current_version as currentVersion, gt.last_version as lastVersion,"
-        + " gt.deleted_at as deletedAt FROM " + GROUP_TABLE_NAME + " gt JOIN " +
-        MetalakeMetaMapper.TABLE_NAME + " mt ON gt.metalake_id = mt.metalakeId + WHERE mt.metalake_name = #{metalake_name}"
+        + " gt.deleted_at as deletedAt FROM "
+        + GROUP_TABLE_NAME
+        + " gt JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON gt.metalake_id = mt.metalakeId + WHERE mt.metalake_name = #{metalake_name}"
         + " AND gt.deleted_at = 0 AND mt.deleted_at = 0";
   }
 

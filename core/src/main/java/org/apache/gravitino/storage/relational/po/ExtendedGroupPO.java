@@ -20,7 +20,7 @@ package org.apache.gravitino.storage.relational.po;
 
 import java.util.Objects;
 
-public class ExtendedGroupPO extends GroupPO{
+public class ExtendedGroupPO extends GroupPO {
 
   private String groupNames;
   private String groupIds;
@@ -28,8 +28,6 @@ public class ExtendedGroupPO extends GroupPO{
   public String getGroupNames() {
     return groupNames;
   }
-
-
 
   public String getGroupIds() {
     return groupIds;
@@ -41,12 +39,12 @@ public class ExtendedGroupPO extends GroupPO{
       return true;
     }
 
-    if (!(o instanceof ExtendedGroupPO)){
+    if (!(o instanceof ExtendedGroupPO)) {
       return false;
     }
     ExtendedGroupPO that = (ExtendedGroupPO) o;
-    return Objects.equals(getGroupNames(), that.getGroupNames()) && Objects.equals(getGroupIds(),
-        that.getGroupIds());
+    return Objects.equals(getGroupNames(), that.getGroupNames())
+        && Objects.equals(getGroupIds(), that.getGroupIds());
   }
 
   @Override
