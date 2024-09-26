@@ -27,8 +27,6 @@ import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -235,38 +233,6 @@ public class TestRole extends TestBase {
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
     buildMockResource(Method.GET, rolePath, null, errResp, SC_SERVER_ERROR);
     Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.listRoleNames());
-  }
-
-  @Test
-  public void testListRoleNamesByObject() throws Exception {
-    String rolePath =
-        withSlash(
-            String.format(
-                "api/metalakes/%s/objects/%s/%s/roles",
-                metalakeName, MetadataObject.Type.CATALOG.name(), "catalog"));
-
-    NameListResponse listResponse = new NameListResponse(new String[] {"role1", "role2"});
-    buildMockResource(Method.GET, rolePath, null, listResponse, SC_OK);
-    MetadataObject metadataObject =
-        MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
-
-    Assertions.assertArrayEquals(
-        new String[] {"role1", "role2"}, gravitinoClient.listRoleNamesByObject(metadataObject));
-
-    ErrorResponse errRespNoMetalake =
-        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "metalake not found");
-    buildMockResource(Method.GET, rolePath, null, errRespNoMetalake, SC_NOT_FOUND);
-    Exception ex =
-        Assertions.assertThrows(
-            NoSuchMetalakeException.class,
-            () -> gravitinoClient.listRoleNamesByObject(metadataObject));
-    Assertions.assertEquals("metalake not found", ex.getMessage());
-
-    // Test RuntimeException
-    ErrorResponse errResp = ErrorResponse.internalError("internal error");
-    buildMockResource(Method.GET, rolePath, null, errResp, SC_SERVER_ERROR);
-    Assertions.assertThrows(
-        RuntimeException.class, () -> gravitinoClient.listRoleNamesByObject(metadataObject));
   }
 
   private RoleDTO mockRoleDTO(String name) {
