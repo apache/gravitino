@@ -12,13 +12,14 @@ Since Hive 2.x, Hive has supported S3 as a storage backend, enabling users to st
 
 The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3 as a storage backend, including configuration details and examples for creating databases and tables.
 
-## Hive cluster configuration
-To use the Hive catalog with S3, you must configure your Hive cluster to recognize S3 as a storage backend. The following example illustrates the required changes in the `hive-site.xml` configuration file:
+## Hive metastore configuration
+To use the Hive catalog with S3, you must configure your Hive metastore to recognize S3 as a storage backend. The following example illustrates the required changes in the `hive-site.xml` configuration file:
 
 ### Example Configuration Changes
 Below are the essential properties to add or modify in the `hive-site.xml` file to support S3:
 
 ```xml
+
 <property>
   <name>fs.s3a.access.key</name>
   <value>S3_ACCESS_KEY_ID</value>
@@ -38,10 +39,10 @@ Below are the essential properties to add or modify in the `hive-site.xml` file 
   <name>fs.s3a.aws.credentials.provider</name>
   <value>org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider,com.amazonaws.auth.EnvironmentVariableCredentialsProvider,org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider</value>
 </property>
+
 ```
 
 ### Adding Required JARs
-
 
 After updating the `hive-site.xml`, you need to ensure that the necessary S3-related JARs are included in the Hive classpath. You can do this by executing the following command:
 ```shell
@@ -49,7 +50,8 @@ cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
 ```
 Alternatively, you can download the required JARs from the Maven repository and place them in the Hive classpath. It is crucial to verify that the JARs are compatible with the version of Hadoop you are using to avoid any compatibility issue.
 
-### Restart Hive Cluster
+### Restart Hive metastore
+
 Once all configurations have been correctly set, restart the Hive cluster to apply the changes. This step is essential to ensure that the new configurations take effect and that the Hive services can communicate with S3.
 
 
@@ -58,6 +60,7 @@ Once all configurations have been correctly set, restart the Hive cluster to app
 Assuming you have already set up a Hive catalog with Gravitino, you can proceed to create tables or databases using S3 storage. For more information on catalog operations, refer to [Catalog operations](./manage-fileset-metadata-using-gravitino.md#catalog-operations)
 
 ### Example: Creating a Database with S3 Storage
+
 The following is an example of how to create a database in S3 using Gravitino:
 
 <Tabs groupId="language" queryString>
@@ -199,6 +202,7 @@ To access S3-stored tables using Spark, you need to configure the SparkSession a
 
     sparkSession.sql("...");
 ```
+
 :::Note
 Please ensure that the necessary S3-related JAR files are included in the Spark classpath. If the JARs are missing, Spark will not be able to access the S3 storage.
 :::

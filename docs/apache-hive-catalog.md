@@ -200,4 +200,6 @@ Support for altering partitions is under development.
 
 ## Hive catalog with S3 storage
 
-To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-s3.md) documentation. 
+To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-s3.md) documentation. No special configurations are required for the Hive catalog to work with S3 storage.
+The only difference is the storage location of the files, which is in S3. You can use `location` to specify the S3 path for the database or table.
+
