@@ -23,11 +23,9 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.Field;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -40,7 +38,6 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,26 +114,23 @@ class UserGroupManager {
   }
 
   String[] listUserNames(String metalake) {
-    Set<Field> skippingFields = Sets.newHashSet();
-    skippingFields.add(UserEntity.ROLE_NAMES);
-    skippingFields.add(UserEntity.ROLE_IDS);
 
-    return Arrays.stream(listUsersInternal(metalake, skippingFields))
+    return Arrays.stream(listUsersInternal(metalake, false /* allFields */))
         .map(User::name)
         .toArray(String[]::new);
   }
 
   User[] listUsers(String metalake) {
-    return listUsersInternal(metalake, Collections.emptySet());
+    return listUsersInternal(metalake, true /* allFields */);
   }
 
-  private User[] listUsersInternal(String metalake, Set<Field> skippingFields) {
+  private User[] listUsersInternal(String metalake, boolean allFields) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
 
       Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
       return store
-          .list(namespace, UserEntity.class, Entity.EntityType.USER, skippingFields)
+          .list(namespace, UserEntity.class, Entity.EntityType.USER, allFields)
           .toArray(new User[0]);
     } catch (NoSuchEntityException e) {
       LOG.error("Metalake {} does not exist", metalake, e);

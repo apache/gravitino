@@ -46,8 +46,8 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the role entity.");
 
-  public static final Field SECURABLE_OBJECT =
-      Field.required("securable_objects", List.class, "The securable objects of the role entity.");
+  public static final Field SECURABLE_OBJECTS =
+      Field.optional("securable_objects", List.class, "The securable objects of the role entity.");
 
   private Long id;
   private String name;
@@ -91,15 +91,6 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
    */
   @Override
   public List<SecurableObject> securableObjects() {
-    // The securable object is a special kind of entities. Some entity types aren't the securable
-    // object, such as
-    // User, Role, etc.
-    // The securable object identifier must be unique.
-    // Gravitino assumes that the identifiers of the entities may be the same if they have different
-    // types.
-    // So one type of them can't be the securable object at least if there are the two same
-    // identifier
-    // entities .
     return securableObjects;
   }
 
@@ -115,7 +106,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
-    fields.put(SECURABLE_OBJECT, securableObjects);
+    fields.put(SECURABLE_OBJECTS, securableObjects);
 
     return Collections.unmodifiableMap(fields);
   }

@@ -20,11 +20,13 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -235,6 +237,22 @@ public class RoleMetaService {
   private List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
     return SessionUtils.getWithoutCommit(
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
+  }
+
+  public List<RoleEntity> listRolesByNamespace(Namespace namespace) {
+    AuthorizationUtils.checkRoleNamespace(namespace);
+    String metalakeName = namespace.level(0);
+
+    List<RolePO> rolePOs =
+        SessionUtils.getWithoutCommit(
+            RoleMetaMapper.class, mapper -> mapper.listRolePOsByMetalake(metalakeName));
+
+    return rolePOs.stream()
+        .map(
+            po ->
+                POConverters.fromRolePO(
+                    po, Collections.emptyList(), AuthorizationUtils.ofRoleNamespace(metalakeName)))
+        .collect(Collectors.toList());
   }
 
   public int deleteRoleMetasByLegacyTimeline(long legacyTimeline, int limit) {
