@@ -44,6 +44,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.responses.DeleteResponse;
+import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -66,6 +67,27 @@ public class RoleOperations {
 
   public RoleOperations() {
     this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
+  }
+
+  @GET
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-role", absolute = true)
+  public Response listRoles(@PathParam("metalake") String metalake) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () ->
+              TreeLockUtils.doWithTreeLock(
+                  NameIdentifier.of(metalake),
+                  LockType.READ,
+                  () -> {
+                    String[] names = accessControlManager.listRoleNames(metalake);
+                    return Utils.ok(new NameListResponse(names));
+                  }));
+    } catch (Exception e) {
+      return ExceptionHandlers.handleRoleException(OperationType.LIST, "", metalake, e);
+    }
   }
 
   @GET

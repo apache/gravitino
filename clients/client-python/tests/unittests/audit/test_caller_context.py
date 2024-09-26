@@ -62,3 +62,6 @@ class TestCallerContext(unittest.TestCase):
             CallerContextHolder.remove()
 
         self.assertIsNone(CallerContextHolder.get())
+
+        # will not throw an exception if the context is not exists
+        CallerContextHolder.remove()

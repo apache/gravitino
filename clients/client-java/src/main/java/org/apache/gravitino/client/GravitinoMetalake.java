@@ -101,9 +101,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
   private static final String API_METALAKES_OWNERS_PATH = "api/metalakes/%s/owners/%s";
-  private static final String BLANK_PLACE_HOLDER = "";
 
   private static final String API_METALAKES_TAGS_PATH = "api/metalakes/%s/tags";
+  private static final String BLANK_PLACEHOLDER = "";
 
   private final RESTClient restClient;
 
@@ -465,7 +465,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
     UserResponse resp =
         restClient.post(
-            String.format(API_METALAKES_USERS_PATH, this.name(), BLANK_PLACE_HOLDER),
+            String.format(API_METALAKES_USERS_PATH, this.name(), BLANK_PLACEHOLDER),
             req,
             UserResponse.class,
             Collections.emptyMap(),
@@ -529,7 +529,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
     UserListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_USERS_PATH, name(), BLANK_PLACE_HOLDER),
+            String.format(API_METALAKES_USERS_PATH, name(), BLANK_PLACEHOLDER),
             params,
             UserListResponse.class,
             Collections.emptyMap(),
@@ -548,7 +548,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public String[] listUserNames() throws NoSuchMetalakeException {
     NameListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_USERS_PATH, name(), BLANK_PLACE_HOLDER),
+            String.format(API_METALAKES_USERS_PATH, name(), BLANK_PLACEHOLDER),
             NameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.userErrorHandler());
@@ -572,7 +572,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
     GroupResponse resp =
         restClient.post(
-            String.format(API_METALAKES_GROUPS_PATH, this.name(), BLANK_PLACE_HOLDER),
+            String.format(API_METALAKES_GROUPS_PATH, this.name(), BLANK_PLACEHOLDER),
             req,
             GroupResponse.class,
             Collections.emptyMap(),
@@ -729,7 +729,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
     RoleResponse resp =
         restClient.post(
-            String.format(API_METALAKES_ROLES_PATH, this.name(), BLANK_PLACE_HOLDER),
+            String.format(API_METALAKES_ROLES_PATH, this.name(), BLANK_PLACEHOLDER),
             req,
             RoleResponse.class,
             Collections.emptyMap(),
@@ -737,6 +737,24 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     resp.validate();
 
     return resp.getRole();
+  }
+
+  /**
+   * Lists the role names.
+   *
+   * @return The role name list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listRoleNames() {
+    NameListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_ROLES_PATH, this.name(), BLANK_PLACEHOLDER),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    resp.validate();
+
+    return resp.getNames();
   }
 
   /**

@@ -154,6 +154,11 @@ public class AccessControlManager implements AccessControlDispatcher {
     return roleManager.deleteRole(metalake, role);
   }
 
+  @Override
+  public String[] listRoleNames(String metalake) throws NoSuchMetalakeException {
+    return roleManager.listRoleNames(metalake);
+  }
+
   @VisibleForTesting
   RoleManager getRoleManager() {
     return roleManager;

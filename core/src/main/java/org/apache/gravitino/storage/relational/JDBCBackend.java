@@ -26,13 +26,11 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -90,8 +88,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType, Set<Field> skippingFields)
-      throws IOException {
+      Namespace namespace, Entity.EntityType entityType, boolean allFields) throws IOException {
     switch (entityType) {
       case METALAKE:
         return (List<E>) MetalakeMetaService.getInstance().listMetalakes();
@@ -108,8 +105,9 @@ public class JDBCBackend implements RelationalBackend {
       case TAG:
         return (List<E>) TagMetaService.getInstance().listTagsByNamespace(namespace);
       case USER:
-        return (List<E>)
-            UserMetaService.getInstance().listUsersByNamespace(namespace, skippingFields);
+        return (List<E>) UserMetaService.getInstance().listUsersByNamespace(namespace, allFields);
+      case ROLE:
+        return (List<E>) RoleMetaService.getInstance().listRolesByNamespace(namespace);
       case GROUP:
         return (List<E>) GroupMetaService.getInstance().listGroupsByNamespace(namespace);
       default:
