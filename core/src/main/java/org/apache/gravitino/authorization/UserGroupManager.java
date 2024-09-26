@@ -27,7 +27,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.Field;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -213,23 +212,28 @@ class UserGroupManager {
   }
 
   Group[] listGroups(String metalake) {
-    AuthorizationUtils.checkMetalakeExists(metalake);
-    Namespace namespace = AuthorizationUtils.ofGroupNamespace(metalake);
+    return listGroupInternal(metalake, true);
+  }
 
-    Set<Field> skippingFields = Sets.newHashSet();
-    skippingFields.add(GroupEntity.ROLE_IDS);
-    skippingFields.add(GroupEntity.ROLE_NAMES);
+  private Group[] listGroupInternal(String metalake, boolean allFields) {
     try {
+      AuthorizationUtils.checkMetalakeExists(metalake);
+      Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
       return store
-          .list(namespace, GroupEntity.class, EntityType.GROUP, skippingFields)
+          .list(namespace, GroupEntity.class, EntityType.GROUP, allFields)
           .toArray(new Group[0]);
-    } catch (Exception ioe) {
-      LOG.error("Listing Groups failed due to storage issues.", ioe);
+    } catch (NoSuchEntityException e) {
+      LOG.error("Metalake {} does not exist", metalake, e);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Listing group under metalake {} failed due to storage issues", metalake, ioe);
       throw new RuntimeException(ioe);
     }
   }
 
   String[] listGroupNames(String metalake) {
-    return Arrays.stream(listGroups(metalake)).map(Group::name).toArray(String[]::new);
+    return Arrays.stream(listGroupInternal(metalake, false))
+        .map(Group::name)
+        .toArray(String[]::new);
   }
 }

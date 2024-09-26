@@ -634,7 +634,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     Map<String,String> params = new HashMap<>();
     GroupListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_GROUPS_PATH,name(),BLANK_PLACE_HOLDER),
+            String.format(API_METALAKES_GROUPS_PATH,name(),BLANK_PLACEHOLDER),
             params,
             GroupListResponse.class,
             Collections.emptyMap(),
@@ -652,7 +652,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   public String[] listGroupNames(){
     NameListResponse resp = restClient.get(
         String.format(API_METALAKES_GROUPS_PATH,name(),
-            BLANK_PLACE_HOLDER),
+            BLANK_PLACEHOLDER),
         NameListResponse.class,
         Collections.emptyMap(),
         ErrorHandlers.groupErrorHandler()
