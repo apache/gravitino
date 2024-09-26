@@ -71,6 +71,16 @@ public class ContainerSuite implements Closeable {
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
       new EnumMap<>(PGImageName.class);
 
+  private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
+
+  /**
+   * We can share the same Hive container as Hive container with S3 contains the following
+   * differences: 1. Configuration of S3 and corresponding environment variables 2. The Hive
+   * container with S3 is Hive3 container and the Hive container is Hive2 container. There is
+   * something wrong with the hive2 container to access the S3.
+   */
+  private static volatile HiveContainer hiveContainerWithS3;
+
   protected static final CloseableGroup closer = CloseableGroup.create();
 
   private static void initIfNecessary() {
@@ -112,7 +122,11 @@ public class ContainerSuite implements Closeable {
     return network;
   }
 
-  public void startHiveContainer() {
+  public void startHiveContainer(Map<String, String> env) {
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    builder.putAll(env);
+    builder.put("HADOOP_USER_NAME", "anonymous");
+
     if (hiveContainer == null) {
       synchronized (ContainerSuite.class) {
         if (hiveContainer == null) {
@@ -121,10 +135,7 @@ public class ContainerSuite implements Closeable {
           HiveContainer.Builder hiveBuilder =
               HiveContainer.builder()
                   .withHostName("gravitino-ci-hive")
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "anonymous")
-                          .build())
+                  .withEnvVars(builder.build())
                   .withNetwork(network);
           HiveContainer container = closer.register(hiveBuilder.build());
           container.start();
@@ -132,6 +143,33 @@ public class ContainerSuite implements Closeable {
         }
       }
     }
+  }
+
+  public void startHiveContainerWithS3(Map<String, String> env) {
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    builder.putAll(env);
+    builder.put("HADOOP_USER_NAME", "anonymous");
+
+    if (hiveContainerWithS3 == null) {
+      synchronized (ContainerSuite.class) {
+        if (hiveContainerWithS3 == null) {
+          initIfNecessary();
+          // Start Hive container
+          HiveContainer.Builder hiveBuilder =
+              HiveContainer.builder()
+                  .withHostName("gravitino-ci-hive")
+                  .withEnvVars(builder.build())
+                  .withNetwork(network);
+          HiveContainer container = closer.register(hiveBuilder.build());
+          container.start();
+          hiveContainerWithS3 = container;
+        }
+      }
+    }
+  }
+
+  public void startHiveContainer() {
+    startHiveContainer(ImmutableMap.of());
   }
 
   /**
@@ -359,6 +397,33 @@ public class ContainerSuite implements Closeable {
         }
       }
     }
+  }
+
+  public void startLocalStackContainer() {
+    if (gravitinoLocalStackContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (gravitinoLocalStackContainer == null) {
+          GravitinoLocalStackContainer.Builder builder =
+              GravitinoLocalStackContainer.builder().withNetwork(network);
+          GravitinoLocalStackContainer container = closer.register(builder.build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start LocalStack container", e);
+            throw new RuntimeException("Failed to start LocalStack container", e);
+          }
+          gravitinoLocalStackContainer = container;
+        }
+      }
+    }
+  }
+
+  public GravitinoLocalStackContainer getLocalStackContainer() {
+    return gravitinoLocalStackContainer;
+  }
+
+  public HiveContainer getHiveContainerWithS3() {
+    return hiveContainerWithS3;
   }
 
   public KafkaContainer getKafkaContainer() {

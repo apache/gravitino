@@ -63,7 +63,7 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   CLOUD_NAME,
                   "The cloud that the catalog is running on",
                   false /* required */,
-                  true /* immutable */,
+                  false /* immutable */,
                   Catalog.CloudName.class,
                   null /* The default value does not work because if the user does not set it, this property will not be displayed */,
                   false /* hidden */,
@@ -71,7 +71,7 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
               PropertyEntry.stringOptionalPropertyEntry(
                   CLOUD_REGION_CODE,
                   "The region code of the cloud that the catalog is running on",
-                  false /* required */,
+                  false /* immutable */,
                   null /* The default value does not work because if the user does not set it, this property will not be displayed */,
                   false /* hidden */)),
           PropertyEntry::getName);

@@ -42,4 +42,25 @@
     <value>hdfs://__REPLACE__HOST_NAME:9000/user/hive/warehouse</value>
     <description>location of default database for the warehouse</description>
   </property>
+
+  <property>
+    <name>fs.s3a.access.key</name>
+    <value>S3_ACCESS_KEY_ID</value>
+  </property>
+
+  <property>
+    <name>fs.s3a.secret.key</name>
+    <value>S3_SECRET_KEY_ID</value>
+  </property>
+
+  <property>
+    <name>fs.s3a.endpoint</name>
+    <value>S3_ENDPOINT_ID</value>
+  </property>
+
+  <property>
+    <name>fs.s3a.aws.credentials.provider</name>
+    <value>org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider,com.amazonaws.auth.EnvironmentVariableCredentialsProvider,org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider</value>
+  </property>
+
 </configuration>

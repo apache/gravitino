@@ -72,6 +72,24 @@ public interface AccessControlDispatcher {
   User getUser(String metalake, String user) throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
+   * Lists the users.
+   *
+   * @param metalake The Metalake of the User.
+   * @return The User list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  User[] listUsers(String metalake) throws NoSuchMetalakeException;
+
+  /**
+   * Lists the usernames.
+   *
+   * @param metalake The Metalake of the User.
+   * @return The username list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  String[] listUserNames(String metalake) throws NoSuchMetalakeException;
+
+  /**
    * Adds a new Group.
    *
    * @param metalake The Metalake of the Group.
@@ -218,5 +236,14 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If deleting the Role encounters storage issues.
    */
-  public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException;
+  boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException;
+
+  /**
+   * Lists the role names.
+   *
+   * @param metalake The Metalake of the Role.
+   * @return The role name list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  String[] listRoleNames(String metalake) throws NoSuchMetalakeException;
 }

@@ -296,7 +296,7 @@ public class TestEntity {
         Lists.newArrayList(
             SecurableObjects.ofCatalog(
                 catalogName, Lists.newArrayList(Privileges.UseCatalog.allow()))),
-        fields.get(RoleEntity.SECURABLE_OBJECT));
+        fields.get(RoleEntity.SECURABLE_OBJECTS));
 
     RoleEntity roleWithoutFields =
         RoleEntity.builder()
