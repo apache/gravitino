@@ -27,9 +27,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -47,22 +45,6 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
     set.add("performance_schema");
     set.add("sys");
     return Collections.unmodifiableSet(set);
-  }
-
-  @Override
-  public String generateCreateDatabaseSql(
-      String databaseName, String comment, Map<String, String> properties) {
-    StringBuilder sqlBuilder = new StringBuilder("CREATE DATABASE ");
-    // Append database name
-    sqlBuilder.append("`").append(databaseName).append("`");
-    // Append options
-    if (MapUtils.isNotEmpty(properties)) {
-      // TODO #804 Properties will be unified in the future.
-      throw new UnsupportedOperationException("Properties are not supported yet");
-    }
-    String result = sqlBuilder.toString();
-    LOG.info("Generated create database:{} sql: {}", databaseName, result);
-    return result;
   }
 
   @Override

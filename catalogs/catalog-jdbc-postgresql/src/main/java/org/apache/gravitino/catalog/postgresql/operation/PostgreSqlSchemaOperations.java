@@ -171,6 +171,11 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
     return SYS_PG_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
   }
 
+  @Override
+  protected boolean supportSchemaComment() {
+    return true;
+  }
+
   private String getShowSchemaCommentSql(String schema) {
     return String.format(
         "SELECT obj_description(n.oid, 'pg_namespace') AS comment\n"

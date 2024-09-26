@@ -140,4 +140,9 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
   protected boolean isSystemDatabase(String dbName) {
     return DORIS_SYSTEM_DATABASE_NAMES.contains(dbName);
   }
+
+  @Override
+  protected boolean supportSchemaComment() {
+    return true;
+  }
 }

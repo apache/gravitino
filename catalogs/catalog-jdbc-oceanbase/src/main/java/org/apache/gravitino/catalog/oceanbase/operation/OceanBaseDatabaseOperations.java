@@ -27,9 +27,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -47,18 +45,6 @@ public class OceanBaseDatabaseOperations extends JdbcDatabaseOperations {
     set.add("sys");
     set.add("oceanbase");
     return Collections.unmodifiableSet(set);
-  }
-
-  @Override
-  public String generateCreateDatabaseSql(
-      String databaseName, String comment, Map<String, String> properties) {
-    String createDatabaseSql = String.format("CREATE DATABASE `%s`", databaseName);
-    // Append options
-    if (MapUtils.isNotEmpty(properties)) {
-      throw new UnsupportedOperationException("Properties are not supported yet.");
-    }
-    LOG.info("Generated create database:{} sql: {}", databaseName, createDatabaseSql);
-    return createDatabaseSql;
   }
 
   @Override

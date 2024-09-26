@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.sql.DataSource;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -114,8 +115,15 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    * @param properties The properties of the database.
    * @return the SQL statement to create a database with the given name and comment.
    */
-  protected abstract String generateCreateDatabaseSql(
-      String databaseName, String comment, Map<String, String> properties);
+  protected String generateCreateDatabaseSql(
+      String databaseName, String comment, Map<String, String> properties) {
+    String createDatabaseSql = String.format("CREATE DATABASE `%s`", databaseName);
+    if (MapUtils.isNotEmpty(properties)) {
+      throw new UnsupportedOperationException("Properties are not supported yet.");
+    }
+    LOG.info("Generated create database:{} sql: {}", databaseName, createDatabaseSql);
+    return createDatabaseSql;
+  }
 
   /**
    * @param databaseName The name of the database.
@@ -138,12 +146,6 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
     return false;
   }
 
-  /**
-   * Check whether support setting schema comment.
-   *
-   * @return true for all cases.
-   */
-  protected boolean supportSchemaComment() {
-    return true;
-  }
+  /** Check whether support setting schema comment. */
+  protected abstract boolean supportSchemaComment();
 }
