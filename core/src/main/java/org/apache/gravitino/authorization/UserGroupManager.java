@@ -223,8 +223,11 @@ class UserGroupManager {
     AuthorizationUtils.checkMetalakeExists(metalake);
     Namespace namespace = AuthorizationUtils.ofGroupNamespace(metalake);
 
+    Set<Field> skippingFields = Sets.newHashSet();
+    skippingFields.add(GroupEntity.ROLE_IDS);
+    skippingFields.add(GroupEntity.ROLE_NAMES);
     try {
-      return store.list(namespace, GroupEntity.class, EntityType.GROUP).toArray(new Group[0]);
+      return store.list(namespace, GroupEntity.class, EntityType.GROUP, skippingFields).toArray(new Group[0]);
     } catch (Exception ioe) {
       LOG.error("Listing Groups failed due to storage issues.", ioe);
       throw new RuntimeException(ioe);
