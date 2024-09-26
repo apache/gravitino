@@ -53,7 +53,6 @@ public class TestIcebergExtendAPI {
     this.icebergRESTServerManager = IcebergRESTServerManager.create();
     registerIcebergExtensionPackages();
     icebergRESTServerManager.startIcebergRESTServer();
-    icebergRESTServerManager.getServerConfig();
     this.uri = String.format("http://127.0.0.1:%d/iceberg", getServerPort());
     LOG.info("Gravitino Iceberg REST server started, uri: {}", uri);
   }
