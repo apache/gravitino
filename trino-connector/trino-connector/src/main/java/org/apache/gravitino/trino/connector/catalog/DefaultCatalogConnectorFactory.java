@@ -26,6 +26,7 @@ import org.apache.gravitino.trino.connector.catalog.hive.HiveConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.jdbc.postgresql.PostgreSQLConnectorAdapter;
+import org.apache.gravitino.trino.connector.catalog.jdbc.trino.TrinoClusterConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.memory.MemoryConnectorAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.slf4j.Logger;
@@ -35,25 +36,49 @@ import org.slf4j.LoggerFactory;
 public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultCatalogConnectorFactory.class);
 
+  private static final String HIVE_CONNECTOR_PROVIDER_NAME = "hive";
+  private static final String ICEBERG_CONNECTOR_PROVIDER_NAME = "lakehouse-iceberg";
+  private static final String MEMORY_CONNECTOR_PROVIDER_NAME = "memory";
+  private static final String MYSQL_CONNECTOR_PROVIDER_NAME = "jdbc-mysql";
+  private static final String POSTGRESQL_CONNECTOR_PROVIDER_NAME = "jdbc-postgresql";
+  private static final String TRINO_CLUSTER_CONNECTOR_PROVIDER_NAME = "trino-cluster";
+
   protected final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders =
       new HashMap<>();
+  protected final String region;
 
   public DefaultCatalogConnectorFactory(GravitinoConfig config) {
-    catalogBuilders.put("hive", new CatalogConnectorContext.Builder(new HiveConnectorAdapter()));
+    this.region = config.getRegion();
+
     catalogBuilders.put(
-        "memory", new CatalogConnectorContext.Builder(new MemoryConnectorAdapter()));
+        HIVE_CONNECTOR_PROVIDER_NAME,
+        new CatalogConnectorContext.Builder(new HiveConnectorAdapter()));
     catalogBuilders.put(
-        "lakehouse-iceberg", new CatalogConnectorContext.Builder(new IcebergConnectorAdapter()));
+        MEMORY_CONNECTOR_PROVIDER_NAME,
+        new CatalogConnectorContext.Builder(new MemoryConnectorAdapter()));
     catalogBuilders.put(
-        "jdbc-mysql", new CatalogConnectorContext.Builder(new MySQLConnectorAdapter()));
+        ICEBERG_CONNECTOR_PROVIDER_NAME,
+        new CatalogConnectorContext.Builder(new IcebergConnectorAdapter()));
     catalogBuilders.put(
-        "jdbc-postgresql", new CatalogConnectorContext.Builder(new PostgreSQLConnectorAdapter()));
+        MYSQL_CONNECTOR_PROVIDER_NAME,
+        new CatalogConnectorContext.Builder(new MySQLConnectorAdapter()));
+    catalogBuilders.put(
+        POSTGRESQL_CONNECTOR_PROVIDER_NAME,
+        new CatalogConnectorContext.Builder(new PostgreSQLConnectorAdapter()));
+    catalogBuilders.put(
+        TRINO_CLUSTER_CONNECTOR_PROVIDER_NAME,
+        new CatalogConnectorContext.Builder(new TrinoClusterConnectorAdapter()));
     LOG.info("Start the DefaultCatalogConnectorFactory");
   }
 
   public CatalogConnectorContext.Builder createCatalogConnectorContextBuilder(
       GravitinoCatalog catalog) {
     String catalogProvider = catalog.getProvider();
+
+    if (!catalog.isSameRegion(region)) {
+      catalogProvider = TRINO_CLUSTER_CONNECTOR_PROVIDER_NAME;
+    }
+
     CatalogConnectorContext.Builder builder = catalogBuilders.get(catalogProvider);
     if (builder == null) {
       String message = String.format("Unsupported catalog provider %s.", catalogProvider);

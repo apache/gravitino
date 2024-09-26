@@ -163,25 +163,25 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 self._strip_storage_protocol(storage_type, actual_path),
                 detail=True,
             )
-            actual_entries = [
+            virtual_entries = [
                 self._convert_actual_info(
                     entry, storage_location, self._get_virtual_location(identifier)
                 )
                 for entry in entries
             ]
-            return actual_entries
+            return virtual_entries
         # only returns paths
         entry_paths = context_pair.filesystem().ls(
             self._strip_storage_protocol(storage_type, actual_path),
             detail=False,
         )
-        actual_entry_paths = [
+        virtual_entry_paths = [
             self._convert_actual_path(
                 entry_path, storage_location, self._get_virtual_location(identifier)
             )
             for entry_path in entry_paths
         ]
-        return actual_entry_paths
+        return virtual_entry_paths
 
     def info(self, path, **kwargs):
         """Get file info.

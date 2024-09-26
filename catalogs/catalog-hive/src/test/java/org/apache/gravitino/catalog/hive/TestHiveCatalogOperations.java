@@ -103,7 +103,9 @@ class TestHiveCatalogOperations {
     Assertions.assertFalse(propertyEntryMap.get(CHECK_INTERVAL_SEC).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(FETCH_TIMEOUT_SEC).isRequired());
     Assertions.assertFalse(propertyEntryMap.get(CLOUD_NAME).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(CLOUD_NAME).isImmutable());
     Assertions.assertFalse(propertyEntryMap.get(CLOUD_REGION_CODE).isRequired());
+    Assertions.assertFalse(propertyEntryMap.get(CLOUD_REGION_CODE).isImmutable());
   }
 
   @Test
