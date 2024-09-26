@@ -70,6 +70,5 @@ project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector
 include("web:web", "web:integration-test")
 include("docs")
 include("integration-test-common")
-include("bundles:hadoop-s3-bundle")
-include("bundles:hadoop-gcs-bundle")
-findProject(":bundles:hadoop-gcs-bundle")?.name = "hadoop-gcs-bundle"
+include("bundles:s3-bundle")
+include("bundles:gcs-bundle")

@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
-import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -30,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -119,18 +116,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     this.propertiesMetadata = propertiesMetadata;
+    this.catalogInfo = info;
+
     // Initialize Hadoop Configuration.
     this.conf = config;
-    this.hadoopConf = new Configuration();
-    this.catalogInfo = info;
-    Map<String, String> bypassConfigs =
-        config.entrySet().stream()
-            .filter(e -> e.getKey().startsWith(CATALOG_BYPASS_PREFIX))
-            .collect(
-                Collectors.toMap(
-                    e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
-                    Map.Entry::getValue));
-    bypassConfigs.forEach(hadoopConf::set);
 
     String configProviderClass =
         config.getOrDefault(
@@ -140,19 +129,18 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Class<?> providerClass = Class.forName(configProviderClass);
       ConfigurationProvider provider =
           (ConfigurationProvider) providerClass.getDeclaredConstructor().newInstance();
-      provider.initialize(bypassConfigs);
-      this.hadoopConf = provider.getConfiguration(bypassConfigs);
+      this.hadoopConf = provider.getConfiguration(config);
     } catch (Exception e) {
       throw new RuntimeException("Failed to initialize Hadoop configuration", e);
     }
+
+    conf.forEach(hadoopConf::set);
 
     String catalogLocation =
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.LOCATION);
-    conf.forEach(hadoopConf::set);
-
     this.catalogStorageLocation =
         StringUtils.isNotBlank(catalogLocation)
             ? Optional.of(catalogLocation).map(Path::new)

@@ -18,14 +18,27 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 
 public class DefaultConfigurationProvider implements ConfigurationProvider {
   @Override
   public Configuration getConfiguration(Map<String, String> conf) {
     Configuration configuration = new Configuration();
-    conf.forEach(configuration::set);
+
+    // Get all configurations that start with the 'gravitino.bypass' prefix and remove the prefix
+    // to set them in the configuration.
+    Map<String, String> bypassConfigs =
+        conf.entrySet().stream()
+            .filter(e -> e.getKey().startsWith(CATALOG_BYPASS_PREFIX))
+            .collect(
+                Collectors.toMap(
+                    e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
+                    Map.Entry::getValue));
+    bypassConfigs.forEach(configuration::set);
     return configuration;
   }
 }
