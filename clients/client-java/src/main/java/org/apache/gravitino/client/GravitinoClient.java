@@ -228,10 +228,20 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
 
+  /**
+   * List the groups.
+   * @return The Group list
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
   public Group[] listGroups(){
     return getMetalake().listGroups();
   }
 
+  /**
+   * List the group names.
+   * @return The group names list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
   public String[] listGroupNames(){
     return getMetalake().listGroupNames();
   }

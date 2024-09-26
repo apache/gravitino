@@ -629,6 +629,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
    * Lists the groups
    *
    * @return The Group list
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   public Group[] listGroups() {
     Map<String,String> params = new HashMap<>();
@@ -648,6 +649,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
    * Lists the group names
    *
    * @return The Group Name List
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   public String[] listGroupNames(){
     NameListResponse resp = restClient.get(

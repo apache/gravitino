@@ -130,10 +130,19 @@ public interface AccessControlDispatcher {
   /**
    * List groups
    *
+   * @param metalake The Metalake of the Group.
    * @return The list of groups
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   Group[] listGroup(String metalake);
 
+  /**
+   * List group names
+   *
+   * @param metalake The Metalake of the Group.
+   * @return The list of group names
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
   String[] listGroupNames(String metalake);
 
   /**
