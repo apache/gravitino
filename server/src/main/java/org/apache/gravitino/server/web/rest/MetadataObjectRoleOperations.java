@@ -42,13 +42,13 @@ import org.apache.gravitino.server.web.Utils;
 
 @NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/objects/{type}/{fullName}/roles")
-public class ObjectRoleOperations {
+public class MetadataObjectRoleOperations {
 
   private final AccessControlDispatcher accessControlManager;
 
   @Context private HttpServletRequest httpRequest;
 
-  public ObjectRoleOperations() {
+  public MetadataObjectRoleOperations() {
     // Because accessControlManager may be null when Gravitino doesn't enable authorization,
     // and Jersey injection doesn't support null value. So ObjectRoleOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.

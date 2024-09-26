@@ -40,7 +40,7 @@ public interface SupportsRelationOperations {
   }
 
   /**
-   * List the entities according to a give entity in a specific relation.
+   * List the entities according to a given entity in a specific relation.
    *
    * @param relType The type of relation.
    * @param nameIdentifier The given entity identifier
@@ -54,7 +54,7 @@ public interface SupportsRelationOperations {
   }
 
   /**
-   * List the entities according to a give entity in a specific relation.
+   * List the entities according to a given entity in a specific relation.
    *
    * @param relType The type of relation.
    * @param nameIdentifier The given entity identifier

@@ -50,7 +50,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestObjectRoleOperations extends JerseyTest {
+public class TestMetadataObjectRoleOperations extends JerseyTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
 
@@ -83,7 +83,7 @@ public class TestObjectRoleOperations extends JerseyTest {
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(ObjectRoleOperations.class);
+    resourceConfig.register(MetadataObjectRoleOperations.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
