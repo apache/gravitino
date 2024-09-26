@@ -259,7 +259,7 @@ public class GroupMetaService {
       List<GroupPO> groupPOS = SessionUtils.getWithoutCommit(
           GroupMetaMapper.class, mapper->mapper.selectGroupsMetaByMetalakeId(metalakeId)
       );
-    return groupPOS.stream().map(po->POConverters.fromGroupPO(po,AuthorizationUtils.ofUserNamespace(metalakeName))).collect(
+    return groupPOS.stream().map(po->POConverters.fromGroupPO(po,Collections.emptyList(),AuthorizationUtils.ofUserNamespace(metalakeName))).collect(
         Collectors.toList());
   }
 
