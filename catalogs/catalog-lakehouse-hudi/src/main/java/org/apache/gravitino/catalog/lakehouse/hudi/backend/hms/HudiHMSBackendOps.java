@@ -24,6 +24,7 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -132,10 +133,16 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
 
     try {
       return clientPool.run(
-          c ->
-              c.getTables(schemaIdent.name(), "*").stream()
-                  .map(table -> NameIdentifier.of(namespace, table))
-                  .toArray(NameIdentifier[]::new));
+          c -> {
+            List<String> allTables = c.getAllTables(schemaIdent.name());
+            return c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
+                .filter(
+                    t ->
+                        t.getSd().getInputFormat() != null
+                            && t.getSd().getInputFormat().startsWith("org.apache.hudi"))
+                .map(t -> NameIdentifier.of(namespace, t.getTableName()))
+                .toArray(NameIdentifier[]::new);
+          });
 
     } catch (UnknownDBException e) {
       throw new NoSuchSchemaException(

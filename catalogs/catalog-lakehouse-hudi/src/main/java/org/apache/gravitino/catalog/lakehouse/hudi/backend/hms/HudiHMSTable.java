@@ -19,7 +19,9 @@
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiTablePropertiesMetadata.COMMENT;
+import static org.apache.gravitino.catalog.lakehouse.hudi.HudiTablePropertiesMetadata.INPUT_FORMAT;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiTablePropertiesMetadata.LOCATION;
+import static org.apache.gravitino.catalog.lakehouse.hudi.HudiTablePropertiesMetadata.OUTPUT_FORMAT;
 
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiColumn;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
@@ -62,11 +64,21 @@ public class HudiHMSTable extends HudiTable<Table> {
       comment = hmsTable.getParameters().get(COMMENT);
       columns = HiveTableConverter.getColumns(hmsTable, HudiColumn.builder());
       partitioning = HiveTableConverter.getPartitioning(hmsTable);
+
+      // should be always SortOrders.NONE since Hudi using clustering to sort data (see
+      // https://hudi.apache.org/docs/next/clustering/)
+      // but is run as a background table service
       sortOrders = HiveTableConverter.getSortOrders(hmsTable);
+
+      // should be always Distributions.NONE since Hudi doesn't support distribution
       distribution = HiveTableConverter.getDistribution(hmsTable);
       auditInfo = HiveTableConverter.getAuditInfo(hmsTable);
+
       properties = hmsTable.getParameters();
       properties.put(LOCATION, hmsTable.getSd().getLocation());
+      properties.put(INPUT_FORMAT, hmsTable.getSd().getInputFormat());
+      properties.put(OUTPUT_FORMAT, hmsTable.getSd().getOutputFormat());
+
       return simpleBuild();
     }
   }

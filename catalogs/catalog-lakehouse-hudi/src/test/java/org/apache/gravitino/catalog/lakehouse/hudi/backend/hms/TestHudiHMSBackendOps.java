@@ -103,7 +103,8 @@ public class TestHudiHMSBackendOps extends MiniHiveMetastoreService {
     Namespace namespace = Namespace.of(METALAKE_NAME, CATALOG_NAME, DB_NAME);
     NameIdentifier[] tables = ops.listTables(namespace);
 
-    Assertions.assertTrue(Arrays.stream(tables).anyMatch(table -> table.name().equals(TABLE_NAME)));
+    // all hive tables are filtered out
+    Assertions.assertEquals(0, tables.length);
   }
 
   @Test

@@ -29,6 +29,9 @@ import org.apache.gravitino.connector.PropertyEntry;
 public class HudiTablePropertiesMetadata extends BasePropertiesMetadata {
   public static final String COMMENT = "comment";
   public static final String LOCATION = "location";
+  public static final String INPUT_FORMAT = "input-format";
+  public static final String OUTPUT_FORMAT = "output-format";
+
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(COMMENT, stringReservedPropertyEntry(COMMENT, "table comment", true /* hidden */))
@@ -41,6 +44,16 @@ public class HudiTablePropertiesMetadata extends BasePropertiesMetadata {
                   null /* default value */,
                   false /* hidden */,
                   false /* reserved */))
+          .put(
+              INPUT_FORMAT,
+              stringReservedPropertyEntry(
+                  INPUT_FORMAT,
+                  "Hudi table input format used to distinguish the table type",
+                  false /* hidden */))
+          .put(
+              OUTPUT_FORMAT,
+              stringReservedPropertyEntry(
+                  OUTPUT_FORMAT, "Hudi table output format", false /* hidden */))
           .build();
 
   @Override
