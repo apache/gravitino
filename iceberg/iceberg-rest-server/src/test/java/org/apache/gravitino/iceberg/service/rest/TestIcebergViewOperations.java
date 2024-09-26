@@ -69,7 +69,7 @@ public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
 
   @ParameterizedTest
   @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  void testListTables(String prefix) {
+  void testListViews(String prefix) {
     setUrlPathWithPrefix(prefix);
     verifyListViewFail(404);
 
@@ -162,24 +162,24 @@ public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
 
   private Response doCreateView(String name) {
     CreateViewRequest createViewRequest =
-            ImmutableCreateViewRequest.builder()
-                    .name(name)
-                    .schema(viewSchema)
-                    .viewVersion(
-                            ImmutableViewVersion.builder()
-                                    .versionId(1)
-                                    .timestampMillis(System.currentTimeMillis())
-                                    .schemaId(1)
-                                    .defaultNamespace(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME))
-                                    .addRepresentations(
-                                            ImmutableSQLViewRepresentation.builder()
-                                                    .sql(VIEW_QUERY)
-                                                    .dialect("spark")
-                                                    .build())
-                                    .build())
-                    .build();
+        ImmutableCreateViewRequest.builder()
+            .name(name)
+            .schema(viewSchema)
+            .viewVersion(
+                ImmutableViewVersion.builder()
+                    .versionId(1)
+                    .timestampMillis(System.currentTimeMillis())
+                    .schemaId(1)
+                    .defaultNamespace(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME))
+                    .addRepresentations(
+                        ImmutableSQLViewRepresentation.builder()
+                            .sql(VIEW_QUERY)
+                            .dialect("spark")
+                            .build())
+                    .build())
+            .build();
     return getViewClientBuilder()
-            .post(Entity.entity(createViewRequest, MediaType.APPLICATION_JSON_TYPE));
+        .post(Entity.entity(createViewRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
   private Response doLoadView(String name) {
@@ -217,20 +217,20 @@ public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
     Assertions.assertEquals(
-            newViewSchema.columns(), loadViewResponse.metadata().schema().columns());
+        newViewSchema.columns(), loadViewResponse.metadata().schema().columns());
   }
 
   private Response doReplaceView(String name, ViewMetadata base) {
     ViewMetadata.Builder builder =
-            ViewMetadata.buildFrom(base).setCurrentVersion(base.currentVersion(), newViewSchema);
+        ViewMetadata.buildFrom(base).setCurrentVersion(base.currentVersion(), newViewSchema);
     ViewMetadata replacement = builder.build();
     UpdateTableRequest updateTableRequest =
-            UpdateTableRequest.create(
-                    null,
-                    UpdateRequirements.forReplaceView(base, replacement.changes()),
-                    replacement.changes());
+        UpdateTableRequest.create(
+            null,
+            UpdateRequirements.forReplaceView(base, replacement.changes()),
+            replacement.changes());
     return getViewClientBuilder(Optional.of(name))
-            .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
+        .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
   private ViewMetadata getViewMeta(String viewName) {
@@ -281,9 +281,9 @@ public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     ListTablesResponse listTablesResponse = response.readEntity(ListTablesResponse.class);
     Set<String> tableNames =
-            listTablesResponse.identifiers().stream()
-                    .map(identifier -> identifier.name())
-                    .collect(Collectors.toSet());
+        listTablesResponse.identifiers().stream()
+            .map(identifier -> identifier.name())
+            .collect(Collectors.toSet());
     Assertions.assertEquals(expectedTableNames, tableNames);
   }
 
@@ -294,14 +294,14 @@ public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
 
   private Response doRenameView(String source, String dest) {
     RenameTableRequest renameTableRequest =
-            RenameTableRequest.builder()
-                    .withSource(
-                            TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), source))
-                    .withDestination(
-                            TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), dest))
-                    .build();
+        RenameTableRequest.builder()
+            .withSource(
+                TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), source))
+            .withDestination(
+                TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), dest))
+            .build();
     return getRenameViewClientBuilder()
-            .post(Entity.entity(renameTableRequest, MediaType.APPLICATION_JSON_TYPE));
+        .post(Entity.entity(renameTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
   private void verifyRenameViewSucc(String source, String dest) {

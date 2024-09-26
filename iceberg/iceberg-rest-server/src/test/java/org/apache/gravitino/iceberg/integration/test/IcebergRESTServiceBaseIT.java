@@ -175,6 +175,10 @@ public abstract class IcebergRESTServiceBaseIT {
     return convertToStringMap(sql("desc table extended " + tableName));
   }
 
+  protected Map<String, String> getViewInfo(String viewName) {
+    return convertToStringMap(sql("desc extended " + viewName));
+  }
+
   protected List<String> getTableColumns(String tableName) {
     List<Object[]> objects = sql("desc table extended " + tableName);
     List<String> columns = new ArrayList<>();
