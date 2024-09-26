@@ -51,7 +51,8 @@ public class MetadataObjectRoleOperations {
 
   public MetadataObjectRoleOperations() {
     // Because accessControlManager may be null when Gravitino doesn't enable authorization,
-    // and Jersey injection doesn't support null value. So MedataObjectRoleOperations chooses to retrieve
+    // and Jersey injection doesn't support null value. So MedataObjectRoleOperations chooses to
+    // retrieve
     // accessControlDispatcher from GravitinoEnv instead of injection here.
     this.accessControlDispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
   }
@@ -77,7 +78,8 @@ public class MetadataObjectRoleOperations {
                   identifier,
                   LockType.READ,
                   () -> {
-                    String[] names = accessControlDispatcher.listRoleNamesByObject(metalake, object);
+                    String[] names =
+                        accessControlDispatcher.listRoleNamesByObject(metalake, object);
                     return Utils.ok(new NameListResponse(names));
                   }));
     } catch (Exception e) {
