@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.common;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
@@ -38,6 +39,7 @@ import org.apache.gravitino.storage.S3Properties;
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final String ICEBERG_CONFIG_PREFIX = "gravitino.iceberg-rest.";
+  @VisibleForTesting public static final String ICEBERG_EXTENSION_PACKAGES = "extension-packages";
 
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
@@ -225,7 +227,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .create();
 
   public static final ConfigEntry<List<String>> REST_API_EXTENSION_PACKAGES =
-      new ConfigBuilder("extension-packages")
+      new ConfigBuilder(ICEBERG_EXTENSION_PACKAGES)
           .doc("Comma-separated list of Iceberg REST API packages to expand")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
