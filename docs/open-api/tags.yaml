@@ -178,7 +178,7 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
-  /metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectFullName}:
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
       - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
@@ -245,7 +245,7 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
-  /metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectFullName}/{tag}:
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags/{tag}:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
       - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
