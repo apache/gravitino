@@ -37,29 +37,27 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
-                  - $ref: "#/components/responses/NameListResponse"
                   - $ref: "#/components/responses/GroupListResponse"
+                  - $ref: "./openapi.yaml#/components/responses/NameXListResponse"
               examples:
+                GroupListResponse:
+                  $ref: "#/components/examples/GroupListResponse"
                 NameListResponse:
                   $ref: "#/components/examples/NameListResponse"
-                TagListResponse:
-                  $ref: "#/components/examples/GroupListResponse"
-            "400":
-              $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-            "404":
-              description: Not Found - The specified metalake does not exist
-              content:
-                application/vnd.gravitino.v1+json:
-                  schema:
-                    $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-                  examples:
-                    NoSuchMetalakeException:
-                      $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-            "5xx":
-              $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
 
-
-
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     post:
       tags:
@@ -218,13 +216,19 @@ components:
           description: Status code of the response
           enum:
             - 0
-        tags:
+        groups:
           type: array
           description: A list of group objects
           items:
             $ref: "#/components/schemas/Group"
 
   examples:
+    NameListResponse:
+      value: {
+        "code": 0,
+        "names": [ "group1", "group2" ]
+      }
+
     GroupAddRequest:
       value: {
         "name": "group1",
@@ -241,6 +245,19 @@ components:
             "createTime": "2023-12-08T06:41:25.595Z"
           },
         }
+      }
+
+    GroupListResponse:
+      value:  {
+        "code": 0,
+        "groups": [{
+          "name": "group1",
+          "roles": [],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          },
+        }]
       }
 
     GroupAlreadyExistsException:

@@ -340,6 +340,21 @@ components:
                 type: boolean
                 description: Whether the set operation was successful
 
+    NameXListResponse:
+      schema:
+        type: object
+        properties:
+          code:
+            type: integer
+            format: int32
+            description: Status code of the response
+            enum:
+              - 0
+          names:
+            type: array
+            items:
+              type: string
+
   parameters:
     metalake:
       name: metalake
