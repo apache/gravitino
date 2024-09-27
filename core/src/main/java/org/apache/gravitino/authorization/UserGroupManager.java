@@ -186,11 +186,10 @@ class UserGroupManager {
     return listGroupInternal(metalake, true);
   }
 
-
   String[] listGroupNames(String metalake) {
     return Arrays.stream(listGroupInternal(metalake, false))
-            .map(Group::name)
-            .toArray(String[]::new);
+        .map(Group::name)
+        .toArray(String[]::new);
   }
 
   private User[] listUsersInternal(String metalake, boolean allFields) {
@@ -199,8 +198,8 @@ class UserGroupManager {
 
       Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
       return store
-              .list(namespace, UserEntity.class, Entity.EntityType.USER, allFields)
-              .toArray(new User[0]);
+          .list(namespace, UserEntity.class, Entity.EntityType.USER, allFields)
+          .toArray(new User[0]);
     } catch (NoSuchEntityException e) {
       LOG.error("Metalake {} does not exist", metalake, e);
       throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
