@@ -115,6 +115,7 @@ public class TestAccessControlManager {
   public static void setUp() throws Exception {
     File dbDir = new File(DB_DIR);
     dbDir.mkdirs();
+
     Mockito.when(config.get(SERVICE_ADMINS)).thenReturn(Lists.newArrayList("admin1", "admin2"));
     Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
@@ -125,10 +126,12 @@ public class TestAccessControlManager {
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     Mockito.when(config.get(CATALOG_CACHE_EVICTION_INTERVAL_MS)).thenReturn(1000L);
+
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
 
@@ -146,6 +149,7 @@ public class TestAccessControlManager {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     entityStore.put(catalogEntity, true);
+
     CatalogEntity anotherCatalogEntity =
         CatalogEntity.builder()
             .withId(4L)
@@ -421,6 +425,31 @@ public class TestAccessControlManager {
     String[] actualRoles = accessControlManager.listRoleNames("metalake_list");
     Arrays.sort(actualRoles);
     Assertions.assertArrayEquals(new String[] {"testList1", "testList2"}, actualRoles);
+
+    accessControlManager.deleteRole("metalake_list", "testList1");
+    accessControlManager.deleteRole("metalake_list", "testList2");
+  }
+
+  @Test
+  public void testListRolesByObject() {
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+
+    accessControlManager.createRole(
+        "metalake_list", "testList1", props, Lists.newArrayList(catalogObject));
+
+    accessControlManager.createRole(
+        "metalake_list", "testList2", props, Lists.newArrayList(catalogObject));
+
+    // Test to list roles
+    String[] listedRoles =
+        accessControlManager.listRoleNamesByObject("metalake_list", catalogObject);
+    Arrays.sort(listedRoles);
+    Assertions.assertArrayEquals(new String[] {"testList1", "testList2"}, listedRoles);
+
+    accessControlManager.deleteRole("metalake_list", "testList1");
+    accessControlManager.deleteRole("metalake_list", "testList2");
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

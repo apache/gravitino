@@ -27,15 +27,19 @@ import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -144,6 +148,35 @@ class RoleManager {
       throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
     } catch (IOException ioe) {
       LOG.error("Listing user under metalake {} failed due to storage issues", metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  String[] listRoleNamesByObject(String metalake, MetadataObject object) {
+    try {
+      AuthorizationUtils.checkMetalakeExists(metalake);
+
+      return store.relationOperations()
+          .listEntitiesByRelation(
+              SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+              MetadataObjectUtil.toEntityIdent(metalake, object),
+              MetadataObjectUtil.toEntityType(object),
+              false /* allFields */)
+          .stream()
+          .map(entity -> ((RoleEntity) entity).name())
+          .toArray(String[]::new);
+
+    } catch (NoSuchEntityException nse) {
+      LOG.error("Metadata object {} (type {}) doesn't exist", object.fullName(), object.type());
+      throw new NoSuchMetadataObjectException(
+          "Metadata object %s (type %s) doesn't exist", object.fullName(), object.type());
+    } catch (IOException ioe) {
+      LOG.error(
+          "Listing roles under metalake {} by object full name {} and type {} failed due to storage issues",
+          metalake,
+          object.fullName(),
+          object.type(),
+          ioe);
       throw new RuntimeException(ioe);
     }
   }

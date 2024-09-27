@@ -369,9 +369,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType) {
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields) {
     switch (relType) {
       case OWNER_REL:
         List<E> list = Lists.newArrayList();
@@ -382,7 +380,7 @@ public class JDBCBackend implements RelationalBackend {
       case METADATA_OBJECT_ROLE_REL:
         return (List<E>)
             RoleMetaService.getInstance()
-                .listRolesByMetadataObjectIdentAndType(nameIdentifier, identType);
+                .listRolesByMetadataObjectIdentAndType(nameIdentifier, identType, allFields);
       case ROLE_GROUP_REL:
         if (identType == Entity.EntityType.ROLE) {
           return (List<E>) GroupMetaService.getInstance().listGroupsByRoleIdent(nameIdentifier);

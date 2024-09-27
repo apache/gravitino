@@ -334,23 +334,6 @@ public class TestRoleOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 
-  private Role buildRole(String role) {
-    SecurableObject catalog =
-        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
-    SecurableObject anotherSecurableObject =
-        SecurableObjects.ofCatalog(
-            "another_catalog", Lists.newArrayList(Privileges.CreateSchema.deny()));
-
-    return RoleEntity.builder()
-        .withId(1L)
-        .withName(role)
-        .withProperties(Collections.emptyMap())
-        .withSecurableObjects(Lists.newArrayList(catalog, anotherSecurableObject))
-        .withAuditInfo(
-            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-        .build();
-  }
-
   @Test
   public void testDeleteRole() {
     when(manager.deleteRole(any(), any())).thenReturn(true);
@@ -501,5 +484,22 @@ public class TestRoleOperations extends JerseyTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  private Role buildRole(String role) {
+    SecurableObject catalog =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject anotherSecurableObject =
+        SecurableObjects.ofCatalog(
+            "another_catalog", Lists.newArrayList(Privileges.CreateSchema.deny()));
+
+    return RoleEntity.builder()
+        .withId(1L)
+        .withName(role)
+        .withProperties(Collections.emptyMap())
+        .withSecurableObjects(Lists.newArrayList(catalog, anotherSecurableObject))
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .build();
   }
 }

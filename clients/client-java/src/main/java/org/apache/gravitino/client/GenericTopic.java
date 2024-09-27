@@ -25,6 +25,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.messaging.Topic;
@@ -32,11 +33,12 @@ import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic topic. */
-class GenericTopic implements Topic, SupportsTags {
+class GenericTopic implements Topic, SupportsTags, SupportsRoles {
 
   private final TopicDTO topicDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectRoleOperations objectRoleOperations;
 
   GenericTopic(TopicDTO topicDTO, RESTClient restClient, Namespace topicNs) {
     this.topicDTO = topicDTO;
@@ -45,6 +47,8 @@ class GenericTopic implements Topic, SupportsTags {
     MetadataObject topicObject = MetadataObjects.of(topicFullName, MetadataObject.Type.TOPIC);
     this.objectTagOperations =
         new MetadataObjectTagOperations(topicNs.level(0), topicObject, restClient);
+    this.objectRoleOperations =
+        new MetadataObjectRoleOperations(topicNs.level(0), topicObject, restClient);
   }
 
   @Override
@@ -73,6 +77,11 @@ class GenericTopic implements Topic, SupportsTags {
   }
 
   @Override
+  public SupportsRoles supportsRoles() {
+    return this;
+  }
+
+  @Override
   public String[] listTags() {
     return objectTagOperations.listTags();
   }
@@ -90,6 +99,11 @@ class GenericTopic implements Topic, SupportsTags {
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] listBindingRoleNames() {
+    return objectRoleOperations.listBindingRoleNames();
   }
 
   @Override
