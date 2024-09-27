@@ -136,7 +136,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity group1 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group1",
             auditInfo);
 
@@ -161,7 +161,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity group2 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace("metalake"),
+            AuthorizationUtils.ofGroupNamespace("metalake"),
             "group2",
             auditInfo,
             Lists.newArrayList(role1.name(), role2.name()),
@@ -173,7 +173,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupMetaService groupMetaService = GroupMetaService.getInstance();
     List<GroupEntity> actualGroups =
         groupMetaService.listGroupsByNamespace(
-            AuthorizationUtils.ofUserNamespace(metalakeName), true);
+            AuthorizationUtils.ofGroupNamespace(metalakeName), true);
     actualGroups.sort(Comparator.comparing(GroupEntity::name));
     List<GroupEntity> expectGroups = Lists.newArrayList(group1, group2);
     Assertions.assertEquals(expectGroups.size(), actualGroups.size());
@@ -315,7 +315,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity group3Overwrite =
         createGroupEntity(
             group1.id(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group3Overwrite",
             auditInfo,
             Lists.newArrayList(role3.name()),
@@ -332,7 +332,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity group4Overwrite =
         createGroupEntity(
             group1.id(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group4Overwrite",
             auditInfo);
     Assertions.assertDoesNotThrow(() -> groupMetaService.insertGroup(group4Overwrite, true));
@@ -851,7 +851,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity group1 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group1",
             auditInfo,
             Lists.newArrayList(role1.name(), role2.name()),
@@ -859,7 +859,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity group2 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group2",
             auditInfo,
             Lists.newArrayList(role1.name(), role2.name()),
@@ -867,7 +867,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity group3 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group3",
             auditInfo,
             Lists.newArrayList(role1.name(), role2.name()),
@@ -875,7 +875,7 @@ class TestGroupMetaService extends TestJDBCBackend {
     GroupEntity group4 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(metalakeName),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
             "group4",
             auditInfo,
             Lists.newArrayList(role1.name(), role2.name()),

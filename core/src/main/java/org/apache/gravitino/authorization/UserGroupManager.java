@@ -206,7 +206,7 @@ class UserGroupManager {
   private Group[] listGroupInternal(String metalake, boolean allFields) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
-      Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
+      Namespace namespace = AuthorizationUtils.ofGroupNamespace(metalake);
       return store
           .list(namespace, GroupEntity.class, EntityType.GROUP, allFields)
           .toArray(new Group[0]);

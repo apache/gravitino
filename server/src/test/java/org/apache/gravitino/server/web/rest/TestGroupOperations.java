@@ -292,7 +292,7 @@ public class TestGroupOperations extends JerseyTest {
 
   @Test
   public void testListGroups() {
-    Group group = buildGroup("user");
+    Group group = buildGroup("group");
     when(manager.listGroups(any())).thenReturn(new Group[] {group});
 
     Response resp =
