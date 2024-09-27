@@ -340,7 +340,12 @@ public class AbstractIT {
     if (authenticators.contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       client = GravitinoAdminClient.builder(serverUri).withOAuth(mockDataProvider).build();
     } else if (authenticators.contains(AuthenticatorType.SIMPLE.name().toLowerCase())) {
-      client = GravitinoAdminClient.builder(serverUri).withSimpleAuth().build();
+      String userName = customConfigs.get("SimpleAuthUserName");
+      if (userName != null) {
+        client = GravitinoAdminClient.builder(serverUri).withSimpleAuth(userName).build();
+      } else {
+        client = GravitinoAdminClient.builder(serverUri).withSimpleAuth().build();
+      }
     } else if (authenticators.contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
       client = null;
