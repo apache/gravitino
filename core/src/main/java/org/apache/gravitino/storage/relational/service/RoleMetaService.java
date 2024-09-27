@@ -272,7 +272,7 @@ public class RoleMetaService {
             POConverters.fromSecurableObjectPO(
                 fullName, securableObjectPO, getType(securableObjectPO.getType())));
       } else {
-        LOG.info(
+        LOG.warn(
             "The securable object {} {} may be deleted",
             securableObjectPO.getMetadataObjectId(),
             securableObjectPO.getType());
