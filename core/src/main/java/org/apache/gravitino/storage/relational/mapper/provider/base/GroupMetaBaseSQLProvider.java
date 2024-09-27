@@ -43,7 +43,7 @@ public class GroupMetaBaseSQLProvider {
         + GROUP_TABLE_NAME
         + " gt JOIN "
         + MetalakeMetaMapper.TABLE_NAME
-        + " mt ON gt.metalake_id = mt.metalake_id  WHERE mt.metalake_name = #{metalakeName}"
+        + " mt ON gt.metalake_id = mt.metalake_id WHERE mt.metalake_name = #{metalakeName}"
         + " AND gt.deleted_at = 0 AND mt.deleted_at = 0";
   }
 

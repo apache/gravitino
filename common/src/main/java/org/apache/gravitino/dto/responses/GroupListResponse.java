@@ -66,7 +66,7 @@ public class GroupListResponse extends BaseResponse {
         .forEach(
             group -> {
               Preconditions.checkArgument(
-                  StringUtils.isNotBlank(group.name()), "group 'name' must not be null and empty");
+                  StringUtils.isNotBlank(group.name()), "group 'name' must not be blank");
               Preconditions.checkArgument(
                   group.auditInfo() != null, "group 'auditInfo' must not be null");
             });
