@@ -133,21 +133,38 @@ public class AccessControlIT extends AbstractIT {
     // Get a not-existed group
     Assertions.assertThrows(NoSuchGroupException.class, () -> metalake.getGroup("not-existed"));
 
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("k1", "v1");
+    SecurableObject metalakeObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+
+    // Test the group with the role
+    metalake.createRole("role2", properties, Lists.newArrayList(metalakeObject));
+    metalake.grantRolesToGroup(Lists.newArrayList("role2"), groupName);
 
     // List groups
-    String anotherGroups = "group2#456";
-    metalake.addGroup(anotherGroups);
+    String anotherGroup = "group2#456";
+    metalake.addGroup(anotherGroup);
     String[] groupNames = metalake.listGroupNames();
     Arrays.sort(groupNames);
-    Assertions.assertEquals(Lists.newArrayList(groupName,anotherGroups),Arrays.asList(groupNames));
+    Assertions.assertEquals(Lists.newArrayList(groupName, anotherGroup), Arrays.asList(groupNames));
 
-
-
+    List<Group> groups =
+        Arrays.stream(metalake.listGroups())
+            .sorted(Comparator.comparing(Group::name))
+            .collect(Collectors.toList());
+    Assertions.assertEquals(
+        Lists.newArrayList(groupName, anotherGroup),
+        groups.stream().map(Group::name).collect(Collectors.toList()));
+    Assertions.assertEquals(Lists.newArrayList("role2"), groups.get(0).roles());
 
     Assertions.assertTrue(metalake.removeGroup(groupName));
-    Assertions.assertTrue(metalake.removeGroup(anotherGroups));
     Assertions.assertFalse(metalake.removeGroup(groupName));
-    Assertions.assertFalse(metalake.removeGroup(anotherGroups));
+
+    // clean up
+    metalake.removeGroup(anotherGroup);
+    metalake.deleteRole("role2");
   }
 
   @Test

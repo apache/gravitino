@@ -28,8 +28,6 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Collections;
-import java.util.Map;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
@@ -51,7 +49,6 @@ import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
-import org.apache.hadoop.security.Groups;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
@@ -333,54 +330,57 @@ public class TestUserGroup extends TestBase {
     Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.removeGroup(groupName));
   }
 
-
   @Test
   public void testListGroupNames() throws JsonProcessingException {
-    String groupPath = withSlash(String.format(API_METALAKES_GROUPS_PATH,metalakeName,""));
-    NameListResponse listResponse = new NameListResponse(new String[] {"group1","group2"});
-    buildMockResource(Method.GET,groupPath,null,listResponse,SC_OK);
-    Assertions.assertArrayEquals(new String[]{"group1","group2"},gravitinoClient.listGroupNames());
-    ErrorResponse errRespNoMetaLake = ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(),"metalake not found");
-    buildMockResource(Method.GET,groupPath,null,errRespNoMetaLake,SC_NOT_FOUND);
-    Exception ex = Assertions.assertThrows(
-        NoSuchMetalakeException.class,()->{
-          gravitinoClient.listGroupNames();
-        }
-    );
-    Assertions.assertEquals("metalake not found",ex.getMessage());
+    String groupPath = withSlash(String.format(API_METALAKES_GROUPS_PATH, metalakeName, ""));
+    NameListResponse listResponse = new NameListResponse(new String[] {"group1", "group2"});
+    buildMockResource(Method.GET, groupPath, null, listResponse, SC_OK);
+    Assertions.assertArrayEquals(
+        new String[] {"group1", "group2"}, gravitinoClient.listGroupNames());
+    ErrorResponse errRespNoMetaLake =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "metalake not found");
+    buildMockResource(Method.GET, groupPath, null, errRespNoMetaLake, SC_NOT_FOUND);
+    Exception ex =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class,
+            () -> {
+              gravitinoClient.listGroupNames();
+            });
+    Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // Test RuntimeException
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
-    buildMockResource(Method.GET,groupPath,null,errResp,SC_SERVER_ERROR);
+    buildMockResource(Method.GET, groupPath, null, errResp, SC_SERVER_ERROR);
 
-    Assertions.assertThrows(RuntimeException.class,()->gravitinoClient.listGroupNames());
+    Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.listGroupNames());
   }
 
   @Test
   public void testListGroups() throws JsonProcessingException {
-    String groupPath = withSlash(String.format(API_METALAKES_GROUPS_PATH,metalakeName,""));
+    String groupPath = withSlash(String.format(API_METALAKES_GROUPS_PATH, metalakeName, ""));
     GroupDTO group1 = mockGroupDTO("group1");
     GroupDTO group2 = mockGroupDTO("group2");
     GroupDTO group3 = mockGroupDTO("group3");
-    Map<String,String> params = new HashMap<>();
-    GroupListResponse listResponse = new GroupListResponse(new GroupDTO[]{group1,group2,group3});
-    buildMockResource(Method.GET,groupPath,params,null,listResponse,SC_OK);
+    Map<String, String> params = new HashMap<>();
+    GroupListResponse listResponse = new GroupListResponse(new GroupDTO[] {group1, group2, group3});
+    buildMockResource(Method.GET, groupPath, params, null, listResponse, SC_OK);
 
     Group[] groups = gravitinoClient.listGroups();
-    Assertions.assertEquals(3,groups.length);
-    assertGroup(group1,groups[0]);
-    assertGroup(group2,groups[1]);
-    assertGroup(group3,groups[2]);
-    ErrorResponse errResNoMetaLake = ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(),"metalake not found");
-    buildMockResource(Method.GET,groupPath,params,null,errResNoMetaLake,SC_NOT_FOUND);
-    Exception ex = Assertions.assertThrows(NoSuchMetalakeException.class,()-> gravitinoClient.listGroups());
-    Assertions.assertEquals("metalake not found",ex.getMessage());
+    Assertions.assertEquals(3, groups.length);
+    assertGroup(group1, groups[0]);
+    assertGroup(group2, groups[1]);
+    assertGroup(group3, groups[2]);
+    ErrorResponse errResNoMetaLake =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "metalake not found");
+    buildMockResource(Method.GET, groupPath, params, null, errResNoMetaLake, SC_NOT_FOUND);
+    Exception ex =
+        Assertions.assertThrows(NoSuchMetalakeException.class, () -> gravitinoClient.listGroups());
+    Assertions.assertEquals("metalake not found", ex.getMessage());
     // Test RuntimeException
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
-    buildMockResource(Method.GET,groupPath,params,null,errResp,SC_SERVER_ERROR);
-    Assertions.assertThrows(RuntimeException.class,()->gravitinoClient.listGroups());
+    buildMockResource(Method.GET, groupPath, params, null, errResp, SC_SERVER_ERROR);
+    Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.listGroups());
   }
-
 
   private UserDTO mockUserDTO(String name) {
     return UserDTO.builder()

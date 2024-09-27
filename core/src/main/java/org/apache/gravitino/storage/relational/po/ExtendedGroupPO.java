@@ -20,17 +20,22 @@ package org.apache.gravitino.storage.relational.po;
 
 import java.util.Objects;
 
+/**
+ * ExtendedGroupPO add extra roleNames and roleIds for GroupPO. This PO is only used for reading the
+ * data from multiple joined tables. The PO won't be written to database. So we don't need the inner
+ * class Builder.
+ */
 public class ExtendedGroupPO extends GroupPO {
 
-  private String groupNames;
-  private String groupIds;
+  private String roleNames;
+  private String roleIds;
 
-  public String getGroupNames() {
-    return groupNames;
+  public String getRoleNames() {
+    return roleNames;
   }
 
-  public String getGroupIds() {
-    return groupIds;
+  public String getRoleIds() {
+    return roleIds;
   }
 
   @Override
@@ -43,12 +48,12 @@ public class ExtendedGroupPO extends GroupPO {
       return false;
     }
     ExtendedGroupPO that = (ExtendedGroupPO) o;
-    return Objects.equals(getGroupNames(), that.getGroupNames())
-        && Objects.equals(getGroupIds(), that.getGroupIds());
+    return Objects.equals(getRoleIds(), that.getRoleIds())
+        && Objects.equals(getRoleNames(), that.getRoleNames());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), getGroupIds(), getGroupNames());
+    return Objects.hash(super.hashCode(), getRoleIds(), getRoleNames());
   }
 }

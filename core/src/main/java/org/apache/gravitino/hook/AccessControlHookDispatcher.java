@@ -97,12 +97,12 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
-  public Group[] listGroup(String metalake) {
-    return dispatcher.listGroup(metalake);
+  public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listGroups(metalake);
   }
 
   @Override
-  public String[] listGroupNames(String metalake) {
+  public String[] listGroupNames(String metalake) throws NoSuchMetalakeException {
     return dispatcher.listGroupNames(metalake);
   }
 

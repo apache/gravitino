@@ -95,12 +95,12 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
-  public Group[] listGroup(String metalake) {
+  public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
     return userGroupManager.listGroups(metalake);
   }
 
   @Override
-  public String[] listGroupNames(String metalake) {
+  public String[] listGroupNames(String metalake) throws NoSuchMetalakeException {
     return userGroupManager.listGroupNames(metalake);
   }
 

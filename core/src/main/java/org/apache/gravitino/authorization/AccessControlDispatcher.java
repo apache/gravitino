@@ -134,7 +134,7 @@ public interface AccessControlDispatcher {
    * @return The list of groups
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
-  Group[] listGroup(String metalake);
+  Group[] listGroups(String metalake);
 
   /**
    * List group names

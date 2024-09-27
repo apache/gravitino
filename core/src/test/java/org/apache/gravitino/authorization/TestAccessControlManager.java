@@ -295,6 +295,28 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testListGroupss() {
+    accessControlManager.addGroup("metalake_list", "testList1");
+    accessControlManager.addGroup("metalake_list", "testList2");
+
+    // Test to list groups
+    String[] expectGroupNames = new String[] {"testList1", "testList2"};
+    String[] actualGroupNames = accessControlManager.listGroupNames("metalake_list");
+    Arrays.sort(actualGroupNames);
+    Assertions.assertArrayEquals(expectGroupNames, actualGroupNames);
+    Group[] groups = accessControlManager.listGroups("metalake_list");
+    Arrays.sort(groups, Comparator.comparing(Group::name));
+    Assertions.assertArrayEquals(
+        expectGroupNames, Arrays.stream(groups).map(Group::name).toArray(String[]::new));
+
+    // Test with NoSuchMetalakeException
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.listGroupNames("no-exist"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.listGroups("no-exist"));
+  }
+
+  @Test
   public void testRemoveGroup() {
     accessControlManager.addGroup(METALAKE, "testRemove");
 

@@ -40,6 +40,7 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -250,19 +251,34 @@ public class GroupMetaService {
     return newEntity;
   }
 
-  public List<GroupEntity> listGroupsByNamespace(Namespace namespace) {
-    AuthorizationUtils.checkUserNamespace(namespace);
+  public List<GroupEntity> listGroupsByNamespace(Namespace namespace, boolean allFields) {
+    AuthorizationUtils.checkGroupNamespace(namespace);
     String metalakeName = namespace.level(0);
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-    List<GroupPO> groupPOS =
-        SessionUtils.getWithoutCommit(
-            GroupMetaMapper.class, mapper -> mapper.selectGroupsMetaByMetalakeId(metalakeId));
-    return groupPOS.stream()
-        .map(
-            po ->
-                POConverters.fromGroupPO(
-                    po, Collections.emptyList(), AuthorizationUtils.ofUserNamespace(metalakeName)))
-        .collect(Collectors.toList());
+
+    if (allFields) {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      List<ExtendedGroupPO> groupPOs =
+          SessionUtils.getWithoutCommit(
+              GroupMetaMapper.class, mapper -> mapper.listExtendedGroupPOsByMetalakeId(metalakeId));
+      return groupPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromExtendedGroupPO(
+                      po, AuthorizationUtils.ofGroupNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    } else {
+      List<GroupPO> groupPOs =
+          SessionUtils.getWithoutCommit(
+              GroupMetaMapper.class, mapper -> mapper.listGroupPOsByMetalake(metalakeName));
+      return groupPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromGroupPO(
+                      po,
+                      Collections.emptyList(),
+                      AuthorizationUtils.ofGroupNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    }
   }
 
   public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {

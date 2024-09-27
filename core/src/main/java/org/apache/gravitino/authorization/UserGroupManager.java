@@ -27,7 +27,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -197,17 +196,6 @@ class UserGroupManager {
     } catch (IOException ioe) {
       LOG.error("Getting group {} failed due to storage issues", group, ioe);
       throw new RuntimeException(ioe);
-    }
-  }
-
-  private void checkMetalakeExists(NameIdentifier ident) throws NoSuchMetalakeException {
-    try {
-      if (!store.exists(ident, EntityType.METALAKE)) {
-        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
-      }
-    } catch (IOException e) {
-      LOG.error("Failed to do storage operation", e);
-      throw new RuntimeException(e);
     }
   }
 

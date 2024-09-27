@@ -23,14 +23,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Group;
-import org.glassfish.jersey.internal.guava.Sets;
 
 public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
 
@@ -73,16 +71,6 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     fields.put(ROLE_IDS, roleIds);
 
     return Collections.unmodifiableMap(fields);
-  }
-
-  public static Set<Field> fieldSet() {
-    Set<Field> fields = Sets.newHashSet();
-    fields.add(ID);
-    fields.add(NAME);
-    fields.add(AUDIT_INFO);
-    fields.add(ROLE_NAMES);
-    fields.add(ROLE_IDS);
-    return Collections.unmodifiableSet(fields);
   }
 
   /**

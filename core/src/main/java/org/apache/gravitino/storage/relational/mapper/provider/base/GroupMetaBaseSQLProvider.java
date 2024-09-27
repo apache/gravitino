@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.GroupMetaMapper.GROUP_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.GROUP_ROLE_RELATION_TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
@@ -35,15 +36,38 @@ public class GroupMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String listGroupsByMetalake(@Param("metalakeName") String metalakeName) {
+  public String listGroupPOsByMetalake(@Param("metalakeName") String metalakeName) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName, gt.metalake_id as metalakeId,"
         + " gt.audit_info as auditInfo, gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt FROM "
         + GROUP_TABLE_NAME
         + " gt JOIN "
         + MetalakeMetaMapper.TABLE_NAME
-        + " mt ON gt.metalake_id = mt.metalakeId + WHERE mt.metalake_name = #{metalake_name}"
+        + " mt ON gt.metalake_id = mt.metalake_id  WHERE mt.metalake_name = #{metalakeName}"
         + " AND gt.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
+  public String listExtendedGroupPOsByMetalakeId(Long metalakeId) {
+    return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
+        + " gt.metalake_id as metalakeId,"
+        + " gt.audit_info as auditInfo,"
+        + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
+        + " gt.deleted_at as deletedAt,"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
+        + " FROM "
+        + GROUP_TABLE_NAME
+        + " gt LEFT OUTER JOIN "
+        + GROUP_ROLE_RELATION_TABLE_NAME
+        + " rt ON rt.group_id = gt.group_id"
+        + " LEFT OUTER JOIN "
+        + ROLE_TABLE_NAME
+        + " rot ON rot.role_id = rt.role_id"
+        + " WHERE "
+        + " gt.deleted_at = 0 AND"
+        + " (rot.deleted_at = 0 OR rot.deleted_at is NULL) AND"
+        + " (rt.deleted_at = 0 OR rt.deleted_at is NULL) AND gt.metalake_id = #{metalakeId}"
+        + " GROUP BY gt.group_id";
   }
 
   public String selectGroupMetaByMetalakeIdAndName(

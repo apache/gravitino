@@ -624,23 +624,23 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
     return resp.getGroup();
   }
 
-
   /**
    * Lists the groups
    *
    * @return The Group list
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
-  public Group[] listGroups() {
-    Map<String,String> params = new HashMap<>();
+  public Group[] listGroups() throws NoSuchMetalakeException {
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+
     GroupListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_GROUPS_PATH,name(),BLANK_PLACEHOLDER),
+            String.format(API_METALAKES_GROUPS_PATH, name(), BLANK_PLACEHOLDER),
             params,
             GroupListResponse.class,
             Collections.emptyMap(),
-            ErrorHandlers.groupErrorHandler()
-        );
+            ErrorHandlers.groupErrorHandler());
     resp.validate();
     return resp.getGroups();
   }
@@ -651,14 +651,13 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
    * @return The Group Name List
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
-  public String[] listGroupNames(){
-    NameListResponse resp = restClient.get(
-        String.format(API_METALAKES_GROUPS_PATH,name(),
-            BLANK_PLACEHOLDER),
-        NameListResponse.class,
-        Collections.emptyMap(),
-        ErrorHandlers.groupErrorHandler()
-    );
+  public String[] listGroupNames() throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_GROUPS_PATH, name(), BLANK_PLACEHOLDER),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
     resp.validate();
     return resp.getNames();
   }
