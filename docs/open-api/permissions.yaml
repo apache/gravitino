@@ -207,23 +207,108 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectFullName}/grant:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/role"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+
+    put:
+      tags:
+        - access control
+      summary: Grant privileges to a role
+      operationId: grantPrivilegeToRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrivilegeGrantRequest"
+            examples:
+              RoleRevokeRequest:
+                $ref: "#/components/examples/PrivilegeGrantRequest"
+
+      responses:
+        "200":
+          description: Returns the granted role object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./roles.yaml#/components/responses/RoleResponse"
+              examples:
+                GroupResponse:
+                  $ref: "./roles.yaml#/components/examples/RoleResponse"
+
+        "404":
+          description: Not Found - The specified medata object or role does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchMetadataObjectException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchMetadataObjectException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectFullName}/revoke:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/role"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+
+    put:
+      tags:
+        - access control
+      summary: Revoke privileges from a role
+      operationId: revokePrivilegeFromRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrivilegeRevokeRequest"
+            examples:
+              RoleRevokeRequest:
+                $ref: "#/components/examples/PrivilegeRevokeRequest"
+
+      responses:
+        "200":
+          description: Returns the revoked role object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./roles.yaml#/components/responses/RoleResponse"
+              examples:
+                GroupResponse:
+                  $ref: "./roles.yaml#/components/examples/RoleResponse"
+
+        "404":
+          description: Not Found - The specified medata object or role does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchMetadataObjectException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchMetadataObjectException"
+                NoSuchRoleException:
+                  $ref: "./roles.yaml#/components/examples/NoSuchRoleException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
 components:
 
   schemas:
-    User:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-          description: The name of the user
-        roles:
-          type: array
-          items:
-            type: string
-          description: The roles of the user
-
     RoleGrantRequest:
       type: object
       required:
@@ -246,6 +331,27 @@ components:
           items:
             type: string
 
+    PrivilegeGrantRequest:
+      type: object
+      required:
+        - privileges
+      properties:
+        privileges:
+          type: array
+          description: The privileges need to grant
+          items:
+            $ref: "./roles.yaml#/components/schemas/Privilege"
+
+    PrivilegeRevokeRequest:
+      type: object
+      required:
+        - privileges
+      properties:
+        privileges:
+          type: array
+          description: The privileges need to revoke
+          items:
+            $ref: "./roles.yaml#/components/schemas/Privilege"
 
   examples:
 
@@ -257,4 +363,22 @@ components:
     RoleRevokeRequest:
       value: {
         "roleNames": [ "role1" ],
+      }
+
+    PrivilegeGrantRequest:
+      value: {
+        "privileges": [
+          {
+            "name": "SELECT_TABLE",
+            "condition": "ALLOW"
+          } ]
+      }
+
+    PrivilegeRevokeRequest:
+      value: {
+        "privileges": [
+          {
+            "name": "SELECT_TABLE",
+            "condition": "ALLOW"
+          } ]
       }
