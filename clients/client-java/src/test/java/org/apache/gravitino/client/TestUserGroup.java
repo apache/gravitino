@@ -342,10 +342,7 @@ public class TestUserGroup extends TestBase {
     buildMockResource(Method.GET, groupPath, null, errRespNoMetaLake, SC_NOT_FOUND);
     Exception ex =
         Assertions.assertThrows(
-            NoSuchMetalakeException.class,
-            () -> {
-              gravitinoClient.listGroupNames();
-            });
+            NoSuchMetalakeException.class, () -> gravitinoClient.listGroupNames());
     Assertions.assertEquals("metalake not found", ex.getMessage());
 
     // Test RuntimeException

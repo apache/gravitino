@@ -125,23 +125,6 @@ class UserGroupManager {
     return listUsersInternal(metalake, true /* allFields */);
   }
 
-  private User[] listUsersInternal(String metalake, boolean allFields) {
-    try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
-
-      Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
-      return store
-          .list(namespace, UserEntity.class, Entity.EntityType.USER, allFields)
-          .toArray(new User[0]);
-    } catch (NoSuchEntityException e) {
-      LOG.error("Metalake {} does not exist", metalake, e);
-      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
-    } catch (IOException ioe) {
-      LOG.error("Listing user under metalake {} failed due to storage issues", metalake, ioe);
-      throw new RuntimeException(ioe);
-    }
-  }
-
   Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
@@ -203,6 +186,30 @@ class UserGroupManager {
     return listGroupInternal(metalake, true);
   }
 
+
+  String[] listGroupNames(String metalake) {
+    return Arrays.stream(listGroupInternal(metalake, false))
+            .map(Group::name)
+            .toArray(String[]::new);
+  }
+
+  private User[] listUsersInternal(String metalake, boolean allFields) {
+    try {
+      AuthorizationUtils.checkMetalakeExists(metalake);
+
+      Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
+      return store
+              .list(namespace, UserEntity.class, Entity.EntityType.USER, allFields)
+              .toArray(new User[0]);
+    } catch (NoSuchEntityException e) {
+      LOG.error("Metalake {} does not exist", metalake, e);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Listing user under metalake {} failed due to storage issues", metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
   private Group[] listGroupInternal(String metalake, boolean allFields) {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
@@ -217,11 +224,5 @@ class UserGroupManager {
       LOG.error("Listing group under metalake {} failed due to storage issues", metalake, ioe);
       throw new RuntimeException(ioe);
     }
-  }
-
-  String[] listGroupNames(String metalake) {
-    return Arrays.stream(listGroupInternal(metalake, false))
-        .map(Group::name)
-        .toArray(String[]::new);
   }
 }
