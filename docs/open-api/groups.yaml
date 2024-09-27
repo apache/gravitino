@@ -38,7 +38,7 @@ paths:
               schema:
                 oneOf:
                   - $ref: "#/components/responses/GroupListResponse"
-                  - $ref: "./openapi.yaml#/components/responses/NameXListResponse"
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
               examples:
                 GroupListResponse:
                   $ref: "#/components/examples/GroupListResponse"
@@ -192,20 +192,6 @@ components:
             - 0
         group:
           $ref: "#/components/schemas/Group"
-
-    NameListResponse:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-          description: Status code of the response
-          enum:
-            - 0
-        names:
-          type: array
-          items:
-            type: string
 
     GroupListResponse:
       type: object

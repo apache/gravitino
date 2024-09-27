@@ -208,8 +208,21 @@ components:
           type: string
           description: The name of the entity
 
-  responses:
+    NameListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        names:
+          type: array
+          items:
+            type: string
 
+  responses:
     EntityListResponse:
       description: A list of entities
       content:
@@ -339,21 +352,6 @@ components:
               set:
                 type: boolean
                 description: Whether the set operation was successful
-
-    NameXListResponse:
-      schema:
-        type: object
-        properties:
-          code:
-            type: integer
-            format: int32
-            description: Status code of the response
-            enum:
-              - 0
-          names:
-            type: array
-            items:
-              type: string
 
   parameters:
     metalake:
