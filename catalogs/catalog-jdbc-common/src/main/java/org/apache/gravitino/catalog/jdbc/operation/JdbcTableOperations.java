@@ -205,6 +205,7 @@ public abstract class JdbcTableOperations implements TableOperation {
       Transform[] tablePartitioning = getTablePartitioning(connection, databaseName, tableName);
       jdbcTableBuilder.withPartitioning(tablePartitioning);
 
+      // 5.Get distribution information
       Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
       jdbcTableBuilder.withDistribution(distribution);
 
@@ -240,6 +241,15 @@ public abstract class JdbcTableOperations implements TableOperation {
     return Transforms.EMPTY_TRANSFORM;
   }
 
+  /**
+   * Get the distribution information of the table, including the distribution type and the fields
+   *
+   * @param connection
+   * @param databaseName
+   * @param tableName
+   * @return
+   * @throws SQLException
+   */
   protected Distribution getDistributionInfo(
       Connection connection, String databaseName, String tableName) throws SQLException {
     return Distributions.NONE;
