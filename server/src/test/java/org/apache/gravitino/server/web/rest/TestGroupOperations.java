@@ -34,6 +34,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
@@ -43,7 +44,9 @@ import org.apache.gravitino.dto.authorization.GroupDTO;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
+import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -119,7 +122,7 @@ public class TestGroupOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     GroupResponse groupResponse = resp.readEntity(GroupResponse.class);
@@ -138,7 +141,7 @@ public class TestGroupOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
 
     ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
@@ -153,7 +156,7 @@ public class TestGroupOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp2.getStatus());
+    Assertions.assertEquals(Status.CONFLICT.getStatusCode(), resp2.getStatus());
 
     ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, errorResponse1.getCode());
@@ -168,8 +171,7 @@ public class TestGroupOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
@@ -241,14 +243,103 @@ public class TestGroupOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 
-  private Group buildGroup(String group) {
-    return GroupEntity.builder()
-        .withId(1L)
-        .withName(group)
-        .withRoleNames(Collections.emptyList())
-        .withAuditInfo(
-            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-        .build();
+  @Test
+  public void testListGroupNames() {
+    when(manager.listGroupNames(any())).thenReturn(new String[] {"group"});
+
+    Response resp =
+        target("/metalakes/metalake1/groups/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    NameListResponse listResponse = resp.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, listResponse.getCode());
+
+    Assertions.assertEquals(1, listResponse.getNames().length);
+    Assertions.assertEquals("group", listResponse.getNames()[0]);
+
+    // Test to throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listGroupNames(any());
+    Response resp1 =
+        target("/metalakes/metalake1/groups/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw internal RuntimeException
+    doThrow(new RuntimeException("mock error")).when(manager).listGroupNames(any());
+    Response resp3 =
+        target("/metalakes/metalake1/groups")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testListGroups() {
+    Group group = buildGroup("group");
+    when(manager.listGroups(any())).thenReturn(new Group[] {group});
+
+    Response resp =
+        target("/metalakes/metalake1/groups/")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    GroupListResponse listResponse = resp.readEntity(GroupListResponse.class);
+    Assertions.assertEquals(0, listResponse.getCode());
+
+    Assertions.assertEquals(1, listResponse.getGroups().length);
+    Assertions.assertEquals(group.name(), listResponse.getGroups()[0].name());
+    Assertions.assertEquals(group.roles(), listResponse.getGroups()[0].roles());
+
+    // Test to throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listGroups(any());
+    Response resp1 =
+        target("/metalakes/metalake1/groups/")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw internal RuntimeException
+    doThrow(new RuntimeException("mock error")).when(manager).listGroups(any());
+    Response resp3 =
+        target("/metalakes/metalake1/groups")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 
   @Test
@@ -261,7 +352,7 @@ public class TestGroupOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .delete();
 
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(Status.OK.getStatusCode(), resp.getStatus());
     RemoveResponse removeResponse = resp.readEntity(RemoveResponse.class);
     Assertions.assertEquals(0, removeResponse.getCode());
     Assertions.assertTrue(removeResponse.removed());
@@ -274,7 +365,7 @@ public class TestGroupOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .delete();
 
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
+    Assertions.assertEquals(Status.OK.getStatusCode(), resp2.getStatus());
     RemoveResponse removeResponse2 = resp2.readEntity(RemoveResponse.class);
     Assertions.assertEquals(0, removeResponse2.getCode());
     Assertions.assertFalse(removeResponse2.removed());
@@ -286,11 +377,20 @@ public class TestGroupOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .delete();
 
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
 
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  private Group buildGroup(String group) {
+    return GroupEntity.builder()
+        .withId(1L)
+        .withName(group)
+        .withRoleNames(Collections.emptyList())
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+        .build();
   }
 }

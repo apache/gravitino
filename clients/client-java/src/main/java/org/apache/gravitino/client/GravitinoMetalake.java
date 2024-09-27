@@ -62,6 +62,7 @@ import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
@@ -633,6 +634,44 @@ public class GravitinoMetalake extends MetalakeDTO
     resp.validate();
 
     return resp.getGroup();
+  }
+
+  /**
+   * Lists the groups
+   *
+   * @return The Group list
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public Group[] listGroups() throws NoSuchMetalakeException {
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+
+    GroupListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_GROUPS_PATH, name(), BLANK_PLACEHOLDER),
+            params,
+            GroupListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+    return resp.getGroups();
+  }
+
+  /**
+   * Lists the group names
+   *
+   * @return The Group Name List
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listGroupNames() throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_GROUPS_PATH, name(), BLANK_PLACEHOLDER),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+    return resp.getNames();
   }
 
   /**
