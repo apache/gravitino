@@ -18,14 +18,15 @@
  */
 package org.apache.gravitino.authorization;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -148,8 +149,9 @@ public class AccessControlManager implements AccessControlDispatcher {
     return roleManager.listRoleNames(metalake);
   }
 
-  @VisibleForTesting
-  RoleManager getRoleManager() {
-    return roleManager;
+  @Override
+  public String[] listRoleNamesByObject(String metalake, MetadataObject object)
+      throws NoSuchMetalakeException, NoSuchMetadataObjectException {
+    return roleManager.listRoleNamesByObject(metalake, object);
   }
 }
