@@ -734,7 +734,7 @@ public class POConverters {
   /**
    * Convert {@link ExtendedUserPO} to {@link UserEntity}
    *
-   * @param userPO ExtendedUserPo object to be converted
+   * @param userPO ExtendedUserPO object to be converted
    * @param namespace Namespace object to be associated with the user
    * @return UserEntity object from ExtendedUserPO object
    */
@@ -818,7 +818,7 @@ public class POConverters {
   /**
    * Convert {@link ExtendedGroupPO} to {@link GroupEntity}
    *
-   * @param groupPO ExtendedUserPo object to be converted
+   * @param groupPO ExtendedGroupPO object to be converted
    * @param namespace Namespace object to be associated with the user
    * @return GroupEntity object from ExtendedGroupPO object
    */
