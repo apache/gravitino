@@ -661,7 +661,6 @@ MetadataObject table = ...
 Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 ```
 
-
 ### Revoke privileges from a role
 
 You can revoke specific privileges from a role.
@@ -703,7 +702,6 @@ MetadataObject table = ...
 Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 
 ```
-
 
 ### Grant roles to a user
 
