@@ -20,8 +20,10 @@
 package org.apache.gravitino.audit;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Maps;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
@@ -33,28 +35,41 @@ public class AuditLogManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditLogManager.class);
 
-  public static final String AUDIT_LOG_PREFIX = "gravitino.audit.";
-
   @VisibleForTesting private AuditLogWriter auditLogWriter;
 
-  public void init(Map<String, String> properties, EventListenerManager eventBusManager) {
-    AuditLogConfig auditLogConfig = new AuditLogConfig(properties);
-    if (!auditLogConfig.isAuditEnabled()) {
+  public void init(Config config, EventListenerManager eventBusManager) {
+    if (!config.get(Configs.AUDIT_LOG_ENABLED_CONF)) {
       LOG.warn("Audit log is not enabled");
       return;
     }
 
-    String writerClassName = auditLogConfig.getWriterClassName();
-    String formatterClassName = auditLogConfig.getAuditLogFormatterClassName();
-    Formatter formatter = loadFormatter(formatterClassName);
-    LOG.info("Audit log writer class name {}", writerClassName);
-    if (StringUtils.isEmpty(writerClassName)) {
-      throw new GravitinoRuntimeException("Audit log writer class is not configured");
+    String formatterClassName = config.get(Configs.FORMATTER_CLASS_NAME);
+    Formatter formatter;
+    if (formatterClassName == null) {
+      LOG.warn(
+          "Audit log formatter is not config, use default formatter class name:{}",
+          DefaultFormatter.class.getName());
+      formatter = new DefaultFormatter();
+    } else {
+      formatter = loadFormatter(formatterClassName);
+      LOG.info("Audit log formatter class name:{}", formatterClassName);
     }
 
-    auditLogWriter =
-        loadAuditLogWriter(
-            writerClassName, auditLogConfig.getWriterProperties(properties), formatter);
+    String writerClassName = config.get(Configs.WRITER_CLASS_NAME);
+    if (writerClassName == null) {
+      LOG.warn(
+          "Audit log writer is not config, use default writer class name:{}",
+          DefaultFileAuditWriter.class.getName());
+      auditLogWriter = new DefaultFileAuditWriter();
+      auditLogWriter.init(formatter, Maps.newHashMap());
+    } else {
+      auditLogWriter =
+          loadAuditLogWriter(
+              writerClassName,
+              config.getConfigsWithPrefix(Configs.AUDIT_LOG_WRITER_CONFIG_PREFIX),
+              formatter);
+      LOG.info("Audit log writer class name:{}", writerClassName);
+    }
 
     eventBusManager.addEventListener(
         "audit-log",
@@ -91,9 +106,8 @@ public class AuditLogManager {
       String className, Map<String, String> config, Formatter formatter) {
     try {
       AuditLogWriter auditLogWriter =
-          (AuditLogWriter)
-              Class.forName(className).getConstructor(Formatter.class).newInstance(formatter);
-      auditLogWriter.init(config);
+          (AuditLogWriter) Class.forName(className).getDeclaredConstructor().newInstance();
+      auditLogWriter.init(formatter, config);
       return auditLogWriter;
     } catch (Exception e) {
       throw new GravitinoRuntimeException(e, "Failed to load audit log writer %s", className);

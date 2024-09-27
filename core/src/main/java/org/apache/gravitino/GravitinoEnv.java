@@ -361,8 +361,7 @@ public class GravitinoEnv {
     this.eventBus = eventListenerManager.createEventBus();
 
     this.auditLogManager = new AuditLogManager();
-    auditLogManager.init(
-        config.getConfigsWithPrefix(AuditLogManager.AUDIT_LOG_PREFIX), eventListenerManager);
+    auditLogManager.init(config, eventListenerManager);
   }
 
   private void initGravitinoServerComponents() {

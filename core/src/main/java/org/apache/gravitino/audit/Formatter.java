@@ -21,18 +21,14 @@ package org.apache.gravitino.audit;
 
 import org.apache.gravitino.listener.api.event.Event;
 
-/**
- * Interface for formatting the event.
- *
- * @param <R>
- */
-public interface Formatter<R> {
+/** Used to format the event. */
+public interface Formatter {
 
   /**
-   * Format the event.
+   * Format the event, returning the unified audit log schema.
    *
    * @param event The event to format.
    * @return The formatted event.
    */
-  R format(Event event);
+  AuditLog format(Event event);
 }

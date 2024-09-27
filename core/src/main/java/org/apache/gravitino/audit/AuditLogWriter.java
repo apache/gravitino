@@ -25,19 +25,30 @@ import org.apache.gravitino.listener.api.event.Event;
 /** Interface for writing the audit log. */
 public interface AuditLogWriter {
 
+  /** @return formatter. */
+  Formatter getFormatter();
   /**
    * Initialize the writer with the given configuration.
    *
-   * @param config
+   * @param properties
    */
-  void init(Map<String, String> config);
+  void init(Formatter formatter, Map<String, String> properties);
 
   /**
    * Write the audit event to storage.
    *
    * @param auditLog
    */
-  void write(Event auditLog);
+  void doWrite(AuditLog auditLog);
+
+  /**
+   * Write the audit event to storage.
+   *
+   * @param event
+   */
+  default void write(Event event) {
+    doWrite(getFormatter().format(event));
+  }
 
   /** Close the writer. */
   void close();

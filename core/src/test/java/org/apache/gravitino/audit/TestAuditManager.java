@@ -19,50 +19,139 @@
 
 package org.apache.gravitino.audit;
 
+import static org.mockito.Mockito.mock;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
-import java.util.Map;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.event.Event;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestAuditManager {
+  private static final Logger LOG = LoggerFactory.getLogger(TestAuditManager.class);
+
+  static final Path TEST_AUDIT_LOG_FILE_NAME =
+      Paths.get(Configs.AUDIT_LOG_DEFAULT_FILE_WRITER_FILE_NAME);
+
+  @BeforeAll
+  public void setup() {
+    if (Files.exists(TEST_AUDIT_LOG_FILE_NAME)) {
+      LOG.warn(
+          String.format(
+              "tmp audit log file: %s already exists, delete it",
+              Configs.AUDIT_LOG_DEFAULT_FILE_WRITER_FILE_NAME));
+      try {
+        Files.delete(TEST_AUDIT_LOG_FILE_NAME);
+        LOG.warn(
+            String.format(
+                "delete tmp audit log file: %s success",
+                Configs.AUDIT_LOG_DEFAULT_FILE_WRITER_FILE_NAME));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
 
   @Test
   public void testAuditLog() {
+    Config config = mock(Config.class);
+    Mockito.doReturn(true).when(config).get(Configs.AUDIT_LOG_ENABLED_CONF);
+    Mockito.doReturn("org.apache.gravitino.audit.DummyAuditWriter")
+        .when(config)
+        .get(Configs.WRITER_CLASS_NAME);
+
+    Mockito.doReturn("org.apache.gravitino.audit.DummyAuditFormatter")
+        .when(config)
+        .get(Configs.FORMATTER_CLASS_NAME);
+
     DummyEvent dummyEvent = mockDummyEvent();
     EventListenerManager eventListenerManager = mockEventListenerManager();
-    AuditLogManager auditLogManager = mockAuditLogManager(eventListenerManager);
+    AuditLogManager auditLogManager = mockAuditLogManager(config, eventListenerManager);
     EventBus eventBus = eventListenerManager.createEventBus();
     eventBus.dispatchEvent(dummyEvent);
     Assertions.assertInstanceOf(DummyAuditWriter.class, auditLogManager.getAuditLogWriter());
     Assertions.assertInstanceOf(
-        DummyAuditFormatter.class,
-        ((DummyAuditWriter) auditLogManager.getAuditLogWriter()).getFormatter());
+        DummyAuditFormatter.class, (auditLogManager.getAuditLogWriter()).getFormatter());
+
     DummyAuditWriter dummyAuditWriter = (DummyAuditWriter) auditLogManager.getAuditLogWriter();
-    Assertions.assertEquals(1, dummyAuditWriter.getAuditLogs().size());
-    Assertions.assertInstanceOf(Map.class, dummyAuditWriter.getAuditLogs().get(0));
-    Map<String, String> auditInfo = (Map<String, String>) dummyAuditWriter.getAuditLogs().get(0);
-    Assertions.assertEquals(dummyEvent.getClass().getSimpleName(), auditInfo.get("eventName"));
-    Assertions.assertEquals(dummyEvent.user(), auditInfo.get("identifier"));
-    Assertions.assertEquals(String.valueOf(dummyEvent.eventTime()), auditInfo.get("timestamp"));
+
+    DummyAuditFormatter formatter = (DummyAuditFormatter) dummyAuditWriter.getFormatter();
+    DummyAuditLog formattedAuditLog = formatter.format(dummyEvent);
+
+    Assertions.assertNotNull(formattedAuditLog);
+    Assertions.assertEquals(formattedAuditLog, dummyAuditWriter.getAuditLogs().get(0));
   }
 
-  private Map<String, String> createManagerConfig() {
-    Map<String, String> properties = new HashMap<>();
-    properties.put("enable", "true");
-    properties.put("writer.class", "org.apache.gravitino.audit.DummyAuditWriter");
-    properties.put("formatter.class", "org.apache.gravitino.audit.DummyAuditFormatter");
-    return properties;
+  @Test
+  public void testDefaultAuditLog() {
+    Config config = mock(Config.class);
+    Mockito.doReturn(true).when(config).get(Configs.AUDIT_LOG_ENABLED_CONF);
+
+    DummyEvent dummyEvent = mockDummyEvent();
+    EventListenerManager eventListenerManager = mockEventListenerManager();
+    AuditLogManager auditLogManager = mockAuditLogManager(config, eventListenerManager);
+    EventBus eventBus = eventListenerManager.createEventBus();
+    eventBus.dispatchEvent(dummyEvent);
+    Assertions.assertInstanceOf(DefaultFileAuditWriter.class, auditLogManager.getAuditLogWriter());
+    Assertions.assertInstanceOf(
+        DefaultFormatter.class, (auditLogManager.getAuditLogWriter()).getFormatter());
+
+    DefaultFileAuditWriter defaultFileAuditWriter =
+        (DefaultFileAuditWriter) auditLogManager.getAuditLogWriter();
+    String fileName = defaultFileAuditWriter.fileName;
+    String auditLog = readAuditLog(fileName);
+
+    DefaultFormatter formatter = (DefaultFormatter) defaultFileAuditWriter.getFormatter();
+    DefaultAuditLog formattedAuditLog = formatter.format(dummyEvent);
+
+    Assertions.assertNotNull(formattedAuditLog);
+    Assertions.assertEquals(formattedAuditLog.toString(), auditLog);
   }
 
-  private AuditLogManager mockAuditLogManager(EventListenerManager eventListenerManager) {
+  @AfterEach
+  public void cleanup() {
+    try {
+      if (Files.exists(TEST_AUDIT_LOG_FILE_NAME)) {
+        Files.delete(TEST_AUDIT_LOG_FILE_NAME);
+        LOG.warn(
+            String.format(
+                "delete tmp audit log file: %s success",
+                Configs.AUDIT_LOG_DEFAULT_FILE_WRITER_FILE_NAME));
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private String readAuditLog(String fileName) {
+    try (BufferedReader reader =
+        Files.newBufferedReader(Paths.get(fileName), StandardCharsets.UTF_8)) {
+      return reader.readLine();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private AuditLogManager mockAuditLogManager(
+      Config config, EventListenerManager eventListenerManager) {
     AuditLogManager auditLogManager = new AuditLogManager();
-    Map<String, String> config = createManagerConfig();
     auditLogManager.init(config, eventListenerManager);
     return auditLogManager;
   }

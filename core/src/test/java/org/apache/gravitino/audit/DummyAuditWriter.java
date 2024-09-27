@@ -21,26 +21,28 @@ package org.apache.gravitino.audit;
 
 import java.util.LinkedList;
 import java.util.Map;
+import lombok.Getter;
 
-public class DummyAuditWriter extends AbstractAuditLogWriter {
-  private LinkedList<Object> auditLogs = new LinkedList<>();
+public class DummyAuditWriter implements AuditLogWriter {
+  private Formatter formatter;
 
-  public DummyAuditWriter(Formatter formatter) {
-    super(formatter);
+  @Getter private LinkedList<DummyAuditLog> auditLogs = new LinkedList<>();
+
+  @Override
+  public Formatter getFormatter() {
+    return formatter;
   }
 
   @Override
-  public void doWrite(Object event) {
-    auditLogs.add(event);
+  public void init(Formatter formatter, Map<String, String> properties) {
+    this.formatter = formatter;
   }
 
   @Override
-  public void init(Map<String, String> config) {}
+  public void doWrite(AuditLog auditLog) {
+    auditLogs.add((DummyAuditLog) auditLog);
+  }
 
   @Override
   public void close() {}
-
-  public LinkedList<Object> getAuditLogs() {
-    return auditLogs;
-  }
 }
