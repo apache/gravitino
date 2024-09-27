@@ -554,6 +554,18 @@ public class TestFilesetOperations extends JerseyTest {
     } finally {
       CallerContext.CallerContextHolder.remove();
     }
+
+    // test `getFileLocation` clear caller context finally
+    Map<String, String> testContextMap = Maps.newHashMap();
+    testContextMap.put("k", "v");
+    CallerContext context = CallerContext.builder().withContext(testContextMap).build();
+    CallerContext.CallerContextHolder.set(context);
+    FilesetOperations mockOperations = Mockito.mock(FilesetOperations.class);
+    Mockito.when(mockOperations.getFileLocation(any(), any(), any(), any(), any()))
+        .thenCallRealMethod();
+    mockOperations.getFileLocation(
+        "test_metalake", "test_catalog", "test_schema", "fileset4", "/test");
+    Assertions.assertNull(CallerContext.CallerContextHolder.get());
   }
 
   private void assertUpdateFileset(FilesetUpdatesRequest req, Fileset updatedFileset) {

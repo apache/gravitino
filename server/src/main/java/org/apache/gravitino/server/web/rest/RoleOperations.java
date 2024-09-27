@@ -96,14 +96,12 @@ public class RoleOperations {
   @ResponseMetered(name = "create-role", absolute = true)
   public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
     try {
-
-      for (SecurableObjectDTO object : request.getSecurableObjects()) {
-        checkSecurableObject(metalake, object);
-      }
-
       return Utils.doAs(
           httpRequest,
           () -> {
+            for (SecurableObjectDTO object : request.getSecurableObjects()) {
+              checkSecurableObject(metalake, object);
+            }
             List<SecurableObject> securableObjects =
                 Arrays.stream(request.getSecurableObjects())
                     .map(
