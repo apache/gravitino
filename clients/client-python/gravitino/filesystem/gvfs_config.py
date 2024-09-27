@@ -25,3 +25,9 @@ class GVFSConfig:
 
     AUTH_TYPE = "auth_type"
     DEFAULT_AUTH_TYPE = "simple"
+
+    OAUTH2_AUTH_TYPE = "oauth2"
+    OAUTH2_SERVER_URI = "oauth2_server_uri"
+    OAUTH2_CREDENTIAL = "oauth2_credential"
+    OAUTH2_PATH = "oauth2_path"
+    OAUTH2_SCOPE = "oauth2_scope"
