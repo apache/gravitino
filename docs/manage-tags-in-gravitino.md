@@ -212,7 +212,7 @@ Gravitino allows you to associate and disassociate tags with metadata objects. C
 You can associate and disassociate tags with a metadata object by providing the object type, object
 name and tag names.
 
-The request path for REST API is `/api/metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectName}`.
+The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/tags`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -222,12 +222,12 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "tagsToAdd": ["tag1", "tag2"],
   "tagsToRemove": ["tag3"]
-}' http://localhost:8090/api/metalakes/test/tags/catalog/catalog1
+}' http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags
 
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "tagsToAdd": ["tag1"]
-}' http://localhost:8090/api/metalakes/test/tags/schema/catalog1.schema1
+}' http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags
 ```
 
 </TabItem>
@@ -252,23 +252,23 @@ You can list all the tags associated with a metadata object. The tags in Graviti
 inheritable, so listing tags of a metadata object will also list the tags of its parent metadata
 objects.
 
-The request path for REST API is `/api/metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectName}`.
+The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/tags`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags/catalog/catalog1
+http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags/schema/catalog1.schema1
+http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags/catalog/catalog1?details=true
+http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags?details=true
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags/schema/catalog1.schema1?details=true
+http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags?details=true
 ```
 
 </TabItem>
@@ -291,17 +291,17 @@ Tag[] tagsInfo = schema1.supportsTags().listTagsInfo();
 
 You can get an associated tag by its name for a metadata object.
 
-The request path for REST API is `/api/metalakes/{metalake}/tags/{metadataObjectType}/{metadataObjectName}/{tagName}`.
+The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/tags/{tagName}`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags/catalog/catalog1/tag1
+http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags/tag1
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags/schema/catalog1.schema1/tag1
+http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags/tag1
 ```
 
 </TabItem>
