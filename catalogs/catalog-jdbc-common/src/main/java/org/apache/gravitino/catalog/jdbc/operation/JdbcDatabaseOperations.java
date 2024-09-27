@@ -19,21 +19,27 @@
 
 package org.apache.gravitino.catalog.jdbc.operation;
 
+import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,6 +116,9 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   }
 
   /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   *
    * @param databaseName The name of the database.
    * @param comment The comment of the database.
    * @param properties The properties of the database.
@@ -126,11 +135,61 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   }
 
   /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   *
    * @param databaseName The name of the database.
    * @param cascade cascade If set to true, drops all the tables in the schema as well.
    * @return the SQL statement to drop a database with the given name.
    */
-  protected abstract String generateDropDatabaseSql(String databaseName, boolean cascade);
+  protected String generateDropDatabaseSql(String databaseName, boolean cascade) {
+    final String dropDatabaseSql = String.format("DROP DATABASE `%s`", databaseName);
+    if (cascade) {
+      return dropDatabaseSql;
+    }
+
+    try (final Connection connection = this.dataSource.getConnection()) {
+      String query = String.format("SHOW TABLES IN `%s`", databaseName);
+      try (Statement statement = connection.createStatement()) {
+        // Execute the query and check if there exists any tables in the database
+        try (ResultSet resultSet = statement.executeQuery(query)) {
+          if (resultSet.next()) {
+            throw new IllegalStateException(
+                String.format(
+                    "Database %s is not empty, the value of cascade should be true.",
+                    databaseName));
+          }
+        }
+      }
+    } catch (SQLException sqlException) {
+      throw this.exceptionMapper.toGravitinoException(sqlException);
+    }
+    return dropDatabaseSql;
+  }
+
+  /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   *
+   * @param databaseName The name of the database to check.
+   * @return information object of the JDBC database.
+   */
+  @Override
+  public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
+    List<String> allDatabases = listDatabases();
+    String dbName =
+        allDatabases.stream()
+            .filter(db -> db.equals(databaseName))
+            .findFirst()
+            .orElseThrow(
+                () -> new NoSuchSchemaException("Database %s could not be found", databaseName));
+
+    return JdbcSchema.builder()
+        .withName(dbName)
+        .withProperties(ImmutableMap.of())
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
+  }
 
   protected Connection getConnection() throws SQLException {
     return dataSource.getConnection();
@@ -140,12 +199,15 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    * Check whether it is a system database.
    *
    * @param dbName The name of the database.
-   * @return false for all cases.
+   * @return whether it is a system database.
    */
   protected boolean isSystemDatabase(String dbName) {
-    return false;
+    return createSysDatabaseNameSet().contains(dbName.toLowerCase(Locale.ROOT));
   }
 
   /** Check whether support setting schema comment. */
   protected abstract boolean supportSchemaComment();
+
+  /** Create a set of system database names. */
+  protected abstract Set<String> createSysDatabaseNameSet();
 }

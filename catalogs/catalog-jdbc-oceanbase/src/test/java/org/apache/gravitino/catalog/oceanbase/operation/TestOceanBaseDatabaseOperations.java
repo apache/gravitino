@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.oceanbase.operation;
 
-import static org.apache.gravitino.catalog.oceanbase.operation.OceanBaseDatabaseOperations.SYS_OCEANBASE_DATABASE_NAMES;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +36,11 @@ public class TestOceanBaseDatabaseOperations extends TestOceanBase {
     // OceanBase database creation does not support incoming comments.
     String comment = null;
     List<String> databases = DATABASE_OPERATIONS.listDatabases();
-    SYS_OCEANBASE_DATABASE_NAMES.forEach(
-        sysOceanBaseDatabaseName ->
-            Assertions.assertFalse(databases.contains(sysOceanBaseDatabaseName)));
+    ((OceanBaseDatabaseOperations) DATABASE_OPERATIONS)
+        .createSysDatabaseNameSet()
+        .forEach(
+            sysOceanBaseDatabaseName ->
+                Assertions.assertFalse(databases.contains(sysOceanBaseDatabaseName)));
     testBaseOperation(databaseName, properties, comment);
   }
 

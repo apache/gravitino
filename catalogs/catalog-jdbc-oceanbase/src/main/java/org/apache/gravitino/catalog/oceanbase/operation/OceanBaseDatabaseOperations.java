@@ -18,85 +18,20 @@
  */
 package org.apache.gravitino.catalog.oceanbase.operation;
 
-import com.google.common.collect.ImmutableMap;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
+import com.google.common.collect.ImmutableSet;
 import java.util.Set;
-import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
-import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.meta.AuditInfo;
 
 /** Database operations for OceanBase. */
 public class OceanBaseDatabaseOperations extends JdbcDatabaseOperations {
 
-  public static final Set<String> SYS_OCEANBASE_DATABASE_NAMES = createSysOceanBaseDatabaseNames();
-
-  private static Set<String> createSysOceanBaseDatabaseNames() {
-    Set<String> set = new HashSet<>();
-    set.add("information_schema");
-    set.add("mysql");
-    set.add("sys");
-    set.add("oceanbase");
-    return Collections.unmodifiableSet(set);
-  }
-
-  @Override
-  public String generateDropDatabaseSql(String databaseName, boolean cascade) {
-    final String dropDatabaseSql = String.format("DROP DATABASE `%s`", databaseName);
-    if (cascade) {
-      return dropDatabaseSql;
-    }
-
-    try (final Connection connection = this.dataSource.getConnection()) {
-      String query = String.format("SHOW TABLES IN `%s`", databaseName);
-      try (Statement statement = connection.createStatement()) {
-        // Execute the query and check if there exists any tables in the database
-        try (ResultSet resultSet = statement.executeQuery(query)) {
-          if (resultSet.next()) {
-            throw new IllegalStateException(
-                String.format(
-                    "Database %s is not empty, the value of cascade should be true.",
-                    databaseName));
-          }
-        }
-      }
-    } catch (SQLException sqlException) {
-      throw this.exceptionMapper.toGravitinoException(sqlException);
-    }
-    return dropDatabaseSql;
-  }
-
-  @Override
-  public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
-    List<String> allDatabases = listDatabases();
-    String dbName =
-        allDatabases.stream()
-            .filter(db -> db.equals(databaseName))
-            .findFirst()
-            .orElseThrow(
-                () -> new NoSuchSchemaException("Database %s could not be found", databaseName));
-
-    return JdbcSchema.builder()
-        .withName(dbName)
-        .withProperties(ImmutableMap.of())
-        .withAuditInfo(AuditInfo.EMPTY)
-        .build();
-  }
-
-  @Override
-  protected boolean isSystemDatabase(String dbName) {
-    return SYS_OCEANBASE_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
-  }
-
   @Override
   protected boolean supportSchemaComment() {
     return false;
+  }
+
+  @Override
+  protected Set<String> createSysDatabaseNameSet() {
+    return ImmutableSet.of("information_schema", "mysql", "sys", "oceanbase");
   }
 }
