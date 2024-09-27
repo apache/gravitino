@@ -8,14 +8,17 @@ license: "This software is licensed under the Apache License version 2."
 
 
 ## Introduction
+
 Since Hive 2.x, Hive has supported S3 as a storage backend, enabling users to store and manage data in Amazon S3 directly through Hive. Gravitino enhances this capability by supporting the Hive catalog with S3, allowing users to efficiently manage the storage locations of files located in S3. This integration simplifies data operations and enables seamless access to S3 data from Hive queries.
 
 The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3 as a storage backend, including configuration details and examples for creating databases and tables.
 
 ## Hive metastore configuration
+
 To use the Hive catalog with S3, you must configure your Hive metastore to recognize S3 as a storage backend. The following example illustrates the required changes in the `hive-site.xml` configuration file:
 
 ### Example Configuration Changes
+
 Below are the essential properties to add or modify in the `hive-site.xml` file to support S3:
 
 ```xml
@@ -35,11 +38,14 @@ Below are the essential properties to add or modify in the `hive-site.xml` file 
   <value>S3_ENDPOINT_ID</value>
 </property>
 
+<!-- The following property is optional and can be replaced with the location property in the schema
+definition and table definition, as shown in the examples below. After explicitly setting this
+property, you can omit the location property in the schema and table definitions.
+-->
 <property>
-  <name>fs.s3a.aws.credentials.provider</name>
-  <value>org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider,com.amazonaws.auth.EnvironmentVariableCredentialsProvider,org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider</value>
+   <name>hive.metastore.warehouse.dir</name>
+   <value>S3_BUCKET_PATH</value>
 </property>
-
 ```
 
 ### Adding Required JARs
