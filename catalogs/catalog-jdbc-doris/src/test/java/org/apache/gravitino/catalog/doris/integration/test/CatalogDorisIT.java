@@ -934,8 +934,6 @@ public class CatalogDorisIT extends AbstractIT {
       Assertions.assertEquals(distribution.strategy(), loadTable.distribution().strategy());
       Assertions.assertArrayEquals(
           distribution.expressions(), loadTable.distribution().expressions());
-      //    Assertions.assertEquals(distribution.numBuckets(),
-      // loadTable.distribution().numBuckets());
 
       tableCatalog.dropTable(tableIdentifier);
     }
