@@ -130,6 +130,24 @@ public interface AccessControlDispatcher {
       throws NoSuchGroupException, NoSuchMetalakeException;
 
   /**
+   * List groups
+   *
+   * @param metalake The Metalake of the Group.
+   * @return The list of groups
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  Group[] listGroups(String metalake);
+
+  /**
+   * List group names
+   *
+   * @param metalake The Metalake of the Group.
+   * @return The list of group names
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  String[] listGroupNames(String metalake);
+
+  /**
    * Grant roles to a user.
    *
    * @param metalake The metalake of the User.

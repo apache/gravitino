@@ -99,6 +99,16 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listGroups(metalake);
+  }
+
+  @Override
+  public String[] listGroupNames(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listGroupNames(metalake);
+  }
+
+  @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
     return dispatcher.grantRolesToUser(metalake, roles, user);

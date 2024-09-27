@@ -96,6 +96,16 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
+    return userGroupManager.listGroups(metalake);
+  }
+
+  @Override
+  public String[] listGroupNames(String metalake) throws NoSuchMetalakeException {
+    return userGroupManager.listGroupNames(metalake);
+  }
+
+  @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
     return permissionManager.grantRolesToUser(metalake, roles, user);

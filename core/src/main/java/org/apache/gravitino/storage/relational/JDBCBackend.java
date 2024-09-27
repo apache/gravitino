@@ -108,6 +108,8 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) UserMetaService.getInstance().listUsersByNamespace(namespace, allFields);
       case ROLE:
         return (List<E>) RoleMetaService.getInstance().listRolesByNamespace(namespace);
+      case GROUP:
+        return (List<E>) GroupMetaService.getInstance().listGroupsByNamespace(namespace, allFields);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
