@@ -383,7 +383,8 @@ public class RangerAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public Boolean onGroupAdded(Group group) throws RuntimeException {
-    return rangerClient.createGroup(VXGroup.builder().withName(group.name()).build());
+    return rangerClient.createGroup(
+        VXGroup.builder().withName(group.name()).withDescription(group.name()).build());
   }
 
   @Override
