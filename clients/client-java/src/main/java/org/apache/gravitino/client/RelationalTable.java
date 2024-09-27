@@ -32,6 +32,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.requests.AddPartitionsRequest;
@@ -55,7 +56,7 @@ import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a relational table. */
-class RelationalTable implements Table, SupportsPartitions, SupportsTags {
+class RelationalTable implements Table, SupportsPartitions, SupportsTags, SupportsRoles {
 
   private static final Joiner DOT_JOINER = Joiner.on(".");
 
@@ -66,6 +67,7 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags {
   private final Namespace namespace;
 
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectRoleOperations objectRoleOperations;
 
   /**
    * Creates a new RelationalTable.
@@ -94,6 +96,8 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags {
         MetadataObjects.parse(tableFullName(namespace, tableDTO.name()), MetadataObject.Type.TABLE);
     this.objectTagOperations =
         new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
+    this.objectRoleOperations =
+        new MetadataObjectRoleOperations(namespace.level(0), tableObject, restClient);
   }
 
   /**
@@ -284,6 +288,11 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags {
     return this;
   }
 
+  @Override
+  public SupportsRoles supportsRoles() {
+    return this;
+  }
+
   private static String tableFullName(Namespace tableNS, String tableName) {
     return DOT_JOINER.join(tableNS.level(1), tableNS.level(2), tableName);
   }
@@ -306,5 +315,10 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags {
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] listBindingRoleNames() {
+    return objectRoleOperations.listBindingRoleNames();
   }
 }

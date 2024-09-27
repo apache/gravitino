@@ -20,8 +20,10 @@ package org.apache.gravitino.authorization;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -246,4 +248,16 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   String[] listRoleNames(String metalake) throws NoSuchMetalakeException;
+
+  /**
+   * Lists the role names associated the metadata object.
+   *
+   * @param metalake The Metalake of the Role.
+   * @return The role list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the Metadata object with the given name does not
+   *     exist.
+   */
+  String[] listRoleNamesByObject(String metalake, MetadataObject object)
+      throws NoSuchMetalakeException, NoSuchMetadataObjectException;
 }

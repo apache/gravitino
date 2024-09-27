@@ -20,6 +20,7 @@ package org.apache.gravitino;
 
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.authorization.SupportsRoles;
 
 /**
  * The interface of a metalake. The metalake is the top level entity in the Apache Gravitino system,
@@ -50,4 +51,12 @@ public interface Metalake extends Auditable {
    * @return The properties of the metalake.
    */
   Map<String, String> properties();
+
+  /**
+   * @return the {@link SupportsRoles} if the metalake supports role operations.
+   * @throws UnsupportedOperationException if the metalake does not support role operations.
+   */
+  default SupportsRoles supportsRoles() {
+    throw new UnsupportedOperationException("Metalake does not support role operations.");
+  }
 }
