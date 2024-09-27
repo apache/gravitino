@@ -820,7 +820,7 @@ public class POConverters {
    *
    * @param groupPO ExtendedUserPo object to be converted
    * @param namespace Namespace object to be associated with the user
-   * @return UserEntity object from ExtendedUserPO object
+   * @return GroupEntity object from ExtendedGroupPO object
    */
   public static GroupEntity fromExtendedGroupPO(ExtendedGroupPO groupPO, Namespace namespace) {
     try {
