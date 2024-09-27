@@ -742,7 +742,7 @@ tasks {
   register("copySubprojectDependencies", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
-        !it.name.startsWith("authorization") &&
+        !it.name.startsWith("authorization") && !it.name.startsWith("credential") &&
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink")
       ) {
@@ -757,6 +757,7 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
         !it.name.startsWith("authorization") &&
+        !it.name.startsWith("credential") &&
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("iceberg") &&

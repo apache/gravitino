@@ -29,6 +29,7 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -37,6 +38,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
@@ -56,6 +58,7 @@ import org.slf4j.LoggerFactory;
 public class IcebergTableOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperations.class);
+  private static final String X_ICEBERG_ACCESS_DELEGATION = "X-Iceberg-Access-Delegation";
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
@@ -162,7 +165,11 @@ public class IcebergTableOperations {
       @PathParam("prefix") String prefix,
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
-      @DefaultValue("all") @QueryParam("snapshots") String snapshots) {
+      @DefaultValue("all") @QueryParam("snapshots") String snapshots,
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+
+    boolean isCredentialVending = isCredentialVending(accessDelegation);
+    LOG.info("is credential vending: {}, {}", accessDelegation, isCredentialVending);
     // todo support snapshots
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
@@ -209,5 +216,21 @@ public class IcebergTableOperations {
       LOG.warn("Serialize update table request failed", e);
       return updateTableRequest.toString();
     }
+  }
+
+  private boolean isCredentialVending(String accessDelegation) {
+    if (StringUtils.isBlank(accessDelegation)) {
+      return false;
+    }
+
+    if ("vended-credentials".equalsIgnoreCase(accessDelegation)) {
+      return true;
+    }
+
+    throw new RuntimeException(
+        "Gravitino server doesn't support "
+            + X_ICEBERG_ACCESS_DELEGATION
+            + " :"
+            + accessDelegation);
   }
 }

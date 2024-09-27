@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -30,7 +31,13 @@ import java.util.Set;
 import java.util.function.Supplier;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialManager;
+import org.apache.gravitino.credential.CredentialProvider;
+import org.apache.gravitino.credential.CredentialUtils;
+import org.apache.gravitino.credential.LocationContext;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
@@ -66,6 +73,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   @Getter protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
   private final IcebergCatalogBackend catalogBackend;
+  private Optional<CredentialProvider> credentialProvider;
   private String catalogUri = null;
   private Map<String, String> catalogConfigToClients;
   private Map<String, String> catalogPropertiesMap;
@@ -73,8 +81,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       ImmutableSet.of(
           IcebergConstants.IO_IMPL,
           IcebergConstants.AWS_S3_REGION,
-          IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID,
-          IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY,
           IcebergConstants.ICEBERG_S3_ENDPOINT,
           IcebergConstants.ICEBERG_OSS_ENDPOINT,
           IcebergConstants.ICEBERG_OSS_ACCESS_KEY_ID,
@@ -99,6 +105,17 @@ public class IcebergCatalogWrapper implements AutoCloseable {
             key -> catalogPropertiesToClientKeys.contains(key));
 
     this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
+
+    String credentialType = icebergConfig.get(IcebergConfig.CREDENTIAL_TYPE);
+    if (StringUtils.isBlank(credentialType)) {
+      this.credentialProvider = Optional.empty();
+    } else {
+      CredentialManager credentialManager = new CredentialManager();
+      this.credentialProvider =
+          Optional.of(
+              credentialManager.getCredentialProvider(
+                  credentialType, icebergConfig.getAllConfig()));
+    }
   }
 
   public IcebergCatalogWrapper() {
@@ -266,12 +283,23 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     LoadTableResponse loadTableResponse = supplier.get();
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
-        .addAllConfig(getCatalogConfigToClient())
+        .addAllConfig(getCatalogConfigToClient(loadTableResponse.tableMetadata().location()))
         .build();
   }
 
-  private Map<String, String> getCatalogConfigToClient() {
-    return catalogConfigToClients;
+  private Map<String, String> getCatalogConfigToClient(String location) {
+    Map<String, String> configs = new HashMap<>(catalogConfigToClients);
+    // todo(fanng): check user privilege.
+    LocationContext locationContext =
+        new LocationContext(ImmutableSet.of(location), ImmutableSet.of());
+    credentialProvider.ifPresent(
+        provider -> {
+          Credential credential = provider.getCredential(locationContext);
+          if (credential != null) {
+            configs.putAll(CredentialUtils.toIcebergProperties(credential));
+          }
+        });
+    return configs;
   }
 
   @Getter
