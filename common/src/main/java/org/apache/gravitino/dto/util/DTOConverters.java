@@ -422,13 +422,6 @@ public class DTOConverters {
         .build();
   }
 
-  public static GroupDTO[] toDTOs(Group[] groups) {
-    if (ArrayUtils.isEmpty(groups)) {
-      return new GroupDTO[0];
-    }
-    return Arrays.stream(groups).map(DTOConverters::toDTO).toArray(GroupDTO[]::new);
-  }
-
   /**
    * Converts a role implementation to a RoleDTO.
    *
@@ -696,6 +689,19 @@ public class DTOConverters {
       return new UserDTO[0];
     }
     return Arrays.stream(users).map(DTOConverters::toDTO).toArray(UserDTO[]::new);
+  }
+
+  /**
+   * Converts an array of Groups to an array of GroupDTOs.
+   *
+   * @param groups The groups to be converted.
+   * @return The array of GroupDTOs.
+   */
+  public static GroupDTO[] toDTOs(Group[] groups) {
+    if (ArrayUtils.isEmpty(groups)) {
+      return new GroupDTO[0];
+    }
+    return Arrays.stream(groups).map(DTOConverters::toDTO).toArray(GroupDTO[]::new);
   }
 
   /**
