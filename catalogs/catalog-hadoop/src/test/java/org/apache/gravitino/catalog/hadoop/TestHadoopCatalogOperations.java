@@ -59,8 +59,13 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -127,6 +132,30 @@ public class TestHadoopCatalogOperations {
   private static EntityStore store;
 
   private static IdGenerator idGenerator;
+
+  private static CatalogInfo randomCatalogInfo() {
+    return new CatalogInfo(
+        idGenerator.nextId(),
+        "catalog1",
+        CatalogInfo.Type.FILESET,
+        "provider1",
+        "comment1",
+        Maps.newHashMap(),
+        null,
+        Namespace.of("m1", "c1"));
+  }
+
+  private static CatalogInfo randomCatalogInfo(String metalakeName, String catalogName) {
+    return new CatalogInfo(
+        idGenerator.nextId(),
+        catalogName,
+        CatalogInfo.Type.FILESET,
+        "hadoop",
+        "comment1",
+        Maps.newHashMap(),
+        null,
+        Namespace.of(metalakeName));
+  }
 
   @BeforeAll
   public static void setUp() {
@@ -195,14 +224,18 @@ public class TestHadoopCatalogOperations {
   @Test
   public void testHadoopCatalogConfiguration() {
     Map<String, String> emptyProps = Maps.newHashMap();
-    HadoopCatalogOperations ops = new HadoopCatalogOperations(store);
-    ops.initialize(emptyProps, null, HADOOP_PROPERTIES_METADATA);
+    SecureHadoopCatalogOperations secOps = new SecureHadoopCatalogOperations(store);
+
+    HadoopCatalogOperations ops = secOps.getBaseHadoopCatalogOperations();
+
+    CatalogInfo catalogInfo = randomCatalogInfo();
+    ops.initialize(emptyProps, catalogInfo, HADOOP_PROPERTIES_METADATA);
     Configuration conf = ops.hadoopConf;
     String value = conf.get("fs.defaultFS");
     Assertions.assertEquals("file:///", value);
 
     emptyProps.put(CATALOG_BYPASS_PREFIX + "fs.defaultFS", "hdfs://localhost:9000");
-    ops.initialize(emptyProps, null, HADOOP_PROPERTIES_METADATA);
+    ops.initialize(emptyProps, catalogInfo, HADOOP_PROPERTIES_METADATA);
     Configuration conf1 = ops.hadoopConf;
     String value1 = conf1.get("fs.defaultFS");
     Assertions.assertEquals("hdfs://localhost:9000", value1);
@@ -210,7 +243,7 @@ public class TestHadoopCatalogOperations {
     Assertions.assertFalse(ops.catalogStorageLocation.isPresent());
 
     emptyProps.put(HadoopCatalogPropertiesMetadata.LOCATION, "file:///tmp/catalog");
-    ops.initialize(emptyProps, null, HADOOP_PROPERTIES_METADATA);
+    ops.initialize(emptyProps, catalogInfo, HADOOP_PROPERTIES_METADATA);
     Assertions.assertTrue(ops.catalogStorageLocation.isPresent());
     Path expectedPath = new Path("file:///tmp/catalog");
     Assertions.assertEquals(expectedPath, ops.catalogStorageLocation.get());
@@ -228,6 +261,22 @@ public class TestHadoopCatalogOperations {
         Assertions.assertThrows(
             SchemaAlreadyExistsException.class, () -> createSchema(name, comment, null, null));
     Assertions.assertEquals("Schema m1.c1.schema11 already exists", exception.getMessage());
+  }
+
+  @Test
+  public void testCreateSchemaWithEmptyCatalogLocation() throws IOException {
+    String name = "schema28";
+    String comment = "comment28";
+    String catalogPath = "";
+    Schema schema = createSchema(name, comment, catalogPath, null);
+    Assertions.assertEquals(name, schema.name());
+    Assertions.assertEquals(comment, schema.comment());
+
+    Throwable exception =
+        Assertions.assertThrows(
+            SchemaAlreadyExistsException.class,
+            () -> createSchema(name, comment, catalogPath, null));
+    Assertions.assertEquals("Schema m1.c1.schema28 already exists", exception.getMessage());
   }
 
   @Test
@@ -290,8 +339,8 @@ public class TestHadoopCatalogOperations {
 
     Assertions.assertEquals(name, schema.name());
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       Schema schema1 = ops.loadSchema(NameIdentifierUtil.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
       Assertions.assertEquals(comment, schema1.comment());
@@ -314,8 +363,8 @@ public class TestHadoopCatalogOperations {
     createSchema(name, comment, null, null);
     createSchema(name1, comment1, null, null);
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listSchemas(Namespace.of("m1", "c1"))).collect(Collectors.toSet());
       Assertions.assertTrue(idents.size() >= 2);
@@ -332,8 +381,8 @@ public class TestHadoopCatalogOperations {
     Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       Schema schema1 = ops.loadSchema(NameIdentifierUtil.ofSchema("m1", "c1", name));
       Assertions.assertEquals(name, schema1.name());
       Assertions.assertEquals(comment, schema1.comment());
@@ -379,10 +428,10 @@ public class TestHadoopCatalogOperations {
     Assertions.assertEquals(name, schema.name());
     NameIdentifier id = NameIdentifierUtil.ofSchema("m1", "c1", name);
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(
           ImmutableMap.of(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath),
-          null,
+          randomCatalogInfo("m1", "c1"),
           HADOOP_PROPERTIES_METADATA);
       Schema schema1 = ops.loadSchema(id);
       Assertions.assertEquals(name, schema1.name());
@@ -436,8 +485,8 @@ public class TestHadoopCatalogOperations {
     }
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(catalogProps, null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
         createSchema(schemaName, comment, catalogPath, schemaPath);
       }
@@ -491,8 +540,8 @@ public class TestHadoopCatalogOperations {
             + " when it's catalog and schema "
             + "location are not set",
         exception.getMessage());
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       Throwable e =
           Assertions.assertThrows(
               NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
@@ -507,8 +556,8 @@ public class TestHadoopCatalogOperations {
     Assertions.assertEquals(
         "Storage location must be set for external fileset " + filesetIdent,
         exception1.getMessage());
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       Throwable e =
           Assertions.assertThrows(
               NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
@@ -527,8 +576,8 @@ public class TestHadoopCatalogOperations {
       createFileset(fileset, schemaName, comment, Fileset.Type.MANAGED, null, null);
     }
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listFilesets(Namespace.of("m1", "c1", schemaName)))
               .collect(Collectors.toSet());
@@ -558,8 +607,8 @@ public class TestHadoopCatalogOperations {
     }
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(catalogProps, null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
         createSchema(schemaName, comment, catalogPath, schemaPath);
       }
@@ -604,8 +653,8 @@ public class TestHadoopCatalogOperations {
     FilesetChange change1 = FilesetChange.setProperty("k1", "v1");
     FilesetChange change2 = FilesetChange.removeProperty("k1");
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
 
       Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
@@ -669,8 +718,8 @@ public class TestHadoopCatalogOperations {
     Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     FilesetChange change1 = FilesetChange.updateComment("comment26_new");
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
 
       Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
@@ -692,8 +741,8 @@ public class TestHadoopCatalogOperations {
     Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     FilesetChange change1 = FilesetChange.removeComment();
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
 
       Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
@@ -706,7 +755,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testTestConnection() {
-    HadoopCatalogOperations catalogOperations = new HadoopCatalogOperations(store);
+    SecureHadoopCatalogOperations catalogOperations = new SecureHadoopCatalogOperations(store);
     Assertions.assertDoesNotThrow(
         () ->
             catalogOperations.testConnection(
@@ -715,6 +764,125 @@ public class TestHadoopCatalogOperations {
                 "hadoop",
                 "comment",
                 ImmutableMap.of()));
+  }
+
+  @Test
+  public void testGetFileLocation() throws IOException {
+    String schemaName = "schema1024";
+    String comment = "comment1024";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, comment, null, schemaPath);
+
+    String catalogName = "c1";
+    String name = "fileset1024";
+    String storageLocation = TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + name;
+    Fileset fileset =
+        createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, storageLocation);
+
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      // test sub path starts with "/"
+      String subPath1 = "/test/test.parquet";
+      String fileLocation1 = ops.getFileLocation(filesetIdent, subPath1);
+      Assertions.assertEquals(
+          String.format("%s%s", fileset.storageLocation(), subPath1), fileLocation1);
+
+      // test sub path not starts with "/"
+      String subPath2 = "test/test.parquet";
+      String fileLocation2 = ops.getFileLocation(filesetIdent, subPath2);
+      Assertions.assertEquals(
+          String.format("%s/%s", fileset.storageLocation(), subPath2), fileLocation2);
+
+      // test sub path is null
+      String subPath3 = null;
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> ops.getFileLocation(filesetIdent, subPath3));
+
+      // test sub path is blank but not null
+      String subPath4 = "";
+      String fileLocation3 = ops.getFileLocation(filesetIdent, subPath4);
+      Assertions.assertEquals(fileset.storageLocation(), fileLocation3);
+    }
+
+    // test mount a single file
+    String filesetName2 = "test_get_file_location_2";
+    String filesetLocation2 =
+        TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName2;
+    Path filesetLocationPath2 = new Path(filesetLocation2);
+    createFileset(filesetName2, schemaName, comment, Fileset.Type.MANAGED, null, filesetLocation2);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store);
+        FileSystem localFileSystem = filesetLocationPath2.getFileSystem(new Configuration())) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName2);
+      // replace fileset location to a single file
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath2));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath2).isDirectory());
+      localFileSystem.delete(filesetLocationPath2, true);
+      localFileSystem.create(filesetLocationPath2);
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath2));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath2).isFile());
+
+      String subPath = "/year=2024/month=07/day=22/test.parquet";
+      Map<String, String> contextMap = Maps.newHashMap();
+      contextMap.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.RENAME.name());
+      CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+      CallerContext.CallerContextHolder.set(callerContext);
+
+      Assertions.assertThrows(
+          GravitinoRuntimeException.class, () -> ops.getFileLocation(filesetIdent, subPath));
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
+
+    // test rename with an empty subPath
+    String filesetName3 = "test_get_file_location_3";
+    String filesetLocation3 =
+        TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName3;
+    Path filesetLocationPath3 = new Path(filesetLocation3);
+    createFileset(filesetName3, schemaName, comment, Fileset.Type.MANAGED, null, filesetLocation3);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store);
+        FileSystem localFileSystem = filesetLocationPath3.getFileSystem(new Configuration())) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName3);
+      // replace fileset location to a single file
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath3));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath3).isDirectory());
+      localFileSystem.delete(filesetLocationPath3, true);
+      localFileSystem.create(filesetLocationPath3);
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath3));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath3).isFile());
+
+      Map<String, String> contextMap = Maps.newHashMap();
+      contextMap.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.RENAME.name());
+      CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+      CallerContext.CallerContextHolder.set(callerContext);
+      Assertions.assertThrows(
+          GravitinoRuntimeException.class, () -> ops.getFileLocation(filesetIdent, ""));
+    }
+
+    // test storage location end with "/"
+    String filesetName4 = "test_get_file_location_4";
+    String filesetLocation4 =
+        TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName4 + "/";
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+    Fileset mockFileset = Mockito.mock(Fileset.class);
+    when(mockFileset.name()).thenReturn(filesetName4);
+    when(mockFileset.storageLocation()).thenReturn(filesetLocation4);
+
+    try (HadoopCatalogOperations mockOps = Mockito.mock(HadoopCatalogOperations.class)) {
+      mockOps.hadoopConf = new Configuration();
+      when(mockOps.loadFileset(filesetIdent)).thenReturn(mockFileset);
+      String subPath = "/test/test.parquet";
+      when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
+      String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
+      Assertions.assertEquals(
+          String.format("%s%s", mockFileset.storageLocation(), subPath.substring(1)), fileLocation);
+    }
   }
 
   private static Stream<Arguments> locationArguments() {
@@ -957,8 +1125,8 @@ public class TestHadoopCatalogOperations {
       props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(props, null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(props, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
 
       NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", name);
       Map<String, String> schemaProps = Maps.newHashMap();
@@ -986,8 +1154,8 @@ public class TestHadoopCatalogOperations {
       props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
 
-    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store)) {
-      ops.initialize(props, null, HADOOP_PROPERTIES_METADATA);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(props, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
 
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
       Map<String, String> filesetProps = Maps.newHashMap();

@@ -254,7 +254,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Metalake
 
-- The top-level container for metadata.
+- The top-level container for metadata. Typically, a metalake is a tenant-like mapping to an organization or a company. All the catalogs, users, and roles are under one metalake. 
 
 ## Metastore
 
@@ -290,7 +290,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Public key
 
-- A openly shared key used for verification, encryption, or other operations intended for public knowledge.
+- An openly shared key used for verification, encryption, or other operations intended for public knowledge.
 
 ## Representational State Transfer (REST)
 

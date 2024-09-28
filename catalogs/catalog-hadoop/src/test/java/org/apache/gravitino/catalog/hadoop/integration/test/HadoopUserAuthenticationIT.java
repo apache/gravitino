@@ -31,9 +31,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -52,6 +56,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.utility.MountableFile;
 import sun.security.krb5.KrbException;
 
 @Tag("gravitino-docker-test")
@@ -71,6 +76,15 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
 
   private static final String HADOOP_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
   private static final String HADOOP_CLIENT_KEYTAB = "/client.keytab";
+
+  private static final String HADOOP_SCHEMA_PRINCIPAL = "cli_schema";
+  private static final String HADOOP_FILESET_PRINCIPAL = "cli_fileset";
+
+  private static final String HADOOP_SCHEMA_KEYTAB = "/cli_schema.keytab";
+  private static final String HADOOP_FILESET_KEYTAB = "/cli_fileset.keytab";
+
+  private static final String REALM = "HADOOPKRB";
+  private static final String ADMIN_PASSWORD = "Admin12!";
 
   private static String TMP_DIR;
 
@@ -127,6 +141,8 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
         .getContainer()
         .copyFileFromContainer("/gravitino_client.keytab", TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
 
+    createKeyTableForSchemaAndFileset();
+
     // Keytab of the Gravitino server
     kerberosHiveContainer
         .getContainer()
@@ -153,8 +169,61 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     System.setProperty("sun.security.krb5.debug", "true");
   }
 
+  private static void createKeyTableForSchemaAndFileset() throws IOException {
+    String shellContent =
+        "echo -e \"%s\\n%s\" | kadmin.local -q \"addprinc %s@%s\""
+            + "\n"
+            + "kadmin.local -q \"xst -k /%s.keytab -norandkey %s@%s\"";
+
+    String createSchemaShellFile = String.format("/%s.sh", HADOOP_SCHEMA_PRINCIPAL);
+    String createFileSetShellFile = String.format("/%s.sh", HADOOP_FILESET_PRINCIPAL);
+
+    FileUtils.writeStringToFile(
+        Paths.get(TMP_DIR + createSchemaShellFile).toFile(),
+        String.format(
+            shellContent,
+            ADMIN_PASSWORD,
+            ADMIN_PASSWORD,
+            HADOOP_SCHEMA_PRINCIPAL,
+            REALM,
+            HADOOP_SCHEMA_PRINCIPAL,
+            HADOOP_SCHEMA_PRINCIPAL,
+            REALM),
+        StandardCharsets.UTF_8);
+    kerberosHiveContainer
+        .getContainer()
+        .copyFileToContainer(
+            MountableFile.forHostPath(TMP_DIR + createSchemaShellFile), createSchemaShellFile);
+    kerberosHiveContainer.executeInContainer("bash", createSchemaShellFile);
+
+    FileUtils.writeStringToFile(
+        Paths.get(TMP_DIR + createFileSetShellFile).toFile(),
+        String.format(
+            shellContent,
+            ADMIN_PASSWORD,
+            ADMIN_PASSWORD,
+            HADOOP_FILESET_PRINCIPAL,
+            REALM,
+            HADOOP_FILESET_PRINCIPAL,
+            HADOOP_FILESET_PRINCIPAL,
+            REALM),
+        StandardCharsets.UTF_8);
+    kerberosHiveContainer
+        .getContainer()
+        .copyFileToContainer(
+            MountableFile.forHostPath(TMP_DIR + createFileSetShellFile), createFileSetShellFile);
+    kerberosHiveContainer.executeInContainer("bash", createFileSetShellFile);
+
+    kerberosHiveContainer
+        .getContainer()
+        .copyFileFromContainer(HADOOP_SCHEMA_KEYTAB, TMP_DIR + HADOOP_SCHEMA_KEYTAB);
+    kerberosHiveContainer
+        .getContainer()
+        .copyFileFromContainer(HADOOP_FILESET_KEYTAB, TMP_DIR + HADOOP_FILESET_KEYTAB);
+  }
+
   private static void addKerberosConfig() {
-    AbstractIT.customConfigs.put("gravitino.authenticator", "kerberos");
+    AbstractIT.customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
     AbstractIT.customConfigs.put(
         "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
     AbstractIT.customConfigs.put(
@@ -203,6 +272,20 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     Assertions.assertTrue(
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
+    // Make the property wrong by changing the principal
+    gravitinoMetalake.alterCatalog(
+        CATALOG_NAME, CatalogChange.setProperty(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL + "wrong"));
+    exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
+    exceptionMessage = Throwables.getStackTraceAsString(exception);
+    Assertions.assertTrue(exceptionMessage.contains("Failed to login with Kerberos"));
+
+    // Restore the property, everything goes okay.
+    gravitinoMetalake.alterCatalog(
+        CATALOG_NAME, CatalogChange.setProperty(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL));
+
     // Now try to give the user the permission to create schema again
     kerberosHiveContainer.executeInContainer("hadoop", "fs", "-chmod", "-R", "777", "/user/hadoop");
     Assertions.assertDoesNotThrow(
@@ -222,5 +305,357 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     catalog.asSchemas().alterSchema(SCHEMA_NAME, SchemaChange.setProperty("k1", "value1"));
 
     catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
+  }
+
+  @Test
+  void testCreateSchemaWithKerberos() {
+    KerberosTokenProvider provider =
+        KerberosTokenProvider.builder()
+            .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
+            .withKeyTabFile(new File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
+            .build();
+    adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
+
+    String metalakeName = GravitinoITUtils.genRandomName("metalake");
+    String catalogName = GravitinoITUtils.genRandomName("catalog");
+    GravitinoMetalake gravitinoMetalake =
+        adminClient.createMetalake(metalakeName, null, ImmutableMap.of());
+
+    // Create a catalog
+    Map<String, String> properties = Maps.newHashMap();
+    String location = HDFS_URL + "/user/hadoop/" + catalogName;
+
+    properties.put(AUTH_TYPE_KEY, "kerberos");
+    properties.put(IMPERSONATION_ENABLE_KEY, "true");
+    properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
+    properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
+    properties.put("location", location);
+
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
+
+    Catalog catalog =
+        gravitinoMetalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, "hadoop", "comment", properties);
+
+    // Test create schema
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
+    String exceptionMessage = Throwables.getStackTraceAsString(exception);
+    // Make sure real user is 'gravitino_client'
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
+
+    Map<String, String> schemaProperty = new HashMap<>();
+    schemaProperty.put(AUTH_TYPE_KEY, "kerberos");
+    // Disable impersonation here, so the user is the same as the principal
+    schemaProperty.put(IMPERSONATION_ENABLE_KEY, "false");
+    schemaProperty.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_SCHEMA_KEYTAB);
+    schemaProperty.put(PRINCIPAL_KEY, HADOOP_SCHEMA_PRINCIPAL + "@" + REALM);
+
+    exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
+    exceptionMessage = Throwables.getStackTraceAsString(exception);
+    // Make sure real user is 'cli_schema'
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=cli_schema, access=WRITE"));
+
+    // enable user impersonation, so the real user is gravitino_client
+    schemaProperty.put(IMPERSONATION_ENABLE_KEY, "true");
+    exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
+    exceptionMessage = Throwables.getStackTraceAsString(exception);
+    // Make sure real user is 'gravitino_client' if user impersonation enabled.
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
+
+    // Now try to give the user the permission to create schema again
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chown", "gravitino_client", "/user/hadoop/" + catalogName);
+    Assertions.assertDoesNotThrow(
+        () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
+
+    // Disable impersonation here, so the user is the same as the principal 'cli_schema'
+    schemaProperty.put(IMPERSONATION_ENABLE_KEY, "false");
+    exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                catalog.asSchemas().createSchema(SCHEMA_NAME + "_new", "comment", schemaProperty));
+    exceptionMessage = Throwables.getStackTraceAsString(exception);
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=cli_schema, access=WRITE"));
+
+    // END of test schema creation
+    Assertions.assertDoesNotThrow(() -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
+
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chown", "cli_schema", "/user/hadoop/" + catalogName);
+    Assertions.assertDoesNotThrow(
+        () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
+
+    catalog
+        .asFilesetCatalog()
+        .createFileset(
+            NameIdentifier.of(SCHEMA_NAME, TABLE_NAME),
+            "comment",
+            Fileset.Type.MANAGED,
+            null,
+            ImmutableMap.of());
+  }
+
+  @Test
+  void createFilesetWithKerberos() {
+    KerberosTokenProvider provider =
+        KerberosTokenProvider.builder()
+            .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
+            .withKeyTabFile(new File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
+            .build();
+    adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
+
+    String metalakeName = GravitinoITUtils.genRandomName("metalake");
+    String catalogName = GravitinoITUtils.genRandomName("catalog");
+    GravitinoMetalake gravitinoMetalake =
+        adminClient.createMetalake(metalakeName, null, ImmutableMap.of());
+
+    // Create a catalog
+    Map<String, String> properties = Maps.newHashMap();
+    String location = HDFS_URL + "/user/hadoop/" + catalogName;
+
+    properties.put(AUTH_TYPE_KEY, "kerberos");
+    properties.put(IMPERSONATION_ENABLE_KEY, "true");
+    properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
+    properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
+    properties.put("location", location);
+
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
+
+    Catalog catalog =
+        gravitinoMetalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, "hadoop", "comment", properties);
+
+    Map<String, String> schemaProperty = new HashMap<>();
+    schemaProperty.put(AUTH_TYPE_KEY, "kerberos");
+    // Disable impersonation here, so the user is the same as the principal as 'cli_schema'
+    schemaProperty.put(IMPERSONATION_ENABLE_KEY, "false");
+    schemaProperty.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_SCHEMA_KEYTAB);
+    schemaProperty.put(PRINCIPAL_KEY, HADOOP_SCHEMA_PRINCIPAL + "@" + REALM);
+
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chown", "-R", "cli_schema", "/user/hadoop/" + catalogName);
+    Assertions.assertDoesNotThrow(
+        () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
+
+    catalog
+        .asFilesetCatalog()
+        .createFileset(
+            NameIdentifier.of(SCHEMA_NAME, TABLE_NAME),
+            "comment",
+            Fileset.Type.MANAGED,
+            null,
+            ImmutableMap.of());
+
+    Map<String, String> tableProperty = Maps.newHashMap();
+    tableProperty.put(AUTH_TYPE_KEY, "kerberos");
+    // Disable impersonation here, so the user is the same as the principal as 'cli_schema'
+    tableProperty.put(IMPERSONATION_ENABLE_KEY, "false");
+    tableProperty.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_FILESET_KEYTAB);
+    tableProperty.put(PRINCIPAL_KEY, HADOOP_FILESET_PRINCIPAL + "@" + REALM);
+
+    String fileset1 = GravitinoITUtils.genRandomName("fileset1");
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                catalog
+                    .asFilesetCatalog()
+                    .createFileset(
+                        NameIdentifier.of(SCHEMA_NAME, fileset1),
+                        "comment",
+                        Fileset.Type.MANAGED,
+                        null,
+                        tableProperty));
+    String exceptionMessage = Throwables.getStackTraceAsString(exception);
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=cli_fileset, access=WRITE"));
+
+    // Now change the owner of schema directory to 'cli_fileset'
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chown", "-R", "cli_fileset", "/user/hadoop/" + catalogName);
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .createFileset(
+                    NameIdentifier.of(SCHEMA_NAME, fileset1),
+                    "comment",
+                    Fileset.Type.MANAGED,
+                    null,
+                    tableProperty));
+
+    // enable user impersonation, so the real user is gravitino_client
+    tableProperty.put(IMPERSONATION_ENABLE_KEY, "true");
+    String fileset2 = GravitinoITUtils.genRandomName("fileset2");
+    exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                catalog
+                    .asFilesetCatalog()
+                    .createFileset(
+                        NameIdentifier.of(SCHEMA_NAME, fileset2),
+                        "comment",
+                        Fileset.Type.MANAGED,
+                        null,
+                        tableProperty));
+    exceptionMessage = Throwables.getStackTraceAsString(exception);
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
+
+    // Now change the owner of schema directory to 'gravitino_client'
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chown", "-R", "gravitino_client", "/user/hadoop/" + catalogName);
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .createFileset(
+                    NameIdentifier.of(SCHEMA_NAME, fileset2),
+                    "comment",
+                    Fileset.Type.MANAGED,
+                    null,
+                    tableProperty));
+
+    // As the owner of the current schema directory is 'gravitino_client', the current user is
+    // cli_fileset.
+    Assertions.assertThrows(
+        Exception.class,
+        () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset1)));
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chown", "-R", "cli_fileset", "/user/hadoop/" + catalogName);
+    // Now try to drop fileset
+    Assertions.assertDoesNotThrow(
+        () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset1)));
+
+    Assertions.assertThrows(
+        Exception.class,
+        () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset2)));
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chown", "-R", "gravitino_client", "/user/hadoop/" + catalogName);
+    Assertions.assertDoesNotThrow(
+        () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset2)));
+
+    Assertions.assertThrows(
+        Exception.class, () -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chown", "-R", "cli_schema", "/user/hadoop/" + catalogName);
+    Assertions.assertDoesNotThrow(() -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
+  }
+
+  @Test
+  void testUserImpersonation() {
+    KerberosTokenProvider provider =
+        KerberosTokenProvider.builder()
+            .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
+            .withKeyTabFile(new File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
+            .build();
+    adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
+
+    String metalakeName = GravitinoITUtils.genRandomName("metalake");
+    String catalogName = GravitinoITUtils.genRandomName("catalog");
+    GravitinoMetalake gravitinoMetalake =
+        adminClient.createMetalake(metalakeName, null, ImmutableMap.of());
+
+    // Create a catalog
+    Map<String, String> properties = Maps.newHashMap();
+    String localtion = HDFS_URL + "/user/hadoop/" + catalogName;
+
+    properties.put(IMPERSONATION_ENABLE_KEY, "true");
+    properties.put(KEY_TAB_URI_KEY, TMP_DIR + HADOOP_CLIENT_KEYTAB);
+    properties.put(PRINCIPAL_KEY, HADOOP_CLIENT_PRINCIPAL);
+    properties.put(AUTH_TYPE_KEY, "kerberos");
+    properties.put("location", localtion);
+
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-mkdir", "-p", "/user/hadoop/" + catalogName);
+
+    Catalog catalog =
+        gravitinoMetalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, "hadoop", "comment", properties);
+
+    Map<String, String> schemaProperty = new HashMap<>();
+
+    // Test set schema IMPERSONATION_ENABLE_KEY to true, the final result is:
+    // IMPERSONATION_ENABLE_KEY is true
+    // so the user access HDFS is user 'gravitino_client'
+    schemaProperty.put(IMPERSONATION_ENABLE_KEY, "true");
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
+    String exceptionMessage = Throwables.getStackTraceAsString(exception);
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
+
+    // Test set schema IMPERSONATION_ENABLE_KEY to false, the final result is:
+    // IMPERSONATION_ENABLE_KEY is false
+    // so the user access HDFS is user 'cli'
+    schemaProperty.put(IMPERSONATION_ENABLE_KEY, "false");
+    exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
+    exceptionMessage = Throwables.getStackTraceAsString(exception);
+    Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
+
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chown", "-R", "cli", "/user/hadoop/" + catalogName);
+    Assertions.assertDoesNotThrow(
+        () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", schemaProperty));
+
+    String filesetName = GravitinoITUtils.genRandomName("fileset");
+    Map<String, String> filesetProperty = new HashMap<>();
+    filesetProperty.put(IMPERSONATION_ENABLE_KEY, "true");
+    exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                catalog
+                    .asFilesetCatalog()
+                    .createFileset(
+                        NameIdentifier.of(SCHEMA_NAME, filesetName),
+                        "comment",
+                        Fileset.Type.MANAGED,
+                        null,
+                        filesetProperty));
+    exceptionMessage = Throwables.getStackTraceAsString(exception);
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
+
+    // Line 602 has set the owner of the schema directory to 'cli', if the IMPERSONATION_ENABLE_KEY
+    // is false, the user is 'cli'
+    filesetProperty.put(IMPERSONATION_ENABLE_KEY, "false");
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .createFileset(
+                    NameIdentifier.of(SCHEMA_NAME, filesetName),
+                    "comment",
+                    Fileset.Type.MANAGED,
+                    null,
+                    filesetProperty));
+
+    catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, filesetName));
+    catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
+    gravitinoMetalake.dropCatalog(catalogName);
+    adminClient.dropMetalake(metalakeName);
   }
 }

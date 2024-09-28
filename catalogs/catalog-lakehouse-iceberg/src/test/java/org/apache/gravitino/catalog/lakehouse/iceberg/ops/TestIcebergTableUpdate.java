@@ -21,7 +21,8 @@ package org.apache.gravitino.catalog.lakehouse.iceberg.ops;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.ColumnPosition;
 import org.apache.gravitino.rel.types.Types;
@@ -43,8 +44,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergTableUpdate {
-  private IcebergTableOps icebergTableOps = null;
-  private IcebergTableOpsHelper icebergTableOpsHelper = null;
+  private IcebergCatalogWrapper icebergCatalogWrapper = null;
+  private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper = null;
   private static final String TEST_NAMESPACE_NAME = "gravitino_test_namespace";
   private static final String TEST_TABLE_NAME = "gravitino_test_table";
 
@@ -78,8 +79,9 @@ public class TestIcebergTableUpdate {
 
   @BeforeEach
   public void init() {
-    icebergTableOps = new IcebergTableOps();
-    icebergTableOpsHelper = icebergTableOps.createIcebergTableOpsHelper();
+    icebergCatalogWrapper = new IcebergCatalogWrapper();
+    icebergCatalogWrapperHelper =
+        new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
     createNamespace(TEST_NAMESPACE_NAME);
     createTable(TEST_NAMESPACE_NAME, TEST_TABLE_NAME);
   }
@@ -87,21 +89,22 @@ public class TestIcebergTableUpdate {
   public LoadTableResponse updateTable(
       NameIdentifier gravitinoNameIdentifier, TableChange... gravitinoTableChanges) {
     IcebergTableChange icebergTableChange =
-        icebergTableOpsHelper.buildIcebergTableChanges(
+        icebergCatalogWrapperHelper.buildIcebergTableChanges(
             gravitinoNameIdentifier, gravitinoTableChanges);
-    return icebergTableOps.updateTable(icebergTableChange);
+    return icebergCatalogWrapper.updateTable(icebergTableChange);
   }
 
   private void createNamespace(String namespace) {
-    icebergTableOps.createNamespace(
+    icebergCatalogWrapper.createNamespace(
         CreateNamespaceRequest.builder().withNamespace(Namespace.of(namespace)).build());
   }
 
   private void createTable(String namespace, String tableName) {
     CreateTableRequest createTableRequest =
         CreateTableRequest.builder().withName(tableName).withSchema(tableSchema).build();
-    icebergTableOps.createTable(Namespace.of(namespace), createTableRequest);
-    Assertions.assertTrue(icebergTableOps.tableExists(TableIdentifier.of(namespace, tableName)));
+    icebergCatalogWrapper.createTable(Namespace.of(namespace), createTableRequest);
+    Assertions.assertTrue(
+        icebergCatalogWrapper.tableExists(TableIdentifier.of(namespace, tableName)));
   }
 
   @Test
@@ -118,7 +121,7 @@ public class TestIcebergTableUpdate {
     String testPropertyKey = "test_property_key";
     String testPropertyValue = "test_property_value";
     String testPropertyNewValue = "test_property_new_value";
-    LoadTableResponse loadTableResponse = icebergTableOps.loadTable(icebergIdentifier);
+    LoadTableResponse loadTableResponse = icebergCatalogWrapper.loadTable(icebergIdentifier);
     Assertions.assertFalse(
         loadTableResponse.tableMetadata().properties().containsKey(testPropertyKey));
 
@@ -140,7 +143,7 @@ public class TestIcebergTableUpdate {
     Assertions.assertFalse(
         loadTableResponse.tableMetadata().properties().containsKey(testPropertyKey));
 
-    IcebergTableOpsHelper.getIcebergReservedProperties().stream()
+    IcebergCatalogWrapperHelper.getIcebergReservedProperties().stream()
         .forEach(
             property -> {
               TableChange setProperty1 = TableChange.setProperty(property, "test_v");
@@ -148,7 +151,7 @@ public class TestIcebergTableUpdate {
                   IllegalArgumentException.class, () -> updateTable(identifier, setProperty1));
             });
 
-    IcebergTableOpsHelper.getIcebergReservedProperties().stream()
+    IcebergCatalogWrapperHelper.getIcebergReservedProperties().stream()
         .forEach(
             property -> {
               TableChange removeProperty1 = TableChange.removeProperty(property);
@@ -207,7 +210,7 @@ public class TestIcebergTableUpdate {
             loadTableResponse
                 .tableMetadata()
                 .schema()
-                .findType(IcebergTableOpsHelper.DOT.join(fourthField[0], "element"));
+                .findType(IcebergCatalogWrapperHelper.DOT.join(fourthField[0], "element"));
     Assertions.assertEquals("struct_after", t.fields().get(1).name());
 
     // add to struct first
@@ -223,7 +226,7 @@ public class TestIcebergTableUpdate {
             loadTableResponse
                 .tableMetadata()
                 .schema()
-                .findType(IcebergTableOpsHelper.DOT.join(fourthField[0], "element"));
+                .findType(IcebergCatalogWrapperHelper.DOT.join(fourthField[0], "element"));
     Assertions.assertEquals("struct_first", t.fields().get(0).name());
 
     // add to struct last
@@ -236,7 +239,7 @@ public class TestIcebergTableUpdate {
             loadTableResponse
                 .tableMetadata()
                 .schema()
-                .findType(IcebergTableOpsHelper.DOT.join(fourthField[0], "element"));
+                .findType(IcebergCatalogWrapperHelper.DOT.join(fourthField[0], "element"));
     Assertions.assertEquals("struct_last", t.fields().get(t.fields().size() - 1).name());
 
     // add column exists
@@ -285,7 +288,7 @@ public class TestIcebergTableUpdate {
     loadTableResponse = updateTable(identifier, deleteColumn);
     Schema schema = loadTableResponse.tableMetadata().schema();
     Assertions.assertTrue(
-        schema.findType(IcebergTableOpsHelper.DOT.join(deleteColumnArray)) == null);
+        schema.findType(IcebergCatalogWrapperHelper.DOT.join(deleteColumnArray)) == null);
 
     deleteColumn = TableChange.deleteColumn(notExistField, true);
     // no exception
@@ -340,7 +343,7 @@ public class TestIcebergTableUpdate {
             loadTableResponse
                 .tableMetadata()
                 .schema()
-                .findType(IcebergTableOpsHelper.DOT.join(fourthField[0], "element"));
+                .findType(IcebergCatalogWrapperHelper.DOT.join(fourthField[0], "element"));
     Assertions.assertEquals(LongType.get(), t.fields().get(0).type());
 
     TableChange updateColumnType2 =
@@ -367,7 +370,7 @@ public class TestIcebergTableUpdate {
             loadTableResponse
                 .tableMetadata()
                 .schema()
-                .findType(IcebergTableOpsHelper.DOT.join(fourthField[0], "element"));
+                .findType(IcebergCatalogWrapperHelper.DOT.join(fourthField[0], "element"));
     Assertions.assertEquals(newColumnName, t.fields().get(0).name());
 
     TableChange renameColumn2 = TableChange.renameColumn(notExistField, newColumnName);
@@ -413,7 +416,7 @@ public class TestIcebergTableUpdate {
             loadTableResponse
                 .tableMetadata()
                 .schema()
-                .findType(IcebergTableOpsHelper.DOT.join(fourthField[0], "element"));
+                .findType(IcebergCatalogWrapperHelper.DOT.join(fourthField[0], "element"));
     Assertions.assertEquals("struct_map", structType.fields().get(0).name());
     Assertions.assertEquals("struct_int", structType.fields().get(1).name());
 
@@ -427,7 +430,7 @@ public class TestIcebergTableUpdate {
             loadTableResponse
                 .tableMetadata()
                 .schema()
-                .findType(IcebergTableOpsHelper.DOT.join(fourthField[0], "element"));
+                .findType(IcebergCatalogWrapperHelper.DOT.join(fourthField[0], "element"));
     Assertions.assertEquals("struct_int", structType.fields().get(0).name());
     Assertions.assertEquals("struct_map", structType.fields().get(1).name());
 
@@ -472,15 +475,17 @@ public class TestIcebergTableUpdate {
 
   @Test
   void testGetFieldName() {
-    Assertions.assertEquals(null, IcebergTableOpsHelper.getParentName(new String[] {"a"}));
+    Assertions.assertEquals(null, IcebergCatalogWrapperHelper.getParentName(new String[] {"a"}));
     Assertions.assertEquals(
-        "a.b", IcebergTableOpsHelper.getParentName(new String[] {"a", "b", "c"}));
+        "a.b", IcebergCatalogWrapperHelper.getParentName(new String[] {"a", "b", "c"}));
 
-    Assertions.assertEquals("a", IcebergTableOpsHelper.getLeafName(new String[] {"a"}));
-    Assertions.assertEquals("c", IcebergTableOpsHelper.getLeafName(new String[] {"a", "b", "c"}));
-
-    Assertions.assertEquals("p", IcebergTableOpsHelper.getSiblingName(new String[] {"a"}, "p"));
+    Assertions.assertEquals("a", IcebergCatalogWrapperHelper.getLeafName(new String[] {"a"}));
     Assertions.assertEquals(
-        "a.b.p", IcebergTableOpsHelper.getSiblingName(new String[] {"a", "b", "c"}, "p"));
+        "c", IcebergCatalogWrapperHelper.getLeafName(new String[] {"a", "b", "c"}));
+
+    Assertions.assertEquals(
+        "p", IcebergCatalogWrapperHelper.getSiblingName(new String[] {"a"}, "p"));
+    Assertions.assertEquals(
+        "a.b.p", IcebergCatalogWrapperHelper.getSiblingName(new String[] {"a", "b", "c"}, "p"));
   }
 }

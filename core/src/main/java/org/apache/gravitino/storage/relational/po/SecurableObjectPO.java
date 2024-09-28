@@ -24,7 +24,7 @@ import com.google.common.base.Preconditions;
 public class SecurableObjectPO {
 
   private Long roleId;
-  private Long entityId;
+  private Long metadataObjectId;
   private String type;
   private String privilegeNames;
   private String privilegeConditions;
@@ -36,8 +36,8 @@ public class SecurableObjectPO {
     return roleId;
   }
 
-  public Long getEntityId() {
-    return entityId;
+  public Long getMetadataObjectId() {
+    return metadataObjectId;
   }
 
   public String getType() {
@@ -74,7 +74,7 @@ public class SecurableObjectPO {
     }
     SecurableObjectPO securableObjectPO = (SecurableObjectPO) o;
     return Objects.equal(getRoleId(), securableObjectPO.getRoleId())
-        && Objects.equal(getEntityId(), securableObjectPO.getEntityId())
+        && Objects.equal(getMetadataObjectId(), securableObjectPO.getMetadataObjectId())
         && Objects.equal(getType(), securableObjectPO.getType())
         && Objects.equal(getPrivilegeConditions(), securableObjectPO.getPrivilegeConditions())
         && Objects.equal(getPrivilegeNames(), securableObjectPO.getPrivilegeNames())
@@ -87,7 +87,7 @@ public class SecurableObjectPO {
   public int hashCode() {
     return Objects.hashCode(
         getRoleId(),
-        getEntityId(),
+        getMetadataObjectId(),
         getType(),
         getPrivilegeNames(),
         getPrivilegeConditions(),
@@ -108,8 +108,8 @@ public class SecurableObjectPO {
       return this;
     }
 
-    public Builder withEntityId(long entityId) {
-      securableObjectPO.entityId = entityId;
+    public Builder withMetadataObjectId(long metadataObjectId) {
+      securableObjectPO.metadataObjectId = metadataObjectId;
       return this;
     }
 
@@ -149,7 +149,7 @@ public class SecurableObjectPO {
       Preconditions.checkArgument(
           securableObjectPO.privilegeNames != null, "Privilege names are required");
       Preconditions.checkArgument(
-          securableObjectPO.privilegeConditions != null, "Priviege conditions are required");
+          securableObjectPO.privilegeConditions != null, "Privilege conditions are required");
       Preconditions.checkArgument(
           securableObjectPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(

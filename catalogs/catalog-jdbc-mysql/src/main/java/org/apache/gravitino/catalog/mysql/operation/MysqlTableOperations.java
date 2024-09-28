@@ -492,6 +492,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         .collect(Collectors.joining(",\n"));
   }
 
+  @Override
   protected JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
     return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
@@ -618,7 +619,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append(MODIFY_COLUMN).append(col);
+    columnDefinition.append(MODIFY_COLUMN).append(quote(col));
     appendColumnDefinition(column, columnDefinition);
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
@@ -663,7 +664,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnDefaultValue.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
+    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quote(col));
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName(col)
@@ -682,7 +683,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + col);
+    StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quote(col));
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName(col)
@@ -724,5 +725,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
       sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");
     }
     return sqlBuilder;
+  }
+
+  private static String quote(String name) {
+    return BACK_QUOTE + name + BACK_QUOTE;
   }
 }

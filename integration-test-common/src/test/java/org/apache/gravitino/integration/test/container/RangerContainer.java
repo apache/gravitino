@@ -37,17 +37,25 @@ public class RangerContainer extends BaseContainer {
 
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_RANGER_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-ranger";
-  public static final int RANGER_PORT = 6080;
+  public static final int RANGER_SERVER_PORT = 6080;
   public RangerClient rangerClient;
   private String rangerUrl;
-  private static final String username = "admin";
+
+  /**
+   * for kerberos authentication: <br>
+   * authType = "kerberos" <br>
+   * username = principal <br>
+   * password = path of the keytab file <br>
+   */
+  public static final String authType = "simple";
+
+  public static final String rangerUserName = "admin";
   // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
-  private static final String password = "rangerR0cks!";
-  /* for kerberos authentication:
-  authType = "kerberos"
-  username = principal
-  password = path of the keytab file */
-  private static final String authType = "simple";
+  public static final String rangerPassword = "rangerR0cks!";
+  // Ranger hive/hdfs Docker startup environment variable name
+  public static final String DOCKER_ENV_RANGER_SERVER_URL = "RANGER_SERVER_URL";
+  public static final String DOCKER_ENV_RANGER_HDFS_REPOSITORY_NAME = "RANGER_HDFS_REPOSITORY_NAME";
+  public static final String DOCKER_ENV_RANGER_HIVE_REPOSITORY_NAME = "RANGER_HIVE_REPOSITORY_NAME";
 
   public static Builder builder() {
     return new Builder();
@@ -74,8 +82,8 @@ public class RangerContainer extends BaseContainer {
   public void start() {
     super.start();
 
-    rangerUrl = String.format("http://localhost:%s", this.getMappedPort(6080));
-    rangerClient = new RangerClient(rangerUrl, authType, username, password, null);
+    rangerUrl = String.format("http://localhost:%s", this.getMappedPort(RANGER_SERVER_PORT));
+    rangerClient = new RangerClient(rangerUrl, authType, rangerUserName, rangerPassword, null);
 
     Preconditions.check("Ranger container startup failed!", checkContainerStatus(10));
   }
@@ -118,9 +126,9 @@ public class RangerContainer extends BaseContainer {
     private Builder() {
       this.image = DEFAULT_IMAGE;
       this.hostName = HOST_NAME;
-      this.exposePorts = ImmutableSet.of(RANGER_PORT);
+      this.exposePorts = ImmutableSet.of(RANGER_SERVER_PORT);
       this.envVars =
-          ImmutableMap.<String, String>builder().put("RANGER_PASSWORD", password).build();
+          ImmutableMap.<String, String>builder().put("RANGER_PASSWORD", rangerPassword).build();
     }
 
     @Override

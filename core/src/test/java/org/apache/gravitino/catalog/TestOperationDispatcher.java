@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.TestFilesetPropertiesMetadata.TEST_FILESET_HIDDEN_KEY;
+import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.reset;
@@ -108,22 +109,20 @@ public abstract class TestOperationDispatcher {
 
   @Test
   public void testGetCatalogIdentifier() {
-    OperationDispatcher dispatcher = new OperationDispatcher(null, null, null) {};
-
     NameIdentifier id1 = NameIdentifier.of("a");
-    assertThrows(IllegalNamespaceException.class, () -> dispatcher.getCatalogIdentifier(id1));
+    assertThrows(IllegalNamespaceException.class, () -> getCatalogIdentifier(id1));
 
     NameIdentifier id2 = NameIdentifier.of("a", "b");
-    assertEquals(dispatcher.getCatalogIdentifier(id2), NameIdentifier.of("a", "b"));
+    assertEquals(getCatalogIdentifier(id2), NameIdentifier.of("a", "b"));
 
     NameIdentifier id3 = NameIdentifier.of("a", "b", "c");
-    assertEquals(dispatcher.getCatalogIdentifier(id3), NameIdentifier.of("a", "b"));
+    assertEquals(getCatalogIdentifier(id3), NameIdentifier.of("a", "b"));
 
     NameIdentifier id4 = NameIdentifier.of("a", "b", "c", "d");
-    assertEquals(dispatcher.getCatalogIdentifier(id4), NameIdentifier.of("a", "b"));
+    assertEquals(getCatalogIdentifier(id4), NameIdentifier.of("a", "b"));
 
     NameIdentifier id5 = NameIdentifier.of("a", "b", "c", "d", "e");
-    assertEquals(dispatcher.getCatalogIdentifier(id5), NameIdentifier.of("a", "b"));
+    assertEquals(getCatalogIdentifier(id5), NameIdentifier.of("a", "b"));
   }
 
   void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {

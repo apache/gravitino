@@ -21,8 +21,9 @@ For more details, please refer to the related doc.
 - [**Apache Hive**](./apache-hive-catalog.md)
 - [**MySQL**](./jdbc-mysql-catalog.md)
 - [**PostgreSQL**](./jdbc-postgresql-catalog.md)
-- [**Doris**](./jdbc-doris-catalog.md)
+- [**Apache Doris**](./jdbc-doris-catalog.md)
 - [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
+- [**Apache Paimon**](./lakehouse-paimon-catalog.md)
 
 Assuming:
 
@@ -76,7 +77,7 @@ Map<String, String> hiveProperties = ImmutableMap.<String, String>builder()
 
 Catalog catalog = gravitinoClient.createCatalog("catalog",
     Type.RELATIONAL,
-    "hive", // provider, We support hive, jdbc-mysql, jdbc-postgresql, lakehouse-iceberg, etc.
+    "hive", // provider, We support hive, jdbc-mysql, jdbc-postgresql, lakehouse-iceberg, lakehouse-paimon etc.
     "This is a hive catalog",
     hiveProperties); // Please change the properties according to the value of the provider.
 // ...
@@ -87,13 +88,14 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider    | Catalog property                                                               |
-|---------------------|--------------------------------------------------------------------------------|
-| `hive`              | [Hive catalog property](./apache-hive-catalog.md#catalog-properties)           |
-| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog.md#catalog-properties)  |
-| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog.md#catalog-properties)           |
-| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties) |
-| `jdbc-doris`        | [Doris catalog property](./jdbc-doris-catalog.md#catalog-properties)           |
+| Catalog provider    | Catalog property                                                                |
+|---------------------|---------------------------------------------------------------------------------|
+| `hive`              | [Hive catalog property](./apache-hive-catalog.md#catalog-properties)            |
+| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog.md#catalog-properties)   |
+| `lakehouse-paimon`  | [Paimon catalog property](./lakehouse-paimon-catalog.md#catalog-properties)     |
+| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog.md#catalog-properties)            |
+| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties)  |
+| `jdbc-doris`        | [Doris catalog property](./jdbc-doris-catalog.md#catalog-properties)            |
 
 ### Load a catalog
 
@@ -160,12 +162,21 @@ Catalog catalog = gravitinoClient.alterCatalog("catalog",
 
 Currently, Gravitino supports the following changes to a catalog:
 
-| Supported modification | JSON                                                         | Java                                           |
-|------------------------|--------------------------------------------------------------|------------------------------------------------|
-| Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `CatalogChange.rename("catalog_renamed")`      |
-| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `CatalogChange.updateComment("new_comment")`   |
-| Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `CatalogChange.setProperty("key1", "value1")`  |
-| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `CatalogChange.removeProperty("key1")`         |
+| Supported modification | JSON                                                         | Java                                          |
+|------------------------|--------------------------------------------------------------|-----------------------------------------------|
+| Rename catalog         | `{"@type":"rename","newName":"catalog_renamed"}`             | `CatalogChange.rename("catalog_renamed")`     |
+| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `CatalogChange.updateComment("new_comment")`  |
+| Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `CatalogChange.setProperty("key1", "value1")` |
+| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `CatalogChange.removeProperty("key1")`        |
+
+:::warning
+
+Most catalog-altering operations are generally safe. However, if you want to change the catalog's URI, you should proceed with caution. Changing the URI may point to a different cluster, rendering the metadata stored in Gravitino unusable.
+For instance, if the old URI and the new URI point to different clusters that both have a database named db1, changing the URI might cause the old metadata, such as audit information, to be used when accessing db1, which is undesirable.
+
+Therefore, do not change the catalog's URI unless you fully understand the consequences of such a modification.
+
+:::
 
 ### Drop a catalog
 
@@ -200,7 +211,7 @@ Dropping a catalog only removes metadata about the catalog, schemas, and tables 
 
 ### List all catalogs in a metalake
 
-You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs in
+You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs in
 a metalake:
 
 <Tabs groupId="language" queryString>
@@ -227,7 +238,7 @@ String[] catalogNames = gravitinoClient.listCatalogs();
 
 ### List all catalogs' information in a metalake
 
-You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all catalogs' information in a metalake:
+You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs' information in a metalake:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -314,6 +325,7 @@ Currently, Gravitino supports the following schema property:
 |---------------------|------------------------------------------------------------------------------|
 | `hive`              | [Hive schema property](./apache-hive-catalog.md#schema-properties)           |
 | `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog.md#schema-properties)  |
+| `lakehouse-paimon`  | [Paimon scheme property](./lakehouse-paimon-catalog.md#schema-properties)    |
 | `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog.md#schema-properties)           |
 | `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog.md#schema-properties) |
 | `jdbc-doris`        | [Doris schema property](./jdbc-doris-catalog.md#schema-properties)           |
@@ -403,7 +415,7 @@ catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
 
 changes = (
     SchemaChange.remove_property("schema_properties_key1"),
-    SchemaChange.set_property("schema_properties_key2", "schema_propertie_new_value"),
+    SchemaChange.set_property("schema_properties_key2", "schema_properties_new_value"),
 )
 schema_new: Schema = catalog.as_schemas().alter_schema("schema", 
                                                        *changes)
@@ -463,7 +475,7 @@ Some catalogs may not support cascading deletion of a schema, please refer to th
 
 ### List all schemas under a catalog
 
-You can alter all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of list all schema
+You can list all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of listing all the schemas
     in a catalog:
 
 
@@ -694,37 +706,38 @@ In order to create a table, you need to provide the following information:
 
 The following types that Gravitino supports:
 
-| Type                       | Java                                                                     | JSON                                                                                                                                 | Description                                                                                      |
-|----------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| Boolean                    | `Types.BooleanType.get()`                                                | `boolean`                                                                                                                            | Boolean type                                                                                     |
-| Byte                       | `Types.ByteType.get()`                                                   | `byte`                                                                                                                               | Byte type, indicates a numerical value of 1 byte                                                 |
-| Byte(false)                | `Types.ByteType.unsigned()`                                              | `byte unsigned`                                                                                                                      | Unsigned Byte type, indicates a unsigned numerical value of 1 byte                               |
-| Short                      | `Types.ShortType.get()`                                                  | `short`                                                                                                                              | Short type, indicates a numerical value of 2 bytes                                               |
-| Short(false)               | `Types.ShortType.unsigned()`                                             | `short unsigned`                                                                                                                     | Unsigned Short type, indicates a unsigned numerical value of 2 bytes                             |
-| Integer                    | `Types.IntegerType.get()`                                                | `integer`                                                                                                                            | Integer type, indicates a numerical value of 4 bytes                                             |
-| Integer(false)             | `Types.IntegerType.unsigned()`                                           | `integer unsigned`                                                                                                                   | Unsigned Integer type, indicates a unsigned numerical value of 4 bytes                           |
-| Long                       | `Types.LongType.get()`                                                   | `long`                                                                                                                               | Long type, indicates a numerical value of 8 bytes                                                |
-| Long(false)                | `Types.LongType.unsigned()`                                              | `long unsigned`                                                                                                                      | Unsigned Long type, indicates a unsigned numerical value of 8 bytes                              |
-| Float                      | `Types.FloatType.get()`                                                  | `float`                                                                                                                              | Float type, indicates a single-precision floating point number                                   |
-| Double                     | `Types.DoubleType.get()`                                                 | `double`                                                                                                                             | Double type, indicates a double-precision floating point number                                  |
-| Decimal(precision, scale)  | `Types.DecimalType.of(precision, scale)`                                 | `decimal(p, s)`                                                                                                                      | Decimal type, indicates a fixed-precision decimal number                                         |
-| String                     | `Types.StringType.get()`                                                 | `string`                                                                                                                             | String type                                                                                      |
-| FixedChar(length)          | `Types.FixedCharType.of(length)`                                         | `char(l)`                                                                                                                            | Char type, indicates a fixed-length string                                                       |
-| VarChar(length)            | `Types.VarCharType.of(length)`                                           | `varchar(l)`                                                                                                                         | Varchar type, indicates a variable-length string, the length is the maximum length of the string |
-| Timestamp                  | `Types.TimestampType.withoutTimeZone()`                                  | `timestamp`                                                                                                                          | Timestamp type, indicates a timestamp without timezone                                           |
-| TimestampWithTimezone      | `Types.TimestampType.withTimeZone()`                                     | `timestamp_tz`                                                                                                                       | Timestamp with timezone type, indicates a timestamp with timezone                                |
-| Date                       | `Types.DateType.get()`                                                   | `date`                                                                                                                               | Date type                                                                                        |
-| Time                       | `Types.TimeType.withoutTimeZone()`                                       | `time`                                                                                                                               | Time type                                                                                        |
-| IntervalToYearMonth        | `Types.IntervalYearType.get()`                                           | `interval_year`                                                                                                                      | Interval type, indicates an interval of year and month                                           |
-| IntervalToDayTime          | `Types.IntervalDayType.get()`                                            | `interval_day`                                                                                                                       | Interval type, indicates an interval of day and time                                             |
-| Fixed(length)              | `Types.FixedType.of(length)`                                             | `fixed(l)`                                                                                                                           | Fixed type, indicates a fixed-length binary array                                                |
-| Binary                     | `Types.BinaryType.get()`                                                 | `binary`                                                                                                                             | Binary type, indicates a arbitrary-length binary array                                           |
-| List                       | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                        |
-| Map                        | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                      |
-| Struct                     | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                         |
-| Union                      | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                           |
+| Type                      | Java                                                                     | JSON                                                                                                                                 | Description                                                                                                                                                                |
+|---------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Boolean                   | `Types.BooleanType.get()`                                                | `boolean`                                                                                                                            | Boolean type                                                                                                                                                               |
+| Byte                      | `Types.ByteType.get()`                                                   | `byte`                                                                                                                               | Byte type, indicates a numerical value of 1 byte                                                                                                                           |
+| Byte(false)               | `Types.ByteType.unsigned()`                                              | `byte unsigned`                                                                                                                      | Unsigned Byte type, indicates a unsigned numerical value of 1 byte                                                                                                         |
+| Short                     | `Types.ShortType.get()`                                                  | `short`                                                                                                                              | Short type, indicates a numerical value of 2 bytes                                                                                                                         |
+| Short(false)              | `Types.ShortType.unsigned()`                                             | `short unsigned`                                                                                                                     | Unsigned Short type, indicates a unsigned numerical value of 2 bytes                                                                                                       |
+| Integer                   | `Types.IntegerType.get()`                                                | `integer`                                                                                                                            | Integer type, indicates a numerical value of 4 bytes                                                                                                                       |
+| Integer(false)            | `Types.IntegerType.unsigned()`                                           | `integer unsigned`                                                                                                                   | Unsigned Integer type, indicates a unsigned numerical value of 4 bytes                                                                                                     |
+| Long                      | `Types.LongType.get()`                                                   | `long`                                                                                                                               | Long type, indicates a numerical value of 8 bytes                                                                                                                          |
+| Long(false)               | `Types.LongType.unsigned()`                                              | `long unsigned`                                                                                                                      | Unsigned Long type, indicates a unsigned numerical value of 8 bytes                                                                                                        |
+| Float                     | `Types.FloatType.get()`                                                  | `float`                                                                                                                              | Float type, indicates a single-precision floating point number                                                                                                             |
+| Double                    | `Types.DoubleType.get()`                                                 | `double`                                                                                                                             | Double type, indicates a double-precision floating point number                                                                                                            |
+| Decimal(precision, scale) | `Types.DecimalType.of(precision, scale)`                                 | `decimal(p, s)`                                                                                                                      | Decimal type, indicates a fixed-precision decimal number with the constraint that the precision must be in range `[1, 38]` and the scala must be in range `[0, precision]` |
+| String                    | `Types.StringType.get()`                                                 | `string`                                                                                                                             | String type                                                                                                                                                                |
+| FixedChar(length)         | `Types.FixedCharType.of(length)`                                         | `char(l)`                                                                                                                            | Char type, indicates a fixed-length string                                                                                                                                 |
+| VarChar(length)           | `Types.VarCharType.of(length)`                                           | `varchar(l)`                                                                                                                         | Varchar type, indicates a variable-length string, the length is the maximum length of the string                                                                           |
+| Timestamp                 | `Types.TimestampType.withoutTimeZone()`                                  | `timestamp`                                                                                                                          | Timestamp type, indicates a timestamp without timezone                                                                                                                     |
+| TimestampWithTimezone     | `Types.TimestampType.withTimeZone()`                                     | `timestamp_tz`                                                                                                                       | Timestamp with timezone type, indicates a timestamp with timezone                                                                                                          |
+| Date                      | `Types.DateType.get()`                                                   | `date`                                                                                                                               | Date type                                                                                                                                                                  |
+| Time                      | `Types.TimeType.withoutTimeZone()`                                       | `time`                                                                                                                               | Time type                                                                                                                                                                  |
+| IntervalToYearMonth       | `Types.IntervalYearType.get()`                                           | `interval_year`                                                                                                                      | Interval type, indicates an interval of year and month                                                                                                                     |
+| IntervalToDayTime         | `Types.IntervalDayType.get()`                                            | `interval_day`                                                                                                                       | Interval type, indicates an interval of day and time                                                                                                                       |
+| Fixed(length)             | `Types.FixedType.of(length)`                                             | `fixed(l)`                                                                                                                           | Fixed type, indicates a fixed-length binary array                                                                                                                          |
+| Binary                    | `Types.BinaryType.get()`                                                 | `binary`                                                                                                                             | Binary type, indicates a arbitrary-length binary array                                                                                                                     |
+| List                      | `Types.ListType.of(elementType, elementNullable)`                        | `{"type": "list", "containsNull": JSON Boolean, "elementType": type JSON}`                                                           | List type, indicate a list of elements with the same type                                                                                                                  |
+| Map                       | `Types.MapType.of(keyType, valueType)`                                   | `{"type": "map", "keyType": type JSON, "valueType": type JSON, "valueContainsNull": JSON Boolean}`                                   | Map type, indicate a map of key-value pairs                                                                                                                                |
+| Struct                    | `Types.StructType.of([Types.StructType.Field.of(name, type, nullable)])` | `{"type": "struct", "fields": [JSON StructField, {"name": string, "type": type JSON, "nullable": JSON Boolean, "comment": string}]}` | Struct type, indicate a struct of fields                                                                                                                                   |
+| Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                                                                                                     |
+| UUID                      | `Types.UUIDType.get()`                                                   | `uuid`                                                                                                                               | UUID type, indicates a universally unique identifier                                                                                                                       |
 
-The related java doc is [here](pathname:///docs/0.5.1/api/java/org/apache/gravitino/rel/types/Type.html).
+The related java doc is [here](pathname:///docs/0.6.0-incubating/api/java/org/apache/gravitino/rel/types/Type.html).
 
 ##### External type
 
@@ -793,6 +806,7 @@ The following is a table of the column default value that Gravitino supports for
 |---------------------|-------------------------|
 | `hive`              | &#10008;                |
 | `lakehouse-iceberg` | &#10008;                |
+| `lakehouse-paimon`  | &#10008;                |
 | `jdbc-mysql`        | &#10004;                |
 | `jdbc-postgresql`   | &#10004;                |
 
@@ -805,6 +819,7 @@ The following table shows the column auto-increment that Gravitino supports for 
 |---------------------|------------------------------------------------------------------------------|
 | `hive`              | &#10008;                                                                     |
 | `lakehouse-iceberg` | &#10008;                                                                     |
+| `lakehouse-paimon`  | &#10008;                                                                     |
 | `jdbc-mysql`        | &#10004;([limitations](./jdbc-mysql-catalog.md#table-column-auto-increment)) |
 | `jdbc-postgresql`   | &#10004;                                                                     |
 
@@ -816,6 +831,7 @@ The following is the table property that Gravitino supports:
 |---------------------|----------------------------------------------------------------------------|----------------------------------------------------------------------------|
 | `hive`              | [Hive table property](./apache-hive-catalog.md#table-properties)           | [Hive type mapping](./apache-hive-catalog.md#table-column-types)           |
 | `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog.md#table-properties)  | [Iceberg type mapping](./lakehouse-iceberg-catalog.md#table-column-types)  |
+| `lakehouse-paimon`  | [Paimon table property](./lakehouse-paimon-catalog.md#table-properties)    | [Paimon type mapping](./lakehouse-paimon-catalog.md#table-column-types)    |
 | `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog.md#table-properties)           | [MySQL type mapping](./jdbc-mysql-catalog.md#table-column-types)           |
 | `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
 | `doris`             | [Doris table property](./jdbc-doris-catalog.md#table-properties)           | [Doris type mapping](./jdbc-doris-catalog.md#table-column-types)           |
@@ -826,10 +842,10 @@ In addition to the basic settings, Gravitino supports the following features:
 
 | Feature             | Description                                                                                                                                                                                                                                                                                    | Java doc                                                                                                                 |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
-| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/0.5.1/api/java/org/apache/gravitino/dto/rel/partitioning/Partitioning.html)             |
-| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.               | [Distribution](pathname:///docs/0.5.1/api/java/org/apache/gravitino/rel/expressions/distributions/Distribution.html) |
-| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.5.1/api/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.html)               |
-| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.5.1/api/java/org/apache/gravitino/rel/indexes/Index.html)                                 |
+| Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/0.6.0-incubating/api/java/org/apache/gravitino/dto/rel/partitioning/Partitioning.html)             |
+| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.               | [Distribution](pathname:///docs/0.6.0-incubating/api/java/org/apache/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.6.0-incubating/api/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.html)               |
+| Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.6.0-incubating/api/java/org/apache/gravitino/rel/indexes/Index.html)                                 |
 
 For more information, please see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
 
@@ -970,11 +986,11 @@ There are two ways to remove a table: `dropTable` and `purgeTable`:
 * `dropTable`  removes both the metadata and the directory associated with the table from the file system if the table is not an external table. In case of an external table, only the associated metadata is removed.
 * `purgeTable` completely removes both the metadata and the directory associated with the table and skipping trash, if the table is an external table or the catalogs don't support purge table, `UnsupportedOperationException` is thrown.
 
-Hive catalog and lakehouse-iceberg catalog supports `purgeTable` while jdbc-mysql and jdbc-postgresql catalog doesn't support.
+Hive catalog and lakehouse-iceberg catalog supports `purgeTable` while jdbc-mysql, jdbc-postgresql and lakehouse-paimon catalog doesn't support.
 
 ### List all tables under a schema
 
-You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of list all tables in a schema:
+You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of listing all the tables in a schema:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

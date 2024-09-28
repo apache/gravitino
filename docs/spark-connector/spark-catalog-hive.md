@@ -19,6 +19,11 @@ Supports most DDL and DML operations in SparkSQL, except such operations:
 - `CREATE TABLE LIKE` clause
 - `TRUCATE TABLE` clause
 
+
+:::info
+Don't support reading and writing tables with `org.apache.hadoop.hive.serde2.OpenCSVSerde` row format.
+:::
+
 ## Requirement
 
 * Hive metastore 2.x

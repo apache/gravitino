@@ -23,7 +23,9 @@ import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
 import static org.apache.gravitino.Catalog.PROPERTY_PACKAGE;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
@@ -31,7 +33,9 @@ import org.apache.gravitino.annotation.Evolving;
 
 @Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
-  protected static final Map<String, PropertyEntry<?>> BASIC_CATALOG_PROPERTY_ENTRIES =
+
+  // The basic property entries for catalog entities
+  private static final Map<String, PropertyEntry<?>> BASIC_CATALOG_PROPERTY_ENTRIES =
       Maps.uniqueIndex(
           ImmutableList.of(
               PropertyEntry.stringImmutablePropertyEntry(
@@ -59,7 +63,7 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   CLOUD_NAME,
                   "The cloud that the catalog is running on",
                   false /* required */,
-                  true /* immutable */,
+                  false /* immutable */,
                   Catalog.CloudName.class,
                   null /* The default value does not work because if the user does not set it, this property will not be displayed */,
                   false /* hidden */,
@@ -67,8 +71,39 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
               PropertyEntry.stringOptionalPropertyEntry(
                   CLOUD_REGION_CODE,
                   "The region code of the cloud that the catalog is running on",
-                  false /* required */,
+                  false /* immutable */,
                   null /* The default value does not work because if the user does not set it, this property will not be displayed */,
                   false /* hidden */)),
           PropertyEntry::getName);
+
+  @Override
+  public Map<String, PropertyEntry<?>> propertyEntries() {
+    if (propertyEntries == null) {
+      synchronized (this) {
+        if (propertyEntries == null) {
+          ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
+          Map<String, PropertyEntry<?>> properties = specificPropertyEntries();
+          builder.putAll(properties);
+
+          // put the basic property entries
+          BASIC_PROPERTY_ENTRIES.forEach(
+              (name, entry) -> {
+                Preconditions.checkArgument(
+                    !properties.containsKey(name), "Property metadata already exists: " + name);
+                builder.put(name, entry);
+              });
+
+          // put the basic catalog property entries
+          BASIC_CATALOG_PROPERTY_ENTRIES.forEach(
+              (name, entry) -> {
+                Preconditions.checkArgument(
+                    !properties.containsKey(name), "Property metadata already exists: " + name);
+                builder.put(name, entry);
+              });
+          propertyEntries = builder.build();
+        }
+      }
+    }
+    return propertyEntries;
+  }
 }

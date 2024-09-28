@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -31,6 +32,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing a table in a {@link Namespace}. It defines the basic properties of a
@@ -93,5 +95,21 @@ public interface Table extends Auditable {
    */
   default SupportsPartitions supportPartitions() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Table does not support partition operations.");
+  }
+
+  /**
+   * @return The {@link SupportsTags} if the table supports tag operations.
+   * @throws UnsupportedOperationException If the table does not support tag operations.
+   */
+  default SupportsTags supportsTags() {
+    throw new UnsupportedOperationException("Table does not support tag operations.");
+  }
+
+  /**
+   * @return The {@link SupportsRoles} if the table supports role operations.
+   * @throws UnsupportedOperationException If the table does not support role operations.
+   */
+  default SupportsRoles supportsRoles() {
+    throw new UnsupportedOperationException("Table does not support role operations.");
   }
 }

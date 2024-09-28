@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
+import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.util.Map;
 import org.apache.gravitino.EntityStore;
@@ -192,6 +193,24 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     return doWithCatalog(
         getCatalogIdentifier(ident),
         c -> c.doWithFilesetOps(f -> f.dropFileset(ident)),
+        NonEmptyEntityException.class);
+  }
+
+  /**
+   * Get the actual location of a file or directory based on the storage location of Fileset and the
+   * sub path.
+   *
+   * @param ident A fileset identifier.
+   * @param subPath The sub path to the file or directory.
+   * @return The actual location of the file or directory.
+   * @throws NoSuchFilesetException If the fileset does not exist.
+   */
+  @Override
+  public String getFileLocation(NameIdentifier ident, String subPath)
+      throws NoSuchFilesetException {
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithFilesetOps(f -> f.getFileLocation(ident, subPath)),
         NonEmptyEntityException.class);
   }
 }

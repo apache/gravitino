@@ -37,8 +37,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOps;
-import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergTableOpsHelper;
+import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -50,6 +49,9 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -80,9 +82,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogOperations.class);
 
-  @VisibleForTesting IcebergTableOps icebergTableOps;
+  @VisibleForTesting IcebergCatalogWrapper icebergCatalogWrapper;
 
-  private IcebergTableOpsHelper icebergTableOpsHelper;
+  private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper;
 
   /**
    * Initializes the Iceberg catalog operations with the provided configuration.
@@ -106,21 +108,19 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
     resultConf.put("catalog_uuid", info.id().toString());
-    if (!resultConf.containsKey(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME)) {
-      resultConf.put(IcebergCatalogPropertiesMetadata.CATALOG_BACKEND_NAME, info.name());
-    }
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
-    this.icebergTableOps = new IcebergTableOps(icebergConfig);
-    this.icebergTableOpsHelper = icebergTableOps.createIcebergTableOpsHelper();
+    this.icebergCatalogWrapper = new IcebergCatalogWrapper(icebergConfig);
+    this.icebergCatalogWrapperHelper =
+        new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
   @Override
   public void close() {
-    if (null != icebergTableOps) {
+    if (null != icebergCatalogWrapper) {
       try {
-        icebergTableOps.close();
+        icebergCatalogWrapper.close();
       } catch (Exception e) {
         LOG.warn("Failed to close Iceberg catalog", e);
       }
@@ -138,7 +138,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     try {
       List<org.apache.iceberg.catalog.Namespace> namespaces =
-          icebergTableOps.listNamespace(IcebergTableOpsHelper.getIcebergNamespace()).namespaces();
+          icebergCatalogWrapper
+              .listNamespace(IcebergCatalogWrapperHelper.getIcebergNamespace())
+              .namespaces();
 
       return namespaces.stream()
           .map(icebergNamespace -> NameIdentifier.of(namespace, icebergNamespace.toString()))
@@ -176,8 +178,9 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
                       .withCreateTime(Instant.now())
                       .build())
               .build();
-      icebergTableOps.createNamespace(
-          createdSchema.toCreateRequest(IcebergTableOpsHelper.getIcebergNamespace(ident.name())));
+      icebergCatalogWrapper.createNamespace(
+          createdSchema.toCreateRequest(
+              IcebergCatalogWrapperHelper.getIcebergNamespace(ident.name())));
       LOG.info(
           "Created Iceberg schema (database) {} in Iceberg\ncurrentUser:{} \ncomment: {} \nmetadata: {}",
           ident.name(),
@@ -209,7 +212,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   public IcebergSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     try {
       GetNamespaceResponse response =
-          icebergTableOps.loadNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident.name()));
+          icebergCatalogWrapper.loadNamespace(
+              IcebergCatalogWrapperHelper.getIcebergNamespace(ident.name()));
       IcebergSchema icebergSchema =
           IcebergSchema.builder()
               .withName(ident.name())
@@ -242,7 +246,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       throws NoSuchSchemaException {
     try {
       GetNamespaceResponse response =
-          icebergTableOps.loadNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident.name()));
+          icebergCatalogWrapper.loadNamespace(
+              IcebergCatalogWrapperHelper.getIcebergNamespace(ident.name()));
       Map<String, String> metadata = response.properties();
       List<String> removals = new ArrayList<>();
       Map<String, String> updates = new HashMap<>();
@@ -276,8 +281,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest =
           UpdateNamespacePropertiesRequest.builder().updateAll(updates).removeAll(removals).build();
       UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse =
-          icebergTableOps.updateNamespaceProperties(
-              IcebergTableOpsHelper.getIcebergNamespace(ident.name()),
+          icebergCatalogWrapper.updateNamespaceProperties(
+              IcebergCatalogWrapperHelper.getIcebergNamespace(ident.name()),
               updateNamespacePropertiesRequest);
       LOG.info(
           "Altered Iceberg schema (database) {}. UpdateResponse:\n{}",
@@ -304,7 +309,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     Preconditions.checkArgument(!cascade, "Iceberg does not support cascading delete operations.");
     try {
-      icebergTableOps.dropNamespace(IcebergTableOpsHelper.getIcebergNamespace(ident.name()));
+      icebergCatalogWrapper.dropNamespace(
+          IcebergCatalogWrapperHelper.getIcebergNamespace(ident.name()));
       LOG.info("Dropped Iceberg schema (database) {}", ident.name());
       return true;
     } catch (NamespaceNotEmptyException e) {
@@ -334,7 +340,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
     try {
       ListTablesResponse listTablesResponse =
-          icebergTableOps.listTable(IcebergTableOpsHelper.getIcebergNamespace(namespace));
+          icebergCatalogWrapper.listTable(
+              IcebergCatalogWrapperHelper.getIcebergNamespace(namespace));
       return listTablesResponse.identifiers().stream()
           .map(
               tableIdentifier ->
@@ -357,7 +364,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     try {
 
       LoadTableResponse tableResponse =
-          icebergTableOps.loadTable(IcebergTableOpsHelper.buildIcebergTableIdentifier(tableIdent));
+          icebergCatalogWrapper.loadTable(
+              IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdent));
       IcebergTable icebergTable =
           IcebergTable.fromIcebergTable(tableResponse.tableMetadata(), tableIdent.name());
 
@@ -405,10 +413,10 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       throws NoSuchTableException, IllegalArgumentException {
     try {
       String[] levels = tableIdent.namespace().levels();
-      IcebergTableOpsHelper.IcebergTableChange icebergTableChange =
-          icebergTableOpsHelper.buildIcebergTableChanges(
+      IcebergTableChange icebergTableChange =
+          icebergCatalogWrapperHelper.buildIcebergTableChanges(
               NameIdentifier.of(levels[levels.length - 1], tableIdent.name()), changes);
-      LoadTableResponse loadTableResponse = icebergTableOps.updateTable(icebergTableChange);
+      LoadTableResponse loadTableResponse = icebergCatalogWrapper.updateTable(icebergTableChange);
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
@@ -430,12 +438,12 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     try {
       RenameTableRequest renameTableRequest =
           RenameTableRequest.builder()
-              .withSource(IcebergTableOpsHelper.buildIcebergTableIdentifier(tableIdent))
+              .withSource(IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdent))
               .withDestination(
-                  IcebergTableOpsHelper.buildIcebergTableIdentifier(
+                  IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(
                       tableIdent.namespace(), renameTable.getNewName()))
               .build();
-      icebergTableOps.renameTable(renameTableRequest);
+      icebergCatalogWrapper.renameTable(renameTableRequest);
       return loadTable(NameIdentifier.of(tableIdent.namespace(), renameTable.getNewName()));
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
@@ -451,7 +459,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public boolean dropTable(NameIdentifier tableIdent) {
     try {
-      icebergTableOps.dropTable(IcebergTableOpsHelper.buildIcebergTableIdentifier(tableIdent));
+      icebergCatalogWrapper.dropTable(
+          IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(tableIdent));
       LOG.info("Dropped Iceberg table {}", tableIdent.name());
       return true;
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
@@ -520,8 +529,8 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
               .build();
 
       LoadTableResponse loadTableResponse =
-          icebergTableOps.createTable(
-              IcebergTableOpsHelper.getIcebergNamespace(schemaIdent.name()),
+          icebergCatalogWrapper.createTable(
+              IcebergCatalogWrapperHelper.getIcebergNamespace(schemaIdent.name()),
               createdTable.toCreateTableRequest());
       loadTableResponse.validate();
 
@@ -543,7 +552,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
     try {
       String schema = NameIdentifier.of(tableIdent.namespace().levels()).name();
-      icebergTableOps.purgeTable(TableIdentifier.of(schema, tableIdent.name()));
+      icebergCatalogWrapper.purgeTable(TableIdentifier.of(schema, tableIdent.name()));
       LOG.info("Purge Iceberg table {}", tableIdent.name());
       return true;
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
@@ -571,7 +580,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
       String comment,
       Map<String, String> properties) {
     try {
-      icebergTableOps.listNamespace(IcebergTableOpsHelper.getIcebergNamespace());
+      icebergCatalogWrapper.listNamespace(IcebergCatalogWrapperHelper.getIcebergNamespace());
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run listNamespace on Iceberg catalog: %s", e.getMessage());

@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.server;
 
+import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.List;
 import java.util.Properties;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
@@ -44,6 +46,7 @@ import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
+import org.apache.gravitino.tag.TagManager;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -69,14 +72,14 @@ public class GravitinoServer extends ResourceConfig {
 
   private final GravitinoEnv gravitinoEnv;
 
-  public GravitinoServer(ServerConfig config) {
+  public GravitinoServer(ServerConfig config, GravitinoEnv gravitinoEnv) {
     serverConfig = config;
     server = new JettyServer();
-    gravitinoEnv = GravitinoEnv.getInstance();
+    this.gravitinoEnv = gravitinoEnv;
   }
 
   public void initialize() {
-    gravitinoEnv.initialize(serverConfig);
+    gravitinoEnv.initialize(serverConfig, true);
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -88,8 +91,15 @@ public class GravitinoServer extends ResourceConfig {
     initializeRestApi();
   }
 
+  public ServerConfig serverConfig() {
+    return serverConfig;
+  }
+
   private void initializeRestApi() {
-    packages("org.apache.gravitino.server.web.rest");
+    List<String> restApiPackages = Lists.newArrayList("org.apache.gravitino.server.web.rest");
+    restApiPackages.addAll(serverConfig.get(Configs.REST_API_EXTENSION_PACKAGES));
+    packages(restApiPackages.toArray(new String[0]));
+
     boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
     register(
         new AbstractBinder() {
@@ -97,12 +107,12 @@ public class GravitinoServer extends ResourceConfig {
           protected void configure() {
             bind(gravitinoEnv.metalakeDispatcher()).to(MetalakeDispatcher.class).ranked(1);
             bind(gravitinoEnv.catalogDispatcher()).to(CatalogDispatcher.class).ranked(1);
-
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
             bind(gravitinoEnv.tableDispatcher()).to(TableDispatcher.class).ranked(1);
             bind(gravitinoEnv.partitionDispatcher()).to(PartitionDispatcher.class).ranked(1);
             bind(gravitinoEnv.filesetDispatcher()).to(FilesetDispatcher.class).ranked(1);
             bind(gravitinoEnv.topicDispatcher()).to(TopicDispatcher.class).ranked(1);
+            bind(gravitinoEnv.tagManager()).to(TagManager.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);
@@ -149,7 +159,7 @@ public class GravitinoServer extends ResourceConfig {
     LOG.info("Starting Gravitino Server");
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = loadConfig(confPath);
-    GravitinoServer server = new GravitinoServer(serverConfig);
+    GravitinoServer server = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
     server.initialize();
 
     try {

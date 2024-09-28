@@ -20,9 +20,11 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -30,16 +32,19 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.dto.requests.FilesetCreateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
@@ -47,6 +52,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -243,6 +249,51 @@ public class FilesetOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleFilesetException(OperationType.DROP, fileset, schema, e);
+    }
+  }
+
+  @GET
+  @Path("{fileset}/location")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "get-file-location." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "get-file-location", absolute = true)
+  public Response getFileLocation(
+      @PathParam("metalake") String metalake,
+      @PathParam("catalog") String catalog,
+      @PathParam("schema") String schema,
+      @PathParam("fileset") String fileset,
+      @QueryParam("sub_path") @NotNull String subPath) {
+    LOG.info(
+        "Received get file location request: {}.{}.{}.{}, sub path:{}",
+        metalake,
+        catalog,
+        schema,
+        fileset,
+        RESTUtils.decodeString(subPath));
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
+            Map<String, String> filteredAuditHeaders = Utils.filterFilesetAuditHeaders(httpRequest);
+            // set the audit info into the thread local context
+            if (!filteredAuditHeaders.isEmpty()) {
+              CallerContext context =
+                  CallerContext.builder().withContext(filteredAuditHeaders).build();
+              CallerContext.CallerContextHolder.set(context);
+            }
+            String actualFileLocation =
+                TreeLockUtils.doWithTreeLock(
+                    ident,
+                    LockType.READ,
+                    () -> dispatcher.getFileLocation(ident, RESTUtils.decodeString(subPath)));
+            return Utils.ok(new FileLocationResponse(actualFileLocation));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleFilesetException(OperationType.GET, fileset, schema, e);
+    } finally {
+      // Clear the caller context
+      CallerContext.CallerContextHolder.remove();
     }
   }
 }

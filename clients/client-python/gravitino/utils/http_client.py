@@ -37,6 +37,7 @@ from gravitino.typing import JSONType
 from gravitino.constants.timeout import TIMEOUT
 
 from gravitino.dto.responses.error_response import ErrorResponse
+from gravitino.dto.responses.oauth2_error_response import OAuth2ErrorResponse
 from gravitino.exceptions.base import RESTException, UnknownError
 from gravitino.exceptions.handlers.error_handler import ErrorHandler
 
@@ -78,6 +79,17 @@ class Response:
 
 
 class HTTPClient:
+
+    FORMDATA_HEADER = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/vnd.gravitino.v1+json",
+    }
+
+    JSON_HEADER = {
+        "Content-Type": "application/json",
+        "Accept": "application/vnd.gravitino.v1+json",
+    }
+
     def __init__(
         self,
         host,
@@ -128,23 +140,33 @@ class HTTPClient:
         except HTTPError as err:
             err_body = err.read()
 
-            if err_body is None:
+            if err_body is None or len(err_body) == 0:
                 return (
                     False,
                     ErrorResponse.generate_error_response(RESTException, err.reason),
                 )
 
-            err_resp = ErrorResponse.from_json(err_body, infer_missing=True)
+            err_resp = self._parse_error_response(err_body)
             err_resp.validate()
 
             return (False, err_resp)
 
+    def _parse_error_response(self, err_body: bytes) -> ErrorResponse:
+        json_err_body = _json.loads(err_body)
+
+        if "code" in json_err_body:
+            return ErrorResponse.from_json(err_body, infer_missing=True)
+
+        return OAuth2ErrorResponse.from_json(err_body, infer_missing=True)
+
+    # pylint: disable=too-many-locals
     def _request(
         self,
         method,
         endpoint,
         params=None,
         json=None,
+        data=None,
         headers=None,
         timeout=None,
         error_handler: ErrorHandler = None,
@@ -152,17 +174,17 @@ class HTTPClient:
         method = method.upper()
         request_data = None
 
+        if data:
+            request_data = urlencode(data.to_dict()).encode()
+            self._update_headers(self.FORMDATA_HEADER)
+        else:
+            if json:
+                request_data = json.to_json().encode("utf-8")
+
+            self._update_headers(self.JSON_HEADER)
+
         if headers:
             self._update_headers(headers)
-        else:
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/vnd.gravitino.v1+json",
-            }
-            self._update_headers(headers)
-
-        if json:
-            request_data = json.to_json().encode("utf-8")
 
         opener = build_opener()
         request = Request(self._build_url(endpoint, params), data=request_data)
@@ -195,9 +217,14 @@ class HTTPClient:
             f"Error handler {type(error_handler).__name__} can't handle this response, error response body: {resp}"
         ) from None
 
-    def get(self, endpoint, params=None, error_handler=None, **kwargs):
+    def get(self, endpoint, params=None, headers=None, error_handler=None, **kwargs):
         return self._request(
-            "get", endpoint, params=params, error_handler=error_handler, **kwargs
+            "get",
+            endpoint,
+            params=params,
+            headers=headers,
+            error_handler=error_handler,
+            **kwargs,
         )
 
     def delete(self, endpoint, error_handler=None, **kwargs):
@@ -211,6 +238,11 @@ class HTTPClient:
     def put(self, endpoint, json=None, error_handler=None, **kwargs):
         return self._request(
             "put", endpoint, json=json, error_handler=error_handler, **kwargs
+        )
+
+    def post_form(self, endpoint, data=None, error_handler=None, **kwargs):
+        return self._request(
+            "post", endpoint, data=data, error_handler=error_handler, **kwargs
         )
 
     def close(self):

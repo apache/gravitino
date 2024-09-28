@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino;
 
+import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * The interface of a catalog. The catalog is the second level entity in the Gravitino system,
@@ -44,7 +47,26 @@ public interface Catalog extends Auditable {
     MESSAGING,
 
     /** Catalog Type for test only. */
-    UNSUPPORTED
+    UNSUPPORTED;
+
+    /**
+     * Convert the string (case-insensitive) to the catalog type.
+     *
+     * @param type The string to convert
+     * @return The catalog type
+     */
+    public static Type fromString(String type) {
+      switch (type.toLowerCase(Locale.ROOT)) {
+        case "relational":
+          return RELATIONAL;
+        case "fileset":
+          return FILESET;
+        case "messaging":
+          return MESSAGING;
+        default:
+          throw new IllegalArgumentException("Unknown catalog type: " + type);
+      }
+    }
   }
 
   /** The cloud that the catalog is running on. Used by the catalog property `cloud.name`. */
@@ -151,5 +173,21 @@ public interface Catalog extends Auditable {
    */
   default TopicCatalog asTopicCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support topic operations");
+  }
+
+  /**
+   * @return the {@link SupportsTags} if the catalog supports tag operations.
+   * @throws UnsupportedOperationException if the catalog does not support tag operations.
+   */
+  default SupportsTags supportsTags() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support tag operations");
+  }
+
+  /**
+   * @return the {@link SupportsRoles} if the catalog supports role operations.
+   * @throws UnsupportedOperationException if the catalog does not support role operations.
+   */
+  default SupportsRoles supportsRoles() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support role operations");
   }
 }

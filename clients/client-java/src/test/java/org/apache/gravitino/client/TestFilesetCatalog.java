@@ -28,10 +28,19 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.nio.file.NoSuchFileException;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
@@ -43,6 +52,7 @@ import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -50,10 +60,15 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockserver.matchers.Times;
+import org.mockserver.model.HttpRequest;
+import org.mockserver.model.HttpResponse;
+import org.mockserver.model.Parameter;
 
 public class TestFilesetCatalog extends TestBase {
 
@@ -398,6 +413,129 @@ public class TestFilesetCatalog extends TestBase {
         RuntimeException.class,
         () -> catalog.asFilesetCatalog().alterFileset(fileset, req.filesetChange()),
         "internal error");
+  }
+
+  @Test
+  public void testGetFileLocation() throws JsonProcessingException {
+    NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
+    String mockSubPath = "mock_location/test";
+    String filesetPath =
+        withSlash(
+            FilesetCatalog.formatFileLocationRequestPath(
+                Namespace.of(metalakeName, catalogName, "schema1"), fileset.name()));
+    Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("sub_path", RESTUtils.encodeString(mockSubPath));
+
+    String mockFileLocation =
+        String.format("file:/fileset/%s/%s/%s/%s", catalogName, "schema1", "fileset1", mockSubPath);
+    FileLocationResponse resp = new FileLocationResponse(mockFileLocation);
+    buildMockResource(Method.GET, filesetPath, queryParams, null, resp, SC_OK);
+
+    String actualFileLocation =
+        catalog
+            .asFilesetCatalog()
+            .getFileLocation(
+                NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath);
+    Assertions.assertTrue(StringUtils.isNotBlank(actualFileLocation));
+    Assertions.assertEquals(mockFileLocation, actualFileLocation);
+
+    // Throw schema not found exception
+    ErrorResponse errResp =
+        ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
+    buildMockResource(Method.GET, filesetPath, null, errResp, SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NoSuchSchemaException.class,
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .getFileLocation(
+                    NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath),
+        "schema not found");
+
+    ErrorResponse errResp1 =
+        ErrorResponse.notFound(NotFoundException.class.getSimpleName(), "fileset not found");
+    buildMockResource(Method.GET, filesetPath, null, errResp1, SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NotFoundException.class,
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .getFileLocation(
+                    NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath),
+        "fileset not found");
+
+    ErrorResponse errResp2 = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.GET, filesetPath, null, errResp2, SC_SERVER_ERROR);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .getFileLocation(
+                    NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath),
+        "internal error");
+  }
+
+  @Test
+  public void testCallerContextToHeader() throws JsonProcessingException {
+    NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, "schema1", "fileset1");
+    String mockSubPath = "mock_location/test";
+    String filesetPath =
+        withSlash(
+            FilesetCatalog.formatFileLocationRequestPath(
+                Namespace.of(metalakeName, catalogName, "schema1"), fileset.name()));
+    Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("sub_path", RESTUtils.encodeString(mockSubPath));
+    String mockFileLocation =
+        String.format("file:/fileset/%s/%s/%s/%s", catalogName, "schema1", "fileset1", mockSubPath);
+    FileLocationResponse resp = new FileLocationResponse(mockFileLocation);
+    String respJson = MAPPER.writeValueAsString(resp);
+
+    List<Parameter> parameters =
+        queryParams.entrySet().stream()
+            .map(kv -> new Parameter(kv.getKey(), kv.getValue()))
+            .collect(Collectors.toList());
+    HttpRequest mockRequest =
+        HttpRequest.request(filesetPath)
+            .withMethod(Method.GET.name())
+            .withQueryStringParameters(parameters);
+    HttpResponse mockResponse = HttpResponse.response().withStatusCode(SC_OK).withBody(respJson);
+
+    // set the thread local context
+    Map<String, String> context = new HashMap<>();
+    context.put(
+        FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
+        InternalClientType.HADOOP_GVFS.name());
+    context.put(
+        FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+        FilesetDataOperation.GET_FILE_STATUS.name());
+    CallerContext callerContext = CallerContext.builder().withContext(context).build();
+    CallerContext.CallerContextHolder.set(callerContext);
+
+    // Using Times.exactly(1) will only match once for the request, so we could set difference
+    // responses for the same request and path.
+    AtomicReference<String> internalClientType = new AtomicReference<>(null);
+    AtomicReference<String> dataOperation = new AtomicReference<>(null);
+    mockServer
+        .when(mockRequest, Times.exactly(1))
+        .respond(
+            httpRequest -> {
+              internalClientType.set(
+                  httpRequest.getFirstHeader(
+                      FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE));
+              dataOperation.set(
+                  httpRequest.getFirstHeader(
+                      FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION));
+              return mockResponse;
+            });
+    catalog
+        .asFilesetCatalog()
+        .getFileLocation(
+            NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath);
+    Assertions.assertEquals(FilesetDataOperation.GET_FILE_STATUS.name(), dataOperation.get());
+    Assertions.assertEquals(InternalClientType.HADOOP_GVFS.name(), internalClientType.get());
+    // the caller context should be cleared after `getFileLocation`
+    Assertions.assertNull(CallerContext.CallerContextHolder.get());
   }
 
   private FilesetDTO mockFilesetDTO(

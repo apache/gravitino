@@ -20,6 +20,7 @@ package org.apache.gravitino.connector.authorization;
 
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
+import java.util.Collections;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
@@ -27,6 +28,7 @@ import org.apache.gravitino.connector.authorization.mysql.TestMySQLAuthorization
 import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationPlugin;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -54,6 +56,10 @@ public class TestAuthorization {
         new TestCatalog()
             .withCatalogConf(ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "ranger"))
             .withCatalogEntity(hiveCatalogEntity);
+    IsolatedClassLoader isolatedClassLoader =
+        new IsolatedClassLoader(
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+    hiveCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
 
     CatalogEntity mySQLEntity =
         CatalogEntity.builder()
@@ -69,6 +75,7 @@ public class TestAuthorization {
         new TestCatalog()
             .withCatalogConf(ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "mysql"))
             .withCatalogEntity(mySQLEntity);
+    mySQLCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
   }
 
   @Test

@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.dto.responses;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import org.apache.gravitino.Catalog;
@@ -41,7 +44,9 @@ import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitioning.Partitioning;
+import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
 
@@ -144,6 +149,28 @@ public class TestResponses {
   void testCatalogException() throws IllegalArgumentException {
     CatalogResponse catalog = new CatalogResponse();
     assertThrows(IllegalArgumentException.class, () -> catalog.validate());
+  }
+
+  @Test
+  void testCatalogListResponse() throws IllegalArgumentException {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    CatalogDTO catalog =
+        CatalogDTO.builder()
+            .withName("CatalogA")
+            .withComment("comment")
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAudit(audit)
+            .build();
+    CatalogListResponse response = new CatalogListResponse(new CatalogDTO[] {catalog});
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testCatalogListException() throws IllegalArgumentException {
+    CatalogListResponse response = new CatalogListResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 
   @Test
@@ -297,5 +324,70 @@ public class TestResponses {
   void testRoleResponseException() throws IllegalArgumentException {
     RoleResponse role = new RoleResponse();
     assertThrows(IllegalArgumentException.class, () -> role.validate());
+  }
+
+  @Test
+  void testNameListResponse() throws JsonProcessingException {
+    String[] names = new String[] {"name1", "name2"};
+    NameListResponse response = new NameListResponse(names);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    NameListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, NameListResponse.class);
+    assertEquals(response, deserResponse);
+    assertArrayEquals(names, deserResponse.getNames());
+
+    NameListResponse response1 = new NameListResponse();
+    Exception e = assertThrows(IllegalArgumentException.class, response1::validate);
+    assertEquals("\"names\" must not be null", e.getMessage());
+  }
+
+  @Test
+  void testTagListResponse() throws JsonProcessingException {
+    TagDTO tag1 = TagDTO.builder().withName("tag1").withComment("comment1").build();
+    TagDTO tag2 = TagDTO.builder().withName("tag2").withComment("comment2").build();
+    TagDTO[] tags = new TagDTO[] {tag1, tag2};
+    TagListResponse response = new TagListResponse(tags);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    TagListResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, TagListResponse.class);
+    assertEquals(response, deserResponse);
+    assertArrayEquals(tags, deserResponse.getTags());
+
+    TagListResponse response1 = new TagListResponse();
+    Exception e = assertThrows(IllegalArgumentException.class, response1::validate);
+    assertEquals("\"tags\" must not be null", e.getMessage());
+  }
+
+  @Test
+  void testTagResponse() throws JsonProcessingException {
+    TagDTO tag = TagDTO.builder().withName("tag1").withComment("comment1").build();
+    TagResponse response = new TagResponse(tag);
+    assertDoesNotThrow(response::validate);
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    TagResponse deserResponse = JsonUtils.objectMapper().readValue(serJson, TagResponse.class);
+    assertEquals(response, deserResponse);
+    assertEquals(tag, deserResponse.getTag());
+
+    TagResponse response1 = new TagResponse();
+    Exception e = assertThrows(IllegalArgumentException.class, response1::validate);
+    assertEquals("\"tag\" must not be null", e.getMessage());
+  }
+
+  @Test
+  void testFileLocationResponse() {
+    String actualFileLocation = "file:/test/1";
+    FileLocationResponse response = new FileLocationResponse(actualFileLocation);
+    response.validate(); // No exception thrown
+  }
+
+  @Test
+  void testFileLocationResponseException() {
+    FileLocationResponse response = new FileLocationResponse();
+    assertThrows(IllegalArgumentException.class, () -> response.validate());
   }
 }

@@ -35,6 +35,8 @@ import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.server.web.Utils;
@@ -107,6 +109,11 @@ public class ExceptionHandlers {
     return GroupPermissionOperationExceptionHandler.INSTANCE.handle(op, roles, parent, e);
   }
 
+  public static Response handleTagException(
+      OperationType op, String tag, String parent, Exception e) {
+    return TagExceptionHandler.INSTANCE.handle(op, tag, parent, e);
+  }
+
   public static Response handleTestConnectionException(Exception e) {
     ErrorResponse response;
     if (e instanceof IllegalArgumentException) {
@@ -129,6 +136,11 @@ public class ExceptionHandlers {
         .entity(response)
         .type(MediaType.APPLICATION_JSON)
         .build();
+  }
+
+  public static Response handleOwnerException(
+      OperationType type, String name, String metalake, Exception e) {
+    return OwnerExceptionHandler.INSTANCE.handle(type, name, metalake, e);
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -515,6 +527,68 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, roles, parent, e);
+      }
+    }
+  }
+
+  private static class TagExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new TagExceptionHandler();
+
+    private static String getTagErrorMsg(
+        String tag, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate tag(s)%s operation [%s] under object [%s], reason [%s]",
+          tag, operation, parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String tag, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(tag) ? "" : " [" + tag + "]";
+      String errorMsg = getTagErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof TagAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof TagAlreadyAssociatedException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else {
+        return super.handle(op, tag, parent, e);
+      }
+    }
+  }
+
+  private static class OwnerExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new OwnerExceptionHandler();
+
+    private static String getOwnerErrorMsg(
+        String name, String operation, String metalake, String reason) {
+      return String.format(
+          "Failed to execute %s owner operation [%s] under metalake [%s], reason [%s]",
+          name, operation, metalake, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String name, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(name) ? "" : " [" + name + "]";
+      String errorMsg = getOwnerErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+      } else {
+        return super.handle(op, name, parent, e);
       }
     }
   }

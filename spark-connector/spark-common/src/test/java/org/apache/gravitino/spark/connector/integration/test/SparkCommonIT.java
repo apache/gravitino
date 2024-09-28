@@ -115,6 +115,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsDelete();
 
+  protected abstract boolean supportsSchemaEvolution();
+
   // Use a custom database not the original default database because SparkCommonIT couldn't
   // read&write data to tables in default database. The main reason is default database location is
   // determined by `hive.metastore.warehouse.dir` in hive-site.xml which is local HDFS address
@@ -192,7 +194,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     Map<String, String> databaseMeta = getDatabaseMetadata(testDatabaseName);
     Assertions.assertFalse(databaseMeta.containsKey("Comment"));
     Assertions.assertTrue(databaseMeta.containsKey("Location"));
-    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
+    Assertions.assertEquals("anonymous", databaseMeta.get("Owner"));
     String properties = databaseMeta.get("Properties");
     Assertions.assertTrue(properties.contains("(ID,001)"));
 
@@ -206,7 +208,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     databaseMeta = getDatabaseMetadata(testDatabaseName);
     String comment = databaseMeta.get("Comment");
     Assertions.assertEquals("comment", comment);
-    Assertions.assertEquals("datastrato", databaseMeta.get("Owner"));
+    Assertions.assertEquals("anonymous", databaseMeta.get("Owner"));
     // underlying catalog may change /tmp/t_create2 to file:/tmp/t_create2
     Assertions.assertTrue(databaseMeta.get("Location").contains(testDatabaseLocation));
     properties = databaseMeta.get("Properties");
@@ -545,6 +547,45 @@ public abstract class SparkCommonIT extends SparkEnvIT {
     ArrayList<SparkColumnInfo> updateCommentColumns = new ArrayList<>(simpleTableColumns);
     updateCommentColumns.add(SparkColumnInfo.of("col1", DataTypes.IntegerType, newColumnComment));
     checkTableColumns(tableName, updateCommentColumns, getTableInfo(tableName));
+  }
+
+  @Test
+  void testAlterTableReplaceColumns() {
+    String tableName = "test_replace_columns_table";
+    dropTableIfExists(tableName);
+
+    createSimpleTable(tableName);
+    List<SparkColumnInfo> simpleTableColumns = getSimpleTableColumn();
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    checkTableColumns(tableName, simpleTableColumns, tableInfo);
+    checkTableReadWrite(tableInfo);
+    String firstLine = getExpectedTableData(tableInfo);
+
+    sql(
+        String.format(
+            "ALTER TABLE %S REPLACE COLUMNS (id int COMMENT 'new comment', name2 string, age long);",
+            tableName));
+    ArrayList<SparkColumnInfo> updateColumns = new ArrayList<>();
+    // change comment for id
+    updateColumns.add(SparkColumnInfo.of("id", DataTypes.IntegerType, "new comment"));
+    // change column name
+    updateColumns.add(SparkColumnInfo.of("name2", DataTypes.StringType, null));
+    // change column type
+    updateColumns.add(SparkColumnInfo.of("age", DataTypes.LongType, null));
+
+    tableInfo = getTableInfo(tableName);
+    checkTableColumns(tableName, updateColumns, tableInfo);
+    sql(String.format("INSERT INTO %S VALUES(3, 'name2', 10)", tableName));
+    List<String> data = getQueryData(String.format("SELECT * from %s ORDER BY id", tableName));
+    Assertions.assertEquals(2, data.size());
+    if (supportsSchemaEvolution()) {
+      // It's different columns for Iceberg if delete and add a column with same name.
+      Assertions.assertEquals(
+          String.join(",", Arrays.asList(NULL_STRING, NULL_STRING, NULL_STRING)), data.get(0));
+    } else {
+      Assertions.assertEquals(firstLine, data.get(0));
+    }
+    Assertions.assertEquals("3,name2,10", data.get(1));
   }
 
   @Test

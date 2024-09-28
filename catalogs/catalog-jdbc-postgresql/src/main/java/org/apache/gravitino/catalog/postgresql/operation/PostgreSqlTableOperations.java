@@ -159,7 +159,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
       sqlBuilder
           .append(NEW_LINE)
           .append(TABLE_COMMENT)
+          .append(PG_QUOTE)
           .append(tableName)
+          .append(PG_QUOTE)
           .append(IS)
           .append(comment)
           .append("';");
@@ -171,9 +173,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
                 sqlBuilder
                     .append(NEW_LINE)
                     .append(COLUMN_COMMENT)
+                    .append(PG_QUOTE)
                     .append(tableName)
+                    .append(PG_QUOTE)
                     .append(".")
+                    .append(PG_QUOTE)
                     .append(jdbcColumn.name())
+                    .append(PG_QUOTE)
                     .append(IS)
                     .append(jdbcColumn.comment())
                     .append("';"));
@@ -576,6 +582,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         + ";";
   }
 
+  @Override
   public JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadTable) {
     if (null == lazyLoadTable) {

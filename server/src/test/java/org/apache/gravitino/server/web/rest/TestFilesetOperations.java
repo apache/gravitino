@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
@@ -41,6 +42,10 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;
 import org.apache.gravitino.dto.file.FilesetDTO;
@@ -51,6 +56,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -67,6 +73,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.mockito.stubbing.Answer;
 
 public class TestFilesetOperations extends JerseyTest {
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
@@ -430,6 +437,135 @@ public class TestFilesetOperations extends JerseyTest {
     ErrorResponse errorResp = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
+  public void testGetFileLocation() {
+    // Test encoded subPath
+    NameIdentifier fullIdentifier = NameIdentifier.of(metalake, catalog, schema, "fileset1");
+    String subPath = "/test/1";
+    when(dispatcher.getFileLocation(fullIdentifier, subPath)).thenReturn(subPath);
+    Response resp =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/location")
+            .queryParam("sub_path", RESTUtils.encodeString(subPath))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    FileLocationResponse contextResponse = resp.readEntity(FileLocationResponse.class);
+    Assertions.assertEquals(0, contextResponse.getCode());
+
+    Assertions.assertEquals(subPath, contextResponse.getFileLocation());
+
+    // Test throw NoSuchFilesetException
+    doThrow(new NoSuchFilesetException("no found"))
+        .when(dispatcher)
+        .getFileLocation(fullIdentifier, subPath);
+    Response resp1 =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/location")
+            .queryParam("sub_path", RESTUtils.encodeString(subPath))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+
+    ErrorResponse errorResp = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(NoSuchFilesetException.class.getSimpleName(), errorResp.getType());
+
+    // Test throw RuntimeException
+    doThrow(new RuntimeException("internal error"))
+        .when(dispatcher)
+        .getFileLocation(fullIdentifier, subPath);
+    Response resp2 =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/location")
+            .queryParam("sub_path", RESTUtils.encodeString(subPath))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+
+    // Test not encoded subPath
+    NameIdentifier fullIdentifier1 = NameIdentifier.of(metalake, catalog, schema, "fileset2");
+    String subPath1 = "/test/2";
+    when(dispatcher.getFileLocation(fullIdentifier1, subPath1)).thenReturn(subPath1);
+    Response resp3 =
+        target(filesetPath(metalake, catalog, schema) + "fileset2/location")
+            .queryParam("sub_path", subPath1)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp3.getStatus());
+
+    FileLocationResponse contextResponse1 = resp3.readEntity(FileLocationResponse.class);
+    Assertions.assertEquals(0, contextResponse1.getCode());
+
+    Assertions.assertEquals(subPath1, contextResponse1.getFileLocation());
+
+    // Test header to caller context
+    try {
+      Map<String, String> callerContextMap = Maps.newHashMap();
+      NameIdentifier fullIdentifier2 = NameIdentifier.of(metalake, catalog, schema, "fileset3");
+      String subPath2 = "/test/3";
+      when(dispatcher.getFileLocation(fullIdentifier2, subPath2))
+          .thenAnswer(
+              (Answer<String>)
+                  invocation -> {
+                    try {
+                      CallerContext context = CallerContext.CallerContextHolder.get();
+                      callerContextMap.putAll(context.context());
+                      return subPath2;
+                    } finally {
+                      CallerContext.CallerContextHolder.remove();
+                    }
+                  });
+      Response resp4 =
+          target(filesetPath(metalake, catalog, schema) + "fileset3/location")
+              .queryParam("sub_path", RESTUtils.encodeString(subPath2))
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .header(
+                  FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
+                  InternalClientType.HADOOP_GVFS.name())
+              .header(
+                  FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+                  FilesetDataOperation.CREATE.name())
+              .accept("application/vnd.gravitino.v1+json")
+              .get();
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp3.getStatus());
+
+      FileLocationResponse contextResponse2 = resp4.readEntity(FileLocationResponse.class);
+      Assertions.assertEquals(0, contextResponse2.getCode());
+
+      Assertions.assertEquals(subPath2, contextResponse2.getFileLocation());
+
+      Assertions.assertFalse(callerContextMap.isEmpty());
+      Assertions.assertEquals(
+          InternalClientType.HADOOP_GVFS.name(),
+          callerContextMap.get(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE));
+      Assertions.assertEquals(
+          FilesetDataOperation.CREATE.name(),
+          callerContextMap.get(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION));
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
+
+    // test `getFileLocation` clear caller context finally
+    Map<String, String> testContextMap = Maps.newHashMap();
+    testContextMap.put("k", "v");
+    CallerContext context = CallerContext.builder().withContext(testContextMap).build();
+    CallerContext.CallerContextHolder.set(context);
+    FilesetOperations mockOperations = Mockito.mock(FilesetOperations.class);
+    Mockito.when(mockOperations.getFileLocation(any(), any(), any(), any(), any()))
+        .thenCallRealMethod();
+    mockOperations.getFileLocation(
+        "test_metalake", "test_catalog", "test_schema", "fileset4", "/test");
+    Assertions.assertNull(CallerContext.CallerContextHolder.get());
   }
 
   private void assertUpdateFileset(FilesetUpdatesRequest req, Fileset updatedFileset) {

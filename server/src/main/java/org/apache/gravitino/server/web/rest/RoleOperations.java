@@ -34,9 +34,8 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
@@ -45,25 +44,50 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.responses.DeleteResponse;
+import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/roles")
 public class RoleOperations {
   private static final Logger LOG = LoggerFactory.getLogger(RoleOperations.class);
 
-  private final AccessControlManager accessControlManager;
+  private final AccessControlDispatcher accessControlManager;
 
   @Context private HttpServletRequest httpRequest;
 
   public RoleOperations() {
-    this.accessControlManager = GravitinoEnv.getInstance().accessControlManager();
+    this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
+  }
+
+  @GET
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-role", absolute = true)
+  public Response listRoles(@PathParam("metalake") String metalake) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () ->
+              TreeLockUtils.doWithTreeLock(
+                  NameIdentifier.of(metalake),
+                  LockType.READ,
+                  () -> {
+                    String[] names = accessControlManager.listRoleNames(metalake);
+                    return Utils.ok(new NameListResponse(names));
+                  }));
+    } catch (Exception e) {
+      return ExceptionHandlers.handleRoleException(OperationType.LIST, "", metalake, e);
+    }
   }
 
   @GET
@@ -94,14 +118,12 @@ public class RoleOperations {
   @ResponseMetered(name = "create-role", absolute = true)
   public Response createRole(@PathParam("metalake") String metalake, RoleCreateRequest request) {
     try {
-
-      for (SecurableObjectDTO object : request.getSecurableObjects()) {
-        checkSecurableObject(metalake, object);
-      }
-
       return Utils.doAs(
           httpRequest,
           () -> {
+            for (SecurableObjectDTO object : request.getSecurableObjects()) {
+              checkSecurableObject(metalake, object);
+            }
             List<SecurableObject> securableObjects =
                 Arrays.stream(request.getSecurableObjects())
                     .map(
@@ -175,69 +197,58 @@ public class RoleOperations {
 
     // Securable object ignores the metalake namespace, so we should add it back.
     if (object.type() == MetadataObject.Type.METALAKE) {
-      // All metalakes don't need to check the securable object whether exists.
-      if (object.name().equals(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)) {
-        return;
-      }
       identifier = NameIdentifier.parse(object.fullName());
     } else {
       identifier = NameIdentifier.parse(String.format("%s.%s", metalake, object.fullName()));
     }
 
-    String existErrMsg = "Securable object % doesn't exist";
+    String existErrMsg = "Securable object %s doesn't exist";
 
-    TreeLockUtils.doWithTreeLock(
-        identifier,
-        LockType.READ,
-        () -> {
-          switch (object.type()) {
-            case METALAKE:
-              if (!GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
-              }
+    switch (object.type()) {
+      case METALAKE:
+        if (!GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
+        break;
 
-            case CATALOG:
-              if (!GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
-              }
+      case CATALOG:
+        if (!GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
+        break;
 
-            case SCHEMA:
-              if (!GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
-              }
+      case SCHEMA:
+        if (!GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
+        break;
 
-            case FILESET:
-              if (!GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
-              }
+      case FILESET:
+        if (!GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
-            case TABLE:
-              if (!GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
-              }
+        break;
+      case TABLE:
+        if (!GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
+        break;
 
-            case TOPIC:
-              if (!GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier)) {
-                throw new IllegalArgumentException(String.format(existErrMsg, object.fullName()));
-              }
+      case TOPIC:
+        if (!GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier)) {
+          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
+        }
 
-              break;
+        break;
 
-            default:
-              throw new IllegalArgumentException(
-                  String.format("Doesn't support the type %s", object.type()));
-          }
-
-          return null;
-        });
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the type %s", object.type()));
+    }
   }
 }

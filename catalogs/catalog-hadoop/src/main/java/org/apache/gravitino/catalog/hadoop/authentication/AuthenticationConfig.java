@@ -22,7 +22,6 @@ package org.apache.gravitino.catalog.hadoop.authentication;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -34,6 +33,17 @@ public class AuthenticationConfig extends Config {
   public static final String AUTH_TYPE_KEY = "authentication.type";
 
   public static final String IMPERSONATION_ENABLE_KEY = "authentication.impersonation-enable";
+
+  enum AuthenticationType {
+    SIMPLE,
+    KERBEROS;
+
+    public static AuthenticationType fromString(String type) {
+      return AuthenticationType.valueOf(type.toUpperCase());
+    }
+  }
+
+  public static final boolean KERBEROS_DEFAULT_IMPERSONATION_ENABLE = false;
 
   public AuthenticationConfig(Map<String, String> properties) {
     super(false);
@@ -53,7 +63,7 @@ public class AuthenticationConfig extends Config {
           .doc("Whether to enable impersonation for the Hadoop catalog")
           .version(ConfigConstants.VERSION_0_5_1)
           .booleanConf()
-          .createWithDefault(KerberosConfig.DEFAULT_IMPERSONATION_ENABLE);
+          .createWithDefault(KERBEROS_DEFAULT_IMPERSONATION_ENABLE);
 
   public String getAuthType() {
     return get(AUTH_TYPE_ENTRY);
@@ -63,6 +73,14 @@ public class AuthenticationConfig extends Config {
     return get(ENABLE_IMPERSONATION_ENTRY);
   }
 
+  public boolean isSimpleAuth() {
+    return AuthenticationType.SIMPLE.name().equalsIgnoreCase(getAuthType());
+  }
+
+  public boolean isKerberosAuth() {
+    return AuthenticationType.KERBEROS.name().equalsIgnoreCase(getAuthType());
+  }
+
   public static final Map<String, PropertyEntry<?>> AUTHENTICATION_PROPERTY_ENTRIES =
       new ImmutableMap.Builder<String, PropertyEntry<?>>()
           .put(
@@ -70,19 +88,18 @@ public class AuthenticationConfig extends Config {
               PropertyEntry.booleanPropertyEntry(
                   IMPERSONATION_ENABLE_KEY,
                   "Whether to enable impersonation for the Hadoop catalog",
-                  false,
-                  true,
-                  KerberosConfig.DEFAULT_IMPERSONATION_ENABLE,
-                  false,
-                  false))
+                  false /* required */,
+                  true /* immutable */,
+                  KERBEROS_DEFAULT_IMPERSONATION_ENABLE /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
           .put(
               AUTH_TYPE_KEY,
-              PropertyEntry.stringImmutablePropertyEntry(
+              PropertyEntry.stringOptionalPropertyEntry(
                   AUTH_TYPE_KEY,
-                  "The type of authentication for Hadoop catalog, currently we only support Kerberos",
-                  false,
-                  null,
-                  false,
-                  false))
+                  "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos",
+                  false /* immutable */,
+                  null /* default value */,
+                  false /* hidden */))
           .build();
 }

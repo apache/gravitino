@@ -22,9 +22,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
@@ -46,16 +44,15 @@ public class MetadataObjectService {
 
   public static long getMetadataObjectId(
       long metalakeId, String fullName, MetadataObject.Type type) {
-    if (fullName.equals(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)
-        && type == MetadataObject.Type.METALAKE) {
-      return Entity.ALL_METALAKES_ENTITY_ID;
-    }
-
     if (type == MetadataObject.Type.METALAKE) {
       return MetalakeMetaService.getInstance().getMetalakeIdByName(fullName);
     }
 
     List<String> names = DOT_SPLITTER.splitToList(fullName);
+    if (type == MetadataObject.Type.ROLE) {
+      return RoleMetaService.getInstance().getRoleIdByMetalakeIdAndName(metalakeId, names.get(0));
+    }
+
     long catalogId =
         CatalogMetaService.getInstance().getCatalogIdByMetalakeIdAndName(metalakeId, names.get(0));
     if (type == MetadataObject.Type.CATALOG) {
@@ -82,10 +79,6 @@ public class MetadataObjectService {
   // Metadata object may be null because the metadata object can be deleted asynchronously.
   @Nullable
   public static String getMetadataObjectFullName(String type, long metadataObjectId) {
-    if (type.equals(Entity.ALL_METALAKES_ENTITY_TYPE)) {
-      return MetadataObjects.METADATA_OBJECT_RESERVED_NAME;
-    }
-
     MetadataObject.Type metadatatype = MetadataObject.Type.valueOf(type);
     if (metadatatype == MetadataObject.Type.METALAKE) {
       MetalakePO metalakePO = MetalakeMetaService.getInstance().getMetalakePOById(metadataObjectId);

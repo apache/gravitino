@@ -21,6 +21,7 @@ package org.apache.gravitino.proto;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
@@ -92,7 +93,7 @@ public class RoleEntitySerDe implements ProtoSerDe<RoleEntity, Role> {
 
       SecurableObject securableObject =
           SecurableObjects.parse(
-              object.getFullName(), SecurableObject.Type.valueOf(object.getType()), privileges);
+              object.getFullName(), MetadataObject.Type.valueOf(object.getType()), privileges);
 
       securableObjects.add(securableObject);
     }

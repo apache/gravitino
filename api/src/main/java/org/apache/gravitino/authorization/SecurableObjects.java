@@ -31,10 +31,11 @@ import org.apache.gravitino.MetadataObjects.MetadataObjectImpl;
 /** The helper class for {@link SecurableObject}. */
 public class SecurableObjects {
 
-  private static final Splitter DOT_SPLITTER = Splitter.on('.');
+  /** The splitter for splitting the names. */
+  public static final Splitter DOT_SPLITTER = Splitter.on('.');
 
   /**
-   * Create the metalake {@link SecurableObject} with the given metalake name.
+   * Create the metalake {@link SecurableObject} with the given metalake name and privileges.
    *
    * @param metalake The metalake name
    * @param privileges The privileges of the metalake
@@ -45,7 +46,7 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the catalog {@link SecurableObject} with the given catalog name.
+   * Create the catalog {@link SecurableObject} with the given catalog name and privileges.
    *
    * @param catalog The catalog name
    * @param privileges The privileges of the catalog
@@ -56,8 +57,8 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the schema {@link SecurableObject} with the given securable catalog object and schema
-   * name.
+   * Create the schema {@link SecurableObject} with the given securable catalog object, schema name
+   * and privileges.
    *
    * @param catalog The catalog securable object.
    * @param schema The schema name
@@ -71,7 +72,8 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the table {@link SecurableObject} with the given securable schema object and table name.
+   * Create the table {@link SecurableObject} with the given securable schema object, table name and
+   * privileges.
    *
    * @param schema The schema securable object
    * @param table The table name
@@ -86,7 +88,8 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the topic {@link SecurableObject} with the given securable schema object and topic name.
+   * Create the topic {@link SecurableObject} with the given securable schema object ,topic name and
+   * privileges.
    *
    * @param schema The schema securable object
    * @param topic The topic name
@@ -101,8 +104,8 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the table {@link SecurableObject} with the given securable schema object and fileset
-   * name.
+   * Create the table {@link SecurableObject} with the given securable schema object, fileset name
+   * and privileges.
    *
    * @param schema The schema securable object
    * @param fileset The fileset name
@@ -114,19 +117,6 @@ public class SecurableObjects {
     List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(fileset);
     return of(MetadataObject.Type.FILESET, names, privileges);
-  }
-
-  /**
-   * All metalakes is a special securable object .You can give the securable object the privileges
-   * `CREATE METALAKE`, etc. It means that you can create any which doesn't exist. This securable
-   * object is only used for metalake admin. You can't grant any privilege to this securable object.
-   * You can't bind this securable object to any role, too.
-   *
-   * @param privileges The privileges of the all metalakes
-   * @return The created {@link SecurableObject}
-   */
-  public static SecurableObject ofAllMetalakes(List<Privilege> privileges) {
-    return new SecurableObjectImpl(null, "*", MetadataObject.Type.METALAKE, privileges);
   }
 
   private static class SecurableObjectImpl extends MetadataObjectImpl implements SecurableObject {
@@ -185,7 +175,7 @@ public class SecurableObjects {
    *
    * @param fullName The full name of securable object.
    * @param type The securable object type.
-   * @param privileges The secureable object privileges.
+   * @param privileges The securable object privileges.
    * @return The created {@link SecurableObject}
    */
   public static SecurableObject parse(
@@ -200,7 +190,7 @@ public class SecurableObjects {
    *
    * @param type The securable object type.
    * @param names The names of the securable object.
-   * @param privileges The secureable object privileges.
+   * @param privileges The securable object privileges.
    * @return The created {@link SecurableObject}
    */
   static SecurableObject of(

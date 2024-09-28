@@ -20,6 +20,7 @@ package org.apache.gravitino;
 
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.config.ConfigBuilder;
@@ -199,10 +200,28 @@ public class Configs {
 
   public static final ConfigEntry<String> AUTHENTICATOR =
       new ConfigBuilder("gravitino.authenticator")
-          .doc("The authenticator which Gravitino uses")
+          .doc(
+              "The authenticator which Gravitino uses. Multiple authenticators "
+                  + "separated by commas")
           .version(ConfigConstants.VERSION_0_3_0)
+          .deprecated()
           .stringConf()
           .createWithDefault("simple");
+
+  public static final ConfigEntry<List<String>> AUTHENTICATORS =
+      new ConfigBuilder("gravitino.authenticators")
+          .doc(
+              "The authenticators which Gravitino uses. Multiple authenticators "
+                  + "separated by commas")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .alternatives(Lists.newArrayList("gravitino.authenticator"))
+          .stringConf()
+          .toSequence()
+          .checkValue(
+              valueList ->
+                  valueList != null && valueList.stream().allMatch(StringUtils::isNotBlank),
+              ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(Lists.newArrayList("simple"));
 
   public static final ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
       new ConfigBuilder("gravitino.entity.store.maxTransactionSkewTimeMs")
@@ -308,13 +327,6 @@ public class Configs {
               ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
-  public static final ConfigEntry<Long> ROLE_CACHE_EVICTION_INTERVAL_MS =
-      new ConfigBuilder("gravitino.authorization.roleCacheEvictionIntervalMs")
-          .doc("The interval in milliseconds to evict the role cache")
-          .version(ConfigConstants.VERSION_0_5_0)
-          .longConf()
-          .createWithDefault(60 * 60 * 1000L);
-
   public static final int DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS = 60;
   public static final ConfigEntry<Integer> METRICS_TIME_SLIDING_WINDOW_SECONDS =
       new ConfigBuilder("gravitino.metrics.timeSlidingWindowSecs")
@@ -322,4 +334,12 @@ public class Configs {
           .version(ConfigConstants.VERSION_0_5_1)
           .intConf()
           .createWithDefault(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
+
+  public static final ConfigEntry<List<String>> REST_API_EXTENSION_PACKAGES =
+      new ConfigBuilder("gravitino.server.rest.extensionPackages")
+          .doc("Comma-separated list of REST API packages to expand")
+          .version(ConfigConstants.VERSION_0_6_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
 }

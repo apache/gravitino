@@ -1,21 +1,19 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import logging
 from typing import List, Dict
@@ -30,6 +28,7 @@ from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
+from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 from gravitino.utils import HTTPClient
 
 
@@ -66,7 +65,7 @@ class GravitinoMetalake(MetalakeDTO):
             A list of the catalog names under this metalake.
         """
         url = f"api/metalakes/{self.name()}/catalogs"
-        response = self.rest_client.get(url)
+        response = self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
         entity_list = EntityListResponse.from_json(response.body, infer_missing=True)
         entity_list.validate()
         return [identifier.name() for identifier in entity_list.identifiers()]
@@ -82,7 +81,9 @@ class GravitinoMetalake(MetalakeDTO):
         """
         params = {"details": "true"}
         url = f"api/metalakes/{self.name()}/catalogs"
-        response = self.rest_client.get(url, params=params)
+        response = self.rest_client.get(
+            url, params=params, error_handler=CATALOG_ERROR_HANDLER
+        )
         catalog_list = CatalogListResponse.from_json(response.body, infer_missing=True)
 
         return [
@@ -103,7 +104,7 @@ class GravitinoMetalake(MetalakeDTO):
             The Catalog with specified name.
         """
         url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
-        response = self.rest_client.get(url)
+        response = self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
         return DTOConverters.to_catalog(
@@ -145,7 +146,9 @@ class GravitinoMetalake(MetalakeDTO):
         catalog_create_request.validate()
 
         url = f"api/metalakes/{self.name()}/catalogs"
-        response = self.rest_client.post(url, json=catalog_create_request)
+        response = self.rest_client.post(
+            url, json=catalog_create_request, error_handler=CATALOG_ERROR_HANDLER
+        )
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
 
         return DTOConverters.to_catalog(
@@ -172,7 +175,9 @@ class GravitinoMetalake(MetalakeDTO):
         updates_request.validate()
 
         url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
-        response = self.rest_client.put(url, json=updates_request)
+        response = self.rest_client.put(
+            url, json=updates_request, error_handler=CATALOG_ERROR_HANDLER
+        )
         catalog_response = CatalogResponse.from_json(response.body, infer_missing=True)
         catalog_response.validate()
 
@@ -189,14 +194,10 @@ class GravitinoMetalake(MetalakeDTO):
         Returns:
             true if the catalog is dropped successfully, false otherwise.
         """
-        try:
-            url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
-            response = self.rest_client.delete(url)
+        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
+        response = self.rest_client.delete(url, error_handler=CATALOG_ERROR_HANDLER)
 
-            drop_response = DropResponse.from_json(response.body, infer_missing=True)
-            drop_response.validate()
+        drop_response = DropResponse.from_json(response.body, infer_missing=True)
+        drop_response.validate()
 
-            return drop_response.dropped()
-        except Exception:
-            logger.warning("Failed to drop catalog %s", name)
-            return False
+        return drop_response.dropped()

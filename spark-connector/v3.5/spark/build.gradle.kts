@@ -49,6 +49,9 @@ dependencies {
   testImplementation(project(":api")) {
     exclude("org.apache.logging.log4j")
   }
+  testImplementation(project(":catalogs:hive-metastore-common")) {
+    exclude("*")
+  }
   testImplementation(project(":clients:client-java")) {
     exclude("org.apache.logging.log4j")
     exclude("org.slf4j")
@@ -138,27 +141,19 @@ dependencies {
 }
 
 tasks.test {
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
-
   val skipITs = project.hasProperty("skipITs")
-  val skipSparkITs = project.hasProperty("skipSparkITs")
-  if (skipITs || skipSparkITs) {
+  val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
+  if (!enableSparkSQLITs) {
+    exclude("**/integration/test/sql/**")
+  }
+  if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
-
-    doFirst {
-      environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "datastrato/gravitino-ci-hive:0.1.12")
-    }
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
+    dependsOn(":catalogs:catalog-hive:jar")
+    dependsOn(":iceberg:iceberg-rest-server:jar")
   }
 }
 

@@ -1,21 +1,19 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import logging
 from typing import List, Dict
@@ -29,6 +27,7 @@ from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.metalake_list_response import MetalakeListResponse
 from gravitino.dto.responses.metalake_response import MetalakeResponse
 from gravitino.api.metalake_change import MetalakeChange
+from gravitino.exceptions.handlers.metalake_error_handler import METALAKE_ERROR_HANDLER
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,9 @@ class GravitinoAdminClient(GravitinoClientBase):
         Returns:
             An array of GravitinoMetalake objects representing the Metalakes.
         """
-        resp = self._rest_client.get(self.API_METALAKES_LIST_PATH)
+        resp = self._rest_client.get(
+            self.API_METALAKES_LIST_PATH, error_handler=METALAKE_ERROR_HANDLER
+        )
         metalake_list_resp = MetalakeListResponse.from_json(
             resp.body, infer_missing=True
         )
@@ -74,7 +75,9 @@ class GravitinoAdminClient(GravitinoClientBase):
         req = MetalakeCreateRequest(name, comment, properties)
         req.validate()
 
-        resp = self._rest_client.post(self.API_METALAKES_LIST_PATH, req)
+        resp = self._rest_client.post(
+            self.API_METALAKES_LIST_PATH, req, error_handler=METALAKE_ERROR_HANDLER
+        )
         metalake_response = MetalakeResponse.from_json(resp.body, infer_missing=True)
         metalake_response.validate()
         metalake = metalake_response.metalake()
@@ -99,7 +102,9 @@ class GravitinoAdminClient(GravitinoClientBase):
         updates_request.validate()
 
         resp = self._rest_client.put(
-            self.API_METALAKES_IDENTIFIER_PATH + name, updates_request
+            self.API_METALAKES_IDENTIFIER_PATH + name,
+            updates_request,
+            error_handler=METALAKE_ERROR_HANDLER,
         )
         metalake_response = MetalakeResponse.from_json(resp.body, infer_missing=True)
         metalake_response.validate()
@@ -116,11 +121,11 @@ class GravitinoAdminClient(GravitinoClientBase):
         Returns:
             True if the Metalake was successfully dropped, false otherwise.
         """
-        try:
-            resp = self._rest_client.delete(self.API_METALAKES_IDENTIFIER_PATH + name)
-            drop_response = DropResponse.from_json(resp.body, infer_missing=True)
 
-            return drop_response.dropped()
-        except Exception:
-            logger.warning("Failed to drop metalake %s", name)
-            return False
+        resp = self._rest_client.delete(
+            self.API_METALAKES_IDENTIFIER_PATH + name,
+            error_handler=METALAKE_ERROR_HANDLER,
+        )
+        drop_response = DropResponse.from_json(resp.body, infer_missing=True)
+
+        return drop_response.dropped()

@@ -41,10 +41,9 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
               PropertyEntry.stringOptionalPropertyEntry(
                   LOCATION,
                   "The storage location managed by Hadoop fileset catalog",
-                  true /* immutable */,
+                  false /* immutable */,
                   null,
                   false /* hidden */))
-          .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
           // The following two are about authentication.
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)

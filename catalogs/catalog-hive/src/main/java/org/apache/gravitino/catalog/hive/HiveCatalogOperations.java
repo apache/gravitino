@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.hive;
 
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
-import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
@@ -28,8 +26,8 @@ import static org.apache.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
 import static org.apache.gravitino.catalog.hive.HiveTable.TABLE_TYPE_PROP;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
-import static org.apache.gravitino.catalog.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.apache.gravitino.hive.converter.HiveDataTypeConverter.CONVERTER;
 import static org.apache.hadoop.hive.metastore.TableType.EXTERNAL_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -59,7 +57,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TableType;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -72,6 +69,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -97,7 +95,6 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +103,7 @@ import org.slf4j.LoggerFactory;
 public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
-  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s-keytab";
+  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-hive-%s-keytab";
 
   @VisibleForTesting CachedClientPool clientPool;
 
@@ -169,8 +166,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     initKerberosIfNecessary(conf, hadoopConf);
 
-    this.clientPool =
-        new CachedClientPool(getClientPoolSize(conf), hiveConf, getCacheEvictionInterval(conf));
+    this.clientPool = new CachedClientPool(hiveConf, conf);
 
     this.listAllTables = enableListAllTables(conf);
   }
@@ -236,7 +232,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
         LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
         refreshKerberosConfig();
-        KerberosName.resetDefaultRealm();
         UserGroupInformation.setConfiguration(hadoopConf);
         UserGroupInformation.loginUserFromKeytab(
             catalogPrincipal, keytabPath.toAbsolutePath().toString());
@@ -283,19 +278,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  @VisibleForTesting
-  int getClientPoolSize(Map<String, String> conf) {
-    return (int)
-        propertiesMetadata.catalogPropertiesMetadata().getOrDefault(conf, CLIENT_POOL_SIZE);
-  }
-
-  long getCacheEvictionInterval(Map<String, String> conf) {
-    return (long)
-        propertiesMetadata
-            .catalogPropertiesMetadata()
-            .getOrDefault(conf, CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS);
   }
 
   boolean enableListAllTables(Map<String, String> conf) {
@@ -375,7 +357,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
               .withName(ident.name())
               .withComment(comment)
               .withProperties(properties)
-              .withConf(hiveConf)
               .withAuditInfo(
                   AuditInfo.builder()
                       .withCreator(UserGroupInformation.getCurrentUser().getUserName())
@@ -416,7 +397,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   public HiveSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     try {
       Database database = clientPool.run(client -> client.getDatabase(ident.name()));
-      HiveSchema hiveSchema = HiveSchema.fromHiveDB(database, hiveConf);
+      HiveSchema hiveSchema = HiveSchema.fromHiveDB(database);
 
       LOG.info("Loaded Hive schema (database) {} from Hive Metastore ", ident.name());
       return hiveSchema;
@@ -480,7 +461,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           });
 
       LOG.info("Altered Hive schema (database) {} in Hive Metastore", ident.name());
-      return HiveSchema.fromHiveDB(alteredDatabase, hiveConf);
+      return HiveSchema.fromHiveDB(alteredDatabase);
 
     } catch (NoSuchObjectException e) {
       throw new NoSuchSchemaException(
@@ -675,11 +656,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         .filter(c -> c instanceof TableChange.ColumnChange)
         .forEach(
             c -> {
-              String fieldToAdd = String.join(".", ((TableChange.ColumnChange) c).fieldName());
+              String fieldName = String.join(".", ((TableChange.ColumnChange) c).fieldName());
               Preconditions.checkArgument(
                   c instanceof TableChange.UpdateColumnComment
-                      || !partitionFields.contains(fieldToAdd),
-                  "Cannot alter partition column: " + fieldToAdd);
+                      || !partitionFields.contains(fieldName),
+                  "Cannot alter partition column: " + fieldName);
 
               if (c instanceof TableChange.UpdateColumnPosition
                   && afterPartitionColumn(
@@ -688,12 +669,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                     "Cannot alter column position to after partition column");
               }
 
+              if (c instanceof TableChange.DeleteColumn) {
+                existingFields.remove(fieldName);
+              }
+
               if (c instanceof TableChange.AddColumn) {
                 TableChange.AddColumn addColumn = (TableChange.AddColumn) c;
 
-                if (existingFields.contains(fieldToAdd)) {
+                if (existingFields.contains(fieldName)) {
                   throw new IllegalArgumentException(
-                      "Cannot add column with duplicate name: " + fieldToAdd);
+                      "Cannot add column with duplicate name: " + fieldName);
                 }
 
                 if (addColumn.getPosition() == null) {

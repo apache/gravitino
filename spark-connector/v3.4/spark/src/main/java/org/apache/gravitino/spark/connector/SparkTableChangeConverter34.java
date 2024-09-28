@@ -1,4 +1,5 @@
 /*
+ * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
@@ -25,6 +26,7 @@ public class SparkTableChangeConverter34 extends SparkTableChangeConverter {
     super(sparkTypeConverter);
   }
 
+  @Override
   public org.apache.gravitino.rel.TableChange toGravitinoTableChange(TableChange change) {
     if (change instanceof TableChange.UpdateColumnDefaultValue) {
       TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =

@@ -2,7 +2,6 @@ name: Frontend Integration Test
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main", "branch-*" ]
   pull_request:
@@ -27,22 +26,18 @@ jobs:
               - bin/**
               - catalogs/**
               - clients/client-java/**
-              - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
               - dev/**
               - gradle/**
-              - integration-test/**
+              - iceberg/**
+              - integration-test-common/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
-              - spark-connector/**
-              - trino-connector/**
               - web/**
-              - docs/open-api/**
               - build.gradle.kts
               - gradle.properties
               - gradlew
@@ -50,16 +45,16 @@ jobs:
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  # Integration test for AMD64 architecture
-  test-amd64-arch:
+  FrontendIT:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       matrix:
+        # Integration test for AMD64 architecture
         architecture: [linux/amd64]
-        java-version: [ 8 ]
+        java-version: [ 17 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:
@@ -89,8 +84,8 @@ jobs:
       - name: Frontend Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :integration-test:test --tests "org.apache.gravitino.integration.test.web.ui.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :integration-test:test --tests "org.apache.gravitino.integration.test.web.ui.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :web:integration-test:test
+          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :web:integration-test:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
@@ -99,9 +94,9 @@ jobs:
           name: integrate-test-reports-${{ matrix.java-version }}
           path: |
             build/reports
-            integration-test/build/integration-test-integration-test.log
-            integration-test/build/*.tar
+            integration-test-common/build/*.log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
             catalogs/**/*.tar
+            web/integration-test/build/*.log

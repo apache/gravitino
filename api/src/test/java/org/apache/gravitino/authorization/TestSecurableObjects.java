@@ -27,28 +27,17 @@ public class TestSecurableObjects {
 
   @Test
   public void testSecurableObjects() {
-    SecurableObject allMetalakes =
-        SecurableObjects.ofAllMetalakes(Lists.newArrayList(Privileges.CreateMetalake.allow()));
-    Assertions.assertEquals("*", allMetalakes.fullName());
-    Assertions.assertEquals(MetadataObject.Type.METALAKE, allMetalakes.type());
-
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            SecurableObjects.of(
-                MetadataObject.Type.METALAKE,
-                Lists.newArrayList("*"),
-                Lists.newArrayList(Privileges.UseMetalake.allow())));
 
     SecurableObject metalake =
-        SecurableObjects.ofMetalake("metalake", Lists.newArrayList(Privileges.UseMetalake.allow()));
+        SecurableObjects.ofMetalake(
+            "metalake", Lists.newArrayList(Privileges.CreateCatalog.allow()));
     Assertions.assertEquals("metalake", metalake.fullName());
     Assertions.assertEquals(MetadataObject.Type.METALAKE, metalake.type());
     SecurableObject anotherMetalake =
         SecurableObjects.of(
             MetadataObject.Type.METALAKE,
             Lists.newArrayList("metalake"),
-            Lists.newArrayList(Privileges.UseMetalake.allow()));
+            Lists.newArrayList(Privileges.CreateCatalog.allow()));
     Assertions.assertEquals(metalake, anotherMetalake);
 
     SecurableObject catalog =
@@ -75,14 +64,15 @@ public class TestSecurableObjects {
     Assertions.assertEquals(schema, anotherSchema);
 
     SecurableObject table =
-        SecurableObjects.ofTable(schema, "table", Lists.newArrayList(Privileges.ReadTable.allow()));
+        SecurableObjects.ofTable(
+            schema, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
     Assertions.assertEquals("catalog.schema.table", table.fullName());
     Assertions.assertEquals(MetadataObject.Type.TABLE, table.type());
     SecurableObject anotherTable =
         SecurableObjects.of(
             MetadataObject.Type.TABLE,
             Lists.newArrayList("catalog", "schema", "table"),
-            Lists.newArrayList(Privileges.ReadTable.allow()));
+            Lists.newArrayList(Privileges.SelectTable.allow()));
     Assertions.assertEquals(table, anotherTable);
 
     SecurableObject fileset =
@@ -98,7 +88,8 @@ public class TestSecurableObjects {
     Assertions.assertEquals(fileset, anotherFileset);
 
     SecurableObject topic =
-        SecurableObjects.ofTopic(schema, "topic", Lists.newArrayList(Privileges.ReadTopic.allow()));
+        SecurableObjects.ofTopic(
+            schema, "topic", Lists.newArrayList(Privileges.ConsumeTopic.allow()));
     Assertions.assertEquals("catalog.schema.topic", topic.fullName());
     Assertions.assertEquals(MetadataObject.Type.TOPIC, topic.type());
 
@@ -106,7 +97,7 @@ public class TestSecurableObjects {
         SecurableObjects.of(
             MetadataObject.Type.TOPIC,
             Lists.newArrayList("catalog", "schema", "topic"),
-            Lists.newArrayList(Privileges.ReadTopic.allow()));
+            Lists.newArrayList(Privileges.ConsumeTopic.allow()));
     Assertions.assertEquals(topic, anotherTopic);
 
     Exception e =
@@ -135,7 +126,7 @@ public class TestSecurableObjects {
                 SecurableObjects.of(
                     MetadataObject.Type.TABLE,
                     Lists.newArrayList("metalake"),
-                    Lists.newArrayList(Privileges.ReadTable.allow())));
+                    Lists.newArrayList(Privileges.SelectTable.allow())));
     Assertions.assertTrue(e.getMessage().contains("the length of names is 1"));
     e =
         Assertions.assertThrows(
@@ -144,7 +135,7 @@ public class TestSecurableObjects {
                 SecurableObjects.of(
                     MetadataObject.Type.TOPIC,
                     Lists.newArrayList("metalake"),
-                    Lists.newArrayList(Privileges.ReadTopic.allow())));
+                    Lists.newArrayList(Privileges.ConsumeTopic.allow())));
     Assertions.assertTrue(e.getMessage().contains("the length of names is 1"));
     e =
         Assertions.assertThrows(

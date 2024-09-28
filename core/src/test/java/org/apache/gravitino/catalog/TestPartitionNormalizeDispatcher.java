@@ -39,11 +39,11 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
       NameIdentifierUtil.ofTable(metalake, catalog, SCHEMA, "TEST_PARTITION_NORMALIZE_TABLE");
 
   @BeforeAll
-  public static void initialize() {
+  public static void initialize() throws IllegalAccessException {
     TestPartitionOperationDispatcher.prepareTable();
     partitionNormalizeDispatcher =
         new PartitionNormalizeDispatcher(
-            TestPartitionOperationDispatcher.partitionOperationDispatcher);
+            TestPartitionOperationDispatcher.partitionOperationDispatcher, catalogManager);
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
     TestPartitionOperationDispatcher.schemaOperationDispatcher.createSchema(
         schemaIdent, "comment", null);

@@ -52,11 +52,13 @@ public enum TestDatabaseName {
   /** Represents the MySQL database for MysqlAbstractIT and its subclasses. */
   MYSQL_MYSQL_ABSTRACT_IT,
 
-  /** Represents the MySQL database for AudtCatalogMysqlIT. */
+  /** Represents the MySQL database for AuditCatalogMysqlIT. */
   MYSQL_AUDIT_CATALOG_MYSQL_IT,
 
   /** Represents the MySQL database used for testing the catalog integration with MySQL. */
   MYSQL_CATALOG_MYSQL_IT,
+
+  PG_JDBC_BACKEND,
 
   /** Represents the PostgreSQL database for CatalogPostgreSqlIT. */
   PG_CATALOG_POSTGRESQL_IT {

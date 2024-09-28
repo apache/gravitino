@@ -1,4 +1,5 @@
 /*
+ * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
@@ -27,7 +28,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata;
+import org.apache.gravitino.catalog.hive.TableType;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -124,8 +125,7 @@ public class HivePropertiesConverter implements PropertiesConverter {
 
     if (isExternal.equalsIgnoreCase("true")) {
       gravitinoTableProperties.put(
-          HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE,
-          HiveTablePropertiesMetadata.TableType.EXTERNAL_TABLE.name());
+          HivePropertiesConstants.GRAVITINO_HIVE_TABLE_TYPE, TableType.EXTERNAL_TABLE.name());
     }
 
     sparkToGravitinoPropertyMap.forEach(

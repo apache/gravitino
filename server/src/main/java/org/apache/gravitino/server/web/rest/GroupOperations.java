@@ -22,19 +22,24 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
+import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
+import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.lock.LockType;
@@ -51,7 +56,7 @@ public class GroupOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(GroupOperations.class);
 
-  private final AccessControlManager accessControlManager;
+  private final AccessControlDispatcher accessControlManager;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -59,7 +64,7 @@ public class GroupOperations {
     // Because accessManager may be null when Gravitino doesn't enable authorization,
     // and Jersey injection doesn't support null value. So GroupOperations chooses to retrieve
     // accessControlManager from GravitinoEnv instead of injection here.
-    this.accessControlManager = GravitinoEnv.getInstance().accessControlManager();
+    this.accessControlManager = GravitinoEnv.getInstance().accessControlDispatcher();
   }
 
   @GET
@@ -132,6 +137,33 @@ public class GroupOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(OperationType.REMOVE, group, metalake, e);
+    }
+  }
+
+  @GET
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-group", absolute = true)
+  public Response listGroups(
+      @PathParam("metalake") String metalake,
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+    LOG.info("Received list groups request.");
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            if (verbose) {
+              return Utils.ok(
+                  new GroupListResponse(
+                      DTOConverters.toDTOs(accessControlManager.listGroups(metalake))));
+            } else {
+              return Utils.ok(new NameListResponse(accessControlManager.listGroupNames(metalake)));
+            }
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleGroupException(
+          OperationType.LIST, Namespace.empty().toString(), metalake, e);
     }
   }
 }

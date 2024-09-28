@@ -21,102 +21,97 @@ package org.apache.gravitino.catalog.hive;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.hive.ClientPropertiesMetadata;
 
 public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
-  public static final String CLIENT_POOL_SIZE = "client.pool-size";
-  public static final int DEFAULT_CLIENT_POOL_SIZE = 1;
-
-  public static final String METASTORE_URIS = "metastore.uris";
+  public static final String CLIENT_POOL_SIZE = HiveConstants.CLIENT_POOL_SIZE;
+  public static final String METASTORE_URIS = HiveConstants.METASTORE_URIS;
 
   public static final String CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
-      "client.pool-cache.eviction-interval-ms";
+      HiveConstants.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 
-  public static final long DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
-      TimeUnit.MINUTES.toMillis(5);
-
-  public static final String IMPERSONATION_ENABLE = "impersonation-enable";
+  public static final String IMPERSONATION_ENABLE = HiveConstants.IMPERSONATION_ENABLE;
 
   public static final boolean DEFAULT_IMPERSONATION_ENABLE = false;
 
-  public static final String KEY_TAB_URI = "kerberos.keytab-uri";
+  public static final String KEY_TAB_URI = HiveConstants.KEY_TAB_URI;
 
-  public static final String PRINCIPAL = "kerberos.principal";
+  public static final String PRINCIPAL = HiveConstants.PRINCIPAL;
 
-  public static final String CHECK_INTERVAL_SEC = "kerberos.check-interval-sec";
+  public static final String CHECK_INTERVAL_SEC = HiveConstants.CHECK_INTERVAL_SEC;
 
-  public static final String FETCH_TIMEOUT_SEC = "kerberos.keytab-fetch-timeout-sec";
+  public static final String FETCH_TIMEOUT_SEC = HiveConstants.FETCH_TIMEOUT_SEC;
 
-  public static final String LIST_ALL_TABLES = "list-all-tables";
+  public static final String LIST_ALL_TABLES = HiveConstants.LIST_ALL_TABLES;
 
   public static final boolean DEFAULT_LIST_ALL_TABLES = false;
+
+  private static final ClientPropertiesMetadata CLIENT_PROPERTIES_METADATA =
+      new ClientPropertiesMetadata();
 
   private static final Map<String, PropertyEntry<?>> HIVE_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
               METASTORE_URIS,
               PropertyEntry.stringRequiredPropertyEntry(
-                  METASTORE_URIS, "The Hive metastore URIs", true, false))
-          .put(
-              CLIENT_POOL_SIZE,
-              PropertyEntry.integerOptionalPropertyEntry(
-                  CLIENT_POOL_SIZE,
-                  "The maximum number of Hive metastore clients in the pool for Gravitino",
-                  true,
-                  DEFAULT_CLIENT_POOL_SIZE,
-                  false))
-          .put(
-              CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
-              PropertyEntry.longOptionalPropertyEntry(
-                  CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
-                  "The cache pool eviction interval",
-                  true,
-                  DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
-                  false))
+                  METASTORE_URIS,
+                  "The Hive metastore URIs",
+                  false /* immutable */,
+                  false /* hidden */))
           .put(
               IMPERSONATION_ENABLE,
               PropertyEntry.booleanPropertyEntry(
                   IMPERSONATION_ENABLE,
                   "Enable user impersonation for Hive catalog",
-                  false,
-                  true,
+                  false /* Whether this property is required */,
+                  false /* immutable */,
                   DEFAULT_IMPERSONATION_ENABLE,
-                  false,
-                  false))
+                  false /* hidden */,
+                  false /* reserved */))
           .put(
               KEY_TAB_URI,
-              PropertyEntry.stringImmutablePropertyEntry(
-                  KEY_TAB_URI, "The uri of key tab for the catalog", false, null, false, false))
+              PropertyEntry.stringOptionalPropertyEntry(
+                  KEY_TAB_URI,
+                  "The uri of key tab for the catalog",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               PRINCIPAL,
-              PropertyEntry.stringImmutablePropertyEntry(
-                  PRINCIPAL, "The principal for the catalog", false, null, false, false))
+              PropertyEntry.stringOptionalPropertyEntry(
+                  PRINCIPAL,
+                  "The principal for the catalog",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .put(
               CHECK_INTERVAL_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
                   CHECK_INTERVAL_SEC,
                   "The interval to check validness of the principal",
-                  true,
-                  60,
-                  false))
+                  false /* immutable */,
+                  60 /* defaultValue */,
+                  false /* hidden */))
           .put(
               FETCH_TIMEOUT_SEC,
               PropertyEntry.integerOptionalPropertyEntry(
-                  FETCH_TIMEOUT_SEC, "The timeout to fetch key tab", true, 60, false))
+                  FETCH_TIMEOUT_SEC, "The timeout to fetch key tab", false, 60, false))
           .put(
               LIST_ALL_TABLES,
               PropertyEntry.booleanPropertyEntry(
                   LIST_ALL_TABLES,
                   "Lists all tables in a database, including non-Hive tables, such as Iceberg, etc.",
-                  false,
-                  false,
+                  false /* required */,
+                  false /* immutable */,
                   DEFAULT_LIST_ALL_TABLES,
-                  false,
-                  false))
-          .putAll(BASIC_CATALOG_PROPERTY_ENTRIES)
+                  false /* hidden */,
+                  false /* reserved */))
+          .putAll(AuthorizationPropertiesMeta.RANGER_AUTHORIZATION_PROPERTY_ENTRIES)
+          .putAll(CLIENT_PROPERTIES_METADATA.propertyEntries())
           .build();
 
   @Override

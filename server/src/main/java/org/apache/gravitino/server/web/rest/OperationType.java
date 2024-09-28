@@ -30,5 +30,7 @@ public enum OperationType {
   REMOVE,
   DELETE,
   GRANT,
-  REVOKE
+  REVOKE,
+  ASSOCIATE,
+  SET,
 }

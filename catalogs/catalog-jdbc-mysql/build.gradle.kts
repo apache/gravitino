@@ -25,17 +25,26 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":catalogs:catalog-jdbc-common"))
-  implementation(project(":common"))
-  implementation(project(":core"))
+  implementation(project(":api")) {
+    exclude(group = "*")
+  }
+  implementation(project(":catalogs:catalog-common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":catalogs:catalog-jdbc-common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":common")) {
+    exclude(group = "*")
+  }
+  implementation(project(":core")) {
+    exclude(group = "*")
+  }
 
   implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.jsqlparser)
-  implementation(libs.slf4j.api)
 
   testImplementation(project(":catalogs:catalog-jdbc-common", "testArtifacts"))
   testImplementation(project(":clients:client-java"))
@@ -43,11 +52,10 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
 
-  testImplementation(libs.commons.lang3)
-  testImplementation(libs.guava)
-  testImplementation(libs.mysql.driver)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
 
@@ -62,7 +70,11 @@ tasks {
 
   val copyCatalogLibs by registering(Copy::class) {
     dependsOn("jar", "runtimeJars")
-    from("build/libs")
+    from("build/libs") {
+      exclude("guava-*.jar")
+      exclude("log4j-*.jar")
+      exclude("slf4j-*.jar")
+    }
     into("$rootDir/distribution/package/catalogs/jdbc-mysql/libs")
   }
 
@@ -75,6 +87,8 @@ tasks {
     exclude { details ->
       details.file.isDirectory()
     }
+
+    fileMode = 0b111101101
   }
 
   register("copyLibAndConfig", Copy::class) {
@@ -83,21 +97,12 @@ tasks {
 }
 
 tasks.test {
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
-
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
-
-    val init = project.extra.get("initIntegrationTest") as (Test) -> Unit
-    init(this)
   }
 }
 

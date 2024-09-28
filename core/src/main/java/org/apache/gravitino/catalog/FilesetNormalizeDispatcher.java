@@ -20,8 +20,10 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
+import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -32,35 +34,35 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 
 public class FilesetNormalizeDispatcher implements FilesetDispatcher {
+  private final CatalogManager catalogManager;
+  private final FilesetDispatcher dispatcher;
 
-  private final FilesetOperationDispatcher dispatcher;
-
-  public FilesetNormalizeDispatcher(FilesetOperationDispatcher dispatcher) {
+  public FilesetNormalizeDispatcher(FilesetDispatcher dispatcher, CatalogManager catalogManager) {
     this.dispatcher = dispatcher;
+    this.catalogManager = catalogManager;
   }
 
   @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    Namespace caseSensitiveNs = applyCaseSensitive(namespace, Capability.Scope.FILESET, dispatcher);
+    Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
     NameIdentifier[] identifiers = dispatcher.listFilesets(caseSensitiveNs);
-    return applyCaseSensitive(identifiers, Capability.Scope.FILESET, dispatcher);
+    return normalizeCaseSensitive(identifiers);
   }
 
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.loadFileset(applyCaseSensitive(ident, Capability.Scope.FILESET, dispatcher));
+    return dispatcher.loadFileset(normalizeCaseSensitive(ident));
   }
 
   @Override
   public boolean filesetExists(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.filesetExists(
-        applyCaseSensitive(ident, Capability.Scope.FILESET, dispatcher));
+    return dispatcher.filesetExists(normalizeCaseSensitive(ident));
   }
 
   @Override
@@ -78,23 +80,48 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    Capability capability = dispatcher.getCatalogCapability(ident);
+    Capability capability = getCapability(ident, catalogManager);
     return dispatcher.alterFileset(
         // The constraints of the name spec may be more strict than underlying catalog,
         // and for compatibility reasons, we only apply case-sensitive capabilities here.
-        applyCaseSensitive(ident, Capability.Scope.FILESET, dispatcher),
-        applyCapabilities(capability, changes));
+        normalizeCaseSensitive(ident), applyCapabilities(capability, changes));
   }
 
   @Override
   public boolean dropFileset(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.dropFileset(applyCaseSensitive(ident, Capability.Scope.FILESET, dispatcher));
+    return dispatcher.dropFileset(normalizeCaseSensitive(ident));
+  }
+
+  @Override
+  public String getFileLocation(NameIdentifier ident, String subPath) {
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities here.
+    return dispatcher.getFileLocation(normalizeCaseSensitive(ident), subPath);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
-    Capability capability = dispatcher.getCatalogCapability(ident);
-    return applyCapabilities(ident, Capability.Scope.FILESET, capability);
+    Capability capabilities = getCapability(ident, catalogManager);
+    return applyCapabilities(ident, Capability.Scope.FILESET, capabilities);
+  }
+
+  private Namespace normalizeCaseSensitive(Namespace namespace) {
+    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
+    return applyCaseSensitive(namespace, Capability.Scope.FILESET, capabilities);
+  }
+
+  private NameIdentifier normalizeCaseSensitive(NameIdentifier filesetIdent) {
+    Capability capabilities = getCapability(filesetIdent, catalogManager);
+    return applyCaseSensitive(filesetIdent, Capability.Scope.FILESET, capabilities);
+  }
+
+  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] filesetIdents) {
+    if (ArrayUtils.isEmpty(filesetIdents)) {
+      return filesetIdents;
+    }
+
+    Capability capabilities = getCapability(filesetIdents[0], catalogManager);
+    return applyCaseSensitive(filesetIdents, Capability.Scope.FILESET, capabilities);
   }
 }

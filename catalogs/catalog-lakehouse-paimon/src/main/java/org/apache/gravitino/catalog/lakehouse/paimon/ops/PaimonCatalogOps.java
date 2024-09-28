@@ -19,14 +19,20 @@
 package org.apache.gravitino.catalog.lakehouse.paimon.ops;
 
 import static org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils.loadCatalogBackend;
+import static org.apache.gravitino.catalog.lakehouse.paimon.utils.TableOpsUtils.buildSchemaChanges;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.paimon.catalog.Catalog;
+import org.apache.paimon.catalog.Catalog.ColumnAlreadyExistException;
+import org.apache.paimon.catalog.Catalog.ColumnNotExistException;
 import org.apache.paimon.catalog.Catalog.DatabaseAlreadyExistException;
 import org.apache.paimon.catalog.Catalog.DatabaseNotEmptyException;
 import org.apache.paimon.catalog.Catalog.DatabaseNotExistException;
+import org.apache.paimon.catalog.Catalog.TableAlreadyExistException;
 import org.apache.paimon.catalog.Catalog.TableNotExistException;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.schema.Schema;
@@ -35,16 +41,21 @@ import org.apache.paimon.table.Table;
 /** Table operation proxy that handles table operations of an underlying Apache Paimon catalog. */
 public class PaimonCatalogOps implements AutoCloseable {
 
+  private final PaimonBackendCatalogWrapper paimonBackendCatalogWrapper;
   protected Catalog catalog;
 
   public PaimonCatalogOps(PaimonConfig paimonConfig) {
-    catalog = loadCatalogBackend(paimonConfig);
+    paimonBackendCatalogWrapper = loadCatalogBackend(paimonConfig);
+    Preconditions.checkArgument(
+        paimonBackendCatalogWrapper.getCatalog() != null,
+        "Can not load Paimon backend catalog instance.");
+    catalog = paimonBackendCatalogWrapper.getCatalog();
   }
 
   @Override
   public void close() throws Exception {
-    if (catalog != null) {
-      catalog.close();
+    if (paimonBackendCatalogWrapper != null) {
+      paimonBackendCatalogWrapper.close();
     }
   }
 
@@ -79,8 +90,18 @@ public class PaimonCatalogOps implements AutoCloseable {
     catalog.createTable(tableIdentifier(tableName), schema, false);
   }
 
-  public void dropTable(String tableName) throws TableNotExistException {
+  public void purgeTable(String tableName) throws TableNotExistException {
     catalog.dropTable(tableIdentifier(tableName), false);
+  }
+
+  public void alterTable(String tableName, TableChange... changes)
+      throws ColumnAlreadyExistException, TableNotExistException, ColumnNotExistException {
+    catalog.alterTable(tableIdentifier(tableName), buildSchemaChanges(changes), false);
+  }
+
+  public void renameTable(String fromTableName, String toTableName)
+      throws TableNotExistException, TableAlreadyExistException {
+    catalog.renameTable(tableIdentifier(fromTableName), tableIdentifier(toTableName), false);
   }
 
   private Identifier tableIdentifier(String tableName) {
