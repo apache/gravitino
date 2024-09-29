@@ -122,6 +122,9 @@ public class RoleOperations {
           httpRequest,
           () -> {
             for (SecurableObjectDTO object : request.getSecurableObjects()) {
+              for (Privilege privilege : object.privileges()) {
+
+              }
               AuthorizationUtils.checkSecurableObject(metalake, object);
             }
 
