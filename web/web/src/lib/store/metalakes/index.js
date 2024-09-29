@@ -151,6 +151,7 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
             reloadedKeys.push(`{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`)
           }
         }
+
         return {
           ...schemaItem,
           node: 'schema',
