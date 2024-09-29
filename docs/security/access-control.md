@@ -661,6 +661,8 @@ Role role = client.grantPrivilegesToRole("role1", schema, Lists.newArrayList(Pri
 MetadataObject table = ...
 Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 ```
+</TabItem>
+<TabItem value="java" label="Java">
 
 ### Revoke privileges from a role
 
