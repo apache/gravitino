@@ -50,7 +50,10 @@ public enum Strategy {
   RANGE,
 
   /** Distributes data evenly across partitions. */
-  EVEN;
+  EVEN,
+
+  /** Distributes data randomly across partitions or table. */
+  RANDOM;
 
   /**
    * Get the distribution strategy by name.

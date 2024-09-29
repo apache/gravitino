@@ -63,6 +63,17 @@ public class Distributions {
   }
 
   /**
+   * Create a distribution by randomly distributing the data across the number of buckets.
+   *
+   * @param number The number of buckets
+   * @param expressions The expressions to distribute by
+   * @return The created random distribution
+   */
+  public static Distribution random(int number, Expression... expressions) {
+    return new DistributionImpl(Strategy.RANDOM, number, expressions);
+  }
+
+  /**
    * Create a distribution by the given strategy.
    *
    * @param strategy The strategy to use
