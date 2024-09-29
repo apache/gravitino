@@ -111,7 +111,7 @@ const MetalakeTree = props => {
         break
       }
       default:
-        dispatch(setIntoTreeNodeWithFetch({ key: nodeProps.data.key }))
+        dispatch(setIntoTreeNodeWithFetch({ key: nodeProps.data.key, reload: true }))
     }
   }
 
