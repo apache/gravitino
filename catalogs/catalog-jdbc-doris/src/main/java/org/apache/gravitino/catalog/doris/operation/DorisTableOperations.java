@@ -235,6 +235,10 @@ public class DorisTableOperations extends JdbcTableOperations {
                       "Distribution column "
                           + expression
                           + " does not exist in the table columns"));
+    } else if (distribution.strategy() == Strategy.EVEN) {
+      Preconditions.checkArgument(
+          distribution.expressions().length == 0,
+          "Doris does not support distribution column in EVEN distribution strategy");
     }
   }
 
