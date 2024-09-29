@@ -152,9 +152,9 @@ You can also create a dedicated role for your business by API or the client.
 
 ### Permission privileges
 
-| Name          | Supports Securable Object | Operation                                                                         |
-|---------------|---------------------------|-----------------------------------------------------------------------------------|
-| MANAGE_GRANTS | Metalake                  | Grant or revoke roles for a user or group. Grant or revoke privileges for a role. |
+| Name          | Supports Securable Object | Operation                                                                                                     |
+|---------------|---------------------------|---------------------------------------------------------------------------------------------------------------|
+| MANAGE_GRANTS | Metalake                  | Manages roles granted to or revoked from the user or group, and privilege granted to or revoked from the role |
 
 ### Catalog privileges
 
@@ -698,7 +698,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 
-// Revoke the privilege allowing `SELEC_TABLE` for the `table` from `role1`         
+// Revoke the privilege allowing `SELEC_TABLE` for the `schema` from `role1`         
 MetadataObject schema = ...
 Role role = client.revokePrivilegesFromRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));
 
