@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.iceberg;
 
+import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
@@ -47,6 +49,8 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   public static final String SERVICE_NAME = "iceberg-rest";
   public static final String ICEBERG_SPEC = "/iceberg/*";
+  private static final String ICEBERG_REST_SPEC_PACKAGE =
+      "org.apache.gravitino.iceberg.service.rest";
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
@@ -58,7 +62,7 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
 
     ResourceConfig config = new ResourceConfig();
-    config.packages("org.apache.gravitino.iceberg.service.rest");
+    config.packages(getIcebergRESTPackages(icebergConfig));
 
     config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
     config.register(IcebergExceptionMapper.class);
@@ -126,5 +130,11 @@ public class RESTService implements GravitinoAuxiliaryService {
     if (server != null) {
       server.join();
     }
+  }
+
+  private String[] getIcebergRESTPackages(IcebergConfig icebergConfig) {
+    List<String> packages = Lists.newArrayList(ICEBERG_REST_SPEC_PACKAGE);
+    packages.addAll(icebergConfig.get(IcebergConfig.REST_API_EXTENSION_PACKAGES));
+    return packages.toArray(new String[0]);
   }
 }
