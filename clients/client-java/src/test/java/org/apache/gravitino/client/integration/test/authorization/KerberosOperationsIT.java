@@ -66,6 +66,10 @@ public class KerberosOperationsIT extends AbstractIT {
 
   private static final String clientPrincipal = "client@EXAMPLE.COM";
 
+  public KerberosOperationsIT(GravitinoAdminClient client) {
+    this.client = client;
+  }
+
   @BeforeAll
   public void startIntegrationTest() throws Exception {
     kdc.startMiniKdc();
