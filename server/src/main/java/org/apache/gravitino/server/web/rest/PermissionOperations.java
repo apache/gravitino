@@ -38,6 +38,7 @@ import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
@@ -214,6 +215,10 @@ public class PermissionOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            for (PrivilegeDTO privilegeDTO : privilegeGrantRequest.getPrivileges()) {
+              AuthorizationUtils.checkPrivilege(privilegeDTO, object);
+            }
+
             AuthorizationUtils.checkSecurableObject(metalake, object);
             return TreeLockUtils.doWithTreeLock(
                 AuthorizationUtils.ofRole(metalake, role),
@@ -264,6 +269,10 @@ public class PermissionOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            for (PrivilegeDTO privilegeDTO : privilegeRevokeRequest.getPrivileges()) {
+              AuthorizationUtils.checkPrivilege(privilegeDTO, object);
+            }
+
             AuthorizationUtils.checkSecurableObject(metalake, object);
             return TreeLockUtils.doWithTreeLock(
                 AuthorizationUtils.ofRole(metalake, role),

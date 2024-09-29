@@ -33,6 +33,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -266,6 +268,16 @@ public class AuthorizationUtils {
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the type %s", object.type()));
+    }
+  }
+
+  public static void checkPrivilege(PrivilegeDTO privilegeDTO, MetadataObject object) {
+    Privilege privilege = DTOConverters.fromPrivilegeDTO(privilegeDTO);
+    if (!privilege.supportsMetadataObject(object.type())) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Securable object %s type %s don't support privilege %s",
+              object.fullName(), object.type(), privilege));
     }
   }
 

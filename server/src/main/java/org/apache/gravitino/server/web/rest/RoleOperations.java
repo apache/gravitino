@@ -21,8 +21,10 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -34,13 +36,15 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.responses.DeleteResponse;
@@ -121,14 +125,21 @@ public class RoleOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            Set<MetadataObject> metadataObjects = Sets.newHashSet();
             for (SecurableObjectDTO object : request.getSecurableObjects()) {
+              MetadataObject metadataObject =
+                  MetadataObjects.parse(object.getFullName(), object.type());
+              if (metadataObjects.contains(metadataObject)) {
+                throw new IllegalArgumentException(
+                    String.format(
+                        "Don't support duplicated metadata objects %s type %s",
+                        object.fullName(), object.type()));
+              } else {
+                metadataObjects.add(metadataObject);
+              }
+
               for (Privilege privilege : object.privileges()) {
-                if (!fromPrivilegeDTO(privilege).supportsMetadataObject(object.type())) {
-                  throw new IllegalArgumentException(
-                      String.format(
-                          "Securable object %s type %s don't support privilege %s",
-                          object.fullName(), object.type(), privilege));
-                }
+                AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object);
               }
               AuthorizationUtils.checkSecurableObject(metalake, object);
             }
@@ -143,7 +154,10 @@ public class RoleOperations {
                                     securableObjectDTO.fullName(),
                                     securableObjectDTO.type(),
                                     securableObjectDTO.privileges().stream()
-                                        .map(privilege -> fromPrivilegeDTO(privilege))
+                                        .map(
+                                            privilege ->
+                                                DTOConverters.fromPrivilegeDTO(
+                                                    (PrivilegeDTO) privilege))
                                         .collect(Collectors.toList())))
                         .collect(Collectors.toList());
 
@@ -190,14 +204,6 @@ public class RoleOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.DELETE, role, metalake, e);
-    }
-  }
-
-  private static Privilege fromPrivilegeDTO(Privilege privilegeDTO) {
-    if (privilegeDTO.condition().equals(Privilege.Condition.ALLOW)) {
-      return Privileges.allow(privilegeDTO.name());
-    } else {
-      return Privileges.deny(privilegeDTO.name());
     }
   }
 }

@@ -170,13 +170,13 @@ public class AccessControlManager implements AccessControlDispatcher {
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, List<Privilege> privileges)
       throws NoSuchRoleException, NoSuchMetalakeException {
-    return permissionManager.grantPrivilegeToRole(metalake, role, object, privileges);
+    return permissionManager.grantPrivilegesToRole(metalake, role, object, privileges);
   }
 
   @Override
   public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, List<Privilege> privileges)
       throws NoSuchRoleException, NoSuchMetalakeException {
-    return permissionManager.revokePrivilegeFromRole(metalake, role, object, privileges);
+    return permissionManager.revokePrivilegesFromRole(metalake, role, object, privileges);
   }
 }
