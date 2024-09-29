@@ -288,7 +288,7 @@ public interface AccessControlDispatcher {
    * @return The role after granted.
    * @throws NoSuchRoleException If the role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   * @throws RuntimeException If granting roles to a role encounters storage issues.
    */
   Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, List<Privilege> privileges)
@@ -303,7 +303,7 @@ public interface AccessControlDispatcher {
    * @return The role after revoked.
    * @throws NoSuchRoleException If the role with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   * @throws RuntimeException If revoking privileges from a role encounters storage issues.
    */
   Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, List<Privilege> privileges)

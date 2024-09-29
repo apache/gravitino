@@ -24,6 +24,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
@@ -258,6 +259,58 @@ public class TestRoleOperations extends JerseyTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+
+    // Test with wrong binding privileges
+    SecurableObject wrongPrivilegeObject =
+        SecurableObjects.ofCatalog("wrong", Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    RoleCreateRequest wrongPriRequest =
+        new RoleCreateRequest(
+            "role",
+            Collections.emptyMap(),
+            new SecurableObjectDTO[] {DTOConverters.toDTO(wrongPrivilegeObject)});
+
+    Response wrongPrivilegeResp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(wrongPriRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), wrongPrivilegeResp.getStatus());
+
+    ErrorResponse wrongPriErrorResp = wrongPrivilegeResp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongPriErrorResp.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), wrongPriErrorResp.getType());
+
+    // Test with empty securable objects request
+    RoleCreateRequest emptyObjectRequest =
+        new RoleCreateRequest("role", Collections.emptyMap(), new SecurableObjectDTO[] {});
+
+    Role emptyObjectRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName("empty")
+            .withProperties(Collections.emptyMap())
+            .withSecurableObjects(Collections.emptyList())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    reset(manager);
+    when(manager.createRole(any(), any(), any(), any())).thenReturn(emptyObjectRole);
+
+    Response emptyObjectResp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(emptyObjectRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), emptyObjectResp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, emptyObjectResp.getMediaType());
+
+    RoleResponse emptyObjectResponse = emptyObjectResp.readEntity(RoleResponse.class);
+    Assertions.assertEquals(0, emptyObjectResponse.getCode());
+    Role emptyRoleDTO = emptyObjectResponse.getRole();
+    Assertions.assertEquals(emptyRoleDTO.name(), "empty");
   }
 
   @Test

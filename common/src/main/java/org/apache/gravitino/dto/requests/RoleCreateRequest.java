@@ -46,7 +46,6 @@ public class RoleCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private Map<String, String> properties;
 
-  @Nullable
   @JsonProperty("securableObjects")
   private SecurableObjectDTO[] securableObjects;
 
@@ -79,5 +78,6 @@ public class RoleCreateRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
+    Preconditions.checkArgument(securableObjects != null, "\"securableObjects\" can't null ");
   }
 }

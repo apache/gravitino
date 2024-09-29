@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.authorization;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -221,48 +224,48 @@ public class AuthorizationUtils {
       identifier = NameIdentifier.parse(String.format("%s.%s", metalake, object.fullName()));
     }
 
-    String existErrMsg = "Securable object %s doesn't exist";
+    Supplier<NoSuchMetadataObjectException> exceptionToThrowSupplier =
+        (com.google.common.base.Supplier<NoSuchMetadataObjectException>)
+            () -> {
+              return new NoSuchMetadataObjectException(
+                  "Securable object %s doesn't exist", object.fullName());
+            };
 
     switch (object.type()) {
       case METALAKE:
-        if (!GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier)) {
-          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-        }
-
+        check(
+            GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier),
+            exceptionToThrowSupplier);
         break;
 
       case CATALOG:
-        if (!GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier)) {
-          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-        }
-
+        check(
+            GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier),
+            exceptionToThrowSupplier);
         break;
 
       case SCHEMA:
-        if (!GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier)) {
-          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-        }
-
+        check(
+            GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier),
+            exceptionToThrowSupplier);
         break;
 
       case FILESET:
-        if (!GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier)) {
-          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-        }
-
+        check(
+            GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier),
+            exceptionToThrowSupplier);
         break;
-      case TABLE:
-        if (!GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier)) {
-          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-        }
 
+      case TABLE:
+        check(
+            GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier),
+            exceptionToThrowSupplier);
         break;
 
       case TOPIC:
-        if (!GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier)) {
-          throw new NoSuchMetadataObjectException(existErrMsg, object.fullName());
-        }
-
+        check(
+            GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier),
+            exceptionToThrowSupplier);
         break;
 
       default:
@@ -278,6 +281,13 @@ public class AuthorizationUtils {
           String.format(
               "Securable object %s type %s don't support privilege %s",
               object.fullName(), object.type(), privilege));
+    }
+  }
+
+  private static void check(
+      final boolean expression, Supplier<? extends RuntimeException> exceptionToThrowSupplier) {
+    if (!expression) {
+      throw checkNotNull(exceptionToThrowSupplier).get();
     }
   }
 

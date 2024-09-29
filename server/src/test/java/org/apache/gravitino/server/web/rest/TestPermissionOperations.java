@@ -466,6 +466,29 @@ public class TestPermissionOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test with wrong binding privileges
+    PrivilegeGrantRequest wrongPriRequest =
+        new PrivilegeGrantRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.CREATE_CATALOG)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+
+    Response wrongPrivilegeResp =
+        target("/metalakes/metalake1/permissions/roles/role1/catalog/catalog1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(wrongPriRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), wrongPrivilegeResp.getStatus());
+
+    ErrorResponse wrongPriErrorResp = wrongPrivilegeResp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongPriErrorResp.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), wrongPriErrorResp.getType());
   }
 
   @Test
@@ -518,5 +541,28 @@ public class TestPermissionOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test with wrong binding privileges
+    PrivilegeRevokeRequest wrongPriRequest =
+        new PrivilegeRevokeRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.CREATE_CATALOG)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+
+    Response wrongPrivilegeResp =
+        target("/metalakes/metalake1/permissions/roles/role1/catalog/catalog1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(wrongPriRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), wrongPrivilegeResp.getStatus());
+
+    ErrorResponse wrongPriErrorResp = wrongPrivilegeResp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongPriErrorResp.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), wrongPriErrorResp.getType());
   }
 }

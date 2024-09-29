@@ -20,7 +20,6 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.List;
@@ -145,21 +144,19 @@ public class RoleOperations {
             }
 
             List<SecurableObject> securableObjects =
-                request.getSecurableObjects() == null
-                    ? Lists.newArrayList()
-                    : Arrays.stream(request.getSecurableObjects())
-                        .map(
-                            securableObjectDTO ->
-                                SecurableObjects.parse(
-                                    securableObjectDTO.fullName(),
-                                    securableObjectDTO.type(),
-                                    securableObjectDTO.privileges().stream()
-                                        .map(
-                                            privilege ->
-                                                DTOConverters.fromPrivilegeDTO(
-                                                    (PrivilegeDTO) privilege))
-                                        .collect(Collectors.toList())))
-                        .collect(Collectors.toList());
+                Arrays.stream(request.getSecurableObjects())
+                    .map(
+                        securableObjectDTO ->
+                            SecurableObjects.parse(
+                                securableObjectDTO.fullName(),
+                                securableObjectDTO.type(),
+                                securableObjectDTO.privileges().stream()
+                                    .map(
+                                        privilege ->
+                                            DTOConverters.fromPrivilegeDTO(
+                                                (PrivilegeDTO) privilege))
+                                    .collect(Collectors.toList())))
+                    .collect(Collectors.toList());
 
             return TreeLockUtils.doWithTreeLock(
                 NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),

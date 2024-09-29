@@ -380,57 +380,71 @@ class PermissionManager {
   Role grantPrivilegesToRole(
       String metalake, String role, MetadataObject object, List<Privilege> privileges) {
     try {
-      AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper = new AuthorizationPluginCallbackWrapper();
+      AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper =
+          new AuthorizationPluginCallbackWrapper();
       Role updatedRole =
           store.update(
               AuthorizationUtils.ofRole(metalake, role),
               RoleEntity.class,
               Entity.EntityType.ROLE,
               roleEntity -> {
-                List<SecurableObject> updateSecurableObjects = updateSecurableObjects(roleEntity.securableObjects(), object, oldObject -> {
-                    if (oldObject == null) {
-                        // Add a new securable object if there not exists the object in the role
-                        SecurableObject securableObject =
+                List<SecurableObject> updateSecurableObjects =
+                    updateSecurableObjects(
+                        roleEntity.securableObjects(),
+                        object,
+                        oldObject -> {
+                          if (oldObject == null) {
+                            // Add a new securable object if there not exists the object in the role
+                            SecurableObject securableObject =
                                 SecurableObjects.parse(
-                                        object.fullName(), object.type(), Lists.newArrayList(privileges));
+                                    object.fullName(),
+                                    object.type(),
+                                    Lists.newArrayList(privileges));
 
-                        authorizationPluginCallbackWrapper.setCallBack(() -> AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                                metalake,
-                                object,
-                                authorizationPlugin -> {
-                                    authorizationPlugin.onRoleUpdated(
-                                            roleEntity, RoleChange.addSecurableObject(role, securableObject));
-                                }));
-                    } else {
-                        // Removed duplicated privileges by set
-                        Set<Privilege> updatePrivileges = Sets.newHashSet();
-                        updatePrivileges.addAll(oldObject.privileges());
-                        // If old object contains all the privileges to grant, the object don't need to change.
-                        if (updatePrivileges.containsAll(privileges)) {
-                            return oldObject;
-                        } else {
-                            updatePrivileges.addAll(privileges);
-                            SecurableObject newSecurableObject =
-                                    SecurableObjects.parse(
-                                            oldObject.fullName(),
-                                            oldObject.type(),
-                                            Lists.newArrayList(updatePrivileges));
+                            authorizationPluginCallbackWrapper.setCallBack(
+                                () ->
+                                    AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                                        metalake,
+                                        object,
+                                        authorizationPlugin -> {
+                                          authorizationPlugin.onRoleUpdated(
+                                              roleEntity,
+                                              RoleChange.addSecurableObject(role, securableObject));
+                                        }));
 
-                            authorizationPluginCallbackWrapper.setCallBack(() -> AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                                    metalake,
-                                    object,
-                                    authorizationPlugin -> {
-                                        authorizationPlugin.onRoleUpdated(
+                            return securableObject;
+                          } else {
+                            // Removed duplicated privileges by set
+                            Set<Privilege> updatePrivileges = Sets.newHashSet();
+                            updatePrivileges.addAll(oldObject.privileges());
+                            // If old object contains all the privileges to grant, the object don't
+                            // need to change.
+                            if (updatePrivileges.containsAll(privileges)) {
+                              return oldObject;
+                            } else {
+                              updatePrivileges.addAll(privileges);
+                              SecurableObject newSecurableObject =
+                                  SecurableObjects.parse(
+                                      oldObject.fullName(),
+                                      oldObject.type(),
+                                      Lists.newArrayList(updatePrivileges));
+
+                              authorizationPluginCallbackWrapper.setCallBack(
+                                  () ->
+                                      AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                                          metalake,
+                                          object,
+                                          authorizationPlugin -> {
+                                            authorizationPlugin.onRoleUpdated(
                                                 roleEntity,
                                                 RoleChange.updateSecurableObject(
-                                                        role, oldObject, newSecurableObject));
-                                    }));
+                                                    role, oldObject, newSecurableObject));
+                                          }));
 
-                            return newSecurableObject;
-                        }
-                    }
-                });
-
+                              return newSecurableObject;
+                            }
+                          }
+                        });
 
                 AuditInfo auditInfo =
                     AuditInfo.builder()
@@ -453,7 +467,7 @@ class PermissionManager {
       authorizationPluginCallbackWrapper.execute();
       return updatedRole;
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Failed to grant, role {} does not exist in the metalake {}", role, metalake, nse);
+      LOG.error("Failed to grant, role {} does not exist in the metalake {}", role, metalake, nse);
       throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
     } catch (IOException ioe) {
       throw new RuntimeException(ioe);
@@ -463,7 +477,8 @@ class PermissionManager {
   Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, List<Privilege> privileges) {
     try {
-      AuthorizationPluginCallbackWrapper authorizationCallbackWrapper = new AuthorizationPluginCallbackWrapper();
+      AuthorizationPluginCallbackWrapper authorizationCallbackWrapper =
+          new AuthorizationPluginCallbackWrapper();
 
       RoleEntity updatedRole =
           store.update(
@@ -476,6 +491,7 @@ class PermissionManager {
                         roleEntity.securableObjects(),
                         object,
                         oldObject -> {
+                          // If securable object doesn't exist, we do nothing except for logging.
                           if (oldObject == null) {
                             LOG.warn(
                                 "Securable object {} type {} doesn't exist in the role {}",
@@ -484,30 +500,36 @@ class PermissionManager {
                                 role);
                             return null;
                           } else {
+                            // If securable object exists, we remove the privileges of the securable
+                            // object.
                             // Remove duplicated privileges
                             Set<Privilege> updatePrivileges = Sets.newHashSet();
                             updatePrivileges.addAll(oldObject.privileges());
                             privileges.forEach(updatePrivileges::remove);
 
-                            // If the object doesn't contain any privilege, we remove this object.
+                            // If object still contains privilege, we should update the object with
+                            // new privileges
                             if (!updatePrivileges.isEmpty()) {
                               SecurableObject newSecurableObject =
                                   SecurableObjects.parse(
                                       oldObject.fullName(),
                                       oldObject.type(),
                                       Lists.newArrayList(updatePrivileges));
-                              authorizationCallbackWrapper.setCallBack(() ->AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                                  metalake,
-                                  object,
-                                  authorizationPlugin -> {
-                                    authorizationPlugin.onRoleUpdated(
-                                        roleEntity,
-                                        RoleChange.updateSecurableObject(
-                                            role, oldObject, newSecurableObject));
-                                  }));
+                              authorizationCallbackWrapper.setCallBack(
+                                  () ->
+                                      AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                                          metalake,
+                                          object,
+                                          authorizationPlugin -> {
+                                            authorizationPlugin.onRoleUpdated(
+                                                roleEntity,
+                                                RoleChange.updateSecurableObject(
+                                                    role, oldObject, newSecurableObject));
+                                          }));
 
                               return newSecurableObject;
                             } else {
+                              // If the object doesn't contain any privilege, we remove this object.
                               authorizationCallbackWrapper.setCallBack(
                                   () ->
                                       AuthorizationUtils.callAuthorizationPluginForMetadataObject(
@@ -546,7 +568,7 @@ class PermissionManager {
 
       return updatedRole;
     } catch (NoSuchEntityException nse) {
-      LOG.warn("Failed to revoke, role {} does not exist in the metalake {}", role, metalake, nse);
+      LOG.error("Failed to revoke, role {} does not exist in the metalake {}", role, metalake, nse);
       throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
     } catch (IOException ioe) {
       throw new RuntimeException(ioe);
@@ -560,6 +582,8 @@ class PermissionManager {
     boolean isExist = false;
     List<SecurableObject> updateSecurableObjects = Lists.newArrayList();
     for (SecurableObject securableObject : securableObjects) {
+      // If securable object is matching the target object, we apply the updates
+      // to this securable object.
       if (!isExist
           && securableObject.fullName().equals(targetObject.fullName())
           && securableObject.type() == targetObject.type()) {
@@ -573,6 +597,7 @@ class PermissionManager {
       }
     }
 
+    // If there not exists a securable object matching the target object.
     if (!isExist) {
       SecurableObject newSecurableObject = objectUpdater.apply(null);
       if (newSecurableObject != null) {
@@ -591,7 +616,7 @@ class PermissionManager {
 
     public void execute() {
       if (callback != null) {
-          callback.run();
+        callback.run();
       }
     }
   }
