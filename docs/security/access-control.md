@@ -152,9 +152,9 @@ You can also create a dedicated role for your business by API or the client.
 
 ### Permission privileges
 
-| Name          | Supports Securable Object | Operation                             |
-|---------------|---------------------------|---------------------------------------|
-| MANAGE_GRANTS | Metalake                  | grant or revoke a role or a privilege |
+| Name          | Supports Securable Object | Operation                                                                         |
+|---------------|---------------------------|-----------------------------------------------------------------------------------|
+| MANAGE_GRANTS | Metalake                  | grant or revoke roles for a user or group. grant or revoke privileges for a role. |
 
 ### Catalog privileges
 
