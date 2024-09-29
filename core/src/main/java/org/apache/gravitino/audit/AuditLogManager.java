@@ -31,6 +31,10 @@ import org.apache.gravitino.listener.api.event.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/*
+ * AuditLogManager is responsible for initializing the audit log writer and formatter,
+ * which are used to write metadata audit logs.
+ * */
 public class AuditLogManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditLogManager.class);
@@ -45,6 +49,7 @@ public class AuditLogManager {
 
     String formatterClassName = config.get(Configs.FORMATTER_CLASS_NAME);
     Formatter formatter;
+    // If formatter class name is not config, use default formatter class name
     if (formatterClassName == null) {
       LOG.warn(
           "Audit log formatter is not config, use default formatter class name:{}",
@@ -56,6 +61,7 @@ public class AuditLogManager {
     }
 
     String writerClassName = config.get(Configs.WRITER_CLASS_NAME);
+    // If writer class name is not config, use default writer class name
     if (writerClassName == null) {
       LOG.warn(
           "Audit log writer is not config, use default writer class name:{}",

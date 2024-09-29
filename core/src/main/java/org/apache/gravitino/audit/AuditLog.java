@@ -1,4 +1,4 @@
 package org.apache.gravitino.audit;
 
-/** Difine AuditLog Schema interface. */
+/** The interface define unified audit log schema. */
 public interface AuditLog {}

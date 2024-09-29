@@ -21,11 +21,11 @@ package org.apache.gravitino.audit;
 
 import org.apache.gravitino.listener.api.event.Event;
 
-/** Used to format the event. */
+/** The interface defined the conversions of metadata change event to unified log format. */
 public interface Formatter {
 
   /**
-   * Format the event, returning the unified audit log schema.
+   * Format the event, returning the unified audit log format.
    *
    * @param event The event to format.
    * @return The formatted event.

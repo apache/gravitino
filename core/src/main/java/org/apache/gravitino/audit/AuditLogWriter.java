@@ -22,7 +22,10 @@ package org.apache.gravitino.audit;
 import java.util.Map;
 import org.apache.gravitino.listener.api.event.Event;
 
-/** Interface for writing the audit log. */
+/**
+ * Interface for writing the audit log, which can write to different storage, such as file,
+ * database,
+ */
 public interface AuditLogWriter {
 
   /** @return formatter. */

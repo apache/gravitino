@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.SneakyThrows;
 import org.apache.gravitino.json.JsonUtils;
 
+/** The default implementation of the audit log. */
 @Getter
 @Builder
 public class DefaultAuditLog implements AuditLog {

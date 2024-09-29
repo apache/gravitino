@@ -3,7 +3,9 @@ package org.apache.gravitino.audit;
 import java.util.Objects;
 import org.apache.gravitino.listener.api.event.Event;
 
+/** The default implementation of the audit log. */
 public class DefaultFormatter implements Formatter {
+
   @Override
   public DefaultAuditLog format(Event event) {
     return DefaultAuditLog.builder()

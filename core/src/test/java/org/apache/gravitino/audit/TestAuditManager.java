@@ -69,6 +69,7 @@ public class TestAuditManager {
     }
   }
 
+  /** Test audit log with custom audit writer and formatter. */
   @Test
   public void testAuditLog() {
     Config config = mock(Config.class);
@@ -99,6 +100,7 @@ public class TestAuditManager {
     Assertions.assertEquals(formattedAuditLog, dummyAuditWriter.getAuditLogs().get(0));
   }
 
+  /** Test audit log with default audit writer and formatter. */
   @Test
   public void testDefaultAuditLog() {
     Config config = mock(Config.class);

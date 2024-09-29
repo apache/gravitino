@@ -15,6 +15,10 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * DefaultFileAuditWriter is the default implementation of AuditLogWriter, which writes audit logs
+ * to a file.
+ */
 public class DefaultFileAuditWriter implements AuditLogWriter {
   private static final Logger Log = LoggerFactory.getLogger(DefaultFileAuditWriter.class);
 

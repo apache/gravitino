@@ -369,12 +369,4 @@ public class Configs {
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault("");
-
-  public static final ConfigEntry<String> DEFAULT_FILE_WRITER_FILE_NAME =
-      new ConfigBuilder("ravitino.audit.writer.file")
-          .doc("Gravitino event log formatter class name")
-          .version(ConfigConstants.VERSION_0_7_0)
-          .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .createWithDefault("");
 }
