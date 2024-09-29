@@ -161,6 +161,15 @@ Note that although Gravitino supports several partitioning strategies, Apache Do
 The `fieldName` specified in the partitioning attributes must be the name of columns defined in the table.
 :::
 
+### Table distribution
+
+Users can also specify the distribution strategy when creating tables in the Doris catalog. Currently, the Doris catalog supports the following distribution strategies:
+- `HASH`
+- `RANDOM`
+
+For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it. More information about the distribution strategy defined in Gravitino can be found [here](./table-partitioning-distribution-sort-order-indexes.md#table-distribution).
+
+
 ### Table operations
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.

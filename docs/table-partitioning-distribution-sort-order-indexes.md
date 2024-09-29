@@ -1,6 +1,6 @@
 ---
-title: "Table partitioning, bucketing and sort ordering and indexes"
-slug: /table-partitioning-bucketing-sort-order-indexes
+title: "Table partitioning, distribution and sort ordering and indexes"
+slug: /table-partitioning-distribution-sort-order-indexes
 date: 2023-12-25
 keyword: Table Partition Bucket Distribute Sort By
 license: This software is licensed under the Apache License version 2.
@@ -45,19 +45,19 @@ For function partitioning, you should provide the function name and the function
 
 Once a partitioned table is created, you can [manage its partitions using Gravitino](./manage-table-partition-using-gravitino.md).
 
-## Table bucketing
+## Table distribution
 
-To create a bucketed table, you should use the following three components to construct a valid bucketed table.
+To create a distribution(bucketed) table, you should use the following three components to construct a valid bucketed table.
 
 - Strategy. It defines how Gravitino distributes table data across partitions.
 
-| Bucket strategy | Description                                                                                                               | JSON    | Java             |
-|-----------------|---------------------------------------------------------------------------------------------------------------------------|---------|------------------|
-| hash            | Bucket table using hash. Gravitino distributes table data into buckets based on the hash value of the key.                | `hash`  | `Strategy.HASH`  |
-| range           | Bucket table using range. Gravitino distributes table data into buckets based on a specified range or interval of values. | `range` | `Strategy.RANGE` |
-| even            | Bucket table using even. Gravitino distributes table data, ensuring an equal distribution of data.                        | `even`  | `Strategy.EVEN`  |
+| Distribution strategy | Description                                                                                                                                                                    | JSON    | Java             |
+|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|------------------|
+| hash                  | Distribution table using hash. Gravitino distributes table data into buckets based on the hash value of the key.                                                               | `hash`  | `Strategy.HASH`  |
+| range                 | Distribution table using range. Gravitino distributes table data into buckets based on a specified range or interval of values.                                                | `range` | `Strategy.RANGE` |
+| even                  | Distribution table using even. Gravitino distributes table data, ensuring an equal distribution of data. Currently we use `even` to implementation Doris `random` distribution | `even`  | `Strategy.EVEN`  |
 
-- number. It defines how many buckets you use to bucket the table.
+- number. It defines how many buckets you use to distribution the table.
 - funcArgs. It defines the arguments of the strategy, the argument must be an [expression](./expression.md).
 
 <Tabs groupId='language' queryString>
