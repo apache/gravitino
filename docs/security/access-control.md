@@ -593,7 +593,6 @@ Role role =
 </TabItem>
 </Tabs>
 
-
 ### Delete a role
 
 You can delete a role by its name.
@@ -653,10 +652,12 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-        
+
+// Grant the privilege allowing `SELEC_TABLE` for the `schema` to `role1`        
 MetadataObject schema = ...
 Role role = client.grantPrivilegesToRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));        
-        
+
+// Grant the privilege allowing `SELEC_TABLE` for the `table` to `role1`        
 MetadataObject table = ...
 Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 ```
@@ -695,9 +696,11 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 
+// Revoke the privilege allowing `SELEC_TABLE` for the `table` from `role1`         
 MetadataObject schema = ...
 Role role = client.revokePrivilegesFromRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));
 
+// Revoke the privilege allowing `SELEC_TABLE` for the `table` from `role1`         
 MetadataObject table = ...
 Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 
