@@ -39,10 +39,10 @@ public class AuthProperties {
   public static final String GRAVITINO_OAUTH2_CREDENTIAL = "oauth2.credential";
 
   /** The configuration key for the path which to get the token. */
-  public static final String GRAVITINO_OAUTH2_PATH = "oauth2.path";
+  public static final String GRAVITINO_OAUTH2_TOKEN_PATH = "oauth2.tokenPath";
 
   /** The configuration key for the scope of the token. */
-  public static final String GRAVITINO_CLIENT_OAUTH2_SCOPE = "oauth2.scope";
+  public static final String GRAVITINO_OAUTH2_SCOPE = "oauth2.scope";
 
   /** The configuration key for the principal. */
   public static final String GRAVITINO_KERBEROS_PRINCIPAL = "kerberos.principal";

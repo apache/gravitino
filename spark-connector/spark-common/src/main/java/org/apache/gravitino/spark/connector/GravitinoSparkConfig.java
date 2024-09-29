@@ -33,6 +33,19 @@ public class GravitinoSparkConfig {
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_CLIENT_AUTH_TYPE;
   public static final String GRAVITINO_AUTH_USER_NAME =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_CLIENT_USER_NAME;
+  public static final String GRAVITINO_OAUTH2_URI =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_SERVER_URI;
+  public static final String GRAVITINO_OAUTH2_PATH =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_TOKEN_PATH;
+  public static final String GRAVITINO_OAUTH2_CREDENTIAL =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_CREDENTIAL;
+  public static final String GRAVITINO_OAUTH2_SCOPE =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_SCOPE;
+  public static final String GRAVITINO_KERBEROS_PRINCIPAL =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_KERBEROS_PRINCIPAL;
+
+  public static final String GRAVITINO_KERBEROS_KEYTAB_FILE_PATH =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_KERBEROS_KEYTAB_FILE_PATH;
 
   public static final String GRAVITINO_HIVE_METASTORE_URI = "metastore.uris";
   public static final String SPARK_HIVE_METASTORE_URI = "hive.metastore.uris";

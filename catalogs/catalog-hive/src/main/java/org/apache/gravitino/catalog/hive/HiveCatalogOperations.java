@@ -82,6 +82,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
@@ -748,6 +749,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
         indexes.length == 0,
         "Hive-catalog does not support indexes, since indexing was removed since 3.0");
     NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
+
+    LOG.info("Create table, user: {} ", PrincipalUtils.getCurrentUserName());
 
     validatePartitionForCreate(columns, partitioning);
     validateDistributionAndSort(distribution, sortOrders);

@@ -24,6 +24,7 @@ import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.removeDup
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -176,17 +177,26 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         builder.withSimpleAuth();
       }
     } else if (AuthProperties.isOAuth2(authType)) {
+      String oAuthUri =
+          sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_URI, null);
+      String credential = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_CREDENTIAL, null);
+      String path = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_PATH, null);
+      String scope = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_SCOPE, null);
       DefaultOAuth2TokenProvider oAuth2TokenProvider =
           DefaultOAuth2TokenProvider.builder()
-              .withUri("")
-              .withCredential("")
-              .withPath("")
-              .withScope("")
+              .withUri(oAuthUri)
+              .withCredential(credential)
+              .withPath(path)
+              .withScope(scope)
               .build();
       builder.withOAuth(oAuth2TokenProvider);
-    } else if (AuthProperties.isSimple(authType)) {
+    } else if (AuthProperties.isKerberos(authType)) {
+      String principal = sparkConf.get(GravitinoSparkConfig.GRAVITINO_KERBEROS_PRINCIPAL, null);
+      String keyTabFile = sparkConf.get(GravitinoSparkConfig.GRAVITINO_KERBEROS_KEYTAB_FILE_PATH,
+          null);
       KerberosTokenProvider kerberosTokenProvider =
-          KerberosTokenProvider.builder().withClientPrincipal("").withKeyTabFile(null).build();
+          KerberosTokenProvider.builder().withClientPrincipal(principal)
+              .withKeyTabFile(new File(keyTabFile)).build();
       builder.withKerberosAuth(kerberosTokenProvider);
     } else {
       throw new UnsupportedOperationException("Doesn't support auth: " + authType);
