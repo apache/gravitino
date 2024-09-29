@@ -44,6 +44,8 @@ dependencies {
   testImplementation(libs.httpclient5)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers.postgresql)
   testImplementation(libs.ranger.intg) {
     exclude("org.apache.hadoop", "hadoop-common")

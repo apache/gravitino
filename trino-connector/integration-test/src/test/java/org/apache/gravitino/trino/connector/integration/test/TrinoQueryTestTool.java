@@ -217,7 +217,7 @@ public class TrinoQueryTestTool {
       TrinoQueryITBase.autoStart = autoStart;
       TrinoQueryITBase.autoStartGravitino = autoStartGravitino;
 
-//      TrinoQueryIT.setup();
+      //      TrinoQueryIT.setup();
       TrinoQueryIT testerRunner = new TrinoQueryIT();
       testerRunner.setup();
 
