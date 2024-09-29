@@ -154,14 +154,14 @@ You can also create a dedicated role for your business by API or the client.
 
 | Name          | Supports Securable Object | Operation                                                                         |
 |---------------|---------------------------|-----------------------------------------------------------------------------------|
-| MANAGE_GRANTS | Metalake                  | grant or revoke roles for a user or group. grant or revoke privileges for a role. |
+| MANAGE_GRANTS | Metalake                  | Grant or revoke roles for a user or group. Grant or revoke privileges for a role. |
 
 ### Catalog privileges
 
 | Name           | Supports Securable Object | Operation        |
 |----------------|---------------------------|------------------|
 | CREATE_CATALOG | Metalake                  | Create a catalog |
-| USE_CATALOG    | Metalake, Catalog         |                  |
+| USE_CATALOG    | Metalake, Catalog         | Use a catalog    |
 
 :::info
 
