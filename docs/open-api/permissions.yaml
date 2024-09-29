@@ -225,7 +225,7 @@ paths:
             schema:
               $ref: "#/components/schemas/PrivilegeGrantRequest"
             examples:
-              RoleRevokeRequest:
+              PrivilegeGrantRequest:
                 $ref: "#/components/examples/PrivilegeGrantRequest"
 
       responses:
@@ -274,7 +274,7 @@ paths:
             schema:
               $ref: "#/components/schemas/PrivilegeRevokeRequest"
             examples:
-              RoleRevokeRequest:
+              PrivilegeRevokeRequest:
                 $ref: "#/components/examples/PrivilegeRevokeRequest"
 
       responses:
