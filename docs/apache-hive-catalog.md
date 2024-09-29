@@ -119,10 +119,10 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `interval_year_month`       | `interval_year`     | 0.2.0         |
 | `interval_day_time`         | `interval_day`      | 0.2.0         |
 | `binary`                    | `binary`            | 0.2.0         |
-| `array`                     | `array`             | 0.2.0         |
+| `array`                     | `list`              | 0.2.0         |
 | `map`                       | `map`               | 0.2.0         |
 | `struct`                    | `struct`            | 0.2.0         |
-| `uniontype`                 | `uniontype`         | 0.2.0         |
+| `uniontype`                 | `union`             | 0.2.0         |
 
 :::info
 Since 0.6.0, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.

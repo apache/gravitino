@@ -224,7 +224,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 |-----------------------------|-----------------------------|
 | `Struct`                    | `Struct`                    |
 | `Map`                       | `Map`                       |
-| `Array`                     | `Array`                     |
+| `List`                      | `Array`                     |
 | `Boolean`                   | `Boolean`                   |
 | `Integer`                   | `Integer`                   |
 | `Long`                      | `Long`                      |
@@ -237,7 +237,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 | `TimestampType withoutZone` | `TimestampType withoutZone` |
 | `Decimal`                   | `Decimal`                   |
 | `Fixed`                     | `Fixed`                     |
-| `BinaryType`                | `Binary`                    |
+| `Binary`                    | `Binary`                    |
 | `UUID`                      | `UUID`                      |
 
 :::info
