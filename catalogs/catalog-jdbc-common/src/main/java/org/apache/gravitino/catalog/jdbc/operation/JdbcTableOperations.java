@@ -244,11 +244,11 @@ public abstract class JdbcTableOperations implements TableOperation {
   /**
    * Get the distribution information of the table, including the distribution type and the fields
    *
-   * @param connection
-   * @param databaseName
-   * @param tableName
-   * @return
-   * @throws SQLException
+   * @param connection jdbc connection.
+   * @param databaseName database name.
+   * @param tableName table name.
+   * @return Returns the distribution information of the table.
+   * @throws SQLException if an error occurs while getting the distribution information.
    */
   protected Distribution getDistributionInfo(
       Connection connection, String databaseName, String tableName) throws SQLException {
