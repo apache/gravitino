@@ -23,6 +23,33 @@ paths:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
 
+    get:
+      tags:
+        - access control
+      summary: List role names
+      operationId: listRoles
+      responses:
+        "200":
+          description: Returns the list of role  name
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+
     post:
       tags:
         - access control
@@ -117,6 +144,42 @@ paths:
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/roles:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+
+    get:
+      tags:
+        - access control
+      summary: List role names for metadata object
+      operationId: listRolesForObject
+      responses:
+        "200":
+          description: Returns the list of role  name for the metadata object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchMetadataObjectException:
+                  $ref: "#/components/examples/NoSuchMetadataObjectException"
+
 
 components:
 
@@ -306,4 +369,10 @@ components:
           "org.apache.gravitino.exceptions.NoSuchUserException: Metadata object does not exist",
           "..."
         ]
+      }
+
+    NameListResponse:
+      value: {
+        "code": 0,
+        "names": [ "user1", "user2" ]
       }
