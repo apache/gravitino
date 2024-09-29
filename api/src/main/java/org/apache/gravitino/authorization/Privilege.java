@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization;
 
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Unstable;
 
 /**
@@ -38,6 +39,14 @@ public interface Privilege {
    *     privilege, `DENY` means that you are denied to use the privilege
    */
   Condition condition();
+
+  /**
+   * If a metadata object supports a privilege, the privilege will return true. Otherwise, false.
+   *
+   * @param type The metadata object type.
+   * @return It will return true if a metadata object supports a privilege. Otherwise, false.
+   */
+  boolean supportsMetadataObject(MetadataObject.Type type);
 
   /** The name of this privilege. */
   enum Name {

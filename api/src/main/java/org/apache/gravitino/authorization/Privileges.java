@@ -18,7 +18,10 @@
  */
 package org.apache.gravitino.authorization;
 
+import com.google.common.collect.Sets;
 import java.util.Objects;
+import java.util.Set;
+import org.apache.gravitino.MetadataObject;
 
 /** The helper class for {@link Privilege}. */
 public class Privileges {
@@ -241,6 +244,11 @@ public class Privileges {
     public static CreateCatalog deny() {
       return DENY_INSTANCE;
     }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
   }
 
   /** The privilege to use a catalog. */
@@ -263,6 +271,11 @@ public class Privileges {
     public static UseCatalog deny() {
       return DENY_INSTANCE;
     }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.CATALOG;
+    }
   }
 
   /** The privilege to use a schema. */
@@ -282,6 +295,16 @@ public class Privileges {
     /** @return The instance with deny condition of the privilege. */
     public static UseSchema deny() {
       return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      Set<MetadataObject.Type> supportedTypes =
+          Sets.newHashSet(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA);
+      return supportedTypes.contains(type);
     }
   }
 
@@ -305,6 +328,11 @@ public class Privileges {
     public static CreateSchema deny() {
       return DENY_INSTANCE;
     }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.CATALOG;
+    }
   }
 
   /** The privilege to create a table. */
@@ -326,6 +354,16 @@ public class Privileges {
     /** @return The instance with deny condition of the privilege. */
     public static CreateTable deny() {
       return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      Set<MetadataObject.Type> supportedTypes =
+          Sets.newHashSet(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA);
+      return supportedTypes.contains(type);
     }
   }
 
@@ -349,6 +387,17 @@ public class Privileges {
     public static SelectTable deny() {
       return DENY_INSTANCE;
     }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      Set<MetadataObject.Type> supportedTypes =
+          Sets.newHashSet(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA,
+              MetadataObject.Type.TABLE);
+      return supportedTypes.contains(type);
+    }
   }
 
   /** The privilege to execute SQL `ALTER`, `INSERT`, `UPDATE`, or `DELETE` for a table. */
@@ -370,6 +419,17 @@ public class Privileges {
     /** @return The instance with deny condition of the privilege. */
     public static ModifyTable deny() {
       return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      Set<MetadataObject.Type> supportedTypes =
+          Sets.newHashSet(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA,
+              MetadataObject.Type.TABLE);
+      return supportedTypes.contains(type);
     }
   }
 
@@ -393,6 +453,16 @@ public class Privileges {
     public static CreateFileset deny() {
       return DENY_INSTANCE;
     }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      Set<MetadataObject.Type> supportedTypes =
+          Sets.newHashSet(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA);
+      return supportedTypes.contains(type);
+    }
   }
 
   /** The privilege to read a fileset. */
@@ -414,6 +484,17 @@ public class Privileges {
     /** @return The instance with deny condition of the privilege. */
     public static ReadFileset deny() {
       return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      Set<MetadataObject.Type> supportedTypes =
+          Sets.newHashSet(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA,
+              MetadataObject.Type.FILESET);
+      return supportedTypes.contains(type);
     }
   }
 
@@ -437,6 +518,17 @@ public class Privileges {
     public static WriteFileset deny() {
       return DENY_INSTANCE;
     }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      Set<MetadataObject.Type> supportedTypes =
+          Sets.newHashSet(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA,
+              MetadataObject.Type.FILESET);
+      return supportedTypes.contains(type);
+    }
   }
 
   /** The privilege to create a topic. */
@@ -458,6 +550,16 @@ public class Privileges {
     /** @return The instance with deny condition of the privilege. */
     public static CreateTopic deny() {
       return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      Set<MetadataObject.Type> supportedTypes =
+          Sets.newHashSet(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA);
+      return supportedTypes.contains(type);
     }
   }
 
@@ -481,6 +583,17 @@ public class Privileges {
     public static ConsumeTopic deny() {
       return DENY_INSTANCE;
     }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      Set<MetadataObject.Type> supportedTypes =
+          Sets.newHashSet(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA,
+              MetadataObject.Type.TOPIC);
+      return supportedTypes.contains(type);
+    }
   }
 
   /** The privilege to produce to a topic. */
@@ -502,6 +615,17 @@ public class Privileges {
     /** @return The instance with deny condition of the privilege. */
     public static ProduceTopic deny() {
       return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      Set<MetadataObject.Type> supportedTypes =
+          Sets.newHashSet(
+              MetadataObject.Type.METALAKE,
+              MetadataObject.Type.CATALOG,
+              MetadataObject.Type.SCHEMA,
+              MetadataObject.Type.TOPIC);
+      return supportedTypes.contains(type);
     }
   }
 
@@ -525,6 +649,11 @@ public class Privileges {
     public static ManageUsers deny() {
       return DENY_INSTANCE;
     }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
   }
 
   /** The privilege to manage groups. */
@@ -546,6 +675,11 @@ public class Privileges {
     /** @return The instance with deny condition of the privilege. */
     public static ManageGroups deny() {
       return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
     }
   }
 
@@ -569,6 +703,11 @@ public class Privileges {
     public static CreateRole deny() {
       return DENY_INSTANCE;
     }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
+    }
   }
 
   /** The privilege to grant or revoke a role for the user or the group. */
@@ -590,6 +729,11 @@ public class Privileges {
     /** @return The instance with deny condition of the privilege. */
     public static ManageGrants deny() {
       return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean supportsMetadataObject(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE;
     }
   }
 }
