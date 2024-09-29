@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
 // AbstractWebIT provides a WebDriver instance for WEB UI tests.
 public class AbstractWebIT extends AbstractIT {
   protected static final Logger LOG = LoggerFactory.getLogger(AbstractWebIT.class);
-  protected static WebDriver driver;
+  protected WebDriver driver;
 
   // https://www.selenium.dev/documentation/webdriver/waits/#implicit-waits
   protected static final long MAX_IMPLICIT_WAIT = 30;
@@ -118,7 +118,7 @@ public class AbstractWebIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void tearDown() {
+  public void tearDown() {
     driver.quit();
   }
 }

@@ -62,8 +62,8 @@ import org.openqa.selenium.By;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogsPageTest extends AbstractWebIT {
-  MetalakePage metalakePage = new MetalakePage();
-  CatalogsPage catalogsPage = new CatalogsPage();
+  private MetalakePage metalakePage;
+  private CatalogsPage catalogsPage;
 
   protected static TrinoITContainers trinoITContainers;
   protected static GravitinoAdminClient gravitinoClient;
@@ -128,6 +128,9 @@ public class CatalogsPageTest extends AbstractWebIT {
     hdfsUri = trinoITContainers.getHdfsUri();
     mysqlUri = trinoITContainers.getMysqlUri();
     postgresqlUri = trinoITContainers.getPostgresqlUri();
+
+    metalakePage = new MetalakePage(driver);
+    catalogsPage = new CatalogsPage(driver);
   }
 
   /**

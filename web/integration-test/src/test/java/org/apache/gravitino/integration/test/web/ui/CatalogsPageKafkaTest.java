@@ -43,8 +43,8 @@ import org.junit.jupiter.api.TestMethodOrder;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogsPageKafkaTest extends AbstractWebIT {
-  MetalakePage metalakePage = new MetalakePage();
-  CatalogsPage catalogsPage = new CatalogsPage();
+  private MetalakePage metalakePage;
+  private CatalogsPage catalogsPage;
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static GravitinoAdminClient gravitinoClient;
@@ -73,6 +73,9 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
 
     String address = containerSuite.getKafkaContainer().getContainerIpAddress();
     kafkaUri = String.format("%s:%d", address, DEFAULT_BROKER_PORT);
+
+    metalakePage = new MetalakePage(driver);
+    catalogsPage = new CatalogsPage(driver);
   }
 
   /**

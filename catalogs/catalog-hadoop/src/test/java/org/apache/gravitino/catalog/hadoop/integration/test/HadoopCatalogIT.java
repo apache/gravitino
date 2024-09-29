@@ -116,14 +116,14 @@ public class HadoopCatalogIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  private void createCatalog() {
     metalake.createCatalog(
         catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
 
     catalog = metalake.loadCatalog(catalogName);
   }
 
-  private static void createSchema() {
+  private void createSchema() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");

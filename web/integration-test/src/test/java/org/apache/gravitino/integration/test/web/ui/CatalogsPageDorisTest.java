@@ -50,8 +50,8 @@ import org.junit.jupiter.api.TestMethodOrder;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogsPageDorisTest extends AbstractWebIT {
-  MetalakePage metalakePage = new MetalakePage();
-  CatalogsPage catalogsPage = new CatalogsPage();
+  private MetalakePage metalakePage;
+  private CatalogsPage catalogsPage;
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static GravitinoAdminClient gravitinoClient;
@@ -90,6 +90,9 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
             containerSuite.getDorisContainer().getContainerIpAddress(),
             DorisContainer.FE_MYSQL_PORT);
     LOG.info("Doris jdbc url: {}", dorisJdbcConnectionUri);
+
+    metalakePage = new MetalakePage(driver);
+    catalogsPage = new CatalogsPage(driver);
   }
 
   /**

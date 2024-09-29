@@ -21,14 +21,17 @@ package org.apache.gravitino.integration.test.web.ui;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
 import org.apache.gravitino.integration.test.web.ui.utils.AbstractWebIT;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 
 @DisabledIfSystemProperty(named = "testMode", matches = "embedded")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class MetalakePageTest extends AbstractWebIT {
   private static final String WEB_TITLE = "Gravitino";
   private static final String METALAKE_NAME = "metalake_name";
@@ -38,7 +41,12 @@ public class MetalakePageTest extends AbstractWebIT {
   private static final String FOOTER_LINK_LICENSE =
       "https://github.com/apache/gravitino/blob/main/LICENSE";
   private static final String FOOTER_LINK_SUPPORT = "https://github.com/apache/gravitino/issues";
-  MetalakePage metalakePage = new MetalakePage();
+  private MetalakePage metalakePage;
+
+  @BeforeAll
+  void init() {
+    metalakePage = new MetalakePage(driver);
+  }
 
   // Create a metalake by name, set the default comment and properties.
   public void createMetalakeAction(String name) throws InterruptedException {

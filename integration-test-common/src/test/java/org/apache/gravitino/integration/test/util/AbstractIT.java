@@ -60,8 +60,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
@@ -96,13 +94,13 @@ public class AbstractIT {
   public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
-  private static TestDatabaseName META_DATA;
-  private static MySQLContainer MYSQL_CONTAINER;
-  private static PostgreSQLContainer POSTGRESQL_CONTAINER;
+  private TestDatabaseName META_DATA;
+  private MySQLContainer MYSQL_CONTAINER;
+  private PostgreSQLContainer POSTGRESQL_CONTAINER;
 
-  protected static String serverUri;
+  protected String serverUri;
 
-  protected static String originConfig;
+  protected String originConfig;
 
   public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
@@ -131,7 +129,7 @@ public class AbstractIT {
     ITUtils.rewriteConfigFile(tmpPath.toString(), configPath.toString(), customConfigs);
   }
 
-  private static void recoverGravitinoServerConfig() throws IOException {
+  private void recoverGravitinoServerConfig() throws IOException {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
 
@@ -253,13 +251,6 @@ public class AbstractIT {
     }
   }
 
-  @ParameterizedTest
-  @CsvSource({
-    "embedded, jdbcBackend",
-    "embedded, kvBackend",
-    "deploy, jdbcBackend",
-    "deploy, kvBackend"
-  })
   @BeforeAll
   public void startIntegrationTest() throws Exception {
     testMode =
