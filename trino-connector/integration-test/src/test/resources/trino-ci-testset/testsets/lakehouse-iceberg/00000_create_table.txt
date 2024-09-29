@@ -24,7 +24,7 @@ WITH (
    sorted_by = ARRAY['salary']
 )"
 
-<QUERY_FAILED> partition field salary_wrong_name not found in table
+<QUERY_FAILED> Field 'salary_wrong_name' not found in table
 
 CREATE TABLE
 
