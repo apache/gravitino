@@ -50,8 +50,14 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
     // Should we call DistributedFileSystem to create file system instance explicitly? If we
     // explicitly create a HDFS file system here, we can't reuse the file system cache in the
     // FileSystem class.
-    if (configuration.get("fs.hdfs.impl") != null) {
+    String impl = configuration.get("fs.hdfs.impl");
+    if (impl == null) {
       configuration.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
+    } else {
+      if (!impl.equals("org.apache.hadoop.hdfs.DistributedFileSystem")) {
+        throw new IllegalArgumentException(
+            "The HDFS file system implementation class should be 'org.apache.hadoop.hdfs.DistributedFileSystem'.");
+      }
     }
 
     try {
