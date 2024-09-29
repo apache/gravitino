@@ -621,8 +621,8 @@ boolean deleted =
 
 ### Grant privileges to a role
 
-You can revoke specific privileges from a role.
-The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/revoke`.
+You can grant specific privileges to a role.
+The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/grant`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -635,7 +635,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
       "name": "SELECT_TABLE",
       "condition": "ALLOW"
       }]
-}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/schema/catalog1.schema1/revoke
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/schema/catalog1.schema1/grant
 
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
@@ -644,7 +644,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
       "name": "SELECT_TABLE",
       "condition": "ALLOW"
       }]
-}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/table/catalog1.schema1.table1/revoke
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/table/catalog1.schema1.table1/grant
 ```
 
 </TabItem>
@@ -678,7 +678,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
       "name": "SELECT_TABLE",
       "condition": "ALLOW"
       }]
-}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/schema/catalog1.schema1/grant
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/schema/catalog1.schema1/revoke
 
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
@@ -687,7 +687,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
       "name": "SELECT_TABLE",
       "condition": "ALLOW"
       }]
-}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/table/catalog1.schema1.table1/grant
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/table/catalog1.schema1.table1/revoke
 ```
 
 </TabItem>
