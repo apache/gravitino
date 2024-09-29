@@ -392,7 +392,7 @@ public class TestAccessControlManagerForPermissions {
     String notExist = "not-exist";
 
     Role role =
-        accessControlManager.revokePrivilegeFromRole(
+        accessControlManager.revokePrivilegesFromRole(
             METALAKE,
             "revokedRole",
             MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
@@ -407,7 +407,7 @@ public class TestAccessControlManagerForPermissions {
 
     // repeat to revoke
     role =
-        accessControlManager.revokePrivilegeFromRole(
+        accessControlManager.revokePrivilegesFromRole(
             METALAKE,
             "revokedRole",
             MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
@@ -419,7 +419,7 @@ public class TestAccessControlManagerForPermissions {
     Assertions.assertThrows(
         NoSuchRoleException.class,
         () ->
-            accessControlManager.revokePrivilegeFromRole(
+            accessControlManager.revokePrivilegesFromRole(
                 METALAKE,
                 notExist,
                 MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),

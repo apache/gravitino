@@ -305,7 +305,7 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If revoking roles from a group encounters storage issues.
    */
-  Role revokePrivilegeFromRole(
+  Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, List<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException;
 }

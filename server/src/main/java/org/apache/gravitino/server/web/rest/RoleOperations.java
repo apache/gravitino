@@ -123,7 +123,12 @@ public class RoleOperations {
           () -> {
             for (SecurableObjectDTO object : request.getSecurableObjects()) {
               for (Privilege privilege : object.privileges()) {
-
+                if (!fromPrivilegeDTO(privilege).supportsMetadataObject(object.type())) {
+                  throw new IllegalArgumentException(
+                      String.format(
+                          "Securable object %s type %s don't support privilege %s",
+                          object.fullName(), object.type(), privilege));
+                }
               }
               AuthorizationUtils.checkSecurableObject(metalake, object);
             }
@@ -138,16 +143,7 @@ public class RoleOperations {
                                     securableObjectDTO.fullName(),
                                     securableObjectDTO.type(),
                                     securableObjectDTO.privileges().stream()
-                                        .map(
-                                            privilege -> {
-                                              if (privilege
-                                                  .condition()
-                                                  .equals(Privilege.Condition.ALLOW)) {
-                                                return Privileges.allow(privilege.name());
-                                              } else {
-                                                return Privileges.deny(privilege.name());
-                                              }
-                                            })
+                                        .map(privilege -> fromPrivilegeDTO(privilege))
                                         .collect(Collectors.toList())))
                         .collect(Collectors.toList());
 
@@ -194,6 +190,14 @@ public class RoleOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.DELETE, role, metalake, e);
+    }
+  }
+
+  private static Privilege fromPrivilegeDTO(Privilege privilegeDTO) {
+    if (privilegeDTO.condition().equals(Privilege.Condition.ALLOW)) {
+      return Privileges.allow(privilegeDTO.name());
+    } else {
+      return Privileges.deny(privilegeDTO.name());
     }
   }
 }

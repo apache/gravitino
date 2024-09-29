@@ -190,9 +190,9 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
-  public Role revokePrivilegeFromRole(
+  public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, List<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
-    return dispatcher.revokePrivilegeFromRole(metalake, role, object, privileges);
+    return dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
   }
 }

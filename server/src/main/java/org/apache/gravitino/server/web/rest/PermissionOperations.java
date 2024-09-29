@@ -272,7 +272,7 @@ public class PermissionOperations {
                     Utils.ok(
                         new RoleResponse(
                             DTOConverters.toDTO(
-                                accessControlManager.revokePrivilegeFromRole(
+                                accessControlManager.revokePrivilegesFromRole(
                                     metalake,
                                     role,
                                     object,

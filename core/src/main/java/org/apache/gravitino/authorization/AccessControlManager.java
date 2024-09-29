@@ -174,7 +174,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
-  public Role revokePrivilegeFromRole(
+  public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, List<Privilege> privileges)
       throws NoSuchRoleException, NoSuchMetalakeException {
     return permissionManager.revokePrivilegeFromRole(metalake, role, object, privileges);

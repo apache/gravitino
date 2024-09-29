@@ -230,7 +230,7 @@ public class TestPermission extends TestBase {
     buildMockResource(Method.PUT, rolePath, request, response, SC_OK);
     MetadataObject object = MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE);
     Role grantedRole =
-        gravitinoClient.grantPrivilegeToRole(
+        gravitinoClient.grantPrivilegesToRole(
             role, object, Lists.newArrayList(Privileges.CreateTable.allow()));
     Assertions.assertEquals(grantedRole.name(), role);
     Assertions.assertEquals(1, grantedRole.securableObjects().size());
@@ -248,7 +248,7 @@ public class TestPermission extends TestBase {
     Assertions.assertThrows(
         RuntimeException.class,
         () ->
-            gravitinoClient.grantPrivilegeToRole(
+            gravitinoClient.grantPrivilegesToRole(
                 role, object, Lists.newArrayList(Privileges.CreateTable.allow())));
   }
 

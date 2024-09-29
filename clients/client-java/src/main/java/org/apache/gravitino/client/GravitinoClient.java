@@ -401,9 +401,9 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
    *     exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   * @throws RuntimeException If granting roles to a role encounters storage issues.
    */
-  public Role grantPrivilegeToRole(String role, MetadataObject object, List<Privilege> privileges)
+  public Role grantPrivilegesToRole(String role, MetadataObject object, List<Privilege> privileges)
       throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException {
     return getMetalake().grantPrivilegesToRole(role, object, privileges);
   }
@@ -419,7 +419,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
    *     exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   * @throws RuntimeException If revoking privileges from a role encounters storage issues.
    */
   public Role revokePrivilegesFromRole(
       String role, MetadataObject object, List<Privilege> privileges)

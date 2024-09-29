@@ -478,7 +478,7 @@ public class TestPermissionOperations extends JerseyTest {
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
-    when(manager.revokePrivilegeFromRole(any(), any(), any(), any())).thenReturn(roleEntity);
+    when(manager.revokePrivilegesFromRole(any(), any(), any(), any())).thenReturn(roleEntity);
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
     PrivilegeRevokeRequest request =
         new PrivilegeRevokeRequest(
@@ -505,7 +505,7 @@ public class TestPermissionOperations extends JerseyTest {
 
     doThrow(new RuntimeException("mock error"))
         .when(manager)
-        .revokePrivilegeFromRole(any(), any(), any(), any());
+        .revokePrivilegesFromRole(any(), any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/permissions/roles/role1/metalake/metalake1/revoke")
             .request(MediaType.APPLICATION_JSON_TYPE)
