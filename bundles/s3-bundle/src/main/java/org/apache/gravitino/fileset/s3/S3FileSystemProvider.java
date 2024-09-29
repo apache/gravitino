@@ -16,22 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.fileset.s3;
 
-package org.apache.gravitino.catalog.hadoop;
-
-import java.util.Map;
+import java.io.IOException;
+import java.net.URI;
+import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
-public interface ConfigurationProvider {
+public class S3FileSystemProvider implements FileSystemProvider {
 
-  default void initialize(Map<String, String> conf) {
-    // Do nothing;
+  @Override
+  public FileSystem getFileSystem(Configuration configuration, Path path) throws IOException {
+    URI uri = path.toUri();
+    if (uri.getScheme() == null || !uri.getScheme().equals("s3a")) {
+      throw new IllegalArgumentException("The path should be a S3 path.");
+    }
+
+    // TODO Check whether S3 related configurations are set such as filesystem.s3a.impl, access key,
+    //  secret key, etc.
+    return FileSystem.get(uri, configuration);
   }
-  /**
-   * Get the configuration from the given properties.
-   *
-   * @param conf The properties to get the configuration from.
-   * @return The configuration.
-   */
-  Configuration getConfiguration(Map<String, String> conf);
+
+  @Override
+  public String getScheme() {
+    return "s3a";
+  }
 }

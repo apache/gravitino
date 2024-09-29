@@ -18,14 +18,30 @@
  */
 package org.apache.gravitino.fileset.gcs;
 
-import java.util.Map;
-import org.apache.gravitino.catalog.hadoop.DefaultConfigurationProvider;
+import java.io.IOException;
+import java.net.URI;
+import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
-public class GCSConfigurationProvider extends DefaultConfigurationProvider {
-  // Add your own implementation here
+public class GCSFileSystemProvider implements FileSystemProvider {
+
   @Override
-  public Configuration getConfiguration(Map<String, String> conf) {
-    return super.getConfiguration(conf);
+  public FileSystem getFileSystem(Configuration configuration, Path path) throws IOException {
+    URI uri = path.toUri();
+    if (uri.getScheme() == null || !uri.getScheme().equals("gs")) {
+      throw new IllegalArgumentException("The path should be a GCS path.");
+    }
+
+    // TODO Check whether GCS related configurations are set such as filesystem.gs.impl, access key,
+    //  secret key, etc.
+
+    return FileSystem.get(uri, configuration);
+  }
+
+  @Override
+  public String getScheme() {
+    return "gs";
   }
 }

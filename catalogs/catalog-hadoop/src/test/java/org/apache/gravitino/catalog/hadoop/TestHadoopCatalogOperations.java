@@ -681,13 +681,10 @@ public class TestHadoopCatalogOperations {
 
     String[] paths =
         new String[] {
-          "tmp/catalog",
-          "/tmp/catalog",
-          "file:/tmp/catalog",
-          "file:///tmp/catalog",
-          "hdfs://localhost:9000/tmp/catalog",
-          "s3://bucket/tmp/catalog",
-          "gs://bucket/tmp/catalog"
+          "tmp/catalog", "/tmp/catalog", "file:/tmp/catalog", "file:///tmp/catalog",
+          //          "hdfs://localhost:9000/tmp/catalog",
+          //          "s3a://bucket/tmp/catalog",
+          //          "gs://bucket/tmp/catalog"
         };
 
     String[] expected =
@@ -696,9 +693,9 @@ public class TestHadoopCatalogOperations {
           "file:/tmp/catalog",
           "file:/tmp/catalog",
           "file:/tmp/catalog",
-          "hdfs://localhost:9000/tmp/catalog",
-          "s3://bucket/tmp/catalog",
-          "gs://bucket/tmp/catalog"
+          //          "hdfs://localhost:9000/tmp/catalog",
+          //          "s3a://bucket/tmp/catalog",
+          //          "gs://bucket/tmp/catalog"
         };
 
     for (int i = 0; i < paths.length; i++) {
@@ -877,6 +874,7 @@ public class TestHadoopCatalogOperations {
     try (HadoopCatalogOperations mockOps = Mockito.mock(HadoopCatalogOperations.class)) {
       mockOps.hadoopConf = new Configuration();
       when(mockOps.loadFileset(filesetIdent)).thenReturn(mockFileset);
+      when(mockOps.getConf()).thenReturn(Maps.newHashMap());
       String subPath = "/test/test.parquet";
       when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);

@@ -35,9 +35,11 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String LOCATION = "location";
 
   /**
-   * The configuration provider class name, default value is {@link DefaultConfigurationProvider}.
+   * The implementation class name of the {@link FileSystemProvider} to be used by the catalog.
+   * Gravitino supports LocalFileSystem and HDFS by default. Users can implement their own by
+   * extending {@link FileSystemProvider} and specify the class name here.
    */
-  public static final String CONFIGURATION_PROVIDER = "configuration.provider";
+  public static final String FILESYSTEM_PROVIDER = "filesystem.providers";
 
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -50,12 +52,12 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   null,
                   false /* hidden */))
           .put(
-              CONFIGURATION_PROVIDER,
+              FILESYSTEM_PROVIDER,
               PropertyEntry.stringOptionalPropertyEntry(
-                  CONFIGURATION_PROVIDER,
-                  "The configuration provider class name",
+                  FILESYSTEM_PROVIDER,
+                  "The file system provider class name",
                   false /* immutable */,
-                  DefaultConfigurationProvider.class.getCanonicalName(),
+                  null,
                   false /* hidden */))
           // The following two are about authentication.
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)

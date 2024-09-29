@@ -16,16 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.fileset.s3;
+package org.apache.gravitino.catalog.hadoop.fs;
 
-import java.util.Map;
-import org.apache.gravitino.catalog.hadoop.DefaultConfigurationProvider;
+import java.io.IOException;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
-public class S3ConfigurationProvider extends DefaultConfigurationProvider {
-  // Add your own implementation here
+public class LocalFileSystemProvider implements FileSystemProvider {
+
   @Override
-  public Configuration getConfiguration(Map<String, String> conf) {
-    return super.getConfiguration(conf);
+  public FileSystem getFileSystem(Configuration configuration, Path path) throws IOException {
+    Path fileSystemPath = path;
+    if (fileSystemPath == null) {
+      String pathString = configuration.get("fs.defaultFS");
+      if (StringUtils.isNotBlank(pathString)) {
+        fileSystemPath = new Path(pathString);
+      }
+    }
+
+    if (fileSystemPath == null) {
+      fileSystemPath = new Path("file:///");
+    }
+
+    return FileSystem.get(fileSystemPath.toUri(), configuration);
   }
 }

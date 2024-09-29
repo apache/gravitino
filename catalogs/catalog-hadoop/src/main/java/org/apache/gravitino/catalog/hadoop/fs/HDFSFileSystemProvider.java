@@ -1,0 +1,74 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.catalog.hadoop.fs;
+
+import java.io.IOException;
+import java.net.URI;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+
+public class HDFSFileSystemProvider implements FileSystemProvider {
+
+  @Override
+  public FileSystem getFileSystem(Configuration configuration, Path path) throws IOException {
+    Path fileSystemPath = path;
+    if (fileSystemPath == null) {
+      String pathString = configuration.get("fs.defaultFS");
+      if (StringUtils.isNotBlank(pathString)) {
+        fileSystemPath = new Path(pathString);
+      }
+    }
+
+    if (fileSystemPath == null) {
+      throw new IllegalArgumentException("The path should be specified.");
+    }
+
+    URI uri = path.toUri();
+    if (uri.getScheme() == null || !uri.getScheme().equals("hdfs")) {
+      throw new IllegalArgumentException("The path should be a HDFS path.");
+    }
+
+    // Should we call DistributedFileSystem to create file system instance explicitly? If we
+    // explicitly create a HDFS file system here, we can't reuse the file system cache in the
+    // FileSystem class.
+    if (configuration.get("fs.hdfs.impl") != null) {
+      configuration.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
+    }
+
+    try {
+      if (HDFSFileSystemProvider.class.getClassLoader().loadClass(configuration.get("fs.hdfs.impl"))
+          == null) {
+        throw new IllegalArgumentException(
+            "The HDFS file system implementation class is not found.");
+      }
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException("The HDFS file system implementation class is not found.");
+    }
+
+    return FileSystem.get(uri, configuration);
+  }
+
+  @Override
+  public String getScheme() {
+    return "hdfs";
+  }
+}
