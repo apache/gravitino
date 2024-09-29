@@ -34,6 +34,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.FailureEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -82,11 +83,14 @@ public class TestAuditManager {
         .when(config)
         .get(Configs.FORMATTER_CLASS_NAME);
 
-    DummyEvent dummyEvent = mockDummyEvent();
     EventListenerManager eventListenerManager = mockEventListenerManager();
     AuditLogManager auditLogManager = mockAuditLogManager(config, eventListenerManager);
     EventBus eventBus = eventListenerManager.createEventBus();
+
+    // dispatch success event
+    DummyEvent dummyEvent = mockDummyEvent();
     eventBus.dispatchEvent(dummyEvent);
+
     Assertions.assertInstanceOf(DummyAuditWriter.class, auditLogManager.getAuditLogWriter());
     Assertions.assertInstanceOf(
         DummyAuditFormatter.class, (auditLogManager.getAuditLogWriter()).getFormatter());
@@ -97,7 +101,21 @@ public class TestAuditManager {
     DummyAuditLog formattedAuditLog = formatter.format(dummyEvent);
 
     Assertions.assertNotNull(formattedAuditLog);
+    Assertions.assertEquals(formattedAuditLog.operation(), "Dummy");
+    Assertions.assertTrue(formattedAuditLog.successful());
+    Assertions.assertEquals(formattedAuditLog.user(), "user");
+    Assertions.assertEquals(formattedAuditLog.identifier(), "a.b.c.d");
+    Assertions.assertEquals(formattedAuditLog.timestamp(), String.valueOf(dummyEvent.eventTime()));
     Assertions.assertEquals(formattedAuditLog, dummyAuditWriter.getAuditLogs().get(0));
+
+    // dispatch fail event
+    DummyFailEvent dummyFailEvent = mockDummyFailEvent();
+    eventBus.dispatchEvent(dummyFailEvent);
+    DummyAuditLog formattedFailAuditLog = formatter.format(dummyFailEvent);
+    Assertions.assertEquals(formattedFailAuditLog, dummyAuditWriter.getAuditLogs().get(1));
+    Assertions.assertEquals(formattedFailAuditLog.operation(), "Dummy");
+    Assertions.assertFalse(formattedFailAuditLog.successful());
+    Assertions.assertEquals(formattedFailAuditLog, dummyAuditWriter.getAuditLogs().get(1));
   }
 
   /** Test audit log with default audit writer and formatter. */
@@ -169,9 +187,19 @@ public class TestAuditManager {
     return new DummyEvent("user", NameIdentifier.of("a", "b", "c", "d"));
   }
 
+  private DummyFailEvent mockDummyFailEvent() {
+    return new DummyFailEvent("user", NameIdentifier.of("a", "b", "c", "d"));
+  }
+
   static class DummyEvent extends Event {
     protected DummyEvent(String user, NameIdentifier identifier) {
       super(user, identifier);
+    }
+  }
+
+  static class DummyFailEvent extends FailureEvent {
+    protected DummyFailEvent(String user, NameIdentifier identifier) {
+      super(user, identifier, new RuntimeException("dummy exception"));
     }
   }
 }
