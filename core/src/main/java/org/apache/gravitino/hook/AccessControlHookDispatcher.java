@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Group;
@@ -32,6 +33,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -70,6 +72,16 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public User[] listUsers(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listUsers(metalake);
+  }
+
+  @Override
+  public String[] listUserNames(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listUserNames(metalake);
+  }
+
+  @Override
   public Group addGroup(String metalake, String group)
       throws GroupAlreadyExistsException, NoSuchMetalakeException {
     return dispatcher.addGroup(metalake, group);
@@ -84,6 +96,16 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
     return dispatcher.getGroup(metalake, group);
+  }
+
+  @Override
+  public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listGroups(metalake);
+  }
+
+  @Override
+  public String[] listGroupNames(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listGroupNames(metalake);
   }
 
   @Override
@@ -146,5 +168,16 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
     return dispatcher.deleteRole(metalake, role);
+  }
+
+  @Override
+  public String[] listRoleNames(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listRoleNames(metalake);
+  }
+
+  @Override
+  public String[] listRoleNamesByObject(String metalake, MetadataObject object)
+      throws NoSuchMetalakeException, NoSuchMetadataObjectException {
+    return dispatcher.listRoleNamesByObject(metalake, object);
   }
 }

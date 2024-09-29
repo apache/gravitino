@@ -20,11 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.collect.Lists;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -41,7 +37,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
@@ -54,7 +49,6 @@ import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
@@ -223,151 +217,6 @@ public class TagOperations {
   }
 
   @GET
-  @Path("{type}/{fullName}")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "list-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "list-object-tags", absolute = true)
-  public Response listTagsForMetadataObject(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
-    LOG.info(
-        "Received list tag {} request for object type: {}, full name: {} under metalake: {}",
-        verbose ? "infos" : "names",
-        type,
-        fullName,
-        metalake);
-
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
-
-            List<TagDTO> tags = Lists.newArrayList();
-            Tag[] nonInheritedTags = tagManager.listTagsInfoForMetadataObject(metalake, object);
-            if (ArrayUtils.isNotEmpty(nonInheritedTags)) {
-              Collections.addAll(
-                  tags,
-                  Arrays.stream(nonInheritedTags)
-                      .map(t -> DTOConverters.toDTO(t, Optional.of(false)))
-                      .toArray(TagDTO[]::new));
-            }
-
-            MetadataObject parentObject = MetadataObjects.parent(object);
-            while (parentObject != null) {
-              Tag[] inheritedTags =
-                  tagManager.listTagsInfoForMetadataObject(metalake, parentObject);
-              if (ArrayUtils.isNotEmpty(inheritedTags)) {
-                Collections.addAll(
-                    tags,
-                    Arrays.stream(inheritedTags)
-                        .map(t -> DTOConverters.toDTO(t, Optional.of(true)))
-                        .toArray(TagDTO[]::new));
-              }
-              parentObject = MetadataObjects.parent(parentObject);
-            }
-
-            if (verbose) {
-              LOG.info(
-                  "List {} tags info for object type: {}, full name: {} under metalake: {}",
-                  tags.size(),
-                  type,
-                  fullName,
-                  metalake);
-              return Utils.ok(new TagListResponse(tags.toArray(new TagDTO[0])));
-
-            } else {
-              // Due to same name tag will be associated to both parent and child objects, so we
-              // need to deduplicate the tag names.
-              String[] tagNames = tags.stream().map(TagDTO::name).distinct().toArray(String[]::new);
-
-              LOG.info(
-                  "List {} tags for object type: {}, full name: {} under metalake: {}",
-                  tagNames.length,
-                  type,
-                  fullName,
-                  metalake);
-              return Utils.ok(new NameListResponse(tagNames));
-            }
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handleTagException(OperationType.LIST, "", fullName, e);
-    }
-  }
-
-  @GET
-  @Path("{type}/{fullName}/{tag}")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "get-object-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "get-object-tag", absolute = true)
-  public Response getTagForObject(
-      @PathParam("metalake") String metalake,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
-      @PathParam("tag") String tagName) {
-    LOG.info(
-        "Received get tag {} request for object type: {}, full name: {} under metalake: {}",
-        tagName,
-        type,
-        fullName,
-        metalake);
-
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
-            Optional<Tag> tag = getTagForObject(metalake, object, tagName);
-            Optional<TagDTO> tagDTO = tag.map(t -> DTOConverters.toDTO(t, Optional.of(false)));
-
-            MetadataObject parentObject = MetadataObjects.parent(object);
-            while (!tag.isPresent() && parentObject != null) {
-              tag = getTagForObject(metalake, parentObject, tagName);
-              tagDTO = tag.map(t -> DTOConverters.toDTO(t, Optional.of(true)));
-              parentObject = MetadataObjects.parent(parentObject);
-            }
-
-            if (!tagDTO.isPresent()) {
-              LOG.warn(
-                  "Tag {} not found for object type: {}, full name: {} under metalake: {}",
-                  tagName,
-                  type,
-                  fullName,
-                  metalake);
-              return Utils.notFound(
-                  NoSuchTagException.class.getSimpleName(),
-                  "Tag not found: "
-                      + tagName
-                      + " for object type: "
-                      + type
-                      + ", full name: "
-                      + fullName
-                      + " under metalake: "
-                      + metalake);
-            } else {
-              LOG.info(
-                  "Get tag: {} for object type: {}, full name: {} under metalake: {}",
-                  tagName,
-                  type,
-                  fullName,
-                  metalake);
-              return Utils.ok(new TagResponse(tagDTO.get()));
-            }
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handleTagException(OperationType.GET, tagName, fullName, e);
-    }
-  }
-
-  @GET
   @Path("{tag}/objects")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-objects-for-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -399,6 +248,41 @@ public class TagOperations {
     }
   }
 
+  @Deprecated
+  @GET
+  @Path("{type}/{fullName}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-object-tags", absolute = true)
+  public Response listTagsForMetadataObject(
+      @PathParam("metalake") String metalake,
+      @PathParam("type") String type,
+      @PathParam("fullName") String fullName,
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+    MetadataObjectTagOperations metadataObjectTagOperations =
+        new MetadataObjectTagOperations(tagManager);
+    metadataObjectTagOperations.setHttpRequest(httpRequest);
+    return metadataObjectTagOperations.listTagsForMetadataObject(metalake, type, fullName, verbose);
+  }
+
+  @Deprecated
+  @GET
+  @Path("{type}/{fullName}/{tag}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "get-object-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "get-object-tag", absolute = true)
+  public Response getTagForObject(
+      @PathParam("metalake") String metalake,
+      @PathParam("type") String type,
+      @PathParam("fullName") String fullName,
+      @PathParam("tag") String tagName) {
+    MetadataObjectTagOperations metadataObjectTagOperations =
+        new MetadataObjectTagOperations(tagManager);
+    metadataObjectTagOperations.setHttpRequest(httpRequest);
+    return metadataObjectTagOperations.getTagForObject(metalake, type, fullName, tagName);
+  }
+
+  @Deprecated
   @POST
   @Path("{type}/{fullName}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -409,45 +293,9 @@ public class TagOperations {
       @PathParam("type") String type,
       @PathParam("fullName") String fullName,
       TagsAssociateRequest request) {
-    LOG.info(
-        "Received associate tags request for object type: {}, full name: {} under metalake: {}",
-        type,
-        fullName,
-        metalake);
-
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            request.validate();
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
-            String[] tagNames =
-                tagManager.associateTagsForMetadataObject(
-                    metalake, object, request.getTagsToAdd(), request.getTagsToRemove());
-            tagNames = tagNames == null ? new String[0] : tagNames;
-
-            LOG.info(
-                "Associated tags: {} for object type: {}, full name: {} under metalake: {}",
-                Arrays.toString(tagNames),
-                type,
-                fullName,
-                metalake);
-            return Utils.ok(new NameListResponse(tagNames));
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handleTagException(OperationType.ASSOCIATE, "", fullName, e);
-    }
-  }
-
-  private Optional<Tag> getTagForObject(String metalake, MetadataObject object, String tagName) {
-    try {
-      return Optional.ofNullable(tagManager.getTagForMetadataObject(metalake, object, tagName));
-    } catch (NoSuchTagException e) {
-      LOG.info("Tag {} not found for object: {}", tagName, object);
-      return Optional.empty();
-    }
+    MetadataObjectTagOperations metadataObjectTagOperations =
+        new MetadataObjectTagOperations(tagManager);
+    metadataObjectTagOperations.setHttpRequest(httpRequest);
+    return metadataObjectTagOperations.associateTagsForObject(metalake, type, fullName, request);
   }
 }

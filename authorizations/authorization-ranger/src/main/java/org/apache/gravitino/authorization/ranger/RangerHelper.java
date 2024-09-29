@@ -36,6 +36,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
+import org.apache.ranger.RangerClient;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.model.RangerRole;
@@ -60,12 +61,12 @@ public class RangerHelper {
   /** The policy search keys */
   private final List<String> policyResourceDefines;
 
-  private final RangerClientExtension rangerClient;
+  private final RangerClient rangerClient;
   private final String rangerAdminName;
   private final String rangerServiceName;
 
   public RangerHelper(
-      RangerClientExtension rangerClient,
+      RangerClient rangerClient,
       String rangerAdminName,
       String rangerServiceName,
       Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping,

@@ -302,4 +302,34 @@ public class CatalogIT extends AbstractIT {
 
     metalake.dropCatalog(catalogName);
   }
+
+  @Test
+  public void testAlterCatalogProperties() {
+    String cloudName = "aws";
+    String alterCloudName = "azure";
+    String regionCode = "us-east-1";
+    String alterRegionCode = "us-west-2";
+
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog");
+    ImmutableMap<String, String> props =
+        ImmutableMap.of(Catalog.CLOUD_NAME, cloudName, Catalog.CLOUD_REGION_CODE, regionCode);
+    Catalog catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", props);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+    Assertions.assertFalse(catalog.properties().isEmpty());
+    Assertions.assertEquals(cloudName, catalog.properties().get(Catalog.CLOUD_NAME));
+    Assertions.assertEquals(regionCode, catalog.properties().get(Catalog.CLOUD_REGION_CODE));
+
+    Catalog alteredCatalog =
+        metalake.alterCatalog(
+            catalogName,
+            CatalogChange.setProperty(Catalog.CLOUD_NAME, alterCloudName),
+            CatalogChange.setProperty(Catalog.CLOUD_REGION_CODE, alterRegionCode));
+
+    Assertions.assertEquals(alterCloudName, alteredCatalog.properties().get(Catalog.CLOUD_NAME));
+    Assertions.assertEquals(
+        alterRegionCode, alteredCatalog.properties().get(Catalog.CLOUD_REGION_CODE));
+    metalake.dropCatalog(catalogName);
+  }
 }

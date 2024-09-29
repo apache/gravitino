@@ -89,7 +89,14 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType) throws IOException {
-    return backend.list(namespace, entityType);
+    return backend.list(namespace, entityType, false);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean allFields)
+      throws IOException {
+    return backend.list(namespace, entityType, allFields);
   }
 
   @Override
@@ -181,11 +188,9 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType)
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
-    return backend.listEntitiesByRelation(relType, nameIdentifier, identType);
+    return backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
   }
 
   @Override
