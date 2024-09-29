@@ -209,11 +209,11 @@ public abstract class JdbcTableOperations implements TableOperation {
       Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
       jdbcTableBuilder.withDistribution(distribution);
 
-      // 5.Get table properties
+      // 6.Get table properties
       Map<String, String> tableProperties = getTableProperties(connection, tableName);
       jdbcTableBuilder.withProperties(tableProperties);
 
-      // 6.Leave the information to the bottom layer to append the table
+      // 7.Leave the information to the bottom layer to append the table
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
 
       return jdbcTableBuilder.withTableOperation(this).build();
