@@ -30,8 +30,10 @@ val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val paimonVersion: String = libs.versions.paimon.get()
 
 dependencies {
-  implementation(project(":catalogs:catalog-common"))
   implementation(project(":api")) {
+    exclude("*")
+  }
+  implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
   implementation(project(":common")) {
