@@ -662,7 +662,7 @@ MetadataObject table = ...
 Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 ```
 </TabItem>
-<TabItem value="java" label="Java">
+<Tabs>
 
 ### Revoke privileges from a role
 
@@ -708,7 +708,7 @@ Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(P
 
 ```
 </TabItem>
-<TabItem value="java" label="Java">
+</Tabs>
 
 ### Grant roles to a user
 
