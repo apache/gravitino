@@ -107,6 +107,55 @@ class TestRoleMetaService extends TestJDBCBackend {
   }
 
   @Test
+  void testListRoles() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo,
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
+            ImmutableMap.of("k1", "v1"));
+
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo,
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())),
+            ImmutableMap.of("k1", "v1"));
+
+    backend.insert(role1, false);
+    backend.insert(role2, false);
+
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    List<RoleEntity> actualRoles =
+        roleMetaService.listRolesByNamespace(AuthorizationUtils.ofRoleNamespace(metalakeName));
+    actualRoles.sort(Comparator.comparing(RoleEntity::name));
+    List<RoleEntity> expectRoles = Lists.newArrayList(role1, role2);
+    Assertions.assertEquals(expectRoles.size(), actualRoles.size());
+    for (int index = 0; index < expectRoles.size(); index++) {
+      RoleEntity expectRole = expectRoles.get(index);
+      RoleEntity actualRole = actualRoles.get(index);
+      Assertions.assertEquals(expectRole.name(), actualRole.name());
+    }
+  }
+
+  @Test
   void insertRole() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -392,7 +441,7 @@ class TestRoleMetaService extends TestJDBCBackend {
 
     List<RoleEntity> roleEntities =
         roleMetaService.listRolesByMetadataObjectIdentAndType(
-            catalog.nameIdentifier(), catalog.type());
+            catalog.nameIdentifier(), catalog.type(), true);
     roleEntities.sort(Comparator.comparing(RoleEntity::name));
     Assertions.assertEquals(Lists.newArrayList(role1, role2), roleEntities);
   }

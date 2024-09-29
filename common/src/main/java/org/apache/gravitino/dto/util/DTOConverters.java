@@ -692,6 +692,19 @@ public class DTOConverters {
   }
 
   /**
+   * Converts an array of Groups to an array of GroupDTOs.
+   *
+   * @param groups The groups to be converted.
+   * @return The array of GroupDTOs.
+   */
+  public static GroupDTO[] toDTOs(Group[] groups) {
+    if (ArrayUtils.isEmpty(groups)) {
+      return new GroupDTO[0];
+    }
+    return Arrays.stream(groups).map(DTOConverters::toDTO).toArray(GroupDTO[]::new);
+  }
+
+  /**
    * Converts a DistributionDTO to a Distribution.
    *
    * @param distributionDTO The distribution DTO.

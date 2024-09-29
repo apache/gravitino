@@ -20,8 +20,10 @@ package org.apache.gravitino.authorization;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -126,6 +128,24 @@ public interface AccessControlDispatcher {
    */
   Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException;
+
+  /**
+   * List groups
+   *
+   * @param metalake The Metalake of the Group.
+   * @return The list of groups
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  Group[] listGroups(String metalake);
+
+  /**
+   * List group names
+   *
+   * @param metalake The Metalake of the Group.
+   * @return The list of group names
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  String[] listGroupNames(String metalake);
 
   /**
    * Grant roles to a user.
@@ -236,5 +256,26 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If deleting the Role encounters storage issues.
    */
-  public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException;
+  boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException;
+
+  /**
+   * Lists the role names.
+   *
+   * @param metalake The Metalake of the Role.
+   * @return The role name list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  String[] listRoleNames(String metalake) throws NoSuchMetalakeException;
+
+  /**
+   * Lists the role names associated the metadata object.
+   *
+   * @param metalake The Metalake of the Role.
+   * @return The role list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the Metadata object with the given name does not
+   *     exist.
+   */
+  String[] listRoleNamesByObject(String metalake, MetadataObject object)
+      throws NoSuchMetalakeException, NoSuchMetadataObjectException;
 }

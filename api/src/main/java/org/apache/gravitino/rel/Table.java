@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -102,5 +103,13 @@ public interface Table extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Table does not support tag operations.");
+  }
+
+  /**
+   * @return The {@link SupportsRoles} if the table supports role operations.
+   * @throws UnsupportedOperationException If the table does not support role operations.
+   */
+  default SupportsRoles supportsRoles() {
+    throw new UnsupportedOperationException("Table does not support role operations.");
   }
 }
