@@ -560,7 +560,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   }
 
   @Test
-  @EnabledIf("catalogTypeNotHive")
+  @EnabledIf("isSupportsViewCatalog")
   void testCreateViewAndDisplayView() {
     String originTableName = "iceberg_rest_table_test.create_table_for_view_1";
     String viewName = "iceberg_rest_table_test.test_create_view";
@@ -582,7 +582,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   }
 
   @Test
-  @EnabledIf("catalogTypeNotHive")
+  @EnabledIf("isSupportsViewCatalog")
   void testViewProperties() {
     String originTableName = "iceberg_rest_table_test.create_table_for_view_2";
     String viewName = "iceberg_rest_table_test.test_create_view_with_properties";
@@ -622,7 +622,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   }
 
   @Test
-  @EnabledIf("catalogTypeNotHive")
+  @EnabledIf("isSupportsViewCatalog")
   void testDropView() {
     String originTableName = "iceberg_rest_table_test.create_table_for_view_3";
     String viewName = "iceberg_rest_table_test.test_drop_view";
@@ -640,7 +640,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   }
 
   @Test
-  @EnabledIf("catalogTypeNotHive")
+  @EnabledIf("isSupportsViewCatalog")
   void testReplaceView() {
     String originTableName = "iceberg_rest_table_test.create_table_for_view_4";
     String viewName = "iceberg_rest_table_test.test_replace_view";
@@ -662,7 +662,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   }
 
   @Test
-  @EnabledIf("catalogTypeNotHive")
+  @EnabledIf("isSupportsViewCatalog")
   void testShowAvailableViews() {
     String originTableName = "iceberg_rest_table_test.create_table_for_view_5";
     String viewName1 = "iceberg_rest_table_test.show_available_views_1";
@@ -680,7 +680,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   }
 
   @Test
-  @EnabledIf("catalogTypeNotHive")
+  @EnabledIf("isSupportsViewCatalog")
   void testShowCreateStatementView() {
     String originTableName = "iceberg_rest_table_test.create_table_for_view_6";
     String viewName = "iceberg_rest_table_test.show_create_statement_view";

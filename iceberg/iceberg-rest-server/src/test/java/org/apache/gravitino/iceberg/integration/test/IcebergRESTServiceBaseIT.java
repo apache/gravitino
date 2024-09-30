@@ -76,7 +76,7 @@ public abstract class IcebergRESTServiceBaseIT {
     return !catalogType.equals(IcebergCatalogBackend.MEMORY);
   }
 
-  boolean catalogTypeNotHive() {
+  boolean isSupportsViewCatalog() {
     return !catalogType.equals(IcebergCatalogBackend.HIVE);
   }
 
