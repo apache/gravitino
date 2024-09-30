@@ -17,9 +17,9 @@ public class DummyAuditLog implements AuditLog {
 
   private String identifier;
 
-  private String timestamp;
+  private long timestamp;
 
-  private Boolean successful;
+  private boolean successful;
 
   @Override
   public String user() {
@@ -37,11 +37,12 @@ public class DummyAuditLog implements AuditLog {
   }
 
   @Override
-  public String timestamp() {
+  public long timestamp() {
     return timestamp;
   }
 
-  public Boolean successful() {
+  @Override
+  public boolean successful() {
     return successful;
   }
 }

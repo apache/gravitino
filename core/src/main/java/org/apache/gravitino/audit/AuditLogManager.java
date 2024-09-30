@@ -20,7 +20,6 @@
 package org.apache.gravitino.audit;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -47,35 +46,19 @@ public class AuditLogManager {
       return;
     }
 
-    String formatterClassName = config.get(Configs.FORMATTER_CLASS_NAME);
-    Formatter formatter;
     // If formatter class name is not config, use default formatter class name
-    if (formatterClassName == null) {
-      LOG.warn(
-          "Audit log formatter is not config, use default formatter class name:{}",
-          DefaultFormatter.class.getName());
-      formatter = new DefaultFormatter();
-    } else {
-      formatter = loadFormatter(formatterClassName);
-      LOG.info("Audit log formatter class name:{}", formatterClassName);
-    }
+    String formatterClassName = config.get(Configs.AUDIT_LOG_FORMATTER_CLASS_NAME);
+    Formatter formatter = loadFormatter(formatterClassName);
+    LOG.info("Audit log formatter class name:{}", formatterClassName);
 
-    String writerClassName = config.get(Configs.WRITER_CLASS_NAME);
+    String writerClassName = config.get(Configs.AUDIT_LOG_WRITER_CLASS_NAME);
     // If writer class name is not config, use default writer class name
-    if (writerClassName == null) {
-      LOG.warn(
-          "Audit log writer is not config, use default writer class name:{}",
-          DefaultFileAuditWriter.class.getName());
-      auditLogWriter = new DefaultFileAuditWriter();
-      auditLogWriter.init(formatter, Maps.newHashMap());
-    } else {
-      auditLogWriter =
-          loadAuditLogWriter(
-              writerClassName,
-              config.getConfigsWithPrefix(Configs.AUDIT_LOG_WRITER_CONFIG_PREFIX),
-              formatter);
-      LOG.info("Audit log writer class name:{}", writerClassName);
-    }
+    auditLogWriter =
+        loadAuditLogWriter(
+            writerClassName,
+            config.getConfigsWithPrefix(Configs.AUDIT_LOG_WRITER_CONFIG_PREFIX),
+            formatter);
+    LOG.info("Audit log writer class name:{}", writerClassName);
 
     eventBusManager.addEventListener(
         "audit-log",

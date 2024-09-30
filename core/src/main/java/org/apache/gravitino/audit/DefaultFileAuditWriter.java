@@ -26,6 +26,8 @@ public class DefaultFileAuditWriter implements AuditLogWriter {
   private Writer outWriter;
   @VisibleForTesting String fileName;
 
+  boolean immediateFlush;
+
   @Override
   public Formatter getFormatter() {
     return formatter;
@@ -34,7 +36,8 @@ public class DefaultFileAuditWriter implements AuditLogWriter {
   @Override
   public void init(Formatter formatter, Map<String, String> properties) {
     this.formatter = formatter;
-    fileName = properties.getOrDefault("file", Configs.AUDIT_LOG_DEFAULT_FILE_WRITER_FILE_NAME);
+    fileName = properties.getOrDefault("file", Configs.AUDIT_LOG_FILE_WRITER_DEFAULT_FILE_NAME);
+    immediateFlush = Boolean.parseBoolean(properties.getOrDefault("immediateFlush", "false"));
     Preconditions.checkArgument(
         StringUtils.isNotBlank(fileName), "FileAuditWriter: fileName is not set in configuration.");
     try {
@@ -51,7 +54,9 @@ public class DefaultFileAuditWriter implements AuditLogWriter {
     String log = auditLog.toString();
     try {
       outWriter.write(log);
-      outWriter.flush();
+      if (immediateFlush) {
+        outWriter.flush();
+      }
     } catch (Exception e) {
       Log.warn("Failed to write audit log: {}", log, e);
     }

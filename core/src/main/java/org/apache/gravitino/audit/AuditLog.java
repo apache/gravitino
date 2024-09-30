@@ -28,5 +28,12 @@ public interface AuditLog {
    *
    * @return operation timestamp.
    */
-  String timestamp();
+  long timestamp();
+
+  /**
+   * The operation is successful or not.
+   *
+   * @return true if the operation is successful, false otherwise.
+   */
+  boolean successful();
 }

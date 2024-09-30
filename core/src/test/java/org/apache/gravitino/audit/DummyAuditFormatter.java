@@ -11,7 +11,7 @@ public class DummyAuditFormatter implements Formatter {
         .user(event.user())
         .operation(parseOperation(event))
         .identifier(event.identifier() != null ? event.identifier().toString() : null)
-        .timestamp(String.valueOf(event.eventTime()))
+        .timestamp(event.eventTime())
         .successful(!(event instanceof FailureEvent))
         .build();
   }

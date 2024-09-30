@@ -343,10 +343,11 @@ public class Configs {
           .toSequence()
           .createWithDefault(Collections.emptyList());
 
-  public static final String AUDIT_LOG_WRITER_CONFIG_PREFIX = "gravitino.audit.writer";
+  public static final String AUDIT_LOG_WRITER_CONFIG_PREFIX = "gravitino.audit.writer.";
 
-  public static final String AUDIT_LOG_DEFAULT_FILE_WRITER_FILE_NAME =
+  public static final String AUDIT_LOG_FILE_WRITER_DEFAULT_FILE_NAME =
       "default_gravitino_audit_log";
+
   public static final ConfigEntry<Boolean> AUDIT_LOG_ENABLED_CONF =
       new ConfigBuilder("gravitino.audit.enable")
           .doc("Gravitino audit log enable flag")
@@ -354,19 +355,26 @@ public class Configs {
           .booleanConf()
           .createWithDefault(false);
 
-  public static final ConfigEntry<String> WRITER_CLASS_NAME =
+  public static final ConfigEntry<String> AUDIT_LOG_WRITER_CLASS_NAME =
       new ConfigBuilder("gravitino.audit.writer.")
           .doc("Gravitino audit log writer class name")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .createWithDefault("");
+          .createWithDefault("org.apache.gravitino.audit.DefaultFileAuditWriter");
 
-  public static final ConfigEntry<String> FORMATTER_CLASS_NAME =
+  public static final ConfigEntry<String> AUDIT_LOG_FORMATTER_CLASS_NAME =
       new ConfigBuilder("gravitino.audit.writer.class")
           .doc("Gravitino event log formatter class name")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .createWithDefault("");
+          .createWithDefault("org.apache.gravitino.audit.DefaultFormatter");
+
+  public static final ConfigEntry<Boolean> AUDIT_LOG_FILE_WRITER_IMMEDIATE_FLUSH =
+      new ConfigBuilder("gravitino.audit.writer.immediateFlush")
+          .doc("Gravitino file writer immediate flush flag")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .booleanConf()
+          .createWithDefault(false);
 }

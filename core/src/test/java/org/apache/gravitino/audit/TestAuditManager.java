@@ -19,8 +19,6 @@
 
 package org.apache.gravitino.audit;
 
-import static org.mockito.Mockito.mock;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -40,7 +38,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +46,7 @@ public class TestAuditManager {
   private static final Logger LOG = LoggerFactory.getLogger(TestAuditManager.class);
 
   static final Path TEST_AUDIT_LOG_FILE_NAME =
-      Paths.get(Configs.AUDIT_LOG_DEFAULT_FILE_WRITER_FILE_NAME);
+      Paths.get(Configs.AUDIT_LOG_FILE_WRITER_DEFAULT_FILE_NAME);
 
   @BeforeAll
   public void setup() {
@@ -57,13 +54,13 @@ public class TestAuditManager {
       LOG.warn(
           String.format(
               "tmp audit log file: %s already exists, delete it",
-              Configs.AUDIT_LOG_DEFAULT_FILE_WRITER_FILE_NAME));
+              Configs.AUDIT_LOG_FILE_WRITER_DEFAULT_FILE_NAME));
       try {
         Files.delete(TEST_AUDIT_LOG_FILE_NAME);
         LOG.warn(
             String.format(
                 "delete tmp audit log file: %s success",
-                Configs.AUDIT_LOG_DEFAULT_FILE_WRITER_FILE_NAME));
+                Configs.AUDIT_LOG_FILE_WRITER_DEFAULT_FILE_NAME));
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -73,15 +70,11 @@ public class TestAuditManager {
   /** Test audit log with custom audit writer and formatter. */
   @Test
   public void testAuditLog() {
-    Config config = mock(Config.class);
-    Mockito.doReturn(true).when(config).get(Configs.AUDIT_LOG_ENABLED_CONF);
-    Mockito.doReturn("org.apache.gravitino.audit.DummyAuditWriter")
-        .when(config)
-        .get(Configs.WRITER_CLASS_NAME);
-
-    Mockito.doReturn("org.apache.gravitino.audit.DummyAuditFormatter")
-        .when(config)
-        .get(Configs.FORMATTER_CLASS_NAME);
+    Config config = new Config(false) {};
+    config.set(Configs.AUDIT_LOG_ENABLED_CONF, true);
+    config.set(Configs.AUDIT_LOG_WRITER_CLASS_NAME, "org.apache.gravitino.audit.DummyAuditWriter");
+    config.set(
+        Configs.AUDIT_LOG_FORMATTER_CLASS_NAME, "org.apache.gravitino.audit.DummyAuditFormatter");
 
     EventListenerManager eventListenerManager = mockEventListenerManager();
     AuditLogManager auditLogManager = mockAuditLogManager(config, eventListenerManager);
@@ -105,7 +98,7 @@ public class TestAuditManager {
     Assertions.assertTrue(formattedAuditLog.successful());
     Assertions.assertEquals(formattedAuditLog.user(), "user");
     Assertions.assertEquals(formattedAuditLog.identifier(), "a.b.c.d");
-    Assertions.assertEquals(formattedAuditLog.timestamp(), String.valueOf(dummyEvent.eventTime()));
+    Assertions.assertEquals(formattedAuditLog.timestamp(), dummyEvent.eventTime());
     Assertions.assertEquals(formattedAuditLog, dummyAuditWriter.getAuditLogs().get(0));
 
     // dispatch fail event
@@ -121,8 +114,10 @@ public class TestAuditManager {
   /** Test audit log with default audit writer and formatter. */
   @Test
   public void testDefaultAuditLog() {
-    Config config = mock(Config.class);
-    Mockito.doReturn(true).when(config).get(Configs.AUDIT_LOG_ENABLED_CONF);
+    Config config = new Config(false) {};
+    config.set(Configs.AUDIT_LOG_ENABLED_CONF, true);
+    // set immediate flush to true for testing, so that the audit log will be read immediately
+    config.set(Configs.AUDIT_LOG_FILE_WRITER_IMMEDIATE_FLUSH, true);
 
     DummyEvent dummyEvent = mockDummyEvent();
     EventListenerManager eventListenerManager = mockEventListenerManager();
@@ -153,7 +148,7 @@ public class TestAuditManager {
         LOG.warn(
             String.format(
                 "delete tmp audit log file: %s success",
-                Configs.AUDIT_LOG_DEFAULT_FILE_WRITER_FILE_NAME));
+                Configs.AUDIT_LOG_FILE_WRITER_DEFAULT_FILE_NAME));
       }
     } catch (IOException e) {
       throw new RuntimeException(e);

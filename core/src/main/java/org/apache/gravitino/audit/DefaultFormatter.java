@@ -18,7 +18,7 @@ public class DefaultFormatter implements Formatter {
             event.identifier() != null
                 ? Objects.requireNonNull(event.identifier()).toString()
                 : null)
-        .timestamp(String.valueOf(event.eventTime()))
+        .timestamp(event.eventTime())
         .successful(successful)
         .build();
   }

@@ -24,12 +24,13 @@ import org.apache.gravitino.listener.api.event.Event;
 
 /**
  * Interface for writing the audit log, which can write to different storage, such as file,
- * database,
+ * database,mq.
  */
 public interface AuditLogWriter {
 
   /** @return formatter. */
   Formatter getFormatter();
+
   /**
    * Initialize the writer with the given configuration.
    *
