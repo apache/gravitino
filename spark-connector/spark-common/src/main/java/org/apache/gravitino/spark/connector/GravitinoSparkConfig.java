@@ -23,7 +23,7 @@ import org.apache.gravitino.auth.AuthProperties;
 
 public class GravitinoSparkConfig {
 
-  public static final String GRAVITINO_PREFIX = "spark.sql.gravitino.";
+  private static final String GRAVITINO_PREFIX = "spark.sql.gravitino.";
   public static final String GRAVITINO_URI = GRAVITINO_PREFIX + "uri";
   public static final String GRAVITINO_METALAKE = GRAVITINO_PREFIX + "metalake";
   public static final String GRAVITINO_ENABLE_ICEBERG_SUPPORT =
@@ -31,8 +31,8 @@ public class GravitinoSparkConfig {
 
   public static final String GRAVITINO_AUTH_TYPE =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_CLIENT_AUTH_TYPE;
-  public static final String GRAVITINO_AUTH_USER_NAME =
-      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_CLIENT_USER_NAME;
+  public static final String GRAVITINO_SIMPLE_USER_NAME =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_SIMPLE_USER_NAME;
   public static final String GRAVITINO_OAUTH2_URI =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_SERVER_URI;
   public static final String GRAVITINO_OAUTH2_PATH =
@@ -43,7 +43,6 @@ public class GravitinoSparkConfig {
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_SCOPE;
   public static final String GRAVITINO_KERBEROS_PRINCIPAL =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_KERBEROS_PRINCIPAL;
-
   public static final String GRAVITINO_KERBEROS_KEYTAB_FILE_PATH =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_KERBEROS_KEYTAB_FILE_PATH;
 

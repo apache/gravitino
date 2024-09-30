@@ -29,7 +29,7 @@ public class AuthProperties {
   public static final String KERBEROS_AUTH_TYPE = "kerberos";
 
   // simple
-  public static final String GRAVITINO_CLIENT_USER_NAME = "simple.userName";
+  public static final String GRAVITINO_SIMPLE_USER_NAME = "simple.userName";
 
   // oauth2
   /** The configuration key for the URI of the default OAuth server. */
