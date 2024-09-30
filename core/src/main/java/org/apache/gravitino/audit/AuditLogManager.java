@@ -42,7 +42,7 @@ public class AuditLogManager {
 
   public void init(Config config, EventListenerManager eventBusManager) {
     if (!config.get(Configs.AUDIT_LOG_ENABLED_CONF)) {
-      LOG.warn("Audit log is not enabled");
+      LOG.info("Audit log is not enabled");
       return;
     }
 
