@@ -388,7 +388,7 @@ public class MetalakePage extends AbstractWebIT {
       LOG.error(e.getMessage(), e);
       return false;
     } finally {
-      //      driver.close();
+      driver.close();
       driver.switchTo().window(originalWindowHandle);
     }
   }
