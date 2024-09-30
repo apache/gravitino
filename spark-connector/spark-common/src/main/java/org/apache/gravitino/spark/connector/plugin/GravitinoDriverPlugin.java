@@ -90,8 +90,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
 
     this.catalogManager =
-        GravitinoCatalogManager.create(
-            () -> createGravitinoAdminClient(gravitinoUri, metalake, conf));
+        GravitinoCatalogManager.create(() -> createGravitinoClient(gravitinoUri, metalake, conf));
     catalogManager.loadRelationalCatalogs();
     registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
     registerSqlExtensions(conf);
@@ -164,7 +163,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private static GravitinoClient createGravitinoAdminClient(
+  private static GravitinoClient createGravitinoClient(
       String uri, String metalake, SparkConf sparkConf) {
     ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
     String authType =
@@ -177,8 +176,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         builder.withSimpleAuth();
       }
     } else if (AuthProperties.isOAuth2(authType)) {
-      String oAuthUri =
-          sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_URI, null);
+      String oAuthUri = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_URI, null);
       String credential = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_CREDENTIAL, null);
       String path = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_PATH, null);
       String scope = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_SCOPE, null);
@@ -192,11 +190,13 @@ public class GravitinoDriverPlugin implements DriverPlugin {
       builder.withOAuth(oAuth2TokenProvider);
     } else if (AuthProperties.isKerberos(authType)) {
       String principal = sparkConf.get(GravitinoSparkConfig.GRAVITINO_KERBEROS_PRINCIPAL, null);
-      String keyTabFile = sparkConf.get(GravitinoSparkConfig.GRAVITINO_KERBEROS_KEYTAB_FILE_PATH,
-          null);
+      String keyTabFile =
+          sparkConf.get(GravitinoSparkConfig.GRAVITINO_KERBEROS_KEYTAB_FILE_PATH, null);
       KerberosTokenProvider kerberosTokenProvider =
-          KerberosTokenProvider.builder().withClientPrincipal(principal)
-              .withKeyTabFile(new File(keyTabFile)).build();
+          KerberosTokenProvider.builder()
+              .withClientPrincipal(principal)
+              .withKeyTabFile(new File(keyTabFile))
+              .build();
       builder.withKerberosAuth(kerberosTokenProvider);
     } else {
       throw new UnsupportedOperationException("Doesn't support auth: " + authType);
