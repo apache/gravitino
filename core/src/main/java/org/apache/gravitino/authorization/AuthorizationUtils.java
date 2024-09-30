@@ -55,13 +55,13 @@ public class AuthorizationUtils {
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
   private static final Set<Privilege.Name> FILESET_PRIVILEGES =
-      Sets.newHashSet(
+      Sets.immutableEnumSet(
           Privilege.Name.CREATE_FILESET, Privilege.Name.WRITE_FILESET, Privilege.Name.READ_FILESET);
   private static final Set<Privilege.Name> TABLE_PRIVILEGES =
-      Sets.newHashSet(
+      Sets.immutableEnumSet(
           Privilege.Name.CREATE_TABLE, Privilege.Name.MODIFY_TABLE, Privilege.Name.SELECT_TABLE);
   private static final Set<Privilege.Name> TOPIC_PRIVILEGES =
-      Sets.newHashSet(
+      Sets.immutableEnumSet(
           Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);
 
   private AuthorizationUtils() {}
@@ -271,7 +271,7 @@ public class AuthorizationUtils {
     if (!privilege.canBindTo(object.type())) {
       throw new IllegalArgumentException(
           String.format(
-              "Securable object %s type %s don't support privilege %s",
+              "Securable object %s type %s don't support binding privilege %s",
               object.fullName(), object.type(), privilege));
     }
 

@@ -26,24 +26,24 @@ import org.apache.gravitino.MetadataObject;
 /** The helper class for {@link Privilege}. */
 public class Privileges {
 
-  private static final Set<MetadataObject.Type> SUPPORTED_TABLE_TYPES =
-      Sets.newHashSet(
+  private static final Set<MetadataObject.Type> TABLE_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
           MetadataObject.Type.METALAKE,
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.TABLE);
-  private static final Set<MetadataObject.Type> SUPPORTED_TOPIC_TYPES =
-      Sets.newHashSet(
+  private static final Set<MetadataObject.Type> TOPIC_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
           MetadataObject.Type.METALAKE,
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.TOPIC);
-  private static final Set<MetadataObject.Type> SUPPORTED_SCHEMA_TYPES =
-      Sets.newHashSet(
+  private static final Set<MetadataObject.Type> SCHEMA_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
           MetadataObject.Type.METALAKE, MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA);
 
-  private static final Set<MetadataObject.Type> SUPPORTED_FILESET_TYPES =
-      Sets.newHashSet(
+  private static final Set<MetadataObject.Type> FILESET_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
           MetadataObject.Type.METALAKE,
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
@@ -322,7 +322,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return SUPPORTED_SCHEMA_TYPES.contains(type);
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -376,7 +376,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return SUPPORTED_SCHEMA_TYPES.contains(type);
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -403,7 +403,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return SUPPORTED_TABLE_TYPES.contains(type);
+      return TABLE_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -430,7 +430,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return SUPPORTED_TABLE_TYPES.contains(type);
+      return TABLE_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -457,7 +457,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return SUPPORTED_SCHEMA_TYPES.contains(type);
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -484,7 +484,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return SUPPORTED_FILESET_TYPES.contains(type);
+      return FILESET_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -511,7 +511,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return SUPPORTED_FILESET_TYPES.contains(type);
+      return FILESET_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -538,7 +538,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return SUPPORTED_SCHEMA_TYPES.contains(type);
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -565,7 +565,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return SUPPORTED_TOPIC_TYPES.contains(type);
+      return TOPIC_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -592,7 +592,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return SUPPORTED_TOPIC_TYPES.contains(type);
+      return TOPIC_SUPPORTED_TYPES.contains(type);
     }
   }
 

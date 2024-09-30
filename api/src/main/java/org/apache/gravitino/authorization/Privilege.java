@@ -41,11 +41,11 @@ public interface Privilege {
   Condition condition();
 
   /**
-   * If the privilege can bind to a metadata object, then this method will return true otherwise
+   * If the privilege can bind to a securable object, then this method will return true, otherwise
    * false.
    *
-   * @param type The metadata object type.
-   * @return It will return true if the privilege can bind to a metadata object otherwise false.
+   * @param type The securable object type.
+   * @return It will return true if the privilege can bind to a securable object, otherwise false.
    */
   boolean canBindTo(MetadataObject.Type type);
 
