@@ -21,11 +21,33 @@ package org.apache.gravitino.authorization;
 import com.google.common.collect.Sets;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 
 /** The helper class for {@link Privilege}. */
 public class Privileges {
+
+  private static final Set<MetadataObject.Type> supportedTableTypes =
+      Sets.newHashSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE);
+  private static final Set<MetadataObject.Type> supportedTopicTypes =
+      Sets.newHashSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TOPIC);
+  private static final Set<MetadataObject.Type> supportedSchemaTypes =
+      Sets.newHashSet(
+          MetadataObject.Type.METALAKE, MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA);
+
+  private static final Set<MetadataObject.Type> supportedFilesetTypes =
+      Sets.newHashSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.FILESET);
 
   /**
    * Returns the Privilege with allow condition from the string representation.
@@ -247,7 +269,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
+    public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
     }
   }
@@ -274,7 +296,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
+    public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.CATALOG;
     }
   }
@@ -299,13 +321,8 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
-      Set<MetadataObject.Type> supportedTypes =
-          Sets.newHashSet(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA);
-      return supportedTypes.contains(type);
+    public boolean canBindTo(MetadataObject.Type type) {
+      return supportedSchemaTypes.contains(type);
     }
   }
 
@@ -331,14 +348,13 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
+    public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.CATALOG;
     }
   }
 
   /** The privilege to create a table. */
-  public static class CreateTable extends GenericPrivilege<CreateTable>
-      implements Privilege.SupportsSpecificCatalog {
+  public static class CreateTable extends GenericPrivilege<CreateTable> {
     private static final CreateTable ALLOW_INSTANCE =
         new CreateTable(Condition.ALLOW, Name.CREATE_TABLE);
     private static final CreateTable DENY_INSTANCE =
@@ -359,29 +375,13 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
-      Set<MetadataObject.Type> supportedTypes =
-          Sets.newHashSet(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA);
-      return supportedTypes.contains(type);
-    }
-
-    @Override
-    public Catalog.Type catalogType() {
-      return Catalog.Type.RELATIONAL;
-    }
-
-    @Override
-    public SupportsSpecificCatalog supportsSpecificCatalog() {
-      return this;
+    public boolean canBindTo(MetadataObject.Type type) {
+      return supportedSchemaTypes.contains(type);
     }
   }
 
   /** The privilege to select data from a table. */
-  public static class SelectTable extends GenericPrivilege<SelectTable>
-      implements Privilege.SupportsSpecificCatalog {
+  public static class SelectTable extends GenericPrivilege<SelectTable> {
     private static final SelectTable ALLOW_INSTANCE =
         new SelectTable(Condition.ALLOW, Name.SELECT_TABLE);
     private static final SelectTable DENY_INSTANCE =
@@ -402,30 +402,13 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
-      Set<MetadataObject.Type> supportedTypes =
-          Sets.newHashSet(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA,
-              MetadataObject.Type.TABLE);
-      return supportedTypes.contains(type);
-    }
-
-    @Override
-    public Catalog.Type catalogType() {
-      return Catalog.Type.RELATIONAL;
-    }
-
-    @Override
-    public SupportsSpecificCatalog supportsSpecificCatalog() {
-      return this;
+    public boolean canBindTo(MetadataObject.Type type) {
+      return supportedTableTypes.contains(type);
     }
   }
 
   /** The privilege to execute SQL `ALTER`, `INSERT`, `UPDATE`, or `DELETE` for a table. */
-  public static class ModifyTable extends GenericPrivilege<ModifyTable>
-      implements Privilege.SupportsSpecificCatalog {
+  public static class ModifyTable extends GenericPrivilege<ModifyTable> {
     private static final ModifyTable ALLOW_INSTANCE =
         new ModifyTable(Condition.ALLOW, Name.MODIFY_TABLE);
     private static final ModifyTable DENY_INSTANCE =
@@ -446,30 +429,13 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
-      Set<MetadataObject.Type> supportedTypes =
-          Sets.newHashSet(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA,
-              MetadataObject.Type.TABLE);
-      return supportedTypes.contains(type);
-    }
-
-    @Override
-    public Catalog.Type catalogType() {
-      return Catalog.Type.RELATIONAL;
-    }
-
-    @Override
-    public SupportsSpecificCatalog supportsSpecificCatalog() {
-      return this;
+    public boolean canBindTo(MetadataObject.Type type) {
+      return supportedTableTypes.contains(type);
     }
   }
 
   /** The privilege to create a fileset. */
-  public static class CreateFileset extends GenericPrivilege<CreateFileset>
-      implements Privilege.SupportsSpecificCatalog {
+  public static class CreateFileset extends GenericPrivilege<CreateFileset> {
     private static final CreateFileset ALLOW_INSTANCE =
         new CreateFileset(Condition.ALLOW, Name.CREATE_FILESET);
     private static final CreateFileset DENY_INSTANCE =
@@ -490,29 +456,13 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
-      Set<MetadataObject.Type> supportedTypes =
-          Sets.newHashSet(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA);
-      return supportedTypes.contains(type);
-    }
-
-    @Override
-    public Catalog.Type catalogType() {
-      return Catalog.Type.FILESET;
-    }
-
-    @Override
-    public SupportsSpecificCatalog supportsSpecificCatalog() {
-      return this;
+    public boolean canBindTo(MetadataObject.Type type) {
+      return supportedSchemaTypes.contains(type);
     }
   }
 
   /** The privilege to read a fileset. */
-  public static class ReadFileset extends GenericPrivilege<ReadFileset>
-      implements Privilege.SupportsSpecificCatalog {
+  public static class ReadFileset extends GenericPrivilege<ReadFileset> {
     private static final ReadFileset ALLOW_INSTANCE =
         new ReadFileset(Condition.ALLOW, Name.READ_FILESET);
     private static final ReadFileset DENY_INSTANCE =
@@ -533,30 +483,13 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
-      Set<MetadataObject.Type> supportedTypes =
-          Sets.newHashSet(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA,
-              MetadataObject.Type.FILESET);
-      return supportedTypes.contains(type);
-    }
-
-    @Override
-    public Catalog.Type catalogType() {
-      return Catalog.Type.FILESET;
-    }
-
-    @Override
-    public SupportsSpecificCatalog supportsSpecificCatalog() {
-      return this;
+    public boolean canBindTo(MetadataObject.Type type) {
+      return supportedFilesetTypes.contains(type);
     }
   }
 
   /** The privilege to write a fileset. */
-  public static class WriteFileset extends GenericPrivilege<WriteFileset>
-      implements Privilege.SupportsSpecificCatalog {
+  public static class WriteFileset extends GenericPrivilege<WriteFileset> {
     private static final WriteFileset ALLOW_INSTANCE =
         new WriteFileset(Condition.ALLOW, Name.WRITE_FILESET);
     private static final WriteFileset DENY_INSTANCE =
@@ -577,30 +510,13 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
-      Set<MetadataObject.Type> supportedTypes =
-          Sets.newHashSet(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA,
-              MetadataObject.Type.FILESET);
-      return supportedTypes.contains(type);
-    }
-
-    @Override
-    public Catalog.Type catalogType() {
-      return Catalog.Type.FILESET;
-    }
-
-    @Override
-    public SupportsSpecificCatalog supportsSpecificCatalog() {
-      return this;
+    public boolean canBindTo(MetadataObject.Type type) {
+      return supportedFilesetTypes.contains(type);
     }
   }
 
   /** The privilege to create a topic. */
-  public static class CreateTopic extends GenericPrivilege<CreateTopic>
-      implements Privilege.SupportsSpecificCatalog {
+  public static class CreateTopic extends GenericPrivilege<CreateTopic> {
     private static final CreateTopic ALLOW_INSTANCE =
         new CreateTopic(Condition.ALLOW, Name.CREATE_TOPIC);
     private static final CreateTopic DENY_INSTANCE =
@@ -621,29 +537,13 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
-      Set<MetadataObject.Type> supportedTypes =
-          Sets.newHashSet(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA);
-      return supportedTypes.contains(type);
-    }
-
-    @Override
-    public Catalog.Type catalogType() {
-      return Catalog.Type.MESSAGING;
-    }
-
-    @Override
-    public SupportsSpecificCatalog supportsSpecificCatalog() {
-      return this;
+    public boolean canBindTo(MetadataObject.Type type) {
+      return supportedSchemaTypes.contains(type);
     }
   }
 
   /** The privilege to consume from a topic. */
-  public static class ConsumeTopic extends GenericPrivilege<ConsumeTopic>
-      implements Privilege.SupportsSpecificCatalog {
+  public static class ConsumeTopic extends GenericPrivilege<ConsumeTopic> {
     private static final ConsumeTopic ALLOW_INSTANCE =
         new ConsumeTopic(Condition.ALLOW, Name.CONSUME_TOPIC);
     private static final ConsumeTopic DENY_INSTANCE =
@@ -664,30 +564,13 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
-      Set<MetadataObject.Type> supportedTypes =
-          Sets.newHashSet(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA,
-              MetadataObject.Type.TOPIC);
-      return supportedTypes.contains(type);
-    }
-
-    @Override
-    public Catalog.Type catalogType() {
-      return Catalog.Type.MESSAGING;
-    }
-
-    @Override
-    public SupportsSpecificCatalog supportsSpecificCatalog() {
-      return this;
+    public boolean canBindTo(MetadataObject.Type type) {
+      return supportedTopicTypes.contains(type);
     }
   }
 
   /** The privilege to produce to a topic. */
-  public static class ProduceTopic extends GenericPrivilege<ProduceTopic>
-      implements Privilege.SupportsSpecificCatalog {
+  public static class ProduceTopic extends GenericPrivilege<ProduceTopic> {
     private static final ProduceTopic ALLOW_INSTANCE =
         new ProduceTopic(Condition.ALLOW, Name.PRODUCE_TOPIC);
     private static final ProduceTopic DENY_INSTANCE =
@@ -708,24 +591,8 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
-      Set<MetadataObject.Type> supportedTypes =
-          Sets.newHashSet(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA,
-              MetadataObject.Type.TOPIC);
-      return supportedTypes.contains(type);
-    }
-
-    @Override
-    public Catalog.Type catalogType() {
-      return Catalog.Type.MESSAGING;
-    }
-
-    @Override
-    public SupportsSpecificCatalog supportsSpecificCatalog() {
-      return this;
+    public boolean canBindTo(MetadataObject.Type type) {
+      return supportedTopicTypes.contains(type);
     }
   }
 
@@ -751,7 +618,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
+    public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
     }
   }
@@ -778,7 +645,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
+    public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
     }
   }
@@ -805,7 +672,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
+    public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
     }
   }
@@ -832,7 +699,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
+    public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
     }
   }
