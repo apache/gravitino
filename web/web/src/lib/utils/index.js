@@ -144,12 +144,14 @@ export const updateTreeData = (list = [], key, children = []) => {
     if (node.key === key) {
       return {
         ...node,
+        isLeaf: children?.length === 0,
         children
       }
     }
-    if (node.children) {
+    if (node.children && node.children.length > 0) {
       return {
         ...node,
+        isLeaf: node.children.length === 0,
         children: updateTreeData(node.children, key, children)
       }
     }
