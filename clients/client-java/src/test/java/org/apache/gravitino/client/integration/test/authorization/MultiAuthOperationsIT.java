@@ -123,7 +123,10 @@ public class MultiAuthOperationsIT extends AbstractIT {
       final String gitCommitId = readGitCommitIdFromGitFile();
       Assertions.assertEquals(gitCommitId, gravitinoVersion1.gitCommit());
     }
-    new KerberosOperationsIT(client).testAuthenticationApi();
+
+    KerberosOperationsIT kerberosOperationsIT = new KerberosOperationsIT();
+    kerberosOperationsIT.setGravitinoAdminClient(client);
+    kerberosOperationsIT.testAuthenticationApi();
 
     GravitinoVersion gravitinoVersion2 = kerberosClient.serverVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion2.version());

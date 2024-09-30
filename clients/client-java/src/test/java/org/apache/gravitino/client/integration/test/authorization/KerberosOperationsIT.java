@@ -66,7 +66,7 @@ public class KerberosOperationsIT extends AbstractIT {
 
   private static final String clientPrincipal = "client@EXAMPLE.COM";
 
-  public KerberosOperationsIT(GravitinoAdminClient client) {
+  public void setGravitinoAdminClient(GravitinoAdminClient client) {
     this.client = client;
   }
 
