@@ -584,9 +584,7 @@ class PermissionManager {
     for (SecurableObject securableObject : securableObjects) {
       // If a securable object is matching the target object, we apply the updates
       // to this securable object.
-      if (!isExist
-          && securableObject.fullName().equals(targetObject.fullName())
-          && securableObject.type() == targetObject.type()) {
+      if (!isExist && targetObject.equals(securableObject)) {
         isExist = true;
         SecurableObject newSecurableObject = objectUpdater.apply(securableObject);
         if (newSecurableObject != null) {
