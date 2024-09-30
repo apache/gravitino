@@ -54,13 +54,13 @@ public class AuthorizationUtils {
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
-  private static final Set<Privilege.Name> filesetPrivileges =
+  private static final Set<Privilege.Name> FILESET_PRIVILEGES =
       Sets.newHashSet(
           Privilege.Name.CREATE_FILESET, Privilege.Name.WRITE_FILESET, Privilege.Name.READ_FILESET);
-  private static final Set<Privilege.Name> tablePrivileges =
+  private static final Set<Privilege.Name> TABLE_PRIVILEGES =
       Sets.newHashSet(
           Privilege.Name.CREATE_TABLE, Privilege.Name.MODIFY_TABLE, Privilege.Name.SELECT_TABLE);
-  private static final Set<Privilege.Name> topicPrivileges =
+  private static final Set<Privilege.Name> TOPIC_PRIVILEGES =
       Sets.newHashSet(
           Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);
 
@@ -280,15 +280,15 @@ public class AuthorizationUtils {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
       NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
       try {
-        if (filesetPrivileges.contains(privilege.name())) {
+        if (FILESET_PRIVILEGES.contains(privilege.name())) {
           checkCatalogType(catalogIdent, Catalog.Type.FILESET, privilege);
         }
 
-        if (tablePrivileges.contains(privilege.name())) {
+        if (TABLE_PRIVILEGES.contains(privilege.name())) {
           checkCatalogType(catalogIdent, Catalog.Type.RELATIONAL, privilege);
         }
 
-        if (topicPrivileges.contains(privilege.name())) {
+        if (TOPIC_PRIVILEGES.contains(privilege.name())) {
           checkCatalogType(catalogIdent, Catalog.Type.MESSAGING, privilege);
         }
       } catch (NoSuchCatalogException ne) {
