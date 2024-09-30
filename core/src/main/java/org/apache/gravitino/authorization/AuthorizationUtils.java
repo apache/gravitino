@@ -54,15 +54,6 @@ public class AuthorizationUtils {
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
-  private static final List<Privilege.Name> pluginNotSupportsPrivileges =
-      Lists.newArrayList(
-          Privilege.Name.CREATE_CATALOG,
-          Privilege.Name.USE_CATALOG,
-          Privilege.Name.MANAGE_GRANTS,
-          Privilege.Name.MANAGE_USERS,
-          Privilege.Name.MANAGE_GROUPS,
-          Privilege.Name.CREATE_ROLE);
-
   private AuthorizationUtils() {}
 
   static void checkMetalakeExists(String metalake) throws NoSuchMetalakeException {
@@ -201,11 +192,10 @@ public class AuthorizationUtils {
   }
 
   public static boolean needApplyAuthorizationPluginAllCatalogs(SecurableObject securableObject) {
-    // TODO: Add `supportsSecurableObjects` method for every privilege to simplify this code
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
       for (Privilege privilege : privileges) {
-        if (!pluginNotSupportsPrivileges.contains(privilege.name())) {
+        if (privilege.supportsMetadataObject(MetadataObject.Type.CATALOG)) {
           return true;
         }
       }
