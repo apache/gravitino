@@ -491,7 +491,7 @@ class PermissionManager {
                         roleEntity.securableObjects(),
                         object,
                         oldObject -> {
-                          // If securable object doesn't exist, we do nothing except for logging.
+                          // If the securable object doesn't exist, we do nothing except for logging.
                           if (oldObject == null) {
                             LOG.warn(
                                 "Securable object {} type {} doesn't exist in the role {}",
@@ -500,14 +500,14 @@ class PermissionManager {
                                 role);
                             return null;
                           } else {
-                            // If securable object exists, we remove the privileges of the securable
+                            // If the securable object exists, we remove the privileges of the securable
                             // object.
                             // Remove duplicated privileges
                             Set<Privilege> updatePrivileges = Sets.newHashSet();
                             updatePrivileges.addAll(oldObject.privileges());
                             privileges.forEach(updatePrivileges::remove);
 
-                            // If object still contains privilege, we should update the object with
+                            // If the object still contains privilege, we should update the object with
                             // new privileges
                             if (!updatePrivileges.isEmpty()) {
                               SecurableObject newSecurableObject =
