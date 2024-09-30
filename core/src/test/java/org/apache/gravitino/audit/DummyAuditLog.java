@@ -32,7 +32,7 @@ public class DummyAuditLog implements AuditLog {
 
   private String user;
 
-  private String operation;
+  private Operation operation;
 
   private String identifier;
 
@@ -46,7 +46,7 @@ public class DummyAuditLog implements AuditLog {
   }
 
   @Override
-  public String operation() {
+  public Operation operation() {
     return operation;
   }
 

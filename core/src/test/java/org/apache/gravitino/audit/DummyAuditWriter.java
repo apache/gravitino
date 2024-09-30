@@ -26,7 +26,7 @@ import lombok.Getter;
 public class DummyAuditWriter implements AuditLogWriter {
   private Formatter formatter;
 
-  @Getter private LinkedList<DummyAuditLog> auditLogs = new LinkedList<>();
+  @Getter private final LinkedList<DummyAuditLog> auditLogs = new LinkedList<>();
 
   @Override
   public Formatter getFormatter() {

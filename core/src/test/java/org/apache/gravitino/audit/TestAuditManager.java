@@ -94,7 +94,7 @@ public class TestAuditManager {
     DummyAuditLog formattedAuditLog = formatter.format(dummyEvent);
 
     Assertions.assertNotNull(formattedAuditLog);
-    Assertions.assertEquals(formattedAuditLog.operation(), "Dummy");
+    Assertions.assertEquals(formattedAuditLog.operation(), AuditLog.Operation.UNKNOWN_OPERATION);
     Assertions.assertTrue(formattedAuditLog.successful());
     Assertions.assertEquals(formattedAuditLog.user(), "user");
     Assertions.assertEquals(formattedAuditLog.identifier(), "a.b.c.d");
@@ -106,7 +106,8 @@ public class TestAuditManager {
     eventBus.dispatchEvent(dummyFailEvent);
     DummyAuditLog formattedFailAuditLog = formatter.format(dummyFailEvent);
     Assertions.assertEquals(formattedFailAuditLog, dummyAuditWriter.getAuditLogs().get(1));
-    Assertions.assertEquals(formattedFailAuditLog.operation(), "Dummy");
+    Assertions.assertEquals(
+        formattedFailAuditLog.operation(), AuditLog.Operation.UNKNOWN_OPERATION);
     Assertions.assertFalse(formattedFailAuditLog.successful());
     Assertions.assertEquals(formattedFailAuditLog, dummyAuditWriter.getAuditLogs().get(1));
   }
