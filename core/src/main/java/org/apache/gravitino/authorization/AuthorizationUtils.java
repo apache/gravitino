@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
@@ -195,7 +194,7 @@ public class AuthorizationUtils {
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
       for (Privilege privilege : privileges) {
-        if (privilege.supportsMetadataObject(MetadataObject.Type.CATALOG)) {
+        if (privilege.supportsMetadataObjectType(MetadataObject.Type.CATALOG)) {
           return true;
         }
       }
@@ -257,7 +256,7 @@ public class AuthorizationUtils {
 
   public static void checkPrivilege(PrivilegeDTO privilegeDTO, MetadataObject object) {
     Privilege privilege = DTOConverters.fromPrivilegeDTO(privilegeDTO);
-    if (!privilege.supportsMetadataObject(object.type())) {
+    if (!privilege.supportsMetadataObjectType(object.type())) {
       throw new IllegalArgumentException(
           String.format(
               "Securable object %s type %s don't support privilege %s",

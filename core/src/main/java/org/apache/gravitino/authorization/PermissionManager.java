@@ -582,7 +582,7 @@ class PermissionManager {
     boolean isExist = false;
     List<SecurableObject> updateSecurableObjects = Lists.newArrayList();
     for (SecurableObject securableObject : securableObjects) {
-      // If securable object is matching the target object, we apply the updates
+      // If a securable object is matching the target object, we apply the updates
       // to this securable object.
       if (!isExist
           && securableObject.fullName().equals(targetObject.fullName())

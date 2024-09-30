@@ -41,12 +41,12 @@ public interface Privilege {
   Condition condition();
 
   /**
-   * If a metadata object supports a privilege, the privilege will return true. Otherwise, false.
+   * If a metadata object supports the privilege, then this method will return true otherwise false.
    *
    * @param type The metadata object type.
-   * @return It will return true if a metadata object supports a privilege. Otherwise, false.
+   * @return It will return true if a metadata object supports the privilege otherwise false.
    */
-  boolean supportsMetadataObject(MetadataObject.Type type);
+  boolean supportsMetadataObjectType(MetadataObject.Type type);
 
   /** The name of this privilege. */
   enum Name {

@@ -246,7 +246,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
     }
   }
@@ -273,7 +273,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.CATALOG;
     }
   }
@@ -298,7 +298,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       Set<MetadataObject.Type> supportedTypes =
           Sets.newHashSet(
               MetadataObject.Type.METALAKE,
@@ -330,7 +330,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.CATALOG;
     }
   }
@@ -357,7 +357,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       Set<MetadataObject.Type> supportedTypes =
           Sets.newHashSet(
               MetadataObject.Type.METALAKE,
@@ -389,7 +389,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       Set<MetadataObject.Type> supportedTypes =
           Sets.newHashSet(
               MetadataObject.Type.METALAKE,
@@ -422,7 +422,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       Set<MetadataObject.Type> supportedTypes =
           Sets.newHashSet(
               MetadataObject.Type.METALAKE,
@@ -455,7 +455,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       Set<MetadataObject.Type> supportedTypes =
           Sets.newHashSet(
               MetadataObject.Type.METALAKE,
@@ -487,7 +487,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       Set<MetadataObject.Type> supportedTypes =
           Sets.newHashSet(
               MetadataObject.Type.METALAKE,
@@ -520,7 +520,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       Set<MetadataObject.Type> supportedTypes =
           Sets.newHashSet(
               MetadataObject.Type.METALAKE,
@@ -553,7 +553,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       Set<MetadataObject.Type> supportedTypes =
           Sets.newHashSet(
               MetadataObject.Type.METALAKE,
@@ -585,7 +585,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       Set<MetadataObject.Type> supportedTypes =
           Sets.newHashSet(
               MetadataObject.Type.METALAKE,
@@ -618,7 +618,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       Set<MetadataObject.Type> supportedTypes =
           Sets.newHashSet(
               MetadataObject.Type.METALAKE,
@@ -651,7 +651,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
     }
   }
@@ -678,7 +678,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
     }
   }
@@ -705,7 +705,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
     }
   }
@@ -732,7 +732,7 @@ public class Privileges {
     }
 
     @Override
-    public boolean supportsMetadataObject(MetadataObject.Type type) {
+    public boolean supportsMetadataObjectType(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
     }
   }
