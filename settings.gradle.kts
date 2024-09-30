@@ -70,5 +70,3 @@ project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector
 include("web:web", "web:integration-test")
 include("docs")
 include("integration-test-common")
-include("bundles:s3-bundle")
-include("bundles:gcs-bundle")

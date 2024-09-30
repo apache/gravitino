@@ -42,8 +42,8 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
       throw new IllegalArgumentException("The path should be specified.");
     }
 
-    URI uri = path.toUri();
-    if (uri.getScheme() == null || !uri.getScheme().equals("hdfs")) {
+    URI uri = fileSystemPath.toUri();
+    if (uri.getScheme() != null && !uri.getScheme().equals("hdfs")) {
       throw new IllegalArgumentException("The path should be a HDFS path.");
     }
 
