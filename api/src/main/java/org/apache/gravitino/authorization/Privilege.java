@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization;
 
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Unstable;
 
@@ -47,6 +48,24 @@ public interface Privilege {
    * @return It will return true if a metadata object supports the privilege otherwise false.
    */
   boolean supportsMetadataObjectType(MetadataObject.Type type);
+
+  /**
+   * @return the {@link SupportsSpecificCatalog} if the privilege only supports specific catalog
+   *     type.
+   * @throws UnsupportedOperationException if the privilege doesn't bind to a specific catalog type.
+   */
+  default SupportsSpecificCatalog supportsSpecificCatalog() {
+    throw new UnsupportedOperationException("Don't support specific catalog");
+  }
+
+  /**
+   * If a privilege only supports specific catalog type, the privilege should implement this
+   * interface.
+   */
+  interface SupportsSpecificCatalog {
+    /** @return It will return the catalog type which the privilege supports. */
+    Catalog.Type catalogType();
+  }
 
   /** The name of this privilege. */
   enum Name {

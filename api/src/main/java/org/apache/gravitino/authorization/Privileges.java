@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization;
 import com.google.common.collect.Sets;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 
 /** The helper class for {@link Privilege}. */
@@ -336,7 +337,8 @@ public class Privileges {
   }
 
   /** The privilege to create a table. */
-  public static class CreateTable extends GenericPrivilege<CreateTable> {
+  public static class CreateTable extends GenericPrivilege<CreateTable>
+      implements Privilege.SupportsSpecificCatalog {
     private static final CreateTable ALLOW_INSTANCE =
         new CreateTable(Condition.ALLOW, Name.CREATE_TABLE);
     private static final CreateTable DENY_INSTANCE =
@@ -365,10 +367,21 @@ public class Privileges {
               MetadataObject.Type.SCHEMA);
       return supportedTypes.contains(type);
     }
+
+    @Override
+    public Catalog.Type catalogType() {
+      return Catalog.Type.RELATIONAL;
+    }
+
+    @Override
+    public SupportsSpecificCatalog supportsSpecificCatalog() {
+      return this;
+    }
   }
 
   /** The privilege to select data from a table. */
-  public static class SelectTable extends GenericPrivilege<SelectTable> {
+  public static class SelectTable extends GenericPrivilege<SelectTable>
+      implements Privilege.SupportsSpecificCatalog {
     private static final SelectTable ALLOW_INSTANCE =
         new SelectTable(Condition.ALLOW, Name.SELECT_TABLE);
     private static final SelectTable DENY_INSTANCE =
@@ -398,10 +411,21 @@ public class Privileges {
               MetadataObject.Type.TABLE);
       return supportedTypes.contains(type);
     }
+
+    @Override
+    public Catalog.Type catalogType() {
+      return Catalog.Type.RELATIONAL;
+    }
+
+    @Override
+    public SupportsSpecificCatalog supportsSpecificCatalog() {
+      return this;
+    }
   }
 
   /** The privilege to execute SQL `ALTER`, `INSERT`, `UPDATE`, or `DELETE` for a table. */
-  public static class ModifyTable extends GenericPrivilege<ModifyTable> {
+  public static class ModifyTable extends GenericPrivilege<ModifyTable>
+      implements Privilege.SupportsSpecificCatalog {
     private static final ModifyTable ALLOW_INSTANCE =
         new ModifyTable(Condition.ALLOW, Name.MODIFY_TABLE);
     private static final ModifyTable DENY_INSTANCE =
@@ -431,10 +455,21 @@ public class Privileges {
               MetadataObject.Type.TABLE);
       return supportedTypes.contains(type);
     }
+
+    @Override
+    public Catalog.Type catalogType() {
+      return Catalog.Type.RELATIONAL;
+    }
+
+    @Override
+    public SupportsSpecificCatalog supportsSpecificCatalog() {
+      return this;
+    }
   }
 
   /** The privilege to create a fileset. */
-  public static class CreateFileset extends GenericPrivilege<CreateFileset> {
+  public static class CreateFileset extends GenericPrivilege<CreateFileset>
+      implements Privilege.SupportsSpecificCatalog {
     private static final CreateFileset ALLOW_INSTANCE =
         new CreateFileset(Condition.ALLOW, Name.CREATE_FILESET);
     private static final CreateFileset DENY_INSTANCE =
@@ -463,10 +498,21 @@ public class Privileges {
               MetadataObject.Type.SCHEMA);
       return supportedTypes.contains(type);
     }
+
+    @Override
+    public Catalog.Type catalogType() {
+      return Catalog.Type.FILESET;
+    }
+
+    @Override
+    public SupportsSpecificCatalog supportsSpecificCatalog() {
+      return this;
+    }
   }
 
   /** The privilege to read a fileset. */
-  public static class ReadFileset extends GenericPrivilege<ReadFileset> {
+  public static class ReadFileset extends GenericPrivilege<ReadFileset>
+      implements Privilege.SupportsSpecificCatalog {
     private static final ReadFileset ALLOW_INSTANCE =
         new ReadFileset(Condition.ALLOW, Name.READ_FILESET);
     private static final ReadFileset DENY_INSTANCE =
@@ -496,10 +542,21 @@ public class Privileges {
               MetadataObject.Type.FILESET);
       return supportedTypes.contains(type);
     }
+
+    @Override
+    public Catalog.Type catalogType() {
+      return Catalog.Type.FILESET;
+    }
+
+    @Override
+    public SupportsSpecificCatalog supportsSpecificCatalog() {
+      return this;
+    }
   }
 
   /** The privilege to write a fileset. */
-  public static class WriteFileset extends GenericPrivilege<WriteFileset> {
+  public static class WriteFileset extends GenericPrivilege<WriteFileset>
+      implements Privilege.SupportsSpecificCatalog {
     private static final WriteFileset ALLOW_INSTANCE =
         new WriteFileset(Condition.ALLOW, Name.WRITE_FILESET);
     private static final WriteFileset DENY_INSTANCE =
@@ -529,10 +586,21 @@ public class Privileges {
               MetadataObject.Type.FILESET);
       return supportedTypes.contains(type);
     }
+
+    @Override
+    public Catalog.Type catalogType() {
+      return Catalog.Type.FILESET;
+    }
+
+    @Override
+    public SupportsSpecificCatalog supportsSpecificCatalog() {
+      return this;
+    }
   }
 
   /** The privilege to create a topic. */
-  public static class CreateTopic extends GenericPrivilege<CreateTopic> {
+  public static class CreateTopic extends GenericPrivilege<CreateTopic>
+      implements Privilege.SupportsSpecificCatalog {
     private static final CreateTopic ALLOW_INSTANCE =
         new CreateTopic(Condition.ALLOW, Name.CREATE_TOPIC);
     private static final CreateTopic DENY_INSTANCE =
@@ -561,10 +629,21 @@ public class Privileges {
               MetadataObject.Type.SCHEMA);
       return supportedTypes.contains(type);
     }
+
+    @Override
+    public Catalog.Type catalogType() {
+      return Catalog.Type.MESSAGING;
+    }
+
+    @Override
+    public SupportsSpecificCatalog supportsSpecificCatalog() {
+      return this;
+    }
   }
 
   /** The privilege to consume from a topic. */
-  public static class ConsumeTopic extends GenericPrivilege<ConsumeTopic> {
+  public static class ConsumeTopic extends GenericPrivilege<ConsumeTopic>
+      implements Privilege.SupportsSpecificCatalog {
     private static final ConsumeTopic ALLOW_INSTANCE =
         new ConsumeTopic(Condition.ALLOW, Name.CONSUME_TOPIC);
     private static final ConsumeTopic DENY_INSTANCE =
@@ -594,10 +673,21 @@ public class Privileges {
               MetadataObject.Type.TOPIC);
       return supportedTypes.contains(type);
     }
+
+    @Override
+    public Catalog.Type catalogType() {
+      return Catalog.Type.MESSAGING;
+    }
+
+    @Override
+    public SupportsSpecificCatalog supportsSpecificCatalog() {
+      return this;
+    }
   }
 
   /** The privilege to produce to a topic. */
-  public static class ProduceTopic extends GenericPrivilege<ProduceTopic> {
+  public static class ProduceTopic extends GenericPrivilege<ProduceTopic>
+      implements Privilege.SupportsSpecificCatalog {
     private static final ProduceTopic ALLOW_INSTANCE =
         new ProduceTopic(Condition.ALLOW, Name.PRODUCE_TOPIC);
     private static final ProduceTopic DENY_INSTANCE =
@@ -626,6 +716,16 @@ public class Privileges {
               MetadataObject.Type.SCHEMA,
               MetadataObject.Type.TOPIC);
       return supportedTypes.contains(type);
+    }
+
+    @Override
+    public Catalog.Type catalogType() {
+      return Catalog.Type.MESSAGING;
+    }
+
+    @Override
+    public SupportsSpecificCatalog supportsSpecificCatalog() {
+      return this;
     }
   }
 

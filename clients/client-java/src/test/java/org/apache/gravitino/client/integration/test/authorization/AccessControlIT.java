@@ -237,6 +237,15 @@ public class AccessControlIT extends AbstractIT {
             metalake.createRole(
                 "not-existed", properties, Lists.newArrayList(wrongPrivilegeObject)));
 
+    // Create a role with wrong privilege
+    SecurableObject wrongCatalogObject =
+        SecurableObjects.ofCatalog(
+            "fileset_catalog", Lists.newArrayList(Privileges.SelectTable.allow()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.createRole("not-existed", properties, Lists.newArrayList(wrongCatalogObject)));
+
     // Get a role
     role = metalake.getRole(roleName);
 
@@ -449,6 +458,15 @@ public class AccessControlIT extends AbstractIT {
             metalake.grantPrivilegesToRole(
                 roleName, catalog, Lists.newArrayList(Privileges.CreateCatalog.allow())));
 
+    // grant a wrong catalog type privilege
+    MetadataObject wrongCatalog =
+        MetadataObjects.of(null, "fileset_catalog", MetadataObject.Type.CATALOG);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.grantPrivilegesToRole(
+                roleName, wrongCatalog, Lists.newArrayList(Privileges.SelectTable.allow())));
+
     // repeat to grant a privilege
     role =
         metalake.grantPrivilegesToRole(
@@ -474,6 +492,13 @@ public class AccessControlIT extends AbstractIT {
         () ->
             metalake.revokePrivilegesFromRole(
                 roleName, catalog, Lists.newArrayList(Privileges.CreateCatalog.allow())));
+
+    // revoke a wrong catalog type privilege
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.revokePrivilegesFromRole(
+                roleName, wrongCatalog, Lists.newArrayList(Privileges.SelectTable.allow())));
 
     // repeat to revoke a privilege
     role =

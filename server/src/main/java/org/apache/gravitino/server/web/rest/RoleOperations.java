@@ -138,7 +138,7 @@ public class RoleOperations {
               }
 
               for (Privilege privilege : object.privileges()) {
-                AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object);
+                AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
               }
               AuthorizationUtils.checkSecurableObject(metalake, object);
             }

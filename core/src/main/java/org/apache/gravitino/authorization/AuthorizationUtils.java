@@ -37,6 +37,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -254,13 +255,34 @@ public class AuthorizationUtils {
     }
   }
 
-  public static void checkPrivilege(PrivilegeDTO privilegeDTO, MetadataObject object) {
+  public static void checkPrivilege(
+      PrivilegeDTO privilegeDTO, MetadataObject object, String metalake) {
     Privilege privilege = DTOConverters.fromPrivilegeDTO(privilegeDTO);
     if (!privilege.supportsMetadataObjectType(object.type())) {
       throw new IllegalArgumentException(
           String.format(
               "Securable object %s type %s don't support privilege %s",
               object.fullName(), object.type(), privilege));
+    }
+
+    if (object.type() == MetadataObject.Type.CATALOG
+        || object.type() == MetadataObject.Type.SCHEMA) {
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+      NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+      try {
+        Catalog catalog = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(catalogIdent);
+        if (privilege instanceof Privilege.SupportsSpecificCatalog) {
+          if (privilege.supportsSpecificCatalog().catalogType() != catalog.type()) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "The catalog type of securable object %s type %s don't support privilege %s",
+                    object.fullName(), object.type(), privilege));
+          }
+        }
+      } catch (NoSuchCatalogException ne) {
+        throw new NoSuchMetadataObjectException(
+            "Securable object %s doesn't exist", object.fullName());
+      }
     }
   }
 

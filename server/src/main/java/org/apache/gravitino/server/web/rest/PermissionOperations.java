@@ -216,7 +216,7 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             for (PrivilegeDTO privilegeDTO : privilegeGrantRequest.getPrivileges()) {
-              AuthorizationUtils.checkPrivilege(privilegeDTO, object);
+              AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
 
             AuthorizationUtils.checkSecurableObject(metalake, object);
@@ -270,7 +270,7 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             for (PrivilegeDTO privilegeDTO : privilegeRevokeRequest.getPrivileges()) {
-              AuthorizationUtils.checkPrivilege(privilegeDTO, object);
+              AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
 
             AuthorizationUtils.checkSecurableObject(metalake, object);
