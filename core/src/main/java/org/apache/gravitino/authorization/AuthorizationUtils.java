@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.authorization;
 
-import com.google.common.collect.Lists;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -33,6 +35,10 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -47,15 +53,6 @@ public class AuthorizationUtils {
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
-
-  private static final List<Privilege.Name> pluginNotSupportsPrivileges =
-      Lists.newArrayList(
-          Privilege.Name.CREATE_CATALOG,
-          Privilege.Name.USE_CATALOG,
-          Privilege.Name.MANAGE_GRANTS,
-          Privilege.Name.MANAGE_USERS,
-          Privilege.Name.MANAGE_GROUPS,
-          Privilege.Name.CREATE_ROLE);
 
   private AuthorizationUtils() {}
 
@@ -195,16 +192,105 @@ public class AuthorizationUtils {
   }
 
   public static boolean needApplyAuthorizationPluginAllCatalogs(SecurableObject securableObject) {
-    // TODO: Add `supportsSecurableObjects` method for every privilege to simplify this code
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
       for (Privilege privilege : privileges) {
-        if (!pluginNotSupportsPrivileges.contains(privilege.name())) {
+        if (privilege.supportsMetadataObjectType(MetadataObject.Type.CATALOG)) {
           return true;
         }
       }
     }
     return false;
+  }
+
+  // Check every securable object whether exists and is imported.
+  public static void checkSecurableObject(String metalake, MetadataObject object) {
+    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+
+    Supplier<NoSuchMetadataObjectException> exceptionToThrowSupplier =
+        () ->
+            new NoSuchMetadataObjectException(
+                "Securable object %s doesn't exist", object.fullName());
+
+    switch (object.type()) {
+      case METALAKE:
+        check(
+            GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier),
+            exceptionToThrowSupplier);
+        break;
+
+      case CATALOG:
+        check(
+            GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier),
+            exceptionToThrowSupplier);
+        break;
+
+      case SCHEMA:
+        check(
+            GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier),
+            exceptionToThrowSupplier);
+        break;
+
+      case FILESET:
+        check(
+            GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier),
+            exceptionToThrowSupplier);
+        break;
+
+      case TABLE:
+        check(
+            GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier),
+            exceptionToThrowSupplier);
+        break;
+
+      case TOPIC:
+        check(
+            GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier),
+            exceptionToThrowSupplier);
+        break;
+
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the type %s", object.type()));
+    }
+  }
+
+  public static void checkPrivilege(
+      PrivilegeDTO privilegeDTO, MetadataObject object, String metalake) {
+    Privilege privilege = DTOConverters.fromPrivilegeDTO(privilegeDTO);
+    if (!privilege.supportsMetadataObjectType(object.type())) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Securable object %s type %s don't support privilege %s",
+              object.fullName(), object.type(), privilege));
+    }
+
+    if (object.type() == MetadataObject.Type.CATALOG
+        || object.type() == MetadataObject.Type.SCHEMA) {
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+      NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+      try {
+        Catalog catalog = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(catalogIdent);
+        if (privilege instanceof Privilege.SupportsSpecificCatalog) {
+          if (privilege.supportsSpecificCatalog().catalogType() != catalog.type()) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "The catalog type of securable object %s type %s don't support privilege %s",
+                    object.fullName(), object.type(), privilege));
+          }
+        }
+      } catch (NoSuchCatalogException ne) {
+        throw new NoSuchMetadataObjectException(
+            "Securable object %s doesn't exist", object.fullName());
+      }
+    }
+  }
+
+  private static void check(
+      final boolean expression, Supplier<? extends RuntimeException> exceptionToThrowSupplier) {
+    if (!expression) {
+      throw checkNotNull(exceptionToThrowSupplier).get();
+    }
   }
 
   private static boolean needApplyAuthorizationPluginAllCatalogs(MetadataObject.Type type) {
