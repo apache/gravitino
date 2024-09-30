@@ -215,21 +215,12 @@ public class AuthorizationUtils {
 
   // Check every securable object whether exists and is imported.
   public static void checkSecurableObject(String metalake, MetadataObject object) {
-    NameIdentifier identifier;
-
-    // Securable object ignores the metalake namespace, so we should add it back.
-    if (object.type() == MetadataObject.Type.METALAKE) {
-      identifier = NameIdentifier.parse(object.fullName());
-    } else {
-      identifier = NameIdentifier.parse(String.format("%s.%s", metalake, object.fullName()));
-    }
+    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
 
     Supplier<NoSuchMetadataObjectException> exceptionToThrowSupplier =
-        (com.google.common.base.Supplier<NoSuchMetadataObjectException>)
-            () -> {
-              return new NoSuchMetadataObjectException(
-                  "Securable object %s doesn't exist", object.fullName());
-            };
+        () ->
+            new NoSuchMetadataObjectException(
+                "Securable object %s doesn't exist", object.fullName());
 
     switch (object.type()) {
       case METALAKE:
