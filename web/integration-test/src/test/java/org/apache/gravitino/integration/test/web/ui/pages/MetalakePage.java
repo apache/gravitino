@@ -111,6 +111,7 @@ public class MetalakePage extends AbstractWebIT {
   public WebElement footerLinkSupport;
 
   public MetalakePage(WebDriver driver) {
+    this.driver = driver;
     PageFactory.initElements(driver, this);
   }
 
@@ -387,7 +388,7 @@ public class MetalakePage extends AbstractWebIT {
       LOG.error(e.getMessage(), e);
       return false;
     } finally {
-      driver.close();
+      //      driver.close();
       driver.switchTo().window(originalWindowHandle);
     }
   }

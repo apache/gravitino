@@ -117,6 +117,7 @@ public class CatalogsPage extends AbstractWebIT {
   public WebElement catalogTypeList;
 
   public CatalogsPage(WebDriver driver) {
+    this.driver = driver;
     PageFactory.initElements(driver, this);
   }
 
