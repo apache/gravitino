@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -93,7 +94,8 @@ public class TestMain {
   }
 
   @Test
-  public void withHelpOption() throws ParseException {
+  @SuppressWarnings("DefaultCharset")
+  public void withHelpOption() throws ParseException, UnsupportedEncodingException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
     String[] args = {"--help"};
@@ -106,7 +108,8 @@ public class TestMain {
   }
 
   @Test
-  public void parseError() {
+  @SuppressWarnings("DefaultCharset")
+  public void parseError() throws UnsupportedEncodingException {
     String[] args = {"--invalidOption"};
 
     Main.main(args);
