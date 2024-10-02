@@ -59,7 +59,7 @@ import org.apache.gravitino.tag.TagOperations;
 public class GravitinoClient extends GravitinoClientBase
     implements SupportsCatalogs, TagOperations {
 
-  private final GravitinoMetalake metalake;
+  private static GravitinoMetalake metalake = null;
 
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
@@ -80,6 +80,24 @@ public class GravitinoClient extends GravitinoClientBase
       Map<String, String> headers) {
     super(uri, authDataProvider, checkVersion, headers);
     this.metalake = loadMetalake(metalakeName);
+  }
+
+  /**
+   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
+   *
+   * @param uri The base URI for the Gravitino API.
+   * @param authDataProvider The provider of the data which is used for authentication.
+   * @param checkVersion Whether to check the version of the Gravitino server. Gravitino does not
+   *     support the case that the client-side version is higher than the server-side version.
+   * @param headers The base header for Gravitino API.
+   * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
+   */
+  private GravitinoClient(
+          String uri,
+          AuthDataProvider authDataProvider,
+          boolean checkVersion,
+          Map<String, String> headers) {
+    super(uri, authDataProvider, checkVersion, headers);
   }
 
   /**
@@ -494,7 +512,7 @@ public class GravitinoClient extends GravitinoClientBase
           metalakeName != null && !metalakeName.isEmpty(),
           "The argument 'metalakeName' must be a valid name");
 
-      return new GravitinoClient(uri, metalakeName, authDataProvider, checkVersion, headers);
+      return new GravitinoClient(uri, authDataProvider, checkVersion, headers);
     }
   }
 }
