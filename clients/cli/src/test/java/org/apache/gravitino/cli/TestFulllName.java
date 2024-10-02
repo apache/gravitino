@@ -20,49 +20,21 @@
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.GravitinoOptions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class TestFulllName {
 
   private Options options;
-  private static final Map<String, String> DEFAULTS = new HashMap<>(System.getenv());
-  private static Map<String, String> envMap;
-
-  /* Used to simulate setting environment variables. */
-  public static void accessFields() throws Exception {
-    envMap = new HashMap<>();
-    Class<?> clazz = Class.forName("java.lang.ProcessEnvironment");
-    Field environmentField = clazz.getDeclaredField("theEnvironment");
-    Field unmodifiableEnvironmentField = clazz.getDeclaredField("theUnmodifiableEnvironment");
-    removeStaticFinalAndSetValue(environmentField, envMap);
-    removeStaticFinalAndSetValue(unmodifiableEnvironmentField, envMap);
-  }
-
-  private static void removeStaticFinalAndSetValue(Field field, Object value) throws Exception {
-    field.setAccessible(true);
-    Field modifiersField = Field.class.getDeclaredField("modifiers");
-    modifiersField.setAccessible(true);
-    modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-    field.set(null, value); 
-  }
 
   @BeforeEach
   public void setUp() {
     options = new GravitinoOptions().options();
-    envMap.clear();
-    envMap.putAll(DEFAULTS);
   }
 
   @Test
@@ -75,19 +47,6 @@ public class TestFulllName {
     assertEquals("metalake_demo", metalakeName);
   }
 
-  @Disabled("Issues on Java 11 and 17")
-  @Test
-  public void entityFromEnvironmentVariable() throws Exception {
-    String[] args = {}; // No command line metalake option
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-
-    System.getenv().put("GRAVITINO_METALAKE", "metalake_env");
-
-    String metalakeName = fullName.getMetalakeName();
-    assertEquals("metalake_env", metalakeName);
-  }
-
   @Test
   public void entityFromFullNameOption() throws Exception {
     String[] args = {"--name", "metalakeA.catalogB.schemaC.tableD"};
@@ -96,25 +55,6 @@ public class TestFulllName {
 
     String metalakeName = fullName.getMetalakeName();
     assertEquals("metalakeA", metalakeName);
-    String catalogName = fullName.getCatalogName();
-    assertEquals("catalogB", catalogName);
-    String schemaName = fullName.getSchemaName();
-    assertEquals("schemaC", schemaName);
-    String tableName = fullName.getTableName();
-    assertEquals("tableD", tableName);
-  }
-
-  @Disabled("Issues on Java 11 and 17")
-  @Test
-  public void entityFromFullNameOptionWithoutMetalake() throws Exception {
-    String[] args = {"--name", "catalogB.schemaC.tableD"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-
-    System.getenv().put("GRAVITINO_METALAKE", "metalake_env");
-
-    String metalakeName = fullName.getMetalakeName();
-    assertEquals("metalake_env", metalakeName);
     String catalogName = fullName.getCatalogName();
     assertEquals("catalogB", catalogName);
     String schemaName = fullName.getSchemaName();
