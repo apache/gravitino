@@ -31,6 +31,7 @@ import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.GravitinoOptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class TestFulllName {
@@ -75,7 +76,7 @@ public class TestFulllName {
     assertEquals("metalake_demo", metalakeName);
   }
 
-  @DDisable("Issues on Java 11 and 17")
+  @Disabled("Issues on Java 11 and 17")
   @Test
   public void entityFromEnvironmentVariable() throws Exception {
     String[] args = {}; // No command line metalake option
@@ -104,7 +105,7 @@ public class TestFulllName {
     assertEquals("tableD", tableName);
   }
 
-  @DDisable("Issues on Java 11 and 17")
+  @Disabled("Issues on Java 11 and 17")
   @Test
   public void entityFromFullNameOptionWithoutMetalake() throws Exception {
     String[] args = {"--name", "catalogB.schemaC.tableD"};
