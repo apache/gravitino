@@ -41,7 +41,6 @@ public class TestFulllName {
   private static Map<String, String> envMap;
 
   /* Used to simulate setting environment variables. */
-  @BeforeAll
   public static void accessFields() throws Exception {
     envMap = new HashMap<>();
     Class<?> clazz = Class.forName("java.lang.ProcessEnvironment");
@@ -56,7 +55,7 @@ public class TestFulllName {
     Field modifiersField = Field.class.getDeclaredField("modifiers");
     modifiersField.setAccessible(true);
     modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-    field.set(null, value);
+    field.set(null, value); 
   }
 
   @BeforeEach
