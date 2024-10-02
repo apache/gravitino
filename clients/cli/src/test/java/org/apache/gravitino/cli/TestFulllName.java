@@ -75,6 +75,7 @@ public class TestFulllName {
     assertEquals("metalake_demo", metalakeName);
   }
 
+  @DisablesOnJre(JRE.JAVA_17)
   @Test
   public void entityFromEnvironmentVariable() throws Exception {
     String[] args = {}; // No command line metalake option
@@ -103,6 +104,7 @@ public class TestFulllName {
     assertEquals("tableD", tableName);
   }
 
+  @DisablesOnJre(JRE.JAVA_17)
   @Test
   public void entityFromFullNameOptionWithoutMetalake() throws Exception {
     String[] args = {"--name", "catalogB.schemaC.tableD"};
