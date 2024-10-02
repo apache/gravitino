@@ -55,16 +55,23 @@ Before you can build and run this project, it is suggested you have the followin
 To run the Gravitino CLI, use the following command structure:
 
 ```bash
-java -jar gravitino-cli.jar <entity> <action> [options]
+usage: gcli <entity> <action> [options]
 Options
--h, --help: Display help information
--v, --version: Display the Gravitino server version
--u, --url <url>: Specify the Gravitino server URL (default: http://localhost:8090)
--m, --metalake <name>: Specify the Metalake to operate on
--c, --catalog <name>: Specify the Catalog to operate on
--s, --schema <name>: Specify the Schema to operate on
--t, --table <name>: Specify the Table to operate on
--x, --command <command>: Specify the action (list, details, create, delete, or update)
+ -c,--catalog <arg>    catalog name
+ -C,--create           create an entity
+ -D,--details          list details about an entity
+ -e,--entity <arg>     entity type
+ -f,--name <arg>       full entity name (dot separated)
+ -h,--help             command help information
+ -L,--list             list entity children
+ -m,--metalake <arg>   metalake name
+ -R,--delete           delete an entity
+ -s,--schema <arg>     schema name
+ -t,--table <arg>      table name
+ -u,--url <arg>        Gravitino URL (default: http://localhost:8090)
+ -U,--update           update an entity
+ -v,--version          Gravitino version
+ -x,--command <arg>    one of: list, details, create, delete, or update
 ```
 
 ## Commands
