@@ -51,7 +51,7 @@ public class GravitinoOptions {
     // Add options using helper method to avoid repetition
     options.addOption(createSimpleOption("h", HELP, "command help information"));
     options.addOption(createSimpleOption("v", VERSION, "Gravitino version"));
-    options.addOption(createArgOption("u", URL, "Gravitino URL"));
+    options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createArgOption("c", CATALOG, "catalog name"));
     options.addOption(createArgOption("s", SCHEMA, "schema name"));
