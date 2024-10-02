@@ -1,0 +1,114 @@
+# Apache Gravitino CLI
+
+Apache Gravitino CLI is a command-line tool that interacts with the Gravitino server to manage and query entities like metalakes, catalogs, schemas, and tables. The tool provides options for listing information about Gravitino entities and in future versions support creating, deleting, and updating these entities.
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Commands](#commands)
+- [Running Tests](#running-tests)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Features
+
+- Retrieve server version
+- Provide help on usage
+- Manage Gravitino entities such as Metalakes, Catalogs, Schemas, and Tables
+- List details about Graviotino entities
+
+## Installation
+
+### Prerequisites
+
+Before you can build and run this project, it is suggested you have the following installed:
+
+- Java 11 or higher
+
+### Build the Project
+
+1. Clone the entire Gravitino repository:
+
+    ```bash
+    git clone https://github.com/apache/gravitino
+    ```
+
+2. Build the CLI sub-project using Gradle:
+
+    ```bash
+    ./gradlew :clients:cli:build
+    ```
+3. Create an alias:
+
+    ```bash
+    alias gcli='java -jar clients/cli/build/libs/gravitino-cli-0.7.0-incubating-SNAPSHOT.jar'
+    ```
+3. Test the command:
+    ```bash
+    gcli --help
+    ```
+
+## Usage
+
+To run the Gravitino CLI, use the following command structure:
+
+```bash
+java -jar gravitino-cli.jar <entity> <action> [options]
+Options
+-h, --help: Display help information
+-v, --version: Display the Gravitino server version
+-u, --url <url>: Specify the Gravitino server URL (default: http://localhost:8090)
+-m, --metalake <name>: Specify the Metalake to operate on
+-c, --catalog <name>: Specify the Catalog to operate on
+-s, --schema <name>: Specify the Schema to operate on
+-t, --table <name>: Specify the Table to operate on
+-x, --command <command>: Specify the action (list, details, create, delete, or update)
+```
+
+## Commands
+The following commands are available for entity management:
+
+list: List available entities
+details: Show detailed information about an entity
+create: Create a new entity
+delete: Delete an existing entity
+update: Update an existing entity
+
+### Examples
+List All Metalakes
+
+```bash
+gcli list
+```
+
+Get Details of a Specific Metalake
+
+```bash
+gcli metalake details -name my-metalake
+```
+
+List Tables in a Catalog
+
+```bash
+gcli metalake list -name my-metalake.my-catalog
+```
+
+## Running Tests
+
+This project includes a suite of unit tests to verify its functionality.
+
+To run the tests, execute the following command:
+
+```bash
+./gradlew :clients:cli:test
+```
+
+## Contributing
+
+We welcome contributions to the Gravitino CLI!
+
+## License
+
+This project is licensed under the Apache License 2.0.

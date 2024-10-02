@@ -349,7 +349,7 @@ subprojects {
     options.locale = "en_US"
 
     val projectName = project.name
-    if (projectName == "common" || projectName == "api" || projectName == "client-java" || projectName == "filesystem-hadoop3") {
+    if (projectName == "common" || projectName == "api" || projectName == "client-java" || projectName == "client-cli" || projectName == "filesystem-hadoop3") {
       options {
         (this as CoreJavadocOptions).addStringOption("Xwerror", "-quiet")
         isFailOnError = true
