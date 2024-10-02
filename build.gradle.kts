@@ -756,6 +756,7 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("client") &&
+        !it.name.startsWith("cli") &&
         !it.name.startsWith("authorization") &&
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
