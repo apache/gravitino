@@ -23,12 +23,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
@@ -75,6 +71,7 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
 
   @Override
   public String generateDropDatabaseSql(String databaseName, boolean cascade) {
+    validateDatabaseName(databaseName);
     final String dropDatabaseSql = "DROP DATABASE `" + databaseName + "`";
     if (cascade) {
       return dropDatabaseSql;
@@ -119,5 +116,11 @@ public class MysqlDatabaseOperations extends JdbcDatabaseOperations {
   @Override
   protected boolean isSystemDatabase(String dbName) {
     return SYS_MYSQL_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
+  }
+
+  public void validateDatabaseName(String databaseName){
+    if(Objects.isNull(databaseName) || databaseName.trim().isEmpty()){
+      throw new IllegalArgumentException("Database name cannot be null or empty.");
+    }
   }
 }
