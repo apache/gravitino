@@ -273,7 +273,8 @@ public class AuthorizationUtils {
     for (Privilege privilege : privileges) {
       if (privilegeNameSet.contains(privilege.name())) {
         throw new IllegalPrivilegeException(
-            "Doesn't support duplicated privilege name %s", privilege.name());
+            "Doesn't support duplicated privilege name %s with different condition",
+            privilege.name());
       }
       privilegeNameSet.add(privilege.name());
     }

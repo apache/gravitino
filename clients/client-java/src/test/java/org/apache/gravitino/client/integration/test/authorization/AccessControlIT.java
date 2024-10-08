@@ -247,6 +247,17 @@ public class AccessControlIT extends AbstractIT {
         () ->
             metalake.createRole("not-existed", properties, Lists.newArrayList(wrongCatalogObject)));
 
+    // Create a role with duplicated privilege
+    SecurableObject duplicatedCatalogObject =
+        SecurableObjects.ofCatalog(
+            "fileset_catalog",
+            Lists.newArrayList(Privileges.SelectTable.allow(), Privileges.SelectTable.deny()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.createRole(
+                "not-existed", properties, Lists.newArrayList(duplicatedCatalogObject)));
+
     // Get a role
     role = metalake.getRole(roleName);
 
@@ -467,6 +478,17 @@ public class AccessControlIT extends AbstractIT {
         () ->
             metalake.grantPrivilegesToRole(
                 roleName, wrongCatalog, Lists.newArrayList(Privileges.SelectTable.allow())));
+
+    // grant a duplicated privilege
+    MetadataObject duplicatedCatalog =
+        MetadataObjects.of(null, "fileset_catalog", MetadataObject.Type.CATALOG);
+    Assertions.assertThrows(
+        IllegalPrivilegeException.class,
+        () ->
+            metalake.grantPrivilegesToRole(
+                roleName,
+                duplicatedCatalog,
+                Lists.newArrayList(Privileges.SelectTable.allow(), Privileges.SelectTable.deny())));
 
     // repeat to grant a privilege
     role =
