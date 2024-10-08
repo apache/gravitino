@@ -35,6 +35,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -454,6 +455,12 @@ public class TestCatalogManager {
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
 
     // Test drop catalog
+    Exception exception =
+        Assertions.assertThrows(
+            EntityInUseException.class, () -> catalogManager.dropCatalog(ident));
+    Assertions.assertTrue(exception.getMessage().contains("Catalog metalake.test41 is in use"));
+
+    Assertions.assertDoesNotThrow(() -> catalogManager.deactivateCatalog(ident));
     boolean dropped = catalogManager.dropCatalog(ident);
     Assertions.assertTrue(dropped);
 

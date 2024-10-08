@@ -21,6 +21,7 @@ package org.apache.gravitino.connector;
 
 import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
+import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.Catalog.PROPERTY_PACKAGE;
 
 import com.google.common.base.Preconditions;
@@ -73,6 +74,11 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   "The region code of the cloud that the catalog is running on",
                   false /* immutable */,
                   null /* The default value does not work because if the user does not set it, this property will not be displayed */,
+                  false /* hidden */),
+              PropertyEntry.booleanReservedPropertyEntry(
+                  PROPERTY_IN_USE,
+                  "The property indicating the catalog is in use",
+                  true /* default value */,
                   false /* hidden */)),
           PropertyEntry::getName);
 

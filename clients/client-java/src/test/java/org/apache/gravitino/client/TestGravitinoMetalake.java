@@ -400,7 +400,7 @@ public class TestGravitinoMetalake extends TestBase {
 
     DropResponse resp = new DropResponse(true);
     buildMockResource(Method.DELETE, path, null, resp, HttpStatus.SC_OK);
-    boolean dropped = gravitinoClient.dropCatalog(catalogName);
+    boolean dropped = gravitinoClient.dropCatalog(catalogName, true);
     Assertions.assertTrue(dropped, "catalog should be dropped");
 
     // Test return false

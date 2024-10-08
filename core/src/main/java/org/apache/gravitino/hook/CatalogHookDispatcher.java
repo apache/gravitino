@@ -32,8 +32,11 @@ import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.NonInUseEntityException;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -110,6 +113,12 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public boolean dropCatalog(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, EntityInUseException {
+    return dispatcher.dropCatalog(ident, force);
+  }
+
+  @Override
   public void testConnection(
       NameIdentifier ident,
       Catalog.Type type,
@@ -118,6 +127,17 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       Map<String, String> properties)
       throws Exception {
     dispatcher.testConnection(ident, type, provider, comment, properties);
+  }
+
+  @Override
+  public void activateCatalog(NameIdentifier ident)
+      throws NoSuchCatalogException, NonInUseEntityException {
+    dispatcher.activateCatalog(ident);
+  }
+
+  @Override
+  public void deactivateCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    dispatcher.deactivateCatalog(ident);
   }
 
   @Override

@@ -18,7 +18,11 @@
 from gravitino.constants.error import ErrorConstants
 from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
-from gravitino.exceptions.base import NoSuchFilesetException, NoSuchSchemaException
+from gravitino.exceptions.base import (
+    NoSuchFilesetException,
+    NoSuchSchemaException,
+    NonInUseEntityException,
+)
 
 
 class FilesetErrorHandler(RestErrorHandler):
@@ -34,6 +38,9 @@ class FilesetErrorHandler(RestErrorHandler):
                 raise NoSuchSchemaException(error_message)
             if exception_type == NoSuchFilesetException.__name__:
                 raise NoSuchFilesetException(error_message)
+
+        if code == ErrorConstants.NON_IN_USE_ENTITY_CODE:
+            raise NonInUseEntityException(error_message)
 
         super().handle(error_response)
 

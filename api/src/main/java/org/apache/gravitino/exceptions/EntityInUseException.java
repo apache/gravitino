@@ -16,23 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.server.web.rest;
+package org.apache.gravitino.exceptions;
 
-public enum OperationType {
-  LIST,
-  CREATE,
-  LOAD,
-  ALTER,
-  DROP,
-  ACTIVATE,
-  DEACTIVATE,
-  /** This is a special operation type that is used to get a partition from a table. */
-  GET,
-  ADD,
-  REMOVE,
-  DELETE,
-  GRANT,
-  REVOKE,
-  ASSOCIATE,
-  SET,
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
+/** Exception thrown when an entity is in use and cannot be deleted. */
+public class EntityInUseException extends GravitinoRuntimeException {
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public EntityInUseException(@FormatString String message, Object... args) {
+    super(message, args);
+  }
 }

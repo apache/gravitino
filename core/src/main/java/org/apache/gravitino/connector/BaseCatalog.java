@@ -342,6 +342,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           tempProperties
               .entrySet()
               .removeIf(entry -> catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+          tempProperties.putIfAbsent(
+              PROPERTY_IN_USE,
+              catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
           properties = tempProperties;
         }
       }
