@@ -34,21 +34,21 @@ public interface Credential {
   String getCredentialType();
 
   /**
-   * Returns the expiration time of the credential in seconds since the epoch.
+   * Returns the expiration time of the credential in seconds since the epoch, 0 means not expire.
    *
    * @return the expiration time as a long.
    */
   long getExpireTimeSecs();
 
   /**
-   * Returns additional information related to the credential.
+   * Returns credential information.
    *
    * @return a map of credential information.
    */
   Map<String, String> getCredentialInfo();
 
   /**
-   * Converts the credential to properties to transfer the credential.
+   * Converts the credential to properties to transfer the credential though API.
    *
    * @return a map containing credential properties.
    */
