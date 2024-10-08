@@ -18,18 +18,26 @@
  */
 package org.apache.gravitino.server.web.rest;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.PropertyEntry;
 
 public class TestCatalog extends BaseCatalog<TestCatalog> {
-  private static final PropertiesMetadata PROPERTIES_METADATA = ImmutableMap::of;
+  private static final PropertiesMetadata PROPERTIES_METADATA =
+      new BaseCatalogPropertiesMetadata() {
+        @Override
+        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+          return Collections.emptyMap();
+        }
+      };
 
   @Override
   public String shortName() {

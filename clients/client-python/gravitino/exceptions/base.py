@@ -111,3 +111,11 @@ class UnauthorizedException(GravitinoRuntimeException):
 
 class BadRequestException(GravitinoRuntimeException):
     """An exception thrown when the request is invalid."""
+
+
+class EntityInUseException(GravitinoRuntimeException):
+    """An Exception thrown when an entity is in use and cannot be deleted."""
+
+
+class NonInUseEntityException(GravitinoRuntimeException):
+    """An exception thrown when operating on a non-in-use entity."""

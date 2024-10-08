@@ -188,6 +188,70 @@ public class CatalogOperations {
   }
 
   @GET
+  @Path("{catalog}/activate")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "activate-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "activate-catalog", absolute = true)
+  public Response activateCatalog(
+      @PathParam("metalake") String metalake, @PathParam("catalog") String catalogName) {
+    LOG.info("Received activate request for catalog: {}.{}", metalake, catalogName);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
+            TreeLockUtils.doWithTreeLock(
+                NameIdentifierUtil.ofMetalake(metalake),
+                LockType.READ,
+                () -> {
+                  catalogDispatcher.activateCatalog(ident);
+                  return null;
+                });
+            Response response = Utils.ok(new BaseResponse());
+            LOG.info("Successfully activate catalog: {}.{}", metalake, catalogName);
+            return response;
+          });
+
+    } catch (Exception e) {
+      LOG.info("Failed to activate catalog: {}.{}", metalake, catalogName);
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.ACTIVATE, catalogName, metalake, e);
+    }
+  }
+
+  @GET
+  @Path("{catalog}/deactivate")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "deactivate-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "deactivate-catalog", absolute = true)
+  public Response deactivateCatalog(
+      @PathParam("metalake") String metalake, @PathParam("catalog") String catalogName) {
+    LOG.info("Received deactivate request for catalog: {}.{}", metalake, catalogName);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
+            TreeLockUtils.doWithTreeLock(
+                NameIdentifierUtil.ofMetalake(metalake),
+                LockType.READ,
+                () -> {
+                  catalogDispatcher.deactivateCatalog(ident);
+                  return null;
+                });
+            Response response = Utils.ok(new BaseResponse());
+            LOG.info("Successfully deactivate catalog: {}.{}", metalake, catalogName);
+            return response;
+          });
+
+    } catch (Exception e) {
+      LOG.info("Failed to deactivate catalog: {}.{}", metalake, catalogName);
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.DEACTIVATE, catalogName, metalake, e);
+    }
+  }
+
+  @GET
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -252,7 +316,9 @@ public class CatalogOperations {
   @Timed(name = "drop-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-catalog", absolute = true)
   public Response dropCatalog(
-      @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
+      @PathParam("metalake") String metalakeName,
+      @PathParam("catalog") String catalogName,
+      @DefaultValue("false") @QueryParam("force") boolean force) {
     LOG.info("Received drop catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
       return Utils.doAs(
@@ -263,7 +329,7 @@ public class CatalogOperations {
                 TreeLockUtils.doWithTreeLock(
                     NameIdentifierUtil.ofMetalake(metalakeName),
                     LockType.WRITE,
-                    () -> catalogDispatcher.dropCatalog(ident));
+                    () -> catalogDispatcher.dropCatalog(ident, force));
             if (!dropped) {
               LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
             }

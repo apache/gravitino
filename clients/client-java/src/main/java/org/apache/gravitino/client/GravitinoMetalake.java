@@ -77,6 +77,7 @@ import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -86,6 +87,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -261,21 +263,68 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
-   * Drop the catalog with specified identifier.
+   * Drop a catalog with specified name. If the force flag is true, it will:
    *
-   * @param catalogName the name of the catalog.
-   * @return true if the catalog is dropped successfully, false if the catalog does not exist.
+   * <ul>
+   *   <li>Cascade drop all sub-entities (schemas, tables, etc.) of the catalog in Gravitino store.
+   *   <li>Drop the catalog even if it is in use.
+   *   <li>External resources (e.g. database, table, etc.) associated with sub-entities will not be
+   *       dropped unless it is managed (such as managed fileset).
+   * </ul>
+   *
+   * @param catalogName The identifier of the catalog.
+   * @param force Whether to force the drop.
+   * @return True if the catalog was dropped, false if the catalog does not exist.
+   * @throws NonEmptyEntityException If the catalog is not empty and force is false.
+   * @throws EntityInUseException If the catalog is in use and force is false.
    */
   @Override
-  public boolean dropCatalog(String catalogName) {
+  public boolean dropCatalog(String catalogName, boolean force)
+      throws NonEmptyEntityException, EntityInUseException {
+    Map<String, String> params = new HashMap<>();
+    params.put("force", String.valueOf(force));
+
     DropResponse resp =
         restClient.delete(
             String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            params,
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  @Override
+  public void activateCatalog(String catalogName) throws NoSuchCatalogException {
+    ErrorResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName) + "/activate",
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
+  @Override
+  public void deactivateCatalog(String catalogName) throws NoSuchCatalogException {
+    ErrorResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName) + "/deactivate",
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
   }
 
   /**

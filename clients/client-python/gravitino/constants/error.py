@@ -56,6 +56,12 @@ class ErrorConstants(IntEnum):
     # Error codes for connect to catalog failed.
     CONNECTION_FAILED_CODE = 1007
 
+    # Error codes for operation on a no in use entity.
+    NON_IN_USE_ENTITY_CODE = 1009
+
+    # Error codes for drop an in use entity.
+    ENTITY_IN_USE_CODE = 1010
+
     # Error codes for invalid state.
     UNKNOWN_ERROR_CODE = 1100
 

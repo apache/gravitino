@@ -185,19 +185,47 @@ class GravitinoMetalake(MetalakeDTO):
             self.name(), catalog_response.catalog(), self.rest_client
         )
 
-    def drop_catalog(self, name: str) -> bool:
+    def drop_catalog(self, name: str, force: bool = False) -> bool:
         """Drop the catalog with specified name.
 
         Args:
-            name the name of the catalog.
+            name: the name of the catalog.
+            force: whether to force drop the catalog.
 
         Returns:
-            true if the catalog is dropped successfully, false otherwise.
+            true if the catalog is dropped successfully, false if the catalog does not exist.
         """
+        params = {"force": str(force)}
         url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
-        response = self.rest_client.delete(url, error_handler=CATALOG_ERROR_HANDLER)
+        response = self.rest_client.delete(
+            url, params=params, error_handler=CATALOG_ERROR_HANDLER
+        )
 
         drop_response = DropResponse.from_json(response.body, infer_missing=True)
         drop_response.validate()
 
         return drop_response.dropped()
+
+    def activate_catalog(self, name: str):
+        """Activate the catalog with specified name. If the catalog is already activated, this method does nothing.
+
+        Args:
+            name: the name of the catalog.
+
+        Raises:
+            NoSuchCatalogException if the catalog with specified name does not exist.
+        """
+        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name) + "/activate"
+        self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
+
+    def deactivate_catalog(self, name: str):
+        """Deactivate the catalog with specified name. If the catalog is already deactivated, this method does nothing.
+
+        Args:
+            name: the name of the catalog.
+
+        Raises:
+            NoSuchCatalogException if the catalog with specified name does not exist.
+        """
+        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name) + "/deactivate"
+        self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
