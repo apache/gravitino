@@ -114,7 +114,7 @@ tasks.test {
 
 tasks.register<JavaExec>("TrinoTest") {
   classpath = sourceSets["test"].runtimeClasspath
-  mainClass.set("org.apache.gravitino.integration.test.trino.TrinoQueryTestTool")
+  mainClass.set("org.apache.gravitino.trino.connector.integration.test.TrinoQueryTestTool")
 
   if (JavaVersion.current() > JavaVersion.VERSION_1_8) {
     jvmArgs = listOf(
