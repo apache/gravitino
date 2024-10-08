@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import java.io.IOException;
 import java.net.URI;
-import org.apache.commons.lang3.StringUtils;
+import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -29,20 +29,18 @@ import org.apache.hadoop.fs.Path;
 public class HDFSFileSystemProvider implements FileSystemProvider {
 
   @Override
-  public FileSystem getFileSystem(Configuration configuration, Path path) throws IOException {
-    Path fileSystemPath = path;
-    if (fileSystemPath == null) {
-      String pathString = configuration.get("fs.defaultFS");
-      if (StringUtils.isNotBlank(pathString)) {
-        fileSystemPath = new Path(pathString);
-      }
+  public FileSystem getFileSystem(Map<String, String> config) throws IOException {
+    Configuration configuration = new Configuration();
+    for (Map.Entry<String, String> entry : config.entrySet()) {
+      configuration.set(entry.getKey(), entry.getValue());
     }
 
-    if (fileSystemPath == null) {
+    String pathString = configuration.get("fs.defaultFS");
+    if (pathString == null) {
       throw new IllegalArgumentException("The path should be specified.");
     }
 
-    URI uri = fileSystemPath.toUri();
+    URI uri = new Path(pathString).toUri();
     if (uri.getScheme() != null && !uri.getScheme().equals("hdfs")) {
       throw new IllegalArgumentException("The path should be a HDFS path.");
     }

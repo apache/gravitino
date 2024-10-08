@@ -19,28 +19,22 @@
 package org.apache.gravitino.catalog.hadoop.fs;
 
 import java.io.IOException;
-import org.apache.commons.lang3.StringUtils;
+import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 
 public class LocalFileSystemProvider implements FileSystemProvider {
 
   @Override
-  public FileSystem getFileSystem(Configuration configuration, Path path) throws IOException {
-    Path fileSystemPath = path;
-    if (fileSystemPath == null) {
-      String pathString = configuration.get("fs.defaultFS");
-      if (StringUtils.isNotBlank(pathString)) {
-        fileSystemPath = new Path(pathString);
-      }
-    }
+  public FileSystem getFileSystem(Map<String, String> config) throws IOException {
+    Configuration configuration = new Configuration();
+    config.forEach(configuration::set);
+    return FileSystem.get(FileSystem.getDefaultUri(configuration), configuration);
+  }
 
-    if (fileSystemPath == null) {
-      fileSystemPath = new Path("file:///");
-    }
-
-    return FileSystem.get(fileSystemPath.toUri(), configuration);
+  @Override
+  public String getScheme() {
+    return "file";
   }
 }

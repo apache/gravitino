@@ -20,9 +20,8 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import java.io.IOException;
-import org.apache.hadoop.conf.Configuration;
+import java.util.Map;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 
 public interface FileSystemProvider {
 
@@ -35,19 +34,17 @@ public interface FileSystemProvider {
    *
    * <p>For example, we can check endpoint configurations for S3AFileSystem, or set the default one.
    *
-   * @param configuration The configuration.
-   * @param path The path.
+   * @param config The configuration for the FileSystem instance.
    * @return The FileSystem instance.
    * @throws IOException If the FileSystem instance cannot be created.
    */
-  FileSystem getFileSystem(Configuration configuration, Path path) throws IOException;
+  FileSystem getFileSystem(Map<String, String> config) throws IOException;
 
   /**
-   * Get the scheme of this FileSystem provider.
+   * Get the scheme of this FileSystem provider. file for LocalFileSystem, hdfs for HDFS, s3a for
+   * S3AFileSystem, etc.
    *
    * @return The scheme of this FileSystem provider.
    */
-  default String getScheme() {
-    return "file";
-  }
+  String getScheme();
 }

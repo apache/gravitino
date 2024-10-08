@@ -680,26 +680,18 @@ public class TestHadoopCatalogOperations {
   public void testFormalizePath() throws IOException {
 
     String[] paths =
-        new String[] {
-          "tmp/catalog", "/tmp/catalog", "file:/tmp/catalog", "file:///tmp/catalog",
-          //          "hdfs://localhost:9000/tmp/catalog",
-          //          "s3a://bucket/tmp/catalog",
-          //          "gs://bucket/tmp/catalog"
-        };
+        new String[] {"tmp/catalog", "/tmp/catalog", "file:/tmp/catalog", "file:///tmp/catalog"};
 
     String[] expected =
         new String[] {
           "file:" + Paths.get("").toAbsolutePath() + "/tmp/catalog",
           "file:/tmp/catalog",
           "file:/tmp/catalog",
-          "file:/tmp/catalog",
-          //          "hdfs://localhost:9000/tmp/catalog",
-          //          "s3a://bucket/tmp/catalog",
-          //          "gs://bucket/tmp/catalog"
+          "file:/tmp/catalog"
         };
 
     for (int i = 0; i < paths.length; i++) {
-      Path actual = HadoopCatalogOperations.formalizePath(new Path(paths[i]), new Configuration());
+      Path actual = HadoopCatalogOperations.formalizePath(new Path(paths[i]), Maps.newHashMap());
       Assertions.assertEquals(expected[i], actual.toString());
     }
   }
@@ -873,6 +865,7 @@ public class TestHadoopCatalogOperations {
 
     try (HadoopCatalogOperations mockOps = Mockito.mock(HadoopCatalogOperations.class)) {
       mockOps.hadoopConf = new Configuration();
+      mockOps.bypassConfigs = Maps.newHashMap();
       when(mockOps.loadFileset(filesetIdent)).thenReturn(mockFileset);
       when(mockOps.getConf()).thenReturn(Maps.newHashMap());
       String subPath = "/test/test.parquet";
