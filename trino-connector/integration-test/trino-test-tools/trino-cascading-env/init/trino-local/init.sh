@@ -32,8 +32,20 @@ cp "$trino_conf_dir/config/catalog/trino.properties" /etc/trino/catalog/trino.pr
 /usr/local/gravitino-server/bin/gravitino.sh start
 
 #create test metalake
-sleep 3
-curl -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://localhost:8090/api/metalakes
+counter=0
+while [ $counter -le 30 ]; do
+  counter=$((counter + 1))
+  response=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://localhost:8090/api/metalakes)
+  if [ "$response" -eq 200 ]; then
+    break
+  fi
+
+  if [ "$counter" -eq 30 ]; then
+    echo "Failed to create test metalake, the gravitino server is not running"
+    exit 1
+  fi
+  sleep 1
+done
 
 #
 # Update `gravitino.uri = http://GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT` in the `conf/catalog/gravitino.properties`
