@@ -216,11 +216,11 @@ If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a 
 
 #### View support
 
-The Gravitino Iceberg REST server supports view interfaces through its JDBC backend. You can enable this by setting the `jdbc.schema-version` property.
+You could access the view interface if using JDBC backend and enable `jdbc.schema-version` property.
 
-| Configuration item                              | Description                                                                                                                                  | Default value           | Required | Since Version |
-|-------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
-| `gravitino.iceberg-rest.jdbc.schema-version`    | JDBC catalog is initialized without view support. To auto-migrate the database's schema and enable view support, set jdbc.schema-version=V1  | (none)                  | NO       | 0.7.0         |
+| Configuration item                              | Description                                                                                | Default value | Required | Since Version |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.jdbc.schema-version`    | The schema version of JDBC catalog backend, setting to `V1` if supporting view operations. | (none)        | NO       | 0.7.0         |
 
 
 #### Multi catalog support
