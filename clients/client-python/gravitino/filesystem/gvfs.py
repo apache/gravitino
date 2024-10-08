@@ -94,11 +94,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         """
         self._metalake = metalake_name
         auth_type = (
-            GVFSConfig.DEFAULT_AUTH_TYPE
+            GVFSConfig.SIMPLE_AUTH_TYPE
             if options is None
-            else options.get(GVFSConfig.AUTH_TYPE, GVFSConfig.DEFAULT_AUTH_TYPE)
+            else options.get(GVFSConfig.AUTH_TYPE, GVFSConfig.SIMPLE_AUTH_TYPE)
         )
-        if auth_type == GVFSConfig.DEFAULT_AUTH_TYPE:
+        if auth_type == GVFSConfig.SIMPLE_AUTH_TYPE:
             self._client = GravitinoClient(
                 uri=server_uri,
                 metalake_name=metalake_name,

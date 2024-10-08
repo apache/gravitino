@@ -562,10 +562,10 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 print(fs.ls("gvfs://fileset/fileset_catlaog/tmp/test_fileset"))
 ```
 
-##### Using `oauth2` authentication
+##### Using `OAuth` authentication
 
 First, make sure that your Gravitino server is also configured to use the `oauth2` authentication mode,
-and you have an oauth2 server to fetch the token: [Security](security/security.md).
+and you have an OAuth server to fetch the token: [Security](security/security.md).
 
 Then, you can configure the authentication like this:
 
