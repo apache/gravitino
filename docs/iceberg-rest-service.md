@@ -14,7 +14,6 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 
 - Supports the Apache Iceberg REST API defined in Iceberg 1.5, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
   - token
-  - view
   - multi table transaction
   - pagination
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
@@ -213,6 +212,15 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 | `gravitino.iceberg-rest.catalog-backend-impl`  | The fully-qualified class name of a custom catalog implementation, only worked if `catalog-backend` is `custom`.    | (none)           | No       | 0.7.0         |
 
 If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a corresponding jar file to the classpath and load a custom Iceberg Catalog implementation by specifying the `catalog-backend-impl` property.
+
+#### View support
+
+You could access the view interface if using JDBC backend and enable `jdbc.schema-version` property.
+
+| Configuration item                              | Description                                                                                | Default value | Required | Since Version |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.jdbc.schema-version`    | The schema version of JDBC catalog backend, setting to `V1` if supporting view operations. | (none)        | NO       | 0.7.0         |
+
 
 #### Multi catalog support
 
