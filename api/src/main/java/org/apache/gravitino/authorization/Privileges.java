@@ -295,6 +295,7 @@ public class Privileges {
       return DENY_INSTANCE;
     }
 
+    @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.CATALOG;
     }
