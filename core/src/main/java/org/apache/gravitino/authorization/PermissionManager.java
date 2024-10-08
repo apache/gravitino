@@ -590,12 +590,15 @@ class PermissionManager {
     updatePrivileges.addAll(targetObject.privileges());
     privileges.forEach(updatePrivileges::remove);
 
-    // If the object still contains privilege, we should update the object
+    // If the object still contain privilege, we should update the object
     // with new privileges
     if (!updatePrivileges.isEmpty()) {
       SecurableObject newSecurableObject =
           SecurableObjects.parse(
               targetObject.fullName(), targetObject.type(), Lists.newArrayList(updatePrivileges));
+
+      // We set authorization callback here, we won't execute this callback in this place.
+      // We will execute the callback after we execute the SQL transaction.
       authorizationCallbackWrapper.setCallback(
           () ->
               AuthorizationUtils.callAuthorizationPluginForMetadataObject(
@@ -610,6 +613,8 @@ class PermissionManager {
       return newSecurableObject;
     } else {
       // If the object doesn't contain any privilege, we remove this object.
+      // We set authorization callback here, we won't execute this callback in this place.
+      // We will execute the callback after we execute the SQL transaction.
       authorizationCallbackWrapper.setCallback(
           () ->
               AuthorizationUtils.callAuthorizationPluginForMetadataObject(
@@ -619,7 +624,9 @@ class PermissionManager {
                     authorizationPlugin.onRoleUpdated(
                         roleEntity, RoleChange.removeSecurableObject(role, targetObject));
                   }));
-
+      // If we return null, the newly generated objects won't contain this object, the storage will
+      // delete
+      // this object.
       return null;
     }
   }
@@ -630,7 +637,7 @@ class PermissionManager {
       MetadataObject targetObject,
       Function<SecurableObject, SecurableObject> objectUpdater) {
 
-    // Find a matched securable object
+    // Find a matched securable object to update privileges
     List<SecurableObject> updateSecurableObjects = Lists.newArrayList();
     SecurableObject matchedSecurableObject = null;
     for (SecurableObject securableObject : securableObjects) {

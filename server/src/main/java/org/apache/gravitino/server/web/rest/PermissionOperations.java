@@ -36,8 +36,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
@@ -232,16 +230,7 @@ public class PermissionOperations {
                                     role,
                                     object,
                                     privilegeGrantRequest.getPrivileges().stream()
-                                        .map(
-                                            privilegeDTO -> {
-                                              if (privilegeDTO
-                                                  .condition()
-                                                  .equals(Privilege.Condition.ALLOW)) {
-                                                return Privileges.allow(privilegeDTO.name());
-                                              } else {
-                                                return Privileges.deny(privilegeDTO.name());
-                                              }
-                                            })
+                                        .map(DTOConverters::fromPrivilegeDTO)
                                         .collect(Collectors.toList()))))));
           });
     } catch (Exception e) {
@@ -286,10 +275,7 @@ public class PermissionOperations {
                                     role,
                                     object,
                                     privilegeRevokeRequest.getPrivileges().stream()
-                                        .map(
-                                            privilegeDTO -> {
-                                              return DTOConverters.fromPrivilegeDTO(privilegeDTO);
-                                            })
+                                        .map(DTOConverters::fromPrivilegeDTO)
                                         .collect(Collectors.toList()))))));
           });
     } catch (Exception e) {
