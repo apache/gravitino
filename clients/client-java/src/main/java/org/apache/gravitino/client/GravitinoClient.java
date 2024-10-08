@@ -35,6 +35,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -401,11 +402,12 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
    *     exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws IllegalArgumentException If any privilege can't be bind to the metadata object.
+   * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If granting roles to a role encounters storage issues.
    */
   public Role grantPrivilegesToRole(String role, MetadataObject object, List<Privilege> privileges)
-      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException {
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+          IllegalPrivilegeException {
     return getMetalake().grantPrivilegesToRole(role, object, privileges);
   }
 
@@ -420,12 +422,13 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
    *     exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws IllegalArgumentException If any privilege can't be bind to the metadata object.
+   * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If revoking privileges from a role encounters storage issues.
    */
   public Role revokePrivilegesFromRole(
       String role, MetadataObject object, List<Privilege> privileges)
-      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException {
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+          IllegalPrivilegeException {
     return getMetalake().revokePrivilegesFromRole(role, object, privileges);
   }
 

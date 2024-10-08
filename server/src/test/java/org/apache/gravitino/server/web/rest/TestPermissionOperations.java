@@ -54,6 +54,7 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -488,7 +489,7 @@ public class TestPermissionOperations extends JerseyTest {
     ErrorResponse wrongPriErrorResp = wrongPrivilegeResp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongPriErrorResp.getCode());
     Assertions.assertEquals(
-        IllegalArgumentException.class.getSimpleName(), wrongPriErrorResp.getType());
+        IllegalPrivilegeException.class.getSimpleName(), wrongPriErrorResp.getType());
   }
 
   @Test
@@ -563,6 +564,6 @@ public class TestPermissionOperations extends JerseyTest {
     ErrorResponse wrongPriErrorResp = wrongPrivilegeResp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongPriErrorResp.getCode());
     Assertions.assertEquals(
-        IllegalArgumentException.class.getSimpleName(), wrongPriErrorResp.getType());
+        IllegalPrivilegeException.class.getSimpleName(), wrongPriErrorResp.getType());
   }
 }

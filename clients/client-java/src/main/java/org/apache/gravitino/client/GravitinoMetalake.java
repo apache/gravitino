@@ -78,6 +78,7 @@ import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -908,11 +909,12 @@ public class GravitinoMetalake extends MetalakeDTO
    * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
    *     exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws IllegalArgumentException If any privilege can't be bind to the metadata object.
+   * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If granting privileges to a role encounters storage issues.
    */
   public Role grantPrivilegesToRole(String role, MetadataObject object, List<Privilege> privileges)
-      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException {
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+          IllegalPrivilegeException {
     PrivilegeGrantRequest request =
         new PrivilegeGrantRequest(DTOConverters.toPrivileges(privileges));
     request.validate();
@@ -948,12 +950,13 @@ public class GravitinoMetalake extends MetalakeDTO
    * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
    *     exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws IllegalArgumentException If any privilege can't be bind to the metadata object.
+   * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If revoking privileges from a role encounters storage issues.
    */
   public Role revokePrivilegesFromRole(
       String role, MetadataObject object, List<Privilege> privileges)
-      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException {
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+          IllegalPrivilegeException {
     PrivilegeRevokeRequest request =
         new PrivilegeRevokeRequest(DTOConverters.toPrivileges(privileges));
     request.validate();

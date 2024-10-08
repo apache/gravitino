@@ -42,6 +42,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -453,7 +454,7 @@ public class AccessControlIT extends AbstractIT {
     // grant a wrong privilege
     MetadataObject catalog = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        IllegalPrivilegeException.class,
         () ->
             metalake.grantPrivilegesToRole(
                 roleName, catalog, Lists.newArrayList(Privileges.CreateCatalog.allow())));
@@ -462,7 +463,7 @@ public class AccessControlIT extends AbstractIT {
     MetadataObject wrongCatalog =
         MetadataObjects.of(null, "fileset_catalog", MetadataObject.Type.CATALOG);
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        IllegalPrivilegeException.class,
         () ->
             metalake.grantPrivilegesToRole(
                 roleName, wrongCatalog, Lists.newArrayList(Privileges.SelectTable.allow())));
@@ -488,14 +489,14 @@ public class AccessControlIT extends AbstractIT {
 
     // revoke a wrong privilege
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        IllegalPrivilegeException.class,
         () ->
             metalake.revokePrivilegesFromRole(
                 roleName, catalog, Lists.newArrayList(Privileges.CreateCatalog.allow())));
 
     // revoke a wrong catalog type privilege
     Assertions.assertThrows(
-        IllegalArgumentException.class,
+        IllegalPrivilegeException.class,
         () ->
             metalake.revokePrivilegesFromRole(
                 roleName, wrongCatalog, Lists.newArrayList(Privileges.SelectTable.allow())));
