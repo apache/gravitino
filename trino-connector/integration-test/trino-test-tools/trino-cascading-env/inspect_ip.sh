@@ -18,12 +18,26 @@
 # under the License.
 
 #
-cd "$(dirname "$0")"
 
-LOG_DIR=../build/trino-ci-container-log
-if [ -d $LOG_DIR ]; then
-  docker cp trino-ci-hive:/usr/local/hadoop/logs $LOG_DIR/hdfs
-  docker cp trino-ci-hive:/tmp/root $LOG_DIR/hive
-fi
+output=$(docker inspect --format='{{.Name}}:{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q) |grep "/trino-ci-" | sed 's/\/trino-ci-//g')
 
-docker compose down
+gravitino_uri=""
+mysql_uri=""
+trino_uri=""
+
+while IFS= read -r line; do
+  name=$(echo $line | cut -d':' -f1)
+  ip=$(echo $line | cut -d':' -f2)
+
+  case $name in
+    trino-local)
+      gravitino_uri="--gravitino_uri=http://$ip:8090"
+      trino_uri="--trino_uri=http://$ip:8080"
+      ;;
+    mysql)
+      mysql_uri="--mysql_uri=jdbc:mysql://$ip"
+      ;;
+  esac
+done <<< "$output"
+
+echo "$gravitino_uri $mysql_uri $trino_uri --params=trino_remote_jdbc_uri,jdbc:trino://$ip:8080"
