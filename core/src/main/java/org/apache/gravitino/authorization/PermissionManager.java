@@ -490,7 +490,7 @@ class PermissionManager {
       List<Privilege> privileges,
       RoleEntity roleEntity,
       AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
-    // Add a new securable object if there not exists the object in the role
+    // Add a new securable object if there doesn't exist the object in the role
     SecurableObject securableObject =
         SecurableObjects.parse(object.fullName(), object.type(), Lists.newArrayList(privileges));
 
@@ -536,6 +536,9 @@ class PermissionManager {
                                 role);
                             return null;
                           } else {
+                            // If the securable object exists, we remove the privileges of the
+                            // securable object and will remove duplicated privileges at the same
+                            // time.
                             return updateRevokedSecurableObject(
                                 metalake,
                                 role,
@@ -584,8 +587,7 @@ class PermissionManager {
       RoleEntity roleEntity,
       SecurableObject targetObject,
       AuthorizationPluginCallbackWrapper authorizationCallbackWrapper) {
-    // If the securable object exists, we remove the privileges of the
-    // securable object. Remove duplicated privileges
+    // Use set to deduplicate the privileges
     Set<Privilege> updatePrivileges = Sets.newHashSet();
     updatePrivileges.addAll(targetObject.privileges());
     privileges.forEach(updatePrivileges::remove);
@@ -625,8 +627,7 @@ class PermissionManager {
                         roleEntity, RoleChange.removeSecurableObject(role, targetObject));
                   }));
       // If we return null, the newly generated objects won't contain this object, the storage will
-      // delete
-      // this object.
+      // delete this object.
       return null;
     }
   }
@@ -638,14 +639,11 @@ class PermissionManager {
       Function<SecurableObject, SecurableObject> objectUpdater) {
 
     // Find a matched securable object to update privileges
-    List<SecurableObject> updateSecurableObjects = Lists.newArrayList();
-    SecurableObject matchedSecurableObject = null;
-    for (SecurableObject securableObject : securableObjects) {
-      if (targetObject.equals(securableObject)) {
-        matchedSecurableObject = securableObject;
-      } else {
-        updateSecurableObjects.add(securableObject);
-      }
+    List<SecurableObject> updateSecurableObjects = Lists.newArrayList(securableObjects);
+    SecurableObject matchedSecurableObject =
+        securableObjects.stream().filter(targetObject::equals).findFirst().orElse(null);
+    if (matchedSecurableObject != null) {
+      updateSecurableObjects.remove(matchedSecurableObject);
     }
 
     // Apply the updates for the matched object
