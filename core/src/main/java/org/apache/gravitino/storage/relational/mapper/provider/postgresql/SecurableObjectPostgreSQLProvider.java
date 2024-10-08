@@ -21,23 +21,26 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.ROLE_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SecurableObjectBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.ibatis.annotations.Param;
 
 public class SecurableObjectPostgreSQLProvider extends SecurableObjectBaseSQLProvider {
-  public String softDeleteSecurableObjectsByObjectIdAndPrivileges(
-      @Param("roleId") Long roleId,
-      @Param("metadataObjectId") Long metadataObjectId,
-      @Param("privilegeConditions") String privilegeConditions,
-      @Param("privilegeNames") String privilegeNames) {
-    return "UPDATE "
+  public String batchSoftDeleteSecurableObjects(
+      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
+    return "<script>"
+        + "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000)))"
-        + " WHERE metadata_object_id = #{metadataObjectId} AND"
-        + " role_id = #{roleId} AND deleted_at = 0 AND"
-        + " privilege_names = #{privilegeNames} AND"
-        + " privilege_conditions = #{privilegeConditions}";
+        + "<foreach collection='securableObjects' item='item' separator=','>"
+        + " WHERE metadata_object_id = #{item.metadataObjectId} AND"
+        + " role_id = #{item.roleId} AND deleted_at = 0 AND"
+        + " privilege_names = #{item.privilegeNames} AND"
+        + " privilege_conditions = #{item.privilegeConditions}"
+        + "</foreach>"
+        + "</script>";
   }
 
   @Override

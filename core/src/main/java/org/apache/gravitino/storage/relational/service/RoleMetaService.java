@@ -215,16 +215,9 @@ public class RoleMetaService {
               return;
             }
 
-            for (SecurableObjectPO objectPO : deleteSecurableObjectPOS) {
-              SessionUtils.doWithoutCommit(
-                  SecurableObjectMapper.class,
-                  mapper ->
-                      mapper.softDeleteSecurableObjectsByObjectIdAndPrivileges(
-                          objectPO.getRoleId(),
-                          objectPO.getMetadataObjectId(),
-                          objectPO.getPrivilegeConditions(),
-                          objectPO.getPrivilegeNames()));
-            }
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper -> mapper.batchSoftDeleteSecurableObjects(deleteSecurableObjectPOS));
           },
           () -> {
             if (insertSecurableObjectPOs.isEmpty()) {

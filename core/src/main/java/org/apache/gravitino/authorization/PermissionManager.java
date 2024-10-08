@@ -389,8 +389,8 @@ class PermissionManager {
               RoleEntity.class,
               Entity.EntityType.ROLE,
               roleEntity -> {
-                List<SecurableObject> updateSecurableObjects =
-                    updateSecurableObjects(
+                List<SecurableObject> grantedSecurableObjects =
+                    generateNewSecurableObjects(
                         roleEntity.securableObjects(),
                         object,
                         targetObject -> {
@@ -428,7 +428,7 @@ class PermissionManager {
                     .withNamespace(roleEntity.namespace())
                     .withProperties(roleEntity.properties())
                     .withAuditInfo(auditInfo)
-                    .withSecurableObjects(updateSecurableObjects)
+                    .withSecurableObjects(grantedSecurableObjects)
                     .build();
               });
 
@@ -468,7 +468,7 @@ class PermissionManager {
 
       // We set authorization callback here, we won't execute this callback in this place.
       // We will execute the callback after we execute the SQL transaction.
-      authorizationPluginCallbackWrapper.setCallBack(
+      authorizationPluginCallbackWrapper.setCallback(
           () ->
               AuthorizationUtils.callAuthorizationPluginForMetadataObject(
                   metalake,
@@ -496,7 +496,7 @@ class PermissionManager {
 
     // We set authorization callback here, we won't execute this callback in this place.
     // We will execute the callback after we execute the SQL transaction.
-    authorizationPluginCallbackWrapper.setCallBack(
+    authorizationPluginCallbackWrapper.setCallback(
         () ->
             AuthorizationUtils.callAuthorizationPluginForMetadataObject(
                 metalake,
@@ -521,8 +521,8 @@ class PermissionManager {
               RoleEntity.class,
               Entity.EntityType.ROLE,
               roleEntity -> {
-                List<SecurableObject> updateSecurableObjects =
-                    updateSecurableObjects(
+                List<SecurableObject> revokedSecurableObjects =
+                    generateNewSecurableObjects(
                         roleEntity.securableObjects(),
                         object,
                         targetObject -> {
@@ -561,7 +561,7 @@ class PermissionManager {
                     .withNamespace(roleEntity.namespace())
                     .withProperties(roleEntity.properties())
                     .withAuditInfo(auditInfo)
-                    .withSecurableObjects(updateSecurableObjects)
+                    .withSecurableObjects(revokedSecurableObjects)
                     .build();
               });
 
@@ -596,7 +596,7 @@ class PermissionManager {
       SecurableObject newSecurableObject =
           SecurableObjects.parse(
               targetObject.fullName(), targetObject.type(), Lists.newArrayList(updatePrivileges));
-      authorizationCallbackWrapper.setCallBack(
+      authorizationCallbackWrapper.setCallback(
           () ->
               AuthorizationUtils.callAuthorizationPluginForMetadataObject(
                   metalake,
@@ -610,7 +610,7 @@ class PermissionManager {
       return newSecurableObject;
     } else {
       // If the object doesn't contain any privilege, we remove this object.
-      authorizationCallbackWrapper.setCallBack(
+      authorizationCallbackWrapper.setCallback(
           () ->
               AuthorizationUtils.callAuthorizationPluginForMetadataObject(
                   metalake,
@@ -624,32 +624,27 @@ class PermissionManager {
     }
   }
 
-  private List<SecurableObject> updateSecurableObjects(
+  // This method will generate all the securable objects after granting or revoking privilege
+  private List<SecurableObject> generateNewSecurableObjects(
       List<SecurableObject> securableObjects,
       MetadataObject targetObject,
       Function<SecurableObject, SecurableObject> objectUpdater) {
-    boolean isExist = false;
+
+    // Find a matched securable object
     List<SecurableObject> updateSecurableObjects = Lists.newArrayList();
+    SecurableObject matchedSecurableObject = null;
     for (SecurableObject securableObject : securableObjects) {
-      // If a securable object is matching the target object, we apply the updates
-      // to this securable object.
-      if (!isExist && targetObject.equals(securableObject)) {
-        isExist = true;
-        SecurableObject newSecurableObject = objectUpdater.apply(securableObject);
-        if (newSecurableObject != null) {
-          updateSecurableObjects.add(newSecurableObject);
-        }
+      if (targetObject.equals(securableObject)) {
+        matchedSecurableObject = securableObject;
       } else {
         updateSecurableObjects.add(securableObject);
       }
     }
 
-    // If there not exists a securable object matching the target object.
-    if (!isExist) {
-      SecurableObject newSecurableObject = objectUpdater.apply(null);
-      if (newSecurableObject != null) {
-        updateSecurableObjects.add(newSecurableObject);
-      }
+    // Apply the updates for the matched object
+    SecurableObject newSecurableObject = objectUpdater.apply(matchedSecurableObject);
+    if (newSecurableObject != null) {
+      updateSecurableObjects.add(newSecurableObject);
     }
     return updateSecurableObjects;
   }
@@ -657,7 +652,7 @@ class PermissionManager {
   private static class AuthorizationPluginCallbackWrapper {
     private Runnable callback;
 
-    public void setCallBack(Runnable callback) {
+    public void setCallback(Runnable callback) {
       this.callback = callback;
     }
 

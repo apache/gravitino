@@ -57,14 +57,9 @@ public class SecurableObjectSQLProviderFactory {
     return getProvider().batchInsertSecurableObjects(securableObjectPOs);
   }
 
-  public static String softDeleteSecurableObjectsByObjectIdAndPrivileges(
-      @Param("roleId") Long roleId,
-      @Param("metadataObjectId") Long metadataObjectId,
-      @Param("privilegeConditions") String privilegeConditions,
-      @Param("privilegeNames") String privilegeNames) {
-    return getProvider()
-        .softDeleteSecurableObjectsByObjectIdAndPrivileges(
-            roleId, metadataObjectId, privilegeConditions, privilegeNames);
+  public static String batchSoftDeleteSecurableObjects(
+      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
+    return getProvider().batchSoftDeleteSecurableObjects(securableObjectPOs);
   }
 
   public static String softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId) {

@@ -48,19 +48,20 @@ public class SecurableObjectBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteSecurableObjectsByObjectIdAndPrivileges(
-      @Param("roleId") Long roleId,
-      @Param("metadataObjectId") Long metadataObjectId,
-      @Param("privilegeConditions") String privilegeConditions,
-      @Param("privilegeNames") String privilegeNames) {
-    return "UPDATE "
+  public String batchSoftDeleteSecurableObjects(
+      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
+    return "<script>"
+        + "UPDATE "
         + SECURABLE_OBJECT_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metadata_object_id = #{metadataObjectId} AND"
-        + " role_id = #{roleId} AND deleted_at = 0 AND"
-        + " privilege_names = #{privilegeNames} AND"
-        + " privilege_conditions = #{privilegeConditions}";
+        + "<foreach collection='securableObjects' item='item' separator=','>"
+        + " WHERE metadata_object_id = #{item.metadataObjectId} AND"
+        + " role_id = #{item.roleId} AND deleted_at = 0 AND"
+        + " privilege_names = #{item.privilegeNames} AND"
+        + " privilege_conditions = #{item.privilegeConditions}"
+        + "</foreach>"
+        + "</script>";
   }
 
   public String softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId) {
