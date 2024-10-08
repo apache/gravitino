@@ -20,6 +20,7 @@ package org.apache.gravitino.dto.authorization;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 
@@ -63,6 +64,15 @@ public class PrivilegeDTO implements Privilege {
   @Override
   public Condition condition() {
     return condition;
+  }
+
+  @Override
+  public boolean canBindTo(MetadataObject.Type type) {
+    if (Condition.ALLOW.equals(condition)) {
+      return Privileges.allow(name).canBindTo(type);
+    } else {
+      return Privileges.deny(name).canBindTo(type);
+    }
   }
 
   /** @return the builder for creating a new instance of PrivilegeDTO. */

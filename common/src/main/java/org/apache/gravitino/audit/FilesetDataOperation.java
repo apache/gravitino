@@ -25,6 +25,10 @@ public enum FilesetDataOperation {
   CREATE,
   /** Opens a file. */
   OPEN,
+  /** Opens a file and writes to it. */
+  OPEN_AND_WRITE,
+  /** Opens a file and appends to it. */
+  OPEN_AND_APPEND,
   /** Appends some content into a file. */
   APPEND,
   /** Renames a file or a directory. */

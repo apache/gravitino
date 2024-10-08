@@ -364,6 +364,10 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         self.assertTrue(fs.exists(mv_new_file))
         self.assertTrue(self.hdfs.exists(mv_new_actual_file))
 
+        # test rename without sub path, which should throw an exception
+        with self.assertRaises(GravitinoRuntimeException):
+            fs.mv(self.fileset_gvfs_location, self.fileset_gvfs_location + "/test_mv")
+
     def test_rm(self):
         rm_dir = self.fileset_gvfs_location + "/test_rm"
         rm_actual_dir = self.fileset_storage_location + "/test_rm"
