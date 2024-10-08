@@ -24,6 +24,7 @@ output=$(docker inspect --format='{{.Name}}:{{range .NetworkSettings.Networks}}{
 gravitino_uri=""
 mysql_uri=""
 trino_uri=""
+trino_remote_jdbc_uri=""
 
 while IFS= read -r line; do
   name=$(echo $line | cut -d':' -f1)
@@ -34,10 +35,13 @@ while IFS= read -r line; do
       gravitino_uri="--gravitino_uri=http://$ip:8090"
       trino_uri="--trino_uri=http://$ip:8080"
       ;;
+    trino-remote)
+      trino_remote_jdbc_uri="jdbc:trino://$ip:8080"
+      ;;
     mysql)
       mysql_uri="--mysql_uri=jdbc:mysql://$ip"
       ;;
   esac
 done <<< "$output"
 
-echo "$gravitino_uri $mysql_uri $trino_uri --params=trino_remote_jdbc_uri,jdbc:trino://$ip:8080"
+echo "$gravitino_uri $mysql_uri $trino_uri --params=trino_remote_jdbc_uri,$trino_remote_jdbc_uri"
