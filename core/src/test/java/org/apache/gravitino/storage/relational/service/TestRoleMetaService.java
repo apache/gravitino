@@ -27,6 +27,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Function;
@@ -700,6 +701,38 @@ class TestRoleMetaService extends TestJDBCBackend {
             SecurableObjects.ofCatalog(
                 "catalog", Lists.newArrayList(Privileges.CreateTable.allow()))),
         grantRevokeRole.securableObjects());
+
+    // revoke multiple securable objects
+    roleMetaService.updateRole(roleEntity.nameIdentifier(), grantUpdater);
+    Function<RoleEntity, RoleEntity> revokeMultipleUpdater =
+        role -> {
+          AuditInfo updateAuditInfo =
+              AuditInfo.builder()
+                  .withCreator(role.auditInfo().creator())
+                  .withCreateTime(role.auditInfo().createTime())
+                  .withLastModifier("revokeMultiple")
+                  .withLastModifiedTime(Instant.now())
+                  .build();
+
+          return RoleEntity.builder()
+              .withId(role.id())
+              .withName(role.name())
+              .withNamespace(role.namespace())
+              .withAuditInfo(updateAuditInfo)
+              .withProperties(role.properties())
+              .withSecurableObjects(Collections.emptyList())
+              .withAuditInfo(updateAuditInfo)
+              .build();
+        };
+
+    roleMetaService.updateRole(roleEntity.nameIdentifier(), revokeMultipleUpdater);
+    RoleEntity revokeMultipleRole =
+        roleMetaService.getRoleByIdentifier(roleEntity.nameIdentifier());
+    Assertions.assertEquals(revokeMultipleRole.id(), roleEntity.id());
+    Assertions.assertEquals(revokeMultipleRole.name(), roleEntity.name());
+    Assertions.assertEquals("creator", revokeMultipleRole.auditInfo().creator());
+    Assertions.assertEquals("revokeMultiple", revokeMultipleRole.auditInfo().lastModifier());
+    Assertions.assertTrue(revokeMultipleRole.securableObjects().isEmpty());
   }
 
   @Test

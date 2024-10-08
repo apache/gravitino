@@ -55,11 +55,12 @@ public class SecurableObjectBaseSQLProvider {
         + SECURABLE_OBJECT_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + "<foreach collection='securableObjects' item='item' separator=','>"
-        + " WHERE metadata_object_id = #{item.metadataObjectId} AND"
+        + " WHERE FALSE "
+        + "<foreach collection='securableObjects' item='item' separator=' '>"
+        + " OR (metadata_object_id = #{item.metadataObjectId} AND"
         + " role_id = #{item.roleId} AND deleted_at = 0 AND"
         + " privilege_names = #{item.privilegeNames} AND"
-        + " privilege_conditions = #{item.privilegeConditions}"
+        + " privilege_conditions = #{item.privilegeConditions})"
         + "</foreach>"
         + "</script>";
   }

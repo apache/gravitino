@@ -288,13 +288,7 @@ public class PermissionOperations {
                                     privilegeRevokeRequest.getPrivileges().stream()
                                         .map(
                                             privilegeDTO -> {
-                                              if (privilegeDTO
-                                                  .condition()
-                                                  .equals(Privilege.Condition.ALLOW)) {
-                                                return Privileges.allow(privilegeDTO.name());
-                                              } else {
-                                                return Privileges.deny(privilegeDTO.name());
-                                              }
+                                              return DTOConverters.fromPrivilegeDTO(privilegeDTO);
                                             })
                                         .collect(Collectors.toList()))))));
           });

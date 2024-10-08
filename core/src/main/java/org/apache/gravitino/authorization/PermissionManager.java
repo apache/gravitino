@@ -454,8 +454,8 @@ class PermissionManager {
     // Removed duplicated privileges by set
     Set<Privilege> updatePrivileges = Sets.newHashSet();
     updatePrivileges.addAll(targetObject.privileges());
-    // If old object contains all the privileges to grant, the object don't
-    // need to change.
+    // If old object contains all the privileges to grant, the object doesn't
+    // need to update.
     if (updatePrivileges.containsAll(privileges)) {
       return targetObject;
     } else {
@@ -624,7 +624,7 @@ class PermissionManager {
     }
   }
 
-  // This method will generate all the securable objects after granting or revoking privilege
+  // This method will generate all the securable objects after granting or revoking privileges
   private List<SecurableObject> generateNewSecurableObjects(
       List<SecurableObject> securableObjects,
       MetadataObject targetObject,
