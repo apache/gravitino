@@ -25,14 +25,14 @@ If you doesn't set `spark.sql.gravitino.simple.userName` explicitly. It will use
 
 ## OAuth2 mode
 
-In the OAuth2 mode, you could use following configuration to fetch an OAuth token to access Gravitino server.
+In the OAuth2 mode, you could use following configuration to fetch an OAuth2 token to access Gravitino server.
 
 | Property                              | Type   | Default Value | Description                                   | Required             | Since Version |
 |---------------------------------------|--------|---------------|-----------------------------------------------|----------------------|---------------|
 | spark.sql.gravitino.oauth2.serverUri  | string | None          | The OAuth2 server uri address.                | Yes, for OAuth2 mode | 0.7.0         |
 | spark.sql.gravitino.oauth2.tokenPath  | string | None          | The path of token interface in OAuth2 server. | Yes, for OAuth2 mode | 0.7.0         |
-| spark.sql.gravitino.oauth2.credential | string | None          | The credential to request the OAuth token.    | Yes, for OAuth2 mode | 0.7.0         |
-| spark.sql.gravitino.oauth2.scope      | string | None          | The scope to request the OAuth token.         | Yes, for OAuth2 mode | 0.7.0         |
+| spark.sql.gravitino.oauth2.credential | string | None          | The credential to request the OAuth2 token.   | Yes, for OAuth2 mode | 0.7.0         |
+| spark.sql.gravitino.oauth2.scope      | string | None          | The scope to request the OAuth2 token.        | Yes, for OAuth2 mode | 0.7.0         |
 
 ## Kerberos mode
 
@@ -40,8 +40,8 @@ In kerberos mode, you could use following configuration to fetch a kerberos tick
 
 | Property                                    | Type   | Default Value | Description                                                         | Required               | Since Version |
 |---------------------------------------------|--------|---------------|---------------------------------------------------------------------|------------------------|---------------|
-| spark.sql.gravitino.kerberos.principal      | string | None          | The Kerberos principal.                                             | Yes, for Kerberos mode | 0.7.0         |
+| spark.sql.gravitino.kerberos.principal      | string | None          | The Kerberos principal of the user.                                 | Yes, for Kerberos mode | 0.7.0         |
 | spark.sql.gravitino.kerberos.keytabFilePath | string | None          | Location of the keytab file with the credentials for the principal. | Yes, for Kerberos mode | 0.7.0         |
 
 The principal of Gravitino server is like `HTTP/$host@$realm`, please keep the `$host` consistent with the host in Gravitino server uri address.
-Please make sure `krb5.conf` is accessible by Spark, like by specifying the configuration `spark.driver.extraJavaOptions="-Djava.security.krb5.conf=/Users/fanng/deploy/kerberos/krb5.conf"`.
+Please make sure `krb5.conf` is accessible by Spark, like by specifying the configuration `spark.driver.extraJavaOptions="-Djava.security.krb5.conf=/xx/krb5.conf"`.
