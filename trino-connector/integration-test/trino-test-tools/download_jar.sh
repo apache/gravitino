@@ -69,9 +69,9 @@ download_trino-cascading-connector() {
   download_jar "trino-trino-0.1-SNAPSHOT.tar.gz" \
   "https://github.com/diqiu50/trino-cascading-connector/releases/download/0.1-SNAPSHOT/trino-trino-0.1-SNAPSHOT.tar.gz" \
   "$path"
-  cd $path
-  rm -fr trino-trino
-  tar -zxvf trino-trino*.tar.gz
+
+  rm -fr $path/trino-trino
+  tar -zxvf $path/trino-trino*.tar.gz -C $path
 
   if [ ! -d "$GRAVITINO_TRINO_CASCADING_CONNECTOR_DIR" ]; then
       echo "Error: Gravitino Trino connector directory '$GRAVITINO_TRINO_CASCADING_CONNECTOR_DIR' does not exist." >&2
