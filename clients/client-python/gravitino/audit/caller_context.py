@@ -68,4 +68,5 @@ class CallerContextHolder:
     @staticmethod
     def remove():
         """Remove the CallerContext from the thread local."""
-        del caller_context_holder.caller_context
+        if hasattr(caller_context_holder, "caller_context"):
+            del caller_context_holder.caller_context

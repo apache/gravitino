@@ -30,7 +30,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -249,18 +248,34 @@ public class UserMetaService {
     return newEntity;
   }
 
-  public List<UserEntity> listUsersByNamespace(Namespace namespace, Set<Field> skippingFields) {
+  public List<UserEntity> listUsersByNamespace(Namespace namespace, boolean allFields) {
     AuthorizationUtils.checkUserNamespace(namespace);
     String metalakeName = namespace.level(0);
 
-    SupportsDesiredFieldsHandlers<List<UserEntity>> handlers =
-        new SupportsDesiredFieldsHandlers<>();
-    handlers.addHandler(new ListDesiredRolesHandler(metalakeName));
-    handlers.addHandler(new ListAllFieldsHandler(metalakeName));
-
-    Set<Field> desiredFields = Sets.newHashSet(UserEntity.fieldSet());
-    desiredFields.removeAll(skippingFields);
-    return handlers.execute(desiredFields);
+    if (allFields) {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      List<ExtendedUserPO> userPOs =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.listExtendedUserPOsByMetalakeId(metalakeId));
+      return userPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromExtendedUserPO(
+                      po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    } else {
+      List<UserPO> userPOs =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalake(metalakeName));
+      return userPOs.stream()
+          .map(
+              po ->
+                  POConverters.fromUserPO(
+                      po,
+                      Collections.emptyList(),
+                      AuthorizationUtils.ofUserNamespace(metalakeName)))
+          .collect(Collectors.toList());
+    }
   }
 
   public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
@@ -281,64 +296,5 @@ public class UserMetaService {
                         mapper.deleteUserRoleRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
-  }
-
-  private static class ListDesiredRolesHandler implements SupportsDesiredFields<List<UserEntity>> {
-    private final String metalakeName;
-
-    ListDesiredRolesHandler(String metalakeName) {
-      this.metalakeName = metalakeName;
-    }
-
-    @Override
-    public Set<Field> desiredFields() {
-      Set<Field> requiredFields = Sets.newHashSet(UserEntity.fieldSet());
-      requiredFields.remove(UserEntity.ROLE_IDS);
-      requiredFields.remove(UserEntity.ROLE_NAMES);
-
-      return requiredFields;
-    }
-
-    @Override
-    public List<UserEntity> execute() {
-      List<UserPO> userPOs =
-          SessionUtils.getWithoutCommit(
-              UserMetaMapper.class, mapper -> mapper.listUserPOsByMetalake(metalakeName));
-      return userPOs.stream()
-          .map(
-              po ->
-                  POConverters.fromUserPO(
-                      po,
-                      Collections.emptyList(),
-                      AuthorizationUtils.ofUserNamespace(metalakeName)))
-          .collect(Collectors.toList());
-    }
-  }
-
-  private static class ListAllFieldsHandler implements SupportsDesiredFields<List<UserEntity>> {
-    final String metalakeName;
-
-    ListAllFieldsHandler(String metalakeName) {
-      this.metalakeName = metalakeName;
-    }
-
-    @Override
-    public Set<Field> desiredFields() {
-      return UserEntity.fieldSet();
-    }
-
-    @Override
-    public List<UserEntity> execute() {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
-      List<ExtendedUserPO> userPOs =
-          SessionUtils.getWithoutCommit(
-              UserMetaMapper.class, mapper -> mapper.listExtendedUserPOsByMetalakeId(metalakeId));
-      return userPOs.stream()
-          .map(
-              po ->
-                  POConverters.fromExtendedUserPO(
-                      po, AuthorizationUtils.ofUserNamespace(metalakeName)))
-          .collect(Collectors.toList());
-    }
   }
 }
