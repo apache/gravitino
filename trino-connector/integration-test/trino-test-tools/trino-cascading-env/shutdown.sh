@@ -17,13 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-#
-cd "$(dirname "$0")"
 
-LOG_DIR=../build/trino-ci-container-log
-if [ -d $LOG_DIR ]; then
-  docker cp trino-ci-hive:/usr/local/hadoop/logs $LOG_DIR/hdfs
-  docker cp trino-ci-hive:/tmp/root $LOG_DIR/hive
-fi
+cd "$(dirname "$0")"
 
 docker compose down

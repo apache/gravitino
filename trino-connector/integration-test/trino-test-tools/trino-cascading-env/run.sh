@@ -17,13 +17,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-#
-cd "$(dirname "$0")"
+#args: --auto=none --test_sets_dir=/Users/ice/Documents/workspace/git/graviton/integration-test/trino-cascading-it/testsets --gravitino_uri=http://trino-local.trino-cascading-it.orb.local:8090 --mysql_uri=jdbc:mysql://mysql.trino-cascading-it.orb.local --trino_uri=http://trino-local.trino-cascading-it.orb.local:8080 --params=trino_remote_jdbc_uri,jdbc:trino://trino-remote.trino-cascading-it.orb.local:8080
 
-LOG_DIR=../build/trino-ci-container-log
-if [ -d $LOG_DIR ]; then
-  docker cp trino-ci-hive:/usr/local/hadoop/logs $LOG_DIR/hdfs
-  docker cp trino-ci-hive:/tmp/root $LOG_DIR/hive
-fi
-
+docker compose up
 docker compose down
