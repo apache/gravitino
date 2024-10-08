@@ -30,6 +30,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
@@ -173,6 +174,15 @@ public class ITUtils {
               ((IdentityPartitionDTO) expected).values(),
               ((IdentityPartitionDTO) actual).values()));
     }
+  }
+
+  public static boolean isEmbedded() {
+    String mode =
+        System.getProperty(TEST_MODE) == null
+            ? EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
+
+    return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
   }
 
   private ITUtils() {}

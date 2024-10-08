@@ -49,6 +49,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -204,11 +205,15 @@ public abstract class JdbcTableOperations implements TableOperation {
       Transform[] tablePartitioning = getTablePartitioning(connection, databaseName, tableName);
       jdbcTableBuilder.withPartitioning(tablePartitioning);
 
-      // 5.Get table properties
+      // 5.Get distribution information
+      Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
+      jdbcTableBuilder.withDistribution(distribution);
+
+      // 6.Get table properties
       Map<String, String> tableProperties = getTableProperties(connection, tableName);
       jdbcTableBuilder.withProperties(tableProperties);
 
-      // 6.Leave the information to the bottom layer to append the table
+      // 7.Leave the information to the bottom layer to append the table
       correctJdbcTableFields(connection, databaseName, tableName, jdbcTableBuilder);
 
       return jdbcTableBuilder.withTableOperation(this).build();
@@ -234,6 +239,20 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected Transform[] getTablePartitioning(
       Connection connection, String databaseName, String tableName) throws SQLException {
     return Transforms.EMPTY_TRANSFORM;
+  }
+
+  /**
+   * Get the distribution information of the table, including the distribution type and the fields
+   *
+   * @param connection jdbc connection.
+   * @param databaseName database name.
+   * @param tableName table name.
+   * @return Returns the distribution information of the table.
+   * @throws SQLException if an error occurs while getting the distribution information.
+   */
+  protected Distribution getDistributionInfo(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    return Distributions.NONE;
   }
 
   protected boolean getAutoIncrementInfo(ResultSet resultSet) throws SQLException {

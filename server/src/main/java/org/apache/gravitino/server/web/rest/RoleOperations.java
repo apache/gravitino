@@ -131,7 +131,7 @@ public class RoleOperations {
               if (metadataObjects.contains(metadataObject)) {
                 throw new IllegalArgumentException(
                     String.format(
-                        "Don't support duplicated metadata objects %s type %s",
+                        "Doesn't support specifying duplicated securable objects %s type %s",
                         object.fullName(), object.type()));
               } else {
                 metadataObjects.add(metadataObject);

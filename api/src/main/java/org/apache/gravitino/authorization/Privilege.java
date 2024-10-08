@@ -42,30 +42,13 @@ public interface Privilege {
   Condition condition();
 
   /**
-   * If a metadata object supports the privilege, then this method will return true otherwise false.
+   * If the privilege can bind to a securable object, then this method will return true, otherwise
+   * false.
    *
-   * @param type The metadata object type.
-   * @return It will return true if a metadata object supports the privilege otherwise false.
+   * @param type The securable object type.
+   * @return It will return true if the privilege can bind to a securable object, otherwise false.
    */
-  boolean supportsMetadataObjectType(MetadataObject.Type type);
-
-  /**
-   * @return the {@link SupportsSpecificCatalog} if the privilege only supports specific catalog
-   *     type.
-   * @throws UnsupportedOperationException if the privilege doesn't bind to a specific catalog type.
-   */
-  default SupportsSpecificCatalog supportsSpecificCatalog() {
-    throw new UnsupportedOperationException("Don't support specific catalog");
-  }
-
-  /**
-   * If a privilege only supports specific catalog type, the privilege should implement this
-   * interface.
-   */
-  interface SupportsSpecificCatalog {
-    /** @return It will return the catalog type which the privilege supports. */
-    Catalog.Type catalogType();
-  }
+  boolean canBindTo(MetadataObject.Type type);
 
   /** The name of this privilege. */
   enum Name {

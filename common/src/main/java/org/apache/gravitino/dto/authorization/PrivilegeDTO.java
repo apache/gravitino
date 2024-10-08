@@ -67,11 +67,11 @@ public class PrivilegeDTO implements Privilege {
   }
 
   @Override
-  public boolean supportsMetadataObjectType(MetadataObject.Type type) {
+  public boolean canBindTo(MetadataObject.Type type) {
     if (Condition.ALLOW.equals(condition)) {
-      return Privileges.allow(name).supportsMetadataObjectType(type);
+      return Privileges.allow(name).canBindTo(type);
     } else {
-      return Privileges.deny(name).supportsMetadataObjectType(type);
+      return Privileges.deny(name).canBindTo(type);
     }
   }
 

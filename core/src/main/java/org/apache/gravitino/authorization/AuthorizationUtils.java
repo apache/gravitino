@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
@@ -53,6 +54,16 @@ public class AuthorizationUtils {
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
+
+  private static final Set<Privilege.Name> FILESET_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_FILESET, Privilege.Name.WRITE_FILESET, Privilege.Name.READ_FILESET);
+  private static final Set<Privilege.Name> TABLE_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_TABLE, Privilege.Name.MODIFY_TABLE, Privilege.Name.SELECT_TABLE);
+  private static final Set<Privilege.Name> TOPIC_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);
 
   private AuthorizationUtils() {}
 
@@ -195,7 +206,7 @@ public class AuthorizationUtils {
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
       for (Privilege privilege : privileges) {
-        if (privilege.supportsMetadataObjectType(MetadataObject.Type.CATALOG)) {
+        if (privilege.canBindTo(MetadataObject.Type.CATALOG)) {
           return true;
         }
       }
@@ -258,10 +269,11 @@ public class AuthorizationUtils {
   public static void checkPrivilege(
       PrivilegeDTO privilegeDTO, MetadataObject object, String metalake) {
     Privilege privilege = DTOConverters.fromPrivilegeDTO(privilegeDTO);
-    if (!privilege.supportsMetadataObjectType(object.type())) {
+
+    if (!privilege.canBindTo(object.type())) {
       throw new IllegalArgumentException(
           String.format(
-              "Securable object %s type %s don't support privilege %s",
+              "Securable object %s type %s don't support binding privilege %s",
               object.fullName(), object.type(), privilege));
     }
 
@@ -270,14 +282,16 @@ public class AuthorizationUtils {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
       NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
       try {
-        Catalog catalog = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(catalogIdent);
-        if (privilege instanceof Privilege.SupportsSpecificCatalog) {
-          if (privilege.supportsSpecificCatalog().catalogType() != catalog.type()) {
-            throw new IllegalArgumentException(
-                String.format(
-                    "The catalog type of securable object %s type %s don't support privilege %s",
-                    object.fullName(), object.type(), privilege));
-          }
+        if (FILESET_PRIVILEGES.contains(privilege.name())) {
+          checkCatalogType(catalogIdent, Catalog.Type.FILESET, privilege);
+        }
+
+        if (TABLE_PRIVILEGES.contains(privilege.name())) {
+          checkCatalogType(catalogIdent, Catalog.Type.RELATIONAL, privilege);
+        }
+
+        if (TOPIC_PRIVILEGES.contains(privilege.name())) {
+          checkCatalogType(catalogIdent, Catalog.Type.MESSAGING, privilege);
         }
       } catch (NoSuchCatalogException ne) {
         throw new NoSuchMetadataObjectException(
@@ -290,6 +304,17 @@ public class AuthorizationUtils {
       final boolean expression, Supplier<? extends RuntimeException> exceptionToThrowSupplier) {
     if (!expression) {
       throw checkNotNull(exceptionToThrowSupplier).get();
+    }
+  }
+
+  private static void checkCatalogType(
+      NameIdentifier catalogIdent, Catalog.Type type, Privilege privilege) {
+    Catalog catalog = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(catalogIdent);
+    if (catalog.type() != type) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Catalog %s type %s don't support privilege %s",
+              catalogIdent, catalog.type(), privilege));
     }
   }
 
