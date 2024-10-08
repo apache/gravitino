@@ -34,8 +34,9 @@ cp "$trino_conf_dir/config/catalog/trino.properties" /etc/trino/catalog/trino.pr
 #create test metalake
 counter=0
 while [ $counter -le 30 ]; do
+  sleep 1
   counter=$((counter + 1))
-  response=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://localhost:8090/api/metalakes)
+  response=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://localhost:8090/api/metalakes) || true
   if [ "$response" -eq 200 ]; then
     break
   fi
@@ -44,7 +45,6 @@ while [ $counter -le 30 ]; do
     echo "Failed to create test metalake, the gravitino server is not running"
     exit 1
   fi
-  sleep 1
 done
 
 #
