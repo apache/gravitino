@@ -199,7 +199,6 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 | `gravitino.iceberg-rest.jdbc.password`                         | The password of the JDBC connection.                                                                                                         | (none)                  | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.jdbc-initialize`                       | Whether to initialize the meta tables when creating the JDBC catalog.                                                                        | `true`                  | No       | 0.2.0         |
 | `gravitino.iceberg-rest.jdbc-driver`                           | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                                     | (none)                  | Yes      | 0.3.0         |
-| `gravitino.iceberg-rest.jdbc.schema-version`                   | JDBC catalog is initialized without view support. To auto-migrate the database's schema and enable view support, set jdbc.schema-version=V1  | (none)                  | NO       | 0.7.0         |
 
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
@@ -214,6 +213,15 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 | `gravitino.iceberg-rest.catalog-backend-impl`  | The fully-qualified class name of a custom catalog implementation, only worked if `catalog-backend` is `custom`.    | (none)           | No       | 0.7.0         |
 
 If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a corresponding jar file to the classpath and load a custom Iceberg Catalog implementation by specifying the `catalog-backend-impl` property.
+
+#### View support
+
+The Gravitino Iceberg REST server supports view interfaces through its JDBC backend. You can enable this by setting the `jdbc.schema-version` property.
+
+| Configuration item                              | Description                                                                                                                                  | Default value           | Required | Since Version |
+|-------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
+| `gravitino.iceberg-rest.jdbc.schema-version`    | JDBC catalog is initialized without view support. To auto-migrate the database's schema and enable view support, set jdbc.schema-version=V1  | (none)                  | NO       | 0.7.0         |
+
 
 #### Multi catalog support
 
