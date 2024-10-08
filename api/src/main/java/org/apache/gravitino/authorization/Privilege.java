@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.authorization;
 
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Unstable;
 

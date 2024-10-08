@@ -21,7 +21,6 @@ package org.apache.gravitino.authorization;
 import com.google.common.collect.Sets;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 
 /** The helper class for {@link Privilege}. */
