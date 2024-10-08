@@ -26,7 +26,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Privilege;
@@ -42,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
@@ -61,6 +65,15 @@ public class AccessControlIT extends AbstractIT {
     registerCustomConfigs(configs);
     AbstractIT.startIntegrationTest();
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
+
+    Catalog filesetCatalog =
+        metalake.createCatalog(
+            "fileset_catalog", Catalog.Type.FILESET, "hadoop", "comment", Collections.emptyMap());
+    NameIdentifier fileIdent = NameIdentifier.of("fileset_schema", "fileset");
+    filesetCatalog.asSchemas().createSchema("fileset_schema", "comment", Collections.emptyMap());
+    filesetCatalog
+        .asFilesetCatalog()
+        .createFileset(fileIdent, "comment", Fileset.Type.EXTERNAL, "tmp", Collections.emptyMap());
   }
 
   @Test
@@ -133,8 +146,38 @@ public class AccessControlIT extends AbstractIT {
     // Get a not-existed group
     Assertions.assertThrows(NoSuchGroupException.class, () -> metalake.getGroup("not-existed"));
 
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("k1", "v1");
+    SecurableObject metalakeObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+
+    // Test the group with the role
+    metalake.createRole("role2", properties, Lists.newArrayList(metalakeObject));
+    metalake.grantRolesToGroup(Lists.newArrayList("role2"), groupName);
+
+    // List groups
+    String anotherGroup = "group2#456";
+    metalake.addGroup(anotherGroup);
+    String[] groupNames = metalake.listGroupNames();
+    Arrays.sort(groupNames);
+    Assertions.assertEquals(Lists.newArrayList(groupName, anotherGroup), Arrays.asList(groupNames));
+
+    List<Group> groups =
+        Arrays.stream(metalake.listGroups())
+            .sorted(Comparator.comparing(Group::name))
+            .collect(Collectors.toList());
+    Assertions.assertEquals(
+        Lists.newArrayList(groupName, anotherGroup),
+        groups.stream().map(Group::name).collect(Collectors.toList()));
+    Assertions.assertEquals(Lists.newArrayList("role2"), groups.get(0).roles());
+
     Assertions.assertTrue(metalake.removeGroup(groupName));
     Assertions.assertFalse(metalake.removeGroup(groupName));
+
+    // clean up
+    metalake.removeGroup(anotherGroup);
+    metalake.deleteRole("role2");
   }
 
   @Test
@@ -186,6 +229,46 @@ public class AccessControlIT extends AbstractIT {
 
     Assertions.assertEquals(
         Lists.newArrayList(anotherRoleName, roleName), Arrays.asList(roleNames));
+
+    // List roles by the object (metalake)
+    roleNames = metalake.listBindingRoleNames();
+    Arrays.sort(roleNames);
+    Assertions.assertEquals(
+        Lists.newArrayList(anotherRoleName, roleName), Arrays.asList(roleNames));
+
+    String testObjectRole = "testObjectRole";
+    SecurableObject anotherCatalogObject =
+        SecurableObjects.ofCatalog(
+            "fileset_catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            anotherCatalogObject,
+            "fileset_schema",
+            Lists.newArrayList(Privileges.UseSchema.allow()));
+    SecurableObject filesetObject =
+        SecurableObjects.ofFileset(
+            schemaObject, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
+
+    metalake.createRole(
+        testObjectRole,
+        properties,
+        Lists.newArrayList(anotherCatalogObject, schemaObject, filesetObject));
+
+    // List roles by the object (catalog)
+    Catalog catalog = metalake.loadCatalog("fileset_catalog");
+    roleNames = catalog.supportsRoles().listBindingRoleNames();
+    Assertions.assertEquals(Lists.newArrayList(testObjectRole), Arrays.asList(roleNames));
+
+    // List roles by the object (schema)
+    Schema schema = catalog.asSchemas().loadSchema("fileset_schema");
+    roleNames = schema.supportsRoles().listBindingRoleNames();
+    Assertions.assertEquals(Lists.newArrayList(testObjectRole), Arrays.asList(roleNames));
+
+    // List roles by the object (fileset)
+    Fileset fileset =
+        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of("fileset_schema", "fileset"));
+    roleNames = fileset.supportsRoles().listBindingRoleNames();
+    Assertions.assertEquals(Lists.newArrayList(testObjectRole), Arrays.asList(roleNames));
 
     // Verify the object
     Assertions.assertEquals(1, role.securableObjects().size());

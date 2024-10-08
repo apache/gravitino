@@ -32,12 +32,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsCatalogs;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
@@ -60,6 +62,7 @@ import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
@@ -93,7 +96,8 @@ import org.apache.gravitino.tag.TagOperations;
  * catalogs as sub-level metadata collections. With {@link GravitinoMetalake}, users can list,
  * create, load, alter and drop a catalog with specified identifier.
  */
-public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, TagOperations {
+public class GravitinoMetalake extends MetalakeDTO
+    implements SupportsCatalogs, TagOperations, SupportsRoles {
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
   private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
@@ -105,6 +109,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   private static final String BLANK_PLACEHOLDER = "";
 
   private final RESTClient restClient;
+  private final MetadataObjectRoleOperations metadataObjectRoleOperations;
 
   GravitinoMetalake(
       String name,
@@ -114,6 +119,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
       RESTClient restClient) {
     super(name, comment, properties, auditDTO);
     this.restClient = restClient;
+    this.metadataObjectRoleOperations =
+        new MetadataObjectRoleOperations(
+            name, MetadataObjects.of(null, name, MetadataObject.Type.METALAKE), restClient);
   }
 
   /**
@@ -306,6 +314,11 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
     // Throw the corresponding exception
     ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
+  @Override
+  public SupportsRoles supportsRoles() {
+    return this;
   }
 
   /*
@@ -624,6 +637,44 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   }
 
   /**
+   * Lists the groups
+   *
+   * @return The Group list
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public Group[] listGroups() throws NoSuchMetalakeException {
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+
+    GroupListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_GROUPS_PATH, name(), BLANK_PLACEHOLDER),
+            params,
+            GroupListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+    return resp.getGroups();
+  }
+
+  /**
+   * Lists the group names
+   *
+   * @return The Group Name List
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listGroupNames() throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_GROUPS_PATH, name(), BLANK_PLACEHOLDER),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+    return resp.getNames();
+  }
+
+  /**
    * Gets a Role.
    *
    * @param role The name of the Role.
@@ -894,6 +945,11 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
             Collections.emptyMap(),
             ErrorHandlers.ownerErrorHandler());
     resp.validate();
+  }
+
+  @Override
+  public String[] listBindingRoleNames() {
+    return metadataObjectRoleOperations.listBindingRoleNames();
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {

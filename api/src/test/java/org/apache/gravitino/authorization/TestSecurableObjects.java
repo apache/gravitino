@@ -157,4 +157,195 @@ public class TestSecurableObjects {
                     Lists.newArrayList(Privileges.UseSchema.allow())));
     Assertions.assertTrue(e.getMessage().contains("the length of names is 3"));
   }
+
+  @Test
+  public void testPrivileges() {
+    Privilege createCatalog = Privileges.CreateCatalog.allow();
+    Privilege useCatalog = Privileges.UseCatalog.allow();
+    Privilege createSchema = Privileges.CreateSchema.allow();
+    Privilege useSchema = Privileges.UseSchema.allow();
+    Privilege createTable = Privileges.CreateTable.allow();
+    Privilege selectTable = Privileges.SelectTable.allow();
+    Privilege modifyTable = Privileges.ModifyTable.allow();
+    Privilege createFileset = Privileges.CreateFileset.allow();
+    Privilege readFileset = Privileges.ReadFileset.allow();
+    Privilege writeFileset = Privileges.WriteFileset.allow();
+    Privilege createTopic = Privileges.CreateTopic.allow();
+    Privilege consumeTopic = Privileges.ConsumeTopic.allow();
+    Privilege produceTopic = Privileges.ProduceTopic.allow();
+    Privilege createRole = Privileges.CreateRole.allow();
+    Privilege manageUsers = Privileges.ManageUsers.allow();
+    Privilege manageGroups = Privileges.ManageGroups.allow();
+    Privilege manageGrants = Privileges.ManageGrants.allow();
+
+    // Test create catalog
+    Assertions.assertTrue(createCatalog.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(createCatalog.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(createCatalog.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createCatalog.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createCatalog.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(createCatalog.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(createCatalog.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(createCatalog.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test use catalog
+    Assertions.assertTrue(useCatalog.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useCatalog.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(useCatalog.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(useCatalog.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(useCatalog.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(useCatalog.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(useCatalog.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(useCatalog.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test create schema
+    Assertions.assertTrue(createSchema.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createSchema.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(createSchema.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createSchema.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createSchema.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(createSchema.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(createSchema.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(createSchema.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test use schema
+    Assertions.assertTrue(useSchema.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useSchema.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useSchema.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(useSchema.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(useSchema.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(useSchema.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(useSchema.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(useSchema.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test create table
+    Assertions.assertTrue(createTable.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createTable.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createTable.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createTable.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createTable.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(createTable.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(createTable.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(createTable.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test select table
+    Assertions.assertTrue(selectTable.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(selectTable.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(selectTable.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(selectTable.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(selectTable.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(selectTable.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(selectTable.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(selectTable.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test modify table
+    Assertions.assertTrue(modifyTable.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(modifyTable.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(modifyTable.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(modifyTable.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(modifyTable.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(modifyTable.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(modifyTable.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(modifyTable.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test create topic
+    Assertions.assertTrue(createTopic.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createTopic.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createTopic.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createTopic.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createTopic.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(createTopic.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(createTopic.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(createTopic.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test consume topic
+    Assertions.assertTrue(consumeTopic.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(consumeTopic.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(consumeTopic.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(consumeTopic.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertTrue(consumeTopic.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(consumeTopic.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(consumeTopic.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(consumeTopic.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test produce topic
+    Assertions.assertTrue(produceTopic.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(produceTopic.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(produceTopic.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(produceTopic.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertTrue(produceTopic.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(produceTopic.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(produceTopic.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(produceTopic.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test create fileset
+    Assertions.assertTrue(createFileset.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createFileset.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createFileset.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createFileset.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createFileset.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(createFileset.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(createFileset.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(createFileset.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test read fileset
+    Assertions.assertTrue(readFileset.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(readFileset.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(readFileset.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(readFileset.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(readFileset.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertTrue(readFileset.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(readFileset.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(readFileset.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test write fileset
+    Assertions.assertTrue(writeFileset.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(writeFileset.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(writeFileset.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(writeFileset.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(writeFileset.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertTrue(writeFileset.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(writeFileset.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(writeFileset.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test create role
+    Assertions.assertTrue(createRole.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(createRole.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(createRole.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createRole.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createRole.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(createRole.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(createRole.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(createRole.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test manager users
+    Assertions.assertTrue(manageUsers.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(manageUsers.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test manager groups
+    Assertions.assertTrue(manageGroups.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(manageGroups.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test manager grants
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.COLUMN));
+  }
 }

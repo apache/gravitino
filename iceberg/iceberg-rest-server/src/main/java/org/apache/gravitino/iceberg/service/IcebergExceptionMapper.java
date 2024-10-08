@@ -32,6 +32,7 @@ import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchIcebergTableException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.exceptions.NotAuthorizedException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.UnprocessableEntityException;
@@ -57,6 +58,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(NoSuchTableException.class, 404)
           .put(NoSuchIcebergTableException.class, 404)
           .put(UnsupportedOperationException.class, 406)
+          .put(NoSuchViewException.class, 404)
           .put(AlreadyExistsException.class, 409)
           .put(CommitFailedException.class, 409)
           .put(UnprocessableEntityException.class, 422)

@@ -395,10 +395,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param kwargs: Extra args
         :return A file-like object from the filesystem
         """
-        if mode.startswith("w"):
-            data_operation = FilesetDataOperation.CREATE
-        elif mode.startswith("a"):
-            data_operation = FilesetDataOperation.APPEND
+        if mode in ("w", "wb"):
+            data_operation = FilesetDataOperation.OPEN_AND_WRITE
+        elif mode in ("a", "ab"):
+            data_operation = FilesetDataOperation.OPEN_AND_APPEND
         else:
             data_operation = FilesetDataOperation.OPEN
         context_pair: FilesetContextPair = self._get_fileset_context(
@@ -596,9 +596,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             self._metalake, identifier.namespace().level(1)
         )
         fileset_catalog = self._get_fileset_catalog(catalog_ident)
-        assert (
-            fileset_catalog is not None
-        ), f"Loaded fileset catalog: {catalog_ident} is null."
+        if fileset_catalog is None:
+            raise GravitinoRuntimeException(
+                f"Loaded fileset catalog: {catalog_ident} is null."
+            )
         sub_path: str = self._get_sub_path_from_virtual_path(identifier, virtual_path)
         context = {
             FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION: operation.name,

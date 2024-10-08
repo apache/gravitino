@@ -32,6 +32,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
@@ -692,6 +693,19 @@ public class DTOConverters {
   }
 
   /**
+   * Converts an array of Groups to an array of GroupDTOs.
+   *
+   * @param groups The groups to be converted.
+   * @return The array of GroupDTOs.
+   */
+  public static GroupDTO[] toDTOs(Group[] groups) {
+    if (ArrayUtils.isEmpty(groups)) {
+      return new GroupDTO[0];
+    }
+    return Arrays.stream(groups).map(DTOConverters::toDTO).toArray(GroupDTO[]::new);
+  }
+
+  /**
    * Converts a DistributionDTO to a Distribution.
    *
    * @param distributionDTO The distribution DTO.
@@ -988,6 +1002,20 @@ public class DTOConverters {
             fromFunctionArgs(((FunctionPartitioningDTO) partitioning).args()));
       default:
         throw new IllegalArgumentException("Unsupported partitioning: " + partitioning.strategy());
+    }
+  }
+
+  /**
+   * Converts a Privilege DTO to a Privilege
+   *
+   * @param privilegeDTO The privilege DTO to be converted.
+   * @return The privilege.
+   */
+  public static Privilege fromPrivilegeDTO(PrivilegeDTO privilegeDTO) {
+    if (privilegeDTO.condition().equals(Privilege.Condition.ALLOW)) {
+      return Privileges.allow(privilegeDTO.name());
+    } else {
+      return Privileges.deny(privilegeDTO.name());
     }
   }
 }

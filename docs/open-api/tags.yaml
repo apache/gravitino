@@ -36,7 +36,7 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
-                  - $ref: "#/components/responses/NameListResponse"
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
                   - $ref: "#/components/responses/TagListResponse"
               examples:
                 NameListResponse:
@@ -197,7 +197,7 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 oneOf:
-                  - $ref: "#/components/responses/NameListResponse"
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
                   - $ref: "#/components/responses/TagListResponse"
               examples:
                 NameListResponse:
@@ -228,7 +228,7 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/NameListResponse"
+                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
               examples:
                 NameListResponse:
                   $ref: "#/components/examples/NameListResponse"
@@ -517,21 +517,6 @@ components:
           nullable: true
 
   responses:
-
-    NameListResponse:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-          description: Status code of the response
-          enum:
-            - 0
-        names:
-          type: array
-          items:
-            type: string
-
     TagListResponse:
       type: object
       properties:

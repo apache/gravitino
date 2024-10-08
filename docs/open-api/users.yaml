@@ -23,6 +23,42 @@ paths:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
 
+    get:
+      tags:
+        - access control
+      summary: List users (names)
+      operationId: listUsers
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns the list of users if {details} is true, otherwise returns the list of user name
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/responses/UserListResponse"
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+              examples:
+                UserListResponse:
+                  $ref: "#/components/examples/UserListResponse"
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
     post:
       tags:
         - access control
@@ -108,6 +144,15 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
+  parameters:
+    details:
+      name: details
+      in: query
+      description: Include detailed information about the user
+      required: false
+      schema:
+        type: boolean
+        default: false
 
   schemas:
     User:
@@ -148,10 +193,31 @@ components:
         user:
           $ref: "#/components/schemas/User"
 
+    UserListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        users:
+          type: array
+          description: A list of user objects
+          items:
+            $ref: "#/components/schemas/User"
+
   examples:
     UserAddRequest:
       value: {
         "name": "user1",
+      }
+
+    NameListResponse:
+      value: {
+        "code": 0,
+        "names": [ "user1", "user2" ]
       }
 
     UserResponse:
@@ -165,6 +231,19 @@ components:
             "createTime": "2023-12-08T06:41:25.595Z"
           },
         }
+      }
+
+    UserListResponse:
+      value: {
+        "code": 0,
+        "users": [ {
+          "name": "user1",
+          "roles": [ ],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          },
+        } ]
       }
 
     UserAlreadyExistsException:

@@ -14,7 +14,6 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 
 - Supports the Apache Iceberg REST API defined in Iceberg 1.5, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
   - token
-  - view
   - multi table transaction
   - pagination
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
@@ -74,7 +73,6 @@ Please note that, it only takes affect in `gravitino.conf`, you don't need to sp
 | `gravitino.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                                                                                 | `131072`                                                                     | No       | 0.2.0         |
 | `gravitino.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                                                                                | `131072`                                                                     | No       | 0.2.0         |
 | `gravitino.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                                                                                     | (none)                                                                       | No       | 0.4.0         |
-
 
 The filter in `customFilters` should be a standard javax servlet filter.
 You can also specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
@@ -215,6 +213,15 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 
 If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a corresponding jar file to the classpath and load a custom Iceberg Catalog implementation by specifying the `catalog-backend-impl` property.
 
+#### View support
+
+You could access the view interface if using JDBC backend and enable `jdbc.schema-version` property.
+
+| Configuration item                              | Description                                                                                | Default value | Required | Since Version |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.jdbc.schema-version`    | The schema version of JDBC catalog backend, setting to `V1` if supporting view operations. | (none)        | NO       | 0.7.0         |
+
+
 #### Multi catalog support
 
 The Gravitino Iceberg REST server supports multiple catalogs and offers a configuration-based catalog management system.
@@ -301,6 +308,13 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 | `gravitino.iceberg-rest.metricsStore`           | The Iceberg metrics storage class name.                                                                                             | (none)        | No       | 0.4.0         |
 | `gravitino.iceberg-rest.metricsStoreRetainDays` | The days to retain Iceberg metrics in store, the value not greater than 0 means retain forever.                                     | -1            | No       | 0.4.0         |
 | `gravitino.iceberg-rest.metricsQueueCapacity`   | The size of queue to store metrics temporally before storing to the persistent storage. Metrics will be dropped when queue is full. | 1000          | No       | 0.4.0         |
+
+### Misc configurations
+
+| Configuration item                          | Description                                                  | Default value | Required | Since Version |
+|---------------------------------------------|--------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.extension-packages` | Comma-separated list of Iceberg REST API packages to expand. | (none)        | No       | 0.7.0         |
+
 
 ## Starting the Iceberg REST server
 

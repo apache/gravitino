@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -57,5 +58,13 @@ public interface Topic extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Topic does not support tag operations.");
+  }
+
+  /**
+   * @return the {@link SupportsRoles} if the topic supports role operations.
+   * @throws UnsupportedOperationException if the topic does not support role operations.
+   */
+  default SupportsRoles supportsRoles() {
+    throw new UnsupportedOperationException("Topic does not support role operations.");
   }
 }
