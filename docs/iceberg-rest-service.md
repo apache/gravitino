@@ -14,7 +14,6 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 
 - Supports the Apache Iceberg REST API defined in Iceberg 1.5, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
   - token
-  - view
   - multi table transaction
   - pagination
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
