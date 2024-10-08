@@ -401,6 +401,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
    *     exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws IllegalArgumentException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If granting roles to a role encounters storage issues.
    */
   public Role grantPrivilegesToRole(String role, MetadataObject object, List<Privilege> privileges)
@@ -419,6 +420,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
    *     exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws IllegalArgumentException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If revoking privileges from a role encounters storage issues.
    */
   public Role revokePrivilegesFromRole(
