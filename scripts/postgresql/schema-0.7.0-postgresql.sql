@@ -140,6 +140,48 @@ COMMENT ON COLUMN table_meta.current_version IS 'table current version';
 COMMENT ON COLUMN table_meta.last_version IS 'table last version';
 COMMENT ON COLUMN table_meta.deleted_at IS 'table deleted at';
 
+CREATE TABLE IF NOT EXISTS table_column_version_info (
+    id BIGINT NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    catalog_id BIGINT NOT NULL,
+    schema_id BIGINT NOT NULL,
+    table_id BIGINT NOT NULL,
+    table_version INT NOT NULL,
+    column_id BIGINT NOT NULL,
+    column_name VARCHAR(128) NOT NULL,
+    column_type VARCHAR(128) NOT NULL,
+    column_comment VARCHAR(256) DEFAULT '',
+    column_nullable SMALLINT NOT NULL DEFAULT 1,
+    column_auto_increment SMALLINT NOT NULL DEFAULT 0,
+    column_default_value VARCHAR(256) DEFAULT NULL,
+    column_op_type SMALLINT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    audit_info TEXT NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE (table_id, table_version, column_id, deleted_at)
+);
+CREATE INDEX idx_mid ON table_column_version_info (metalake_id);
+CREATE INDEX idx_cid ON table_column_version_info (catalog_id);
+CREATE INDEX idx_sid ON table_column_version_info (schema_id);
+COMMENT ON TABLE table_column_version_info IS 'table column version information';
+
+COMMENT ON COLUMN table_column_version_info.id IS 'auto increment id';
+COMMENT ON COLUMN table_column_version_info.metalake_id IS 'metalake id';
+COMMENT ON COLUMN table_column_version_info.catalog_id IS 'catalog id';
+COMMENT ON COLUMN table_column_version_info.schema_id IS 'schema id';
+COMMENT ON COLUMN table_column_version_info.table_id IS 'table id';
+COMMENT ON COLUMN table_column_version_info.table_version IS 'table version';
+COMMENT ON COLUMN table_column_version_info.column_id IS 'column id';
+COMMENT ON COLUMN table_column_version_info.column_name IS 'column name';
+COMMENT ON COLUMN table_column_version_info.column_type IS 'column type';
+COMMENT ON COLUMN table_column_version_info.column_comment IS 'column comment';
+COMMENT ON COLUMN table_column_version_info.column_nullable IS 'column nullable, 0 is not nullable, 1 is nullable';
+COMMENT ON COLUMN table_column_version_info.column_auto_increment IS 'column auto increment, 0 is not auto increment, 1 is auto increment';
+COMMENT ON COLUMN table_column_version_info.column_default_value IS 'column default value';
+COMMENT ON COLUMN table_column_version_info.column_op_type IS 'column op type, 1 is add, 2 is modify, 3 is delete';
+COMMENT ON COLUMN table_column_version_info.deleted_at IS 'column deleted at';
+COMMENT ON COLUMN table_column_version_info.audit_info IS 'column audit info';
+
 
 CREATE TABLE IF NOT EXISTS fileset_meta (
     fileset_id BIGINT NOT NULL,
