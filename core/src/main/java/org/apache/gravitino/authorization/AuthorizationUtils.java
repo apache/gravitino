@@ -223,7 +223,7 @@ public class AuthorizationUtils {
     Supplier<NoSuchMetadataObjectException> exceptionToThrowSupplier =
         () ->
             new NoSuchMetadataObjectException(
-                "Securable object %s doesn't exist", object.fullName());
+                "Securable object %s type %s doesn't exist", object.fullName(), object.type());
 
     switch (object.type()) {
       case METALAKE:
