@@ -73,7 +73,7 @@ echo "The docker compose log is: $LOG_FILE"
 docker compose up -d
 nohup docker compose logs -f  -t > $LOG_FILE &
 
-max_attempts=300
+max_attempts=120
 attempts=1
 
 while true; do
