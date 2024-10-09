@@ -31,21 +31,21 @@ public interface Credential {
    *
    * @return the credential type as a String.
    */
-  String getCredentialType();
+  String credentialType();
 
   /**
    * Returns the expiration time of the credential in seconds since the epoch, 0 means not expire.
    *
    * @return the expiration time as a long.
    */
-  long getExpireTimeSecs();
+  long expireTimeSecs();
 
   /**
    * Returns credential information.
    *
    * @return a map of credential information.
    */
-  Map<String, String> getCredentialInfo();
+  Map<String, String> credentialInfo();
 
   /**
    * Converts the credential to properties to transfer the credential though API.
@@ -54,9 +54,9 @@ public interface Credential {
    */
   default Map<String, String> toProperties() {
     return new ImmutableMap.Builder<String, String>()
-        .putAll(getCredentialInfo())
-        .put(CredentialConstants.CREDENTIAL_TYPE, getCredentialType())
-        .put(CredentialConstants.EXPIRE_TIME_SECS, String.valueOf(getExpireTimeSecs()))
+        .putAll(credentialInfo())
+        .put(CredentialConstants.CREDENTIAL_TYPE, credentialType())
+        .put(CredentialConstants.EXPIRE_TIME_SECS, String.valueOf(expireTimeSecs()))
         .build();
   }
 }

@@ -35,7 +35,7 @@ public class DummyCredentialProvider implements CredentialProvider {
   }
 
   @Override
-  public void stop() {}
+  public void close() {}
 
   @Override
   public String credentialType() {
@@ -64,17 +64,17 @@ public class DummyCredentialProvider implements CredentialProvider {
     }
 
     @Override
-    public String getCredentialType() {
+    public String credentialType() {
       return DummyCredentialProvider.CREDENTIAL_TYPE;
     }
 
     @Override
-    public long getExpireTimeSecs() {
+    public long expireTimeSecs() {
       return 0;
     }
 
     @Override
-    public Map<String, String> getCredentialInfo() {
+    public Map<String, String> credentialInfo() {
       return ImmutableMap.of(
           "writeLocation", writeLocations.toString(), "readLocation", readLocations.toString());
     }

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.credential;
 
+import java.io.Closeable;
 import java.util.Map;
 import javax.annotation.Nullable;
 
@@ -27,7 +28,7 @@ import javax.annotation.Nullable;
  *
  * <p>A credential provider is responsible for managing and retrieving credentials.
  */
-public interface CredentialProvider {
+public interface CredentialProvider extends Closeable {
   /**
    * Initializes the credential provider with catalog properties.
    *
@@ -35,9 +36,6 @@ public interface CredentialProvider {
    *     properties required vary by implementation.
    */
   void initialize(Map<String, String> properties);
-
-  /** Stops the credential provider, performing any necessary cleanup. */
-  void stop();
 
   /**
    * Returns the type of credential, it should be identical in Gravitino.
