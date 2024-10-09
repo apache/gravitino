@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -125,7 +126,8 @@ public class SecurableObjects {
 
     SecurableObjectImpl(String parent, String name, Type type, List<Privilege> privileges) {
       super(parent, name, type);
-      this.privileges = ImmutableList.copyOf(privileges);
+      // Remove duplicated privileges
+      this.privileges = ImmutableList.copyOf(Sets.newHashSet(privileges));
     }
 
     @Override

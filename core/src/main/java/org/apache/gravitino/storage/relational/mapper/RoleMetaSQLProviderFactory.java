@@ -83,6 +83,11 @@ public class RoleMetaSQLProviderFactory {
     return getProvider().insertRoleMetaOnDuplicateKeyUpdate(rolePO);
   }
 
+  public static String updateRoleMeta(
+      @Param("newRoleMeta") RolePO newRolePO, @Param("oldRoleMeta") RolePO oldRolePO) {
+    return getProvider().updateRoleMeta(newRolePO, oldRolePO);
+  }
+
   public static String softDeleteRoleMetaByRoleId(Long roleId) {
     return getProvider().softDeleteRoleMetaByRoleId(roleId);
   }

@@ -47,12 +47,16 @@ public class Utils {
   }
 
   public static Response illegalArguments(String message) {
-    return illegalArguments(message, null);
+    return illegalArguments(IllegalArgumentException.class.getSimpleName(), message, null);
   }
 
   public static Response illegalArguments(String message, Throwable throwable) {
+    return illegalArguments(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  public static Response illegalArguments(String type, String message, Throwable throwable) {
     return Response.status(Response.Status.BAD_REQUEST)
-        .entity(ErrorResponse.illegalArguments(message, throwable))
+        .entity(ErrorResponse.illegalArguments(type, message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }

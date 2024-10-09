@@ -59,6 +59,7 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -281,7 +282,7 @@ public class TestRoleOperations extends JerseyTest {
     ErrorResponse wrongPriErrorResp = wrongPrivilegeResp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, wrongPriErrorResp.getCode());
     Assertions.assertEquals(
-        IllegalArgumentException.class.getSimpleName(), wrongPriErrorResp.getType());
+        IllegalPrivilegeException.class.getSimpleName(), wrongPriErrorResp.getType());
 
     // Test with empty securable objects request
     RoleCreateRequest emptyObjectRequest =
