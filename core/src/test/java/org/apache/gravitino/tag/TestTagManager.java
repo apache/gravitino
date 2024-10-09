@@ -31,7 +31,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
-import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.spy;
 
 import com.google.common.collect.ImmutableMap;
@@ -167,9 +167,7 @@ public class TestTagManager {
     entityStore.put(table, false /* overwritten */);
 
     tagManager = spy(new TagManager(idGenerator, entityStore));
-    doReturn(true)
-        .when(tagManager)
-        .checkAndImportEntity(Mockito.any(), Mockito.any(), Mockito.any());
+    doNothing().when(tagManager).checkAndImportEntity(Mockito.any(), Mockito.any(), Mockito.any());
   }
 
   @AfterAll

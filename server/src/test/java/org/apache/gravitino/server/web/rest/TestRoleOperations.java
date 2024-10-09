@@ -31,6 +31,8 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -39,8 +41,8 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlManager;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -59,6 +61,7 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -69,6 +72,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -105,8 +109,6 @@ public class TestRoleOperations extends JerseyTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
@@ -439,11 +441,15 @@ public class TestRoleOperations extends JerseyTest {
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
-        () -> AuthorizationUtils.checkSecurableObject("metalake", DTOConverters.toDTO(catalog)));
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", DTOConverters.toDTO(catalog), GravitinoEnv.getInstance()));
     when(catalogDispatcher.catalogExists(any())).thenReturn(false);
     Assertions.assertThrows(
         NoSuchMetadataObjectException.class,
-        () -> AuthorizationUtils.checkSecurableObject("metalake", DTOConverters.toDTO(catalog)));
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", DTOConverters.toDTO(catalog), GravitinoEnv.getInstance()));
 
     // check the schema
     SecurableObject schema =
@@ -451,11 +457,15 @@ public class TestRoleOperations extends JerseyTest {
             catalog, "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
     when(schemaDispatcher.schemaExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
-        () -> AuthorizationUtils.checkSecurableObject("metalake", DTOConverters.toDTO(schema)));
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", DTOConverters.toDTO(schema), GravitinoEnv.getInstance()));
     when(schemaDispatcher.schemaExists(any())).thenReturn(false);
     Assertions.assertThrows(
         NoSuchMetadataObjectException.class,
-        () -> AuthorizationUtils.checkSecurableObject("metalake", DTOConverters.toDTO(schema)));
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", DTOConverters.toDTO(schema), GravitinoEnv.getInstance()));
 
     // check the table
     SecurableObject table =
@@ -463,11 +473,15 @@ public class TestRoleOperations extends JerseyTest {
             schema, "table", Lists.newArrayList(Privileges.SelectTable.allow()));
     when(tableDispatcher.tableExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
-        () -> AuthorizationUtils.checkSecurableObject("metalake", DTOConverters.toDTO(table)));
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", DTOConverters.toDTO(table), GravitinoEnv.getInstance()));
     when(tableDispatcher.tableExists(any())).thenReturn(false);
     Assertions.assertThrows(
         NoSuchMetadataObjectException.class,
-        () -> AuthorizationUtils.checkSecurableObject("metalake", DTOConverters.toDTO(table)));
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", DTOConverters.toDTO(table), GravitinoEnv.getInstance()));
 
     // check the topic
     SecurableObject topic =
@@ -475,11 +489,15 @@ public class TestRoleOperations extends JerseyTest {
             schema, "topic", Lists.newArrayList(Privileges.ConsumeTopic.allow()));
     when(topicDispatcher.topicExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
-        () -> AuthorizationUtils.checkSecurableObject("metalake", DTOConverters.toDTO(topic)));
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", DTOConverters.toDTO(topic), GravitinoEnv.getInstance()));
     when(topicDispatcher.topicExists(any())).thenReturn(false);
     Assertions.assertThrows(
         NoSuchMetadataObjectException.class,
-        () -> AuthorizationUtils.checkSecurableObject("metalake", DTOConverters.toDTO(topic)));
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", DTOConverters.toDTO(topic), GravitinoEnv.getInstance()));
 
     // check the fileset
     SecurableObject fileset =
@@ -487,11 +505,84 @@ public class TestRoleOperations extends JerseyTest {
             schema, "fileset", Lists.newArrayList(Privileges.ReadFileset.allow()));
     when(filesetDispatcher.filesetExists(any())).thenReturn(true);
     Assertions.assertDoesNotThrow(
-        () -> AuthorizationUtils.checkSecurableObject("metalake", DTOConverters.toDTO(fileset)));
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", DTOConverters.toDTO(fileset), GravitinoEnv.getInstance()));
     when(filesetDispatcher.filesetExists(any())).thenReturn(false);
     Assertions.assertThrows(
         NoSuchMetadataObjectException.class,
-        () -> AuthorizationUtils.checkSecurableObject("metalake", DTOConverters.toDTO(fileset)));
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", DTOConverters.toDTO(fileset), GravitinoEnv.getInstance()));
+
+    AtomicReference<String> wrongParent = new AtomicReference<>();
+    AtomicReference<String> wrongName = new AtomicReference<>();
+    AtomicReference<MetadataObject.Type> wrongType = new AtomicReference<>();
+    wrongParent.set("catalog1");
+    wrongName.set("schema1");
+
+    MetadataObject wrongMetadataObject =
+        new MetadataObject() {
+          @Nullable
+          @Override
+          public String parent() {
+            return wrongParent.get();
+          }
+
+          @Override
+          public String name() {
+            return wrongName.get();
+          }
+
+          @Override
+          public Type type() {
+            return wrongType.get();
+          }
+        };
+
+    // Test catalog object
+    wrongType.set(MetadataObject.Type.CATALOG);
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", wrongMetadataObject, GravitinoEnv.getInstance()));
+
+    // Test schema object
+    wrongType.set(MetadataObject.Type.CATALOG);
+    wrongParent.set("catalog1.schema1");
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", wrongMetadataObject, GravitinoEnv.getInstance()));
+
+    // Test table object
+    wrongType.set(MetadataObject.Type.TABLE);
+    wrongParent.set("catalog1");
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", wrongMetadataObject, GravitinoEnv.getInstance()));
+
+    // Test fileset object
+    wrongType.set(MetadataObject.Type.FILESET);
+    wrongParent.set("catalog1");
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", wrongMetadataObject, GravitinoEnv.getInstance()));
+
+    // Test topic object
+    wrongType.set(MetadataObject.Type.TOPIC);
+    wrongParent.set("catalog1");
+    Assertions.assertThrows(
+        IllegalNamespaceException.class,
+        () ->
+            MetadataObjectUtil.checkMetadataObject(
+                "metalake", wrongMetadataObject, GravitinoEnv.getInstance()));
   }
 
   @Test

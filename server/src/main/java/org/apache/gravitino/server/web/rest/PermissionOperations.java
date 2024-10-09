@@ -50,6 +50,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 @NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/permissions")
@@ -217,7 +218,7 @@ public class PermissionOperations {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
 
-            AuthorizationUtils.checkSecurableObject(metalake, object);
+            MetadataObjectUtil.checkMetadataObject(metalake, object, GravitinoEnv.getInstance());
             return TreeLockUtils.doWithTreeLock(
                 AuthorizationUtils.ofRole(metalake, role),
                 LockType.WRITE,
@@ -262,7 +263,7 @@ public class PermissionOperations {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
 
-            AuthorizationUtils.checkSecurableObject(metalake, object);
+            MetadataObjectUtil.checkMetadataObject(metalake, object, GravitinoEnv.getInstance());
             return TreeLockUtils.doWithTreeLock(
                 AuthorizationUtils.ofRole(metalake, role),
                 LockType.WRITE,

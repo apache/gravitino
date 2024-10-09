@@ -18,16 +18,22 @@
  */
 package org.apache.gravitino.utils;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 
 public class MetadataObjectUtil {
 
@@ -96,6 +102,79 @@ public class MetadataObjectUtil {
       default:
         throw new IllegalArgumentException(
             "Unknown metadata object type: " + metadataObject.type());
+    }
+  }
+
+  /**
+   * This method will check if the entity is existed explicitly, internally this check will load the
+   * entity from underlying sources to entity store if not stored, and will allocate an uid for this
+   * entity, with this uid tags can be associated with this entity. This method should be called out
+   * of the tree lock, otherwise it will cause deadlock.
+   *
+   * @param metalake The metalake name
+   * @param object The metadata object
+   * @param env The Gravitino environment
+   * @throws NoSuchMetadataObjectException if the metadata object type doesn't exist.
+   */
+  public static void checkMetadataObject(String metalake, MetadataObject object, GravitinoEnv env) {
+    NameIdentifier identifier = toEntityIdent(metalake, object);
+
+    Supplier<NoSuchMetadataObjectException> exceptionToThrowSupplier =
+        () ->
+            new NoSuchMetadataObjectException(
+                "Metadata object %s type %s doesn't exist", object.fullName(), object.type());
+
+    switch (object.type()) {
+      case METALAKE:
+        NameIdentifierUtil.checkMetalake(identifier);
+        check(env.metalakeDispatcher().metalakeExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case CATALOG:
+        NameIdentifierUtil.checkCatalog(identifier);
+        check(env.catalogDispatcher().catalogExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case SCHEMA:
+        NameIdentifierUtil.checkSchema(identifier);
+        check(env.schemaDispatcher().schemaExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case FILESET:
+        NameIdentifierUtil.checkFileset(identifier);
+        check(env.filesetDispatcher().filesetExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case TABLE:
+        NameIdentifierUtil.checkTable(identifier);
+        check(env.tableDispatcher().tableExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case TOPIC:
+        NameIdentifierUtil.checkTopic(identifier);
+        check(env.topicDispatcher().topicExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case ROLE:
+        AuthorizationUtils.checkRole(identifier);
+        try {
+          env.accessControlDispatcher().getRole(metalake, object.fullName());
+        } catch (NoSuchRoleException nsr) {
+          throw checkNotNull(exceptionToThrowSupplier).get();
+        }
+        break;
+
+      case COLUMN:
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the type %s", object.type()));
+    }
+  }
+
+  private static void check(
+      final boolean expression, Supplier<? extends RuntimeException> exceptionToThrowSupplier) {
+    if (!expression) {
+      throw checkNotNull(exceptionToThrowSupplier).get();
     }
   }
 }
