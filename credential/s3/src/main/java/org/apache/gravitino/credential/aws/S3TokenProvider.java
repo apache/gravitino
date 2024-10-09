@@ -170,7 +170,6 @@ public class S3TokenProvider implements CredentialProvider {
           .values()
           .forEach(statementBuilder -> policyBuilder.addStatement(statementBuilder.build()));
     } else {
-      // add list privilege with 0 resources
       policyBuilder.addStatement(
           IamStatement.builder().effect(IamEffect.ALLOW).addAction("s3:ListBucket").build());
     }

@@ -759,6 +759,8 @@ tasks {
         !it.name.startsWith("client") &&
         !it.name.startsWith("authorization") &&
         !it.name.startsWith("credential") &&
+        !it.name.startsWith("gcs") &&
+        !it.name.startsWith("s3") &&
         !it.name.startsWith("filesystem") &&
         !it.name.startsWith("spark") &&
         !it.name.startsWith("iceberg") &&

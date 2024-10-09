@@ -43,6 +43,9 @@ public class IcebergConstants {
   public static final String ICEBERG_S3_TOKEN = "s3.session-token";
   public static final String AWS_S3_REGION = "client.region";
 
+  public static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
+  public static final String ICEBERG_GCS_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+
   public static final String ICEBERG_OSS_ENDPOINT = "oss.endpoint";
   public static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
   public static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";

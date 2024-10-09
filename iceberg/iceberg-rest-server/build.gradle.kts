@@ -42,6 +42,7 @@ dependencies {
   }
   // todo remove
   implementation(project(":credential:s3"))
+  implementation(project(":credential:gcs"))
   implementation(project(":iceberg:iceberg-common"))
   implementation(project(":server-common")) {
     exclude("*")
@@ -77,6 +78,7 @@ dependencies {
     exclude("org.rocksdb")
   }
 
+  testImplementation(libs.iceberg.gcp.bundle)
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }

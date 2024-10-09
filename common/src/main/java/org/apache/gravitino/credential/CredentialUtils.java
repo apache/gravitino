@@ -23,18 +23,27 @@ import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
 public class CredentialUtils {
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.of(
-          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID,
+          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+          IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID,
           S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
-              IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY,
-          S3Properties.GRAVITINO_S3_TOKEN, IcebergConstants.ICEBERG_S3_TOKEN);
+          IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY,
+          S3Properties.GRAVITINO_S3_TOKEN,
+          IcebergConstants.ICEBERG_S3_TOKEN,
+          GCSProperties.GRAVITINO_GCS_TOKEN,
+          IcebergConstants.ICEBERG_GCS_TOKEN,
+          GCSProperties.GRAVITINO_TOKEN_EXPIRE_MS,
+          IcebergConstants.ICEBERG_GCS_TOKEN_EXPIRES_AT);
 
   public static Map<String, String> toIcebergProperties(Credential credential) {
-    if (credential instanceof S3TokenCredential || credential instanceof S3SecretKeyCredential) {
+    if (credential instanceof S3TokenCredential
+        || credential instanceof S3SecretKeyCredential
+        || credential instanceof GcsTokenCredential) {
       return transformProperties(credential.getCredentialInfo(), icebergCredentialPropertyMap);
     }
     throw new UnsupportedOperationException(
