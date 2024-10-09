@@ -54,7 +54,7 @@ public class SchemaDetails extends Command {
 
     try {
       GravitinoClient client = buildClient(metalake);
-      result = client.loadMetalake(metalake).loadCatalog(catalog).asSchemas().loadSchema(schema);
+      result = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
