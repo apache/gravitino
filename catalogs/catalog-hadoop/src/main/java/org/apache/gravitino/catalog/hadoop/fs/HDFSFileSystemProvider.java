@@ -31,9 +31,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   @Override
   public FileSystem getFileSystem(Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
-    for (Map.Entry<String, String> entry : config.entrySet()) {
-      configuration.set(entry.getKey(), entry.getValue());
-    }
+    config.forEach(configuration::set);
 
     String pathString = configuration.get("fs.defaultFS");
     if (pathString == null) {
