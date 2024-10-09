@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog.lakehouse.paimon.utils;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_BACKEND;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_URI;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_WAREHOUSE;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_JDBC_USER;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_JDBC_PASSWORD;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
@@ -118,6 +120,16 @@ public class CatalogUtils {
       String uri = paimonConfig.get(CATALOG_URI);
       Preconditions.checkArgument(
           StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");
+    }
+
+    if (PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(metastore)) {
+      String jdbcUser = paimonConfig.get(CATALOG_JDBC_USER);
+      Preconditions.checkArgument(
+              StringUtils.isNotBlank(jdbcUser), "Paimon Catalog jdbc user can not be null or empty.");
+
+      String jdbcPassword = paimonConfig.get(CATALOG_JDBC_PASSWORD);
+      Preconditions.checkArgument(
+              StringUtils.isNotBlank(jdbcPassword), "Paimon Catalog jdbc password can not be null or empty.");
     }
   }
 }

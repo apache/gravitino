@@ -44,9 +44,11 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String PAIMON_METASTORE = "metastore";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
+  public static final String JDBC_USER = "jdbc.user";
+  public static final String JDBC_PASSWORD = "jdbc.password";
 
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
-      ImmutableMap.of(GRAVITINO_CATALOG_BACKEND, PAIMON_METASTORE, WAREHOUSE, WAREHOUSE, URI, URI);
+      ImmutableMap.of(GRAVITINO_CATALOG_BACKEND, PAIMON_METASTORE, WAREHOUSE, WAREHOUSE, URI, URI, JDBC_USER, JDBC_USER, JDBC_PASSWORD, JDBC_PASSWORD);
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
   private static final Map<String, String> KERBEROS_CONFIGURATION =
       ImmutableMap.of(
@@ -83,7 +85,19 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 "Paimon catalog uri config",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */));
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                    JDBC_USER,
+                    "Paimon catalog jdbc user",
+                    false /* immutable */,
+                    null /* defaultValue */,
+                    false /* hidden */),
+            stringOptionalPropertyEntry(
+                    JDBC_PASSWORD,
+                    "Paimon catalog jdbc password",
+                    false /* immutable */,
+                    null /* defaultValue */,
+                    false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
