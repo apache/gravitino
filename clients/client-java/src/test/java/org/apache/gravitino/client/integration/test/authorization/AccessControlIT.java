@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.auth.AuthConstants;
@@ -40,6 +42,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -214,6 +217,47 @@ public class AccessControlIT extends AbstractIT {
         NoSuchMetadataObjectException.class,
         () -> metalake.createRole("not-existed", properties, Lists.newArrayList(catalogObject)));
 
+    // Create a role with duplicated securable objects
+    SecurableObject duplicatedMetalakeObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.createRole(
+                roleName,
+                properties,
+                Lists.newArrayList(metalakeObject, duplicatedMetalakeObject)));
+
+    // Create a role with wrong privilege
+    SecurableObject wrongPrivilegeObject =
+        SecurableObjects.ofCatalog("wrong", Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.createRole(
+                "not-existed", properties, Lists.newArrayList(wrongPrivilegeObject)));
+
+    // Create a role with wrong privilege
+    SecurableObject wrongCatalogObject =
+        SecurableObjects.ofCatalog(
+            "fileset_catalog", Lists.newArrayList(Privileges.SelectTable.allow()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.createRole("not-existed", properties, Lists.newArrayList(wrongCatalogObject)));
+
+    // Create a role with duplicated privilege
+    SecurableObject duplicatedCatalogObject =
+        SecurableObjects.ofCatalog(
+            "fileset_catalog",
+            Lists.newArrayList(Privileges.SelectTable.allow(), Privileges.SelectTable.deny()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.createRole(
+                "not-existed", properties, Lists.newArrayList(duplicatedCatalogObject)));
+
     // Get a role
     role = metalake.getRole(roleName);
 
@@ -282,9 +326,15 @@ public class AccessControlIT extends AbstractIT {
     Assertions.assertEquals(createdPrivilege.name(), Privilege.Name.CREATE_CATALOG);
     Assertions.assertEquals(createdPrivilege.condition(), Privilege.Condition.ALLOW);
 
+    // create empty objects role
+    Role emptyObjectsRole = metalake.createRole("empty", properties, Collections.emptyList());
+    Assertions.assertEquals("empty", emptyObjectsRole.name());
+    Assertions.assertEquals(properties, role.properties());
+
     // Delete a role
     Assertions.assertTrue(metalake.deleteRole(roleName));
     Assertions.assertFalse(metalake.deleteRole(roleName));
+    metalake.deleteRole(emptyObjectsRole.name());
   }
 
   @Test
@@ -394,6 +444,99 @@ public class AccessControlIT extends AbstractIT {
 
     // Clean up
     metalake.removeGroup(groupName);
+    metalake.deleteRole(roleName);
+  }
+
+  @Test
+  void testManageRolePermissions() {
+    String roleName = "role#123";
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("k1", "v1");
+    metalake.createRole(roleName, properties, Lists.newArrayList());
+    MetadataObject metadataObject =
+        MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE);
+
+    // grant a privilege
+    Role role =
+        metalake.grantPrivilegesToRole(
+            roleName, metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertEquals(1, role.securableObjects().size());
+
+    // grant a wrong privilege
+    MetadataObject catalog = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
+    Assertions.assertThrows(
+        IllegalPrivilegeException.class,
+        () ->
+            metalake.grantPrivilegesToRole(
+                roleName, catalog, Lists.newArrayList(Privileges.CreateCatalog.allow())));
+
+    // grant a wrong catalog type privilege
+    MetadataObject wrongCatalog =
+        MetadataObjects.of(null, "fileset_catalog", MetadataObject.Type.CATALOG);
+    Assertions.assertThrows(
+        IllegalPrivilegeException.class,
+        () ->
+            metalake.grantPrivilegesToRole(
+                roleName, wrongCatalog, Lists.newArrayList(Privileges.SelectTable.allow())));
+
+    // grant a duplicated privilege
+    MetadataObject duplicatedCatalog =
+        MetadataObjects.of(null, "fileset_catalog", MetadataObject.Type.CATALOG);
+    Assertions.assertThrows(
+        IllegalPrivilegeException.class,
+        () ->
+            metalake.grantPrivilegesToRole(
+                roleName,
+                duplicatedCatalog,
+                Lists.newArrayList(Privileges.SelectTable.allow(), Privileges.SelectTable.deny())));
+
+    // repeat to grant a privilege
+    role =
+        metalake.grantPrivilegesToRole(
+            roleName, metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertEquals(1, role.securableObjects().size());
+
+    // grant a not-existing role
+    Assertions.assertThrows(
+        NoSuchRoleException.class,
+        () ->
+            metalake.grantPrivilegesToRole(
+                "not-exist", metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow())));
+
+    // revoke a privilege
+    role =
+        metalake.revokePrivilegesFromRole(
+            roleName, metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertTrue(role.securableObjects().isEmpty());
+
+    // revoke a wrong privilege
+    Assertions.assertThrows(
+        IllegalPrivilegeException.class,
+        () ->
+            metalake.revokePrivilegesFromRole(
+                roleName, catalog, Lists.newArrayList(Privileges.CreateCatalog.allow())));
+
+    // revoke a wrong catalog type privilege
+    Assertions.assertThrows(
+        IllegalPrivilegeException.class,
+        () ->
+            metalake.revokePrivilegesFromRole(
+                roleName, wrongCatalog, Lists.newArrayList(Privileges.SelectTable.allow())));
+
+    // repeat to revoke a privilege
+    role =
+        metalake.revokePrivilegesFromRole(
+            roleName, metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow()));
+    Assertions.assertTrue(role.securableObjects().isEmpty());
+
+    // revoke a not-existing role
+    Assertions.assertThrows(
+        NoSuchRoleException.class,
+        () ->
+            metalake.revokePrivilegesFromRole(
+                "not-exist", metadataObject, Lists.newArrayList(Privileges.CreateCatalog.allow())));
+
+    // Cleanup
     metalake.deleteRole(roleName);
   }
 
