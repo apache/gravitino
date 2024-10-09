@@ -325,7 +325,8 @@ public class AuthorizationUtils {
     Catalog catalog = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(catalogIdent);
     if (catalog.type() != type) {
       throw new IllegalPrivilegeException(
-          "Catalog %s type %s don't support privilege %s", catalogIdent, catalog.type(), privilege);
+          "Catalog %s type %s doesn't support privilege %s",
+          catalogIdent, catalog.type(), privilege);
     }
   }
 

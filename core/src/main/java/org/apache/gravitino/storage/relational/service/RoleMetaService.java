@@ -197,11 +197,11 @@ public class RoleMetaService {
         return newRoleEntity;
       }
 
-      List<SecurableObjectPO> deleteSecurableObjectPOS =
-          toSecurablePOs(deleteObjects, oldRoleEntity, metalakeId);
+      List<SecurableObjectPO> deleteSecurableObjectPOs =
+          toSecurableObjectPOs(deleteObjects, oldRoleEntity, metalakeId);
 
       List<SecurableObjectPO> insertSecurableObjectPOs =
-          toSecurablePOs(insertObjects, oldRoleEntity, metalakeId);
+          toSecurableObjectPOs(insertObjects, oldRoleEntity, metalakeId);
 
       SessionUtils.doMultipleWithCommit(
           () ->
@@ -211,13 +211,13 @@ public class RoleMetaService {
                       mapper.updateRoleMeta(
                           POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO)),
           () -> {
-            if (deleteSecurableObjectPOS.isEmpty()) {
+            if (deleteSecurableObjectPOs.isEmpty()) {
               return;
             }
 
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
-                mapper -> mapper.batchSoftDeleteSecurableObjects(deleteSecurableObjectPOS));
+                mapper -> mapper.batchSoftDeleteSecurableObjects(deleteSecurableObjectPOs));
           },
           () -> {
             if (insertSecurableObjectPOs.isEmpty()) {
@@ -236,7 +236,7 @@ public class RoleMetaService {
     }
   }
 
-  private List<SecurableObjectPO> toSecurablePOs(
+  private List<SecurableObjectPO> toSecurableObjectPOs(
       Set<SecurableObject> deleteObjects, RoleEntity oldRoleEntity, Long metalakeId) {
     List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
     for (SecurableObject object : deleteObjects) {

@@ -439,6 +439,7 @@ class PermissionManager {
       LOG.error("Failed to grant, role {} does not exist in the metalake {}", role, metalake, nse);
       throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
     } catch (IOException ioe) {
+      LOG.error("Grant privileges to {} failed due to storage issues", role, ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -575,6 +576,7 @@ class PermissionManager {
       LOG.error("Failed to revoke, role {} does not exist in the metalake {}", role, metalake, nse);
       throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
     } catch (IOException ioe) {
+      LOG.error("Revoke privileges from {} failed due to storage issues", role, ioe);
       throw new RuntimeException(ioe);
     }
   }
@@ -592,7 +594,7 @@ class PermissionManager {
     updatePrivileges.addAll(targetObject.privileges());
     privileges.forEach(updatePrivileges::remove);
 
-    // If the object still contain privilege, we should update the object
+    // If the object still contains privilege, we should update the object
     // with new privileges
     if (!updatePrivileges.isEmpty()) {
       SecurableObject newSecurableObject =
