@@ -86,7 +86,7 @@ services:
       - ./init/trino-local:/tmp/trino
       - ${GRAVITINO_TRINO_CONNECTOR_DIR:-/null}:/usr/lib/trino/plugin/gravitino
       - ${GRAVITINO_TRINO_CASCADING_CONNECTOR_DIR:-/null}:/usr/lib/trino/plugin/trino
-      - ${GRAVITINO_SERVER_DIR:-/null}:/usr/local/gravitino-server
+      - ${GRAVITINO_SERVER_DIR:-/null}:/opt/gravitino-server
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:

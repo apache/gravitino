@@ -20,4 +20,9 @@
 
 cd "$(dirname "$0")"
 
+LOG_DIR=../../build/trino-cascading-env
+if [ -d $LOG_DIR ]; then
+  docker cp trino-ci-trino-local:/tmp/gravitino-server/logs $LOG_DIR/gravitino-server
+fi
+
 docker compose down

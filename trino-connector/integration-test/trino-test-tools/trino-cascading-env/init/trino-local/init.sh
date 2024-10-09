@@ -29,7 +29,10 @@ cp "$trino_conf_dir/config/catalog/gravitino.properties" /etc/trino/catalog/grav
 cp "$trino_conf_dir/config/catalog/trino.properties" /etc/trino/catalog/trino.properties
 
 #start the gravitino server
-/usr/local/gravitino-server/bin/gravitino.sh start
+cp -r /opt/gravitino-server /tmp/gravitino-server
+rm -fr /tmp/gravitino-server/logs
+rm -fr /tmp/gravitino-server/data
+/tmp/gravitino-server/bin/gravitino.sh start
 
 #create test metalake
 counter=0
