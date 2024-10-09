@@ -22,6 +22,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -38,6 +39,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -54,6 +56,7 @@ public class AuthorizationUtils {
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
+
   private static final Set<Privilege.Name> FILESET_PRIVILEGES =
       Sets.immutableEnumSet(
           Privilege.Name.CREATE_FILESET, Privilege.Name.WRITE_FILESET, Privilege.Name.READ_FILESET);
@@ -220,7 +223,7 @@ public class AuthorizationUtils {
     Supplier<NoSuchMetadataObjectException> exceptionToThrowSupplier =
         () ->
             new NoSuchMetadataObjectException(
-                "Securable object %s doesn't exist", object.fullName());
+                "Securable object %s type %s doesn't exist", object.fullName(), object.type());
 
     switch (object.type()) {
       case METALAKE:
@@ -265,14 +268,26 @@ public class AuthorizationUtils {
     }
   }
 
+  public static void checkDuplicatedNamePrivilege(Collection<Privilege> privileges) {
+    Set<Privilege.Name> privilegeNameSet = Sets.newHashSet();
+    for (Privilege privilege : privileges) {
+      if (privilegeNameSet.contains(privilege.name())) {
+        throw new IllegalPrivilegeException(
+            "Doesn't support duplicated privilege name %s with different condition",
+            privilege.name());
+      }
+      privilegeNameSet.add(privilege.name());
+    }
+  }
+
   public static void checkPrivilege(
       PrivilegeDTO privilegeDTO, MetadataObject object, String metalake) {
     Privilege privilege = DTOConverters.fromPrivilegeDTO(privilegeDTO);
+
     if (!privilege.canBindTo(object.type())) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Securable object %s type %s don't support binding privilege %s",
-              object.fullName(), object.type(), privilege));
+      throw new IllegalPrivilegeException(
+          "Securable object %s type %s don't support binding privilege %s",
+          object.fullName(), object.type(), privilege);
     }
 
     if (object.type() == MetadataObject.Type.CATALOG
@@ -309,10 +324,9 @@ public class AuthorizationUtils {
       NameIdentifier catalogIdent, Catalog.Type type, Privilege privilege) {
     Catalog catalog = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(catalogIdent);
     if (catalog.type() != type) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Catalog %s type %s don't support privilege %s",
-              catalogIdent, catalog.type(), privilege));
+      throw new IllegalPrivilegeException(
+          "Catalog %s type %s doesn't support privilege %s",
+          catalogIdent, catalog.type(), privilege);
     }
   }
 

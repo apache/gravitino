@@ -151,6 +151,25 @@ public class RoleMetaBaseSQLProvider {
         + " deleted_at = #{roleMeta.deletedAt}";
   }
 
+  public String updateRoleMeta(
+      @Param("newRoleMeta") RolePO newRolePO, @Param("oldRoleMeta") RolePO oldRolePO) {
+    return "UPDATE "
+        + ROLE_TABLE_NAME
+        + " SET role_name = #{newRoleMeta.roleName},"
+        + " metalake_id = #{newRoleMeta.metalakeId},"
+        + " properties = #{newRoleMeta.properties},"
+        + " audit_info = #{newRoleMeta.auditInfo},"
+        + " current_version = #{newRoleMeta.currentVersion},"
+        + " last_version = #{newRoleMeta.lastVersion},"
+        + " deleted_at = #{newRoleMeta.deletedAt}"
+        + " WHERE role_id = #{oldRoleMeta.roleId}"
+        + " AND role_name = #{oldRoleMeta.roleName}"
+        + " AND metalake_id = #{oldRoleMeta.metalakeId}"
+        + " AND current_version = #{oldRoleMeta.currentVersion}"
+        + " AND last_version = #{oldRoleMeta.lastVersion}"
+        + " AND deleted_at = 0";
+  }
+
   public String softDeleteRoleMetaByRoleId(Long roleId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
