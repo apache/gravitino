@@ -62,6 +62,8 @@ echo "GRAVITINO_TRINO_CASCADING_CONNECTOR_DIR is '$GRAVITINO_TRINO_CASCADING_CON
 
 echo "Clean gravitino server data"
 rm -fr $GRAVITINO_SERVER_DIR/data/*.*
+mkdir -p $GRAVITINO_SERVER_DIR/logs
+chmod 777 $GRAVITINO_SERVER_DIR/logs
 
 # create log dir
 LOG_DIR=../../build/trino-cascading-env
