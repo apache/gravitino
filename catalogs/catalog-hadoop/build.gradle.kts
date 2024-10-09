@@ -71,6 +71,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(project(":bundles:gcs-bundle"))
 
   testImplementation(libs.minikdc)
   testImplementation(libs.hadoop3.minicluster)
@@ -84,6 +85,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.hadoop3.gcs)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

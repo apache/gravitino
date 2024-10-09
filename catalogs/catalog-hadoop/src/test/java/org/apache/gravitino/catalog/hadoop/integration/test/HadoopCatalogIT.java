@@ -53,32 +53,32 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class HadoopCatalogIT extends AbstractIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  public static final String metalakeName =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
-  public static final String catalogName =
-      GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
+  public String metalakeName = GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
+  public String catalogName = GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
   public static final String SCHEMA_PREFIX = "CatalogFilesetIT_schema";
-  public static final String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
-  private static final String provider = "hadoop";
-  private static GravitinoMetalake metalake;
-  private static Catalog catalog;
-  private static FileSystem hdfs;
-  private static String defaultBaseLocation;
+  public String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+  protected static final String provider = "hadoop";
+  protected static GravitinoMetalake metalake;
+  protected static Catalog catalog;
+  protected static FileSystem fileSystem;
+  protected static String defaultBaseLocation;
 
   @BeforeAll
-  public static void setup() throws IOException {
+  public void setup() throws IOException {
     containerSuite.startHiveContainer();
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", defaultBaseLocation());
-    hdfs = FileSystem.get(conf);
+    fileSystem = FileSystem.get(conf);
 
     createMetalake();
     createCatalog();
@@ -86,13 +86,13 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() throws IOException {
+  public void stop() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
-    if (hdfs != null) {
-      hdfs.close();
+    if (fileSystem != null) {
+      fileSystem.close();
     }
 
     try {
@@ -102,7 +102,7 @@ public class HadoopCatalogIT extends AbstractIT {
     }
   }
 
-  private static void createMetalake() {
+  protected void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
@@ -114,14 +114,14 @@ public class HadoopCatalogIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  protected void createCatalog() {
     metalake.createCatalog(
         catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
 
     catalog = metalake.loadCatalog(catalogName);
   }
 
-  private static void createSchema() {
+  protected void createSchema() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
@@ -137,7 +137,7 @@ public class HadoopCatalogIT extends AbstractIT {
     Assertions.assertNotNull(loadSchema.properties().get("location"));
   }
 
-  private static void dropSchema() {
+  private void dropSchema() {
     catalog.asSchemas().dropSchema(schemaName, true);
     Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaName));
   }
@@ -171,7 +171,7 @@ public class HadoopCatalogIT extends AbstractIT {
     String filesetName = "test_create_fileset";
     String storageLocation = storageLocation(filesetName);
     Assertions.assertFalse(
-        hdfs.exists(new Path(storageLocation)), "storage location should not exists");
+        fileSystem.exists(new Path(storageLocation)), "storage location should not exists");
     Fileset fileset =
         createFileset(
             filesetName,
@@ -242,7 +242,7 @@ public class HadoopCatalogIT extends AbstractIT {
     String filesetName = "test_create_fileset_with_chinese";
     String storageLocation = storageLocation(filesetName) + "/中文目录test";
     Assertions.assertFalse(
-        hdfs.exists(new Path(storageLocation)), "storage location should not exists");
+        fileSystem.exists(new Path(storageLocation)), "storage location should not exists");
     Fileset fileset =
         createFileset(
             filesetName,
@@ -285,7 +285,7 @@ public class HadoopCatalogIT extends AbstractIT {
     Assertions.assertEquals(1, fileset.properties().size());
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
     Assertions.assertTrue(
-        hdfs.exists(new Path(storageLocation)), "storage location should be created");
+        fileSystem.exists(new Path(storageLocation)), "storage location should be created");
 
     // create fileset with storage location that not exist
     String filesetName2 = "test_external_fileset_no_exist";
@@ -349,7 +349,7 @@ public class HadoopCatalogIT extends AbstractIT {
     String storageLocation = storageLocation(filesetName);
 
     Assertions.assertFalse(
-        hdfs.exists(new Path(storageLocation)), "storage location should not exists");
+        fileSystem.exists(new Path(storageLocation)), "storage location should not exists");
 
     createFileset(
         filesetName, "comment", Fileset.Type.MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
@@ -365,7 +365,7 @@ public class HadoopCatalogIT extends AbstractIT {
         catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, filesetName)),
         "fileset should not be exists");
     Assertions.assertFalse(
-        hdfs.exists(new Path(storageLocation)), "storage location should be dropped");
+        fileSystem.exists(new Path(storageLocation)), "storage location should be dropped");
   }
 
   @Test
@@ -392,7 +392,7 @@ public class HadoopCatalogIT extends AbstractIT {
         catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, filesetName)),
         "fileset should not be exists");
     Assertions.assertTrue(
-        hdfs.exists(new Path(storageLocation)), "storage location should not be dropped");
+        fileSystem.exists(new Path(storageLocation)), "storage location should not be dropped");
   }
 
   @Test
@@ -688,7 +688,7 @@ public class HadoopCatalogIT extends AbstractIT {
     }
   }
 
-  private static String generateLocation(String filesetName) {
+  protected String generateLocation(String filesetName) {
     return String.format(
         "hdfs://%s:%d/user/hadoop/%s/%s/%s",
         containerSuite.getHiveContainer().getContainerIpAddress(),
@@ -707,7 +707,7 @@ public class HadoopCatalogIT extends AbstractIT {
     if (storageLocation != null) {
       Path location = new Path(storageLocation);
       try {
-        hdfs.deleteOnExit(location);
+        fileSystem.deleteOnExit(location);
       } catch (IOException e) {
         LOG.warn("Failed to delete location: {}", location, e);
       }
@@ -724,10 +724,11 @@ public class HadoopCatalogIT extends AbstractIT {
         catalog.asFilesetCatalog().filesetExists(NameIdentifier.of(schemaName, filesetName)),
         "fileset should be exists");
     Assertions.assertTrue(
-        hdfs.exists(new Path(storageLocation(filesetName))), "storage location should be exists");
+        fileSystem.exists(new Path(storageLocation(filesetName))),
+        "storage location should be exists");
   }
 
-  private static String defaultBaseLocation() {
+  protected String defaultBaseLocation() {
     if (defaultBaseLocation == null) {
       defaultBaseLocation =
           String.format(
@@ -739,7 +740,7 @@ public class HadoopCatalogIT extends AbstractIT {
     return defaultBaseLocation;
   }
 
-  private static String storageLocation(String filesetName) {
+  private String storageLocation(String filesetName) {
     return defaultBaseLocation() + "/" + filesetName;
   }
 }

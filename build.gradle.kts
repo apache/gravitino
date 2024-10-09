@@ -744,7 +744,7 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("authorization") &&
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink")
+        it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink") && it.name != "gcs-bundle"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -763,7 +763,7 @@ tasks {
         !it.name.startsWith("integration-test") &&
         !it.name.startsWith("flink") &&
         !it.name.startsWith("trino-connector") &&
-        it.name != "hive-metastore-common"
+        it.name != "hive-metastore-common" && it.name != "gcs-bundle"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
