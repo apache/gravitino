@@ -24,9 +24,11 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
@@ -89,6 +91,16 @@ public class SqliteDatabaseOperations extends JdbcDatabaseOperations {
       return JdbcSchema.builder().withName(databaseName).withAuditInfo(AuditInfo.EMPTY).build();
     }
     return null;
+  }
+
+  @Override
+  protected boolean supportSchemaComment() {
+    return false;
+  }
+
+  @Override
+  protected Set<String> createSysDatabaseNameSet() {
+    return Collections.emptySet();
   }
 
   @Override
