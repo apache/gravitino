@@ -55,7 +55,7 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
               FILESYSTEM_PROVIDER,
               PropertyEntry.stringOptionalPropertyEntry(
                   FILESYSTEM_PROVIDER,
-                  "The file system provider class name",
+                  "The file system provider class name, separated by comma",
                   false /* immutable */,
                   null,
                   false /* hidden */))
