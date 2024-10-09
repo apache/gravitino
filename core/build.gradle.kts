@@ -24,6 +24,7 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":common"))
   implementation(project(":meta"))
   implementation(libs.bundles.log4j)
