@@ -484,32 +484,6 @@ class PermissionManager {
     }
   }
 
-  private static SecurableObject createNewSecurableObject(
-      String metalake,
-      String role,
-      MetadataObject object,
-      List<Privilege> privileges,
-      RoleEntity roleEntity,
-      AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
-    // Add a new securable object if there doesn't exist the object in the role
-    SecurableObject securableObject =
-        SecurableObjects.parse(object.fullName(), object.type(), Lists.newArrayList(privileges));
-
-    // We set authorization callback here, we won't execute this callback in this place.
-    // We will execute the callback after we execute the SQL transaction.
-    authorizationPluginCallbackWrapper.setCallback(
-        () ->
-            AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-                metalake,
-                object,
-                authorizationPlugin -> {
-                  authorizationPlugin.onRoleUpdated(
-                      roleEntity, RoleChange.addSecurableObject(role, securableObject));
-                }));
-
-    return securableObject;
-  }
-
   Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, List<Privilege> privileges) {
     try {
@@ -579,6 +553,32 @@ class PermissionManager {
       LOG.error("Revoke privileges from {} failed due to storage issues", role, ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  private static SecurableObject createNewSecurableObject(
+      String metalake,
+      String role,
+      MetadataObject object,
+      List<Privilege> privileges,
+      RoleEntity roleEntity,
+      AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
+    // Add a new securable object if there doesn't exist the object in the role
+    SecurableObject securableObject =
+        SecurableObjects.parse(object.fullName(), object.type(), Lists.newArrayList(privileges));
+
+    // We set authorization callback here, we won't execute this callback in this place.
+    // We will execute the callback after we execute the SQL transaction.
+    authorizationPluginCallbackWrapper.setCallback(
+        () ->
+            AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                metalake,
+                object,
+                authorizationPlugin -> {
+                  authorizationPlugin.onRoleUpdated(
+                      roleEntity, RoleChange.addSecurableObject(role, securableObject));
+                }));
+
+    return securableObject;
   }
 
   private static SecurableObject updateRevokedSecurableObject(
