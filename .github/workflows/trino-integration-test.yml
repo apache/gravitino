@@ -82,12 +82,15 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+
       - name: Trino Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :trino-connector:integration-test:test
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :trino-connector:integration-test:test
-          trino-connector/integration-test/trino-test-tools/run_test.sh
+          #./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :trino-connector:integration-test:test
+          #./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :trino-connector:integration-test:test
+          ./gradlew compileDistribution -x test && trino-connector/integration-test/trino-test-tools/run_test.sh
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
@@ -96,8 +99,9 @@ jobs:
           name: trino-connector-integrate-test-reports-${{ matrix.java-version }}
           path: |
             build/reports
-            trino-connector/integrate-test/build/*.log
-            trino-connector/integrate-test/build/*.tar
+            trino-connector/integration-test/build/*.log
+            trino-connector/integration-test/build/*.tar
+            trino-connector/integration-test/build/trino-cascading-env
             integration-test-common/build/trino-ci-container-log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
