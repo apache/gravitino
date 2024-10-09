@@ -542,7 +542,7 @@ print(documents)
 
 ### Authentication
 
-Currently, Gravitino Virtual File System in Python supports two kinds of authentication types to access Gravitino server: `simple` and `oatuh2`.
+Currently, Gravitino Virtual File System in Python supports two kinds of authentication types to access Gravitino server: `simple` and `oauth2`.
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System in Python.
 
