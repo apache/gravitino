@@ -20,39 +20,39 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.cli.ErrorMessages;
-import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
-
+public class CreateMetalake extends Command {
   protected String metalake;
+  protected String comment;
 
   /**
-   * Displays metalake details.
+   * Create a new metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param comment The metalake's comment.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public CreateMetalake(String url, String metalake, String comment) {
     super(url);
     this.metalake = metalake;
+    this.comment = comment;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** Create a new metalake. */
   public void handle() {
-    String comment = "";
     try {
-      GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
-    } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      GravitinoAdminClient client = buildAdminClient();
+      client.createMetalake(metalake, comment, null);
+    } catch (MetalakeAlreadyExistsException err) {
+      System.err.println(ErrorMessages.METALAKE_EXISTS);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    System.out.println(metalake + " created");
   }
 }

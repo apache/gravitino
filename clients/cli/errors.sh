@@ -41,6 +41,9 @@ gcli unknown list
 # Name not specified 
 gcli metalake details
 
+# Too many arguments
+gcli metalake details more
+
 # Unknown metalake name
 gcli metalake details --name unknown
 
@@ -49,3 +52,12 @@ gcli catalog details --name metalake_demo.unknown
 
 # Unknown catalog name
 gcli catalog details --name metalake_demo
+
+# Already exists
+gcli metalake create -name metalake_demo
+
+# Doesn't exist
+gcli metalake delete -name unknown-metalake
+
+# Malformed name
+gcli catalog details -name metalake_demo

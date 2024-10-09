@@ -21,38 +21,49 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
+public class DeleteCatalog extends Command {
 
   protected String metalake;
+  protected String catalog;
 
   /**
-   * Displays metalake details.
+   * Delete a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public DeleteCatalog(String url, String metalake, String catalog) {
     super(url);
     this.metalake = metalake;
+    this.catalog = catalog;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** Delete a catalog. */
   public void handle() {
-    String comment = "";
+    boolean deleted = false;
+
     try {
       GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      deleted = client.dropCatalog(catalog);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    if (deleted) {
+      System.out.println(catalog + " deleted.");
+    } else {
+      System.out.println(catalog + " not deleted.");
+    }
   }
 }

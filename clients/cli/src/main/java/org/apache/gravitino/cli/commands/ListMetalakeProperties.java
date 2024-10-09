@@ -19,32 +19,34 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Map;
+import org.apache.gravitino.Metalake;
 import org.apache.gravitino.cli.ErrorMessages;
-import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
+/** List the properties of a metalake. */
+public class ListMetalakeProperties extends ListProperties {
 
   protected String metalake;
 
   /**
-   * Displays metalake details.
+   * List the properties of a metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public ListMetalakeProperties(String url, String metalake) {
     super(url);
     this.metalake = metalake;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** List the properties of a metalake. */
   public void handle() {
-    String comment = "";
+    Metalake gMetalake = null;
     try {
-      GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      GravitinoAdminClient client = buildAdminClient();
+      gMetalake = client.loadMetalake(metalake);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -53,6 +55,8 @@ public class MetalakeDetails extends Command {
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    Map<String, String> properties = gMetalake.properties();
+
+    printProperties(properties);
   }
 }

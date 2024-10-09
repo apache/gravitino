@@ -19,40 +19,61 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.cli.Providers;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
-
+public class CreateCatalog extends Command {
   protected String metalake;
+  protected String catalog;
+  protected String provider;
+  protected String comment;
+  Map<String, String> properties;
 
   /**
-   * Displays metalake details.
+   * Create a new catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param provider The provider/type of catalog.
+   * @param comment The catalog's comment.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public CreateCatalog(
+      String url, String metalake, String catalog, String provider, String comment) {
     super(url);
     this.metalake = metalake;
+    this.catalog = catalog;
+    this.provider = provider;
+    this.comment = comment;
+    properties = new HashMap<>();
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** Create a new catalog. */
   public void handle() {
-    String comment = "";
     try {
       GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      client.createCatalog(
+          catalog,
+          Providers.catalogType(provider),
+          Providers.internal(provider),
+          comment,
+          properties);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      System.err.println(ErrorMessages.METALAKE_EXISTS);
+      return;
+    } catch (CatalogAlreadyExistsException err) {
+      System.err.println(ErrorMessages.CATALOG_EXISTS);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    System.out.println(catalog + " created");
   }
 }

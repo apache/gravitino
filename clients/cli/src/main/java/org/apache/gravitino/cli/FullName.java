@@ -45,6 +45,7 @@ public class FullName {
    */
   public String getMetalakeName() {
     String metalakeEnv = System.getenv("GRAVITINO_METALAKE");
+    GravitinoConfig config = new GravitinoConfig(null);
 
     // Check if the metalake name is specified as a command line option
     if (line.hasOption(GravitinoOptions.METALAKE)) {
@@ -52,8 +53,17 @@ public class FullName {
       // Check if the metalake name is set as an environment variable
     } else if (metalakeEnv != null) {
       return metalakeEnv;
-      // Extract the metalake name from the full name option
-    } else if (line.hasOption(GravitinoOptions.NAME)) {
+      // Check if the metalake name is specified in the configuration file
+    } else if (config.fileExists()) {
+      config.read();
+      String configName = config.getMetalakeName();
+      if (configName != null) {
+        return config.getMetalakeName();
+      }
+    }
+
+    // Extract the metalake name from the full name option
+    if (line.hasOption(GravitinoOptions.NAME)) {
       return line.getOptionValue(GravitinoOptions.NAME).split("\\.")[0];
     }
 
@@ -109,7 +119,7 @@ public class FullName {
         position = position - 1;
       }
 
-      if (names.length < position) {
+      if (names.length - 1 < position) {
         System.err.println(ErrorMessages.MALFORMED_NAME);
         return null;
       }

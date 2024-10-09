@@ -21,38 +21,52 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
-
+public class CreateSchema extends Command {
   protected String metalake;
+  protected String catalog;
+  protected String schema;
+  protected String comment;
 
   /**
-   * Displays metalake details.
+   * Create a new schema.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param schema The name of the schema.
+   * @param comment The schema's comment.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public CreateSchema(String url, String metalake, String catalog, String schema, String comment) {
     super(url);
     this.metalake = metalake;
+    this.catalog = catalog;
+    this.schema = schema;
+    this.comment = comment;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** Create a new schema. */
   public void handle() {
-    String comment = "";
     try {
       GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      client.loadCatalog(catalog).asSchemas().createSchema(schema, comment, null);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
+    } catch (SchemaAlreadyExistsException err) {
+      System.err.println(ErrorMessages.SCHEMA_EXISTS);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    System.out.println(schema + " created");
   }
 }

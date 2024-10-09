@@ -20,31 +20,29 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.cli.ErrorMessages;
-import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
-
+public class DeleteMetalake extends Command {
   protected String metalake;
 
   /**
-   * Displays metalake details.
+   * Delete a metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public DeleteMetalake(String url, String metalake) {
     super(url);
     this.metalake = metalake;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** Delete a metalake. */
   public void handle() {
-    String comment = "";
+    boolean deleted = false;
     try {
-      GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      GravitinoAdminClient client = buildAdminClient();
+      deleted = client.dropMetalake(metalake);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -53,6 +51,10 @@ public class MetalakeDetails extends Command {
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    if (deleted) {
+      System.out.println(metalake + " deleted.");
+    } else {
+      System.out.println(metalake + " not deleted.");
+    }
   }
 }

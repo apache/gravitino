@@ -104,12 +104,21 @@ public class TestFulllName {
   }
 
   @Test
-  public void malformedName() throws Exception {
+  public void malformedMissingEntityName() throws Exception {
     String[] args = {"--name", "metalake.catalog"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
     String tableName = fullName.getTableName();
     assertNull(tableName);
+  }
+
+  @Test
+  public void malformedMissingdName() throws Exception {
+    String[] args = {"catalog", "--name", "metalake"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    String catalogName = fullName.getCatalogName();
+    assertNull(catalogName);
   }
 
   @Test

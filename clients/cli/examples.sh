@@ -39,7 +39,7 @@ gcli list
 # metalake details (all these command are equivalent)
 gcli metalake details --name metalake_demo
 gcli metalake details --metalake metalake_demo
-gcli --command details --metalake metalake_demo
+gcli metalake --command details --metalake metalake_demo
 gcli metalake --name metalake_demo details
 gcli details --name metalake_demo
 gcli details --metalake metalake_demo
@@ -73,6 +73,44 @@ gcli schema details --name metalake_demo.catalog_hive.sales
 gcli table list --name metalake_demo.catalog_postgres.hr.departments
 gcli table list --name metalake_demo.catalog_mysql.db.iceberg_tables
 gcli table list --name metalake_demo.catalog_hive.sales.products
+
+# Metalkes operations
+gcli metalake create --name my_metalake --comment "This is my metalake"
+gcli metalake delete --name my_metalake 
+gcli metalake update --name metalake_demo --rename demo 
+gcli metalake update --name demo --rename metalake_demo 
+gcli metalake update --name metalake_demo --comment "new comment" 
+gcli metalake properties --name metalake_demo
+gcli metalake set --name metalake_demo --property test --value value
+gcli metalake remove --name metalake_demo --property test
+
+# Catalog operations
+gcli catalog create -name metalake_demo.hive --provider hive --metastore thrift://hive-host:9083
+gcli catalog create -name metalake_demo.iceberg --provider iceberg --metastore thrift://hive-host:9083 --warehouse hdfs://hdfs-host:9000/user/iceberg/warehouse
+gcli catalog create -name metalake_demo.mysql --provider mysql --jdbcurl "jdbc:mysql://mysql-host:3306?useSSL=false" --user user --password password
+gcli catalog create -name metalake_demo.postgres --provider postgres --jdbcurl jdbc:postgresql://postgresql-host/mydb --user user --password password -database db
+gcli catalog create -name metalake_demo.kafka --provider kafka -bootstrap 127.0.0.1:9092,127.0.0.2:9092
+gcli catalog delete -name metalake_demo.hive
+gcli catalog delete -name metalake_demo.iceberg
+gcli catalog delete -name metalake_demo.mysql
+gcli catalog delete -name metalake_demo.postres
+gcli catalog delete -name metalake_demo.kafka
+gcli catalog update --name metalake_demo.catalog_mysql --rename mysql 
+gcli catalog update --name metalake_demo.mysql --rename catalog_mysql 
+gcli catalog update --name metalake_demo.catalog_mysql --comment "new comment" 
+gcli catalog properties --name metalake_demo.catalog_mysql
+gcli catalog set --name metalake_demo.catalog_mysql --property test --value value
+gcli catalog remove --name metalake_demo.catalog_mysql --property test
+
+# Schema operations
+gcli schema create -name metalake_demo.catalog_postgres.new_db
+gcli schema delete -name metalake_demo.catalog_postgres.public
+gcli schema properties --name metalake_demo.catalog_postgres.hr
+gcli schema set --name metalake_demo.catalog_postgres.hr --property test --value value # not currently supported
+gcli schema remove --name metalake_demo.catalog_postgres.hr --property test # not currently supported
+
+# Table operations
+gcli table delete -name metalake_demo.catalog_postgres.hr.salaries
 
 # Exmaples where metalake is set in an evironment variable
 export GRAVITINO_METALAKE=metalake_demo

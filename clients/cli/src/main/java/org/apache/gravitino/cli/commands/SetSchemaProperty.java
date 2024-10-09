@@ -19,40 +19,62 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
+/** Set a property of a schema. */
+public class SetSchemaProperty extends Command {
 
   protected String metalake;
+  protected String catalog;
+  protected String schema;
+  protected String property;
+  protected String value;
 
   /**
-   * Displays metalake details.
+   * Set a property of a schema.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param schema The name of the schema.
+   * @param property The name of the property.
+   * @param value The value of the property.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public SetSchemaProperty(
+      String url, String metalake, String catalog, String schema, String property, String value) {
     super(url);
     this.metalake = metalake;
+    this.catalog = catalog;
+    this.schema = schema;
+    this.property = property;
+    this.value = value;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** Set a property of a schema. */
   public void handle() {
-    String comment = "";
     try {
       GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      SchemaChange change = SchemaChange.setProperty(property, value);
+      client.loadCatalog(catalog).asSchemas().alterSchema(schema, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    System.out.println(schema + " property set.");
   }
 }

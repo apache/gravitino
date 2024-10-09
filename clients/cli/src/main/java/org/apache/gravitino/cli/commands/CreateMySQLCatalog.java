@@ -19,40 +19,33 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.cli.ErrorMessages;
-import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
-
-  protected String metalake;
+public class CreateMySQLCatalog extends CreateCatalog {
 
   /**
-   * Displays metalake details.
+   * Create a new MySQL catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param provider The provider/type of catalog.
+   * @param comment The catalog's comment.
+   * @param jdbcurl The MySQL JDBC URL.
+   * @param user The MySQL user.
+   * @param password The MySQL user's password.
    */
-  public MetalakeDetails(String url, String metalake) {
-    super(url);
-    this.metalake = metalake;
-  }
-
-  /** Displays the name and comment of a metalake. */
-  public void handle() {
-    String comment = "";
-    try {
-      GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
-    } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
-    } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
-    }
-
-    System.out.println(metalake + "," + comment);
+  public CreateMySQLCatalog(
+      String url,
+      String metalake,
+      String catalog,
+      String provider,
+      String comment,
+      String jdbcurl,
+      String user,
+      String password) {
+    super(url, metalake, catalog, provider, comment);
+    properties.put("jdbc-url", jdbcurl);
+    properties.put("jdbc-user", user);
+    properties.put("jdbc-password", password);
+    properties.put("jdbc-driver", "com.mysql.cj.jdbc.Driver");
   }
 }

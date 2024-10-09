@@ -19,40 +19,51 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
+/** Remove a property of a catalog. */
+public class RemoveCatalogProperty extends Command {
 
   protected String metalake;
+  protected String catalog;
+  protected String property;
 
   /**
-   * Displays metalake details.
+   * Remove a property of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param property The name of the property.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public RemoveCatalogProperty(String url, String metalake, String catalog, String property) {
     super(url);
     this.metalake = metalake;
+    this.catalog = catalog;
+    this.property = property;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** Remove a property of a catalog. */
   public void handle() {
-    String comment = "";
     try {
       GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      CatalogChange change = CatalogChange.removeProperty(property);
+      client.alterCatalog(catalog, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    System.out.println(property + " property removed.");
   }
 }

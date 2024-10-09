@@ -19,40 +19,57 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Map;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
+/** List the properties of a catalog. */
+public class ListSchemaProperties extends ListProperties {
 
   protected String metalake;
+  protected String catalog;
+  protected String schema;
 
   /**
-   * Displays metalake details.
+   * List the properties of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param schema The name of the schema.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public ListSchemaProperties(String url, String metalake, String catalog, String schema) {
     super(url);
     this.metalake = metalake;
+    this.catalog = catalog;
+    this.schema = schema;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** List the properties of a catalog. */
   public void handle() {
-    String comment = "";
+    Schema gSchema = null;
     try {
       GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    Map<String, String> properties = gSchema.properties();
+    printProperties(properties);
   }
 }

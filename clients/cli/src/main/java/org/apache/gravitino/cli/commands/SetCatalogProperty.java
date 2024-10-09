@@ -19,40 +19,55 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
+/** Set a property of a catalog. */
+public class SetCatalogProperty extends Command {
 
   protected String metalake;
+  protected String catalog;
+  protected String property;
+  protected String value;
 
   /**
-   * Displays metalake details.
+   * Set a property of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param property The name of the property.
+   * @param value The value of the property.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public SetCatalogProperty(
+      String url, String metalake, String catalog, String property, String value) {
     super(url);
     this.metalake = metalake;
+    this.catalog = catalog;
+    this.property = property;
+    this.value = value;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** Set a property of a catalog. */
   public void handle() {
-    String comment = "";
     try {
       GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      CatalogChange change = CatalogChange.setProperty(property, value);
+      client.alterCatalog(catalog, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    System.out.println(catalog + " property set.");
   }
 }

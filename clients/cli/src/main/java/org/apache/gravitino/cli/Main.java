@@ -34,8 +34,13 @@ public class Main {
 
     try {
       CommandLine line = parser.parse(options, args);
+      String[] extra = line.getArgs();
+      if (extra.length > 2) {
+        System.err.println(ErrorMessages.TOO_MANY_ARGUMENTS);
+        return;
+      }
       String command = resolveCommand(line);
-      String entity = resolveEntity(line);
+      String entity = resolveEntity(line, command != null);
       GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, entity, command);
       commandLine.handleCommandLine();
     } catch (ParseException exp) {
@@ -72,7 +77,7 @@ public class Main {
       return CommandActions.UPDATE;
     }
 
-    /* Or as the bare second argument of two arguments. */
+    /* Or as the first command or bare second argument of two arguments. */
     String[] args = line.getArgs();
 
     if (args.length == 1 || args.length == 2) {
@@ -92,9 +97,10 @@ public class Main {
    * Determines the entity to act upon based on the command line input.
    *
    * @param line Parsed command line object.
+   * @param command true if command is an argument
    * @return The entity, e.g. metakalake, catalog, schema, table, etc.
    */
-  protected static String resolveEntity(CommandLine line) {
+  protected static String resolveEntity(CommandLine line, boolean command) {
     /* Can be specified in the form --entity XXX. */
     if (line.hasOption(GravitinoOptions.ENTITY)) {
       String entity = line.getOptionValue(GravitinoOptions.ENTITY);
@@ -104,27 +110,30 @@ public class Main {
     }
 
     /* Or as --metalake, --catalog, --schema, --table etc. */
-    if (line.hasOption(GravitinoOptions.METALAKE)) {
-      return CommandEntities.METALAKE;
-    } else if (line.hasOption(GravitinoOptions.CATALOG)) {
-      return CommandEntities.CATALOG;
+    if (line.hasOption(GravitinoOptions.TABLE)) {
+      return CommandEntities.TABLE;
     } else if (line.hasOption(GravitinoOptions.SCHEMA)) {
       return CommandEntities.SCHEMA;
-    } else if (line.hasOption(GravitinoOptions.TABLE)) {
-      return CommandEntities.TABLE;
+    } else if (line.hasOption(GravitinoOptions.CATALOG)) {
+      return CommandEntities.CATALOG;
+    } else if (line.hasOption(GravitinoOptions.METALAKE)) {
+      return CommandEntities.METALAKE;
     }
 
-    /* Or as the bare first argument of two arguments. */
+    /* Or as the bare first argument of one or two arguments. */
     String[] args = line.getArgs();
+    String entity = args[0];
 
-    if (args.length == 2) {
-      String entity = args[0];
-      if (CommandEntities.isValidEntity(entity)) {
-        return entity;
-      } else {
-        System.err.println(ErrorMessages.UNKNOWN_ENTITY);
-        return null;
+    if (args.length == 1) {
+      if (CommandActions.isValidCommand(args[0])) {
+        return null; /* But not an error. */
       }
+    }
+
+    if (CommandEntities.isValidEntity(entity)) {
+      return entity;
+    } else {
+      System.err.println(ErrorMessages.UNKNOWN_ENTITY);
     }
 
     return null;

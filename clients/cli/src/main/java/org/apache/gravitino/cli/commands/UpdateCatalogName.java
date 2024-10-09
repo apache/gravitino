@@ -19,32 +19,39 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
+/** Update the name of a catalog. */
+public class UpdateCatalogName extends Command {
 
   protected String metalake;
+  protected String catalog;
+  protected String name;
 
   /**
-   * Displays metalake details.
+   * Update the name of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param name The new metalake name.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public UpdateCatalogName(String url, String metalake, String catalog, String name) {
     super(url);
     this.metalake = metalake;
+    this.catalog = catalog;
+    this.name = name;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** Update the name of a catalog. */
   public void handle() {
-    String comment = "";
     try {
       GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      CatalogChange change = CatalogChange.rename(name);
+      client.alterCatalog(catalog, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -53,6 +60,6 @@ public class MetalakeDetails extends Command {
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    System.out.println(catalog + " name changed.");
   }
 }

@@ -21,38 +21,56 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
-/** Displays the details of a metalake. */
-public class MetalakeDetails extends Command {
+public class DeleteSchema extends Command {
 
   protected String metalake;
+  protected String catalog;
+  protected String schema;
 
   /**
-   * Displays metalake details.
+   * Delete a schema.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param schema The name of the schema.
    */
-  public MetalakeDetails(String url, String metalake) {
+  public DeleteSchema(String url, String metalake, String catalog, String schema) {
     super(url);
     this.metalake = metalake;
+    this.catalog = catalog;
+    this.schema = schema;
   }
 
-  /** Displays the name and comment of a metalake. */
+  /** Delete a schema. */
   public void handle() {
-    String comment = "";
+    boolean deleted = false;
+
     try {
       GravitinoClient client = buildClient(metalake);
-      comment = client.loadMetalake(metalake).comment();
+      deleted = client.loadCatalog(catalog).asSchemas().dropSchema(schema, false);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    if (deleted) {
+      System.out.println(schema + " deleted.");
+    } else {
+      System.out.println(schema + " not deleted.");
+    }
   }
 }
