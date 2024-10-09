@@ -32,7 +32,7 @@ airlift-resolver = "1.6"
 hive2 = "2.3.9"
 hadoop2 = "2.10.2"
 hadoop3 = "3.1.0"
-hadoop3-gcs = "1.9.4-hadoop3"
+hadoop3-gcs = "3.0.0"
 hadoop3-aliyun = "3.1.0"
 hadoop-minikdc = "3.3.6"
 htrace-core4 = "4.1.0-incubating"
@@ -106,6 +106,7 @@ datanucleus-api-jdo = "4.2.4"
 datanucleus-rdbms = "4.1.19"
 datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
+google-auth = "1.28.0"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -178,6 +179,7 @@ iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.re
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
 iceberg-gcp = { group = "org.apache.iceberg", name = "iceberg-gcp", version.ref = "iceberg" }
+iceberg-gcp-bundle = { group = "org.apache.iceberg", name = "iceberg-gcp-bundle", version.ref = "iceberg" }
 paimon-core = { group = "org.apache.paimon", name = "paimon-core", version.ref = "paimon" }
 paimon-format = { group = "org.apache.paimon", name = "paimon-format", version.ref = "paimon" }
 paimon-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog", version.ref = "paimon" }
@@ -242,6 +244,9 @@ servlet = { group = "javax.servlet", name = "javax.servlet-api", version.ref = "
 mail = { group = "javax.mail", name = "mail", version.ref = "mail" }
 rome = { group = "rome", name = "rome", version.ref = "rome" }
 jettison = { group = "org.codehaus.jettison", name = "jettison", version.ref = "jettison" }
+
+google-auth-http = { group = "com.google.auth", name = "google-auth-library-oauth2-http", version.ref = "google-auth" }
+google-auth-credentials = { group = "com.google.auth", name = "google-auth-library-credentials", version.ref = "google-auth" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api"]

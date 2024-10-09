@@ -28,6 +28,12 @@ public interface Credential {
   String CREDENTIAL_TYPE = "credential-type";
   /** Credential expire time in ms since the epoch. */
   String EXPIRE_TIME_IN_MS = "expire-time-in-ms";
+  /** GCS credential type. */
+  String GCS_TOKEN_CREDENTIAL_TYPE = "gcs-token";
+  /** GCS credential token. */
+  String GCS_TOKEN_NAME = "gcs-token";
+  /** GCS token expire time. */
+  String GCS_TOKEN_EXPIRE_MS = "gcs-token-expire-ms";
 
   /**
    * Returns the type of the credential. It should be the same as the credential type of the

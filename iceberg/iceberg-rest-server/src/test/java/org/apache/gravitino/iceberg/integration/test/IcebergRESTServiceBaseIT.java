@@ -32,6 +32,7 @@ import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
@@ -46,6 +47,7 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("FormatStringAnnotation")
 public abstract class IcebergRESTServiceBaseIT {
+
   public static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceBaseIT.class);
   private SparkSession sparkSession;
   protected IcebergCatalogBackend catalogType = IcebergCatalogBackend.MEMORY;
@@ -84,6 +86,10 @@ public abstract class IcebergRESTServiceBaseIT {
 
   abstract Map<String, String> getCatalogConfig();
 
+  protected boolean supportsCredentialVending() {
+    return false;
+  }
+
   private void registerIcebergCatalogConfig() {
     Map<String, String> icebergConfigs = getCatalogConfig();
     icebergRESTServerManager.registerCustomConfigs(icebergConfigs);
@@ -100,18 +106,25 @@ public abstract class IcebergRESTServiceBaseIT {
   private void initSparkEnv() {
     int port = getServerPort();
     LOG.info("Iceberg REST server port:{}", port);
-    String IcebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
+    String icebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
+    SparkConf sparkConf = new SparkConf()
+        .set("spark.sql.extensions",
+            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+        .set("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
+        .set("spark.sql.catalog.rest.type", "rest")
+        .set("spark.sql.catalog.rest.uri", icebergRESTUri)
+        // drop Iceberg table purge may hang in spark local mode
+        .set("spark.locality.wait.node", "0");
+
+    if (supportsCredentialVending()) {
+      sparkConf.set("spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation",
+          "vended-credentials");
+    }
+
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
-            .config(
-                "spark.sql.extensions",
-                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-            .config("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
-            .config("spark.sql.catalog.rest.type", "rest")
-            .config("spark.sql.catalog.rest.uri", IcebergRESTUri)
-            // drop Iceberg table purge may hang in spark local mode
-            .config("spark.locality.wait.node", "0")
+            .config(sparkConf)
             .getOrCreate();
   }
 
@@ -155,7 +168,9 @@ public abstract class IcebergRESTServiceBaseIT {
         .toArray(Object[]::new);
   }
 
-  /** check whether all child map content is in parent map */
+  /**
+   * check whether all child map content is in parent map
+   */
   protected void checkMapContains(Map<String, String> child, Map<String, String> parent) {
     child.forEach(
         (k, v) -> {
@@ -164,7 +179,9 @@ public abstract class IcebergRESTServiceBaseIT {
         });
   }
 
-  /** mainly used to debug */
+  /**
+   * mainly used to debug
+   */
   protected void printObjects(List<Object[]> objects) {
     objects.stream()
         .forEach(

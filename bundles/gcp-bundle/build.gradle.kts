@@ -25,9 +25,16 @@ plugins {
 }
 
 dependencies {
+  compileOnly(project(":api"))
+  compileOnly(project(":core"))
+  compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
+
   compileOnly(libs.hadoop3.common)
+
   implementation(libs.hadoop3.gcs)
+  implementation(libs.google.auth.http)
+  implementation(libs.google.auth.credentials)
 }
 
 tasks.withType(ShadowJar::class.java) {

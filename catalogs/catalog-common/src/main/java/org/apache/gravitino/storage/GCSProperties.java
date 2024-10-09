@@ -17,12 +17,14 @@
  *  under the License.
  */
 
-package org.apache.gravitino.credential;
+package org.apache.gravitino.storage;
 
-public class CredentialConstants {
-  public static final String CREDENTIAL_PROVIDER_TYPE = "credential-provider-type";
+public class GCSProperties {
+  public static final String GRAVITINO_GCS_TOKEN = "gcs-token";
 
-  public static final String GCS_TOKEN_CREDENTIAL_TYPE = "gcs-token";
+  public static final String GRAVITINO_TOKEN_EXPIRE_MS = "gcs-token-expire-ms";
 
-  private CredentialConstants() {}
+  public static final String GRAVITINO_GCS_CREDENTIAL_FILE_PATH = "gcs-credential-file-path";
+
+  private GCSProperties() {}
 }

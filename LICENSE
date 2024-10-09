@@ -251,6 +251,9 @@
    ./iceberg/iceberg-common/src/main/java/org/apache/gravitino/iceberg/common/utils/IcebergHiveCachedClientPool.java
    ./gradlew
 
+   Apache Polaris
+   ./credential/src/main/java/org/apache/gravitino/credential/gcs/GcsTokenProvider.java
+
    Apache Paimon
    ./catalogs/catalog-lakehouse-paimon/src/main/java/org/apache/gravitino/catalog/lakehouse/paimon/utils/TypeUtils.java
 
