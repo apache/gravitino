@@ -119,11 +119,20 @@ public class ErrorResponse extends BaseResponse {
    * @return The new instance.
    */
   public static ErrorResponse illegalArguments(String message, Throwable throwable) {
+    return illegalArguments(IllegalArgumentException.class.getSimpleName(), message, throwable);
+  }
+
+  /**
+   * Create a new illegal arguments error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse illegalArguments(String type, String message, Throwable throwable) {
     return new ErrorResponse(
-        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
-        IllegalArgumentException.class.getSimpleName(),
-        message,
-        getStackTrace(throwable));
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE, type, message, getStackTrace(throwable));
   }
 
   /**

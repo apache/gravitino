@@ -158,7 +158,7 @@ public class RoleDTO implements Role {
     /**
      * Sets the securable objects of the role.
      *
-     * @param securableObjects The securableObjects of the role.
+     * @param securableObjects The securable objects of the role.
      * @return The builder instance.
      */
     public S withSecurableObjects(SecurableObjectDTO[] securableObjects) {
@@ -186,9 +186,7 @@ public class RoleDTO implements Role {
     public RoleDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      Preconditions.checkArgument(
-          securableObjects != null && securableObjects.length != 0,
-          "securable objects can't null or empty");
+      Preconditions.checkArgument(securableObjects != null, "securable objects can't null");
 
       return new RoleDTO(name, properties, securableObjects, audit);
     }

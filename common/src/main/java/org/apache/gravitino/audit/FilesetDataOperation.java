@@ -21,29 +21,45 @@ package org.apache.gravitino.audit;
 
 /** An enum class containing fileset data operations that supported. */
 public enum FilesetDataOperation {
-  /** This data operation means that create a new file. */
+  /** Creates a new file. */
   CREATE,
-  /** This data operation means that open a file. */
+  /** Opens a file. */
   OPEN,
-  /** This data operation means that append some content into a file. */
+  /** Opens a file and writes to it. */
+  OPEN_AND_WRITE,
+  /** Opens a file and appends to it. */
+  OPEN_AND_APPEND,
+  /** Appends some content into a file. */
   APPEND,
-  /** This data operation means that rename a file or a directory. */
+  /** Renames a file or a directory. */
   RENAME,
-  /** This data operation means that delete a file or a directory. */
+  /** Deletes a file or a directory. */
   DELETE,
-  /** This data operation means that get a file status from a file or a directory. */
+  /** Gets a file status from a file or a directory. */
   GET_FILE_STATUS,
-  /** This data operation means that list file statuses under a directory. */
+  /** Lists file statuses under a directory. */
   LIST_STATUS,
-  /** This data operation means that create a directory. */
+  /** Creates a directory. */
   MKDIRS,
-  /** This data operation means that get the default replication of a file system. */
+  /** Gets the default replication of a file system. */
   GET_DEFAULT_REPLICATION,
-  /** This data operation means that get the default block size of a file system. */
+  /** Gets the default block size of a file system. */
   GET_DEFAULT_BLOCK_SIZE,
-  /** This data operation means that set current working directory. */
+  /** Sets current working directory. */
   SET_WORKING_DIR,
-  /** This data operation means that it is an unknown data operation. */
+  /** Gets the current working directory. */
+  EXISTS,
+  /** Gets the created time of a file. */
+  CREATED_TIME,
+  /** Gets the modified time of a file. */
+  MODIFIED_TIME,
+  /** Copies a file. */
+  COPY_FILE,
+  /** Gets the content of a file. */
+  CAT_FILE,
+  /** Copies a remote file to local. */
+  GET_FILE,
+  /** Unknown data operation. */
   UNKNOWN;
 
   /**
@@ -57,7 +73,7 @@ public enum FilesetDataOperation {
       FilesetDataOperation.valueOf(operation);
       return true;
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException("Unknown fileset data operation: " + operation, e);
+      return false;
     }
   }
 }

@@ -40,12 +40,12 @@ Builds with Apache Paimon `0.8.0`.
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)                 | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60                     | No                                                              | 0.6.0         |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60                     | No                                                              | 0.6.0         |
-| `s3.endpoint`                                      | The endpoint of the AWS s3.                                                                                                                                                                                 | (none)                 | required if the value of `warehouse` is a S3 path               | 0.7.0         |
-| `s3.access-key`                                    | The access key of the AWS s3.                                                                                                                                                                               | (none)                 | required if the value of `warehouse` is a S3 path               | 0.7.0         |
-| `s3.secret-key`                                    | The secret key of the AWS s3.                                                                                                                                                                               | (none)                 | required if the value of `warehouse` is a S3 path               | 0.7.0         |
-| `fs.oss.endpoint`                                  | The endpoint of the Aliyun oss.                                                                                                                                                                             | (none)                 | required if the value of `warehouse` is a oss path              | 0.7.0         |
-| `fs.oss.accessKeyId`                               | The endpoint of the Aliyun oss.                                                                                                                                                                             | (none)                 | required if the value of `warehouse` is a oss path              | 0.7.0         |
-| `fs.oss.accessKeySecret`                           | The endpoint of the Aliyun s3.                                                                                                                                                                              | (none)                 | required if the value of `warehouse` is a oss path              | 0.7.0         |
+| `oss-endpoint`                                     | The endpoint of the Aliyun oss.                                                                                                                                                                             | (none)                 | required if the value of `warehouse` is a oss path              | 0.7.0         |
+| `oss-access-key-id`                                | The access key of the Aliyun oss.                                                                                                                                                                           | (none)                 | required if the value of `warehouse` is a oss path              | 0.7.0         |
+| `oss-accesss-key-secret`                           | The secret key the Aliyun s3.                                                                                                                                                                               | (none)                 | required if the value of `warehouse` is a oss path              | 0.7.0         |
+| `s3-endpoint`                                      | The endpoint of the AWS s3.                                                                                                                                                                                 | (none)                 | required if the value of `warehouse` is a S3 path               | 0.7.0         |
+| `s3-access-key-id`                                 | The access key of the AWS s3.                                                                                                                                                                               | (none)                 | required if the value of `warehouse` is a S3 path               | 0.7.0         |
+| `s3-secret-access-key`                             | The secret key of the AWS s3.                                                                                                                                                                               | (none)                 | required if the value of `warehouse` is a S3 path               | 0.7.0         |
 
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
@@ -133,28 +133,28 @@ Paimon Table primary key constraint should not be same with partition fields, th
 
 ### Table column types
 
-| Gravitino Type                | Apache Paimon Type             |
-|-------------------------------|--------------------------------|
-| `Sturct`                      | `Row`                          |
-| `Map`                         | `Map`                          |
-| `Array`                       | `Array`                        |
-| `Boolean`                     | `Boolean`                      |
-| `Byte`                        | `TinyInt`                      |
-| `Short`                       | `SmallInt`                     |
-| `Integer`                     | `Int`                          |
-| `Long`                        | `BigInt`                       |
-| `Float`                       | `Float`                        |
-| `Double`                      | `Double`                       |
-| `Decimal`                     | `Decimal`                      |
-| `String`                      | `VarChar(Integer.MAX_VALUE)`   |
-| `VarChar`                     | `VarChar`                      |
-| `FixedChar`                   | `Char`                         |
-| `Date`                        | `Date`                         |
-| `Time`                        | `Time`                         |
-| `TimestampType withZone`      | `LocalZonedTimestamp`          |
-| `TimestampType withoutZone`   | `Timestamp`                    |
-| `Binary`                      | `Binary`                       |
-| `Fixed`                       | `VarBinary`                    |
+| Gravitino Type              | Apache Paimon Type             |
+|-----------------------------|--------------------------------|
+| `Struct`                    | `Row`                          |
+| `Map`                       | `Map`                          |
+| `List`                      | `Array`                        |
+| `Boolean`                   | `Boolean`                      |
+| `Byte`                      | `TinyInt`                      |
+| `Short`                     | `SmallInt`                     |
+| `Integer`                   | `Int`                          |
+| `Long`                      | `BigInt`                       |
+| `Float`                     | `Float`                        |
+| `Double`                    | `Double`                       |
+| `Decimal`                   | `Decimal`                      |
+| `String`                    | `VarChar(Integer.MAX_VALUE)`   |
+| `VarChar`                   | `VarChar`                      |
+| `FixedChar`                 | `Char`                         |
+| `Date`                      | `Date`                         |
+| `Time`                      | `Time`                         |
+| `TimestampType withZone`    | `LocalZonedTimestamp`          |
+| `TimestampType withoutZone` | `Timestamp`                    |
+| `Binary`                    | `Binary`                       |
+| `Fixed`                     | `VarBinary`                    |
 
 :::info
 Gravitino doesn't support Paimon `MultisetType` type.

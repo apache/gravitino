@@ -886,8 +886,13 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(type), "Paimon Catalog backend type can not be null or empty.");
     catalogProperties.put(PaimonCatalogPropertiesMetadata.PAIMON_METASTORE, type);
+
+    // Why needs this conversion? Because PaimonCatalogOperations#initialize will try to convert
+    // Gravitino general S3 properties to Paimon specific S3 properties.
+    Map<String, String> copy = CatalogUtils.toPaimonCatalogProperties(catalogProperties);
+
     PaimonBackendCatalogWrapper paimonBackendCatalogWrapper =
-        CatalogUtils.loadCatalogBackend(new PaimonConfig(catalogProperties));
+        CatalogUtils.loadCatalogBackend(new PaimonConfig(copy));
     paimonCatalog = paimonBackendCatalogWrapper.getCatalog();
   }
 

@@ -53,12 +53,16 @@ public class Utils {
   }
 
   public static Response illegalArguments(String message) {
-    return illegalArguments(message, null);
+    return illegalArguments(IllegalArgumentException.class.getSimpleName(), message, null);
   }
 
   public static Response illegalArguments(String message, Throwable throwable) {
+    return illegalArguments(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  public static Response illegalArguments(String type, String message, Throwable throwable) {
     return Response.status(Response.Status.BAD_REQUEST)
-        .entity(ErrorResponse.illegalArguments(message, throwable))
+        .entity(ErrorResponse.illegalArguments(type, message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
@@ -160,18 +164,23 @@ public class Utils {
 
     String internalClientType =
         httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE);
-    if (StringUtils.isNotBlank(internalClientType)
-        && InternalClientType.checkValid(internalClientType)) {
+    if (StringUtils.isNotBlank(internalClientType)) {
       filteredHeaders.put(
-          FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE, internalClientType);
+          FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
+          InternalClientType.checkValid(internalClientType)
+              ? internalClientType
+              : InternalClientType.UNKNOWN.name());
     }
 
     String dataOperation =
         httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION);
     if (StringUtils.isNotBlank(
-            httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION))
-        && FilesetDataOperation.checkValid(dataOperation)) {
-      filteredHeaders.put(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION, dataOperation);
+        httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION))) {
+      filteredHeaders.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.checkValid(dataOperation)
+              ? dataOperation
+              : FilesetDataOperation.UNKNOWN.name());
     }
     return filteredHeaders;
   }

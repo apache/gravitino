@@ -23,6 +23,42 @@ paths:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
 
+    get:
+      tags:
+        - access control
+      summary: List groups (names)
+      operationId: listGroups
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns the list of groups if {details} is true, otherwise returns the list of group name
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/responses/GroupListResponse"
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+              examples:
+                GroupListResponse:
+                  $ref: "#/components/examples/GroupListResponse"
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
     post:
       tags:
         - access control
@@ -108,6 +144,15 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
+  parameters:
+    details:
+      name: details
+      in: query
+      description: Include detailed information about the group
+      required: false
+      schema:
+        type: boolean
+        default: false
 
   schemas:
     Group:
@@ -148,10 +193,31 @@ components:
         group:
           $ref: "#/components/schemas/Group"
 
+    GroupListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        groups:
+          type: array
+          description: A list of group objects
+          items:
+            $ref: "#/components/schemas/Group"
+
   examples:
     GroupAddRequest:
       value: {
         "name": "group1",
+      }
+
+    NameListResponse:
+      value: {
+        "code": 0,
+        "names": [ "group1", "group2" ]
       }
 
     GroupResponse:
@@ -165,6 +231,19 @@ components:
             "createTime": "2023-12-08T06:41:25.595Z"
           },
         }
+      }
+
+    GroupListResponse:
+      value:  {
+        "code": 0,
+        "groups": [{
+          "name": "group1",
+          "roles": [],
+          "audit": {
+            "creator": "gravitino",
+            "createTime": "2023-12-08T06:41:25.595Z"
+          },
+        }]
       }
 
     GroupAlreadyExistsException:

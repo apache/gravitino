@@ -1,21 +1,19 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import logging
 from typing import List, Dict
@@ -23,6 +21,7 @@ from typing import List, Dict
 from gravitino.api.catalog import Catalog
 from gravitino.api.fileset import Fileset
 from gravitino.api.fileset_change import FilesetChange
+from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 from gravitino.catalog.base_schema_catalog import BaseSchemaCatalog
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
@@ -30,6 +29,7 @@ from gravitino.dto.requests.fileset_update_request import FilesetUpdateRequest
 from gravitino.dto.requests.fileset_updates_request import FilesetUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
+from gravitino.dto.responses.file_location_response import FileLocationResponse
 from gravitino.dto.responses.fileset_response import FilesetResponse
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
@@ -236,6 +236,40 @@ class FilesetCatalog(BaseSchemaCatalog):
 
         return drop_resp.dropped()
 
+    def get_file_location(self, ident: NameIdentifier, sub_path: str) -> str:
+        """Get the actual location of a file or directory based on the storage location of Fileset and the sub path.
+
+        Args:
+             ident: A fileset identifier, which should be "schema.fileset" format.
+             sub_path: The sub path of the file or directory.
+
+        Returns:
+             The actual location of the file or directory.
+        """
+        self.check_fileset_name_identifier(ident)
+
+        full_namespace = self._get_fileset_full_namespace(ident.namespace())
+        try:
+            caller_context: CallerContext = CallerContextHolder.get()
+            params = {"sub_path": encode_string(sub_path)}
+
+            resp = self.rest_client.get(
+                self.format_file_location_request_path(full_namespace, ident.name()),
+                params=params,
+                headers=(
+                    caller_context.context() if caller_context is not None else None
+                ),
+                error_handler=FILESET_ERROR_HANDLER,
+            )
+            file_location_resp = FileLocationResponse.from_json(
+                resp.body, infer_missing=True
+            )
+            file_location_resp.validate()
+
+            return file_location_resp.file_location()
+        finally:
+            CallerContextHolder.remove()
+
     @staticmethod
     def check_fileset_namespace(namespace: Namespace):
         Namespace.check(
@@ -261,6 +295,14 @@ class FilesetCatalog(BaseSchemaCatalog):
     def format_fileset_request_path(namespace: Namespace) -> str:
         schema_ns = Namespace.of(namespace.level(0), namespace.level(1))
         return f"{BaseSchemaCatalog.format_schema_request_path(schema_ns)}/{encode_string(namespace.level(2))}/filesets"
+
+    @staticmethod
+    def format_file_location_request_path(namespace: Namespace, name: str) -> str:
+        schema_ns = Namespace.of(namespace.level(0), namespace.level(1))
+        return (
+            f"{BaseSchemaCatalog.format_schema_request_path(schema_ns)}/{encode_string(namespace.level(2))}"
+            f"/filesets/{encode_string(name)}/location"
+        )
 
     @staticmethod
     def to_fileset_update_request(change: FilesetChange):

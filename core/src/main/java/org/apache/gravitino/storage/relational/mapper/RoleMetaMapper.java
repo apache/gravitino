@@ -65,6 +65,9 @@ public interface RoleMetaMapper {
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listRolePOsByMetalake")
+  List<RolePO> listRolePOsByMetalake(@Param("metalakeName") String metalakeName);
+
   @InsertProvider(type = RoleMetaSQLProviderFactory.class, method = "insertRoleMeta")
   void insertRoleMeta(@Param("roleMeta") RolePO rolePO);
 
@@ -72,6 +75,10 @@ public interface RoleMetaMapper {
       type = RoleMetaSQLProviderFactory.class,
       method = "insertRoleMetaOnDuplicateKeyUpdate")
   void insertRoleMetaOnDuplicateKeyUpdate(@Param("roleMeta") RolePO rolePO);
+
+  @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "updateRoleMeta")
+  Integer updateRoleMeta(
+      @Param("newRoleMeta") RolePO newRolePO, @Param("oldRoleMeta") RolePO oldRolePO);
 
   @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "softDeleteRoleMetaByRoleId")
   void softDeleteRoleMetaByRoleId(Long roleId);

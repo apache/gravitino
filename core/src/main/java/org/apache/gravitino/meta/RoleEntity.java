@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Supplier;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
@@ -47,18 +46,15 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the role entity.");
 
-  public static final Field SECURABLE_OBJECTS_SUPPLIER =
-      Field.required(
-          "securable_objects_supplier",
-          Supplier.class,
-          "The securable objects supplier of the role entity.");
+  public static final Field SECURABLE_OBJECTS =
+      Field.optional("securable_objects", List.class, "The securable objects of the role entity.");
 
   private Long id;
   private String name;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
   private Namespace namespace;
-  private Supplier<List<SecurableObject>> securableObjectsSupplier = () -> null;
+  private List<SecurableObject> securableObjects;
 
   /**
    * The name of the role.
@@ -95,7 +91,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
    */
   @Override
   public List<SecurableObject> securableObjects() {
-    return securableObjectsSupplier.get();
+    return securableObjects;
   }
 
   /**
@@ -110,7 +106,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
-    fields.put(SECURABLE_OBJECTS_SUPPLIER, securableObjectsSupplier);
+    fields.put(SECURABLE_OBJECTS, securableObjects);
 
     return Collections.unmodifiableMap(fields);
   }
@@ -146,12 +142,12 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(properties, that.properties)
-        && Objects.equals(securableObjects(), that.securableObjects());
+        && Objects.equals(securableObjects, that.securableObjects);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, properties, auditInfo, securableObjects(), namespace);
+    return Objects.hash(id, name, properties, auditInfo, securableObjects, namespace);
   }
 
   /**
@@ -226,19 +222,7 @@ public class RoleEntity implements Role, Entity, Auditable, HasIdentifier {
      * @return The builder instance.
      */
     public Builder withSecurableObjects(List<SecurableObject> securableObjects) {
-      roleEntity.securableObjectsSupplier = () -> ImmutableList.copyOf(securableObjects);
-      return this;
-    }
-
-    /**
-     * Sets the securable objects supplier of the role entity.
-     *
-     * @param securableObjectsSupplier The securable objects supplier of the role entity.
-     * @return The builder instance.
-     */
-    public Builder withSecurableObjectsSupplier(
-        Supplier<List<SecurableObject>> securableObjectsSupplier) {
-      roleEntity.securableObjectsSupplier = securableObjectsSupplier;
+      roleEntity.securableObjects = ImmutableList.copyOf(securableObjects);
       return this;
     }
 

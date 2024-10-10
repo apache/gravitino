@@ -36,6 +36,8 @@ import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.s3.PaimonS3FileS
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 
 /**
  * Implementation of {@link PropertiesMetadata} that represents Paimon catalog properties metadata.
@@ -46,6 +48,11 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String PAIMON_METASTORE = "metastore";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
+
+  // S3 properties needed by Paimon
+  public static final String S3_ENDPOINT = "s3.endpoint";
+  public static final String S3_ACCESS_KEY = "s3.access-key";
+  public static final String S3_SECRET_KEY = "s3.secret-key";
 
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
       ImmutableMap.of(GRAVITINO_CATALOG_BACKEND, PAIMON_METASTORE, WAREHOUSE, WAREHOUSE, URI, URI);
@@ -63,17 +70,17 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           AuthenticationConfig.AUTH_TYPE_KEY,
           AuthenticationConfig.AUTH_TYPE_KEY);
 
-  private static final Map<String, String> S3_CONFIGURATION =
+  public static final Map<String, String> S3_CONFIGURATION =
       ImmutableMap.of(
-          PaimonS3FileSystemConfig.S3_ACCESS_KEY, PaimonS3FileSystemConfig.S3_ACCESS_KEY,
-          PaimonS3FileSystemConfig.S3_SECRET_KEY, PaimonS3FileSystemConfig.S3_SECRET_KEY,
-          PaimonS3FileSystemConfig.S3_ENDPOINT, PaimonS3FileSystemConfig.S3_ENDPOINT);
+          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY,
+          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY,
+          S3Properties.GRAVITINO_S3_ENDPOINT, S3_ENDPOINT);
 
-  private static final Map<String, String> OSS_CONFIGURATION =
+  public static final Map<String, String> OSS_CONFIGURATION =
       ImmutableMap.of(
-          PaimonOSSFileSystemConfig.OSS_ACCESS_KEY, PaimonOSSFileSystemConfig.OSS_ACCESS_KEY,
-          PaimonOSSFileSystemConfig.OSS_SECRET_KEY, PaimonOSSFileSystemConfig.OSS_SECRET_KEY,
-          PaimonOSSFileSystemConfig.OSS_ENDPOINT, PaimonOSSFileSystemConfig.OSS_ENDPOINT);
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, PaimonOSSFileSystemConfig.OSS_ACCESS_KEY,
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, PaimonOSSFileSystemConfig.OSS_SECRET_KEY,
+          OSSProperties.GRAVITINO_OSS_ENDPOINT, PaimonOSSFileSystemConfig.OSS_ENDPOINT);
 
   static {
     List<PropertyEntry<?>> propertyEntries =

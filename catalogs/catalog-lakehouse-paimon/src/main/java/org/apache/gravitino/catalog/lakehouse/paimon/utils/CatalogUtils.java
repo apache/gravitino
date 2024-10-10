@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.utils;
 
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.OSS_CONFIGURATION;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.S3_CONFIGURATION;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_BACKEND;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_URI;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_WAREHOUSE;
@@ -26,6 +28,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
@@ -33,9 +36,6 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
-import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.FileSystemType;
-import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.oss.PaimonOSSFileSystemConfig;
-import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.s3.PaimonS3FileSystemConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
@@ -124,51 +124,17 @@ public class CatalogUtils {
     }
   }
 
-  public static void checkWarehouseConfig(
-      PaimonConfig paimonConfig, Map<String, String> resultConf) {
-    String warehouse = paimonConfig.get(CATALOG_WAREHOUSE);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(warehouse), "Paimon Catalog warehouse can not be null or empty.");
+  public static Map<String, String> toPaimonCatalogProperties(
+      Map<String, String> gravitinoProperties) {
+    Map<String, String> paimonProperties = new HashMap<>();
 
-    FileSystemType fileSystemType = FileSystemType.fromStoragePath(warehouse);
-    switch (fileSystemType) {
-      case S3:
-        checkS3FileSystemConfig(resultConf);
-        break;
-      case OSS:
-        checkOSSFileSystemConfig(resultConf);
-        break;
-      case LOCAL_FILE:
-      case HDFS:
-        break;
-      default:
-        throw new IllegalArgumentException("Unsupported file system type: " + fileSystemType);
-    }
-  }
+    gravitinoProperties.forEach(
+        (k, v) -> {
+          if (S3_CONFIGURATION.containsKey(k)) {
+            paimonProperties.put(S3_CONFIGURATION.get(k), v);
+          } else paimonProperties.put(OSS_CONFIGURATION.getOrDefault(k, k), v);
+        });
 
-  private static void checkS3FileSystemConfig(Map<String, String> resultConf) {
-    PaimonS3FileSystemConfig s3FileSystemConfig = new PaimonS3FileSystemConfig(resultConf);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(s3FileSystemConfig.getS3AccessKey()),
-        "S3 access key can not be null or empty.");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(s3FileSystemConfig.getS3SecretKey()),
-        "S3 secret key can not be null or empty.");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(s3FileSystemConfig.getS3Endpoint()),
-        "S3 endpoint can not be null or empty.");
-  }
-
-  private static void checkOSSFileSystemConfig(Map<String, String> resultConf) {
-    PaimonOSSFileSystemConfig ossFileSystemConfig = new PaimonOSSFileSystemConfig(resultConf);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(ossFileSystemConfig.getOSSAccessKey()),
-        "OSS access key can not be null or empty.");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(ossFileSystemConfig.getOSSSecretKey()),
-        "OSS secret key can not be null or empty.");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(ossFileSystemConfig.getOSSEndpoint()),
-        "OSS endpoint can not be null or empty.");
+    return paimonProperties;
   }
 }

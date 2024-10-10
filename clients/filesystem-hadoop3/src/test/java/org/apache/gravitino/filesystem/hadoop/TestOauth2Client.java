@@ -160,6 +160,9 @@ public class TestOauth2Client extends TestGvfsBase {
   @Test
   public void testFileSystemAuthConfigs() throws IOException {
     // init conf
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(
+            catalogName, schemaName, "testFileSystemAuthConfigs", true);
     Configuration configuration = new Configuration();
     configuration.set(
         String.format(
@@ -207,6 +210,9 @@ public class TestOauth2Client extends TestGvfsBase {
 
   @Test
   public void testFileSystemAuthUnauthorized() throws ParseException {
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(
+            catalogName, schemaName, "testFileSystemAuthUnauthorized", true);
     // 1. test always throw UnauthorizedException
     HttpResponse mockResponse = response().withStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
     OAuth2ErrorResponse respBody = new OAuth2ErrorResponse("invalid_client", "invalid");
@@ -332,6 +338,9 @@ public class TestOauth2Client extends TestGvfsBase {
 
   @Test
   public void testFileSystemAuthBadRequest() {
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(
+            catalogName, schemaName, "testFileSystemAuthBadRequest", true);
     HttpResponse mockResponse = response().withStatusCode(HttpStatus.SC_INTERNAL_SERVER_ERROR);
     OAuth2ErrorResponse respBody = new OAuth2ErrorResponse("invalid_grant", "invalid");
     try {

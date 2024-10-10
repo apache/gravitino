@@ -105,11 +105,11 @@ Gravitino provides event listener mechanism to allow users to capture the events
 
 To leverage the event listener, you must implement the `EventListenerPlugin` interface and place the JAR file in the classpath of the Gravitino server. Then, add configurations to gravitino.conf to enable the event listener.
 
-| Property name                              | Description                                                                                            | Default value | Required | Since Version |
-|--------------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.eventListener.names`            | The name of the event listener, For multiple listeners, separate names with a comma, like "audit,sync" | (none)        | Yes      | 0.5.0         |
-| `gravitino.eventListener.{name}.className` | The class name of the event listener, replace `{name}` with the actual listener name.                  | (none)        | Yes      | 0.5.0         | 
-| `gravitino.eventListener.{name}.{key}`     | Custom properties that will be passed to the event listener plugin.                                    | (none)        | Yes      | 0.5.0         | 
+| Property name                          | Description                                                                                            | Default value | Required | Since Version |
+|----------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.eventListener.names`        | The name of the event listener, For multiple listeners, separate names with a comma, like "audit,sync" | (none)        | Yes      | 0.5.0         |
+| `gravitino.eventListener.{name}.class` | The class name of the event listener, replace `{name}` with the actual listener name.                  | (none)        | Yes      | 0.5.0         | 
+| `gravitino.eventListener.{name}.{key}` | Custom properties that will be passed to the event listener plugin.                                    | (none)        | Yes      | 0.5.0         | 
 
 #### Event
 

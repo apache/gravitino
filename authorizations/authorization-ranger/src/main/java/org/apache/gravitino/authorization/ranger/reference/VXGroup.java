@@ -91,6 +91,11 @@ public class VXGroup extends VXDataObject implements java.io.Serializable {
       return this;
     }
 
+    public Builder withDescription(String description) {
+      vxGroup.description = description;
+      return this;
+    }
+
     public VXGroup build() {
       return vxGroup;
     }

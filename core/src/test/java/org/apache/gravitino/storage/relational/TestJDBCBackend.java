@@ -45,7 +45,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -601,7 +600,8 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace("metalake"),
             "user",
             auditInfo,
-            Lists.newArrayList(role));
+            Lists.newArrayList(role.name()),
+            Lists.newArrayList(role.id()));
     backend.insert(user, false);
 
     GroupEntity group =
@@ -610,7 +610,8 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace("metalake"),
             "group",
             auditInfo,
-            Lists.newArrayList(role));
+            Lists.newArrayList(role.name()),
+            Lists.newArrayList(role.id()));
     backend.insert(group, false);
 
     TagEntity tag =
@@ -687,7 +688,8 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofUserNamespace("another-metalake"),
             "another-user",
             auditInfo,
-            Lists.newArrayList(anotherRole));
+            Lists.newArrayList(anotherRole.name()),
+            Lists.newArrayList(anotherRole.id()));
     backend.insert(anotherUser, false);
 
     GroupEntity anotherGroup =
@@ -696,7 +698,8 @@ public class TestJDBCBackend {
             AuthorizationUtils.ofGroupNamespace("another-metalake"),
             "another-group",
             auditInfo,
-            Lists.newArrayList(anotherRole));
+            Lists.newArrayList(anotherRole.name()),
+            Lists.newArrayList(anotherRole.id()));
     backend.insert(anotherGroup, false);
 
     TagEntity anotherTagEntity =
@@ -710,24 +713,27 @@ public class TestJDBCBackend {
     backend.insert(anotherTagEntity, false);
 
     // meta data list
-    List<BaseMetalake> metaLakes = backend.list(metalake.namespace(), Entity.EntityType.METALAKE);
+    List<BaseMetalake> metaLakes =
+        backend.list(metalake.namespace(), Entity.EntityType.METALAKE, true);
     assertTrue(metaLakes.contains(metalake));
 
-    List<CatalogEntity> catalogs = backend.list(catalog.namespace(), Entity.EntityType.CATALOG);
+    List<CatalogEntity> catalogs =
+        backend.list(catalog.namespace(), Entity.EntityType.CATALOG, true);
     assertTrue(catalogs.contains(catalog));
 
-    List<SchemaEntity> schemas = backend.list(schema.namespace(), Entity.EntityType.SCHEMA);
+    List<SchemaEntity> schemas = backend.list(schema.namespace(), Entity.EntityType.SCHEMA, true);
     assertTrue(schemas.contains(schema));
 
-    List<TableEntity> tables = backend.list(table.namespace(), Entity.EntityType.TABLE);
+    List<TableEntity> tables = backend.list(table.namespace(), Entity.EntityType.TABLE, true);
     assertTrue(tables.contains(table));
 
-    List<FilesetEntity> filesets = backend.list(fileset.namespace(), Entity.EntityType.FILESET);
+    List<FilesetEntity> filesets =
+        backend.list(fileset.namespace(), Entity.EntityType.FILESET, true);
     assertFalse(filesets.contains(fileset));
     assertTrue(filesets.contains(filesetV2));
     assertEquals("2", filesets.get(filesets.indexOf(filesetV2)).properties().get("version"));
 
-    List<TopicEntity> topics = backend.list(topic.namespace(), Entity.EntityType.TOPIC);
+    List<TopicEntity> topics = backend.list(topic.namespace(), Entity.EntityType.TOPIC, true);
     assertTrue(topics.contains(topic));
 
     RoleEntity roleEntity = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
@@ -753,7 +759,7 @@ public class TestJDBCBackend {
 
     TagEntity tagEntity = backend.get(tag.nameIdentifier(), Entity.EntityType.TAG);
     assertEquals(tag, tagEntity);
-    List<TagEntity> tags = backend.list(tag.namespace(), Entity.EntityType.TAG);
+    List<TagEntity> tags = backend.list(tag.namespace(), Entity.EntityType.TAG, true);
     assertTrue(tags.contains(tag));
     assertEquals(1, tags.size());
 
@@ -1109,7 +1115,8 @@ public class TestJDBCBackend {
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(null)
+        .withRoleIds(null)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -1119,12 +1126,14 @@ public class TestJDBCBackend {
       Namespace namespace,
       String name,
       AuditInfo auditInfo,
-      List<RoleEntity> roleEntities) {
+      List<String> roleNames,
+      List<Long> roleIds) {
     return UserEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoles(roleEntities)
+        .withRoleNames(roleNames)
+        .withRoleIds(roleIds)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -1150,18 +1159,25 @@ public class TestJDBCBackend {
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(null)
+        .withRoleIds(null)
         .withAuditInfo(auditInfo)
         .build();
   }
 
   public static GroupEntity createGroupEntity(
-      Long id, Namespace namespace, String name, AuditInfo auditInfo, List<RoleEntity> roles) {
+      Long id,
+      Namespace namespace,
+      String name,
+      AuditInfo auditInfo,
+      List<String> roleNames,
+      List<Long> roleIds) {
     return GroupEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withRoles(roles)
+        .withRoleNames(roleNames)
+        .withRoleIds(roleIds)
         .withAuditInfo(auditInfo)
         .build();
   }

@@ -30,6 +30,7 @@ import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.catalyst.analysis.NoSuchViewException;
 import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -556,5 +557,143 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     sql("INSERT INTO iceberg_rest_table_test.register_foo2 VALUES (2, 'b')");
     result = convertToStringMap(sql("SELECT * FROM iceberg_rest_table_test.register_foo2"));
     Assertions.assertEquals(ImmutableMap.of("1", "a", "2", "b"), result);
+  }
+
+  @Test
+  @EnabledIf("isSupportsViewCatalog")
+  void testCreateViewAndDisplayView() {
+    String originTableName = "iceberg_rest_table_test.create_table_for_view_1";
+    String viewName = "iceberg_rest_table_test.test_create_view";
+
+    sql(
+        String.format(
+            "CREATE TABLE %s ( id bigint, data string, ts timestamp) USING iceberg",
+            originTableName));
+    sql(String.format("CREATE VIEW %s AS SELECT * FROM %s", viewName, originTableName));
+
+    Map<String, String> viewInfo = getViewInfo(viewName);
+    Map<String, String> m =
+        ImmutableMap.of(
+            "id", "bigint",
+            "data", "string",
+            "ts", "timestamp");
+
+    checkMapContains(m, viewInfo);
+  }
+
+  @Test
+  @EnabledIf("isSupportsViewCatalog")
+  void testViewProperties() {
+    String originTableName = "iceberg_rest_table_test.create_table_for_view_2";
+    String viewName = "iceberg_rest_table_test.test_create_view_with_properties";
+    sql(
+        String.format(
+            "CREATE TABLE %s ( id bigint, data string, ts timestamp) USING iceberg",
+            originTableName));
+
+    // test create view with properties
+    sql(
+        String.format(
+            "CREATE VIEW %s TBLPROPERTIES ('key1' = 'val1') AS SELECT * FROM %s",
+            viewName, originTableName));
+
+    Map<String, String> viewInfo = getViewInfo(viewName);
+    Assertions.assertTrue(viewInfo.getOrDefault("View Properties", "").contains("'key1' = 'val1'"));
+    Assertions.assertFalse(
+        viewInfo.getOrDefault("View Properties", "").contains("'key2' = 'val2'"));
+
+    // test set properties
+    sql(
+        String.format(
+            "ALTER VIEW %s SET TBLPROPERTIES ('key1' = 'val1', 'key2' = 'val2')", viewName));
+
+    viewInfo = getViewInfo(viewName);
+    Assertions.assertTrue(viewInfo.getOrDefault("View Properties", "").contains("'key1' = 'val1'"));
+    Assertions.assertTrue(viewInfo.getOrDefault("View Properties", "").contains("'key2' = 'val2'"));
+
+    // test unset properties
+    sql(String.format("ALTER VIEW %s UNSET TBLPROPERTIES ('key1', 'key2')", viewName));
+
+    viewInfo = getViewInfo(viewName);
+    Assertions.assertFalse(
+        viewInfo.getOrDefault("View Properties", "").contains("'key1' = 'val1'"));
+    Assertions.assertFalse(
+        viewInfo.getOrDefault("View Properties", "").contains("'key2' = 'val2'"));
+  }
+
+  @Test
+  @EnabledIf("isSupportsViewCatalog")
+  void testDropView() {
+    String originTableName = "iceberg_rest_table_test.create_table_for_view_3";
+    String viewName = "iceberg_rest_table_test.test_drop_view";
+
+    sql(
+        String.format(
+            "CREATE TABLE %s ( id bigint, data string, ts timestamp) USING iceberg",
+            originTableName));
+    sql(String.format("CREATE VIEW %s AS SELECT * FROM %s", viewName, originTableName));
+    sql(String.format("DROP VIEW %s", viewName));
+
+    Assertions.assertThrowsExactly(AnalysisException.class, () -> getViewInfo(viewName));
+    Assertions.assertThrowsExactly(
+        NoSuchViewException.class, () -> sql(String.format("DROP VIEW %s", viewName)));
+  }
+
+  @Test
+  @EnabledIf("isSupportsViewCatalog")
+  void testReplaceView() {
+    String originTableName = "iceberg_rest_table_test.create_table_for_view_4";
+    String viewName = "iceberg_rest_table_test.test_replace_view";
+
+    sql(
+        String.format(
+            "CREATE TABLE %s (id bigint, data string, ts timestamp) USING iceberg",
+            originTableName));
+    sql(String.format("CREATE VIEW %s AS SELECT * FROM %s", viewName, originTableName));
+    sql(
+        String.format(
+            "CREATE OR REPLACE VIEW %s (updated_id COMMENT 'updated ID') TBLPROPERTIES ('key1' = 'new_val1') AS SELECT id FROM %s",
+            viewName, originTableName));
+
+    Map<String, String> viewInfo = getViewInfo(viewName);
+    Assertions.assertTrue(
+        viewInfo.getOrDefault("View Properties", "").contains("'key1' = 'new_val1'"));
+    Assertions.assertTrue(viewInfo.containsKey("updated_id"));
+  }
+
+  @Test
+  @EnabledIf("isSupportsViewCatalog")
+  void testShowAvailableViews() {
+    String originTableName = "iceberg_rest_table_test.create_table_for_view_5";
+    String viewName1 = "iceberg_rest_table_test.show_available_views_1";
+    String viewName2 = "iceberg_rest_table_test.show_available_views_2";
+
+    sql(
+        String.format(
+            "CREATE TABLE %s (id bigint, data string, ts timestamp) USING iceberg",
+            originTableName));
+    sql(String.format("CREATE VIEW %s AS SELECT * FROM %s", viewName1, originTableName));
+    sql(String.format("CREATE VIEW %s AS SELECT * FROM %s", viewName2, originTableName));
+
+    List<Object[]> views = sql("SHOW VIEWS IN iceberg_rest_table_test");
+    Assertions.assertEquals(2, views.size());
+  }
+
+  @Test
+  @EnabledIf("isSupportsViewCatalog")
+  void testShowCreateStatementView() {
+    String originTableName = "iceberg_rest_table_test.create_table_for_view_6";
+    String viewName = "iceberg_rest_table_test.show_create_statement_view";
+
+    sql(
+        String.format(
+            "CREATE TABLE %s (id bigint, data string, ts timestamp) USING iceberg",
+            originTableName));
+    sql(String.format("CREATE VIEW %s AS SELECT * FROM %s", viewName, originTableName));
+
+    List<Object[]> result = sql(String.format("SHOW CREATE TABLE %s", viewName));
+    Assertions.assertEquals(1, result.size());
+    Assertions.assertTrue(
+        Arrays.stream(result.get(0)).findFirst().orElse("").toString().contains(viewName));
   }
 }

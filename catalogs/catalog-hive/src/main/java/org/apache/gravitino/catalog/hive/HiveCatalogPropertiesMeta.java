@@ -21,23 +21,18 @@ package org.apache.gravitino.catalog.hive;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.hive.ClientPropertiesMetadata;
 
 public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   public static final String CLIENT_POOL_SIZE = HiveConstants.CLIENT_POOL_SIZE;
-  public static final int DEFAULT_CLIENT_POOL_SIZE = 1;
-
   public static final String METASTORE_URIS = HiveConstants.METASTORE_URIS;
 
   public static final String CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
       HiveConstants.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
-
-  public static final long DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS =
-      TimeUnit.MINUTES.toMillis(5);
 
   public static final String IMPERSONATION_ENABLE = HiveConstants.IMPERSONATION_ENABLE;
 
@@ -55,6 +50,9 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
 
   public static final boolean DEFAULT_LIST_ALL_TABLES = false;
 
+  private static final ClientPropertiesMetadata CLIENT_PROPERTIES_METADATA =
+      new ClientPropertiesMetadata();
+
   private static final Map<String, PropertyEntry<?>> HIVE_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
@@ -63,22 +61,6 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   METASTORE_URIS,
                   "The Hive metastore URIs",
                   false /* immutable */,
-                  false /* hidden */))
-          .put(
-              CLIENT_POOL_SIZE,
-              PropertyEntry.integerOptionalPropertyEntry(
-                  CLIENT_POOL_SIZE,
-                  "The maximum number of Hive metastore clients in the pool for Gravitino",
-                  false /* immutable */,
-                  DEFAULT_CLIENT_POOL_SIZE,
-                  false /* hidden */))
-          .put(
-              CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
-              PropertyEntry.longOptionalPropertyEntry(
-                  CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
-                  "The cache pool eviction interval",
-                  false /* immutable */,
-                  DEFAULT_CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS,
                   false /* hidden */))
           .put(
               IMPERSONATION_ENABLE,
@@ -129,6 +111,7 @@ public class HiveCatalogPropertiesMeta extends BaseCatalogPropertiesMetadata {
                   false /* hidden */,
                   false /* reserved */))
           .putAll(AuthorizationPropertiesMeta.RANGER_AUTHORIZATION_PROPERTY_ENTRIES)
+          .putAll(CLIENT_PROPERTIES_METADATA.propertyEntries())
           .build();
 
   @Override
