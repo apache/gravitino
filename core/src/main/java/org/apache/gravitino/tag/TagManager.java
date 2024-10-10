@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.tag;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -245,7 +244,7 @@ public class TagManager {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
 
-    checkAndImportEntity(metalake, metadataObject, GravitinoEnv.getInstance());
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject, GravitinoEnv.getInstance());
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
@@ -271,7 +270,7 @@ public class TagManager {
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     NameIdentifier tagIdent = ofTagIdent(metalake, name);
 
-    checkAndImportEntity(metalake, metadataObject, GravitinoEnv.getInstance());
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject, GravitinoEnv.getInstance());
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
@@ -307,7 +306,7 @@ public class TagManager {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
 
-    checkAndImportEntity(metalake, metadataObject, GravitinoEnv.getInstance());
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject, GravitinoEnv.getInstance());
 
     // Remove all the tags that are both set to add and remove
     Set<String> tagsToAddSet = tagsToAdd == null ? Sets.newHashSet() : Sets.newHashSet(tagsToAdd);
@@ -417,14 +416,5 @@ public class TagManager {
                 .withLastModifiedTime(Instant.now())
                 .build())
         .build();
-  }
-
-  // This method will check if the entity is existed explicitly, internally this check will load
-  // the entity from underlying sources to entity store if not stored, and will allocate an uid
-  // for this entity, with this uid tags can be associated with this entity.
-  // This method should be called out of the tree lock, otherwise it will cause deadlock.
-  @VisibleForTesting
-  void checkAndImportEntity(String metalake, MetadataObject metadataObject, GravitinoEnv env) {
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject, env);
   }
 }
