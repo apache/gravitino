@@ -99,7 +99,7 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
               try {
                 Container.ExecResult result =
                     localStackContainer.executeInContainer(
-                        "awslocal", "s3", "ls", "s3://" + S3_BUCKET_NAME);
+                        "awslocal", "s3", "mb", "s3://" + S3_BUCKET_NAME);
                 return result.getExitCode() == 0;
               } catch (Exception e) {
                 return false;

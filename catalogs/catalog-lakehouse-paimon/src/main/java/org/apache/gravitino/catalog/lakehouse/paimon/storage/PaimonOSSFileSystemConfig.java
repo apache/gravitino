@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.lakehouse.paimon.filesystem.oss;
+package org.apache.gravitino.catalog.lakehouse.paimon.storage;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
