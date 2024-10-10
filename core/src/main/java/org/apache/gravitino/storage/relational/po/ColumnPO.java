@@ -32,13 +32,13 @@ public class ColumnPO {
     UPDATE((byte) 2),
     DELETE((byte) 3);
 
-    private final Byte value;
+    private final byte value;
 
-    ColumnOpType(Byte value) {
+    ColumnOpType(byte value) {
       this.value = value;
     }
 
-    public Byte value() {
+    public byte value() {
       return value;
     }
   }
@@ -47,11 +47,11 @@ public class ColumnPO {
     TRUE((byte) 0, true),
     FALSE((byte) 1, false);
 
-    private final Byte value;
+    private final byte value;
 
     private final boolean nullable;
 
-    Nullable(Byte value, boolean nullable) {
+    Nullable(byte value, boolean nullable) {
       this.value = value;
       this.nullable = nullable;
     }
@@ -64,9 +64,9 @@ public class ColumnPO {
       return nullable;
     }
 
-    public static Nullable fromValue(Byte value) {
+    public static Nullable fromValue(byte value) {
       for (Nullable nullable : values()) {
-        if (nullable.value.equals(value)) {
+        if (nullable.value == value) {
           return nullable;
         }
       }
@@ -87,7 +87,7 @@ public class ColumnPO {
     TRUE((byte) 0, true),
     FALSE((byte) 1, false);
 
-    private final Byte value;
+    private final byte value;
 
     private final boolean autoIncrement;
 
@@ -104,9 +104,9 @@ public class ColumnPO {
       return autoIncrement;
     }
 
-    public static AutoIncrement fromValue(Byte value) {
+    public static AutoIncrement fromValue(byte value) {
       for (AutoIncrement autoIncrement : values()) {
-        if (autoIncrement.value.equals(value)) {
+        if (autoIncrement.value == value) {
           return autoIncrement;
         }
       }

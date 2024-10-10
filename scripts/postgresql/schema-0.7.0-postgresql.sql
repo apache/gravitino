@@ -178,7 +178,7 @@ COMMENT ON COLUMN table_column_version_info.column_comment IS 'column comment';
 COMMENT ON COLUMN table_column_version_info.column_nullable IS 'column nullable, 0 is not nullable, 1 is nullable';
 COMMENT ON COLUMN table_column_version_info.column_auto_increment IS 'column auto increment, 0 is not auto increment, 1 is auto increment';
 COMMENT ON COLUMN table_column_version_info.column_default_value IS 'column default value';
-COMMENT ON COLUMN table_column_version_info.column_op_type IS 'column op type, 1 is add, 2 is modify, 3 is delete';
+COMMENT ON COLUMN table_column_version_info.column_op_type IS 'column operation type, 1 is create, 2 is update, 3 is delete';
 COMMENT ON COLUMN table_column_version_info.deleted_at IS 'column deleted at';
 COMMENT ON COLUMN table_column_version_info.audit_info IS 'column audit info';
 

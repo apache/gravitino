@@ -27,18 +27,18 @@ public class TableColumnBaseSQLProvider {
 
   public String listColumnPOsByTableIdAndVersion(
       @Param("tableId") Long tableId, @Param("tableVersion") Long tableVersion) {
-    return "SELECT t1.column_id as columnId, t1.column_name as columnName,"
-        + " t1.metalake_id as metalakeId, t1.catalog_id as catalogId,"
-        + " t1.schema_id as schemaId, t1.table_id as tableId,"
-        + " t1.table_version as tableVersion, t1.column_type as columnType,"
-        + " t1.column_comment as columnComment, t1.column_nullable as nullable,"
-        + " t1.column_auto_increment as autoIncrement,"
-        + " t1.column_default_value as defaultValue, t1.column_op_type as columnOpType,"
-        + " t1.deleted_at as deletedAt, t1.audit_info as auditInfo"
+    return "SELECT t1.column_id AS columnId, t1.column_name AS columnName,"
+        + " t1.metalake_id AS metalakeId, t1.catalog_id AS catalogId,"
+        + " t1.schema_id AS schemaId, t1.table_id AS tableId,"
+        + " t1.table_version AS tableVersion, t1.column_type AS columnType,"
+        + " t1.column_comment AS columnComment, t1.column_nullable AS nullable,"
+        + " t1.column_auto_increment AS autoIncrement,"
+        + " t1.column_default_value AS defaultValue, t1.column_op_type AS columnOpType,"
+        + " t1.deleted_at AS deletedAt, t1.audit_info AS auditInfo"
         + " FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " t1 JOIN ("
-        + " SELECT column_id, MAX(table_version) as max_table_version"
+        + " SELECT column_id, MAX(table_version) AS max_table_version"
         + " FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " WHERE table_id = #{tableId} AND table_version <= #{tableVersion} AND deleted_at = 0"

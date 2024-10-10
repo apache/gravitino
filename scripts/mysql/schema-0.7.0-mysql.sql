@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `column_nullable` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'column nullable, 0 is not nullable, 1 is nullable',
     `column_auto_increment` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'column auto increment, 0 is not auto increment, 1 is auto increment',
     `column_default_value` VARCHAR(256) DEFAULT NULL COMMENT 'column default value',
-    `column_op_type` TINYINT(1) NOT NULL COMMENT 'column op type, 1 is add, 2 is modify, 3 is delete',
+    `column_op_type` TINYINT(1) NOT NULL COMMENT 'column operation type, 1 is create, 2 is update, 3 is delete',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'column deleted at',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'column audit info',
     PRIMARY KEY (`id`),
