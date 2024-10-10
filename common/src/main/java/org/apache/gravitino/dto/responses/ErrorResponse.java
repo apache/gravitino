@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.RESTException;
 
 /** Represents an error response. */
@@ -301,6 +302,21 @@ public class ErrorResponse extends BaseResponse {
     return new ErrorResponse(
         ErrorConstants.UNSUPPORTED_OPERATION_CODE,
         UnsupportedOperationException.class.getSimpleName(),
+        message,
+        getStackTrace(throwable));
+  }
+
+  /**
+   * Create a new forbidden operation error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse forbidden(String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.FORBIDDEN_CODE,
+        ForbiddenException.class.getSimpleName(),
         message,
         getStackTrace(throwable));
   }
