@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
-import org.apache.gravitino.catalog.lakehouse.paimon.filesystem.S3StorageConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.storage.S3StorageConfig;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
