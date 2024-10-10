@@ -99,6 +99,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   protected String jdbcPassword;
   protected Catalog catalog;
   protected org.apache.paimon.catalog.Catalog paimonCatalog;
+  protected SparkSession spark;
   protected String metalakeName = GravitinoITUtils.genRandomName("paimon_it_metalake");
   protected String catalogName = GravitinoITUtils.genRandomName("paimon_it_catalog");
   protected String schemaName = GravitinoITUtils.genRandomName("paimon_it_schema");
@@ -115,8 +116,8 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   private static final String alertTableName = "alert_table_name";
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO paimon.%s VALUES %s";
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM paimon.%s";
+  private static final String DEFAULT_DB = "default";
   private GravitinoMetalake metalake;
-  protected SparkSession spark;
   private Map<String, String> catalogProperties;
 
   @BeforeAll
@@ -726,7 +727,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     // update column position
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
-    Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
+    Column col3 = Column.of("date_of_birth", Types.StringType.get(), "comment");
 
     Column[] newColumns = new Column[] {col1, col2, col3};
     NameIdentifier tableIdentifier =
@@ -873,7 +874,13 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   private void clearTableAndSchema() {
     SupportsSchemas supportsSchema = catalog.asSchemas();
     Arrays.stream(supportsSchema.listSchemas())
-        .forEach(schema -> supportsSchema.dropSchema(schema, true));
+        .forEach(
+            schema -> {
+              // can not drop default database for hive backend.
+              if (!DEFAULT_DB.equalsIgnoreCase(schema)) {
+                supportsSchema.dropSchema(schema, true);
+              }
+            });
   }
 
   private void createMetalake() {
