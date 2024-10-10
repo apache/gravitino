@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
@@ -46,7 +47,7 @@ public interface TableColumnMapper {
       method = "softDeleteColumnsByMetalakeId")
   Integer softDeleteColumnsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @UpdateProvider(
+  @DeleteProvider(
       type = TableColumnSQLProviderFactory.class,
       method = "deleteColumnPOsByLegacyTimeline")
   Integer deleteColumnPOsByLegacyTimeline(

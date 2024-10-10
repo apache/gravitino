@@ -22,7 +22,6 @@ import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -51,7 +50,7 @@ public class TableColumnMetaService {
 
     // Filter out the deleted columns
     return columnPOs.stream()
-        .filter(c -> !Objects.equals(c.getColumnOpType(), ColumnPO.ColumnOpType.DELETE.value()))
+        .filter(c -> c.getColumnOpType() != ColumnPO.ColumnOpType.DELETE.value())
         .collect(Collectors.toList());
   }
 

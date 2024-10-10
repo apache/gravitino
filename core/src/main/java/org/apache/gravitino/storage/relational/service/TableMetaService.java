@@ -159,17 +159,17 @@ public class TableMetaService {
     TableEntity oldTableEntity =
         POConverters.fromTableAndColumnPOs(oldTablePO, oldTableColumns, identifier.namespace());
 
-    TableEntity newEntity = (TableEntity) updater.apply((E) oldTableEntity);
+    TableEntity newTableEntity = (TableEntity) updater.apply((E) oldTableEntity);
     Preconditions.checkArgument(
-        Objects.equals(oldTableEntity.id(), newEntity.id()),
+        Objects.equals(oldTableEntity.id(), newTableEntity.id()),
         "The updated table entity id: %s should be same with the table entity id before: %s",
-        newEntity.id(),
+        newTableEntity.id(),
         oldTableEntity.id());
 
-    boolean needUpdateVersion =
-        TableColumnMetaService.getInstance().isColumnUpdated(oldTableEntity, newEntity);
+    boolean isColumnChanged =
+        TableColumnMetaService.getInstance().isColumnUpdated(oldTableEntity, newTableEntity);
     TablePO newTablePO =
-        POConverters.updateTablePOWithVersion(oldTablePO, newEntity, needUpdateVersion);
+        POConverters.updateTablePOWithVersion(oldTablePO, newTableEntity, isColumnChanged);
 
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
@@ -180,20 +180,20 @@ public class TableMetaService {
                       TableMetaMapper.class,
                       mapper -> mapper.updateTableMeta(newTablePO, oldTablePO))),
           () -> {
-            if (needUpdateVersion) {
+            if (isColumnChanged) {
               TableColumnMetaService.getInstance()
-                  .updateColumnPOsFromTableDiff(oldTableEntity, newEntity, newTablePO);
+                  .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
             }
           });
 
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.TABLE, newEntity.nameIdentifier().toString());
+          re, Entity.EntityType.TABLE, newTableEntity.nameIdentifier().toString());
       throw re;
     }
 
     if (updateResult.get() > 0) {
-      return newEntity;
+      return newTableEntity;
     } else {
       throw new IOException("Failed to update the entity: " + identifier);
     }
