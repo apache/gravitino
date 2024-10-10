@@ -164,7 +164,6 @@ public class MetadataObjectUtil {
         }
         break;
 
-      case COLUMN:
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the type %s", object.type()));
