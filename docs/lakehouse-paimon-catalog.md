@@ -22,19 +22,21 @@ Builds with Apache Paimon `0.8.0`.
 
 ### Catalog capabilities
 
-- Works as a catalog proxy, supporting `FilesystemCatalog`.
+- Works as a catalog proxy, supporting `FilesystemCatalog` and `JdbcCatalog`.
 - Supports DDL operations for Paimon schemas and tables.
 
-- Doesn't support `JdbcCatalog` and `HiveCatalog` catalog backend now.
+- Doesn't support `HiveCatalog` catalog backend now.
 - Doesn't support alterSchema.
 
 ### Catalog properties
 
 | Property name                                      | Description                                                                                                                                                                                                 | Default value          | Required                                                        | Since Version |
 |----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-----------------------------------------------------------------|---------------|
-| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Only supports `filesystem` now.                                                                                                                                | (none)                 | Yes                                                             | 0.6.0         |
+| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Supports `filesystem` and `jdbc` now.                                                                                                                          | (none)                 | Yes                                                             | 0.6.0         |
 | `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                 | required if the value of `catalog-backend` is not `filesystem`. | 0.6.0         |
 | `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS or `s3://{bucket-name}/path/` for S3                                              | (none)                 | Yes                                                             | 0.6.0         |
+| `jdbc.user`                                        | Jdbc user of Gravitino Paimon catalog for `jdbc` backend.                                                                                                                                                   | (none)                 | required if the value of `catalog-backend` is `jdbc`.           | 0.7.0         |
+| `jdbc.password`                                    | Jdbc password of Gravitino Paimon catalog for `jdbc` backend.                                                                                                                                               | (none)                 | required if the value of `catalog-backend` is `jdbc`.           | 0.7.0         |
 | `authentication.type`                              | The type of authentication for Paimon catalog backend, currently Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`               | No                                                              | 0.6.0         |
 | `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)                 | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)                 | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
@@ -46,6 +48,7 @@ Builds with Apache Paimon `0.8.0`.
 
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
+
 
 ### Catalog operations
 

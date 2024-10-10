@@ -55,6 +55,7 @@ public class PaimonConfig extends Config {
           .doc("Paimon catalog jdbc user")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<String> CATALOG_JDBC_PASSWORD =
@@ -62,6 +63,7 @@ public class PaimonConfig extends Config {
           .doc("Paimon catalog jdbc password")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
 
   public PaimonConfig() {

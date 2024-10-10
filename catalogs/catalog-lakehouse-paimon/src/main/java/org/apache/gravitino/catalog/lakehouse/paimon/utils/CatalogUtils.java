@@ -20,8 +20,6 @@ package org.apache.gravitino.catalog.lakehouse.paimon.utils;
 
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.S3_CONFIGURATION;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_BACKEND;
-import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_JDBC_PASSWORD;
-import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_JDBC_USER;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_URI;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_WAREHOUSE;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
@@ -86,11 +84,6 @@ public class CatalogUtils {
       PaimonConfig paimonConfig, Configuration configuration) {
     checkPaimonConfig(paimonConfig);
 
-    // TODO: Now we only support kerberos auth for Filesystem backend, and will support it for Hive
-    // backend later.
-    Preconditions.checkArgument(
-        PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(paimonConfig.get(CATALOG_BACKEND)));
-
     CatalogContext catalogContext =
         CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()), configuration);
     return CatalogFactory.createCatalog(catalogContext);
@@ -122,17 +115,6 @@ public class CatalogUtils {
       String uri = paimonConfig.get(CATALOG_URI);
       Preconditions.checkArgument(
           StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");
-    }
-
-    if (PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(metastore)) {
-      String jdbcUser = paimonConfig.get(CATALOG_JDBC_USER);
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(jdbcUser), "Paimon Catalog jdbc user can not be null or empty.");
-
-      String jdbcPassword = paimonConfig.get(CATALOG_JDBC_PASSWORD);
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(jdbcPassword),
-          "Paimon Catalog jdbc password can not be null or empty.");
     }
   }
 

@@ -20,16 +20,9 @@ package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Schema;
-import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.paimon.catalog.Catalog;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
@@ -62,29 +55,5 @@ public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
     catalogProperties.put(PaimonCatalogPropertiesMetadata.JDBC_PASSWORD, jdbcPassword);
 
     return catalogProperties;
-  }
-
-  @Test
-  void testPaimonSchemaProperties() throws Catalog.DatabaseNotExistException {
-    SupportsSchemas schemas = catalog.asSchemas();
-
-    // create schema check.
-    String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
-    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
-    Map<String, String> schemaProperties = Maps.newHashMap();
-    schemaProperties.put("key1", "val1");
-    schemaProperties.put("key2", "val2");
-    Schema createdSchema =
-        schemas.createSchema(schemaIdent.name(), schema_comment, schemaProperties);
-    Assertions.assertEquals(createdSchema.properties().get("key1"), "val1");
-    Assertions.assertEquals(createdSchema.properties().get("key2"), "val2");
-
-    // load schema check.
-    Schema schema = schemas.loadSchema(schemaIdent.name());
-    Assertions.assertEquals(schema.properties().get("key1"), "val1");
-    Assertions.assertEquals(schema.properties().get("key2"), "val2");
-    Map<String, String> loadedProps = paimonCatalog.loadDatabaseProperties(schemaIdent.name());
-    Assertions.assertEquals(loadedProps.get("key1"), "val1");
-    Assertions.assertEquals(loadedProps.get("key2"), "val2");
   }
 }
