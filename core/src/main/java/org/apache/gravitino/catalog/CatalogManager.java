@@ -366,7 +366,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     .build())
             .build();
 
-    boolean createSuccess = false;
+    boolean needClean = true;
     try {
       NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
       if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
@@ -376,13 +376,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
       store.put(e, false /* overwrite */);
       CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
-      createSuccess = true;
+
+      needClean = false;
       return wrapper.catalog;
+
     } catch (EntityAlreadyExistsException e1) {
+      needClean = false;
       LOG.warn("Catalog {} already exists", ident, e1);
       throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
+
     } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
       throw e2;
+
     } catch (Exception e3) {
       catalogCache.invalidate(ident);
       LOG.error("Failed to create catalog {}", ident, e3);
@@ -390,8 +395,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         throw (RuntimeException) e3;
       }
       throw new RuntimeException(e3);
+
     } finally {
-      if (!createSuccess) {
+      if (needClean) {
+        // since we put the catalog entity into the store but failed to create the catalog instance,
+        // we need to clean up the entity stored.
         try {
           store.delete(ident, EntityType.CATALOG, true);
         } catch (IOException e4) {
