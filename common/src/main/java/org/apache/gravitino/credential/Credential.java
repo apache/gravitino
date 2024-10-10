@@ -34,11 +34,12 @@ public interface Credential {
   String credentialType();
 
   /**
-   * Returns the expiration time of the credential in seconds since the epoch, 0 means not expire.
+   * Returns the expiration time of the credential in milliseconds since the epoch, 0 means not
+   * expire.
    *
    * @return the expiration time as a long.
    */
-  long expireTimeSecs();
+  long expireTimeMs();
 
   /**
    * Returns credential information.
@@ -56,7 +57,7 @@ public interface Credential {
     return new ImmutableMap.Builder<String, String>()
         .putAll(credentialInfo())
         .put(CredentialConstants.CREDENTIAL_TYPE, credentialType())
-        .put(CredentialConstants.EXPIRE_TIME_SECS, String.valueOf(expireTimeSecs()))
+        .put(CredentialConstants.EXPIRE_TIME_MS, String.valueOf(expireTimeMs()))
         .build();
   }
 }

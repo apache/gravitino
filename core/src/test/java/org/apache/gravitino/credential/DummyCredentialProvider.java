@@ -69,7 +69,7 @@ public class DummyCredentialProvider implements CredentialProvider {
     }
 
     @Override
-    public long expireTimeSecs() {
+    public long expireTimeMs() {
       return 0;
     }
 
