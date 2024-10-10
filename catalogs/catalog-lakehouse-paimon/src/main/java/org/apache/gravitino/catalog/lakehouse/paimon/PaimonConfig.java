@@ -51,18 +51,18 @@ public class PaimonConfig extends Config {
           .create();
 
   public static final ConfigEntry<String> CATALOG_JDBC_USER =
-          new ConfigBuilder(PaimonCatalogPropertiesMetadata.JDBC_USER)
-                  .doc("Paimon catalog jdbc user")
-                  .version(ConfigConstants.VERSION_0_7_0)
-                  .stringConf()
-                  .create();
+      new ConfigBuilder(PaimonCatalogPropertiesMetadata.JDBC_USER)
+          .doc("Paimon catalog jdbc user")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
 
   public static final ConfigEntry<String> CATALOG_JDBC_PASSWORD =
-          new ConfigBuilder(PaimonCatalogPropertiesMetadata.JDBC_PASSWORD)
-                  .doc("Paimon catalog jdbc password")
-                  .version(ConfigConstants.VERSION_0_7_0)
-                  .stringConf()
-                  .create();
+      new ConfigBuilder(PaimonCatalogPropertiesMetadata.JDBC_PASSWORD)
+          .doc("Paimon catalog jdbc password")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
 
   public PaimonConfig() {
     super(false);

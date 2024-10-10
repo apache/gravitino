@@ -48,7 +48,17 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String JDBC_PASSWORD = "jdbc.password";
 
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
-      ImmutableMap.of(GRAVITINO_CATALOG_BACKEND, PAIMON_METASTORE, WAREHOUSE, WAREHOUSE, URI, URI, JDBC_USER, JDBC_USER, JDBC_PASSWORD, JDBC_PASSWORD);
+      ImmutableMap.of(
+          GRAVITINO_CATALOG_BACKEND,
+          PAIMON_METASTORE,
+          WAREHOUSE,
+          WAREHOUSE,
+          URI,
+          URI,
+          JDBC_USER,
+          JDBC_USER,
+          JDBC_PASSWORD,
+          JDBC_PASSWORD);
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
   private static final Map<String, String> KERBEROS_CONFIGURATION =
       ImmutableMap.of(
@@ -87,17 +97,17 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 null /* defaultValue */,
                 false /* hidden */),
             stringOptionalPropertyEntry(
-                    JDBC_USER,
-                    "Paimon catalog jdbc user",
-                    false /* immutable */,
-                    null /* defaultValue */,
-                    false /* hidden */),
+                JDBC_USER,
+                "Paimon catalog jdbc user",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
             stringOptionalPropertyEntry(
-                    JDBC_PASSWORD,
-                    "Paimon catalog jdbc password",
-                    false /* immutable */,
-                    null /* defaultValue */,
-                    false /* hidden */));
+                JDBC_PASSWORD,
+                "Paimon catalog jdbc password",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
