@@ -49,7 +49,7 @@ public class CatalogDetails extends Command {
 
     try {
       GravitinoClient client = buildClient(metalake);
-      result = client.loadMetalake(metalake).loadCatalog(catalog);
+      result = client.loadCatalog(catalog);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
