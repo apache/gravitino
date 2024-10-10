@@ -32,6 +32,8 @@ from gravitino.audit.caller_context import CallerContext, CallerContextHolder
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
 from gravitino.audit.fileset_data_operation import FilesetDataOperation
 from gravitino.audit.internal_client_type import InternalClientType
+from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
+from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
 from gravitino.catalog.fileset_catalog import FilesetCatalog
 from gravitino.client.gravitino_client import GravitinoClient
@@ -92,15 +94,40 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         """
         self._metalake = metalake_name
         auth_type = (
-            GVFSConfig.DEFAULT_AUTH_TYPE
+            GVFSConfig.SIMPLE_AUTH_TYPE
             if options is None
-            else options.get(GVFSConfig.AUTH_TYPE, GVFSConfig.DEFAULT_AUTH_TYPE)
+            else options.get(GVFSConfig.AUTH_TYPE, GVFSConfig.SIMPLE_AUTH_TYPE)
         )
-        if auth_type == GVFSConfig.DEFAULT_AUTH_TYPE:
+        if auth_type == GVFSConfig.SIMPLE_AUTH_TYPE:
             self._client = GravitinoClient(
                 uri=server_uri,
                 metalake_name=metalake_name,
                 auth_data_provider=SimpleAuthProvider(),
+            )
+        elif auth_type == GVFSConfig.OAUTH2_AUTH_TYPE:
+            oauth2_server_uri = options.get(GVFSConfig.OAUTH2_SERVER_URI)
+            self._check_auth_config(
+                auth_type, GVFSConfig.OAUTH2_SERVER_URI, oauth2_server_uri
+            )
+
+            oauth2_credential = options.get(GVFSConfig.OAUTH2_CREDENTIAL)
+            self._check_auth_config(
+                auth_type, GVFSConfig.OAUTH2_CREDENTIAL, oauth2_credential
+            )
+
+            oauth2_path = options.get(GVFSConfig.OAUTH2_PATH)
+            self._check_auth_config(auth_type, GVFSConfig.OAUTH2_PATH, oauth2_path)
+
+            oauth2_scope = options.get(GVFSConfig.OAUTH2_SCOPE)
+            self._check_auth_config(auth_type, GVFSConfig.OAUTH2_SCOPE, oauth2_scope)
+
+            oauth2_token_provider: OAuth2TokenProvider = DefaultOAuth2TokenProvider(
+                oauth2_server_uri, oauth2_credential, oauth2_path, oauth2_scope
+            )
+            self._client = GravitinoClient(
+                uri=server_uri,
+                metalake_name=metalake_name,
+                auth_data_provider=oauth2_token_provider,
             )
         else:
             raise GravitinoRuntimeException(
@@ -685,6 +712,19 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         raise GravitinoRuntimeException(
             f"Storage type:{storage_type} doesn't support now."
         )
+
+    @staticmethod
+    def _check_auth_config(auth_type: str, config_key: str, config_value: str):
+        """Check if the config value is null.
+        :param auth_type: The auth type
+        :param config_key: The config key
+        :param config_value: The config value
+        """
+        if config_value is None:
+            raise GravitinoRuntimeException(
+                f"{config_key} should not be null"
+                f" if {GVFSConfig.AUTH_TYPE} is set to {auth_type}."
+            )
 
     def _get_fileset_catalog(self, catalog_ident: NameIdentifier):
         read_lock = self._catalog_cache_lock.gen_rlock()

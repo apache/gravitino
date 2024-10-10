@@ -18,48 +18,20 @@
  */
 package org.apache.gravitino.catalog.oceanbase.operation;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Map;
+import com.google.common.collect.ImmutableSet;
 import java.util.Set;
-import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
-import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
 /** Database operations for OceanBase. */
 public class OceanBaseDatabaseOperations extends JdbcDatabaseOperations {
 
-  public static final Set<String> SYS_OCEANBASE_DATABASE_NAMES = createSysOceanBaseDatabaseNames();
-
-  private static Set<String> createSysOceanBaseDatabaseNames() {
-    Set<String> set = new HashSet<>();
-    set.add("information_schema");
-    set.add("mysql");
-    set.add("sys");
-    set.add("oceanbase");
-    return Collections.unmodifiableSet(set);
+  @Override
+  protected boolean supportSchemaComment() {
+    return false;
   }
 
   @Override
-  public String generateCreateDatabaseSql(
-      String databaseName, String comment, Map<String, String> properties) {
-
-    throw new UnsupportedOperationException("Not implemented yet.");
-  }
-
-  @Override
-  public String generateDropDatabaseSql(String databaseName, boolean cascade) {
-    throw new UnsupportedOperationException("Not implemented yet.");
-  }
-
-  @Override
-  public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
-    throw new UnsupportedOperationException("Not implemented yet.");
-  }
-
-  @Override
-  protected boolean isSystemDatabase(String dbName) {
-    return SYS_OCEANBASE_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
+  protected Set<String> createSysDatabaseNameSet() {
+    return ImmutableSet.of("information_schema", "mysql", "sys", "oceanbase");
   }
 }

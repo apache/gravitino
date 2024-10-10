@@ -176,6 +176,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) UserMetaService.getInstance().updateUser(ident, updater);
       case GROUP:
         return (E) GroupMetaService.getInstance().updateGroup(ident, updater);
+      case ROLE:
+        return (E) RoleMetaService.getInstance().updateRole(ident, updater);
       case TAG:
         return (E) TagMetaService.getInstance().updateTag(ident, updater);
       default:

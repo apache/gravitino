@@ -137,6 +137,8 @@ public class RoleOperations {
                 metadataObjects.add(metadataObject);
               }
 
+              Set<Privilege> privileges = Sets.newHashSet(object.privileges());
+              AuthorizationUtils.checkDuplicatedNamePrivilege(privileges);
               for (Privilege privilege : object.privileges()) {
                 AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
               }

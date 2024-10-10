@@ -1069,6 +1069,27 @@ public class POConverters {
     }
   }
 
+  public static RolePO updateRolePOWithVersion(RolePO oldRolePO, RoleEntity newRole) {
+    Long lastVersion = oldRolePO.getLastVersion();
+    // TODO: set the version to the last version + 1 when having some fields need be multiple
+    // version
+    Long nextVersion = lastVersion;
+    try {
+      return RolePO.builder()
+          .withRoleId(oldRolePO.getRoleId())
+          .withRoleName(newRole.name())
+          .withMetalakeId(oldRolePO.getMetalakeId())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newRole.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newRole.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
   public static TagEntity fromTagPO(TagPO tagPO, Namespace namespace) {
     try {
       return TagEntity.builder()

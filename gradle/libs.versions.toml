@@ -173,6 +173,9 @@ iceberg-gcp = { group = "org.apache.iceberg", name = "iceberg-gcp", version.ref 
 paimon-core = { group = "org.apache.paimon", name = "paimon-core", version.ref = "paimon" }
 paimon-format = { group = "org.apache.paimon", name = "paimon-format", version.ref = "paimon" }
 paimon-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog", version.ref = "paimon" }
+paimon-s3 = { group = "org.apache.paimon", name = "paimon-s3", version.ref = "paimon" }
+paimon-spark = { group = "org.apache.paimon", name = "paimon-spark", version.ref = "paimon" }
+
 trino-spi= { group = "io.trino", name = "trino-spi", version.ref = "trino" }
 trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trino" }
 trino-memory= { group = "io.trino", name = "trino-memory", version.ref = "trino" }

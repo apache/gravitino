@@ -57,6 +57,11 @@ public class SecurableObjectSQLProviderFactory {
     return getProvider().batchInsertSecurableObjects(securableObjectPOs);
   }
 
+  public static String batchSoftDeleteSecurableObjects(
+      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
+    return getProvider().batchSoftDeleteSecurableObjects(securableObjectPOs);
+  }
+
   public static String softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId) {
     return getProvider().softDeleteSecurableObjectsByRoleId(roleId);
   }
