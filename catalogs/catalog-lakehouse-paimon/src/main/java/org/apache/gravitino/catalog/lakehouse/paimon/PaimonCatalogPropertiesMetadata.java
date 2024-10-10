@@ -31,9 +31,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.storage.S3StorageConfig;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.storage.S3Properties;
 
 /**
  * Implementation of {@link PropertiesMetadata} that represents Paimon catalog properties metadata.
@@ -46,6 +48,11 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String URI = "uri";
   public static final String JDBC_USER = "jdbc.user";
   public static final String JDBC_PASSWORD = "jdbc.password";
+
+  // S3 properties needed by Paimon
+  public static final String S3_ENDPOINT = "s3.endpoint";
+  public static final String S3_ACCESS_KEY = "s3.access-key";
+  public static final String S3_SECRET_KEY = "s3.secret-key";
 
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
       ImmutableMap.of(
@@ -72,6 +79,12 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           KerberosConfig.FETCH_TIMEOUT_SEC_KEY,
           AuthenticationConfig.AUTH_TYPE_KEY,
           AuthenticationConfig.AUTH_TYPE_KEY);
+
+  public static final Map<String, String> S3_CONFIGURATION =
+      ImmutableMap.of(
+          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY,
+          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY,
+          S3Properties.GRAVITINO_S3_ENDPOINT, S3_ENDPOINT);
 
   static {
     List<PropertyEntry<?>> propertyEntries =
@@ -112,6 +125,8 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
     result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
+    result.putAll(S3StorageConfig.S3_FILESYSTEM_PROPERTY_ENTRIES);
+
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);
   }
 
@@ -130,6 +145,10 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
 
           if (KERBEROS_CONFIGURATION.containsKey(key)) {
             gravitinoConfig.put(KERBEROS_CONFIGURATION.get(key), value);
+          }
+
+          if (S3_CONFIGURATION.containsKey(key)) {
+            gravitinoConfig.put(S3_CONFIGURATION.get(key), value);
           }
         });
     return gravitinoConfig;
