@@ -119,19 +119,20 @@ if [[ "$1" == "finalize" ]]; then
     echo "git tag v$RELEASE_VERSION created"
   fi
 
-  # download Gravitino Python binary from the dev directory and upload to PyPi.
+  # upload to PyPi.
+  # todo: uncomment below codes if possible, it will download Gravitino Python binary from the dev directory
   echo "Uploading Gravitino to PyPi"
-  svn co --depth=empty "$RELEASE_STAGING_LOCATION/$RELEASE_TAG" svn-gravitino
-  cd svn-gravitino
+  # svn co --depth=empty "$RELEASE_STAGING_LOCATION/$RELEASE_TAG" svn-gravitino
+  # cd svn-gravitino
   PYGRAVITINO_VERSION=`echo "$RELEASE_VERSION" |  sed -e "s/-/./" -e "s/preview/dev/"`
-  svn update "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz"
-  svn update "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
+  # svn update "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz"
+  # svn update "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
   twine upload -u __token__  -p $PYPI_API_TOKEN \
     --repository-url https://upload.pypi.org/legacy/ \
     "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz" \
     "apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
-  cd ..
-  rm -rf svn-gravitino
+  # cd ..
+  # rm -rf svn-gravitino
   echo "Python Gravitino package uploaded"
 
   # Moves the binaries from dev directory to release directory.
@@ -251,6 +252,12 @@ if [[ "$1" == "package" ]]; then
     echo "Copying release tarballs"
     cp gravitino-* "svn-gravitino/${DEST_DIR_NAME}/"
     cp apache_gravitino-* "svn-gravitino/${DEST_DIR_NAME}/"
+    # remove python client tarball
+    # todo: remove this when python version supports include '-incubating' or the project is graduated
+    rm "svn-gravitino/${DEST_DIR_NAME}/apache_gravitino-$PYGRAVITINO_VERSION.tar.gz"
+    rm "svn-gravitino/${DEST_DIR_NAME}/apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.asc"
+    rm "svn-gravitino/${DEST_DIR_NAME}/apache_gravitino-$PYGRAVITINO_VERSION.tar.gz.sha512"
+
     svn add "svn-gravitino/${DEST_DIR_NAME}"
 
     cd svn-gravitino
