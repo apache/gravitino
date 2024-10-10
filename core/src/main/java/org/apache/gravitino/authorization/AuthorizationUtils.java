@@ -18,15 +18,12 @@
  */
 package org.apache.gravitino.authorization;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -216,58 +213,6 @@ public class AuthorizationUtils {
     return false;
   }
 
-  // Check every securable object whether exists and is imported.
-  public static void checkSecurableObject(String metalake, MetadataObject object) {
-    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-
-    Supplier<NoSuchMetadataObjectException> exceptionToThrowSupplier =
-        () ->
-            new NoSuchMetadataObjectException(
-                "Securable object %s type %s doesn't exist", object.fullName(), object.type());
-
-    switch (object.type()) {
-      case METALAKE:
-        check(
-            GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      case CATALOG:
-        check(
-            GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      case SCHEMA:
-        check(
-            GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      case FILESET:
-        check(
-            GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      case TABLE:
-        check(
-            GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      case TOPIC:
-        check(
-            GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      default:
-        throw new IllegalArgumentException(
-            String.format("Doesn't support the type %s", object.type()));
-    }
-  }
-
   public static void checkDuplicatedNamePrivilege(Collection<Privilege> privileges) {
     Set<Privilege.Name> privilegeNameSet = Sets.newHashSet();
     for (Privilege privilege : privileges) {
@@ -310,13 +255,6 @@ public class AuthorizationUtils {
         throw new NoSuchMetadataObjectException(
             "Securable object %s doesn't exist", object.fullName());
       }
-    }
-  }
-
-  private static void check(
-      final boolean expression, Supplier<? extends RuntimeException> exceptionToThrowSupplier) {
-    if (!expression) {
-      throw checkNotNull(exceptionToThrowSupplier).get();
     }
   }
 
