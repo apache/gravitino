@@ -113,10 +113,10 @@ public class MetadataObjectUtil {
    *
    * @param metalake The metalake name
    * @param object The metadata object
-   * @param env The Gravitino environment
    * @throws NoSuchMetadataObjectException if the metadata object type doesn't exist.
    */
-  public static void checkMetadataObject(String metalake, MetadataObject object, GravitinoEnv env) {
+  public static void checkMetadataObject(String metalake, MetadataObject object) {
+    GravitinoEnv env = GravitinoEnv.getInstance();
     NameIdentifier identifier = toEntityIdent(metalake, object);
 
     Supplier<NoSuchMetadataObjectException> exceptionToThrowSupplier =

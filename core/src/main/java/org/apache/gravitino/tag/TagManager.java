@@ -30,7 +30,6 @@ import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -244,7 +243,7 @@ public class TagManager {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
 
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject, GravitinoEnv.getInstance());
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
@@ -270,7 +269,7 @@ public class TagManager {
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     NameIdentifier tagIdent = ofTagIdent(metalake, name);
 
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject, GravitinoEnv.getInstance());
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
@@ -306,7 +305,7 @@ public class TagManager {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
 
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject, GravitinoEnv.getInstance());
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     // Remove all the tags that are both set to add and remove
     Set<String> tagsToAddSet = tagsToAdd == null ? Sets.newHashSet() : Sets.newHashSet(tagsToAdd);

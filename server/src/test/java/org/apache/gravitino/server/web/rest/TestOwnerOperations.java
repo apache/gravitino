@@ -257,12 +257,11 @@ class TestOwnerOperations extends JerseyTest {
   public void testRoleObject() {
     MetadataObject role = MetadataObjects.of(null, "role", MetadataObject.Type.ROLE);
     when(accessControlDispatcher.getRole(any(), any())).thenReturn(mock(Role.class));
-    Assertions.assertDoesNotThrow(
-        () -> MetadataObjectUtil.checkMetadataObject("metalake", role, GravitinoEnv.getInstance()));
+    Assertions.assertDoesNotThrow(() -> MetadataObjectUtil.checkMetadataObject("metalake", role));
 
     doThrow(new NoSuchRoleException("test")).when(accessControlDispatcher).getRole(any(), any());
     Assertions.assertThrows(
         NoSuchMetadataObjectException.class,
-        () -> MetadataObjectUtil.checkMetadataObject("metalake", role, GravitinoEnv.getInstance()));
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", role));
   }
 }

@@ -143,7 +143,7 @@ public class RoleOperations {
               for (Privilege privilege : object.privileges()) {
                 AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
               }
-              MetadataObjectUtil.checkMetadataObject(metalake, object, GravitinoEnv.getInstance());
+              MetadataObjectUtil.checkMetadataObject(metalake, object);
             }
 
             List<SecurableObject> securableObjects =

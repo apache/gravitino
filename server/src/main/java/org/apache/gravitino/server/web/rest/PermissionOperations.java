@@ -218,7 +218,7 @@ public class PermissionOperations {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
 
-            MetadataObjectUtil.checkMetadataObject(metalake, object, GravitinoEnv.getInstance());
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
             return TreeLockUtils.doWithTreeLock(
                 AuthorizationUtils.ofRole(metalake, role),
                 LockType.WRITE,
@@ -263,7 +263,7 @@ public class PermissionOperations {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
 
-            MetadataObjectUtil.checkMetadataObject(metalake, object, GravitinoEnv.getInstance());
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
             return TreeLockUtils.doWithTreeLock(
                 AuthorizationUtils.ofRole(metalake, role),
                 LockType.WRITE,
