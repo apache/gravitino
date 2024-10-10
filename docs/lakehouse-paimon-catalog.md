@@ -47,6 +47,10 @@ Builds with Apache Paimon `0.8.0`.
 | `s3-access-key-id`                                 | The access key of the AWS s3.                                                                                                                                                                               | (none)                 | required if the value of `warehouse` is a S3 path               | 0.7.0         |
 | `s3-secret-access-key`                             | The secret key of the AWS s3.                                                                                                                                                                               | (none)                 | required if the value of `warehouse` is a S3 path               | 0.7.0         |
 
+:::note
+If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/master/filesystems/s3/). 
+:::
+
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
 
