@@ -67,7 +67,7 @@ download_trino-cascading-connector() {
 
   path=$GRAVITINO_HOME_DIR/trino-connector/integration-test/build
   download_jar "trino-trino-0.1-SNAPSHOT.tar.gz" \
-  "https://github.com/diqiu50/trino-cascading-connector/releases/download/0.1-SNAPSHOT/trino-trino-0.1-SNAPSHOT.tar.gz" \
+  "https://github.com/datastrato/trino-cascading-connector/releases/download/v0.0.1/trino-trino-0.1-SNAPSHOT.tar.gz" \
   "$path"
 
   rm -fr $path/trino-trino
