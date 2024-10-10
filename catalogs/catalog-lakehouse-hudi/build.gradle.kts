@@ -24,6 +24,10 @@ plugins {
   id("idea")
 }
 
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val fullSparkVersion: String = libs.versions.spark34.get()
+val sparkVersion = fullSparkVersion.split(".").take(2).joinToString(".")
+
 dependencies {
   implementation(project(":api")) {
     exclude(group = "*")
@@ -117,6 +121,20 @@ dependencies {
   testImplementation(libs.htrace.core4)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.woodstox.core)
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$fullSparkVersion") {
+    exclude("org.apache.hadoop")
+    exclude("io.dropwizard.metrics")
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$fullSparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
 
+  testRuntimeOnly("org.apache.hudi:hudi-spark$sparkVersion-bundle_$scalaVersion:0.15.0")
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

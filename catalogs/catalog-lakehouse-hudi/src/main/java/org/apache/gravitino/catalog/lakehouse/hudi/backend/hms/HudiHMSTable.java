@@ -65,12 +65,12 @@ public class HudiHMSTable extends HudiTable<Table> {
       columns = HiveTableConverter.getColumns(hmsTable, HudiColumn.builder());
       partitioning = HiveTableConverter.getPartitioning(hmsTable);
 
-      // should be always SortOrders.NONE since Hudi using clustering to sort data (see
+      // Should always be SortOrders.NONE since Hudi using clustering to sort data (see
       // https://hudi.apache.org/docs/next/clustering/)
       // but is run as a background table service
       sortOrders = HiveTableConverter.getSortOrders(hmsTable);
 
-      // should be always Distributions.NONE since Hudi doesn't support distribution
+      // Should always be Distributions.NONE since Hudi doesn't support distribution
       distribution = HiveTableConverter.getDistribution(hmsTable);
       auditInfo = HiveTableConverter.getAuditInfo(hmsTable);
 

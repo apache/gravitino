@@ -58,6 +58,9 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
   // Mapping from Gravitino config to Hive config
   private static final Map<String, String> CONFIG_CONVERTER =
       ImmutableMap.of(URI, HiveConf.ConfVars.METASTOREURIS.varname);
+
+  private static final String HUDI_PACKAGE_PREFIX = "org.apache.hudi";
+
   @VisibleForTesting CachedClientPool clientPool;
 
   @Override
@@ -136,10 +139,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
           c -> {
             List<String> allTables = c.getAllTables(schemaIdent.name());
             return c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
-                .filter(
-                    t ->
-                        t.getSd().getInputFormat() != null
-                            && t.getSd().getInputFormat().startsWith("org.apache.hudi"))
+                .filter(this::checkHudiTable)
                 .map(t -> NameIdentifier.of(namespace, t.getTableName()))
                 .toArray(NameIdentifier[]::new);
           });
@@ -164,6 +164,10 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
     try {
       Table table =
           clientPool.run(client -> client.getTable(schemaIdent.name(), tableIdent.name()));
+      if (!checkHudiTable(table)) {
+        throw new NoSuchTableException(
+            "Table %s is not a Hudi table in Hive Metastore", tableIdent.name());
+      }
       return HudiHMSTable.builder().withBackendTable(table).build();
 
     } catch (NoSuchObjectException e) {
@@ -210,6 +214,15 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
       clientPool.close();
       clientPool = null;
     }
+  }
+
+  private boolean checkHudiTable(Table table) {
+    // here uses the input format to filter out non-Hudi tables, the COW table
+    // uses `org.apache.hudi.hadoop.HoodieParquetInputFormat` and MOR table
+    // uses `org.apache.hudi.hadoop.HoodieParquetRealtimeInputFormat`, to
+    // simplify the logic, we just check the prefix of the input format
+    return table.getSd().getInputFormat() != null
+        && table.getSd().getInputFormat().startsWith(HUDI_PACKAGE_PREFIX);
   }
 
   private HiveConf buildHiveConf(Map<String, String> properties) {
