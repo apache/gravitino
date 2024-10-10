@@ -111,6 +111,7 @@ if ! is_dry_run; then
   rm -fr gravitino
 else
   cd ..
+  rm -rf gravitino-tag
   mv gravitino gravitino-tag
   echo "Clone with version changes and tag available as gravitino-tag in the output directory."
 fi
