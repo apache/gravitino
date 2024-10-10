@@ -28,6 +28,7 @@ import org.apache.commons.lang.ArrayUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.AbstractIT;
@@ -124,6 +125,13 @@ public class CatalogIT extends AbstractIT {
             catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
     Assertions.assertTrue(metalake.catalogExists(catalogName));
     Assertions.assertEquals(catalogName, catalog.name());
+
+    Assertions.assertThrows(
+        CatalogAlreadyExistsException.class,
+        () ->
+            metalake.createCatalog(
+                catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties));
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     Assertions.assertTrue(metalake.dropCatalog(catalogName), "catalog should be dropped");
     Assertions.assertFalse(metalake.dropCatalog(catalogName), "catalog should be non-existent");
