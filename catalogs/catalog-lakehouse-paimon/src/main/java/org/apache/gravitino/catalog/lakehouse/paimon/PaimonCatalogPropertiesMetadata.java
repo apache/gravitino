@@ -33,6 +33,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.authentication.Authenticati
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.storage.PaimonOSSFileSystemConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.storage.PaimonS3FileSystemConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
@@ -57,7 +58,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
       ImmutableMap.of(GRAVITINO_CATALOG_BACKEND, PAIMON_METASTORE, WAREHOUSE, WAREHOUSE, URI, URI);
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
-  private static final Map<String, String> KERBEROS_CONFIGURATION =
+  public static final Map<String, String> KERBEROS_CONFIGURATION =
       ImmutableMap.of(
           KerberosConfig.PRINCIPAL_KEY,
           KerberosConfig.PRINCIPAL_KEY,
@@ -119,26 +120,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
     return PROPERTIES_METADATA;
   }
 
-  protected Map<String, String> transformProperties(Map<String, String> properties) {
-    Map<String, String> gravitinoConfig = Maps.newHashMap();
-    properties.forEach(
-        (key, value) -> {
-          if (GRAVITINO_CONFIG_TO_PAIMON.containsKey(key)) {
-            gravitinoConfig.put(GRAVITINO_CONFIG_TO_PAIMON.get(key), value);
-          }
-
-          if (KERBEROS_CONFIGURATION.containsKey(key)) {
-            gravitinoConfig.put(KERBEROS_CONFIGURATION.get(key), value);
-          }
-
-          if (S3_CONFIGURATION.containsKey(key)) {
-            gravitinoConfig.put(S3_CONFIGURATION.get(key), value);
-          }
-
-          if (OSS_CONFIGURATION.containsKey(key)) {
-            gravitinoConfig.put(OSS_CONFIGURATION.get(key), value);
-          }
-        });
-    return gravitinoConfig;
+  Map<String, String> transformProperties(Map<String, String> properties) {
+    return CatalogUtils.toInnerProperty(properties, false);
   }
 }
