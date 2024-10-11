@@ -66,7 +66,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
       throw new IllegalArgumentException("The HDFS file system implementation class is not found.");
     }
 
-    return FileSystem.get(uri, configuration);
+    return FileSystem.newInstance(uri, configuration);
   }
 
   @Override

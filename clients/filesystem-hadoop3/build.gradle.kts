@@ -26,6 +26,10 @@ plugins {
 dependencies {
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly(libs.hadoop3.common)
+  implementation(project(":catalogs:catalog-hadoop")) {
+    exclude(group = "*")
+  }
+
   implementation(libs.caffeine)
 
   testImplementation(project(":api"))
@@ -69,6 +73,11 @@ dependencies {
 
 tasks.build {
   dependsOn("javadoc")
+}
+
+tasks.compileJava {
+  dependsOn(":catalogs:catalog-hadoop:jar")
+  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
 }
 
 tasks.test {

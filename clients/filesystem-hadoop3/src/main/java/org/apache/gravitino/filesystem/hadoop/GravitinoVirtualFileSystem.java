@@ -41,6 +41,9 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
+import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
@@ -81,6 +84,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private static final Pattern IDENTIFIER_PATTERN =
       Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$");
   private static final String SLASH = "/";
+  private static final Map<String, FileSystemProvider> FILE_SYSTEM_PROVIDERS = Maps.newHashMap();
+  private static final String GRAVITINO_BYPASS_PREFIX = "gravitino.bypass.";
+
+  static {
+    // Register the default FileSystemProvider
+    FILE_SYSTEM_PROVIDERS.put("file", new LocalFileSystemProvider());
+    FILE_SYSTEM_PROVIDERS.put("hdfs", new HDFSFileSystemProvider());
+  }
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
@@ -125,11 +136,31 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
     initializeClient(configuration);
 
+    initializePluginFileSystem(configuration);
+
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
 
     setConf(configuration);
     super.initialize(uri, getConf());
+  }
+
+  private void initializePluginFileSystem(Configuration configuration) {
+    String fileSystemProviders = configuration.get("fs.gvfs.filesystem.providers");
+    if (StringUtils.isNotBlank(fileSystemProviders)) {
+      String[] providers = fileSystemProviders.split(",");
+      for (String provider : providers) {
+        try {
+          FileSystemProvider fileSystemProvider =
+              (FileSystemProvider)
+                  Class.forName(provider.trim()).getDeclaredConstructor().newInstance();
+          FILE_SYSTEM_PROVIDERS.put(fileSystemProvider.getScheme(), fileSystemProvider);
+        } catch (Exception e) {
+          throw new GravitinoRuntimeException(
+              e, "Failed to initialize file system provider: %s", provider);
+        }
+      }
+    }
   }
 
   @VisibleForTesting
@@ -351,7 +382,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     Preconditions.checkArgument(
         filesetCatalog != null, String.format("Loaded fileset catalog: %s is null.", catalogIdent));
 
-    // set the thread local audit info
     Map<String, String> contextMap = Maps.newHashMap();
     contextMap.put(
         FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
@@ -374,7 +404,15 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             scheme,
             str -> {
               try {
-                return FileSystem.newInstance(uri, getConf());
+                Map<String, String> maps = getConfigMap(getConf(), uri);
+                FileSystemProvider provider = FILE_SYSTEM_PROVIDERS.get(scheme);
+                if (provider == null) {
+                  throw new GravitinoRuntimeException(
+                      "Unsupported file system scheme: %s for %s.",
+                      scheme, GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME);
+                }
+
+                return provider.getFileSystem(maps);
               } catch (IOException ioe) {
                 throw new GravitinoRuntimeException(
                     "Exception occurs when create new FileSystem for actual uri: %s, msg: %s",
@@ -383,6 +421,23 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             });
 
     return new FilesetContextPair(new Path(actualFileLocation), fs);
+  }
+
+  private Map<String, String> getConfigMap(Configuration configuration, URI uri) {
+    Map<String, String> maps = Maps.newHashMap();
+    configuration.forEach(
+        entry -> {
+          String key = entry.getKey();
+          if (key.startsWith(GRAVITINO_BYPASS_PREFIX)) {
+            maps.put(key.substring(GRAVITINO_BYPASS_PREFIX.length()), entry.getValue());
+          } else if (!key.startsWith("fs.gvfs.")) {
+            maps.put(key, entry.getValue());
+          }
+        });
+
+    maps.put(FS_DEFAULT_NAME_KEY, uri.toString());
+
+    return maps;
   }
 
   private String getSubPathFromVirtualPath(NameIdentifier identifier, String virtualPathString) {

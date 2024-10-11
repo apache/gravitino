@@ -34,7 +34,7 @@ public class LocalFileSystemProvider implements FileSystemProvider {
     Configuration configuration = new Configuration();
     config.forEach(configuration::set);
     config.put(DEFAULT_FS, LOCAL_FILE_PATH);
-    return FileSystem.get(configuration);
+    return FileSystem.newInstance(configuration);
   }
 
   @Override
