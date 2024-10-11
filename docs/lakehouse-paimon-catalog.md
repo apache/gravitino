@@ -30,16 +30,19 @@ Builds with Apache Paimon `0.8.0`.
 
 ### Catalog properties
 
-| Property name                                      | Description                                                                                                                                                                                                 | Default value          | Required                                                        | Since Version |
-|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-----------------------------------------------------------------|---------------|
-| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Only supports `filesystem` now.                                                                                                                                | (none)                 | Yes                                                             | 0.6.0         |
-| `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                 | required if the value of `catalog-backend` is not `filesystem`. | 0.6.0         |
-| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs or `hdfs://namespace/hdfs/path` for HDFS.                                                                                | (none)                 | Yes                                                             | 0.6.0         |
-| `authentication.type`                              | The type of authentication for Paimon catalog backend, currently Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`               | No                                                              | 0.6.0         |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)                 | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)                 | required if the value of `authentication.type` is Kerberos.     | 0.6.0         |
-| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60                     | No                                                              | 0.6.0         |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60                     | No                                                              | 0.6.0         |
+| Property name                                      | Description                                                                                                                                                                                                 | Default value | Required                                                        | Since Version    |
+|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------------------------------------------------------------|------------------|
+| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Only supports `filesystem` now.                                                                                                                                | (none)        | Yes                                                             | 0.6.0-incubating |
+| `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)        | required if the value of `catalog-backend` is not `filesystem`. | 0.6.0-incubating |
+| `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS or `s3://{bucket-name}/path/` for S3                                              | (none)        | Yes                                                             | 0.6.0-incubating |
+| `authentication.type`                              | The type of authentication for Paimon catalog backend, currently Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`      | No                                                              | 0.6.0-incubating |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)        | required if the value of `authentication.type` is Kerberos.     | 0.6.0-incubating |
+| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)        | required if the value of `authentication.type` is Kerberos.     | 0.6.0-incubating |
+| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60            | No                                                              | 0.6.0-incubating |
+| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                  | 60            | No                                                              | 0.6.0-incubating |
+| `s3-endpoint`                                      | The endpoint of the AWS s3.                                                                                                                                                                                 | (none)        | required if the value of `warehouse` is a S3 path               | 0.7.0-incubating |
+| `s3-access-key-id`                                 | The access key of the AWS s3.                                                                                                                                                                               | (none)        | required if the value of `warehouse` is a S3 path               | 0.7.0-incubating |
+| `s3-secret-access-key`                             | The secret key of the AWS s3.                                                                                                                                                                               | (none)        | required if the value of `warehouse` is a S3 path               | 0.7.0-incubating |
 
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
@@ -85,7 +88,7 @@ Gravitino Paimon Catalog does not support dropTable, because the dropTable in Pa
 Paimon does not support auto increment column.
 :::
 
-#### Table changes
+### Table changes
 
 - RenameTable
 - AddColumn
@@ -99,7 +102,7 @@ Paimon does not support auto increment column.
 - SetProperty
 - RemoveProperty
 
-#### Table partitions
+### Table partitions
 
 - Only supports Identity partitions, such as `day`, `hour`, etc.
 
