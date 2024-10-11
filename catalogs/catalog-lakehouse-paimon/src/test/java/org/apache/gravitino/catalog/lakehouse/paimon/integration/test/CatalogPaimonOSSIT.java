@@ -21,30 +21,29 @@ package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
-import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.gravitino.storage.S3Properties;
+import org.apache.gravitino.storage.OSSProperties;
 import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
-import org.testcontainers.containers.Container;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
+@Disabled(
+    "You need to specify the real OSS bucket name, access key, secret key and endpoint to run this test")
+public class CatalogPaimonOSSIT extends CatalogPaimonBaseIT {
 
-  private static final String S3_BUCKET_NAME = "my-test-bucket";
-  private static GravitinoLocalStackContainer localStackContainer;
-  private String accessKey;
-  private String secretKey;
-  private String endpoint;
+  private static final String OSS_BUCKET_NAME = "YOUR_BUCKET";
+  private static final String accessKey = "YOUR_ACCESS_KEY";
+  private static final String secretKey = "YOUR_SECRET_KEY";
+  private static final String endpoint = "OSS_ENDPOINT";
+  private static final String warehouse = "oss://" + OSS_BUCKET_NAME + "/paimon-test";
 
-  private static final String PAIMON_S3_JAR_URL =
-      "https://repo1.maven.org/maven2/org/apache/paimon/paimon-s3/0.8.0/paimon-s3-0.8.0.jar";
+  private static final String PAIMON_OSS_JAR_URL =
+      "https://repo1.maven.org/maven2/org/apache/paimon/paimon-oss/0.8.0/paimon-oss-0.8.0.jar";
 
   @Override
   protected Map<String, String> initPaimonCatalogProperties() {
@@ -54,56 +53,31 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
     catalogProperties.put("key2", "val2");
 
     TYPE = "filesystem";
-    WAREHOUSE = "s3://" + S3_BUCKET_NAME + "/";
 
-    accessKey = "accessKey";
-    secretKey = "secretKey";
-    endpoint = String.format("http://%s:%d", localStackContainer.getContainerIpAddress(), 4566);
-
+    WAREHOUSE = warehouse;
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
-    catalogProperties.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
-    catalogProperties.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
-    catalogProperties.put(S3Properties.GRAVITINO_S3_ENDPOINT, endpoint);
+    catalogProperties.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, accessKey);
+    catalogProperties.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, secretKey);
+    catalogProperties.put(OSSProperties.GRAVITINO_OSS_ENDPOINT, endpoint);
 
-    // Need to download the S3 dependency in the deploy mode.
-    downloadS3Dependency();
+    // Need to download the OSS dependency in the deploy mode.
+    downloadOSSDependency();
 
     return catalogProperties;
   }
 
-  private void downloadS3Dependency() {
+  private void downloadOSSDependency() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     try {
       if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
         String paimonCatalogPath =
             ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-paimon", "libs");
-        DownloaderUtils.downloadFile(PAIMON_S3_JAR_URL, paimonCatalogPath);
+        DownloaderUtils.downloadFile(PAIMON_OSS_JAR_URL, paimonCatalogPath);
       }
     } catch (Exception e) {
-      throw new RuntimeException("Failed to download the S3 dependency", e);
+      throw new RuntimeException("Failed to download the OSS dependency", e);
     }
-  }
-
-  @Override
-  protected void startNecessaryContainers() {
-    containerSuite.startLocalStackContainer();
-    localStackContainer = containerSuite.getLocalStackContainer();
-
-    Awaitility.await()
-        .atMost(60, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result =
-                    localStackContainer.executeInContainer(
-                        "awslocal", "s3", "mb", "s3://" + S3_BUCKET_NAME);
-                return result.getExitCode() == 0;
-              } catch (Exception e) {
-                return false;
-              }
-            });
   }
 
   protected void initSparkEnv() {
@@ -117,9 +91,9 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
             .config(
                 "spark.sql.extensions",
                 "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
-            .config("spark.sql.catalog.paimon.s3.access-key", accessKey)
-            .config("spark.sql.catalog.paimon.s3.secret-key", secretKey)
-            .config("spark.sql.catalog.paimon.s3.endpoint", endpoint)
+            .config("spark.sql.catalog.paimon.fs.oss.accessKeyId", accessKey)
+            .config("spark.sql.catalog.paimon.fs.oss.accessKeySecret", secretKey)
+            .config("spark.sql.catalog.paimon.fs.oss.endpoint", endpoint)
             .enableHiveSupport()
             .getOrCreate();
   }
