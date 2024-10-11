@@ -791,12 +791,19 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     if (path != null) {
       scheme = path.toUri().getScheme();
       if (scheme == null) {
-        scheme = LOCAL_FILE_SCHEMA;
+        // If the schema of the path is not set, we need to get the default FS from the
+        // configuration.
+        String defaultFS = config.get(DEFAULT_FS);
+        if (defaultFS == null) {
+          scheme = LOCAL_FILE_SCHEMA;
+        } else {
+          String schemaFromDefaultFS = new Path(defaultFS).toUri().getScheme();
+          scheme = schemaFromDefaultFS == null ? LOCAL_FILE_SCHEMA : schemaFromDefaultFS;
+        }
       }
       fsPath = path;
     } else {
-
-      String defaultFS = config.get(DEFAULT_FS);
+      String defaultFS = newConfig.get(DEFAULT_FS);
       if (defaultFS == null) {
         // Should be the local file system.
         scheme = LOCAL_FILE_SCHEMA;
@@ -812,7 +819,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     }
 
     // For any non-local file system, we need to explicitly set the default FS.
-    if (!LOCAL_FILE_SCHEMA.equals(scheme)) {
+    if (!LOCAL_FILE_SCHEMA.equals(scheme) && !newConfig.containsKey(DEFAULT_FS)) {
       newConfig.put(DEFAULT_FS, fsPath.toString());
     }
 
