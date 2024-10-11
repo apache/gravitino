@@ -38,6 +38,8 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    * The implementation class name of the {@link FileSystemProvider} to be used by the catalog.
    * Gravitino supports LocalFileSystem and HDFS by default. Users can implement their own by
    * extending {@link FileSystemProvider} and specify the class name here.
+   *
+   * <p>The value can be 'xxxx.yyy.FileSystemProvider1, xxxx.yyy.FileSystemProvider2'.
    */
   public static final String FILESYSTEM_PROVIDER = "filesystem.providers";
 
@@ -55,7 +57,7 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
               FILESYSTEM_PROVIDER,
               PropertyEntry.stringOptionalPropertyEntry(
                   FILESYSTEM_PROVIDER,
-                  "The file system provider class name",
+                  "The file system provider class name, separated by comma",
                   false /* immutable */,
                   null,
                   false /* hidden */))
