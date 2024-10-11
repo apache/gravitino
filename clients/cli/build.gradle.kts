@@ -26,9 +26,9 @@ dependencies {
   implementation(project(":clients:client-java"))
   implementation(project(":api"))
   implementation(project(":common"))
-  implementation("commons-cli:commons-cli:1.9.0")
-  implementation("org.slf4j:slf4j-api:2.0.16")
-  implementation("org.slf4j:slf4j-simple:2.0.16")
+  implementation(libs.slf4j.api)
+  implementation(libs.slf4j.simple)
+  implementation(libs.commons.cli)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
