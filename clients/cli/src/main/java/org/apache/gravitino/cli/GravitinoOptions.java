@@ -26,6 +26,7 @@ import org.apache.commons.cli.Options;
 public class GravitinoOptions {
   public static final String HELP = "help";
   public static final String VERSION = "version";
+  public static final String SERVER = "server";
   public static final String URL = "url";
   public static final String METALAKE = "metalake";
   public static final String CATALOG = "catalog";
@@ -50,7 +51,8 @@ public class GravitinoOptions {
 
     // Add options using helper method to avoid repetition
     options.addOption(createSimpleOption("h", HELP, "command help information"));
-    options.addOption(createSimpleOption("v", VERSION, "Gravitino version"));
+    options.addOption(createSimpleOption("v", VERSION, "Gravitino client version"));
+    options.addOption(createSimpleOption("r", SERVER, "Gravitino server version"));
     options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createArgOption("c", CATALOG, "catalog name"));

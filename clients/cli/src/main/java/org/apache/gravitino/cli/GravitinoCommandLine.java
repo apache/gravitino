@@ -24,6 +24,7 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.AllMetalakeDetails;
 import org.apache.gravitino.cli.commands.CatalogDetails;
+import org.apache.gravitino.cli.commands.ClientVersion;
 import org.apache.gravitino.cli.commands.ListCatalogs;
 import org.apache.gravitino.cli.commands.ListColumns;
 import org.apache.gravitino.cli.commands.ListMetalakes;
@@ -31,8 +32,8 @@ import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListTables;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.SchemaDetails;
+import org.apache.gravitino.cli.commands.ServerVersion;
 import org.apache.gravitino.cli.commands.TableDetails;
-import org.apache.gravitino.cli.commands.Version;
 
 /* Gravitino Command line */
 public class GravitinoCommandLine {
@@ -68,7 +69,9 @@ public class GravitinoCommandLine {
     }
     /* Display Gravitino version. */
     else if (line.hasOption(GravitinoOptions.VERSION)) {
-      new Version(getUrl()).handle();
+      new ClientVersion(getUrl()).handle();
+    } else if (line.hasOption(GravitinoOptions.SERVER)) {
+      new ServerVersion(getUrl()).handle();
     } else {
       executeCommand();
     }

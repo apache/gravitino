@@ -21,29 +21,28 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.client.GravitinoAdminClient;
 
-/** Displays the Gravitino server version. */
-public class Version extends Command {
+/** Displays the Gravitino client version. */
+public class ClientVersion extends Command {
 
   /**
-   * Displays the server version.
+   * Displays the client version.
    *
    * @param url The URL of the Gravitino server.
    */
-  public Version(String url) {
+  public ClientVersion(String url) {
     super(url);
   }
 
-  /** Displays the server version. */
+  /** Displays the client version. */
   public void handle() {
     String version = "unknown";
     try {
       GravitinoAdminClient client = buildAdminClient();
-      version = client.serverVersion().version();
+      version = client.clientVersion().version();
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
-
     System.out.println("Apache Gravitino " + version);
   }
 }
