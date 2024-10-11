@@ -20,23 +20,18 @@ package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
 import static org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType.HMS;
 
-import java.util.Map;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType;
+import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
-import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class HudiHMSBackend extends HudiCatalogBackend {
+public class TestHudiHMSBackend {
+  @Test
+  public void testInitialize() {
+    HudiCatalogBackend backend = new HudiHMSBackend();
+    backend.initialize(ImmutableMap.of());
 
-  public HudiHMSBackend() {
-    this(HMS, new HudiHMSBackendOps());
-  }
-
-  private HudiHMSBackend(BackendType backendType, HudiCatalogBackendOps catalogOps) {
-    super(backendType, catalogOps);
-  }
-
-  @Override
-  public void initialize(Map<String, String> properties) {
-    backendOps().initialize(properties);
+    Assertions.assertEquals(HMS, backend.type());
+    Assertions.assertInstanceOf(HudiHMSBackendOps.class, backend.backendOps());
   }
 }

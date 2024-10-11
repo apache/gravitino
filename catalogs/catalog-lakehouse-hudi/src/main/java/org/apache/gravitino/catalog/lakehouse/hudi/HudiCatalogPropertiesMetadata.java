@@ -18,14 +18,43 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi;
 
-import java.util.Collections;
+import static org.apache.gravitino.connector.PropertyEntry.enumImmutablePropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
+
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.hive.ClientPropertiesMetadata;
 
 public class HudiCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
+  public static final String CATALOG_BACKEND = "catalog-backend";
+  public static final String URI = "uri";
+  private static final ClientPropertiesMetadata CLIENT_PROPERTIES_METADATA =
+      new ClientPropertiesMetadata();
+
+  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
+      ImmutableMap.<String, PropertyEntry<?>>builder()
+          .put(
+              CATALOG_BACKEND,
+              enumImmutablePropertyEntry(
+                  CATALOG_BACKEND,
+                  "Hudi catalog type choose properties",
+                  true /* required */,
+                  BackendType.class,
+                  null /* defaultValue */,
+                  false /* hidden */,
+                  false /* reserved */))
+          .put(
+              URI,
+              stringRequiredPropertyEntry(
+                  URI, "Hudi catalog uri config", false /* immutable */, false /* hidden */))
+          .putAll(CLIENT_PROPERTIES_METADATA.propertyEntries())
+          .build();
+
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return Collections.emptyMap();
+    return PROPERTIES_METADATA;
   }
 }
