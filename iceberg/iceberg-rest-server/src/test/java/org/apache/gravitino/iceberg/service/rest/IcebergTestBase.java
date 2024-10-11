@@ -45,13 +45,27 @@ public class IcebergTestBase extends JerseyTest {
     return getIcebergClientBuilder(IcebergRestTestUtil.RENAME_TABLE_PATH, Optional.empty());
   }
 
+  public Invocation.Builder getRenameViewClientBuilder() {
+    return getIcebergClientBuilder(IcebergRestTestUtil.RENAME_VIEW_PATH, Optional.empty());
+  }
+
   public Invocation.Builder getTableClientBuilder() {
     return getTableClientBuilder(Optional.empty());
+  }
+
+  public Invocation.Builder getViewClientBuilder() {
+    return getViewClientBuilder(Optional.empty());
   }
 
   public Invocation.Builder getTableClientBuilder(Optional<String> name) {
     String path =
         Joiner.on("/").skipNulls().join(IcebergRestTestUtil.TABLE_PATH, name.orElseGet(() -> null));
+    return getIcebergClientBuilder(path, Optional.empty());
+  }
+
+  public Invocation.Builder getViewClientBuilder(Optional<String> name) {
+    String path =
+        Joiner.on("/").skipNulls().join(IcebergRestTestUtil.VIEW_PATH, name.orElseGet(() -> null));
     return getIcebergClientBuilder(path, Optional.empty());
   }
 

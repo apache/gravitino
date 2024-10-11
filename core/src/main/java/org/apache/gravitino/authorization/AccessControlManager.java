@@ -150,6 +150,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return roleManager.getRole(metalake, role);
   }
 
+  @Override
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
     return roleManager.deleteRole(metalake, role);
   }
@@ -163,5 +164,19 @@ public class AccessControlManager implements AccessControlDispatcher {
   public String[] listRoleNamesByObject(String metalake, MetadataObject object)
       throws NoSuchMetalakeException, NoSuchMetadataObjectException {
     return roleManager.listRoleNamesByObject(metalake, object);
+  }
+
+  @Override
+  public Role grantPrivilegeToRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetalakeException {
+    return permissionManager.grantPrivilegesToRole(metalake, role, object, privileges);
+  }
+
+  @Override
+  public Role revokePrivilegesFromRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetalakeException {
+    return permissionManager.revokePrivilegesFromRole(metalake, role, object, privileges);
   }
 }

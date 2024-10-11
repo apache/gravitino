@@ -22,7 +22,7 @@ info:
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
-  version: 0.4.0
+  version: 0.7.0-incubating-SNAPSHOT
   description: |
     Defines the specification for the first version of the Gravitino REST API.
 
@@ -64,6 +64,9 @@ paths:
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1tags"
+
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/roles:
+    $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1roles"
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags/{tag}:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1tags~1%7Btag%7D"
@@ -144,6 +147,12 @@ paths:
   /metalakes/{metalake}/permissions/groups/{group}/revoke:
     $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1groups~1%7Bgroup%7D~1revoke"
 
+  /metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectFullName}/grant:
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1roles~1%7Brole%7D~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1grant"
+
+  /metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectFullName}/revoke:
+    $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1roles~1%7Brole%7D~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1revoke"
+
 components:
 
   schemas:
@@ -208,8 +217,21 @@ components:
           type: string
           description: The name of the entity
 
-  responses:
+    NameListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        names:
+          type: array
+          items:
+            type: string
 
+  responses:
     EntityListResponse:
       description: A list of entities
       content:

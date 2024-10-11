@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.utils;
 
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.S3_CONFIGURATION;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_BACKEND;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_URI;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_WAREHOUSE;
@@ -26,6 +27,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
@@ -119,5 +121,13 @@ public class CatalogUtils {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");
     }
+  }
+
+  public static Map<String, String> toPaimonCatalogProperties(
+      Map<String, String> gravitinoProperties) {
+    Map<String, String> paimonProperties = new HashMap<>();
+    gravitinoProperties.forEach(
+        (key, value) -> paimonProperties.put(S3_CONFIGURATION.getOrDefault(key, key), value));
+    return paimonProperties;
   }
 }

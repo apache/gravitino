@@ -219,8 +219,16 @@ function init_java {
   if [ -z "$JAVA_HOME" ]; then
     error "JAVA_HOME is not set."
   fi
+  echo "JAVA_HOME is $JAVA_HOME"
+
+  if [ -x "${JAVA_HOME}/bin/javac" ]; then
+      JAVA_VERSION=$("${JAVA_HOME}/bin/javac" -version 2>&1 | cut -d " " -f 2)
+  else
+      error "javac not found in ${JAVA_HOME}/bin, please ensure you have a JDK installed."
+  fi
   JAVA_VERSION=$("${JAVA_HOME}"/bin/javac -version 2>&1 | cut -d " " -f 2)
   export JAVA_VERSION
+  echo "Java version is $JAVA_VERSION"
 }
 
 function init_gradle {

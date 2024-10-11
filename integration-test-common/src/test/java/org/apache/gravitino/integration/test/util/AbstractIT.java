@@ -145,18 +145,15 @@ public class AbstractIT {
       String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
       String icebergCatalogPath =
           ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
-      JdbcDriverDownloader.downloadJdbcDriver(
+      DownloaderUtils.downloadFile(DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
+      DownloaderUtils.downloadFile(
           DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
     } else {
       Path icebergLibsPath =
           Paths.get(gravitinoHome, "catalogs", "catalog-lakehouse-iceberg", "build", "libs");
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_MYSQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
+      DownloaderUtils.downloadFile(DOWNLOAD_MYSQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
 
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
+      DownloaderUtils.downloadFile(DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
     }
   }
 

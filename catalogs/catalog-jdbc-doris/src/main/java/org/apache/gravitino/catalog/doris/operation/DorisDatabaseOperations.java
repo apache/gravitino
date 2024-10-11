@@ -40,9 +40,6 @@ import org.apache.gravitino.meta.AuditInfo;
 public class DorisDatabaseOperations extends JdbcDatabaseOperations {
   public static final String COMMENT_KEY = "comment";
 
-  private static final Set<String> DORIS_SYSTEM_DATABASE_NAMES =
-      ImmutableSet.of("information_schema");
-
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
@@ -137,7 +134,12 @@ public class DorisDatabaseOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  protected boolean isSystemDatabase(String dbName) {
-    return DORIS_SYSTEM_DATABASE_NAMES.contains(dbName);
+  protected boolean supportSchemaComment() {
+    return true;
+  }
+
+  @Override
+  protected Set<String> createSysDatabaseNameSet() {
+    return ImmutableSet.of("information_schema");
   }
 }
