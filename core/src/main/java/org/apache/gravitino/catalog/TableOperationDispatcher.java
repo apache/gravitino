@@ -24,9 +24,16 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
+import com.google.common.base.Objects;
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -41,6 +48,7 @@ import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -107,14 +115,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       schemaDispatcher.loadSchema(schemaIdent);
 
       // Import the table.
-      TreeLockUtils.doWithTreeLock(
-          schemaIdent,
-          LockType.WRITE,
-          () -> {
-            importTable(ident);
-            return null;
-          });
+      table = TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
     }
+
+    // Update the column entities in Gravitino store if the columns are different from the ones
+    // fetching from the underlying source.
+    updateColumnsIfNecessaryWhenLoad(ident, table);
 
     return table;
   }
@@ -215,11 +221,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                               .map(c -> ((TableChange.RenameTable) c).getNewName())
                               .reduce((c1, c2) -> c2)
                               .orElse(tableEntity.name());
+                      // Update the columns
+                      Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
+                          updateColumnsIfNecessary(alteredTable, tableEntity);
 
                       return TableEntity.builder()
                           .withId(tableEntity.id())
                           .withName(newName)
                           .withNamespace(ident.namespace())
+                          .withColumns(columnsUpdateResult.getRight())
                           .withAuditInfo(
                               AuditInfo.builder()
                                   .withCreator(tableEntity.auditInfo().creator())
@@ -328,11 +338,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         : droppedFromCatalog;
   }
 
-  private void importTable(NameIdentifier identifier) {
+  private EntityCombinedTable importTable(NameIdentifier identifier) {
     EntityCombinedTable table = internalLoadTable(identifier);
 
     if (table.imported()) {
-      return;
+      return table;
     }
 
     StringIdentifier stringId = null;
@@ -348,8 +358,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       // of external system to correct it.
       LOG.warn(
           "The Table uid {} existed but still need to be imported, this could be happened "
-              + "when Table is renamed by external systems not controlled by Gravitino. In this case, "
-              + "we need to overwrite the stored entity to keep the consistency.",
+              + "when Table is renamed by external systems not controlled by Gravitino. In this "
+              + "case, we need to overwrite the stored entity to keep the consistency.",
           stringId);
       uid = stringId.id();
     } else {
@@ -357,18 +367,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       uid = idGenerator.nextId();
     }
 
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator(table.auditInfo().creator())
+            .withCreateTime(table.auditInfo().createTime())
+            .withLastModifier(table.auditInfo().lastModifier())
+            .withLastModifiedTime(table.auditInfo().lastModifiedTime())
+            .build();
+    List<ColumnEntity> columnEntityList =
+        toColumnEntities(table.tableFromCatalog().columns(), audit);
     TableEntity tableEntity =
         TableEntity.builder()
             .withId(uid)
             .withName(identifier.name())
             .withNamespace(identifier.namespace())
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(table.auditInfo().creator())
-                    .withCreateTime(table.auditInfo().createTime())
-                    .withLastModifier(table.auditInfo().lastModifier())
-                    .withLastModifiedTime(table.auditInfo().lastModifiedTime())
-                    .build())
+            .withColumns(columnEntityList)
+            .withAuditInfo(audit)
             .build();
     try {
       store.put(tableEntity, true);
@@ -376,6 +390,13 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import the table entity to the store.", e);
     }
+
+    return EntityCombinedTable.of(table.tableFromCatalog(), tableEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(
+                getCatalogIdentifier(identifier),
+                HasPropertyMetadata::tablePropertiesMetadata,
+                table.tableFromCatalog().properties()));
   }
 
   private EntityCombinedTable internalLoadTable(NameIdentifier ident) {
@@ -465,16 +486,23 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             NoSuchSchemaException.class,
             TableAlreadyExistsException.class);
 
+    AuditInfo audit =
+        AuditInfo.builder()
+            .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+            .withCreateTime(Instant.now())
+            .build();
+    List<ColumnEntity> columnEntityList =
+        Arrays.stream(columns)
+            .map(c -> ColumnEntity.toColumnEntity(c, idGenerator.nextId(), audit))
+            .collect(Collectors.toList());
+
     TableEntity tableEntity =
         TableEntity.builder()
             .withId(uid)
             .withName(ident.name())
             .withNamespace(ident.namespace())
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                    .withCreateTime(Instant.now())
-                    .build())
+            .withColumns(columnEntityList)
+            .withAuditInfo(audit)
             .build();
 
     try {
@@ -491,5 +519,154 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 catalogIdent, HasPropertyMetadata::tablePropertiesMetadata, table.properties()));
+  }
+
+  private List<ColumnEntity> toColumnEntities(Column[] columns, AuditInfo audit) {
+    return columns == null
+        ? Collections.emptyList()
+        : Arrays.stream(columns)
+            .map(c -> ColumnEntity.toColumnEntity(c, idGenerator.nextId(), audit))
+            .collect(Collectors.toList());
+  }
+
+  private boolean isSameColumn(Column left, ColumnEntity right) {
+    return Objects.equal(left.name(), right.name())
+        && Objects.equal(left.dataType(), right.dataType())
+        && Objects.equal(left.comment(), right.comment())
+        && left.nullable() == right.nullable()
+        && left.autoIncrement() == right.autoIncrement()
+        && Objects.equal(left.defaultValue(), right.defaultValue());
+  }
+
+  private Pair<Boolean, List<ColumnEntity>> updateColumnsIfNecessary(
+      Table tableFromCatalog, TableEntity tableFromGravitino) {
+    if (tableFromCatalog == null || tableFromGravitino == null) {
+      LOG.warn(
+          "Cannot update columns for table when altering because table or table entity is "
+              + "null");
+      return Pair.of(false, Collections.emptyList());
+    }
+
+    Map<String, Column> columnsFromCatalogTable =
+        tableFromCatalog.columns() == null
+            ? Collections.emptyMap()
+            : Arrays.stream(tableFromCatalog.columns())
+                .collect(Collectors.toMap(Column::name, Function.identity()));
+    Map<String, ColumnEntity> columnsFromTableEntity =
+        tableFromGravitino.columns() == null
+            ? Collections.emptyMap()
+            : tableFromGravitino.columns().stream()
+                .collect(Collectors.toMap(ColumnEntity::name, Function.identity()));
+
+    // Check if columns need to be updated in Gravitino store
+    List<ColumnEntity> columnsToInsert = Lists.newArrayList();
+    boolean columnsNeedsUpdate = false;
+    for (Map.Entry<String, ColumnEntity> entry : columnsFromTableEntity.entrySet()) {
+      Column column = columnsFromCatalogTable.get(entry.getKey());
+      if (column == null) {
+        LOG.debug(
+            "Column {} is not found in the table from underlying source, it will be removed"
+                + " from the table entity",
+            entry.getKey());
+        columnsNeedsUpdate = true;
+
+      } else if (!isSameColumn(column, entry.getValue())) {
+        // If the column need to be updated, we create a new ColumnEntity with the same id
+        LOG.debug(
+            "Column {} is found in the table from underlying source, but it is different "
+                + "from the one in the table entity, it will be updated",
+            entry.getKey());
+
+        ColumnEntity updatedColumnEntity =
+            ColumnEntity.builder()
+                .withId(entry.getValue().id())
+                .withName(column.name())
+                .withDataType(column.dataType())
+                .withComment(column.comment())
+                .withNullable(column.nullable())
+                .withAutoIncrement(column.autoIncrement())
+                .withDefaultValue(column.defaultValue())
+                .withAuditInfo(
+                    AuditInfo.builder()
+                        .withCreator(entry.getValue().auditInfo().creator())
+                        .withCreateTime(entry.getValue().auditInfo().createTime())
+                        .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                        .withLastModifiedTime(Instant.now())
+                        .build())
+                .build();
+
+        columnsNeedsUpdate = true;
+        columnsToInsert.add(updatedColumnEntity);
+
+      } else {
+        // If the column is the same, we keep the original ColumnEntity
+        columnsToInsert.add(entry.getValue());
+      }
+    }
+
+    // Check if there are new columns in the table from the underlying source
+    for (Map.Entry<String, Column> entry : columnsFromCatalogTable.entrySet()) {
+      if (!columnsFromTableEntity.containsKey(entry.getKey())) {
+        LOG.debug(
+            "Column {} is found in the table from underlying source but not in the table "
+                + "entity, it will be added to the table entity",
+            entry.getKey());
+        ColumnEntity newColumnEntity =
+            ColumnEntity.toColumnEntity(
+                entry.getValue(),
+                idGenerator.nextId(),
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build());
+
+        columnsNeedsUpdate = true;
+        columnsToInsert.add(newColumnEntity);
+      }
+    }
+
+    return Pair.of(columnsNeedsUpdate, columnsToInsert);
+  }
+
+  private void updateColumnsIfNecessaryWhenLoad(
+      NameIdentifier tableIdent, EntityCombinedTable combinedTable) {
+    Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
+        updateColumnsIfNecessary(
+            combinedTable.tableFromCatalog(), combinedTable.tableFromGravitino());
+
+    // No need to update the columns
+    if (!columnsUpdateResult.getLeft()) {
+      return;
+    }
+
+    // Update the columns in the Gravitino store
+    TreeLockUtils.doWithTreeLock(
+        tableIdent,
+        LockType.WRITE,
+        () ->
+            operateOnEntity(
+                tableIdent,
+                id ->
+                    store.update(
+                        id,
+                        TableEntity.class,
+                        TABLE,
+                        entity ->
+                            TableEntity.builder()
+                                .withId(entity.id())
+                                .withName(entity.name())
+                                .withNamespace(entity.namespace())
+                                .withColumns(columnsUpdateResult.getRight())
+                                .withAuditInfo(
+                                    AuditInfo.builder()
+                                        .withCreator(entity.auditInfo().creator())
+                                        .withCreateTime(entity.auditInfo().createTime())
+                                        .withLastModifier(
+                                            PrincipalUtils.getCurrentPrincipal().getName())
+                                        .withLastModifiedTime(Instant.now())
+                                        .build())
+                                .build()),
+                "UPDATE",
+                combinedTable.tableFromGravitino().id()));
   }
 }
