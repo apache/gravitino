@@ -36,6 +36,7 @@ import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.TrinoITContainers;
 import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.TableCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
@@ -71,7 +72,7 @@ public class TrinoQueryITBase {
   private static AbstractIT abstractIT;
 
   private void setEnv() throws Exception {
-    abstractIT = new AbstractIT();
+    abstractIT = new BaseIT();
     if (autoStart) {
       abstractIT.startIntegrationTest();
       gravitinoClient = abstractIT.getGravitinoClient();

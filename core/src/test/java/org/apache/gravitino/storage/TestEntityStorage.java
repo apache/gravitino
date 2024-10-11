@@ -66,6 +66,7 @@ import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -125,7 +126,7 @@ public class TestEntityStorage {
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(DB_DIR);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
-    AbstractIT abstractIT = new AbstractIT();
+    AbstractIT abstractIT = new BaseIT();
 
     try {
       if (type.equalsIgnoreCase("h2")) {

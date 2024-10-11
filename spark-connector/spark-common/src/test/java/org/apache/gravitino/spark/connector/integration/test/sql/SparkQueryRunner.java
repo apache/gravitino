@@ -37,6 +37,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
@@ -84,7 +85,7 @@ public class SparkQueryRunner {
     }
     initSparkEnv();
 
-    abstractIT = new AbstractIT();
+    abstractIT = new BaseIT();
     catalogs.put(CatalogType.HIVE, HIVE_CATALOG_NAME);
     catalogs.put(CatalogType.ICEBERG, ICEBERG_CATALOG_NAME);
     catalogs.put(CatalogType.UNKNOWN, HIVE_CATALOG_NAME);
