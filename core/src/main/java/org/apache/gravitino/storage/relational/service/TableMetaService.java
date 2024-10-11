@@ -180,7 +180,7 @@ public class TableMetaService {
                       TableMetaMapper.class,
                       mapper -> mapper.updateTableMeta(newTablePO, oldTablePO))),
           () -> {
-            if (isColumnChanged) {
+            if (updateResult.get() > 0 && isColumnChanged) {
               TableColumnMetaService.getInstance()
                   .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
             }
@@ -216,13 +216,20 @@ public class TableMetaService {
                 SessionUtils.doWithCommitAndFetchResult(
                     TableMetaMapper.class,
                     mapper -> mapper.softDeleteTableMetasByTableId(tableId))),
-        () ->
+        () -> {
+          if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        tableId, MetadataObject.Type.TABLE.name())),
-        () -> TableColumnMetaService.getInstance().deleteColumnsByTableId(tableId));
+                        tableId, MetadataObject.Type.TABLE.name()));
+          }
+        },
+        () -> {
+          if (deleteResult.get() > 0) {
+            TableColumnMetaService.getInstance().deleteColumnsByTableId(tableId);
+          }
+        });
 
     return deleteResult.get() > 0;
   }
