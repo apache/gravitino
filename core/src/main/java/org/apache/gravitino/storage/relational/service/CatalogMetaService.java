@@ -222,10 +222,6 @@ public class CatalogMetaService {
                   mapper -> mapper.softDeleteFilesetMetasByCatalogId(catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
-                  FilesetMetaMapper.class,
-                  mapper -> mapper.softDeleteFilesetMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
                   FilesetVersionMapper.class,
                   mapper -> mapper.softDeleteFilesetVersionsByCatalogId(catalogId)),
           () ->
