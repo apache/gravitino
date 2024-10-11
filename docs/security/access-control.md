@@ -662,7 +662,7 @@ MetadataObject table = ...
 Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 ```
 </TabItem>
-<Tabs>
+</Tabs>
 
 ### Revoke privileges from a role
 

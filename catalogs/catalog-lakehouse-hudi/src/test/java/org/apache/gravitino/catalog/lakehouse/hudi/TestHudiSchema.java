@@ -16,27 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
+package org.apache.gravitino.catalog.lakehouse.hudi;
 
-import static org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType.HMS;
+public class TestHudiSchema extends HudiSchema<TestHudiSchema> {
 
-import java.util.Map;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType;
-import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
-import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
-
-public class HudiHMSBackend extends HudiCatalogBackend {
-
-  public HudiHMSBackend() {
-    this(HMS, new HudiHMSBackendOps());
-  }
-
-  private HudiHMSBackend(BackendType backendType, HudiCatalogBackendOps catalogOps) {
-    super(backendType, catalogOps);
+  public static Builder builder() {
+    return new Builder();
   }
 
   @Override
-  public void initialize(Map<String, String> properties) {
-    backendOps().initialize(properties);
+  public TestHudiSchema fromHudiSchema() {
+    return this;
+  }
+
+  public static class Builder extends HudiSchema.Builder<TestHudiSchema> {
+
+    @Override
+    protected TestHudiSchema simpleBuild() {
+      TestHudiSchema schema = new TestHudiSchema();
+      schema.name = name;
+      schema.comment = comment;
+      schema.properties = properties;
+      schema.auditInfo = auditInfo;
+      return schema;
+    }
+
+    @Override
+    protected HudiSchema<TestHudiSchema> buildFromSchema(TestHudiSchema schema) {
+      return simpleBuild();
+    }
   }
 }

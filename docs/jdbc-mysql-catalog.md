@@ -87,30 +87,30 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 #### Table column types
 
-| Gravitino Type   | MySQL Type          |
-|------------------|---------------------|
-| `Byte`           | `Tinyint`           |
-| `Byte(false)`    | `Tinyint Unsigned`  |
-| `Short`          | `Smallint`          |
-| `Short(false)`   | `Smallint Unsigned` |
-| `Integer`        | `Int`               |
-| `Integer(false)` | `Int Unsigned`      |
-| `Long`           | `Bigint`            |
-| `Long(false)`    | `Bigint Unsigned`   | 
-| `Float`          | `Float`             |
-| `Double`         | `Double`            |
-| `String`         | `Text`              |
-| `Date`           | `Date`              |
-| `Time`           | `Time`              |
-| `Timestamp`      | `Timestamp`         |
-| `Decimal`        | `Decimal`           |
-| `VarChar`        | `VarChar`           |
-| `FixedChar`      | `FixedChar`         |
-| `Binary`         | `Binary`            |
+| Gravitino Type     | MySQL Type          |
+|--------------------|---------------------|
+| `Byte`             | `Tinyint`           |
+| `Unsigned Byte`    | `Tinyint Unsigned`  |
+| `Short`            | `Smallint`          |
+| `Unsigned Short`   | `Smallint Unsigned` |
+| `Integer`          | `Int`               |
+| `Unsigned Integer` | `Int Unsigned`      |
+| `Long`             | `Bigint`            |
+| `Unsigned Long`    | `Bigint Unsigned`   | 
+| `Float`            | `Float`             |
+| `Double`           | `Double`            |
+| `String`           | `Text`              |
+| `Date`             | `Date`              |
+| `Time`             | `Time`              |
+| `Timestamp`        | `Timestamp`         |
+| `Decimal`          | `Decimal`           |
+| `VarChar`          | `VarChar`           |
+| `FixedChar`        | `FixedChar`         |
+| `Binary`           | `Binary`            |
 
 :::info
 MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
 #### Table column auto-increment

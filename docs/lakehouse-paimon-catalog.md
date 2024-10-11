@@ -95,7 +95,7 @@ Gravitino Paimon Catalog does not support dropTable, because the dropTable in Pa
 Paimon does not support auto increment column.
 :::
 
-#### Table changes
+### Table changes
 
 - RenameTable
 - AddColumn
@@ -109,7 +109,7 @@ Paimon does not support auto increment column.
 - SetProperty
 - RemoveProperty
 
-#### Table partitions
+### Table partitions
 
 - Only supports Identity partitions, such as `day`, `hour`, etc.
 

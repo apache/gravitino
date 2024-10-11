@@ -36,17 +36,25 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -58,6 +66,9 @@ import org.mockito.Mockito;
 
 class TestOwnerOperations extends JerseyTest {
   private static final OwnerManager manager = mock(OwnerManager.class);
+  private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
+  private static final AccessControlDispatcher accessControlDispatcher =
+      mock(AccessControlDispatcher.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
@@ -76,6 +87,10 @@ class TestOwnerOperations extends JerseyTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerManager", manager, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
   }
 
   @Override
@@ -116,6 +131,7 @@ class TestOwnerOperations extends JerseyTest {
         };
 
     when(manager.getOwner(any(), any())).thenReturn(Optional.of(owner));
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
 
     Response resp =
         target("/metalakes/metalake1/owners/metalake/metalake1")
@@ -172,10 +188,20 @@ class TestOwnerOperations extends JerseyTest {
 
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+
+    // Test to throw IllegalNamespaceException
+    Response resp4 =
+        target("/metalakes/metalake1/owners/catalog/metalake1.catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    ErrorResponse errorResponse3 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse3.getCode());
   }
 
   @Test
   void testSetOwnerForObject() {
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
     OwnerSetRequest request = new OwnerSetRequest("test", Owner.Type.USER);
     Response resp =
         target("/metalakes/metalake1/owners/metalake/metalake1")
@@ -216,5 +242,26 @@ class TestOwnerOperations extends JerseyTest {
 
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+
+    // Test to throw IllegalNamespaceException
+    Response resp4 =
+        target("/metalakes/metalake1/owners/catalog/metalake1.catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    ErrorResponse errorResponse3 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse3.getCode());
+  }
+
+  @Test
+  public void testRoleObject() {
+    MetadataObject role = MetadataObjects.of(null, "role", MetadataObject.Type.ROLE);
+    when(accessControlDispatcher.getRole(any(), any())).thenReturn(mock(Role.class));
+    Assertions.assertDoesNotThrow(() -> MetadataObjectUtil.checkMetadataObject("metalake", role));
+
+    doThrow(new NoSuchRoleException("test")).when(accessControlDispatcher).getRole(any(), any());
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> MetadataObjectUtil.checkMetadataObject("metalake", role));
   }
 }

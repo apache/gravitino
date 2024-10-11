@@ -18,7 +18,12 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms;
 
+import static org.apache.gravitino.catalog.lakehouse.hudi.HudiSchemaPropertiesMetadata.LOCATION;
+
+import com.google.common.collect.Maps;
+import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.hadoop.hive.metastore.api.Database;
 
 public class HudiHMSSchema extends HudiSchema<Database> {
@@ -39,7 +44,7 @@ public class HudiHMSSchema extends HudiSchema<Database> {
   public static class Builder extends HudiSchema.Builder<Database> {
 
     @Override
-    protected HudiSchema simpleBuild() {
+    protected HudiHMSSchema simpleBuild() {
       HudiHMSSchema schema = new HudiHMSSchema();
       schema.name = name;
       schema.comment = comment;
@@ -49,8 +54,17 @@ public class HudiHMSSchema extends HudiSchema<Database> {
     }
 
     @Override
-    protected HudiSchema buildFromSchema(Database schema) {
-      // todo: convert HMS database to HudiSchema
+    protected HudiHMSSchema buildFromSchema(Database database) {
+      name = database.getName();
+      comment = database.getDescription();
+
+      properties = Maps.newHashMap(database.getParameters());
+      properties.put(LOCATION, database.getLocationUri());
+
+      AuditInfo.Builder auditInfoBuilder = AuditInfo.builder();
+      Optional.ofNullable(database.getOwnerName()).ifPresent(auditInfoBuilder::withCreator);
+      auditInfo = auditInfoBuilder.build();
+
       return simpleBuild();
     }
   }
