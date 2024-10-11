@@ -21,8 +21,10 @@ package org.apache.gravitino.listener;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.PreEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,9 +70,36 @@ public class EventListenerPluginWrapper implements EventListenerPlugin {
       userEventListener.onPostEvent(event);
     } catch (Exception e) {
       LOG.warn(
-          "Event listener {} process event {} failed,",
+          "Event listener {} process post event {} failed,",
           listenerName,
           event.getClass().getSimpleName(),
+          e);
+    }
+  }
+
+  @Override
+  public void onPreEvent(PreEvent preEvent) {
+    try {
+      userEventListener.onPreEvent(preEvent);
+    } catch (ForbiddenException e) {
+      if (Mode.SYNC.equals(mode())) {
+        LOG.warn(
+            "Event listener {} process pre event {} failed, will skip the operation.",
+            listenerName,
+            preEvent.getClass().getSimpleName(),
+            e);
+        throw e;
+      }
+      LOG.warn(
+          "Event listener {} process pre event {} failed,",
+          listenerName,
+          preEvent.getClass().getSimpleName(),
+          e);
+    } catch (Exception e) {
+      LOG.warn(
+          "Event listener {} process pre event {} failed,",
+          listenerName,
+          preEvent.getClass().getSimpleName(),
           e);
     }
   }

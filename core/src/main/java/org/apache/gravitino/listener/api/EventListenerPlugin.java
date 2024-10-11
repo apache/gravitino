@@ -21,7 +21,9 @@ package org.apache.gravitino.listener.api;
 
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.PreEvent;
 
 /**
  * Defines an interface for event listeners that manage the lifecycle and state of a plugin,
@@ -95,17 +97,30 @@ public interface EventListenerPlugin {
   void stop() throws RuntimeException;
 
   /**
-   * Handles events generated after the completion of an operation. Implementers are responsible for
-   * processing these events, which may involve additional logic to respond to the operation
-   * outcomes.
+   * Handles events generated after the completion of an operation.
    *
-   * <p>This method provides a hook for post-operation event processing, allowing plugins to react
-   * or adapt based on the event details.
+   * <p>This method provides a hook for post-operation event processing, you couldn't change the
+   * resource in the event.
    *
-   * @param event The event to be processed.
-   * @throws RuntimeException Indicates issues encountered during event processing.
+   * @param postEvent The post event to be processed.
+   * @throws RuntimeException Indicates issues encountered during event processing, this has no
+   *     affect to the operation.
    */
-  void onPostEvent(Event event) throws RuntimeException;
+  default void onPostEvent(Event postEvent) throws RuntimeException {}
+
+  /**
+   * Handles pre events generated before the operation.
+   *
+   * <p>This method provides a hook for pre-operation event processing, any changes you make to the
+   * resources during the event will be reflected in the operations that follow the event listener
+   * is SYNC mode.
+   *
+   * @param preEvent The pre event to be processed.
+   * @throws ForbiddenException The operation will be skipped if and only if throwing {@code
+   *     org.apache.gravitino.exceptions.ForbiddenException} and the event listener is SYNC mode,
+   *     the exception will be ignored on other conditions.
+   */
+  default void onPreEvent(PreEvent preEvent) throws ForbiddenException {}
 
   /**
    * Specifies the default operational mode for event processing by the plugin. The default

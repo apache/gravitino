@@ -26,12 +26,14 @@ import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.PreEvent;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 
 public class DummyEventListener implements EventListenerPlugin {
   Map<String, String> properties;
-  @Getter LinkedList<Event> events = new LinkedList<>();
+  @Getter LinkedList<Event> postEvents = new LinkedList<>();
+  @Getter LinkedList<PreEvent> preEvents = new LinkedList<>();
 
   @Override
   public void init(Map<String, String> properties) {
@@ -46,7 +48,12 @@ public class DummyEventListener implements EventListenerPlugin {
 
   @Override
   public void onPostEvent(Event event) {
-    this.events.add(event);
+    postEvents.add(event);
+  }
+
+  @Override
+  public void onPreEvent(PreEvent preEvent) {
+    preEvents.add(preEvent);
   }
 
   @Override
@@ -55,8 +62,13 @@ public class DummyEventListener implements EventListenerPlugin {
   }
 
   public Event popEvent() {
-    Assertions.assertTrue(events.size() > 0, "No events to pop");
-    return events.removeLast();
+    Assertions.assertTrue(postEvents.size() > 0, "No events to pop");
+    return postEvents.removeLast();
+  }
+
+  public PreEvent popPreEvent() {
+    Assertions.assertTrue(preEvents.size() > 0, "No events to pop");
+    return preEvents.removeLast();
   }
 
   public static class DummyAsyncEventListener extends DummyEventListener {
@@ -64,8 +76,8 @@ public class DummyEventListener implements EventListenerPlugin {
       Awaitility.await()
           .atMost(20, TimeUnit.SECONDS)
           .pollInterval(10, TimeUnit.MILLISECONDS)
-          .until(() -> getEvents().size() > 0);
-      return getEvents();
+          .until(() -> getPostEvents().size() > 0);
+      return getPostEvents();
     }
 
     @Override

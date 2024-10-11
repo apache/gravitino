@@ -30,18 +30,28 @@ import org.apache.gravitino.listener.DummyEventListener.DummyAsyncEventListener;
 import org.apache.gravitino.listener.DummyEventListener.DummyAsyncIsolatedEventListener;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.PreEvent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestEventListenerManager {
-  static class DummyEvent extends Event {
-    protected DummyEvent(String user, NameIdentifier identifier) {
+  static class DummyPostEvent extends Event {
+    protected DummyPostEvent(String user, NameIdentifier identifier) {
       super(user, identifier);
     }
   }
 
-  private static final DummyEvent DUMMY_EVENT_INSTANCE =
-      new DummyEvent("user", NameIdentifier.of("a", "b"));
+  static class DummyPreEvent extends PreEvent {
+    protected DummyPreEvent(String user, NameIdentifier identifier) {
+      super(user, identifier);
+    }
+  }
+
+  private static final DummyPostEvent DUMMY_POST_EVENT_INSTANCE =
+      new DummyPostEvent("user", NameIdentifier.of("a", "b"));
+
+  private static final DummyPreEvent DUMMY_PRE_EVENT_INSTANCE =
+      new DummyPreEvent("user2", NameIdentifier.of("a2", "b2"));
 
   @Test
   void testSyncListener() {
@@ -54,9 +64,10 @@ public class TestEventListenerManager {
     eventListenerManager.start();
 
     EventBus eventBus = eventListenerManager.createEventBus();
-    eventBus.dispatchEvent(DUMMY_EVENT_INSTANCE);
 
-    List<EventListenerPlugin> listeners = eventBus.getPostEventListeners();
+    // test post event
+    eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
+    List<EventListenerPlugin> listeners = eventBus.getEventListeners();
     Assertions.assertEquals(2, listeners.size());
     Set<String> names =
         listeners.stream()
@@ -66,7 +77,29 @@ public class TestEventListenerManager {
                   EventListenerPluginWrapper wrapper = (EventListenerPluginWrapper) listener;
                   EventListenerPlugin userListener = wrapper.getUserEventListener();
                   Assertions.assertTrue(userListener instanceof DummyEventListener);
-                  checkEvents(((DummyEventListener) userListener).getEvents());
+                  checkPostEvents(((DummyEventListener) userListener).getPostEvents());
+                  Assertions.assertEquals(
+                      0, ((DummyEventListener) userListener).getPreEvents().size());
+                  return ((DummyEventListener) userListener).properties.get("name");
+                })
+            .collect(Collectors.toSet());
+    Assertions.assertEquals(ImmutableSet.of(sync1, sync2), names);
+
+    // test pre event
+    eventBus.dispatchEvent(DUMMY_PRE_EVENT_INSTANCE);
+    listeners = eventBus.getPreEventListeners();
+    Assertions.assertEquals(2, listeners.size());
+    names =
+        listeners.stream()
+            .map(
+                listener -> {
+                  Assertions.assertTrue(listener instanceof EventListenerPluginWrapper);
+                  EventListenerPluginWrapper wrapper = (EventListenerPluginWrapper) listener;
+                  EventListenerPlugin userListener = wrapper.getUserEventListener();
+                  Assertions.assertTrue(userListener instanceof DummyEventListener);
+                  checkPreEvents(((DummyEventListener) userListener).getPreEvents());
+                  Assertions.assertEquals(
+                      0, ((DummyEventListener) userListener).getPostEvents().size());
                   return ((DummyEventListener) userListener).properties.get("name");
                 })
             .collect(Collectors.toSet());
@@ -86,8 +119,8 @@ public class TestEventListenerManager {
     eventListenerManager.start();
 
     EventBus eventBus = eventListenerManager.createEventBus();
-    eventBus.dispatchEvent(DUMMY_EVENT_INSTANCE);
-    List<EventListenerPlugin> listeners = eventBus.getPostEventListeners();
+    eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
+    List<EventListenerPlugin> listeners = eventBus.getEventListeners();
 
     Assertions.assertEquals(1, listeners.size());
     Assertions.assertTrue(listeners.get(0) instanceof AsyncQueueListener);
@@ -102,7 +135,9 @@ public class TestEventListenerManager {
                   EventListenerPlugin userListener =
                       ((EventListenerPluginWrapper) shareQueueListener).getUserEventListener();
                   Assertions.assertTrue(userListener instanceof DummyAsyncEventListener);
-                  checkEvents(((DummyAsyncEventListener) userListener).tryGetEvents());
+                  checkPostEvents(((DummyAsyncEventListener) userListener).tryGetEvents());
+                  Assertions.assertEquals(
+                      0, ((DummyAsyncEventListener) userListener).getPreEvents().size());
                   return ((DummyAsyncEventListener) userListener).properties.get("name");
                 })
             .collect(Collectors.toSet());
@@ -122,8 +157,8 @@ public class TestEventListenerManager {
     eventListenerManager.start();
 
     EventBus eventBus = eventListenerManager.createEventBus();
-    eventBus.dispatchEvent(DUMMY_EVENT_INSTANCE);
-    List<EventListenerPlugin> listeners = eventBus.getPostEventListeners();
+    eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
+    List<EventListenerPlugin> listeners = eventBus.getEventListeners();
 
     Assertions.assertEquals(2, listeners.size());
     Set<String> isolatedListenerNames =
@@ -141,7 +176,9 @@ public class TestEventListenerManager {
                       ((EventListenerPluginWrapper) internalListeners.get(0))
                           .getUserEventListener();
                   Assertions.assertTrue(userListener instanceof DummyAsyncEventListener);
-                  checkEvents(((DummyAsyncEventListener) userListener).tryGetEvents());
+                  checkPostEvents(((DummyAsyncEventListener) userListener).tryGetEvents());
+                  Assertions.assertEquals(
+                      0, ((DummyAsyncEventListener) userListener).getPreEvents().size());
                   return ((DummyAsyncEventListener) userListener).properties.get("name");
                 })
             .collect(Collectors.toSet());
@@ -206,8 +243,15 @@ public class TestEventListenerManager {
     return config;
   }
 
-  private void checkEvents(List<Event> events) {
+  private void checkPostEvents(List<Event> events) {
     Assertions.assertEquals(1, events.size());
-    Assertions.assertEquals(DUMMY_EVENT_INSTANCE, events.get(0));
+    Assertions.assertEquals(DUMMY_POST_EVENT_INSTANCE, events.get(0));
+    events.clear();
+  }
+
+  private void checkPreEvents(List<PreEvent> events) {
+    Assertions.assertEquals(1, events.size());
+    Assertions.assertEquals(DUMMY_PRE_EVENT_INSTANCE, events.get(0));
+    events.clear();
   }
 }
