@@ -60,8 +60,6 @@ public class TestCommandEntities {
 
   @Test
   public void caseSensitive() {
-    assertFalse(
-        CommandEntities.isValidEntity("DETAILS".toUpperCase()),
-        "Entities should be case-sensitive");
+    assertFalse(CommandEntities.isValidEntity("METALAKE"), "Entities should be case-sensitive");
   }
 }

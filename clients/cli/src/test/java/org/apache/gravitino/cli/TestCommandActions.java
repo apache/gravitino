@@ -68,8 +68,6 @@ public class TestCommandActions {
 
   @Test
   public void caseSensitive() {
-    assertFalse(
-        CommandActions.isValidCommand("DETAILS".toUpperCase()),
-        "Commands should be case-sensitive");
+    assertFalse(CommandActions.isValidCommand("DETAILS"), "Commands should be case-sensitive");
   }
 }

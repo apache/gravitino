@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.MissingArgumentException;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.GravitinoOptions;
@@ -66,6 +67,16 @@ public class TestFulllName {
   @Test
   public void entityNotFound() throws Exception {
     String[] args = {};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+
+    String metalakeName = fullName.getMetalakeName();
+    assertNull(metalakeName);
+  }
+
+  @Test
+  public void justName() throws Exception, MissingArgumentException {
+    String[] args = {"--name"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
 
