@@ -79,6 +79,22 @@ public class TableColumnBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
+  public String softDeleteColumnsByCatalogId(@Param("catalogId") Long catalogId) {
+    return "UPDATE "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+  }
+
+  public String softDeleteColumnsBySchemaId(@Param("schemaId") Long schemaId) {
+    return "UPDATE "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+  }
+
   public String deleteColumnPOsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "

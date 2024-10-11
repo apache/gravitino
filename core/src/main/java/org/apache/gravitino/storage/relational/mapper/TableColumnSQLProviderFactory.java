@@ -73,4 +73,12 @@ public class TableColumnSQLProviderFactory {
   public static String softDeleteColumnsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteColumnsByMetalakeId(metalakeId);
   }
+
+  public static String softDeleteColumnsByCatalogId(@Param("catalogId") Long catalogId) {
+    return getProvider().softDeleteColumnsByCatalogId(catalogId);
+  }
+
+  public static String softDeleteColumnsBySchemaId(@Param("schemaId") Long schemaId) {
+    return getProvider().softDeleteColumnsBySchemaId(schemaId);
+  }
 }
