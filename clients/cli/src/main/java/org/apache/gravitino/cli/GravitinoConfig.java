@@ -66,4 +66,8 @@ public class GravitinoConfig {
   public String getMetalakeName() {
     return metalake;
   }
+
+  public String getConfigFile() {
+    return configFile;
+  }
 }
