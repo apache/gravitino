@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.GVFS_CONFIG_PREFIX;
+
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
@@ -88,9 +91,12 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private static final String GRAVITINO_BYPASS_PREFIX = "gravitino.bypass.";
 
   static {
-    // Register the default FileSystemProvider
-    FILE_SYSTEM_PROVIDERS.put("file", new LocalFileSystemProvider());
-    FILE_SYSTEM_PROVIDERS.put("hdfs", new HDFSFileSystemProvider());
+    // Register the default local and HDFS FileSystemProvider
+    FileSystemProvider localFileSystemProvider = new LocalFileSystemProvider();
+    FILE_SYSTEM_PROVIDERS.put(localFileSystemProvider.getScheme(), localFileSystemProvider);
+
+    FileSystemProvider hdfsFileSystemProvider = new HDFSFileSystemProvider();
+    FILE_SYSTEM_PROVIDERS.put(hdfsFileSystemProvider.getScheme(), hdfsFileSystemProvider);
   }
 
   @Override
@@ -136,7 +142,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
     initializeClient(configuration);
 
-    initializePluginFileSystem(configuration);
+    initializeFileSystemProviders(configuration);
 
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
@@ -145,8 +151,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     super.initialize(uri, getConf());
   }
 
-  private void initializePluginFileSystem(Configuration configuration) {
-    String fileSystemProviders = configuration.get("fs.gvfs.filesystem.providers");
+  private void initializeFileSystemProviders(Configuration configuration) {
+    String fileSystemProviders = configuration.get(FS_FILESYSTEM_PROVIDERS);
     if (StringUtils.isNotBlank(fileSystemProviders)) {
       String[] providers = fileSystemProviders.split(",");
       for (String provider : providers) {
@@ -430,7 +436,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
           String key = entry.getKey();
           if (key.startsWith(GRAVITINO_BYPASS_PREFIX)) {
             maps.put(key.substring(GRAVITINO_BYPASS_PREFIX.length()), entry.getValue());
-          } else if (!key.startsWith("fs.gvfs.")) {
+          } else if (!key.startsWith(GVFS_CONFIG_PREFIX)) {
             maps.put(key, entry.getValue());
           }
         });

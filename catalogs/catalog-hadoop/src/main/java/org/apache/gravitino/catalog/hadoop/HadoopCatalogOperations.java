@@ -74,13 +74,13 @@ import org.slf4j.LoggerFactory;
 
 public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
 
-  private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
-  private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
-  private static final String SLASH = "/";
   public static final String DEFAULT_FS = "fs.defaultFS";
   private static final String LOCAL_FILE_SCHEMA = "file";
   public static final String LOCAL_FILE_PATH = "file:///";
 
+  private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
+  private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
+  private static final String SLASH = "/";
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
   public static final Map<String, FileSystemProvider> FILE_SYSTEM_PROVIDERS = Maps.newHashMap();
 
@@ -123,7 +123,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   public Configuration getHadoopConf() {
-    return hadoopConf;
+    Configuration configuration = new Configuration();
+    bypassConfigs.forEach(configuration::set);
+    return configuration;
   }
 
   public Map<String, String> getConf() {
@@ -140,19 +142,15 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     // Initialize Hadoop Configuration.
     this.conf = config;
 
-    hadoopConf = new Configuration();
-    Map<String, String> bypassConfigs =
+    this.bypassConfigs =
         conf.entrySet().stream()
             .filter(e -> e.getKey().startsWith(CATALOG_BYPASS_PREFIX))
             .collect(
                 Collectors.toMap(
                     e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
                     Map.Entry::getValue));
-    bypassConfigs.forEach(hadoopConf::set);
 
-    this.bypassConfigs = bypassConfigs;
-
-    initPluginFileSystem(config);
+    initFileSystemProviders(config);
 
     String catalogLocation =
         (String)
@@ -165,12 +163,12 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             : Optional.empty();
   }
 
-  private void initPluginFileSystem(Map<String, String> config) {
+  private void initFileSystemProviders(Map<String, String> config) {
     String fileSystemProviders =
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDER);
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
 
     if (StringUtils.isNotBlank(fileSystemProviders)) {
       String[] providers = fileSystemProviders.split(",");

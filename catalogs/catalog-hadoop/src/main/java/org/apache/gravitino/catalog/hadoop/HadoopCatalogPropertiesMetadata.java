@@ -41,7 +41,7 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    *
    * <p>The value can be 'xxxx.yyy.FileSystemProvider1, xxxx.yyy.FileSystemProvider2'.
    */
-  public static final String FILESYSTEM_PROVIDER = "filesystem.providers";
+  public static final String FILESYSTEM_PROVIDERS = "filesystem-providers";
 
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -54,9 +54,9 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   null,
                   false /* hidden */))
           .put(
-              FILESYSTEM_PROVIDER,
+              FILESYSTEM_PROVIDERS,
               PropertyEntry.stringOptionalPropertyEntry(
-                  FILESYSTEM_PROVIDER,
+                  FILESYSTEM_PROVIDERS,
                   "The file system provider class name, separated by comma",
                   false /* immutable */,
                   null,
