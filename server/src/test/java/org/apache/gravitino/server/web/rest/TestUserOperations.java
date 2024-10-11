@@ -43,7 +43,9 @@ import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -293,5 +295,104 @@ public class TestUserOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testListUsernames() {
+    when(manager.listUserNames(any())).thenReturn(new String[] {"user"});
+
+    Response resp =
+        target("/metalakes/metalake1/users/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    NameListResponse listResponse = resp.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, listResponse.getCode());
+
+    Assertions.assertEquals(1, listResponse.getNames().length);
+    Assertions.assertEquals("user", listResponse.getNames()[0]);
+
+    // Test to throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listUserNames(any());
+    Response resp1 =
+        target("/metalakes/metalake1/users/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw internal RuntimeException
+    doThrow(new RuntimeException("mock error")).when(manager).listUserNames(any());
+    Response resp3 =
+        target("/metalakes/metalake1/users")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testListUsers() {
+    User user = buildUser("user");
+    when(manager.listUsers(any())).thenReturn(new User[] {user});
+
+    Response resp =
+        target("/metalakes/metalake1/users/")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    UserListResponse listResponse = resp.readEntity(UserListResponse.class);
+    Assertions.assertEquals(0, listResponse.getCode());
+
+    Assertions.assertEquals(1, listResponse.getUsers().length);
+    Assertions.assertEquals(user.name(), listResponse.getUsers()[0].name());
+    Assertions.assertEquals(user.roles(), listResponse.getUsers()[0].roles());
+
+    // Test to throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listUsers(any());
+    Response resp1 =
+        target("/metalakes/metalake1/users/")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+
+    ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw internal RuntimeException
+    doThrow(new RuntimeException("mock error")).when(manager).listUsers(any());
+    Response resp3 =
+        target("/metalakes/metalake1/users")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
 }

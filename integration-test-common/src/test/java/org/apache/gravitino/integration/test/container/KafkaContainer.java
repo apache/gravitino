@@ -22,13 +22,12 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.base.Preconditions;
 import java.net.Socket;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.logging.log4j.util.Strings;
 import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
@@ -152,14 +151,12 @@ public class KafkaContainer extends BaseContainer {
               .put("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
               .build();
 
-      ClassLoader classLoader = getClass().getClassLoader();
-      URL resource = classLoader.getResource("run");
+      String rootDir = System.getenv("GRAVITINO_ROOT_DIR");
+      Preconditions.checkArgument(rootDir != null, "GRAVITINO_ROOT_DIR is not set");
+      String initScript =
+          ITUtils.joinPath(rootDir, "integration-test-common", "docker-script/init/kafka/run");
       String filePath;
-      try {
-        filePath = Paths.get(resource.toURI()).toFile().getAbsolutePath();
-      } catch (URISyntaxException e) {
-        throw new RuntimeException("Could not find file", e);
-      }
+      filePath = Paths.get(initScript).toAbsolutePath().toString();
       this.filesToMount = ImmutableMap.of("/etc/kafka/docker/run", filePath);
     }
 

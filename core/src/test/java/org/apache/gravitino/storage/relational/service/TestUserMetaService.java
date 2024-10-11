@@ -27,6 +27,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
@@ -116,6 +117,77 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals(user2.name(), actualUser.name());
     Assertions.assertEquals(
         Sets.newHashSet(user2.roleNames()), Sets.newHashSet(actualUser.roleNames()));
+  }
+
+  @Test
+  void testListUsers() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    UserEntity user1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user1",
+            auditInfo);
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace("metalake"),
+            "role1",
+            auditInfo,
+            "catalog");
+    backend.insert(role1, false);
+
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace("metalake"),
+            "role2",
+            auditInfo,
+            "catalog");
+    backend.insert(role2, false);
+
+    UserEntity user2 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace("metalake"),
+            "user2",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+
+    backend.insert(user1, false);
+    backend.insert(user2, false);
+
+    UserMetaService userMetaService = UserMetaService.getInstance();
+    List<UserEntity> actualUsers =
+        userMetaService.listUsersByNamespace(
+            AuthorizationUtils.ofUserNamespace(metalakeName), true);
+    actualUsers.sort(Comparator.comparing(UserEntity::name));
+    List<UserEntity> expectUsers = Lists.newArrayList(user1, user2);
+    Assertions.assertEquals(expectUsers.size(), actualUsers.size());
+    for (int index = 0; index < expectUsers.size(); index++) {
+      Assertions.assertEquals(expectUsers.get(index).name(), actualUsers.get(index).name());
+      if (expectUsers.get(index).roleNames() == null) {
+        Assertions.assertNull(actualUsers.get(index).roleNames());
+      } else {
+        Assertions.assertEquals(
+            expectUsers.get(index).roleNames().size(), actualUsers.get(index).roleNames().size());
+        for (String roleName : expectUsers.get(index).roleNames()) {
+          Assertions.assertTrue(actualUsers.get(index).roleNames().contains(roleName));
+        }
+      }
+    }
   }
 
   @Test

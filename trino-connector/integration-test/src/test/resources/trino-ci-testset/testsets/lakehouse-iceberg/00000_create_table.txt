@@ -1,0 +1,89 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+"CREATE TABLE %.gt_db2.tb01 (
+   name varchar,
+   salary integer
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01'
+)"
+
+CREATE TABLE
+
+"CREATE TABLE %.gt_db2.tb02 (
+   name varchar,
+   salary integer
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb02',
+   partitioning = ARRAY['name'],
+   sorted_by = ARRAY['salary']
+)"
+
+<QUERY_FAILED> Field 'salary_wrong_name' not found in table
+
+CREATE TABLE
+
+"CREATE TABLE %.gt_db2.tb03 (
+   name varchar,
+   salary integer
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb03',
+   partitioning = ARRAY['name'],
+   sorted_by = ARRAY['name']
+)"
+
+CREATE TABLE
+
+"CREATE TABLE %.gt_db2.tb04 (
+   name varchar,
+   salary integer
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb04',
+   sorted_by = ARRAY['name']
+)"
+
+CREATE TABLE
+
+"CREATE TABLE %.gt_db2.tb05 (
+   name varchar,
+   salary integer
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb05',
+   partitioning = ARRAY['name']
+)"
+
+CREATE TABLE
+
+"CREATE TABLE %.gt_db2.tb06 (
+   name varchar,
+   salary integer
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/%/gt_db2/tb06'
+)"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

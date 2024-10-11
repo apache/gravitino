@@ -88,7 +88,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType) throws IOException {
+      Namespace namespace, Entity.EntityType entityType, boolean allFields) throws IOException {
     switch (entityType) {
       case METALAKE:
         return (List<E>) MetalakeMetaService.getInstance().listMetalakes();
@@ -104,6 +104,12 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>) TopicMetaService.getInstance().listTopicsByNamespace(namespace);
       case TAG:
         return (List<E>) TagMetaService.getInstance().listTagsByNamespace(namespace);
+      case USER:
+        return (List<E>) UserMetaService.getInstance().listUsersByNamespace(namespace, allFields);
+      case ROLE:
+        return (List<E>) RoleMetaService.getInstance().listRolesByNamespace(namespace);
+      case GROUP:
+        return (List<E>) GroupMetaService.getInstance().listGroupsByNamespace(namespace, allFields);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -170,6 +176,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) UserMetaService.getInstance().updateUser(ident, updater);
       case GROUP:
         return (E) GroupMetaService.getInstance().updateGroup(ident, updater);
+      case ROLE:
+        return (E) RoleMetaService.getInstance().updateRole(ident, updater);
       case TAG:
         return (E) TagMetaService.getInstance().updateTag(ident, updater);
       default:
@@ -365,9 +373,7 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType) {
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields) {
     switch (relType) {
       case OWNER_REL:
         List<E> list = Lists.newArrayList();
@@ -378,7 +384,7 @@ public class JDBCBackend implements RelationalBackend {
       case METADATA_OBJECT_ROLE_REL:
         return (List<E>)
             RoleMetaService.getInstance()
-                .listRolesByMetadataObjectIdentAndType(nameIdentifier, identType);
+                .listRolesByMetadataObjectIdentAndType(nameIdentifier, identType, allFields);
       case ROLE_GROUP_REL:
         if (identType == Entity.EntityType.ROLE) {
           return (List<E>) GroupMetaService.getInstance().listGroupsByRoleIdent(nameIdentifier);
@@ -417,9 +423,10 @@ public class JDBCBackend implements RelationalBackend {
     }
   }
 
-  enum JDBCBackendType {
+  public enum JDBCBackendType {
     H2(true),
-    MYSQL(false);
+    MYSQL(false),
+    POSTGRESQL(false);
 
     private final boolean embedded;
 
@@ -432,8 +439,23 @@ public class JDBCBackend implements RelationalBackend {
         return JDBCBackendType.H2;
       } else if (jdbcURI.startsWith("jdbc:mysql")) {
         return JDBCBackendType.MYSQL;
+      } else if (jdbcURI.startsWith("jdbc:postgresql")) {
+        return JDBCBackendType.POSTGRESQL;
       } else {
         throw new IllegalArgumentException("Unknown JDBC URI: " + jdbcURI);
+      }
+    }
+
+    public static JDBCBackendType fromString(String jdbcType) {
+      switch (jdbcType) {
+        case "h2":
+          return JDBCBackendType.H2;
+        case "mysql":
+          return JDBCBackendType.MYSQL;
+        case "postgresql":
+          return JDBCBackendType.POSTGRESQL;
+        default:
+          throw new IllegalArgumentException("Unknown JDBC type: " + jdbcType);
       }
     }
   }

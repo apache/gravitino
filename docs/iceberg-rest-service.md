@@ -14,21 +14,17 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 
 - Supports the Apache Iceberg REST API defined in Iceberg 1.5, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
   - token
-  - view
   - multi table transaction
   - pagination
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
-- Supports multi storage.
-  - HDFS
-  - S3
-  - OSS
+- Supports different storages like `S3`, `HDFS`, `OSS`, `GCS` and provides the capability to support other storages.
 - Supports OAuth2 and HTTPS.
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 
 ## Server management
 
 There are three deployment scenarios for Gravitino Iceberg REST server:
-- A standalone server with a standalone Gravitino Iceberg REST server package.
+- A standalone server in a standalone Gravitino Iceberg REST server package.
 - A standalone server in the Gravitino server package.
 - An auxiliary service embedded in the Gravitino server.
  
@@ -77,7 +73,6 @@ Please note that, it only takes affect in `gravitino.conf`, you don't need to sp
 | `gravitino.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                                                                                 | `131072`                                                                     | No       | 0.2.0         |
 | `gravitino.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                                                                                | `131072`                                                                     | No       | 0.2.0         |
 | `gravitino.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                                                                                     | (none)                                                                       | No       | 0.4.0         |
-
 
 The filter in `customFilters` should be a standard javax servlet filter.
 You can also specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
@@ -138,12 +133,42 @@ For other Iceberg OSS properties not managed by Gravitino like `client.security-
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the classpath of Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
 :::
 
+#### GCS
+
+Supports using google credential file to access GCS data.
+
+| Configuration item               | Description                                                                                        | Default value | Required | Since Version |
+|----------------------------------|----------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.io-impl` | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.gcp.gcs.GCSFileIO` for GCS. | (none)        | No       | 0.6.0         |
+
+For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.iceberg-rest.gcs.project-id`.
+
+Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino Iceberg REST server is started.
+
+:::info
+Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to the classpath of Gravitino Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
+:::
+
 #### HDFS configuration
 
 You should place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
 
 :::info
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
+:::
+
+#### Other storages
+
+For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.
+
+| Configuration item               | Description                                                                             | Default value | Required | Since Version |
+|----------------------------------|-----------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0         |
+
+To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.iceberg-rest.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
+
+:::info
+Please set the `gravitino.iceberg-rest.warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the classpath of Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
 :::
 
 ### Catalog backend configuration
@@ -187,6 +212,15 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 | `gravitino.iceberg-rest.catalog-backend-impl`  | The fully-qualified class name of a custom catalog implementation, only worked if `catalog-backend` is `custom`.    | (none)           | No       | 0.7.0         |
 
 If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a corresponding jar file to the classpath and load a custom Iceberg Catalog implementation by specifying the `catalog-backend-impl` property.
+
+#### View support
+
+You could access the view interface if using JDBC backend and enable `jdbc.schema-version` property.
+
+| Configuration item                              | Description                                                                                | Default value | Required | Since Version |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.jdbc.schema-version`    | The schema version of JDBC catalog backend, setting to `V1` if supporting view operations. | (none)        | NO       | 0.7.0         |
+
 
 #### Multi catalog support
 
@@ -275,6 +309,13 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 | `gravitino.iceberg-rest.metricsStoreRetainDays` | The days to retain Iceberg metrics in store, the value not greater than 0 means retain forever.                                     | -1            | No       | 0.4.0         |
 | `gravitino.iceberg-rest.metricsQueueCapacity`   | The size of queue to store metrics temporally before storing to the persistent storage. Metrics will be dropped when queue is full. | 1000          | No       | 0.4.0         |
 
+### Misc configurations
+
+| Configuration item                          | Description                                                  | Default value | Required | Since Version |
+|---------------------------------------------|--------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.extension-packages` | Comma-separated list of Iceberg REST API packages to expand. | (none)        | No       | 0.7.0         |
+
+
 ## Starting the Iceberg REST server
 
 To start as an auxiliary service with Gravitino server:
@@ -321,7 +362,9 @@ For example, we can configure Spark catalog options to use Gravitino Iceberg RES
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/
 ```
 
-You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in S3, you need to download [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) jar and place it in the classpath of Spark, no extra config is needed because S3 related properties is transferred from Iceberg REST server to Iceberg REST client automaticly. 
+You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in cloud, you need to download corresponding jars (please refer to the cloud storage part) and place it in the classpath of Spark, no extra config is needed because related properties is transferred from Iceberg REST server to Iceberg REST client automatically.
+
+For other storages not managed by Gravitino, the properties wouldn't transfer from the server to client automatically, if you want to pass custom properties to initialize `FileIO`, you could add it by `spark.sql.catalog.${iceberg_catalog_name}.${configuration_key}` = `{property_value}`.
 
 ### Exploring Apache Iceberg with Apache Spark SQL
 

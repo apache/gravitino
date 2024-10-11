@@ -20,11 +20,11 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.DeleteProvider;
+import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
  * A MyBatis Mapper for table meta operation SQLs.
@@ -39,61 +39,36 @@ public interface SecurableObjectMapper {
   String SECURABLE_OBJECT_TABLE_NAME = "role_meta_securable_object";
   String ROLE_TABLE_NAME = "role_meta";
 
-  @Insert({
-    "<script>",
-    "INSERT INTO "
-        + SECURABLE_OBJECT_TABLE_NAME
-        + "(role_id, metadata_object_id, type, privilege_names, privilege_conditions, "
-        + " current_version, last_version, deleted_at)"
-        + " VALUES ",
-    "<foreach collection='securableObjects' item='item' separator=','>",
-    "(#{item.roleId},"
-        + " #{item.metadataObjectId},"
-        + " #{item.type},"
-        + " #{item.privilegeNames},"
-        + " #{item.privilegeConditions},"
-        + " #{item.currentVersion},"
-        + " #{item.lastVersion},"
-        + " #{item.deletedAt})",
-    "</foreach>",
-    "</script>"
-  })
+  @InsertProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "batchInsertSecurableObjects")
   void batchInsertSecurableObjects(
       @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs);
 
-  @Update(
-      "UPDATE "
-          + SECURABLE_OBJECT_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE role_id = #{roleId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "batchSoftDeleteSecurableObjects")
+  void batchSoftDeleteSecurableObjects(
+      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs);
+
+  @UpdateProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "softDeleteSecurableObjectsByRoleId")
   void softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId);
 
-  @Update(
-      "UPDATE "
-          + SECURABLE_OBJECT_TABLE_NAME
-          + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE exists (SELECT * from "
-          + ROLE_TABLE_NAME
-          + " ro WHERE ro.metalake_id = #{metalakeId} AND ro.role_id = ob.role_id"
-          + " AND ro.deleted_at = 0) AND ob.deleted_at = 0")
+  @UpdateProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "softDeleteRoleMetasByMetalakeId")
   void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @Select(
-      "SELECT role_id as roleId, metadata_object_id as metadataObjectId,"
-          + " type as type, privilege_names as privilegeNames,"
-          + " privilege_conditions as privilegeConditions, current_version as currentVersion,"
-          + " last_version as lastVersion, deleted_at as deletedAt"
-          + " FROM "
-          + SECURABLE_OBJECT_TABLE_NAME
-          + " WHERE role_id = #{roleId} AND deleted_at = 0")
+  @SelectProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "listSecurableObjectsByRoleId")
   List<SecurableObjectPO> listSecurableObjectsByRoleId(@Param("roleId") Long roleId);
 
-  @Delete(
-      "DELETE FROM "
-          + SECURABLE_OBJECT_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  @DeleteProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "deleteSecurableObjectsByLegacyTimeline")
   Integer deleteSecurableObjectsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

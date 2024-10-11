@@ -6,7 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
-- [How to Build Apache Gravitino on Windows (Using WSL)](#how-to-build-gravitino-on-windows-using-wsl)
+- [How to Build Apache Gravitino on Windows (Using WSL)](#how-to-build-apache-gravitino-on-windows-using-wsl)
 
 ## Prerequisites
 
@@ -266,6 +266,6 @@ Access [http://localhost:8090](http://localhost:8090)
 
 Building the Gravitino project compiles the necessary components, and starting the server allows you to access the application in your browser.
 
-Please refer to [CONTRIBUTING.md] (https://github.com/apache/gravitino/blob/main/CONTRIBUTING.md) for instructions on running the project using VSCode or IntelliJ on Windows.
+Please refer to [CONTRIBUTING.md](https://github.com/apache/gravitino/blob/main/CONTRIBUTING.md) for instructions on running the project using VSCode or IntelliJ on Windows.
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToBuild" alt="" />

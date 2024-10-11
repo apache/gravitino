@@ -343,10 +343,11 @@ public class TestSupportTags extends TestBase {
     String path =
         "/api/metalakes/"
             + METALAKE_NAME
-            + "/tags/"
+            + "/objects/"
             + metadataObject.type().name().toLowerCase(Locale.ROOT)
             + "/"
-            + metadataObject.fullName();
+            + metadataObject.fullName()
+            + "/tags";
 
     String[] tags = new String[] {"tag1", "tag2"};
     NameListResponse resp = new NameListResponse(tags);
@@ -383,10 +384,11 @@ public class TestSupportTags extends TestBase {
     String path =
         "/api/metalakes/"
             + METALAKE_NAME
-            + "/tags/"
+            + "/objects/"
             + metadataObject.type().name().toLowerCase(Locale.ROOT)
             + "/"
-            + metadataObject.fullName();
+            + metadataObject.fullName()
+            + "/tags";
 
     TagDTO tag1 =
         TagDTO.builder()
@@ -435,11 +437,11 @@ public class TestSupportTags extends TestBase {
     String path =
         "/api/metalakes/"
             + METALAKE_NAME
-            + "/tags/"
+            + "/objects/"
             + metadataObject.type().name().toLowerCase(Locale.ROOT)
             + "/"
             + metadataObject.fullName()
-            + "/tag1";
+            + "/tags/tag1";
 
     TagDTO tag1 =
         TagDTO.builder()
@@ -476,10 +478,11 @@ public class TestSupportTags extends TestBase {
     String path =
         "/api/metalakes/"
             + METALAKE_NAME
-            + "/tags/"
+            + "/objects/"
             + metadataObject.type().name().toLowerCase(Locale.ROOT)
             + "/"
-            + metadataObject.fullName();
+            + metadataObject.fullName()
+            + "/tags";
 
     String[] tagsToAdd = new String[] {"tag1", "tag2"};
     String[] tagsToRemove = new String[] {"tag3", "tag4"};

@@ -23,6 +23,7 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -40,12 +41,16 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -69,6 +74,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
+  private static final String SLASH = "/";
 
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
 
@@ -352,6 +358,78 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete fileset " + ident, ioe);
     }
+  }
+
+  @Override
+  public String getFileLocation(NameIdentifier ident, String subPath)
+      throws NoSuchFilesetException {
+    Preconditions.checkArgument(subPath != null, "subPath must not be null");
+    String processedSubPath;
+    if (!subPath.trim().isEmpty() && !subPath.trim().startsWith(SLASH)) {
+      processedSubPath = SLASH + subPath.trim();
+    } else {
+      processedSubPath = subPath.trim();
+    }
+
+    Fileset fileset = loadFileset(ident);
+
+    boolean isSingleFile = checkSingleFile(fileset);
+    // if the storage location is a single file, it cannot have sub path to access.
+    if (isSingleFile && StringUtils.isBlank(processedSubPath)) {
+      throw new GravitinoRuntimeException(
+          "Sub path should always be blank, because the fileset only mounts a single file.");
+    }
+
+    // do checks for some data operations.
+    if (hasCallerContext()) {
+      Map<String, String> contextMap = CallerContext.CallerContextHolder.get().context();
+      String operation =
+          contextMap.getOrDefault(
+              FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+              FilesetDataOperation.UNKNOWN.name());
+      if (!FilesetDataOperation.checkValid(operation)) {
+        LOG.warn(
+            "The data operation: {} is not valid, we cannot do some checks for this operation.",
+            operation);
+      } else {
+        FilesetDataOperation dataOperation = FilesetDataOperation.valueOf(operation);
+        switch (dataOperation) {
+          case RENAME:
+            // Fileset only mounts a single file, the storage location of the fileset cannot be
+            // renamed; Otherwise the metadata in the Gravitino server may be inconsistent.
+            if (isSingleFile) {
+              throw new GravitinoRuntimeException(
+                  "Cannot rename the fileset: %s which only mounts to a single file.", ident);
+            }
+            // if the sub path is blank, it cannot be renamed,
+            // otherwise the metadata in the Gravitino server may be inconsistent.
+            if (StringUtils.isBlank(processedSubPath)
+                || (processedSubPath.startsWith(SLASH) && processedSubPath.length() == 1)) {
+              throw new GravitinoRuntimeException(
+                  "subPath cannot be blank when need to rename a file or a directory.");
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+
+    String fileLocation;
+    // 1. if the storage location is a single file, we pass the storage location directly
+    // 2. if the processed sub path is blank, we pass the storage location directly
+    if (isSingleFile || StringUtils.isBlank(processedSubPath)) {
+      fileLocation = fileset.storageLocation();
+    } else {
+      // the processed sub path always starts with "/" if it is not blank,
+      // so we can safely remove the tailing slash if storage location ends with "/".
+      String storageLocation =
+          fileset.storageLocation().endsWith(SLASH)
+              ? fileset.storageLocation().substring(0, fileset.storageLocation().length() - 1)
+              : fileset.storageLocation();
+      fileLocation = String.format("%s%s", storageLocation, processedSubPath);
+    }
+    return fileLocation;
   }
 
   @Override
@@ -642,5 +720,26 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   static Path formalizePath(Path path, Configuration configuration) throws IOException {
     FileSystem defaultFs = FileSystem.get(configuration);
     return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
+  }
+
+  private boolean hasCallerContext() {
+    return CallerContext.CallerContextHolder.get() != null
+        && CallerContext.CallerContextHolder.get().context() != null
+        && !CallerContext.CallerContextHolder.get().context().isEmpty();
+  }
+
+  private boolean checkSingleFile(Fileset fileset) {
+    try {
+      Path locationPath = new Path(fileset.storageLocation());
+      return locationPath.getFileSystem(hadoopConf).getFileStatus(locationPath).isFile();
+    } catch (FileNotFoundException e) {
+      // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
+      return false;
+    } catch (IOException e) {
+      throw new GravitinoRuntimeException(
+          e,
+          "Exception occurs when checking whether fileset: %s mounts a single file",
+          fileset.name());
+    }
   }
 }

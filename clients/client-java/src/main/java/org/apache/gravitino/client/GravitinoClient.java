@@ -29,11 +29,13 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.SupportsCatalogs;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -169,6 +171,26 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
+   * Lists the users.
+   *
+   * @return The User list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public User[] listUsers() {
+    return getMetalake().listUsers();
+  }
+
+  /**
+   * Lists the usernames.
+   *
+   * @return The username list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listUserNames() {
+    return getMetalake().listUserNames();
+  }
+
+  /**
    * Adds a new Group.
    *
    * @param group The name of the Group.
@@ -205,6 +227,26 @@ public class GravitinoClient extends GravitinoClientBase
    */
   public Group getGroup(String group) throws NoSuchGroupException, NoSuchMetalakeException {
     return getMetalake().getGroup(group);
+  }
+
+  /**
+   * List the groups.
+   *
+   * @return The Group list
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public Group[] listGroups() throws NoSuchMetalakeException {
+    return getMetalake().listGroups();
+  }
+
+  /**
+   * List the group names.
+   *
+   * @return The group names list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listGroupNames() throws NoSuchMetalakeException {
+    return getMetalake().listGroupNames();
   }
 
   /**
@@ -337,6 +379,57 @@ public class GravitinoClient extends GravitinoClientBase
   public void setOwner(MetadataObject object, String ownerName, Owner.Type ownerType)
       throws NotFoundException {
     getMetalake().setOwner(object, ownerName, ownerType);
+  }
+
+  /**
+   * Lists the role names.
+   *
+   * @return The role name list.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listRoleNames() throws NoSuchMetalakeException {
+    return getMetalake().listRoleNames();
+  }
+
+  /**
+   * Grant privileges to a role.
+   *
+   * @param role The name of the role.
+   * @param privileges The privileges to grant.
+   * @param object The object is associated with privileges to grant.
+   * @return The role after granted.
+   * @throws NoSuchRoleException If the role with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
+   *     exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
+   * @throws RuntimeException If granting roles to a role encounters storage issues.
+   */
+  public Role grantPrivilegesToRole(String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+          IllegalPrivilegeException {
+    return getMetalake().grantPrivilegesToRole(role, object, privileges);
+  }
+
+  /**
+   * Revoke privileges from a role.
+   *
+   * @param role The name of the role.
+   * @param privileges The privileges to revoke.
+   * @param object The object is associated with privileges to revoke.
+   * @return The role after revoked.
+   * @throws NoSuchRoleException If the role with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
+   *     exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
+   * @throws RuntimeException If revoking privileges from a role encounters storage issues.
+   */
+  public Role revokePrivilegesFromRole(
+      String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+          IllegalPrivilegeException {
+    return getMetalake().revokePrivilegesFromRole(role, object, privileges);
   }
 
   /**

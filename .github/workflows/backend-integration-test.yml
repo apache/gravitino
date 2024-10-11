@@ -2,7 +2,6 @@ name: Backend Integration Test
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main", "branch-*" ]
   pull_request:
@@ -29,21 +28,17 @@ jobs:
               - clients/client-java/**
               - clients/client-java-runtime/**
               - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
               - dev/**
               - gradle/**
-              - integration-test/**
-              - integration-test-common/**
               - iceberg/**
+              - integration-test-common/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
-              - trino-connector/**
-              - web/**
-              - docs/open-api/**
               - build.gradle.kts
               - gradle.properties
               - gradlew
@@ -51,142 +46,48 @@ jobs:
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  test-on-push:
+  BackendIT-on-push:
     needs: changes
     if: (github.event_name == 'push' && needs.changes.outputs.source_changes == 'true')
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
     strategy:
       matrix:
-        # Integration test for AMD64 architecture
         architecture: [linux/amd64]
         java-version: [ 8, 11, 17 ]
+        backend: [ h2, mysql, postgresql ]
         test-mode: [ embedded, deploy ]
-        include:
+        exclude:
           - test-mode: 'embedded'
-            backend: 'h2'
-          - test-mode: 'deploy'
             backend: 'mysql'
+          - test-mode: 'embedded'
+            backend: 'postgresql'
+          - test-mode: 'deploy'
+            backend: 'h2'
+    uses: ./.github/workflows/backend-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+      backend: ${{ matrix.backend }}
+      test-mode: ${{ matrix.test-mode }}
 
-    env:
-      PLATFORM: ${{ matrix.architecture }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java-version }}
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
-      - name: Check required command
-        run: |
-          dev/ci/check_commands.sh
-
-      - name: Package Gravitino
-        if : ${{ matrix.test-mode == 'deploy' }}
-        run: |
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
-
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
-
-      - name: Backend Integration Test (JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
-        id: integrationTest
-        run: >
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
-          -x :web:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:test -x :spark-connector:spark-common:test 
-          -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
-          -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
-          -x :authorizations:authorization-ranger:test
-
-      - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v3
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
-        with:
-          name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }}
-          path: |
-            build/reports
-            iceberg/iceberg-rest-server/build/*.log
-            integration-test/build/*.log
-            integration-test/build/*.tar
-            integration-test/build/trino-ci-container-log
-            distribution/package/logs/*.out
-            distribution/package/logs/*.log
-            catalogs/**/*.log
-            catalogs/**/*.tar
-            distribution/**/*.log
-
-  test-on-pr:
+  BackendIT-on-pr:
     needs: changes
     if: (github.event_name == 'pull_request' && needs.changes.outputs.source_changes == 'true')
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
     strategy:
       matrix:
-        # Integration test for AMD64 architecture
         architecture: [ linux/amd64 ]
         java-version: [ 17 ]
+        backend: [ h2, mysql, postgresql ]
         test-mode: [ embedded, deploy ]
-        include:
+        exclude:
           - test-mode: 'embedded'
-            backend: 'h2'
-          - test-mode: 'deploy'
             backend: 'mysql'
-
-    env:
-      PLATFORM: ${{ matrix.architecture }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java-version }}
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
-      - name: Check required command
-        run: |
-          dev/ci/check_commands.sh
-
-      - name: Package Gravitino
-        if: ${{ matrix.test-mode == 'deploy' }}
-        run: |
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
-
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
-
-      - name: Backend Integration Test (JDK${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }})
-        id: integrationTest
-        run: >
-          ./gradlew test -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PjdbcBackend=${{ matrix.backend }} -PskipWebITs -PskipDockerTests=false
-          -x :web:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:test -x :spark-connector:spark-common:test 
-          -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
-          -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
-          -x :authorizations:authorization-ranger:test
-
-      - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v3
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
-        with:
-          name: integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}-${{ matrix.backend }}
-          path: |
-            build/reports
-            iceberg/iceberg-rest-server/build/*.log
-            integration-test/build/*.log
-            integration-test/build/*.tar
-            integration-test/build/trino-ci-container-log
-            distribution/package/logs/*.out
-            distribution/package/logs/*.log
-            catalogs/**/*.log
-            catalogs/**/*.tar
-            distribution/**/*.log
+          - test-mode: 'embedded'
+            backend: 'postgresql'
+          - test-mode: 'deploy'
+            backend: 'h2'
+    uses: ./.github/workflows/backend-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+      backend: ${{ matrix.backend }}
+      test-mode: ${{ matrix.test-mode }}

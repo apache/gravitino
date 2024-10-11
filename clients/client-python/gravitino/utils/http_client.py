@@ -140,7 +140,7 @@ class HTTPClient:
         except HTTPError as err:
             err_body = err.read()
 
-            if err_body is None:
+            if err_body is None or len(err_body) == 0:
                 return (
                     False,
                     ErrorResponse.generate_error_response(RESTException, err.reason),
@@ -217,9 +217,14 @@ class HTTPClient:
             f"Error handler {type(error_handler).__name__} can't handle this response, error response body: {resp}"
         ) from None
 
-    def get(self, endpoint, params=None, error_handler=None, **kwargs):
+    def get(self, endpoint, params=None, headers=None, error_handler=None, **kwargs):
         return self._request(
-            "get", endpoint, params=params, error_handler=error_handler, **kwargs
+            "get",
+            endpoint,
+            params=params,
+            headers=headers,
+            error_handler=error_handler,
+            **kwargs,
         )
 
     def delete(self, endpoint, error_handler=None, **kwargs):

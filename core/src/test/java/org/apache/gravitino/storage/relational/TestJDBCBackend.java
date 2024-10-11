@@ -84,6 +84,7 @@ import org.apache.gravitino.tag.TagManager;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -435,6 +436,96 @@ public class TestJDBCBackend {
   }
 
   @Test
+  void testUpdateMetalakeWithNullableComment() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    BaseMetalake metalake =
+        BaseMetalake.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("metalake" + RandomIdGenerator.INSTANCE.nextId())
+            .withAuditInfo(auditInfo)
+            .withComment(null)
+            .withProperties(null)
+            .withVersion(SchemaVersion.V_0_1)
+            .build();
+
+    backend.insert(metalake, false);
+
+    backend.update(
+        metalake.nameIdentifier(),
+        Entity.EntityType.METALAKE,
+        e ->
+            BaseMetalake.builder()
+                .withId(metalake.id())
+                .withName(metalake.name())
+                .withAuditInfo(auditInfo)
+                .withComment("comment")
+                .withProperties(metalake.properties())
+                .withVersion(metalake.getVersion())
+                .build());
+
+    BaseMetalake updatedMetalake =
+        backend.get(metalake.nameIdentifier(), Entity.EntityType.METALAKE);
+    Assertions.assertNotNull(updatedMetalake.comment());
+
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, false);
+  }
+
+  @Test
+  void testUpdateCatalogWithNullableComment() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    String metalakeName = "metalake" + RandomIdGenerator.INSTANCE.nextId();
+    BaseMetalake metalake =
+        BaseMetalake.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(metalakeName)
+            .withAuditInfo(auditInfo)
+            .withComment("")
+            .withProperties(null)
+            .withVersion(SchemaVersion.V_0_1)
+            .build();
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withNamespace(NamespaceUtil.ofCatalog(metalakeName))
+            .withName("catalog")
+            .withAuditInfo(auditInfo)
+            .withComment(null)
+            .withProperties(null)
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .build();
+
+    backend.insert(catalog, false);
+
+    backend.update(
+        catalog.nameIdentifier(),
+        Entity.EntityType.CATALOG,
+        e ->
+            CatalogEntity.builder()
+                .withId(catalog.id())
+                .withNamespace(catalog.namespace())
+                .withName(catalog.name())
+                .withAuditInfo(auditInfo)
+                .withComment("comment")
+                .withProperties(catalog.getProperties())
+                .withType(Catalog.Type.RELATIONAL)
+                .withProvider("test")
+                .build());
+
+    CatalogEntity updatedCatalog = backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    Assertions.assertNotNull(updatedCatalog.getComment());
+
+    backend.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG, false);
+    backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, false);
+  }
+
+  @Test
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -622,24 +713,27 @@ public class TestJDBCBackend {
     backend.insert(anotherTagEntity, false);
 
     // meta data list
-    List<BaseMetalake> metaLakes = backend.list(metalake.namespace(), Entity.EntityType.METALAKE);
+    List<BaseMetalake> metaLakes =
+        backend.list(metalake.namespace(), Entity.EntityType.METALAKE, true);
     assertTrue(metaLakes.contains(metalake));
 
-    List<CatalogEntity> catalogs = backend.list(catalog.namespace(), Entity.EntityType.CATALOG);
+    List<CatalogEntity> catalogs =
+        backend.list(catalog.namespace(), Entity.EntityType.CATALOG, true);
     assertTrue(catalogs.contains(catalog));
 
-    List<SchemaEntity> schemas = backend.list(schema.namespace(), Entity.EntityType.SCHEMA);
+    List<SchemaEntity> schemas = backend.list(schema.namespace(), Entity.EntityType.SCHEMA, true);
     assertTrue(schemas.contains(schema));
 
-    List<TableEntity> tables = backend.list(table.namespace(), Entity.EntityType.TABLE);
+    List<TableEntity> tables = backend.list(table.namespace(), Entity.EntityType.TABLE, true);
     assertTrue(tables.contains(table));
 
-    List<FilesetEntity> filesets = backend.list(fileset.namespace(), Entity.EntityType.FILESET);
+    List<FilesetEntity> filesets =
+        backend.list(fileset.namespace(), Entity.EntityType.FILESET, true);
     assertFalse(filesets.contains(fileset));
     assertTrue(filesets.contains(filesetV2));
     assertEquals("2", filesets.get(filesets.indexOf(filesetV2)).properties().get("version"));
 
-    List<TopicEntity> topics = backend.list(topic.namespace(), Entity.EntityType.TOPIC);
+    List<TopicEntity> topics = backend.list(topic.namespace(), Entity.EntityType.TOPIC, true);
     assertTrue(topics.contains(topic));
 
     RoleEntity roleEntity = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
@@ -665,7 +759,7 @@ public class TestJDBCBackend {
 
     TagEntity tagEntity = backend.get(tag.nameIdentifier(), Entity.EntityType.TAG);
     assertEquals(tag, tagEntity);
-    List<TagEntity> tags = backend.list(tag.namespace(), Entity.EntityType.TAG);
+    List<TagEntity> tags = backend.list(tag.namespace(), Entity.EntityType.TAG, true);
     assertTrue(tags.contains(tag));
     assertEquals(1, tags.size());
 

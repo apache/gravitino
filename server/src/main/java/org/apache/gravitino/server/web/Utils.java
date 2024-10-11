@@ -18,12 +18,18 @@
  */
 package org.apache.gravitino.server.web;
 
+import com.google.common.collect.Maps;
 import java.security.PrivilegedExceptionAction;
+import java.util.Map;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -47,12 +53,16 @@ public class Utils {
   }
 
   public static Response illegalArguments(String message) {
-    return illegalArguments(message, null);
+    return illegalArguments(IllegalArgumentException.class.getSimpleName(), message, null);
   }
 
   public static Response illegalArguments(String message, Throwable throwable) {
+    return illegalArguments(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  public static Response illegalArguments(String type, String message, Throwable throwable) {
     return Response.status(Response.Status.BAD_REQUEST)
-        .entity(ErrorResponse.illegalArguments(message, throwable))
+        .entity(ErrorResponse.illegalArguments(type, message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
@@ -147,5 +157,31 @@ public class Utils {
       principal = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
     }
     return PrincipalUtils.doAs(principal, action);
+  }
+
+  public static Map<String, String> filterFilesetAuditHeaders(HttpServletRequest httpRequest) {
+    Map<String, String> filteredHeaders = Maps.newHashMap();
+
+    String internalClientType =
+        httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE);
+    if (StringUtils.isNotBlank(internalClientType)) {
+      filteredHeaders.put(
+          FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
+          InternalClientType.checkValid(internalClientType)
+              ? internalClientType
+              : InternalClientType.UNKNOWN.name());
+    }
+
+    String dataOperation =
+        httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION);
+    if (StringUtils.isNotBlank(
+        httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION))) {
+      filteredHeaders.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.checkValid(dataOperation)
+              ? dataOperation
+              : FilesetDataOperation.UNKNOWN.name());
+    }
+    return filteredHeaders;
   }
 }

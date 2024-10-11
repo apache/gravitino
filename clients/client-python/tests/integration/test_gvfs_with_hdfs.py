@@ -1,21 +1,19 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 # pylint: disable=protected-access
 
@@ -46,7 +44,7 @@ from gravitino import (
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.exceptions.base import GravitinoRuntimeException
 from tests.integration.integration_test_env import IntegrationTestEnv
-from tests.integration.hdfs_container import HDFSContainer
+from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.base_hadoop_env import BaseHadoopEnvironment
 
 logger = logging.getLogger(__name__)
@@ -94,6 +92,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
     @classmethod
     def setUpClass(cls):
+
+        cls._get_gravitino_home()
+
         cls.hdfs_container = HDFSContainer()
         hdfs_container_ip = cls.hdfs_container.get_ip()
         # init hadoop env
@@ -101,8 +102,11 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         cls.config = {
             "gravitino.bypass.fs.defaultFS": f"hdfs://{hdfs_container_ip}:9000"
         }
+
+        cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+
         # append the hadoop conf to server
-        cls._append_catalog_hadoop_conf(cls.config)
+        cls._append_conf(cls.config, cls.hadoop_conf_path)
         # restart the server
         cls.restart_server()
         # create entity
@@ -113,7 +117,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         try:
             cls._clean_test_data()
             # reset server conf
-            cls._reset_catalog_hadoop_conf(cls.config)
+            cls._reset_conf(cls.config, cls.hadoop_conf_path)
             # restart server
             cls.restart_server()
             # clear hadoop env
@@ -359,6 +363,10 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs.mv(mv_file, mv_new_file)
         self.assertTrue(fs.exists(mv_new_file))
         self.assertTrue(self.hdfs.exists(mv_new_actual_file))
+
+        # test rename without sub path, which should throw an exception
+        with self.assertRaises(GravitinoRuntimeException):
+            fs.mv(self.fileset_gvfs_location, self.fileset_gvfs_location + "/test_mv")
 
     def test_rm(self):
         rm_dir = self.fileset_gvfs_location + "/test_rm"

@@ -61,6 +61,7 @@ testcontainers = "1.19.0"
 jwt = "0.11.1"
 jline = "3.21.0"
 okhttp3 = "4.11.0"
+opencsv = "2.3"
 metrics = "4.2.25"
 prometheus = "0.16.0"
 mysql = "8.0.23"
@@ -95,6 +96,12 @@ woodstox-core = "5.3.0"
 mail = "1.4.1"
 rome = "1.0"
 jettison = "1.1"
+thrift = "0.12.0"
+derby = "10.14.2.0"
+datanucleus-core = "4.1.17"
+datanucleus-api-jdo = "4.2.4"
+datanucleus-rdbms = "4.1.19"
+datanucleus-jdo = "3.2.0-m3"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -136,8 +143,10 @@ hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = 
 hive2-jdbc = { group = "org.apache.hive", name = "hive-jdbc", version.ref = "hive2"}
 hadoop2-auth = { group = "org.apache.hadoop", name = "hadoop-auth", version.ref = "hadoop2" }
 hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
+hadoop2-hdfs-client = { group = "org.apache.hadoop", name = "hadoop-hdfs-client", version.ref = "hadoop2" }
 hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
+hadoop2-s3 = { group = "org.apache.hadoop", name = "hadoop-aws", version.ref = "hadoop2"}
 hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop3" }
 hadoop3-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop3"}
 hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.ref = "hadoop3"}
@@ -160,9 +169,13 @@ iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref 
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
+iceberg-gcp = { group = "org.apache.iceberg", name = "iceberg-gcp", version.ref = "iceberg" }
 paimon-core = { group = "org.apache.paimon", name = "paimon-core", version.ref = "paimon" }
 paimon-format = { group = "org.apache.paimon", name = "paimon-format", version.ref = "paimon" }
 paimon-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog", version.ref = "paimon" }
+paimon-s3 = { group = "org.apache.paimon", name = "paimon-s3", version.ref = "paimon" }
+paimon-spark = { group = "org.apache.paimon", name = "paimon-spark", version.ref = "paimon" }
+
 trino-spi= { group = "io.trino", name = "trino-spi", version.ref = "trino" }
 trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trino" }
 trino-memory= { group = "io.trino", name = "trino-memory", version.ref = "trino" }
@@ -174,6 +187,7 @@ testcontainers = { group = "org.testcontainers", name = "testcontainers", versio
 testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
 testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
+testcontainers-localstack = { group = "org.testcontainers", name = "localstack", version.ref = "testcontainers" }
 trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino" }
 jwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jwt"}
 jwt-impl = { group = "io.jsonwebtoken", name = "jjwt-impl", version.ref = "jwt"}
@@ -184,6 +198,7 @@ metrics-jvm = { group = "io.dropwizard.metrics", name = "metrics-jvm", version.r
 metrics-jmx = { group = "io.dropwizard.metrics", name = "metrics-jmx", version.ref = "metrics" }
 jline-terminal = { group = "org.jline", name = "jline-terminal", version.ref = "jline" }
 okhttp3-loginterceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp3" }
+opencsv = {group = "net.sf.opencsv", name = "opencsv", version.ref = "opencsv"}
 metrics-servlets = { group = "io.dropwizard.metrics", name = "metrics-servlets", version.ref = "metrics" }
 prometheus-client = { group = "io.prometheus", name = "simpleclient", version.ref = "prometheus" }
 prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwizard", version.ref = "prometheus" }
@@ -199,6 +214,12 @@ kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka"
 curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
 cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
 woodstox-core = { group = "com.fasterxml.woodstox", name = "woodstox-core", version.ref = "woodstox-core"}
+thrift = { group = "org.apache.thrift", name = "libthrift", version.ref = "thrift"}
+derby = { group = "org.apache.derby", name = "derby", version.ref = "derby"}
+datanucleus-core = { group = "org.datanucleus", name = "datanucleus-core", version.ref = "datanucleus-core" }
+datanucleus-api-jdo = { group = "org.datanucleus", name = "datanucleus-api-jdo", version.ref = "datanucleus-api-jdo" }
+datanucleus-rdbms = { group = "org.datanucleus", name = "datanucleus-rdbms", version.ref = "datanucleus-rdbms" }
+datanucleus-jdo = { group = "org.datanucleus", name = "javax.jdo", version.ref = "datanucleus-jdo" }
 
 ranger-intg = { group = "org.apache.ranger", name = "ranger-intg", version.ref = "ranger" }
 javax-jaxb-api = { group = "javax.xml.bind", name = "jaxb-api", version.ref = "javax-jaxb-api" }

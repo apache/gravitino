@@ -20,15 +20,11 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.authorization.SecurableObjects.DOT_SPLITTER;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.rangerClient;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.verifyRoleInRanger;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,8 +40,11 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationHivePlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
+import org.apache.gravitino.authorization.ranger.RangerPrivilege;
+import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -70,12 +69,9 @@ public class RangerHiveIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private static Connection adminConnection;
-  private static Connection anonymousConnection;
   private static final String adminUser = "gravitino";
-  private static final String anonymousUser = "anonymous";
   private static RangerAuthorizationPlugin rangerAuthPlugin;
-  private static RangerHelper rangerPolicyHelper;
+  private static RangerHelper rangerHelper;
   private final AuditInfo auditInfo =
       AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
@@ -101,8 +97,7 @@ public class RangerHiveIT {
                 adminUser)));
 
     rangerAuthPlugin =
-        new RangerAuthorizationPlugin(
-            "hive",
+        RangerAuthorizationHivePlugin.getInstance(
             ImmutableMap.of(
                 AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
                 String.format(
@@ -117,21 +112,14 @@ public class RangerHiveIT {
                 RangerContainer.rangerPassword,
                 AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
                 RangerITEnv.RANGER_HIVE_REPO_NAME));
-    rangerPolicyHelper = new RangerHelper(rangerAuthPlugin, "hive");
-
-    // Create hive connection
-    String url =
-        String.format(
-            "jdbc:hive2://%s:%d/default",
-            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_SERVICE_PORT);
-    try {
-      Class.forName("org.apache.hive.jdbc.HiveDriver");
-      adminConnection = DriverManager.getConnection(url, adminUser, "");
-      anonymousConnection = DriverManager.getConnection(url, anonymousUser, "");
-    } catch (ClassNotFoundException | SQLException e) {
-      throw new RuntimeException(e);
-    }
+    rangerHelper =
+        new RangerHelper(
+            rangerClient,
+            RangerContainer.rangerUserName,
+            RangerITEnv.RANGER_HIVE_REPO_NAME,
+            rangerAuthPlugin.privilegesMappingRule(),
+            rangerAuthPlugin.ownerMappingRule(),
+            rangerAuthPlugin.policyResourceDefinesRule());
   }
 
   /**
@@ -190,7 +178,7 @@ public class RangerHiveIT {
     role.securableObjects().stream()
         .forEach(
             securableObject ->
-                Assertions.assertNull(rangerPolicyHelper.findManagedPolicy(securableObject)));
+                Assertions.assertNull(rangerHelper.findManagedPolicy(securableObject)));
   }
 
   @Test
@@ -212,7 +200,7 @@ public class RangerHiveIT {
     role.securableObjects().stream()
         .forEach(
             securableObject ->
-                Assertions.assertNotNull(rangerPolicyHelper.findManagedPolicy(securableObject)));
+                Assertions.assertNotNull(rangerHelper.findManagedPolicy(securableObject)));
   }
 
   @Test
@@ -262,14 +250,14 @@ public class RangerHiveIT {
             String.format("catalog.%s3.tab1", dbName),
             MetadataObject.Type.TABLE,
             Lists.newArrayList(Privileges.CreateTable.allow()));
-    Assertions.assertNull(rangerPolicyHelper.findManagedPolicy(securableObject1));
+    Assertions.assertNull(rangerHelper.findManagedPolicy(securableObject1));
 
     // Add a policy for `db3.tab1`
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "tab1"),
         GravitinoITUtils.genRandomName(currentFunName()));
     // findManagedPolicy function use precise search, so return not null
-    Assertions.assertNotNull(rangerPolicyHelper.findManagedPolicy(securableObject1));
+    Assertions.assertNotNull(rangerHelper.findManagedPolicy(securableObject1));
   }
 
   static void createHivePolicy(List<String> metaObjects, String roleName) {
@@ -280,8 +268,8 @@ public class RangerHiveIT {
           new RangerPolicy.RangerPolicyResource(metaObjects.get(i));
       policyResourceMap.put(
           i == 0
-              ? RangerDefines.RESOURCE_DATABASE
-              : i == 1 ? RangerDefines.RESOURCE_TABLE : RangerDefines.RESOURCE_COLUMN,
+              ? RangerITEnv.RESOURCE_DATABASE
+              : i == 1 ? RangerITEnv.RESOURCE_TABLE : RangerITEnv.RESOURCE_COLUMN,
           policyResource);
     }
 
@@ -289,7 +277,8 @@ public class RangerHiveIT {
     policyItem.setGroups(Arrays.asList(RangerDefines.PUBLIC_GROUP));
     policyItem.setAccesses(
         Arrays.asList(
-            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_SELECT)));
+            new RangerPolicy.RangerPolicyItemAccess(
+                RangerPrivilege.RangerHivePrivilege.SELECT.toString())));
     RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HIVE,
         RangerITEnv.RANGER_HIVE_REPO_NAME,
@@ -467,7 +456,7 @@ public class RangerHiveIT {
     role.securableObjects().stream()
         .forEach(
             securableObject ->
-                Assertions.assertNotNull(rangerPolicyHelper.findManagedPolicy(securableObject)));
+                Assertions.assertNotNull(rangerHelper.findManagedPolicy(securableObject)));
     verifyOwnerInRanger(oldMetadataObject, Lists.newArrayList(userName));
   }
 
@@ -1089,15 +1078,15 @@ public class RangerHiveIT {
     role1.securableObjects().stream()
         .forEach(
             securableObject ->
-                Assertions.assertNotNull(rangerPolicyHelper.findManagedPolicy(securableObject)));
+                Assertions.assertNotNull(rangerHelper.findManagedPolicy(securableObject)));
     role2.securableObjects().stream()
         .forEach(
             securableObject ->
-                Assertions.assertNotNull(rangerPolicyHelper.findManagedPolicy(securableObject)));
+                Assertions.assertNotNull(rangerHelper.findManagedPolicy(securableObject)));
     role3.securableObjects().stream()
         .forEach(
             securableObject ->
-                Assertions.assertNotNull(rangerPolicyHelper.findManagedPolicy(securableObject)));
+                Assertions.assertNotNull(rangerHelper.findManagedPolicy(securableObject)));
   }
 
   /** Verify the Gravitino role in Ranger service */
@@ -1132,8 +1121,8 @@ public class RangerHiveIT {
               .getResources()
               .get(
                   i == 0
-                      ? RangerDefines.RESOURCE_DATABASE
-                      : i == 1 ? RangerDefines.RESOURCE_TABLE : RangerDefines.RESOURCE_COLUMN)
+                      ? RangerITEnv.RESOURCE_DATABASE
+                      : i == 1 ? RangerITEnv.RESOURCE_TABLE : RangerITEnv.RESOURCE_COLUMN)
               .getValues()
               .get(0));
     }
@@ -1146,7 +1135,9 @@ public class RangerHiveIT {
               return policyItem.getAccesses().stream()
                   .anyMatch(
                       access -> {
-                        return rangerAuthPlugin.getOwnerPrivileges().contains(access.getType());
+                        return rangerAuthPlugin
+                            .ownerMappingRule()
+                            .contains(RangerPrivileges.valueOf(access.getType()));
                       });
             })
         .anyMatch(
@@ -1193,125 +1184,5 @@ public class RangerHiveIT {
 
   private void verifyOwnerInRanger(MetadataObject metadataObject, List<String> includeUsers) {
     verifyOwnerInRanger(metadataObject, includeUsers, null, null, null);
-  }
-
-  /** Currently we only test Ranger Hive, So wo Allow anyone to visit HDFS */
-  static void allowAnyoneAccessHDFS() {
-    String policyName = currentFunName();
-    try {
-      if (null != RangerITEnv.rangerClient.getPolicy(RangerDefines.SERVICE_TYPE_HDFS, policyName)) {
-        return;
-      }
-    } catch (RangerServiceException e) {
-      // If the policy doesn't exist, we will create it
-    }
-
-    Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap =
-        ImmutableMap.of(RangerDefines.RESOURCE_PATH, new RangerPolicy.RangerPolicyResource("/*"));
-    RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-    policyItem.setUsers(Arrays.asList(RangerDefines.CURRENT_USER));
-    policyItem.setAccesses(
-        Arrays.asList(
-            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_READ),
-            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_WRITE),
-            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HDFS_EXECUTE)));
-    RangerITEnv.updateOrCreateRangerPolicy(
-        RangerDefines.SERVICE_TYPE_HDFS,
-        RangerITEnv.RANGER_HDFS_REPO_NAME,
-        policyName,
-        policyResourceMap,
-        Collections.singletonList(policyItem));
-  }
-
-  /**
-   * Hive must have this policy Allow anyone can access information schema to show `database`,
-   * `tables` and `columns`
-   */
-  static void allowAnyoneAccessInformationSchema() {
-    String policyName = currentFunName();
-    try {
-      if (null != RangerITEnv.rangerClient.getPolicy(RangerDefines.SERVICE_TYPE_HIVE, policyName)) {
-        return;
-      }
-    } catch (RangerServiceException e) {
-      // If the policy doesn't exist, we will create it
-    }
-
-    Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap =
-        ImmutableMap.of(
-            RangerDefines.RESOURCE_DATABASE,
-            new RangerPolicy.RangerPolicyResource("information_schema"),
-            RangerDefines.RESOURCE_TABLE,
-            new RangerPolicy.RangerPolicyResource("*"),
-            RangerDefines.RESOURCE_COLUMN,
-            new RangerPolicy.RangerPolicyResource("*"));
-    RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-    policyItem.setGroups(Arrays.asList(RangerDefines.PUBLIC_GROUP));
-    policyItem.setAccesses(
-        Arrays.asList(
-            new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_SELECT)));
-    RangerITEnv.updateOrCreateRangerPolicy(
-        RangerDefines.SERVICE_TYPE_HIVE,
-        RangerITEnv.RANGER_HIVE_REPO_NAME,
-        policyName,
-        policyResourceMap,
-        Collections.singletonList(policyItem));
-  }
-
-  @Test
-  public void testCreateDatabase() throws Exception {
-    String dbName = currentFunName().toLowerCase(); // Hive database name is case-insensitive
-
-    // Only allow admin user to operation database `db1`
-    // Other users can't see the database `db1`
-    Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap =
-        ImmutableMap.of(
-            RangerDefines.RESOURCE_DATABASE, new RangerPolicy.RangerPolicyResource(dbName));
-    RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-    policyItem.setUsers(Arrays.asList(adminUser));
-    policyItem.setAccesses(
-        Arrays.asList(new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_ALL)));
-    RangerITEnv.updateOrCreateRangerPolicy(
-        RangerDefines.SERVICE_TYPE_HIVE,
-        RangerITEnv.RANGER_HIVE_REPO_NAME,
-        "testAllowShowDatabase",
-        policyResourceMap,
-        Collections.singletonList(policyItem));
-
-    Statement adminStmt = adminConnection.createStatement();
-    adminStmt.execute(String.format("CREATE DATABASE %s", dbName));
-    String sql = "show databases";
-    ResultSet adminRS = adminStmt.executeQuery(sql);
-    List<String> adminDbs = new ArrayList<>();
-    while (adminRS.next()) {
-      adminDbs.add(adminRS.getString(1));
-    }
-    Assertions.assertTrue(adminDbs.contains(dbName), "adminDbs : " + adminDbs);
-
-    // Anonymous user can't see the database `db1`
-    Statement anonymousStmt = anonymousConnection.createStatement();
-    ResultSet anonymousRS = anonymousStmt.executeQuery(sql);
-    List<String> anonymousDbs = new ArrayList<>();
-    while (anonymousRS.next()) {
-      anonymousDbs.add(anonymousRS.getString(1));
-    }
-    Assertions.assertFalse(anonymousDbs.contains(dbName), "anonymous : " + anonymousDbs);
-
-    // Allow anonymous user to see the database `db1`
-    policyItem.setUsers(Arrays.asList(adminUser, anonymousUser));
-    policyItem.setAccesses(
-        Arrays.asList(new RangerPolicy.RangerPolicyItemAccess(RangerDefines.ACCESS_TYPE_HIVE_ALL)));
-    RangerITEnv.updateOrCreateRangerPolicy(
-        RangerDefines.SERVICE_TYPE_HIVE,
-        RangerITEnv.RANGER_HIVE_REPO_NAME,
-        "testAllowShowDatabase",
-        policyResourceMap,
-        Collections.singletonList(policyItem));
-    anonymousRS = anonymousStmt.executeQuery(sql);
-    anonymousDbs.clear();
-    while (anonymousRS.next()) {
-      anonymousDbs.add(anonymousRS.getString(1));
-    }
-    Assertions.assertTrue(anonymousDbs.contains(dbName));
   }
 }

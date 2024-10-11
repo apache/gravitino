@@ -7,7 +7,7 @@ The Apache Software Foundation (http://www.apache.org/).
 The initial code for the Gravitino project was donated
 to the ASF by Datastrato (https://datastrato.ai/) copyright 2023-2024.
 
-The Web UI also has a NOTICE file please see web/NOTICE
+The Web UI also has a NOTICE file please see web/web/NOTICE
 for it's contents.
 
 Apache Iceberg
@@ -33,6 +33,3 @@ Copyright 2019 and onwards The Apache Software Foundation.
 
 Apache Arrow
 Copyright 2016-2024 The Apache Software Foundation
-
-This product includes software developed at
-The Apache Software Foundation (http://www.apache.org/).

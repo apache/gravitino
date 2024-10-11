@@ -53,7 +53,7 @@ public class IcebergCatalogUtil {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogUtil.class);
 
   private static InMemoryCatalog loadMemoryCatalog(IcebergConfig icebergConfig) {
-    String icebergCatalogName = icebergConfig.getCatalogBackendName("memory");
+    String icebergCatalogName = icebergConfig.getCatalogBackendName();
     InMemoryCatalog memoryCatalog = new InMemoryCatalog();
     Map<String, String> resultProperties = icebergConfig.getIcebergCatalogProperties();
     resultProperties.put(CatalogProperties.WAREHOUSE_LOCATION, "/tmp");
@@ -64,7 +64,7 @@ public class IcebergCatalogUtil {
   private static HiveCatalog loadHiveCatalog(IcebergConfig icebergConfig) {
     ClosableHiveCatalog hiveCatalog = new ClosableHiveCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
-    String icebergCatalogName = icebergConfig.getCatalogBackendName("hive");
+    String icebergCatalogName = icebergConfig.getCatalogBackendName();
 
     Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
     properties.forEach(hdfsConfiguration::set);
@@ -114,7 +114,7 @@ public class IcebergCatalogUtil {
 
   private static JdbcCatalog loadJdbcCatalog(IcebergConfig icebergConfig) {
     String driverClassName = icebergConfig.getJdbcDriver();
-    String icebergCatalogName = icebergConfig.getCatalogBackendName("jdbc");
+    String icebergCatalogName = icebergConfig.getCatalogBackendName();
 
     Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
     Preconditions.checkNotNull(
@@ -140,7 +140,7 @@ public class IcebergCatalogUtil {
   }
 
   private static Catalog loadRestCatalog(IcebergConfig icebergConfig) {
-    String icebergCatalogName = icebergConfig.getCatalogBackendName("rest");
+    String icebergCatalogName = icebergConfig.getCatalogBackendName();
     RESTCatalog restCatalog = new RESTCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
@@ -151,7 +151,7 @@ public class IcebergCatalogUtil {
   }
 
   private static Catalog loadCustomCatalog(IcebergConfig icebergConfig) {
-    String customCatalogName = icebergConfig.getCatalogBackendName("custom");
+    String customCatalogName = icebergConfig.getCatalogBackendName();
     String className = icebergConfig.get(IcebergConfig.CATALOG_BACKEND_IMPL);
     return CatalogUtil.loadCatalog(
         className,

@@ -59,9 +59,13 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -760,6 +764,125 @@ public class TestHadoopCatalogOperations {
                 "hadoop",
                 "comment",
                 ImmutableMap.of()));
+  }
+
+  @Test
+  public void testGetFileLocation() throws IOException {
+    String schemaName = "schema1024";
+    String comment = "comment1024";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, comment, null, schemaPath);
+
+    String catalogName = "c1";
+    String name = "fileset1024";
+    String storageLocation = TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + name;
+    Fileset fileset =
+        createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, storageLocation);
+
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      // test sub path starts with "/"
+      String subPath1 = "/test/test.parquet";
+      String fileLocation1 = ops.getFileLocation(filesetIdent, subPath1);
+      Assertions.assertEquals(
+          String.format("%s%s", fileset.storageLocation(), subPath1), fileLocation1);
+
+      // test sub path not starts with "/"
+      String subPath2 = "test/test.parquet";
+      String fileLocation2 = ops.getFileLocation(filesetIdent, subPath2);
+      Assertions.assertEquals(
+          String.format("%s/%s", fileset.storageLocation(), subPath2), fileLocation2);
+
+      // test sub path is null
+      String subPath3 = null;
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> ops.getFileLocation(filesetIdent, subPath3));
+
+      // test sub path is blank but not null
+      String subPath4 = "";
+      String fileLocation3 = ops.getFileLocation(filesetIdent, subPath4);
+      Assertions.assertEquals(fileset.storageLocation(), fileLocation3);
+    }
+
+    // test mount a single file
+    String filesetName2 = "test_get_file_location_2";
+    String filesetLocation2 =
+        TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName2;
+    Path filesetLocationPath2 = new Path(filesetLocation2);
+    createFileset(filesetName2, schemaName, comment, Fileset.Type.MANAGED, null, filesetLocation2);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store);
+        FileSystem localFileSystem = filesetLocationPath2.getFileSystem(new Configuration())) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName2);
+      // replace fileset location to a single file
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath2));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath2).isDirectory());
+      localFileSystem.delete(filesetLocationPath2, true);
+      localFileSystem.create(filesetLocationPath2);
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath2));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath2).isFile());
+
+      String subPath = "/year=2024/month=07/day=22/test.parquet";
+      Map<String, String> contextMap = Maps.newHashMap();
+      contextMap.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.RENAME.name());
+      CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+      CallerContext.CallerContextHolder.set(callerContext);
+
+      Assertions.assertThrows(
+          GravitinoRuntimeException.class, () -> ops.getFileLocation(filesetIdent, subPath));
+    } finally {
+      CallerContext.CallerContextHolder.remove();
+    }
+
+    // test rename with an empty subPath
+    String filesetName3 = "test_get_file_location_3";
+    String filesetLocation3 =
+        TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName3;
+    Path filesetLocationPath3 = new Path(filesetLocation3);
+    createFileset(filesetName3, schemaName, comment, Fileset.Type.MANAGED, null, filesetLocation3);
+    try (HadoopCatalogOperations ops = new HadoopCatalogOperations(store);
+        FileSystem localFileSystem = filesetLocationPath3.getFileSystem(new Configuration())) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName3);
+      // replace fileset location to a single file
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath3));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath3).isDirectory());
+      localFileSystem.delete(filesetLocationPath3, true);
+      localFileSystem.create(filesetLocationPath3);
+      Assertions.assertTrue(localFileSystem.exists(filesetLocationPath3));
+      Assertions.assertTrue(localFileSystem.getFileStatus(filesetLocationPath3).isFile());
+
+      Map<String, String> contextMap = Maps.newHashMap();
+      contextMap.put(
+          FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+          FilesetDataOperation.RENAME.name());
+      CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+      CallerContext.CallerContextHolder.set(callerContext);
+      Assertions.assertThrows(
+          GravitinoRuntimeException.class, () -> ops.getFileLocation(filesetIdent, ""));
+    }
+
+    // test storage location end with "/"
+    String filesetName4 = "test_get_file_location_4";
+    String filesetLocation4 =
+        TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName4 + "/";
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+    Fileset mockFileset = Mockito.mock(Fileset.class);
+    when(mockFileset.name()).thenReturn(filesetName4);
+    when(mockFileset.storageLocation()).thenReturn(filesetLocation4);
+
+    try (HadoopCatalogOperations mockOps = Mockito.mock(HadoopCatalogOperations.class)) {
+      mockOps.hadoopConf = new Configuration();
+      when(mockOps.loadFileset(filesetIdent)).thenReturn(mockFileset);
+      String subPath = "/test/test.parquet";
+      when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
+      String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
+      Assertions.assertEquals(
+          String.format("%s%s", mockFileset.storageLocation(), subPath.substring(1)), fileLocation);
+    }
   }
 
   private static Stream<Arguments> locationArguments() {

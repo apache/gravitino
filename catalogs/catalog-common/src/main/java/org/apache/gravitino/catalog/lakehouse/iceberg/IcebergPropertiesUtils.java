@@ -20,7 +20,11 @@ package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergPropertiesUtils {
 
@@ -40,18 +44,16 @@ public class IcebergPropertiesUtils {
     map.put(IcebergConstants.CATALOG_BACKEND_NAME, IcebergConstants.CATALOG_BACKEND_NAME);
     map.put(IcebergConstants.IO_IMPL, IcebergConstants.IO_IMPL);
     // S3
-    map.put(IcebergConstants.GRAVITINO_S3_ENDPOINT, IcebergConstants.ICEBERG_S3_ENDPOINT);
-    map.put(IcebergConstants.GRAVITINO_S3_REGION, IcebergConstants.AWS_S3_REGION);
-    map.put(IcebergConstants.GRAVITINO_S3_ACCESS_KEY_ID, IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID);
+    map.put(S3Properties.GRAVITINO_S3_ENDPOINT, IcebergConstants.ICEBERG_S3_ENDPOINT);
+    map.put(S3Properties.GRAVITINO_S3_REGION, IcebergConstants.AWS_S3_REGION);
+    map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID);
     map.put(
-        IcebergConstants.GRAVITINO_S3_SECRET_ACCESS_KEY,
-        IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY);
+        S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY);
     // OSS
-    map.put(IcebergConstants.GRAVITINO_OSS_ENDPOINT, IcebergConstants.ICEBERG_OSS_ENDPOINT);
+    map.put(OSSProperties.GRAVITINO_OSS_ENDPOINT, IcebergConstants.ICEBERG_OSS_ENDPOINT);
+    map.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, IcebergConstants.ICEBERG_OSS_ACCESS_KEY_ID);
     map.put(
-        IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_ID, IcebergConstants.ICEBERG_OSS_ACCESS_KEY_ID);
-    map.put(
-        IcebergConstants.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+        OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
         IcebergConstants.ICEBERG_OSS_ACCESS_KEY_SECRET);
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
   }
@@ -73,5 +75,23 @@ public class IcebergPropertiesUtils {
           }
         });
     return icebergProperties;
+  }
+
+  /**
+   * Get catalog backend name from Gravitino catalog properties.
+   *
+   * @param catalogProperties a map of Gravitino catalog properties.
+   * @return catalog backend name.
+   */
+  public static String getCatalogBackendName(Map<String, String> catalogProperties) {
+    String backendName = catalogProperties.get(IcebergConstants.CATALOG_BACKEND_NAME);
+    if (backendName != null) {
+      return backendName;
+    }
+
+    String catalogBackend = catalogProperties.get(IcebergConstants.CATALOG_BACKEND);
+    return Optional.ofNullable(catalogBackend)
+        .map(s -> s.toLowerCase(Locale.ROOT))
+        .orElse("memory");
   }
 }

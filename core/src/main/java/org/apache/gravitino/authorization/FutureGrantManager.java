@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,6 @@ import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.glassfish.jersey.internal.guava.Sets;
 
 /**
  * FutureGrantManager is responsible for granting privileges to future object. When you grant a

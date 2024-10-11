@@ -21,11 +21,11 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.RolePO;
-import org.apache.ibatis.annotations.Delete;
-import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.DeleteProvider;
+import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
  * A MyBatis Mapper for table meta operation SQLs.
@@ -40,134 +40,57 @@ public interface RoleMetaMapper {
   String USER_ROLE_RELATION_TABLE_NAME = "user_role_rel";
   String GROUP_ROLE_RELATION_TABLE_NAME = "group_role_rel";
 
-  @Select(
-      "SELECT role_id as roleId, role_name as roleName,"
-          + " metalake_id as metalakeId, properties as properties,"
-          + " audit_info as auditInfo, current_version as currentVersion,"
-          + " last_version as lastVersion, deleted_at as deletedAt"
-          + " FROM "
-          + ROLE_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND role_name = #{roleName}"
-          + " AND deleted_at = 0")
+  @SelectProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "selectRoleMetaByMetalakeIdAndName")
   RolePO selectRoleMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName);
 
-  @Select(
-      "SELECT role_id as roleId FROM "
-          + ROLE_TABLE_NAME
-          + " WHERE metalake_id = #{metalakeId} AND role_name = #{roleName}"
-          + " AND deleted_at = 0")
+  @SelectProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "selectRoleIdByMetalakeIdAndName")
   Long selectRoleIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String name);
 
-  @Select(
-      "SELECT ro.role_id as roleId, ro.role_name as roleName,"
-          + " ro.metalake_id as metalakeId, ro.properties as properties,"
-          + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
-          + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
-          + " FROM "
-          + ROLE_TABLE_NAME
-          + " ro JOIN "
-          + USER_ROLE_RELATION_TABLE_NAME
-          + " re ON ro.role_id = re.role_id"
-          + " WHERE re.user_id = #{userId}"
-          + " AND ro.deleted_at = 0 AND re.deleted_at = 0")
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listRolesByUserId")
   List<RolePO> listRolesByUserId(@Param("userId") Long userId);
 
-  @Select(
-      "SELECT ro.role_id as roleId, ro.role_name as roleName,"
-          + " ro.metalake_id as metalakeId, ro.properties as properties,"
-          + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
-          + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
-          + " FROM "
-          + ROLE_TABLE_NAME
-          + " ro JOIN "
-          + GROUP_ROLE_RELATION_TABLE_NAME
-          + " ge ON ro.role_id = ge.role_id"
-          + " WHERE ge.group_id = #{groupId}"
-          + " AND ro.deleted_at = 0 AND ge.deleted_at = 0")
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listRolesByGroupId")
   List<RolePO> listRolesByGroupId(Long groupId);
 
-  @Select(
-      "SELECT DISTINCT ro.role_id as roleId, ro.role_name as roleName,"
-          + " ro.metalake_id as metalakeId, ro.properties as properties,"
-          + " ro.audit_info as auditInfo, ro.current_version as currentVersion,"
-          + " ro.last_version as lastVersion, ro.deleted_at as deletedAt"
-          + " FROM "
-          + ROLE_TABLE_NAME
-          + " ro JOIN "
-          + SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME
-          + " se ON ro.role_id = se.role_id"
-          + " WHERE se.metadata_object_id = #{metadataObjectId}"
-          + " AND se.type = #{metadataObjectType}"
-          + " AND ro.deleted_at = 0 AND se.deleted_at = 0")
+  @SelectProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "listRolesByMetadataObjectIdAndType")
   List<RolePO> listRolesByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
-  @Insert(
-      "INSERT INTO "
-          + ROLE_TABLE_NAME
-          + "(role_id, role_name,"
-          + " metalake_id, properties,"
-          + " audit_info, current_version, last_version, deleted_at)"
-          + " VALUES("
-          + " #{roleMeta.roleId},"
-          + " #{roleMeta.roleName},"
-          + " #{roleMeta.metalakeId},"
-          + " #{roleMeta.properties},"
-          + " #{roleMeta.auditInfo},"
-          + " #{roleMeta.currentVersion},"
-          + " #{roleMeta.lastVersion},"
-          + " #{roleMeta.deletedAt}"
-          + " )")
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listRolePOsByMetalake")
+  List<RolePO> listRolePOsByMetalake(@Param("metalakeName") String metalakeName);
+
+  @InsertProvider(type = RoleMetaSQLProviderFactory.class, method = "insertRoleMeta")
   void insertRoleMeta(@Param("roleMeta") RolePO rolePO);
 
-  @Insert(
-      "INSERT INTO "
-          + ROLE_TABLE_NAME
-          + "(role_id, role_name,"
-          + " metalake_id, properties,"
-          + " audit_info, current_version, last_version, deleted_at)"
-          + " VALUES("
-          + " #{roleMeta.roleId},"
-          + " #{roleMeta.roleName},"
-          + " #{roleMeta.metalakeId},"
-          + " #{roleMeta.properties},"
-          + " #{roleMeta.auditInfo},"
-          + " #{roleMeta.currentVersion},"
-          + " #{roleMeta.lastVersion},"
-          + " #{roleMeta.deletedAt}"
-          + " ) ON DUPLICATE KEY UPDATE"
-          + " role_name = #{roleMeta.roleName},"
-          + " metalake_id = #{roleMeta.metalakeId},"
-          + " properties = #{roleMeta.properties},"
-          + " audit_info = #{roleMeta.auditInfo},"
-          + " current_version = #{roleMeta.currentVersion},"
-          + " last_version = #{roleMeta.lastVersion},"
-          + " deleted_at = #{roleMeta.deletedAt}")
+  @InsertProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "insertRoleMetaOnDuplicateKeyUpdate")
   void insertRoleMetaOnDuplicateKeyUpdate(@Param("roleMeta") RolePO rolePO);
 
-  @Update(
-      "UPDATE "
-          + ROLE_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE role_id = #{roleId} AND deleted_at = 0")
+  @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "updateRoleMeta")
+  Integer updateRoleMeta(
+      @Param("newRoleMeta") RolePO newRolePO, @Param("oldRoleMeta") RolePO oldRolePO);
+
+  @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "softDeleteRoleMetaByRoleId")
   void softDeleteRoleMetaByRoleId(Long roleId);
 
-  @Update(
-      "UPDATE "
-          + ROLE_TABLE_NAME
-          + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-          + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-          + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0")
+  @UpdateProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "softDeleteRoleMetasByMetalakeId")
   void softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
 
-  @Delete(
-      "DELETE FROM "
-          + ROLE_TABLE_NAME
-          + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}")
+  @DeleteProvider(
+      type = RoleMetaSQLProviderFactory.class,
+      method = "deleteRoleMetasByLegacyTimeline")
   Integer deleteRoleMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

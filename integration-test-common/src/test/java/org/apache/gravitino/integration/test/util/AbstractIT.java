@@ -19,6 +19,8 @@
 package org.apache.gravitino.integration.test.util;
 
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
+import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_CATALOG_POSTGRESQL_IT;
+import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_JDBC_BACKEND;
 import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.google.common.base.Splitter;
@@ -39,6 +41,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -49,6 +52,7 @@ import org.apache.gravitino.integration.test.MiniGravitino;
 import org.apache.gravitino.integration.test.MiniGravitinoContext;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
 import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -92,6 +96,7 @@ public class AbstractIT {
 
   private static TestDatabaseName META_DATA;
   private static MySQLContainer MYSQL_CONTAINER;
+  private static PostgreSQLContainer POSTGRESQL_CONTAINER;
 
   protected static String serverUri;
 
@@ -140,31 +145,75 @@ public class AbstractIT {
       String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
       String icebergCatalogPath =
           ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
-      JdbcDriverDownloader.downloadJdbcDriver(
+      DownloaderUtils.downloadFile(DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
+      DownloaderUtils.downloadFile(
           DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
     } else {
       Path icebergLibsPath =
           Paths.get(gravitinoHome, "catalogs", "catalog-lakehouse-iceberg", "build", "libs");
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_MYSQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
+      DownloaderUtils.downloadFile(DOWNLOAD_MYSQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
 
-      JdbcDriverDownloader.downloadJdbcDriver(
-          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
+      DownloaderUtils.downloadFile(DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, icebergLibsPath.toString());
     }
   }
 
-  private static void setMySQLBackend() {
-    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
-    customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, mysqlUrl);
-    customConfigs.put(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, "root");
-    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, "root");
+  public static String startAndInitPGBackend() {
+    META_DATA = PG_JDBC_BACKEND;
+    containerSuite.startPostgreSQLContainer(META_DATA);
+    POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
 
+    String pgUrlWithoutSchema = POSTGRESQL_CONTAINER.getJdbcUrl(META_DATA);
+    String randomSchemaName = RandomStringUtils.random(10, true, false);
+    // Connect to the PostgreSQL docker and create a schema
+    String currentExecuteSql = "";
+    try (Connection connection =
+        DriverManager.getConnection(
+            pgUrlWithoutSchema,
+            POSTGRESQL_CONTAINER.getUsername(),
+            POSTGRESQL_CONTAINER.getPassword())) {
+      connection.setCatalog(PG_CATALOG_POSTGRESQL_IT.toString());
+      final Statement statement = connection.createStatement();
+      statement.execute("drop schema if exists " + randomSchemaName);
+      statement.execute("create schema " + randomSchemaName);
+      statement.execute("set search_path to " + randomSchemaName);
+      String gravitinoHome = System.getenv("GRAVITINO_ROOT_DIR");
+      String mysqlContent =
+          FileUtils.readFileToString(
+              new File(
+                  gravitinoHome
+                      + String.format(
+                          "/scripts/postgresql/schema-%s-postgresql.sql",
+                          ConfigConstants.VERSION_0_7_0)),
+              "UTF-8");
+
+      String[] initPGBackendSqls =
+          Arrays.stream(mysqlContent.split(";"))
+              .map(String::trim)
+              .filter(s -> !s.isEmpty())
+              .toArray(String[]::new);
+
+      for (String sql : initPGBackendSqls) {
+        currentExecuteSql = sql;
+        statement.execute(sql);
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to create database in pg, sql:\n{}", currentExecuteSql, e);
+      throw new RuntimeException(e);
+    }
+
+    pgUrlWithoutSchema = pgUrlWithoutSchema + "?currentSchema=" + randomSchemaName;
+    customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgUrlWithoutSchema);
+
+    LOG.info("PG URL: {}", pgUrlWithoutSchema);
+    return pgUrlWithoutSchema;
+  }
+
+  public static String startAndInitMySQLBackend() {
+    META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
+    containerSuite.startMySQLContainer(META_DATA);
+    MYSQL_CONTAINER = containerSuite.getMySQLContainer();
+
+    String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
     LOG.info("MySQL URL: {}", mysqlUrl);
     // Connect to the mysql docker and create a databases
     try (Connection connection =
@@ -192,6 +241,7 @@ public class AbstractIT {
       for (String sql : initMySQLBackendSqls) {
         statement.execute(sql);
       }
+      return mysqlUrl;
     } catch (Exception e) {
       LOG.error("Failed to create database in mysql", e);
       throw new RuntimeException(e);
@@ -216,11 +266,27 @@ public class AbstractIT {
 
     if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
-      META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
-      containerSuite.startMySQLContainer(META_DATA);
-      MYSQL_CONTAINER = containerSuite.getMySQLContainer();
-
-      setMySQLBackend();
+      String jdbcURL = startAndInitMySQLBackend();
+      customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, jdbcURL);
+      customConfigs.put(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, "root");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, "root");
+    } else if ("PostgreSQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
+      // Start PostgreSQL docker instance.
+      String pgJdbcUrl = startAndInitPGBackend();
+      customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
+      customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgJdbcUrl);
+      customConfigs.put(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY,
+          POSTGRESQL_CONTAINER.getDriverClassName(META_DATA));
+      customConfigs.put(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, POSTGRESQL_CONTAINER.getUsername());
+      customConfigs.put(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, POSTGRESQL_CONTAINER.getPassword());
     }
 
     File baseDir = new File(System.getProperty("java.io.tmpdir"));
@@ -271,7 +337,12 @@ public class AbstractIT {
     if (authenticators.contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       client = GravitinoAdminClient.builder(serverUri).withOAuth(mockDataProvider).build();
     } else if (authenticators.contains(AuthenticatorType.SIMPLE.name().toLowerCase())) {
-      client = GravitinoAdminClient.builder(serverUri).withSimpleAuth().build();
+      String userName = customConfigs.get("SimpleAuthUserName");
+      if (userName != null) {
+        client = GravitinoAdminClient.builder(serverUri).withSimpleAuth(userName).build();
+      } else {
+        client = GravitinoAdminClient.builder(serverUri).withSimpleAuth().build();
+      }
     } else if (authenticators.contains(AuthenticatorType.KERBEROS.name().toLowerCase())) {
       serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
       client = null;

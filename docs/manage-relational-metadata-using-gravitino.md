@@ -162,12 +162,12 @@ Catalog catalog = gravitinoClient.alterCatalog("catalog",
 
 Currently, Gravitino supports the following changes to a catalog:
 
-| Supported modification | JSON                                                         | Java                                           |
-|------------------------|--------------------------------------------------------------|------------------------------------------------|
-| Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `CatalogChange.rename("catalog_renamed")`      |
-| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `CatalogChange.updateComment("new_comment")`   |
-| Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `CatalogChange.setProperty("key1", "value1")`  |
-| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `CatalogChange.removeProperty("key1")`         |
+| Supported modification | JSON                                                         | Java                                          |
+|------------------------|--------------------------------------------------------------|-----------------------------------------------|
+| Rename catalog         | `{"@type":"rename","newName":"catalog_renamed"}`             | `CatalogChange.rename("catalog_renamed")`     |
+| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `CatalogChange.updateComment("new_comment")`  |
+| Set a property         | `{"@type":"setProperty","property":"key1","value":"value1"}` | `CatalogChange.setProperty("key1", "value1")` |
+| Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `CatalogChange.removeProperty("key1")`        |
 
 :::warning
 
@@ -836,14 +836,14 @@ The following is the table property that Gravitino supports:
 | `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties) | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
 | `doris`             | [Doris table property](./jdbc-doris-catalog.md#table-properties)           | [Doris type mapping](./jdbc-doris-catalog.md#table-column-types)           |
 
-#### Table partitioning, bucketing, sort ordering and indexes
+#### Table partitioning, distribution, sort ordering and indexes
 
 In addition to the basic settings, Gravitino supports the following features:
 
-| Feature             | Description                                                                                                                                                                                                                                                                                    | Java doc                                                                                                                 |
-|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| Feature             | Description                                                                                                                                                                                                                                                                                    | Java doc                                                                                                                        |
+|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
 | Table partitioning  | Equal to `PARTITION BY` in Apache Hive, It is a partitioning strategy that is used to split a table into parts based on partition keys. Some table engine may not support this feature                                                                                                         | [Partition](pathname:///docs/0.6.0-incubating/api/java/org/apache/gravitino/dto/rel/partitioning/Partitioning.html)             |
-| Table bucketing     | Equal to `CLUSTERED BY` in Apache Hive, Bucketing a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the bucketing column will be hashed by a user-defined number into buckets.               | [Distribution](pathname:///docs/0.6.0-incubating/api/java/org/apache/gravitino/rel/expressions/distributions/Distribution.html) |
+| Table distribution  | Equal to `CLUSTERED BY` in Apache Hive, distribution a.k.a (Clustering) is a technique to split the data into more manageable files/parts, (By specifying the number of buckets to create). The value of the distribution column will be hashed by a user-defined number into buckets.         | [Distribution](pathname:///docs/0.6.0-incubating/api/java/org/apache/gravitino/rel/expressions/distributions/Distribution.html) |
 | Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.6.0-incubating/api/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.html)               |
 | Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.6.0-incubating/api/java/org/apache/gravitino/rel/indexes/Index.html)                                 |
 
