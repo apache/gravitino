@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
@@ -168,18 +169,21 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
     String authType =
         sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
+    authType = getRequiredConfig(sparkConf, authType);
     if (AuthProperties.isSimple(authType)) {
-      String username = sparkConf.get(GravitinoSparkConfig.GRAVITINO_SIMPLE_USER_NAME, null);
+      String username =
+          getOptionalConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_SIMPLE_USER_NAME);
       if (StringUtils.isNotBlank(username)) {
         builder.withSimpleAuth(username.trim());
       } else {
         builder.withSimpleAuth();
       }
     } else if (AuthProperties.isOAuth2(authType)) {
-      String oAuthUri = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_URI, null);
-      String credential = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_CREDENTIAL, null);
-      String path = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_PATH, null);
-      String scope = sparkConf.get(GravitinoSparkConfig.GRAVITINO_OAUTH2_SCOPE, null);
+      String oAuthUri = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_OAUTH2_URI);
+      String credential =
+          getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_OAUTH2_CREDENTIAL);
+      String path = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_OAUTH2_PATH);
+      String scope = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_OAUTH2_SCOPE);
       DefaultOAuth2TokenProvider oAuth2TokenProvider =
           DefaultOAuth2TokenProvider.builder()
               .withUri(oAuthUri)
@@ -189,9 +193,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               .build();
       builder.withOAuth(oAuth2TokenProvider);
     } else if (AuthProperties.isKerberos(authType)) {
-      String principal = sparkConf.get(GravitinoSparkConfig.GRAVITINO_KERBEROS_PRINCIPAL, null);
+      String principal =
+          getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_KERBEROS_PRINCIPAL);
       String keyTabFile =
-          sparkConf.get(GravitinoSparkConfig.GRAVITINO_KERBEROS_KEYTAB_FILE_PATH, null);
+          getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_KERBEROS_KEYTAB_FILE_PATH);
       KerberosTokenProvider kerberosTokenProvider =
           KerberosTokenProvider.builder()
               .withClientPrincipal(principal)
@@ -199,8 +204,20 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               .build();
       builder.withKerberosAuth(kerberosTokenProvider);
     } else {
-      throw new UnsupportedOperationException("Doesn't support auth: " + authType);
+      throw new UnsupportedOperationException("Unsupported auth type: " + authType);
     }
     return builder.build();
+  }
+
+  private static String getRequiredConfig(SparkConf sparkConf, String configKey) {
+    String configValue = sparkConf.get(configKey, null);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(configValue), configKey + " should not empty");
+    return configValue;
+  }
+
+  @Nullable
+  private static String getOptionalConfig(SparkConf sparkConf, String configKey) {
+    return sparkConf.get(configKey, null);
   }
 }

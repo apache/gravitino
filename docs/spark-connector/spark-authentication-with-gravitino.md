@@ -17,15 +17,15 @@ Spark connector supports `simple` `oauth2` and `kerberos` authentication when ac
 
 In the simple mode, you could specify the username by configuration.
 
-| Property                            | Type   | Default Value | Description                           | Required | Since Version |
-|-------------------------------------|--------|---------------|---------------------------------------|----------|---------------|
-| spark.sql.gravitino.simple.userName | string | None          | The user name to access the Gravitino | No       | 0.7.0         |
+| Property                                | Type   | Default Value                    | Description                           | Required | Since Version |
+|-----------------------------------------|--------|----------------------------------|---------------------------------------|----------|---------------|
+| spark.sql.gravitino.simpleAuth.userName | string | The user logging in the machine. | The user name to access the Gravitino | No       | 0.7.0         |
 
-If you doesn't set `spark.sql.gravitino.simple.userName` explicitly. It will use the value of environment variable `GRAVITINO_USER` as the user. If the environment variable `GRAVITINO_USER` isn't set, the client uses the user logging in the machine.
+If you doesn't set `spark.sql.gravitino.simpleAuth.userName` explicitly. It will use the value of environment variable `GRAVITINO_USER` as the user. If the environment variable `GRAVITINO_USER` isn't set, the client uses the user logging in the machine.
 
 ## OAuth2 mode
 
-In the OAuth2 mode, you could use following configuration to fetch an OAuth2 token to access Gravitino server.
+In the OAuth2 mode, you could use the following configuration to fetch an OAuth2 token to access Gravitino server.
 
 | Property                              | Type   | Default Value | Description                                   | Required             | Since Version |
 |---------------------------------------|--------|---------------|-----------------------------------------------|----------------------|---------------|
