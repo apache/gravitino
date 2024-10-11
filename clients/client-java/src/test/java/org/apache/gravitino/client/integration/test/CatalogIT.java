@@ -28,6 +28,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.AbstractIT;
@@ -124,6 +125,13 @@ public class CatalogIT extends AbstractIT {
             catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties);
     Assertions.assertTrue(metalake.catalogExists(catalogName));
     Assertions.assertEquals(catalogName, catalog.name());
+
+    Assertions.assertThrows(
+        CatalogAlreadyExistsException.class,
+        () ->
+            metalake.createCatalog(
+                catalogName, Catalog.Type.RELATIONAL, "hive", "catalog comment", properties));
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     Assertions.assertTrue(metalake.dropCatalog(catalogName), "catalog should be dropped");
     Assertions.assertFalse(metalake.dropCatalog(catalogName), "catalog should be non-existent");
@@ -298,6 +306,36 @@ public class CatalogIT extends AbstractIT {
         metalake.alterCatalog(catalogName, CatalogChange.updateComment("new catalog comment"));
     Assertions.assertEquals("new catalog comment", updatedCatalog.comment());
 
+    metalake.dropCatalog(catalogName);
+  }
+
+  @Test
+  public void testAlterCatalogProperties() {
+    String cloudName = "aws";
+    String alterCloudName = "azure";
+    String regionCode = "us-east-1";
+    String alterRegionCode = "us-west-2";
+
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog");
+    ImmutableMap<String, String> props =
+        ImmutableMap.of(Catalog.CLOUD_NAME, cloudName, Catalog.CLOUD_REGION_CODE, regionCode);
+    Catalog catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", props);
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+    Assertions.assertFalse(catalog.properties().isEmpty());
+    Assertions.assertEquals(cloudName, catalog.properties().get(Catalog.CLOUD_NAME));
+    Assertions.assertEquals(regionCode, catalog.properties().get(Catalog.CLOUD_REGION_CODE));
+
+    Catalog alteredCatalog =
+        metalake.alterCatalog(
+            catalogName,
+            CatalogChange.setProperty(Catalog.CLOUD_NAME, alterCloudName),
+            CatalogChange.setProperty(Catalog.CLOUD_REGION_CODE, alterRegionCode));
+
+    Assertions.assertEquals(alterCloudName, alteredCatalog.properties().get(Catalog.CLOUD_NAME));
+    Assertions.assertEquals(
+        alterRegionCode, alteredCatalog.properties().get(Catalog.CLOUD_REGION_CODE));
     metalake.dropCatalog(catalogName);
   }
 }

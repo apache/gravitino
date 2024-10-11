@@ -78,6 +78,7 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
             NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, object);
             Optional<Owner> owner =
                 TreeLockUtils.doWithTreeLock(
@@ -112,6 +113,7 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
             NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, object);
             TreeLockUtils.doWithTreeLock(
                 objectIdent,

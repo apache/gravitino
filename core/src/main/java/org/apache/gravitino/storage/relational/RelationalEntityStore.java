@@ -188,11 +188,9 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType)
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
-    return backend.listEntitiesByRelation(relType, nameIdentifier, identType);
+    return backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
   }
 
   @Override

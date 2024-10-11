@@ -143,6 +143,11 @@ public class ExceptionHandlers {
     return OwnerExceptionHandler.INSTANCE.handle(type, name, metalake, e);
   }
 
+  public static Response handleRolePermissionOperationException(
+      OperationType type, String name, String parent, Exception e) {
+    return RolePermissionOperationHandler.INSTANCE.handle(type, name, parent, e);
+  }
+
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new PartitionExceptionHandler();
@@ -505,6 +510,19 @@ public class ExceptionHandlers {
       return String.format(
           "Failed to operate role(s)%s operation [%s] under group [%s], reason [%s]",
           roles, operation, parent, reason);
+    }
+  }
+
+  private static class RolePermissionOperationHandler extends BasePermissionExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new RolePermissionOperationHandler();
+
+    @Override
+    protected String getPermissionErrorMsg(
+        String object, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate object(%s) operation [%s] under role [%s], reason [%s]",
+          object, operation, parent, reason);
     }
   }
 

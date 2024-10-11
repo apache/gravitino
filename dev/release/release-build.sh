@@ -193,6 +193,7 @@ if [[ "$1" == "package" ]]; then
   rm -f gravitino-$GRAVITINO_VERSION-src/web/LICENSE.bin
   rm -f gravitino-$GRAVITINO_VERSION-src/web/NOTICE.bin
 
+  rm -f *.asc
   tar cvzf gravitino-$GRAVITINO_VERSION-src.tar.gz --exclude gravitino-$GRAVITINO_VERSION-src/.git gravitino-$GRAVITINO_VERSION-src
   echo $GPG_PASSPHRASE | $GPG --passphrase-fd 0 --armour --output gravitino-$GRAVITINO_VERSION-src.tar.gz.asc \
     --detach-sig gravitino-$GRAVITINO_VERSION-src.tar.gz
@@ -286,7 +287,7 @@ if [[ "$1" == "publish-release" ]]; then
   cd gravitino-$GRAVITINO_VERSION-publish
 
   # Using Nexus API documented here:
-  # https://support.sonatype.com/entries/39720203-Uploading-to-a-Staging-Repository-via-REST-API
+  # https://support.sonatype.com/hc/en-us/articles/213465868-Uploading-to-a-Nexus-Repository-2-Staging-Repository-via-REST-API
   if ! is_dry_run; then
     echo "Creating Nexus staging repository"
     repo_request="<promoteRequest><data><description>Apache Gravitino $GRAVITINO_VERSION (commit $git_hash)</description></data></promoteRequest>"

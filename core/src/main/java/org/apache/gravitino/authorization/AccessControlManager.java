@@ -18,14 +18,15 @@
  */
 package org.apache.gravitino.authorization;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -95,6 +96,16 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
+    return userGroupManager.listGroups(metalake);
+  }
+
+  @Override
+  public String[] listGroupNames(String metalake) throws NoSuchMetalakeException {
+    return userGroupManager.listGroupNames(metalake);
+  }
+
+  @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
     return permissionManager.grantRolesToUser(metalake, roles, user);
@@ -139,6 +150,7 @@ public class AccessControlManager implements AccessControlDispatcher {
     return roleManager.getRole(metalake, role);
   }
 
+  @Override
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
     return roleManager.deleteRole(metalake, role);
   }
@@ -148,8 +160,23 @@ public class AccessControlManager implements AccessControlDispatcher {
     return roleManager.listRoleNames(metalake);
   }
 
-  @VisibleForTesting
-  RoleManager getRoleManager() {
-    return roleManager;
+  @Override
+  public String[] listRoleNamesByObject(String metalake, MetadataObject object)
+      throws NoSuchMetalakeException, NoSuchMetadataObjectException {
+    return roleManager.listRoleNamesByObject(metalake, object);
+  }
+
+  @Override
+  public Role grantPrivilegeToRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetalakeException {
+    return permissionManager.grantPrivilegesToRole(metalake, role, object, privileges);
+  }
+
+  @Override
+  public Role revokePrivilegesFromRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetalakeException {
+    return permissionManager.revokePrivilegesFromRole(metalake, role, object, privileges);
   }
 }

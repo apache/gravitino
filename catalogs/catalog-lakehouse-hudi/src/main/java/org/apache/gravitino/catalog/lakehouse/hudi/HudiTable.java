@@ -68,5 +68,10 @@ public abstract class HudiTable<TABLE> extends BaseTable {
      * @return the HudiTable
      */
     protected abstract HudiTable<T> buildFromTable(T backendTable);
+
+    @Override
+    public HudiTable<T> build() {
+      return internalBuild();
+    }
   }
 }

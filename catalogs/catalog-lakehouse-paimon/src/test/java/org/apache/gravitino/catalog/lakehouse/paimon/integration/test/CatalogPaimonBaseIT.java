@@ -109,17 +109,21 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   private GravitinoMetalake metalake;
   private Catalog catalog;
   private org.apache.paimon.catalog.Catalog paimonCatalog;
-  private SparkSession spark;
+  protected SparkSession spark;
   private Map<String, String> catalogProperties;
 
   @BeforeAll
   public void startup() {
-    containerSuite.startHiveContainer();
+    startNecessaryContainers();
     catalogProperties = initPaimonCatalogProperties();
     createMetalake();
     createCatalog();
     createSchema();
     initSparkEnv();
+  }
+
+  protected void startNecessaryContainers() {
+    containerSuite.startHiveContainer();
   }
 
   @AfterAll
@@ -882,8 +886,13 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(type), "Paimon Catalog backend type can not be null or empty.");
     catalogProperties.put(PaimonCatalogPropertiesMetadata.PAIMON_METASTORE, type);
+
+    // Why needs this conversion? Because PaimonCatalogOperations#initialize will try to convert
+    // Gravitino general S3 properties to Paimon specific S3 properties.
+    Map<String, String> copy = CatalogUtils.toInnerProperty(catalogProperties, true);
+
     PaimonBackendCatalogWrapper paimonBackendCatalogWrapper =
-        CatalogUtils.loadCatalogBackend(new PaimonConfig(catalogProperties));
+        CatalogUtils.loadCatalogBackend(new PaimonConfig(copy));
     paimonCatalog = paimonBackendCatalogWrapper.getCatalog();
   }
 
@@ -926,7 +935,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     return properties;
   }
 
-  private void initSparkEnv() {
+  protected void initSparkEnv() {
     spark =
         SparkSession.builder()
             .master("local[1]")
