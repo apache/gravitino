@@ -49,7 +49,7 @@ For detailed instructions on how to build and install the Gravitino server packa
 
 There are distinct configuration files for standalone and auxiliary server: `gravitino-iceberg-rest-server.conf` is used for the standalone server, while `gravitino.conf` is for the auxiliary server. Although the configuration files differ, the configuration items remain the same. 
 
-Starting with version `0.6.0`, the prefix `gravitino.auxService.iceberg-rest.` for auxiliary server configurations has been deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the latter will take precedence. The configurations listed below use the `gravitino.iceberg-rest.` prefix.
+Starting with version `0.6.0-incubating`, the prefix `gravitino.auxService.iceberg-rest.` for auxiliary server configurations has been deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the latter will take precedence. The configurations listed below use the `gravitino.iceberg-rest.` prefix.
 
 ### Configuration to enable Iceberg REST service in Gravitino server.
 

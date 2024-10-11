@@ -69,13 +69,13 @@ You must download the corresponding JDBC driver to the `catalogs/lakehouse-icebe
 
 Supports using static access-key-id and secret-access-key to access S3 data.
 
-| Configuration item     | Description                                                                                                                                                                                                         | Default value | Required | Since Version |
-|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `io-impl`              | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aws.s3.S3FileIO` for s3.                                                                                                                     | (none)        | No       | 0.6.0         |
-| `s3-access-key-id`     | The static access key ID used to access S3 data.                                                                                                                                                                    | (none)        | No       | 0.6.0         |
-| `s3-secret-access-key` | The static secret access key used to access S3 data.                                                                                                                                                                | (none)        | No       | 0.6.0         |
-| `s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)        | No       | 0.6.0         |
-| `s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)        | No       | 0.6.0         |
+| Configuration item     | Description                                                                                                                                                                                                         | Default value | Required | Since Version    |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `io-impl`              | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aws.s3.S3FileIO` for s3.                                                                                                                     | (none)        | No       | 0.6.0-incubating |
+| `s3-access-key-id`     | The static access key ID used to access S3 data.                                                                                                                                                                    | (none)        | No       | 0.6.0-incubating |
+| `s3-secret-access-key` | The static secret access key used to access S3 data.                                                                                                                                                                | (none)        | No       | 0.6.0-incubating |
+| `s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)        | No       | 0.6.0-incubating |
+| `s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)        | No       | 0.6.0-incubating |
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
@@ -107,7 +107,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 - Doesn't support column default value.
 
-#### Table partitions
+### Table partitions
 
 Supports transforms:
 
@@ -242,7 +242,7 @@ Apache Iceberg doesn't support Gravitino `EvenDistribution` type.
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
 ### Table properties
