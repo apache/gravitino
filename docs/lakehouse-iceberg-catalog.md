@@ -83,66 +83,6 @@ For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you
 To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle]([Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle)) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
-#### OSS
-
-Gravitino Iceberg REST service supports using static access-key-id and secret-access-key to access OSS data.
-
-| Configuration item      | Description                                                                                           | Default value | Required | Since Version    |
-|-------------------------|-------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `io-impl`               | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aliyun.oss.OSSFileIO` for OSS. | (none)        | No       | 0.6.0-incubating |
-| `oss-access-key-id`     | The static access key ID used to access OSS data.                                                     | (none)        | No       | 0.7.0-incubating |
-| `oss-secret-access-key` | The static secret access key used to access OSS data.                                                 | (none)        | No       | 0.7.0-incubating |
-| `oss-endpoint`          | The endpoint of Aliyun OSS service.                                                                   | (none)        | No       | 0.7.0-incubating |
-
-For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.bypass.client.security-token`.
-
-:::info
-Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the `catalogs/lakehouse-iceberg/libs/` directory.
-:::
-
-#### GCS
-
-Supports using google credential file to access GCS data.
-
-| Configuration item | Description                                                                                        | Default value | Required | Since Version    |
-|--------------------|----------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `io-impl`          | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.gcp.gcs.GCSFileIO` for GCS. | (none)        | No       | 0.6.0-incubating |
-
-For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.bypass.gcs.project-id`.
-
-Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino server is started.
-
-:::info
-Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
-:::
-
-#### Other storages
-
-For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.
-
-| Configuration item | Description                                                                             | Default value | Required | Since Version    |
-|--------------------|-----------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `io-impl`          | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0-incubating |
-
-To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.bypass.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
-
-:::info
-Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the `catalogs/lakehouse-iceberg/libs/` directory.
-:::
-
-#### Catalog backend security
-
-Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
-
-| Property name                                      | Description                                                                                                                                                                                                                                      | Default value | Required                                                    | Since Version    |
-|----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|------------------|
-| `authentication.type`                              | The type of authentication for Iceberg catalog backend. This configuration only applicable for for Hive backend, and only supports `Kerberos`, `simple` currently. As for JDBC backend, only username/password authentication was supported now. | `simple`      | No                                                          | 0.6.0-incubating |
-| `authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                                                                          | `false`       | No                                                          | 0.6.0-incubating |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                                                     | (none)        | required if the value of `authentication.type` is Kerberos. | 0.6.0-incubating |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                                                           | (none)        | required if the value of `authentication.type` is Kerberos. | 0.6.0-incubating |
-| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                   | 60            | No                                                          | 0.6.0-incubating |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                       | 60            | No                                                          | 0.6.0-incubating |
-
 ### Catalog operations
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
