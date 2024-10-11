@@ -21,18 +21,20 @@ package org.apache.gravitino.catalog.hadoop;
 
 import java.io.IOException;
 import java.util.Map;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 
 public interface FileSystemProvider {
 
   /**
-   * Get the FileSystem instance according to the configuration and the path.
+   * Get the FileSystem instance according to the configuration map.
    *
-   * <p>Compared to the FileSystem.get method, this method allows the provider to create a
-   * FileSystem instance with a specific configuration and path and do further initialization if
-   * needed.
+   * <p>Compared to the {@link FileSystem#get(Configuration)} method, this method allows the
+   * provider to create a FileSystem instance with a specific configuration and do further
+   * initialization if needed.
    *
    * <p>For example, we can check endpoint configurations for S3AFileSystem, or set the default one.
+   * We can also set the default file system for HDFS.
    *
    * @param config The configuration for the FileSystem instance.
    * @return The FileSystem instance.
