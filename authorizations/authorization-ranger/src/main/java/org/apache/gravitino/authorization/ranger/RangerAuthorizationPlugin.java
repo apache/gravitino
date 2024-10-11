@@ -19,14 +19,17 @@
 package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
@@ -34,6 +37,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
+import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
@@ -41,6 +45,7 @@ import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -70,6 +75,7 @@ public abstract class RangerAuthorizationPlugin
   protected final RangerClientExtension rangerClient;
   private final RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
+  private final Set<Privilege.Name> allowPrivileges;
 
   protected RangerAuthorizationPlugin(Map<String, String> config) {
     String rangerUrl = config.get(AuthorizationPropertiesMeta.RANGER_ADMIN_URL);
@@ -78,31 +84,20 @@ public abstract class RangerAuthorizationPlugin
     // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
     String password = config.get(AuthorizationPropertiesMeta.RANGER_PASSWORD);
     rangerServiceName = config.get(AuthorizationPropertiesMeta.RANGER_SERVICE_NAME);
-    RangerHelper.check(rangerUrl != null, "Ranger admin URL is required");
-    RangerHelper.check(authType != null, "Ranger auth type is required");
-    RangerHelper.check(rangerAdminName != null, "Ranger username is required");
-    RangerHelper.check(password != null, "Ranger password is required");
-    RangerHelper.check(rangerServiceName != null, "Ranger service name is required");
+    Preconditions.checkArgument(rangerUrl != null, "Ranger admin URL is required");
+    Preconditions.checkArgument(authType != null, "Ranger auth type is required");
+    Preconditions.checkArgument(rangerAdminName != null, "Ranger username is required");
+    Preconditions.checkArgument(password != null, "Ranger password is required");
+    Preconditions.checkArgument(rangerServiceName != null, "Ranger service name is required");
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
-
+    allowPrivileges = allowPrivilegesRule();
     rangerHelper =
         new RangerHelper(
             rangerClient,
             rangerAdminName,
             rangerServiceName,
-            privilegesMappingRule(),
             ownerMappingRule(),
             policyResourceDefinesRule());
-  }
-
-  /**
-   * Translate the privilege name to the corresponding privilege name in the Ranger
-   *
-   * @param name The privilege name to translate
-   * @return The corresponding Ranger privilege name in the underlying permission system
-   */
-  public Set<String> translatePrivilege(Privilege.Name name) {
-    return rangerHelper.translatePrivilege(name);
   }
 
   /**
@@ -112,7 +107,11 @@ public abstract class RangerAuthorizationPlugin
    */
   @Override
   public Boolean onRoleCreated(Role role) throws RuntimeException {
-    rangerHelper.createRangerRoleIfNotExists(role.name());
+    if (!validAuthorizationOperation(role.securableObjects())) {
+      return false;
+    }
+
+    rangerHelper.createRangerRoleIfNotExists(role.name(), false);
     return onRoleUpdated(
         role,
         role.securableObjects().stream()
@@ -122,12 +121,18 @@ public abstract class RangerAuthorizationPlugin
 
   @Override
   public Boolean onRoleAcquired(Role role) throws RuntimeException {
+    if (!validAuthorizationOperation(role.securableObjects())) {
+      return false;
+    }
     return rangerHelper.checkRangerRole(role.name());
   }
 
   /** Remove the role name from the Ranger policy item, and delete this Role in the Ranger. <br> */
   @Override
   public Boolean onRoleDeleted(Role role) throws RuntimeException {
+    if (!validAuthorizationOperation(role.securableObjects())) {
+      return false;
+    }
     // First, remove the role in the Ranger policy
     onRoleUpdated(
         role,
@@ -147,20 +152,67 @@ public abstract class RangerAuthorizationPlugin
   @Override
   public Boolean onRoleUpdated(Role role, RoleChange... changes) throws RuntimeException {
     for (RoleChange change : changes) {
-      boolean execResult;
       if (change instanceof RoleChange.AddSecurableObject) {
-        execResult = doAddSecurableObject((RoleChange.AddSecurableObject) change);
+        SecurableObject securableObject =
+            ((RoleChange.AddSecurableObject) change).getSecurableObject();
+        if (!validAuthorizationOperation(Arrays.asList(securableObject))) {
+          return false;
+        }
+
+        List<RangerSecurableObject> rangerSecurableObjects = translatePrivilege(securableObject);
+        rangerSecurableObjects.stream()
+            .forEach(
+                rangerSecurableObject -> {
+                  if (!doAddSecurableObject(role.name(), rangerSecurableObject)) {
+                    throw new RuntimeException(
+                        "Failed to add the securable object to the Ranger policy!");
+                  }
+                });
       } else if (change instanceof RoleChange.RemoveSecurableObject) {
-        execResult = doRemoveSecurableObject((RoleChange.RemoveSecurableObject) change);
+        SecurableObject securableObject =
+            ((RoleChange.RemoveSecurableObject) change).getSecurableObject();
+        if (!validAuthorizationOperation(Arrays.asList(securableObject))) {
+          return false;
+        }
+
+        List<RangerSecurableObject> rangerSecurableObjects = translatePrivilege(securableObject);
+        rangerSecurableObjects.stream()
+            .forEach(
+                rangerSecurableObject -> {
+                  if (!doRemoveSecurableObject(role.name(), rangerSecurableObject)) {
+                    throw new RuntimeException(
+                        "Failed to add the securable object to the Ranger policy!");
+                  }
+                });
       } else if (change instanceof RoleChange.UpdateSecurableObject) {
-        execResult = doUpdateSecurableObject((RoleChange.UpdateSecurableObject) change);
+        SecurableObject oldSecurableObject =
+            ((RoleChange.UpdateSecurableObject) change).getSecurableObject();
+        if (!validAuthorizationOperation(Arrays.asList(oldSecurableObject))) {
+          return false;
+        }
+        SecurableObject newSecurableObject =
+            ((RoleChange.UpdateSecurableObject) change).getNewSecurableObject();
+        if (!validAuthorizationOperation(Arrays.asList(newSecurableObject))) {
+          return false;
+        }
+        List<RangerSecurableObject> rangerOldSecurableObjects =
+            translatePrivilege(oldSecurableObject);
+        List<RangerSecurableObject> rangerNewSecurableObjects =
+            translatePrivilege(newSecurableObject);
+        rangerOldSecurableObjects.stream()
+            .forEach(
+                rangerSecurableObject -> {
+                  doRemoveSecurableObject(role.name(), rangerSecurableObject);
+                });
+        rangerNewSecurableObjects.stream()
+            .forEach(
+                rangerSecurableObject -> {
+                  doAddSecurableObject(role.name(), rangerSecurableObject);
+                });
       } else {
         throw new IllegalArgumentException(
             "Unsupported role change type: "
                 + (change == null ? "null" : change.getClass().getSimpleName()));
-      }
-      if (!execResult) {
-        return Boolean.FALSE;
       }
     }
 
@@ -181,29 +233,42 @@ public abstract class RangerAuthorizationPlugin
   @Override
   public Boolean onOwnerSet(MetadataObject metadataObject, Owner preOwner, Owner newOwner)
       throws RuntimeException {
-    RangerHelper.check(newOwner != null, "The newOwner must be not null");
+    Preconditions.checkArgument(newOwner != null, "The newOwner must be not null");
 
     // Add the user or group to the Ranger
+    String preOwnerUserName = null,
+        preOwnerGroupName = null,
+        newOwnerUserName = null,
+        newOwnerGroupName = null;
     AuditInfo auditInfo =
         AuditInfo.builder()
             .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
             .withCreateTime(Instant.now())
             .build();
+    if (preOwner != null) {
+      if (preOwner.type() == Owner.Type.USER) {
+        preOwnerUserName = newOwner.name();
+      } else {
+        preOwnerGroupName = newOwner.name();
+      }
+    }
     if (newOwner.type() == Owner.Type.USER) {
+      newOwnerUserName = newOwner.name();
       UserEntity userEntity =
           UserEntity.builder()
               .withId(1L)
-              .withName(newOwner.name())
+              .withName(newOwnerUserName)
               .withRoleNames(Collections.emptyList())
               .withRoleIds(Collections.emptyList())
               .withAuditInfo(auditInfo)
               .build();
       onUserAdded(userEntity);
     } else {
+      newOwnerGroupName = newOwner.name();
       GroupEntity groupEntity =
           GroupEntity.builder()
               .withId(1L)
-              .withName(newOwner.name())
+              .withName(newOwnerGroupName)
               .withRoleNames(Collections.emptyList())
               .withRoleIds(Collections.emptyList())
               .withAuditInfo(auditInfo)
@@ -211,17 +276,79 @@ public abstract class RangerAuthorizationPlugin
       onGroupAdded(groupEntity);
     }
 
-    RangerPolicy policy = rangerHelper.findManagedPolicy(metadataObject);
-    try {
-      if (policy == null) {
-        policy = rangerHelper.addOwnerToNewPolicy(metadataObject, newOwner);
-        rangerClient.createPolicy(policy);
-      } else {
-        rangerHelper.updatePolicyOwner(policy, preOwner, newOwner);
-        rangerClient.updatePolicy(policy.getId(), policy);
-      }
-    } catch (RangerServiceException e) {
-      throw new RuntimeException(e);
+    List<RangerSecurableObject> rangerSecurableObjects = translateOwner(metadataObject);
+    String ownerRoleName;
+    switch (metadataObject.type()) {
+      case METALAKE:
+      case CATALOG:
+        // The metalake and catalog use role to manage the owner
+        if (metadataObject.type() == MetadataObject.Type.METALAKE) {
+          ownerRoleName = RangerHelper.GRAVITINO_METALAKE_OWNER_ROLE;
+        } else {
+          ownerRoleName = RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE;
+        }
+        rangerHelper.createRangerRoleIfNotExists(ownerRoleName, true);
+        try {
+          if (preOwnerUserName != null || preOwnerGroupName != null) {
+            GrantRevokeRoleRequest revokeRoleRequest =
+                rangerHelper.createGrantRevokeRoleRequest(
+                    ownerRoleName, preOwnerUserName, preOwnerGroupName);
+            rangerClient.revokeRole(rangerServiceName, revokeRoleRequest);
+          }
+          if (newOwnerUserName != null || newOwnerGroupName != null) {
+            GrantRevokeRoleRequest grantRoleRequest =
+                rangerHelper.createGrantRevokeRoleRequest(
+                    ownerRoleName, newOwnerUserName, newOwnerGroupName);
+            rangerClient.grantRole(rangerServiceName, grantRoleRequest);
+          }
+        } catch (RangerServiceException e) {
+          // Ignore exception, support idempotent operation
+          LOG.warn("Grant owner role: {} failed!", ownerRoleName, e);
+        }
+
+        rangerSecurableObjects.stream()
+            .forEach(
+                rangerSecurableObject -> {
+                  RangerPolicy policy = rangerHelper.findManagedPolicy(rangerSecurableObject);
+                  try {
+                    if (policy == null) {
+                      policy =
+                          rangerHelper.addOwnerRoleToNewPolicy(
+                              rangerSecurableObject, ownerRoleName);
+                      rangerClient.createPolicy(policy);
+                    } else {
+                      rangerHelper.updatePolicyOwnerRole(policy, ownerRoleName);
+                      rangerClient.updatePolicy(policy.getId(), policy);
+                    }
+                  } catch (RangerServiceException e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+        break;
+      case SCHEMA:
+      case TABLE:
+        // The schema and table use user/group to manage the owner
+        rangerSecurableObjects.stream()
+            .forEach(
+                rangerSecurableObject -> {
+                  RangerPolicy policy = rangerHelper.findManagedPolicy(rangerSecurableObject);
+                  try {
+                    if (policy == null) {
+                      policy = rangerHelper.addOwnerToNewPolicy(rangerSecurableObject, newOwner);
+                      rangerClient.createPolicy(policy);
+                    } else {
+                      rangerHelper.updatePolicyOwner(policy, preOwner, newOwner);
+                      rangerClient.updatePolicy(policy.getId(), policy);
+                    }
+                  } catch (RangerServiceException e) {
+                    throw new RuntimeException(e);
+                  }
+                });
+        break;
+      default:
+        throw new AuthorizationPluginException(
+            "The owner privilege is not supported for the securable object: %s",
+            metadataObject.type());
     }
 
     return Boolean.TRUE;
@@ -238,13 +365,17 @@ public abstract class RangerAuthorizationPlugin
    */
   @Override
   public Boolean onGrantedRolesToUser(List<Role> roles, User user) throws RuntimeException {
+    if (roles.stream().anyMatch(role -> !validAuthorizationOperation(role.securableObjects()))) {
+      return false;
+    }
+
     // If the user does not exist, then create it.
     onUserAdded(user);
 
     roles.stream()
         .forEach(
             role -> {
-              rangerHelper.createRangerRoleIfNotExists(role.name());
+              rangerHelper.createRangerRoleIfNotExists(role.name(), false);
               GrantRevokeRoleRequest grantRevokeRoleRequest =
                   rangerHelper.createGrantRevokeRoleRequest(role.name(), user.name(), null);
               try {
@@ -269,6 +400,9 @@ public abstract class RangerAuthorizationPlugin
    */
   @Override
   public Boolean onRevokedRolesFromUser(List<Role> roles, User user) throws RuntimeException {
+    if (roles.stream().anyMatch(role -> !validAuthorizationOperation(role.securableObjects()))) {
+      return false;
+    }
     // If the user does not exist, then create it.
     onUserAdded(user);
 
@@ -300,13 +434,16 @@ public abstract class RangerAuthorizationPlugin
    */
   @Override
   public Boolean onGrantedRolesToGroup(List<Role> roles, Group group) throws RuntimeException {
+    if (roles.stream().anyMatch(role -> !validAuthorizationOperation(role.securableObjects()))) {
+      return false;
+    }
     // If the group does not exist, then create it.
     onGroupAdded(group);
 
     roles.stream()
         .forEach(
             role -> {
-              rangerHelper.createRangerRoleIfNotExists(role.name());
+              rangerHelper.createRangerRoleIfNotExists(role.name(), false);
               GrantRevokeRoleRequest grantRevokeRoleRequest =
                   rangerHelper.createGrantRevokeRoleRequest(role.name(), null, group.name());
               try {
@@ -330,6 +467,9 @@ public abstract class RangerAuthorizationPlugin
    */
   @Override
   public Boolean onRevokedRolesFromGroup(List<Role> roles, Group group) throws RuntimeException {
+    if (roles.stream().anyMatch(role -> !validAuthorizationOperation(role.securableObjects()))) {
+      return false;
+    }
     onGroupAdded(group);
     roles.stream()
         .forEach(
@@ -414,37 +554,32 @@ public abstract class RangerAuthorizationPlugin
    * return true. <br>
    * 3. If the policy does not exist, then create a new policy. <br>
    */
-  private boolean doAddSecurableObject(RoleChange.AddSecurableObject change) {
-    RangerPolicy policy = rangerHelper.findManagedPolicy(change.getSecurableObject());
+  private boolean doAddSecurableObject(String roleName, RangerSecurableObject securableObject) {
+    RangerPolicy policy = rangerHelper.findManagedPolicy(securableObject);
 
     if (policy != null) {
-      // Check the policy item's accesses and roles equal the Gravitino securable object's privilege
-      Set<String> policyPrivileges =
+      // Check the policy item's accesses and roles equal the Ranger securable object's privilege
+      Set<RangerPrivilege> policyPrivileges =
           policy.getPolicyItems().stream()
-              .filter(policyItem -> policyItem.getRoles().contains(change.getRoleName()))
+              .filter(policyItem -> policyItem.getRoles().contains(roleName))
               .flatMap(policyItem -> policyItem.getAccesses().stream())
               .map(RangerPolicy.RangerPolicyItemAccess::getType)
+              .map(RangerPrivileges::valueOf)
               .collect(Collectors.toSet());
-      Set<String> newPrivileges =
-          change.getSecurableObject().privileges().stream()
-              .filter(Objects::nonNull)
-              .flatMap(privilege -> translatePrivilege(privilege.name()).stream())
-              .filter(Objects::nonNull)
-              .collect(Collectors.toSet());
-      if (policyPrivileges.containsAll(newPrivileges)) {
+      if (policyPrivileges.containsAll(securableObject.privileges())) {
         LOG.info(
             "The privilege({}) already added to Ranger policy({})!",
             policy.getName(),
-            change.getSecurableObject().fullName());
+            securableObject.fullName());
         // If it exists policy with the same privilege, then directly return true, because support
         // idempotent operation.
         return true;
       }
     } else {
-      policy = rangerHelper.createPolicyAddResources(change.getSecurableObject());
+      policy = rangerHelper.createPolicyAddResources(securableObject);
     }
 
-    rangerHelper.addPolicyItem(policy, change.getRoleName(), change.getSecurableObject());
+    rangerHelper.addPolicyItem(policy, roleName, securableObject);
     try {
       if (policy.getId() == null) {
         rangerClient.createPolicy(policy);
@@ -465,13 +600,13 @@ public abstract class RangerAuthorizationPlugin
    * <br>
    * 3. If policy does not contain any policy item, then delete this policy. <br>
    */
-  private boolean doRemoveSecurableObject(RoleChange.RemoveSecurableObject change) {
-    RangerPolicy policy = rangerHelper.findManagedPolicy(change.getSecurableObject());
+  private boolean doRemoveSecurableObject(
+      String roleName, RangerSecurableObject rangerSecurableObject) {
+    RangerPolicy policy = rangerHelper.findManagedPolicy(rangerSecurableObject);
     if (policy == null) {
       LOG.warn(
-          "Cannot find the Ranger policy({}) for the Gravitino securable object({})!",
-          change.getRoleName(),
-          change.getSecurableObject().fullName());
+          "Cannot find the Ranger policy for the Ranger securable object({})!",
+          rangerSecurableObject.fullName());
       // Don't throw exception or return false, because need support immutable operation.
       return true;
     }
@@ -487,16 +622,13 @@ public abstract class RangerAuthorizationPlugin
                           access -> {
                             // Use Gravitino privilege to search the Ranger policy item's access
                             boolean matchPrivilege =
-                                change.getSecurableObject().privileges().stream()
+                                rangerSecurableObject.privileges().stream()
                                     .filter(Objects::nonNull)
-                                    .flatMap(
-                                        privilege -> translatePrivilege(privilege.name()).stream())
-                                    .filter(Objects::nonNull)
-                                    .anyMatch(privilege -> privilege.equals(access.getType()));
+                                    .anyMatch(privilege -> privilege.equalsTo(access.getType()));
                             return matchPrivilege;
                           });
               if (match) {
-                policyItem.getRoles().removeIf(change.getRoleName()::equals);
+                policyItem.getRoles().removeIf(roleName::equals);
               }
             });
 
@@ -522,36 +654,36 @@ public abstract class RangerAuthorizationPlugin
     return true;
   }
 
-  /**
-   * 1. Find the policy base the metadata object. <br>
-   * 2. If the policy exists, then user new securable object's privilege to update. <br>
-   * 3. If the policy does not exist, return false. <br>
-   */
-  private boolean doUpdateSecurableObject(RoleChange.UpdateSecurableObject change) {
-    RangerPolicy policy = rangerHelper.findManagedPolicy(change.getSecurableObject());
-    if (policy == null) {
-      LOG.warn(
-          "Cannot find the Ranger policy({}) for the Gravitino securable object({})!",
-          change.getRoleName(),
-          change.getSecurableObject().fullName());
-      // Don't throw exception or return false, because need support immutable operation.
-      return false;
-    }
-
-    rangerHelper.removePolicyItem(policy, change.getRoleName(), change.getSecurableObject());
-    rangerHelper.addPolicyItem(policy, change.getRoleName(), change.getNewSecurableObject());
-    try {
-      if (policy.getId() == null) {
-        rangerClient.createPolicy(policy);
-      } else {
-        rangerClient.updatePolicy(policy.getId(), policy);
-      }
-    } catch (RangerServiceException e) {
-      throw new RuntimeException(e);
-    }
-    return true;
-  }
-
   @Override
   public void close() throws IOException {}
+
+  public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
+    return securableObjects.stream()
+        .allMatch(
+            securableObject -> {
+              AtomicBoolean match = new AtomicBoolean(false);
+              securableObject.privileges().stream()
+                  .filter(Objects::nonNull)
+                  .forEach(
+                      privilege -> {
+                        if (!allowPrivileges.contains(privilege.name())) {
+                          LOG.error(
+                              "Authorization to ignore privilege({}) on metadata object({})!",
+                              privilege.name(),
+                              securableObject.fullName());
+                          return;
+                        }
+
+                        if (privilege.canBindTo(securableObject.type())) {
+                          match.set(true);
+                        } else {
+                          LOG.error(
+                              "The privilege({}) is not supported for the metadata object({})!",
+                              privilege.name(),
+                              securableObject.fullName());
+                        }
+                      });
+              return match.get();
+            });
+  }
 }

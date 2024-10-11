@@ -18,13 +18,22 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
-import org.apache.gravitino.authorization.Privilege;
+import java.util.List;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.annotation.Unstable;
 
-/** RangerPrivilege interface is used to define the Ranger privileges. */
-public interface RangerPrivilege {
-  String getName();
-
-  Privilege.Condition condition();
-
-  boolean equalsTo(String value);
+/**
+ * The Ranger securable object is the entity which access can be granted. Unless allowed by a grant,
+ * access is denied. <br>
+ * You can use the helper class `RangerSecurableObjects` to create the Ranger securable object which
+ * you need.
+ */
+@Unstable
+public interface RangerSecurableObject extends MetadataObject {
+  /**
+   * The privileges of the Ranger securable object.
+   *
+   * @return The privileges of the securable object.
+   */
+  List<RangerPrivilege> privileges();
 }
