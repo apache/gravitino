@@ -175,11 +175,16 @@ The Gravitino server doesn't allow passing the following reserved fields.
 | `comment`                          | The table comment.                                           |
 | `owner`                            | The table owner.                                             |
 | `bucket-key`                       | The table bucket-key.                                        |
+| `primary-key`                      | The table primary-key.                                       |
+| `partition`                        | The table partition.                                         |
+
+The Gravitino server doesn't allow the following immutable fields to be modified, but allows them to be specified when creating a new table.
+
+| Configuration item                 | Description                                                  |
+|------------------------------------|--------------------------------------------------------------|
 | `merge-engine`                     | The table merge-engine.                                      |
 | `sequence.field`                   | The table sequence.field.                                    |
 | `rowkind.field`                    | The table rowkind.field.                                     |
-| `primary-key`                      | The table primary-key.                                       |
-| `partition`                        | The table partition.                                         |
 
 ### Table operations
 
