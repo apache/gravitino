@@ -90,7 +90,7 @@ public class CatalogUtils {
     // TODO: Now we only support kerberos auth for Filesystem backend, and will support it for Hive
     // backend later.
     Preconditions.checkArgument(
-            PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(paimonConfig.get(CATALOG_BACKEND)));
+        PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(paimonConfig.get(CATALOG_BACKEND)));
 
     CatalogContext catalogContext =
         CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()), configuration);
