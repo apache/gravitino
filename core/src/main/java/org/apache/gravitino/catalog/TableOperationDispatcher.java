@@ -120,9 +120,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Update the column entities in Gravitino store if the columns are different from the ones
     // fetching from the underlying source.
-    updateColumnsIfNecessaryWhenLoad(ident, table);
+    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, table);
 
-    return table;
+    return EntityCombinedTable.of(table.tableFromCatalog(), updatedEntity)
+        .withHiddenPropertiesSet(
+            getHiddenPropertyNames(
+                getCatalogIdentifier(ident),
+                HasPropertyMetadata::tablePropertiesMetadata,
+                table.tableFromCatalog().properties()))
+        .withImported(table.imported());
   }
 
   /**
@@ -628,7 +634,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return Pair.of(columnsNeedsUpdate, columnsToInsert);
   }
 
-  private void updateColumnsIfNecessaryWhenLoad(
+  private TableEntity updateColumnsIfNecessaryWhenLoad(
       NameIdentifier tableIdent, EntityCombinedTable combinedTable) {
     Pair<Boolean, List<ColumnEntity>> columnsUpdateResult =
         updateColumnsIfNecessary(
@@ -636,11 +642,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // No need to update the columns
     if (!columnsUpdateResult.getLeft()) {
-      return;
+      return combinedTable.tableFromGravitino();
     }
 
     // Update the columns in the Gravitino store
-    TreeLockUtils.doWithTreeLock(
+    return TreeLockUtils.doWithTreeLock(
         tableIdent,
         LockType.WRITE,
         () ->
