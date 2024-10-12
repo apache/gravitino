@@ -43,7 +43,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class HadoopCatalogIT extends AbstractIT {
+public class HadoopCatalogIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 

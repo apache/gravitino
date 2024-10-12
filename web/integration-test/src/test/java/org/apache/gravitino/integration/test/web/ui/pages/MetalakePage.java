@@ -22,7 +22,7 @@ package org.apache.gravitino.integration.test.web.ui.pages;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
@@ -33,7 +33,7 @@ import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-public class MetalakePage extends AbstractWebIT {
+public class MetalakePage extends BaseWebIT {
   private static final String PAGE_TITLE = "Metalakes";
 
   @FindBy(

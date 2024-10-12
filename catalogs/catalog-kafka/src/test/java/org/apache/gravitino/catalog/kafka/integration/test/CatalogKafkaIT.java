@@ -41,7 +41,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
@@ -74,7 +74,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogKafkaIT extends AbstractIT {
+public class CatalogKafkaIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogKafkaIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
   private static final String METALAKE_NAME =

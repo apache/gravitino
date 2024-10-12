@@ -65,7 +65,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -126,7 +125,7 @@ public class TestEntityStorage {
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(DB_DIR);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
-    AbstractIT abstractIT = new BaseIT();
+    BaseIT baseIT = new BaseIT();
 
     try {
       if (type.equalsIgnoreCase("h2")) {
@@ -143,7 +142,7 @@ public class TestEntityStorage {
             SQLExceptionConverterFactory.class, "converter", new H2ExceptionConverter(), true);
 
       } else if (type.equalsIgnoreCase("mysql")) {
-        String mysqlJdbcUrl = abstractIT.startAndInitMySQLBackend();
+        String mysqlJdbcUrl = baseIT.startAndInitMySQLBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(mysqlJdbcUrl);
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
@@ -154,7 +153,7 @@ public class TestEntityStorage {
             SQLExceptionConverterFactory.class, "converter", new MySQLExceptionConverter(), true);
 
       } else if (type.equalsIgnoreCase("postgresql")) {
-        String postgreSQLJdbcUrl = abstractIT.startAndInitPGBackend();
+        String postgreSQLJdbcUrl = baseIT.startAndInitPGBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(postgreSQLJdbcUrl);
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");

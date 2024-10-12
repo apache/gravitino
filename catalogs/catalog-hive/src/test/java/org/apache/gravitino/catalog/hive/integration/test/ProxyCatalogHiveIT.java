@@ -39,7 +39,7 @@ import org.apache.gravitino.dto.rel.partitioning.Partitioning;
 import org.apache.gravitino.hive.HiveClientPool;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -66,7 +66,7 @@ import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class ProxyCatalogHiveIT extends AbstractIT {
+public class ProxyCatalogHiveIT extends BaseIT {
 
   public static final String METALAKE_NAME =
       GravitinoITUtils.genRandomName("ProxyCatalogHiveIT_metalake");

@@ -43,7 +43,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -65,7 +65,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class HiveUserAuthenticationIT extends AbstractIT {
+public class HiveUserAuthenticationIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HiveUserAuthenticationIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();

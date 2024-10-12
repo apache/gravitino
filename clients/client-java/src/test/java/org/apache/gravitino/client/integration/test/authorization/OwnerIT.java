@@ -39,7 +39,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.KafkaContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class OwnerIT extends AbstractIT {
+public class OwnerIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(OwnerIT.class);
 

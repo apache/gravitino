@@ -29,7 +29,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
-import org.apache.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -42,7 +42,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogsPageKafkaTest extends AbstractWebIT {
+public class CatalogsPageKafkaTest extends BaseWebIT {
   private MetalakePage metalakePage;
   private CatalogsPage catalogsPage;
 

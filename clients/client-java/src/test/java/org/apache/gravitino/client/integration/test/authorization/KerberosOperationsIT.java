@@ -34,7 +34,7 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoVersion;
 import org.apache.gravitino.client.KerberosTokenProvider;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.hadoop.minikdc.KerberosSecurityTestcase;
 import org.junit.jupiter.api.AfterAll;
@@ -45,7 +45,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class KerberosOperationsIT extends AbstractIT {
+public class KerberosOperationsIT extends BaseIT {
 
   private static final KerberosSecurityTestcase kdc =
       new KerberosSecurityTestcase() {

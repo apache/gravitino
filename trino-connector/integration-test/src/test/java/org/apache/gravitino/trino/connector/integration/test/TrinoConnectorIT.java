@@ -37,7 +37,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.TrinoContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -70,7 +70,7 @@ import org.slf4j.LoggerFactory;
 @Deprecated
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TrinoConnectorIT extends AbstractIT {
+public class TrinoConnectorIT extends BaseIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();

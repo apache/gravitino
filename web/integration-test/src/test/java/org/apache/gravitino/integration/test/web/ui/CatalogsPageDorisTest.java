@@ -31,7 +31,7 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
-import org.apache.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -49,7 +49,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogsPageDorisTest extends AbstractWebIT {
+public class CatalogsPageDorisTest extends BaseWebIT {
   private MetalakePage metalakePage;
   private CatalogsPage catalogsPage;
 

@@ -26,7 +26,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class AuditIT extends AbstractIT {
+public class AuditIT extends BaseIT {
 
   private static final String expectUser = System.getProperty("user.name");
 

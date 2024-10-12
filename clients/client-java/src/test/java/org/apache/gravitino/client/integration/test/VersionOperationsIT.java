@@ -19,14 +19,14 @@
 package org.apache.gravitino.client.integration.test;
 
 import org.apache.gravitino.client.GravitinoVersion;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class VersionOperationsIT extends AbstractIT {
+public class VersionOperationsIT extends BaseIT {
   @Test
   public void testGetVersion() {
     GravitinoVersion gravitinoVersion = client.serverVersion();

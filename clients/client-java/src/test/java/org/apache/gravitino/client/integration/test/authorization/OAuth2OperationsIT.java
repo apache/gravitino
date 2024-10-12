@@ -30,7 +30,7 @@ import java.util.Map;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.GravitinoVersion;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
 import org.apache.gravitino.server.authentication.OAuthConfig;
@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class OAuth2OperationsIT extends AbstractIT {
+public class OAuth2OperationsIT extends BaseIT {
 
   private static final KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
   private static final String publicKey =

@@ -36,12 +36,12 @@ public class WebDriverManager {
 
     WebDriverProvider provide = new ChromeWebDriverProvider();
     WebDriver driver = generateWebDriver(provide);
-    driver.manage().timeouts().implicitlyWait(AbstractWebIT.MAX_IMPLICIT_WAIT, TimeUnit.SECONDS);
+    driver.manage().timeouts().implicitlyWait(BaseWebIT.MAX_IMPLICIT_WAIT, TimeUnit.SECONDS);
     driver.get(url);
 
     // wait for webpage load compiled.
     try {
-      (new WebDriverWait(driver, AbstractWebIT.MAX_TIMEOUT))
+      (new WebDriverWait(driver, BaseWebIT.MAX_TIMEOUT))
           .until(
               d -> {
                 String gravitinoVersion = d.findElement(By.id("gravitino_version")).getText();

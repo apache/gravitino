@@ -41,7 +41,7 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoVersion;
 import org.apache.gravitino.client.KerberosTokenProvider;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
 import org.apache.gravitino.server.authentication.OAuthConfig;
@@ -57,7 +57,7 @@ import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptib
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class MultiAuthOperationsIT extends AbstractIT {
+public class MultiAuthOperationsIT extends BaseIT {
   private static final KerberosSecurityTestcase kdc =
       new KerberosSecurityTestcase() {
         @Override

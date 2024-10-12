@@ -36,7 +36,7 @@ import org.apache.gravitino.catalog.mysql.integration.test.service.MysqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
@@ -52,7 +52,7 @@ import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class AuditCatalogMysqlIT extends AbstractIT {
+public class AuditCatalogMysqlIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final String metalakeName = GravitinoITUtils.genRandomName("audit_mysql_metalake");
   private static final String expectUser = System.getProperty("user.name");

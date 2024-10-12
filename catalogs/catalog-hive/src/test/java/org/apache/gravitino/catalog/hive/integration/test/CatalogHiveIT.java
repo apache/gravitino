@@ -70,7 +70,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.HiveClientPool;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -114,7 +114,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogHiveIT extends AbstractIT {
+public class CatalogHiveIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");

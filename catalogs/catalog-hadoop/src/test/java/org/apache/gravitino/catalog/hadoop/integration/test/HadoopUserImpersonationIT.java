@@ -45,7 +45,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -69,7 +69,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class HadoopUserImpersonationIT extends AbstractIT {
+public class HadoopUserImpersonationIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
 
   public static final String metalakeName =

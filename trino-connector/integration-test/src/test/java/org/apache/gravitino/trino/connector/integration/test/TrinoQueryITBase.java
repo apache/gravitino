@@ -35,7 +35,6 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.TrinoITContainers;
-import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.TableCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -69,17 +68,17 @@ public class TrinoQueryITBase {
   protected static final String metalakeName = "test";
   protected static GravitinoMetalake metalake;
 
-  private static AbstractIT abstractIT;
+  private static BaseIT baseIT;
 
   private void setEnv() throws Exception {
-    abstractIT = new BaseIT();
+    baseIT = new BaseIT();
     if (autoStart) {
-      abstractIT.startIntegrationTest();
-      gravitinoClient = abstractIT.getGravitinoClient();
-      gravitinoUri = String.format("http://127.0.0.1:%d", abstractIT.getGravitinoServerPort());
+      baseIT.startIntegrationTest();
+      gravitinoClient = baseIT.getGravitinoClient();
+      gravitinoUri = String.format("http://127.0.0.1:%d", baseIT.getGravitinoServerPort());
 
       trinoITContainers = ContainerSuite.getTrinoITContainers();
-      trinoITContainers.launch(abstractIT.getGravitinoServerPort());
+      trinoITContainers.launch(baseIT.getGravitinoServerPort());
 
       trinoUri = trinoITContainers.getTrinoUri();
       hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
@@ -88,9 +87,9 @@ public class TrinoQueryITBase {
       postgresqlUri = trinoITContainers.getPostgresqlUri();
 
     } else if (autoStartGravitino) {
-      abstractIT.startIntegrationTest();
-      gravitinoClient = abstractIT.getGravitinoClient();
-      gravitinoUri = String.format("http://127.0.0.1:%d", abstractIT.getGravitinoServerPort());
+      baseIT.startIntegrationTest();
+      gravitinoClient = baseIT.getGravitinoClient();
+      gravitinoUri = String.format("http://127.0.0.1:%d", baseIT.getGravitinoServerPort());
 
     } else {
       gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
@@ -117,7 +116,7 @@ public class TrinoQueryITBase {
     try {
       if (autoStart) {
         if (trinoITContainers != null) trinoITContainers.shutdown();
-        abstractIT.stopIntegrationTest();
+        baseIT.stopIntegrationTest();
       }
     } catch (Exception e) {
       LOG.error("Error in cleanup", e);

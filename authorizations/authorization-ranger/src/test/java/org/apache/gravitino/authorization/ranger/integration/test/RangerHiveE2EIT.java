@@ -54,7 +54,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class RangerHiveE2EIT extends AbstractIT {
+public class RangerHiveE2EIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveE2EIT.class);
 
   private static RangerAuthorizationPlugin rangerAuthPlugin;

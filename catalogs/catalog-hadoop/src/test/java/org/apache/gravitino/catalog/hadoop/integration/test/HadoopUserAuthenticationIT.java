@@ -46,7 +46,7 @@ import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
@@ -62,7 +62,7 @@ import sun.security.krb5.KrbException;
 
 @Tag("gravitino-docker-test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class HadoopUserAuthenticationIT extends AbstractIT {
+public class HadoopUserAuthenticationIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopUserAuthenticationIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
