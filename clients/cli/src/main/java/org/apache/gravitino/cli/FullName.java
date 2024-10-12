@@ -26,7 +26,8 @@ import org.apache.commons.cli.CommandLine;
  * metalake, catalog, schema, and table names.
  */
 public class FullName {
-  CommandLine line;
+  private CommandLine line;
+  private String metalakeEnv;
 
   /**
    * Constructor for the {@code FullName} class.
@@ -44,8 +45,12 @@ public class FullName {
    * @return The metalake name, or null if not found.
    */
   public String getMetalakeName() {
-    String metalakeEnv = System.getenv("GRAVITINO_METALAKE");
     GravitinoConfig config = new GravitinoConfig(null);
+
+    // Cache the metalake environment variable
+    if (metalakeEnv == null) {
+      metalakeEnv = System.getenv("GRAVITINO_METALAKE");
+    }
 
     // Check if the metalake name is specified as a command line option
     if (line.hasOption(GravitinoOptions.METALAKE)) {

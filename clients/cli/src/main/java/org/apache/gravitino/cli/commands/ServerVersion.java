@@ -16,44 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
 
-dependencies {
-  implementation(project(":clients:client-java"))
-  implementation(project(":api"))
-  implementation(project(":common"))
-  implementation(libs.slf4j.api)
-  implementation(libs.slf4j.simple)
-  implementation(libs.commons.cli)
+package org.apache.gravitino.cli.commands;
 
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mockito.core)
+import org.apache.gravitino.client.GravitinoAdminClient;
 
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+/** Displays the Gravitino server version. */
+public class ServerVersion extends Command {
 
-tasks.build {
-  dependsOn("javadoc")
-}
-
-tasks.clean {
-  delete("target")
-  delete("tmp")
-}
-
-tasks.jar {
-  manifest {
-    attributes["Main-Class"] = "org.apache.gravitino.cli.Main"
+  /**
+   * Displays the server version.
+   *
+   * @param url The URL of the Gravitino server.
+   */
+  public ServerVersion(String url) {
+    super(url);
   }
-  val dependencies = configurations
-    .runtimeClasspath
-    .get()
-    .map(::zipTree)
-  from(dependencies)
-  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+  /** Displays the server version. */
+  public void handle() {
+    String version = "unknown";
+    try {
+      GravitinoAdminClient client = buildAdminClient();
+      version = client.serverVersion().version();
+    } catch (Exception exp) {
+      System.err.println(exp.getMessage());
+      return;
+    }
+
+    System.out.println("Apache Gravitino " + version);
+  }
 }

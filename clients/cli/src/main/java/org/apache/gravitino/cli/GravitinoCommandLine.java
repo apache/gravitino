@@ -24,6 +24,7 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.AllMetalakeDetails;
 import org.apache.gravitino.cli.commands.CatalogDetails;
+import org.apache.gravitino.cli.commands.ClientVersion;
 import org.apache.gravitino.cli.commands.CreateHadoopCatalog;
 import org.apache.gravitino.cli.commands.CreateHiveCatalog;
 import org.apache.gravitino.cli.commands.CreateIcebergCatalog;
@@ -49,6 +50,7 @@ import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
 import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.SchemaDetails;
+import org.apache.gravitino.cli.commands.ServerVersion;
 import org.apache.gravitino.cli.commands.SetCatalogProperty;
 import org.apache.gravitino.cli.commands.SetMetalakeProperty;
 import org.apache.gravitino.cli.commands.SetSchemaProperty;
@@ -57,7 +59,6 @@ import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
 import org.apache.gravitino.cli.commands.UpdateMetalakeName;
-import org.apache.gravitino.cli.commands.Version;
 
 /* Gravitino Command line */
 public class GravitinoCommandLine {
@@ -93,7 +94,9 @@ public class GravitinoCommandLine {
     }
     /* Display Gravitino version. */
     else if (line.hasOption(GravitinoOptions.VERSION)) {
-      new Version(getUrl()).handle();
+      new ClientVersion(getUrl()).handle();
+    } else if (line.hasOption(GravitinoOptions.SERVER)) {
+      new ServerVersion(getUrl()).handle();
     } else {
       executeCommand();
     }

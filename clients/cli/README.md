@@ -74,7 +74,7 @@ Before you can build and run this project, it is suggested you have the followin
 To run the Gravitino CLI, use the following command structure:
 
 ```bash
-usage: gcli <entity> <action> [options]
+usage: gcli [metalake|catalog|schema|table] [list|details|create|delete|update|set|remove|properties] [options]
  -b,--bootstrap <arg>   Kafka bootstrap servers
  -c,--catalog <arg>     catalog name
  -C,--create            create an entity
