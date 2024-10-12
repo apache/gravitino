@@ -22,21 +22,10 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/**
- * Represents an abstract base class for events related to Metalake operations. This class extends
- * {@link Event} to provide a more specific context involving operations on Metalakes, such as
- * creation, deletion, or modification. It captures essential information including the user
- * performing the operation and the identifier of the Metalake being operated on.
- */
+/** Represents a failure event in Gravitino server. */
 @DeveloperApi
-public abstract class MetalakeEvent extends GravitinoPostEvent {
-  /**
-   * Constructs a new {@code MetalakeEvent} with the specified user and Metalake identifier.
-   *
-   * @param user The user responsible for triggering the Metalake operation.
-   * @param identifier The identifier of the Metalake involved in the operation.
-   */
-  protected MetalakeEvent(String user, NameIdentifier identifier) {
-    super(user, identifier);
+public abstract class GravitinoFailureEvent extends FailureEvent {
+  protected GravitinoFailureEvent(String user, NameIdentifier identifier, Exception exception) {
+    super(user, identifier, exception);
   }
 }
