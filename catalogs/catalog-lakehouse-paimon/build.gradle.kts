@@ -125,6 +125,7 @@ dependencies {
   testImplementation(libs.h2db)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.paimon.oss)
   testImplementation(libs.paimon.s3)
   testImplementation(libs.paimon.spark)
   testImplementation(libs.testcontainers)
