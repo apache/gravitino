@@ -50,8 +50,10 @@ import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.rest.RESTUtil;
@@ -76,6 +78,7 @@ public class IcebergTableOperations {
   private IcebergMetricsManager icebergMetricsManager;
 
   private ObjectMapper icebergObjectMapper;
+  private IcebergTableOperationDispatcher tableOperationDispatcher;
 
   @SuppressWarnings("UnusedVariable")
   @Context
@@ -84,10 +87,12 @@ public class IcebergTableOperations {
   @Inject
   public IcebergTableOperations(
       IcebergCatalogWrapperManager icebergCatalogWrapperManager,
-      IcebergMetricsManager icebergMetricsManager) {
+      IcebergMetricsManager icebergMetricsManager,
+      IcebergTableOperationDispatcher tableOperationDispatcher) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
-    this.icebergObjectMapper = IcebergObjectMapper.getInstance();
     this.icebergMetricsManager = icebergMetricsManager;
+    this.tableOperationDispatcher = tableOperationDispatcher;
+    this.icebergObjectMapper = IcebergObjectMapper.getInstance();
   }
 
   @GET
@@ -110,16 +115,17 @@ public class IcebergTableOperations {
       CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     boolean isCredentialVending = isCredentialVending(accessDelegation);
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Create Iceberg table, namespace: {}, create table request: {}, accessDelegation: {}, isCredentialVending: {}",
-        namespace,
+        "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, accessDelegation: {}, isCredentialVending: {}",
+        catalogName,
+        icebergNS,
         createTableRequest,
         accessDelegation,
         isCredentialVending);
     LoadTableResponse loadTableResponse =
-        icebergCatalogWrapperManager
-            .getOps(prefix)
-            .createTable(RESTUtil.decodeNamespace(namespace), createTableRequest);
+        tableOperationDispatcher.createTable(catalogName, icebergNS, createTableRequest);
     if (isCredentialVending) {
       return IcebergRestUtils.ok(injectCredentialConfig(prefix, loadTableResponse));
     } else {

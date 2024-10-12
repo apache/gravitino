@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.rest;
 
 import com.google.common.collect.Maps;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,7 +32,11 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.listener.EventBus;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.logging.LoggingFeature;
@@ -89,6 +94,12 @@ public class IcebergRestTestUtil {
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
           new IcebergCatalogWrapperManagerForTest(catalogConf);
 
+      EventBus eventBus = new EventBus(Arrays.asList());
+      IcebergTableOperationExecutor icebergTableOperationExecutor =
+          new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
+      IcebergTableEventDispatcher icebergTableEventDispatcher =
+          new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus);
+
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(
           new AbstractBinder() {
@@ -96,6 +107,7 @@ public class IcebergRestTestUtil {
             protected void configure() {
               bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(2);
               bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(2);
+              bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(2);
             }
           });
     }

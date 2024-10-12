@@ -61,7 +61,7 @@ public class StaticIcebergCatalogConfigProvider implements IcebergCatalogConfigP
                             MapUtils.getPrefixMap(
                                 properties, String.format("catalog.%s.", catalogName)))));
     this.catalogConfigs.put(
-        IcebergConstants.GRAVITINO_DEFAULT_CATALOG, new IcebergConfig(properties));
+        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, new IcebergConfig(properties));
   }
 
   @Override

@@ -77,5 +77,6 @@ public class IcebergConstants {
 
   public static final String GRAVITINO_METALAKE = "gravitino-metalake";
 
-  public static final String GRAVITINO_DEFAULT_CATALOG = "__gravitino_default_catalog";
+  public static final String ICEBERG_REST_DEFAULT_METALAKE = "gravitino";
+  public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";
 }

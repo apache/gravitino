@@ -28,7 +28,11 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
@@ -70,14 +74,20 @@ public class RESTService implements GravitinoAuxiliaryService {
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);
 
+    EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     icebergCatalogWrapperManager = new IcebergCatalogWrapperManager(icebergConfig.getAllConfig());
     icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    IcebergTableOperationExecutor icebergTableOperationExecutor =
+        new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
+    IcebergTableEventDispatcher icebergTableEventDispatcher =
+        new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus);
     config.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
+            bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
           }
         });
 

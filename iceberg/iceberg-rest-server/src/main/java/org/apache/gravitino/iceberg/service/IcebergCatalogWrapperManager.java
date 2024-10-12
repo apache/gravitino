@@ -154,16 +154,6 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     }
   }
 
-  private String shelling(String rawPrefix) {
-    if (StringUtils.isBlank(rawPrefix)) {
-      return rawPrefix;
-    } else {
-      // rawPrefix is a string matching ([^/]*/) which end with /
-      Preconditions.checkArgument(
-          rawPrefix.endsWith("/"), String.format("rawPrefix %s format is illegal", rawPrefix));
-      return rawPrefix.substring(0, rawPrefix.length() - 1);
-    }
-  }
 
   private void closeIcebergCatalogWrapper(IcebergCatalogWrapper catalogWrapper) {
     try {

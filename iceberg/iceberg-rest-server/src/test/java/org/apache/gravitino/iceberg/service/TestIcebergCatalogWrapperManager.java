@@ -51,8 +51,7 @@ public class TestIcebergCatalogWrapperManager {
   }
 
   @ParameterizedTest
-  @ValueSource(
-      strings = {"hello", "\\\n\t\\\'", "\u0024", "\100", "[_~", "__gravitino_default_catalog/"})
+  @ValueSource(strings = {"hello", "\\\n\t\\\'", "\u0024", "\100", "[_~", "default_catalog/"})
   public void testInvalidGetOps(String rawPrefix) {
     Map<String, String> config = Maps.newHashMap();
     IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config);
