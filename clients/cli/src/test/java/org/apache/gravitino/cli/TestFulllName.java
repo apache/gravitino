@@ -19,6 +19,7 @@
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
@@ -77,11 +78,8 @@ public class TestFulllName {
   @Test
   public void justName() throws Exception, MissingArgumentException {
     String[] args = {"--name"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
 
-    String metalakeName = fullName.getMetalakeName();
-    assertNull(metalakeName);
+    assertThrows(MissingArgumentException.class, () -> new DefaultParser().parse(options, args));
   }
 
   @Test
