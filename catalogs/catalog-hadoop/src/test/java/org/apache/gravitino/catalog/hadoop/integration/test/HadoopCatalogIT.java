@@ -557,6 +557,7 @@ public class HadoopCatalogIT extends BaseIT {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testFilesetRemoveComment() throws IOException {
     // create fileset
     String filesetName = "test_remove_fileset_comment";

@@ -369,6 +369,7 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testRemoveFilesetComment() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.RemoveFilesetCommentRequest();
     Fileset fileset =
@@ -377,6 +378,7 @@ public class TestFilesetOperations extends JerseyTest {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testMultiUpdateRequest() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.RenameFilesetRequest("new name");
     FilesetUpdateRequest req1 = new FilesetUpdateRequest.UpdateFilesetCommentRequest("new comment");

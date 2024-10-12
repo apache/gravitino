@@ -668,6 +668,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         .build();
   }
 
+  @SuppressWarnings("deprecation")
   private FilesetEntity updateFilesetEntity(
       NameIdentifier ident, FilesetEntity filesetEntity, FilesetChange... changes) {
     Map<String, String> props =

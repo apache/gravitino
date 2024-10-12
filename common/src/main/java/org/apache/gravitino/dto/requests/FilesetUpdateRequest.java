@@ -109,17 +109,9 @@ public interface FilesetUpdateRequest extends RESTRequest {
       return FilesetChange.updateComment(newComment);
     }
 
-    /**
-     * Validates the request.
-     *
-     * @throws IllegalArgumentException if the request is invalid.
-     */
+    /** Validates the fields of the request. Always pass. */
     @Override
-    public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(newComment),
-          "\"newComment\" field is required and cannot be empty");
-    }
+    public void validate() throws IllegalArgumentException {}
   }
 
   /** The fileset update request for setting the properties of a fileset. */
@@ -189,6 +181,7 @@ public interface FilesetUpdateRequest extends RESTRequest {
   @EqualsAndHashCode
   @NoArgsConstructor(force = true)
   @ToString
+  @Deprecated
   class RemoveFilesetCommentRequest implements FilesetUpdateRequest {
 
     /** @return The fileset change. */
