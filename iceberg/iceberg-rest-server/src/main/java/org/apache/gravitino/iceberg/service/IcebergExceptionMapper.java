@@ -53,6 +53,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(ValidationException.class, 400)
           .put(NamespaceNotEmptyException.class, 400)
           .put(NotAuthorizedException.class, 401)
+          .put(org.apache.gravitino.exceptions.ForbiddenException.class, 403)
           .put(ForbiddenException.class, 403)
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)

@@ -32,7 +32,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * specific type of topic operation being represented.
  */
 @DeveloperApi
-public abstract class TopicEvent extends Event {
+public abstract class TopicEvent extends GravitinoPostEvent {
   /**
    * Constructs a new {@code TopicEvent} with the specified user and topic identifier.
    *

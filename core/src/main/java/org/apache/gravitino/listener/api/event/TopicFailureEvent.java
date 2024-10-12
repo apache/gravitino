@@ -24,16 +24,16 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * An abstract class representing events that are triggered when a topic operation fails due to an
- * exception. This class extends {@link FailureEvent} to provide a more specific context related to
- * topic operations, encapsulating details about the user who initiated the operation, the
- * identifier of the topic involved, and the exception that led to the failure.
+ * exception. This class extends {@link GravitinoFailureEvent} to provide a more specific context
+ * related to topic operations, encapsulating details about the user who initiated the operation,
+ * the identifier of the topic involved, and the exception that led to the failure.
  *
  * <p>Implementations of this class can be used to convey detailed information about failures in
  * operations such as creating, updating, deleting, or querying topics, making it easier to diagnose
  * and respond to issues.
  */
 @DeveloperApi
-public abstract class TopicFailureEvent extends FailureEvent {
+public abstract class TopicFailureEvent extends GravitinoFailureEvent {
   /**
    * Constructs a new {@code TopicFailureEvent} instance, capturing information about the failed
    * topic operation.

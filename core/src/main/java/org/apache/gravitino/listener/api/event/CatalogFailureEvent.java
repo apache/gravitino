@@ -24,12 +24,12 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * An abstract class representing events that are triggered when a catalog operation fails due to an
- * exception. This class extends {@link FailureEvent} to provide a more specific context related to
- * catalog operations, encapsulating details about the user who initiated the operation, the
- * identifier of the catalog involved, and the exception that led to the failure.
+ * exception. This class extends {@link GravitinoFailureEvent} to provide a more specific context
+ * related to catalog operations, encapsulating details about the user who initiated the operation,
+ * the identifier of the catalog involved, and the exception that led to the failure.
  */
 @DeveloperApi
-public abstract class CatalogFailureEvent extends FailureEvent {
+public abstract class CatalogFailureEvent extends GravitinoFailureEvent {
   /**
    * Constructs a new {@code CatalogFailureEvent} instance, capturing information about the failed
    * catalog operation.

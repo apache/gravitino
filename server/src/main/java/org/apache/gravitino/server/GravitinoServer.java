@@ -144,7 +144,7 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void start() throws Exception {
-    gravitinoEnv.start();
+    gravitinoEnv.start(true);
     server.start();
   }
 

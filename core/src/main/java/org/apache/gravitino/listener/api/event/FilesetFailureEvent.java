@@ -31,7 +31,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * diagnose and respond to issues.
  */
 @DeveloperApi
-public abstract class FilesetFailureEvent extends FailureEvent {
+public abstract class FilesetFailureEvent extends GravitinoFailureEvent {
   /**
    * Constructs a new {@code FilesetFailureEvent} instance, capturing information about the failed
    * fileset operation.

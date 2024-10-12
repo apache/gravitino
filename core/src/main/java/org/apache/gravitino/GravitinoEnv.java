@@ -307,10 +307,12 @@ public class GravitinoEnv {
     return futureGrantManager;
   }
 
-  public void start() {
-    auxServiceManager.serviceStart();
+  public void start(boolean isGravitinoServer) {
     metricsSystem.start();
     eventListenerManager.start();
+    if (isGravitinoServer) {
+      auxServiceManager.serviceStart();
+    }
   }
 
   /** Shutdown the Gravitino environment. */

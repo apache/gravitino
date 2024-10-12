@@ -28,7 +28,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * creation, deletion, or modification.
  */
 @DeveloperApi
-public abstract class CatalogEvent extends Event {
+public abstract class CatalogEvent extends GravitinoPostEvent {
   /**
    * Constructs a new {@code CatalogEvent} with the specified user and catalog identifier.
    *

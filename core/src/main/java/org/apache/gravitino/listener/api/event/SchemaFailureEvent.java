@@ -27,7 +27,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * exception.
  */
 @DeveloperApi
-public abstract class SchemaFailureEvent extends FailureEvent {
+public abstract class SchemaFailureEvent extends GravitinoFailureEvent {
   protected SchemaFailureEvent(String user, NameIdentifier identifier, Exception exception) {
     super(user, identifier, exception);
   }
