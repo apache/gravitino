@@ -90,6 +90,18 @@ The owner of each entity has implicit administrative class privilege, for exampl
 Only the Owner of a securable object can fully manage that resource.
 If a securable object needs to be managed by more than one person at the same time, the owner is assigned to a user group.
 
+The metadata object which supports ownership is as follows:
+
+| Metadata Object Type |
+|----------------------|
+| Metalake             |
+| Catalog              |
+| Schema               |
+| Table                |
+| Topic                |
+| Fileset              |
+| Role                 |
+
 ### User
 Users are generally granted one or multiple Roles, and users have different operating privileges depending on their Role.
 
