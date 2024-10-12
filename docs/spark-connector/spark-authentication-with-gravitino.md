@@ -11,15 +11,15 @@ Spark connector supports `simple` `oauth2` and `kerberos` authentication when ac
 
 | Property                     | Type   | Default Value | Description                                                                                                         | Required | Since Version |
 |------------------------------|--------|---------------|---------------------------------------------------------------------------------------------------------------------|----------|---------------|
-| spark.sql.gravitino.authType | string | `simple`      | The authentication mechanisms when communicating with Gravitino server, supports `simple`, `oauth2` and `kerberos`. | No       | 0.7.0         |
+| spark.sql.gravitino.authType | string | `simple`      | The authentication mechanisms when communicating with Gravitino server, supports `simple`, `oauth2` and `kerberos`. | No       | 0.7.0-incubating        |
 
 ## Simple mode
 
 In the simple mode, you could specify the username by configuration.
 
-| Property                                | Type   | Default Value                    | Description                           | Required | Since Version |
-|-----------------------------------------|--------|----------------------------------|---------------------------------------|----------|---------------|
-| spark.sql.gravitino.simpleAuth.userName | string | The user logging in the machine. | The user name to access the Gravitino | No       | 0.7.0         |
+| Property                                | Type   | Default Value                    | Description                           | Required | Since Version    |
+|-----------------------------------------|--------|----------------------------------|---------------------------------------|----------|------------------|
+| spark.sql.gravitino.simpleAuth.userName | string | The user logging in the machine. | The user name to access the Gravitino | No       | 0.7.0-incubating |
 
 If you doesn't set `spark.sql.gravitino.simpleAuth.userName` explicitly. It will use the value of environment variable `GRAVITINO_USER` as the user. If the environment variable `GRAVITINO_USER` isn't set, the client uses the user logging in the machine.
 

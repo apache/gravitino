@@ -169,7 +169,6 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
     String authType =
         sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
-    authType = getRequiredConfig(sparkConf, authType);
     if (AuthProperties.isSimple(authType)) {
       String username =
           getOptionalConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_SIMPLE_USER_NAME);
