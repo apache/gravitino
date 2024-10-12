@@ -78,13 +78,13 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   public static final String DEFAULT_FS = "fs.defaultFS";
   public static final String LOCAL_FILE_PATH = "file:///";
+  public static final Map<String, FileSystemProvider> FILE_SYSTEM_PROVIDERS = Maps.newHashMap();
 
   private static final String LOCAL_FILE_SCHEMA = "file";
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
-  public static final Map<String, FileSystemProvider> FILE_SYSTEM_PROVIDERS = Maps.newHashMap();
 
   private final EntityStore store;
 
