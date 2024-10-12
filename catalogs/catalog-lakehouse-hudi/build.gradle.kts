@@ -27,6 +27,7 @@ plugins {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val fullSparkVersion: String = libs.versions.spark34.get()
 val sparkVersion = fullSparkVersion.split(".").take(2).joinToString(".")
+val hudiVersion = libs.versions.hudi.get()
 
 dependencies {
   implementation(project(":api")) {
@@ -147,7 +148,7 @@ dependencies {
     exclude("org.rocksdb")
   }
 
-  testRuntimeOnly("org.apache.hudi:hudi-spark$sparkVersion-bundle_$scalaVersion:0.15.0")
+  testRuntimeOnly("org.apache.hudi:hudi-spark$sparkVersion-bundle_$scalaVersion:$hudiVersion")
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
