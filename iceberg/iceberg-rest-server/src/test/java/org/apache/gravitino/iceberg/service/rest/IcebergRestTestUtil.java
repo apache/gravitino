@@ -44,7 +44,11 @@ public class IcebergRestTestUtil {
   public static final String UPDATE_NAMESPACE_POSTFIX = "properties";
   public static final String TEST_NAMESPACE_NAME = "gravitino-test";
   public static final String TABLE_PATH = NAMESPACE_PATH + "/" + TEST_NAMESPACE_NAME + "/tables";
+
+  public static final String VIEW_PATH = NAMESPACE_PATH + "/" + TEST_NAMESPACE_NAME + "/views";
   public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";
+
+  public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";
   public static final String REPORT_METRICS_POSTFIX = "metrics";
 
   public static final boolean DEBUG_SERVER_LOG_ENABLED = true;

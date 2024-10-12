@@ -32,7 +32,6 @@ dependencies {
   testImplementation(project(":core"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":authorizations:authorization-ranger"))
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)

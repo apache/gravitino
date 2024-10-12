@@ -28,6 +28,14 @@ class FilesetDataOperation(Enum):
     """Opens a file.
     """
 
+    OPEN_AND_WRITE = "OPEN_AND_WRITE"
+    """Opens a file and writes to it.
+    """
+
+    OPEN_AND_APPEND = "OPEN_AND_APPEND"
+    """Opens a file and appends to it.
+    """
+
     APPEND = "APPEND"
     """Appends some content into a file.
     """

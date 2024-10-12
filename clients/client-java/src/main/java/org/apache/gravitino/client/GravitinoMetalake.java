@@ -32,12 +32,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsCatalogs;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
@@ -47,6 +50,8 @@ import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
+import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
+import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
@@ -60,6 +65,7 @@ import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
@@ -72,6 +78,7 @@ import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -93,7 +100,8 @@ import org.apache.gravitino.tag.TagOperations;
  * catalogs as sub-level metadata collections. With {@link GravitinoMetalake}, users can list,
  * create, load, alter and drop a catalog with specified identifier.
  */
-public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, TagOperations {
+public class GravitinoMetalake extends MetalakeDTO
+    implements SupportsCatalogs, TagOperations, SupportsRoles {
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
   private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
@@ -105,6 +113,7 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   private static final String BLANK_PLACEHOLDER = "";
 
   private final RESTClient restClient;
+  private final MetadataObjectRoleOperations metadataObjectRoleOperations;
 
   GravitinoMetalake(
       String name,
@@ -114,6 +123,9 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
       RESTClient restClient) {
     super(name, comment, properties, auditDTO);
     this.restClient = restClient;
+    this.metadataObjectRoleOperations =
+        new MetadataObjectRoleOperations(
+            name, MetadataObjects.of(null, name, MetadataObject.Type.METALAKE), restClient);
   }
 
   /**
@@ -306,6 +318,11 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
 
     // Throw the corresponding exception
     ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
+  @Override
+  public SupportsRoles supportsRoles() {
+    return this;
   }
 
   /*
@@ -624,6 +641,44 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   }
 
   /**
+   * Lists the groups
+   *
+   * @return The Group list
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public Group[] listGroups() throws NoSuchMetalakeException {
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+
+    GroupListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_GROUPS_PATH, name(), BLANK_PLACEHOLDER),
+            params,
+            GroupListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+    return resp.getGroups();
+  }
+
+  /**
+   * Lists the group names
+   *
+   * @return The Group Name List
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  public String[] listGroupNames() throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_GROUPS_PATH, name(), BLANK_PLACEHOLDER),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+    return resp.getNames();
+  }
+
+  /**
    * Gets a Role.
    *
    * @param role The name of the Role.
@@ -844,6 +899,89 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
   }
 
   /**
+   * Grant privileges to a role.
+   *
+   * @param role The name of the role.
+   * @param privileges The privileges to grant.
+   * @param object The object is associated with privileges to grant.
+   * @return The role after granted.
+   * @throws NoSuchRoleException If the role with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
+   *     exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
+   * @throws RuntimeException If granting privileges to a role encounters storage issues.
+   */
+  public Role grantPrivilegesToRole(String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+          IllegalPrivilegeException {
+    PrivilegeGrantRequest request =
+        new PrivilegeGrantRequest(DTOConverters.toPrivileges(privileges));
+    request.validate();
+
+    RoleResponse resp =
+        restClient.put(
+            String.format(
+                API_PERMISSION_PATH,
+                this.name(),
+                String.format(
+                    "roles/%s/%s/%s/grant",
+                    RESTUtils.encodeString(role),
+                    object.type().name().toLowerCase(Locale.ROOT),
+                    object.fullName())),
+            request,
+            RoleResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+
+    resp.validate();
+
+    return resp.getRole();
+  }
+
+  /**
+   * Revoke privileges from a role.
+   *
+   * @param role The name of the role.
+   * @param privileges The privileges to revoke.
+   * @param object The object is associated with privileges to revoke.
+   * @return The role after revoked.
+   * @throws NoSuchRoleException If the role with the given name does not exist.
+   * @throws NoSuchMetadataObjectException If the metadata object with the given name does not
+   *     exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
+   * @throws RuntimeException If revoking privileges from a role encounters storage issues.
+   */
+  public Role revokePrivilegesFromRole(
+      String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchRoleException, NoSuchMetadataObjectException, NoSuchMetalakeException,
+          IllegalPrivilegeException {
+    PrivilegeRevokeRequest request =
+        new PrivilegeRevokeRequest(DTOConverters.toPrivileges(privileges));
+    request.validate();
+
+    RoleResponse resp =
+        restClient.put(
+            String.format(
+                API_PERMISSION_PATH,
+                this.name(),
+                String.format(
+                    "roles/%s/%s/%s/revoke",
+                    RESTUtils.encodeString(role),
+                    object.type().name().toLowerCase(Locale.ROOT),
+                    object.fullName())),
+            request,
+            RoleResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.permissionOperationErrorHandler());
+
+    resp.validate();
+
+    return resp.getRole();
+  }
+
+  /**
    * Get the owner of a metadata object.
    *
    * @param object The metadata object
@@ -894,6 +1032,11 @@ public class GravitinoMetalake extends MetalakeDTO implements SupportsCatalogs, 
             Collections.emptyMap(),
             ErrorHandlers.ownerErrorHandler());
     resp.validate();
+  }
+
+  @Override
+  public String[] listBindingRoleNames() {
+    return metadataObjectRoleOperations.listBindingRoleNames();
   }
 
   static class Builder extends MetalakeDTO.Builder<Builder> {

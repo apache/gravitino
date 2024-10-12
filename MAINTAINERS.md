@@ -61,8 +61,8 @@ something like that, all PRs should have related issues.
 6. After PR is merged, please check the related issue:
    - If the issue is not closed, please close it as fixed manually.
    - Assign the issue "Assignees" to the PR author.
-   - Starting from 0.6.0, we will use the "labels" to manage the release versions, so please add
-     the corresponding labels to the issue. For example, if the issue is fixed in 0.6.0, please
+   - Starting from 0.6.0-incubating, we will use the "labels" to manage the release versions, so please add
+     the corresponding labels to the issue. For example, if the issue is fixed in 0.6.0-incubating, please
      add the label "0.6.0". If the issue is fixed both in 0.6.0 and 0.5.1, please add both labels.
 
 ## Policy on backporting bug fixes
