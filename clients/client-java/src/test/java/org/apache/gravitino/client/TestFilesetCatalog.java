@@ -378,7 +378,7 @@ public class TestFilesetCatalog extends TestBase {
     assertFileset(mockFileset3, res3);
 
     // Test remove fileset comment
-    FilesetUpdateRequest req4 = new FilesetUpdateRequest.RemoveFilesetCommentRequest();
+    FilesetUpdateRequest req4 = new FilesetUpdateRequest.UpdateFilesetCommentRequest(null);
     FilesetDTO mockFileset4 =
         mockFilesetDTO("new name", Fileset.Type.MANAGED, null, "mock location", ImmutableMap.of());
     FilesetResponse resp4 = new FilesetResponse(mockFileset4);
