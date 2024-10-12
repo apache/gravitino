@@ -172,31 +172,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             : Optional.empty();
   }
 
-  private void initFileSystemProviders(Map<String, String> config) {
-    String fileSystemProviders =
-        (String)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
-
-    if (StringUtils.isBlank(fileSystemProviders)) {
-      return;
-    }
-
-    String[] providers = fileSystemProviders.split(",");
-    for (String provider : providers) {
-      try {
-        FileSystemProvider fileSystemProvider =
-            (FileSystemProvider)
-                Class.forName(provider.trim()).getDeclaredConstructor().newInstance();
-        FILE_SYSTEM_PROVIDERS.put(fileSystemProvider.getScheme(), fileSystemProvider);
-      } catch (Exception e) {
-        throw new GravitinoRuntimeException(
-            e, "Failed to initialize file system provider: %s", provider);
-      }
-    }
-  }
-
   @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
     try {

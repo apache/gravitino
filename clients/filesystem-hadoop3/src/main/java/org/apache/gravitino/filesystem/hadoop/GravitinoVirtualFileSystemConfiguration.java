@@ -42,7 +42,8 @@ class GravitinoVirtualFileSystemConfiguration {
    * example:
    *
    * <pre>
-   * fs.gvfs.filesystem.providers=org.apache.gravitino.catalog.hadoop.fs.XFileSystemProvider,org.apache.gravitino.catalog.hadoop.fs.YFileSystemProvider
+   * fs.gvfs.filesystem.providers=org.apache.gravitino.catalog.hadoop.fs.XFileSystemProvider,
+   * org.apache.gravitino.catalog.hadoop.fs.YFileSystemProvider
    * </pre>
    */
   public static final String FS_FILESYSTEM_PROVIDERS = "fs.gvfs.filesystem.providers";
