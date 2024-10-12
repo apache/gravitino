@@ -81,6 +81,9 @@ class FilesetChange(ABC):
 
         Returns:
             The fileset change.
+
+        Deprecated:
+            This class is deprecated and will be removed in future versions.
         """
         return FilesetChange.RemoveComment()
 
@@ -279,7 +282,11 @@ class FilesetChange(ABC):
 
     @dataclass
     class RemoveComment:
-        """A fileset change to remove comment from the fileset."""
+        """A fileset change to remove comment from the fileset.
+
+        Deprecated:
+            This class is deprecated and will be removed in future versions.
+        """
 
         def __eq__(self, other) -> bool:
             """Compares this RemoveComment instance with another object for equality.

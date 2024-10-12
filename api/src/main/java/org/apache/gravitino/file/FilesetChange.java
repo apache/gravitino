@@ -74,6 +74,7 @@ public interface FilesetChange {
    *
    * @return The fileset change.
    */
+  @Deprecated
   static FilesetChange removeComment() {
     return RemoveComment.getInstance();
   }
@@ -311,6 +312,7 @@ public interface FilesetChange {
   }
 
   /** A fileset change to remove comment from the fileset. */
+  @Deprecated
   final class RemoveComment implements FilesetChange {
     private static final RemoveComment INSTANCE = new RemoveComment();
 
