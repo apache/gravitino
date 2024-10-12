@@ -124,19 +124,27 @@ public class CheckCurrentUserIT extends AbstractIT {
             anotherMetalake.createCatalog(
                 catalogName, Catalog.Type.MESSAGING, "kafka", "comment", properties));
 
-    metalake.createCatalog(catalogName, Catalog.Type.MESSAGING, "kafka", "comment", properties);
+    Catalog catalog =
+        metalake.createCatalog(catalogName, Catalog.Type.MESSAGING, "kafka", "comment", properties);
 
     // Test to create topic with not-existed user
     metalake.addUser("test");
-    Catalog catalog = anotherMetalake.loadCatalog(catalogName);
+    Catalog anotherCatalog = anotherMetalake.loadCatalog(catalogName);
     metalake.removeUser("test");
     NameIdentifier topicIdent = NameIdentifier.of("default", "topic");
     Assertions.assertThrows(
         ForbiddenException.class,
         () ->
+            anotherCatalog
+                .asTopicCatalog()
+                .createTopic(topicIdent, "comment", null, Collections.emptyMap()));
+
+    Assertions.assertDoesNotThrow(
+        () ->
             catalog
                 .asTopicCatalog()
                 .createTopic(topicIdent, "comment", null, Collections.emptyMap()));
+    catalog.asTopicCatalog().dropTopic(topicIdent);
 
     metalake.dropCatalog(catalogName);
   }
@@ -173,7 +181,15 @@ public class CheckCurrentUserIT extends AbstractIT {
                 .createFileset(
                     fileIdent, "comment", Fileset.Type.EXTERNAL, "tmp", Collections.emptyMap()));
 
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .createFileset(
+                    fileIdent, "comment", Fileset.Type.EXTERNAL, "tmp", Collections.emptyMap()));
+
     // Clean up
+    catalog.asFilesetCatalog().dropFileset(fileIdent);
     catalog.asSchemas().dropSchema("schema", true);
     metalake.dropCatalog(catalogName);
   }
@@ -188,6 +204,12 @@ public class CheckCurrentUserIT extends AbstractIT {
         () ->
             anotherMetalake.createRole(
                 "role", Collections.emptyMap(), Lists.newArrayList(metalakeSecObject)));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            metalake.createRole(
+                "role", Collections.emptyMap(), Lists.newArrayList(metalakeSecObject)));
+    metalake.deleteRole("role");
   }
 
   @Test
@@ -230,7 +252,21 @@ public class CheckCurrentUserIT extends AbstractIT {
                     "comment",
                     Collections.emptyMap()));
 
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    tableIdent,
+                    new Column[] {
+                      Column.of("col1", Types.IntegerType.get()),
+                      Column.of("col2", Types.StringType.get())
+                    },
+                    "comment",
+                    Collections.emptyMap()));
+
     // Clean up
+    catalog.asTableCatalog().dropTable(tableIdent);
     catalog.asSchemas().dropSchema("schema", true);
     metalake.dropCatalog(catalogName);
   }
