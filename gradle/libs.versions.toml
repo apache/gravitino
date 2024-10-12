@@ -102,6 +102,7 @@ datanucleus-core = "4.1.17"
 datanucleus-api-jdo = "4.2.4"
 datanucleus-rdbms = "4.1.19"
 datanucleus-jdo = "3.2.0-m3"
+hudi = "0.15.0"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
