@@ -44,7 +44,8 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
-import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
@@ -142,31 +143,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
     initializeClient(configuration);
 
-    initializeFileSystemProviders(configuration);
+    String fileSystemProviders = configuration.get(FS_FILESYSTEM_PROVIDERS);
+    FileSystemUtils.initFileSystemProviders(fileSystemProviders, FILE_SYSTEM_PROVIDERS);
 
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
 
     setConf(configuration);
     super.initialize(uri, getConf());
-  }
-
-  private void initializeFileSystemProviders(Configuration configuration) {
-    String fileSystemProviders = configuration.get(FS_FILESYSTEM_PROVIDERS);
-    if (StringUtils.isNotBlank(fileSystemProviders)) {
-      String[] providers = fileSystemProviders.split(",");
-      for (String provider : providers) {
-        try {
-          FileSystemProvider fileSystemProvider =
-              (FileSystemProvider)
-                  Class.forName(provider.trim()).getDeclaredConstructor().newInstance();
-          FILE_SYSTEM_PROVIDERS.put(fileSystemProvider.getScheme(), fileSystemProvider);
-        } catch (Exception e) {
-          throw new GravitinoRuntimeException(
-              e, "Failed to initialize file system provider: %s", provider);
-        }
-      }
-    }
   }
 
   @VisibleForTesting

@@ -21,7 +21,6 @@ package org.apache.gravitino.catalog.hadoop.fs;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
-import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;

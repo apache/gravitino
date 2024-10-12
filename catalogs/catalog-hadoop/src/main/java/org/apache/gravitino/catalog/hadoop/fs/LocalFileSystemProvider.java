@@ -23,7 +23,6 @@ import static org.apache.gravitino.catalog.hadoop.HadoopCatalogOperations.LOCAL_
 
 import java.io.IOException;
 import java.util.Map;
-import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 

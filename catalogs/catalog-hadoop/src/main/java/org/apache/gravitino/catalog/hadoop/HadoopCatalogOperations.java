@@ -44,6 +44,8 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.CatalogInfo;
@@ -94,6 +96,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private Map<String, String> conf;
 
+  // The bypassConfigs are the configurations that are used to initialize the Hadoop Configuration.
   Map<String, String> bypassConfigs;
 
   private CatalogInfo catalogInfo;
@@ -150,7 +153,13 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                     e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
                     Map.Entry::getValue));
 
-    initFileSystemProviders(config);
+    String fileSystemProviders =
+        (String)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
+
+    FileSystemUtils.initFileSystemProviders(fileSystemProviders, FILE_SYSTEM_PROVIDERS);
 
     String catalogLocation =
         (String)
@@ -170,18 +179,20 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
 
-    if (StringUtils.isNotBlank(fileSystemProviders)) {
-      String[] providers = fileSystemProviders.split(",");
-      for (String provider : providers) {
-        try {
-          FileSystemProvider fileSystemProvider =
-              (FileSystemProvider)
-                  Class.forName(provider.trim()).getDeclaredConstructor().newInstance();
-          FILE_SYSTEM_PROVIDERS.put(fileSystemProvider.getScheme(), fileSystemProvider);
-        } catch (Exception e) {
-          throw new GravitinoRuntimeException(
-              e, "Failed to initialize file system provider: %s", provider);
-        }
+    if (StringUtils.isBlank(fileSystemProviders)) {
+      return;
+    }
+
+    String[] providers = fileSystemProviders.split(",");
+    for (String provider : providers) {
+      try {
+        FileSystemProvider fileSystemProvider =
+            (FileSystemProvider)
+                Class.forName(provider.trim()).getDeclaredConstructor().newInstance();
+        FILE_SYSTEM_PROVIDERS.put(fileSystemProvider.getScheme(), fileSystemProvider);
+      } catch (Exception e) {
+        throw new GravitinoRuntimeException(
+            e, "Failed to initialize file system provider: %s", provider);
       }
     }
   }
