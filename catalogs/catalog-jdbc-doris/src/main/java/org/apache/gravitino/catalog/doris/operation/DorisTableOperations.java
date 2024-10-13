@@ -170,12 +170,11 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   private Map<String, String> appendNecessaryProperties(Map<String, String> properties) {
-    Map<String, String> resultMap;
     if (properties == null) {
-      resultMap = new HashMap<>();
-    } else {
-      resultMap = new HashMap<>(properties);
+      return new HashMap<>();
     }
+
+    Map<String, String> resultMap = new HashMap<>(properties);
 
     // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
     // set the property 'replication_num' to 1 explicitly.
