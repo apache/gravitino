@@ -78,9 +78,6 @@ public class RoleCreateRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
-
-    Preconditions.checkArgument(
-        securableObjects != null && securableObjects.length != 0,
-        "\"securableObjects\" can't null or empty");
+    Preconditions.checkArgument(securableObjects != null, "\"securableObjects\" can't null ");
   }
 }

@@ -37,7 +37,6 @@ public class HudiHMSBackend extends HudiCatalogBackend {
 
   @Override
   public void initialize(Map<String, String> properties) {
-    // todo: initialize the catalogOps
-    catalogOps().initialize(properties);
+    backendOps().initialize(properties);
   }
 }

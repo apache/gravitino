@@ -55,6 +55,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,10 +138,12 @@ public class RoleOperations {
                 metadataObjects.add(metadataObject);
               }
 
+              Set<Privilege> privileges = Sets.newHashSet(object.privileges());
+              AuthorizationUtils.checkDuplicatedNamePrivilege(privileges);
               for (Privilege privilege : object.privileges()) {
                 AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
               }
-              AuthorizationUtils.checkSecurableObject(metalake, object);
+              MetadataObjectUtil.checkMetadataObject(metalake, object);
             }
 
             List<SecurableObject> securableObjects =
