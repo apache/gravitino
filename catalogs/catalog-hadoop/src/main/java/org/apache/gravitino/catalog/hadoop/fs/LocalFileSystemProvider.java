@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import java.io.IOException;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -30,7 +32,7 @@ public class LocalFileSystemProvider implements FileSystemProvider {
     Configuration configuration = new Configuration();
     config.forEach(
         (k, v) -> {
-          configuration.set(k.replace("gravitino.bypass.", ""), v);
+          configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v);
         });
 
     return FileSystem.newInstance(configuration);

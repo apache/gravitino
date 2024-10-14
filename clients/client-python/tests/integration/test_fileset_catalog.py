@@ -255,7 +255,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
         )
 
         self.assertEqual(
-            actual_file_location, f"file:/tmp/test_get_file_location/test/test.txt"
+            actual_file_location, "file:/tmp/test_get_file_location/test/test.txt"
         )
 
         # test rename without sub path should throw an exception

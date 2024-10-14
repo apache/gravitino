@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
@@ -32,7 +34,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
     Configuration configuration = new Configuration();
     config.forEach(
         (k, v) -> {
-          configuration.set(k.replace("gravitino.bypass.", ""), v);
+          configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v);
         });
 
     String pathString = configuration.get("fs.defaultFS");
