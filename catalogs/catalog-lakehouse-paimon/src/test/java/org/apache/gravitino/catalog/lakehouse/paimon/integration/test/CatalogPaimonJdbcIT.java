@@ -20,55 +20,40 @@ package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Schema;
-import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.paimon.catalog.Catalog;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
-public class CatalogPaimonFileSystemIT extends CatalogPaimonBaseIT {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
 
   @Override
   protected Map<String, String> initPaimonCatalogProperties() {
+    containerSuite.startMySQLContainer(TEST_DB_NAME);
+    mySQLContainer = containerSuite.getMySQLContainer();
 
     Map<String, String> catalogProperties = Maps.newHashMap();
     catalogProperties.put("key1", "val1");
     catalogProperties.put("key2", "val2");
 
-    TYPE = "filesystem";
+    TYPE = "jdbc";
     WAREHOUSE =
         String.format(
             "hdfs://%s:%d/user/hive/warehouse-catalog-paimon/",
             containerSuite.getHiveContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT);
+    URI = mySQLContainer.getJdbcUrl(TEST_DB_NAME);
+    jdbcUser = mySQLContainer.getUsername();
+    jdbcPassword = mySQLContainer.getPassword();
 
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
+    catalogProperties.put(PaimonCatalogPropertiesMetadata.URI, URI);
+    catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_USER, jdbcUser);
+    catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD, jdbcPassword);
 
     return catalogProperties;
-  }
-
-  @Test
-  void testPaimonSchemaProperties() throws Catalog.DatabaseNotExistException {
-    SupportsSchemas schemas = catalog.asSchemas();
-
-    // create schema.
-    String testSchemaName = GravitinoITUtils.genRandomName("test_schema_1");
-    NameIdentifier schemaIdent = NameIdentifier.of(metalakeName, catalogName, testSchemaName);
-    Map<String, String> schemaProperties = Maps.newHashMap();
-    schemaProperties.put("key1", "val1");
-    schemaProperties.put("key2", "val2");
-    schemas.createSchema(schemaIdent.name(), schema_comment, schemaProperties);
-
-    // load schema check, database properties is empty for Paimon FilesystemCatalog.
-    Schema schema = schemas.loadSchema(schemaIdent.name());
-    Assertions.assertTrue(schema.properties().isEmpty());
-    Assertions.assertTrue(paimonCatalog.loadDatabaseProperties(schemaIdent.name()).isEmpty());
   }
 }
