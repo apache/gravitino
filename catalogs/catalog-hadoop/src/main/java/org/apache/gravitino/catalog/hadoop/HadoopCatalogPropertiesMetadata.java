@@ -45,11 +45,12 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String FILESYSTEM_PROVIDERS = "filesystem-providers";
 
   /**
-   * The default file system URI. It is used to create the default file system instance; if not
-   * specified, the default file system instance will be created with the schema prefix in the file
-   * path.
+   * The default file system provider. It is used to create the default file system instance; if not
+   * specified, file system instance will be created with the schema prefix in the file path like
+   * 'file:/tmp/'. If there is no schema prefix, the default file system provider will be local file
+   * system.
    */
-  public static final String DEFAULT_FS = "default-filesystem";
+  public static final String DEFAULT_FS = "default-filesystem-provider";
 
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()

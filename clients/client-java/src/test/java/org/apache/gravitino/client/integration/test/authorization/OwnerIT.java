@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.client.integration.test.authorization;
 
-import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Collections;
@@ -106,11 +105,7 @@ public class OwnerIT extends AbstractIT {
     String catalogNameA = RandomNameUtils.genRandomName("catalogA");
     Catalog catalog =
         metalake.createCatalog(
-            catalogNameA,
-            Catalog.Type.FILESET,
-            "hadoop",
-            "comment",
-            ImmutableBiMap.of("default-filesystem", "file:///"));
+            catalogNameA, Catalog.Type.FILESET, "hadoop", "comment", Collections.emptyMap());
     NameIdentifier fileIdent = NameIdentifier.of("schema_owner", "fileset_owner");
     catalog.asSchemas().createSchema("schema_owner", "comment", Collections.emptyMap());
     catalog

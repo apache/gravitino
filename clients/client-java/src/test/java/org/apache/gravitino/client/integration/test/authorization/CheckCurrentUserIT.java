@@ -20,7 +20,6 @@ package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Collections;
@@ -162,11 +161,7 @@ public class CheckCurrentUserIT extends AbstractIT {
 
     Catalog catalog =
         metalake.createCatalog(
-            catalogName,
-            Catalog.Type.FILESET,
-            "hadoop",
-            "comment",
-            ImmutableMap.of("default-filesystem", "file:///"));
+            catalogName, Catalog.Type.FILESET, "hadoop", "comment", Collections.emptyMap());
 
     // Test to create a schema with a not-existed user
     Catalog anotherCatalog = anotherMetalake.loadCatalog(catalogName);

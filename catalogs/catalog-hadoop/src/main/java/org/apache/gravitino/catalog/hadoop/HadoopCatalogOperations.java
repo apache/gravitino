@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
-import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -749,62 +747,42 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    // Set by catalog properties 'default-filesystem' explicitly.
-    String defaultFSSetByUsers =
+    String defaultFilesystemProvider =
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS);
 
-    // Set by properties 'gravitino.bypass.fs.defaultFS'.
-    String defaultFSfromByPass = config.get(CATALOG_BYPASS_PREFIX + DEFAULT_FS);
-    String schema;
-    Path fsPath;
-
     Map<String, String> newConfig = Maps.newHashMap(config);
-    if (path != null && path.toUri().getScheme() != null) {
-      schema = path.toUri().getScheme();
-      fsPath = path;
-    } else {
-      if (defaultFSSetByUsers == null && defaultFSfromByPass == null) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Can't get the schema from the path: %s, and the `defaultFS` and"
-                    + " `gravitino.bypass.fs.defaultFS` is not set.",
-                path));
-      }
-
-      if (defaultFSSetByUsers != null) {
-        fsPath = new Path(defaultFSSetByUsers);
-        schema = fsPath.toUri().getScheme();
-        if (schema == null) {
-          throw new IllegalArgumentException(
-              String.format(
-                  "Can't get the schema from the path: %s, and can't get schema from `defaultFS`.",
-                  path));
-        }
+    if (path == null) {
+      if (defaultFilesystemProvider != null) {
+        return getByFileSystemByScheme(defaultFilesystemProvider, newConfig);
       } else {
-        fsPath = new Path(defaultFSfromByPass);
-        schema = fsPath.toUri().getScheme();
-        if (schema == null) {
-          throw new IllegalArgumentException(
-              String.format(
-                  "Can't get the schema from the path: %s, and can't get schema from `gravitino.bypass.fs.defaultFS`.",
-                  path));
-        }
+        LOG.warn("The path and default filesystem provider are both null, using local file system");
+        return getByFileSystemByScheme(LOCAL_FILE_SCHEMA, newConfig);
       }
     }
 
-    // For any non-local file system, we need to explicitly set the default FS.
-    if (!newConfig.containsKey(DEFAULT_FS) && !LOCAL_FILE_SCHEMA.equals(schema)) {
-      newConfig.put(DEFAULT_FS, fsPath.toString());
+    // Path is not null;
+    if (path.toUri().getScheme() == null) {
+      LOG.warn(
+          "Can't get schema from path: {} and default filesystem provider are both null, using"
+              + " local file system",
+          path);
+      return getByFileSystemByScheme(LOCAL_FILE_SCHEMA, newConfig);
+    } else {
+      newConfig.put(DEFAULT_FS, path.toUri().toString());
+      return getByFileSystemByScheme(path.toUri().getScheme(), newConfig);
     }
+  }
 
-    FileSystemProvider provider = fileSystemProvidersMap.get(schema);
+  private FileSystem getByFileSystemByScheme(String scheme, Map<String, String> config)
+      throws IOException {
+    FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     if (provider == null) {
-      throw new IllegalArgumentException("Unsupported scheme: " + schema);
+      throw new IllegalArgumentException("Unsupported scheme: " + scheme);
     }
 
-    return provider.getFileSystem(newConfig);
+    return provider.getFileSystem(config);
   }
 }

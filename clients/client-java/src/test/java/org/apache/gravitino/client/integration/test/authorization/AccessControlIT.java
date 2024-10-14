@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.client.integration.test.authorization;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
@@ -72,11 +71,7 @@ public class AccessControlIT extends AbstractIT {
 
     Catalog filesetCatalog =
         metalake.createCatalog(
-            "fileset_catalog",
-            Catalog.Type.FILESET,
-            "hadoop",
-            "comment",
-            ImmutableMap.of("default-filesystem", "file:///"));
+            "fileset_catalog", Catalog.Type.FILESET, "hadoop", "comment", Collections.emptyMap());
     NameIdentifier fileIdent = NameIdentifier.of("fileset_schema", "fileset");
     filesetCatalog.asSchemas().createSchema("fileset_schema", "comment", Collections.emptyMap());
     filesetCatalog

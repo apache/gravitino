@@ -478,7 +478,6 @@ public class TestHadoopCatalogOperations {
     if (catalogPath != null) {
       catalogProps.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
-    catalogProps.put(HadoopCatalogPropertiesMetadata.DEFAULT_FS, "file:///");
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
@@ -1159,8 +1158,6 @@ public class TestHadoopCatalogOperations {
     if (catalogPath != null) {
       props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
-
-    props.put(HadoopCatalogPropertiesMetadata.DEFAULT_FS, "file:///");
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(props, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);

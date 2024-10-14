@@ -71,7 +71,7 @@ class TestCatalog(IntegrationTestEnv):
             catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment=self.catalog_comment,
-            properties={self.catalog_location_prop: "file:/tmp/test_schema"},
+            properties={self.catalog_location_prop: "/tmp/test_schema"},
         )
 
     def clean_test_data(self):
@@ -105,7 +105,7 @@ class TestCatalog(IntegrationTestEnv):
         catalog = self.create_catalog(self.catalog_name)
         self.assertEqual(catalog.name(), self.catalog_name)
         self.assertEqual(
-            catalog.properties(), {self.catalog_location_prop: "file:/tmp/test_schema"}
+            catalog.properties(), {self.catalog_location_prop: "/tmp/test_schema"}
         )
 
     def test_failed_create_catalog(self):
@@ -155,7 +155,7 @@ class TestCatalog(IntegrationTestEnv):
         self.assertEqual(catalog.comment(), self.catalog_comment)
         self.assertEqual(
             catalog.properties(),
-            {self.catalog_location_prop: "file:/tmp/test_schema"},
+            {self.catalog_location_prop: "/tmp/test_schema"},
         )
         self.assertEqual(catalog.audit_info().creator(), "anonymous")
 
