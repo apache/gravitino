@@ -49,8 +49,10 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String PAIMON_METASTORE = "metastore";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
-  public static final String JDBC_USER = "jdbc.user";
-  public static final String JDBC_PASSWORD = "jdbc.password";
+  public static final String GRAVITINO_JDBC_USER = "jdbc-user";
+  public static final String PAIMON_JDBC_USER = "jdbc.user";
+  public static final String GRAVITINO_JDBC_PASSWORD = "jdbc-password";
+  public static final String PAIMON_JDBC_PASSWORD = "jdbc.password";
 
   // S3 properties needed by Paimon
   public static final String S3_ENDPOINT = "s3.endpoint";
@@ -65,10 +67,10 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           WAREHOUSE,
           URI,
           URI,
-          JDBC_USER,
-          JDBC_USER,
-          JDBC_PASSWORD,
-          JDBC_PASSWORD);
+          GRAVITINO_JDBC_USER,
+          PAIMON_JDBC_USER,
+          GRAVITINO_JDBC_PASSWORD,
+          PAIMON_JDBC_PASSWORD);
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
   public static final Map<String, String> KERBEROS_CONFIGURATION =
       ImmutableMap.of(
@@ -119,14 +121,14 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 null /* defaultValue */,
                 false /* hidden */),
             stringOptionalPropertyEntry(
-                JDBC_USER,
-                "Paimon catalog jdbc user",
+                GRAVITINO_JDBC_USER,
+                "Gravitino Paimon catalog jdbc user",
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */),
             stringOptionalPropertyEntry(
-                JDBC_PASSWORD,
-                "Paimon catalog jdbc password",
+                GRAVITINO_JDBC_PASSWORD,
+                "Gravitino Paimon catalog jdbc password",
                 false /* immutable */,
                 null /* defaultValue */,
                 false /* hidden */));

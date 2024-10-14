@@ -51,8 +51,8 @@ public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, TYPE);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, WAREHOUSE);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.URI, URI);
-    catalogProperties.put(PaimonCatalogPropertiesMetadata.JDBC_USER, jdbcUser);
-    catalogProperties.put(PaimonCatalogPropertiesMetadata.JDBC_PASSWORD, jdbcPassword);
+    catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_USER, jdbcUser);
+    catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD, jdbcPassword);
 
     return catalogProperties;
   }

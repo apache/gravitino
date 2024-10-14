@@ -56,12 +56,12 @@ Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pas
 
 #### JDBC backend
 
-If you are using JDBC backend, you must specify the properties like `jdbc.user` and `jdbc.password`.
+If you are using JDBC backend, you must specify the properties like `jdbc-user` and `jdbc-password`.
 
-| Property name                                      | Description                                                                                                                                                                                                 | Default value          | Required                                                        | Since Version      |
-|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-----------------------------------------------------------------|--------------------|
-| `jdbc.user`                                        | Jdbc user of Gravitino Paimon catalog for `jdbc` backend.                                                                                                                                                   | (none)                 | required if the value of `catalog-backend` is `jdbc`.           | 0.7.0-incubating   |
-| `jdbc.password`                                    | Jdbc password of Gravitino Paimon catalog for `jdbc` backend.                                                                                                                                               | (none)                 | required if the value of `catalog-backend` is `jdbc`.           | 0.7.0-incubating   |
+| Property name   | Description                                                                                                                                                                                                 | Default value          | Required                                                        | Since Version      |
+|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-----------------------------------------------------------------|--------------------|
+| `jdbc-user`     | Jdbc user of Gravitino Paimon catalog for `jdbc` backend.                                                                                                                                                   | (none)                 | required if the value of `catalog-backend` is `jdbc`.           | 0.7.0-incubating   |
+| `jdbc-password` | Jdbc password of Gravitino Paimon catalog for `jdbc` backend.                                                                                                                                               | (none)                 | required if the value of `catalog-backend` is `jdbc`.           | 0.7.0-incubating   |
 
 :::caution
 You must download the corresponding JDBC driver and place it to the `catalogs/lakehouse-paimon/libs` directory If you are using JDBC backend.
