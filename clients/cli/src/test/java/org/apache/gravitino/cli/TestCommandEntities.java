@@ -37,6 +37,10 @@ public class TestCommandEntities {
         CommandEntities.isValidEntity(CommandEntities.SCHEMA), "SCHEMA should be a valid entity");
     assertTrue(
         CommandEntities.isValidEntity(CommandEntities.TABLE), "TABLE should be a valid entity");
+    assertTrue(
+        CommandEntities.isValidEntity(CommandEntities.USER), "USER should be a valid entity");
+    assertTrue(
+        CommandEntities.isValidEntity(CommandEntities.GROUP), "GROUP should be a valid entity");
   }
 
   @Test

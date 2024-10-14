@@ -53,6 +53,7 @@ public class GravitinoOptions {
   public static final String PASSWORD = "password";
   public static final String DATABASE = "database";
   public static final String BOOTSTRAP = "bootstrap";
+  public static final String GROUP = "group";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -93,7 +94,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("v", VALUE, "property value"));
     options.addOption(
         createArgOption(
-            "p", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
+            "p", PROVIDER, "the provider one of hadoop, hive, mysql, postgres, iceberg or kafka"));
     options.addOption(createArgOption("m", METASTORE, "Hive metastore URI"));
     options.addOption(createArgOption("w", WAREHOUSE, "warehouse name"));
     options.addOption(createArgOption("b", BOOTSTRAP, "Kafka bootstrap servers"));
@@ -101,6 +102,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("u", USER, "database username"));
     options.addOption(createArgOption("p", PASSWORD, "database password"));
     options.addOption(createArgOption("d", DATABASE, "database name"));
+    options.addOption(createArgOption("g", GROUP, "group name"));
 
     return options;
   }

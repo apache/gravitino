@@ -147,3 +147,15 @@ gcli schema details --name catalog_hive.sales
 gcli table list --name catalog_postgres.hr.departments
 gcli table list --name catalog_mysql.db.iceberg_tables
 gcli table list --name catalog_hive.sales.products
+
+# User examples
+gcli user create --name metalake_demo --user new_user
+gcli user details --name metalake_demo --user new_user
+gcli user list --name metalake_demo
+gcli user delete --name metalake_demo --user new_user
+
+# Group examples
+gcli group create --name metalake_demo --user new_group
+gcli group details --name metalake_demo --user new_group
+gcli group list --name metalake_demo
+gcli group delete --name metalake_demo --user new_group

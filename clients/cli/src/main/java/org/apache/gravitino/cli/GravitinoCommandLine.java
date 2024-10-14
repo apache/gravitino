@@ -25,6 +25,7 @@ import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.AllMetalakeDetails;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.ClientVersion;
+import org.apache.gravitino.cli.commands.CreateGroup;
 import org.apache.gravitino.cli.commands.CreateHadoopCatalog;
 import org.apache.gravitino.cli.commands.CreateHiveCatalog;
 import org.apache.gravitino.cli.commands.CreateIcebergCatalog;
@@ -33,18 +34,24 @@ import org.apache.gravitino.cli.commands.CreateMetalake;
 import org.apache.gravitino.cli.commands.CreateMySQLCatalog;
 import org.apache.gravitino.cli.commands.CreatePostgresCatalog;
 import org.apache.gravitino.cli.commands.CreateSchema;
+import org.apache.gravitino.cli.commands.CreateUser;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
+import org.apache.gravitino.cli.commands.DeleteGroup;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
 import org.apache.gravitino.cli.commands.DeleteSchema;
 import org.apache.gravitino.cli.commands.DeleteTable;
+import org.apache.gravitino.cli.commands.DeleteUser;
+import org.apache.gravitino.cli.commands.GroupDetails;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
 import org.apache.gravitino.cli.commands.ListColumns;
+import org.apache.gravitino.cli.commands.ListGroups;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
 import org.apache.gravitino.cli.commands.ListMetalakes;
 import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
 import org.apache.gravitino.cli.commands.ListTables;
+import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
@@ -59,6 +66,7 @@ import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
 import org.apache.gravitino.cli.commands.UpdateMetalakeName;
+import org.apache.gravitino.cli.commands.UserDetails;
 
 /* Gravitino Command line */
 public class GravitinoCommandLine {
@@ -123,6 +131,10 @@ public class GravitinoCommandLine {
         handleCatalogCommand();
       } else if (entity.equals(CommandEntities.METALAKE)) {
         handleMetalakeCommand();
+      } else if (entity.equals(CommandEntities.USER)) {
+        handleUserCommand();
+      } else if (entity.equals(CommandEntities.GROUP)) {
+        handleGroupCommand();
       }
     } else {
       handleGeneralCommand();
@@ -284,6 +296,42 @@ public class GravitinoCommandLine {
       // TODO
     } else if (CommandActions.DELETE.equals(command)) {
       new DeleteTable(url, metalake, catalog, schema, table).handle();
+    }
+  }
+
+  /** Handles the command execution for Users based on command type and the command line options. */
+  protected void handleUserCommand() {
+    String url = getUrl();
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String user = line.getOptionValue(GravitinoOptions.USER);
+
+    if (CommandActions.DETAILS.equals(command)) {
+      new UserDetails(url, metalake, user).handle();
+    } else if (CommandActions.LIST.equals(command)) {
+      new ListUsers(url, metalake).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      new CreateUser(url, metalake, user).handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      new DeleteUser(url, metalake, user).handle();
+    }
+  }
+
+  /** Handles the command execution for Group based on command type and the command line options. */
+  protected void handleGroupCommand() {
+    String url = getUrl();
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String group = line.getOptionValue(GravitinoOptions.GROUP);
+
+    if (CommandActions.DETAILS.equals(command)) {
+      new GroupDetails(url, metalake, group).handle();
+    } else if (CommandActions.LIST.equals(command)) {
+      new ListGroups(url, metalake).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      new CreateGroup(url, metalake, group).handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      new DeleteGroup(url, metalake, group).handle();
     }
   }
 
