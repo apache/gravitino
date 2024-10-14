@@ -20,8 +20,10 @@
 package org.apache.gravitino.credential;
 
 public class CredentialConstants {
+  // Credential type in the credential
   public static final String CREDENTIAL_TYPE = "credential-type";
-  public static final String EXPIRE_TIME_MS = "expire-time-ms";
+  // Credential expire time at ms since the epoch.
+  public static final String EXPIRE_TIME_AT_MS = "expire-time-at-ms";
 
   private CredentialConstants() {}
 }

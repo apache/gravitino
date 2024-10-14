@@ -56,7 +56,7 @@ public interface Credential {
     return new ImmutableMap.Builder<String, String>()
         .putAll(credentialInfo())
         .put(CredentialConstants.CREDENTIAL_TYPE, credentialType())
-        .put(CredentialConstants.EXPIRE_TIME_MS, String.valueOf(expireTimeInMs()))
+        .put(CredentialConstants.EXPIRE_TIME_AT_MS, String.valueOf(expireTimeInMs()))
         .build();
   }
 }
