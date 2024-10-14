@@ -119,12 +119,11 @@ public class FullName {
       String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
 
       /* Adjust position if metalake is part of the full name. */
-      String metalakeEnv = System.getenv("GRAVITINO_METALAKE");
       if (metalakeEnv != null) {
         position = position - 1;
       }
 
-      if (names.length - 1 < position) {
+      if (position >= names.length) {
         System.err.println(ErrorMessages.MALFORMED_NAME);
         return null;
       }
@@ -134,5 +133,68 @@ public class FullName {
 
     System.err.println(ErrorMessages.MISSING_NAME);
     return null;
+  }
+
+  /**
+   * Helper method to determine a specific part of the full name exits.
+   *
+   * @param entity The part of the name to obtain.
+   * @return True if the part exitsts.
+   */
+  public boolean hasNamePart(String entity) {
+    /* Check if the name is specified as a command line option. */
+    if (line.hasOption(entity)) {
+      return true;
+      /* Extract the name part from the full name if available. */
+    } else if (line.hasOption(GravitinoOptions.NAME)) {
+      String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
+      int length = names.length;
+      String [] order = {GravitinoOptions.METALAKE, GravitinoOptions.CATALOG,GravitinoOptions.SCHEMA,GravitinoOptions.TABLE};
+      int position = order.indexOf(entity);
+
+      /* Adjust position if metalake is part of the full name. */
+      if (metalakeEnv != null) {
+        position = position - 1;
+      }
+      return position < length;
+    }
+
+    return false;
+  }
+
+  /**
+   * Does the metalake name exist?
+   *
+   * @return True if the catalog name exists, or false if it does not.
+   */
+  public boolean hasMetalakeName() {
+    return hasNamePart(GravitinoOptions.METALAKE);
+  }
+
+  /**
+   * Does the catalog name exist?
+   *
+   * @return True if the catalog name exists, or false if it does not.
+   */
+  public boolean hasCatalogName() {
+    return hasNamePart(GravitinoOptions.CATALOG);
+  }
+
+  /**
+   * Does the schema name exist?
+   *
+   * @return True if the schema name exists, or false if it does not.
+   */
+  public boolean hasSchemaName() {
+    return hasNamePart(GravitinoOptions.SCHEMA);
+  }
+
+  /**
+   * Does the table name exist?
+   *
+   * @return True if the table name exists, or false if it does not.
+   */
+  public boolean hasTableName() {
+    return hasNamePart(GravitinoOptions.TABLE);
   }
 }

@@ -18,8 +18,10 @@
  */
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
@@ -138,5 +140,49 @@ public class TestFulllName {
 
     String namePart = fullName.getNamePart(GravitinoOptions.TABLE, 3);
     assertNull(namePart);
+  }
+
+  @Test
+  public void hasPartNameMetalake() throws Exception {
+    String[] args = {"metalake", "details", "--name", "metalake"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertTrue(fullName.hasMetalakeName());
+    assertFalse(fullName.hasCatalogName());
+    assertFalse(fullName.hasSchemaName());
+    assertFalse(fullName.hasTableName());
+  }
+
+  @Test
+  public void hasPartNameCatalog() throws Exception {
+    String[] args = {"catalog", "details", "--name", "metalake.catalog"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertTrue(fullName.hasMetalakeName());
+    assertTrue(fullName.hasCatalogName());
+    assertFalse(fullName.hasSchemaName());
+    assertFalse(fullName.hasTableName());
+  }
+
+  @Test
+  public void hasPartNameSchema() throws Exception {
+    String[] args = {"schema", "details", "--name", "metalake.catalog.schema"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertTrue(fullName.hasMetalakeName());
+    assertTrue(fullName.hasCatalogName());
+    assertTrue(fullName.hasSchemaName());
+    assertFalse(fullName.hasTableName());
+  }
+
+  @Test
+  public void hasPartNameTable() throws Exception {
+    String[] args = {"table", "details", "--name", "metalake.catalog.schema.table"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertTrue(fullName.hasMetalakeName());
+    assertTrue(fullName.hasCatalogName());
+    assertTrue(fullName.hasSchemaName());
+    assertTrue(fullName.hasTableName());
   }
 }

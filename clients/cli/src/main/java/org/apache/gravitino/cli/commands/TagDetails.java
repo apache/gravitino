@@ -19,40 +19,37 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.tag.Tag;
 
-/** Update the name of a catalog. */
-public class UpdateCatalogName extends Command {
+public class TagDetails extends Command {
 
   protected String metalake;
-  protected String catalog;
-  protected String name;
+  protected String tag;
 
   /**
-   * Update the name of a catalog.
+   * Displays the name and comment of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
-   * @param catalog The name of the catalog.
-   * @param name The new metalake name.
+   * @param tag The name of the tag.
    */
-  public UpdateCatalogName(String url, String metalake, String catalog, String name) {
+  public TagDetails(String url, String metalake, String tag) {
     super(url);
     this.metalake = metalake;
-    this.catalog = catalog;
-    this.name = name;
+    this.tag = tag;
   }
 
-  /** Update the name of a catalog. */
+  /** Displays the name and details of a specified tag. */
   public void handle() {
+    Tag result = null;
+
     try {
       GravitinoClient client = buildClient(metalake);
-      CatalogChange change = CatalogChange.rename(name);
-      client.alterCatalog(catalog, change);
+      result = client.getTag(tag);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -64,6 +61,8 @@ public class UpdateCatalogName extends Command {
       return;
     }
 
-    System.out.println(catalog + " name changed.");
+    if (result != null) {
+      System.out.println(result.name() + "," + result.comment());
+    }
   }
 }

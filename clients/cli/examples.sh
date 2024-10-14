@@ -159,3 +159,20 @@ gcli group create --name metalake_demo --user new_group
 gcli group details --name metalake_demo --user new_group
 gcli group list --name metalake_demo
 gcli group delete --name metalake_demo --user new_group
+
+# Tag examples
+gcli tag create --name metalake_demo --tag tagA
+gcli tag details --name metalake_demo --tag tagA
+gcli tag list --name metalake_demo # all tags in a metalake
+gcli tag delete --name metalake_demo --tag tagA
+gcli tag update --name metalake_demo --tag tagA --rename new_tag 
+gcli tag update --name metalake_demo --tag tagA --comment "new comment" 
+gcli tag properties --name metalake_demo --tag tagA 
+gcli tag set --name metalake_demo --tag tagA --property color --value green
+gcli tag remove --name metalake_demo --tag tagA --property color
+gcli tag create --name metalake_demo --tag hr
+gcli tag set --name metalake_demo.catalog_postgres.hr --tag hr # tag entity
+gcli tag remove --name metalake_demo.catalog_postgres.hr --tag hr # untag entity
+
+gcli tag list --name metalake_demo.catalog_postgres.hr # all tags hr has been taged with
+gcli tag list --tag tagA --name metalake_demo # all objects with tagA
