@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.DummyEventListener.DummyAsyncEventListener;
 import org.apache.gravitino.listener.DummyEventListener.DummyAsyncIsolatedEventListener;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
@@ -35,13 +36,16 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestEventListenerManager {
+
   static class DummyPostEvent extends Event {
+
     protected DummyPostEvent(String user, NameIdentifier identifier) {
       super(user, identifier);
     }
   }
 
   static class DummyPreEvent extends PreEvent {
+
     protected DummyPreEvent(String user, NameIdentifier identifier) {
       super(user, identifier);
     }
@@ -52,6 +56,12 @@ public class TestEventListenerManager {
 
   private static final DummyPreEvent DUMMY_PRE_EVENT_INSTANCE =
       new DummyPreEvent("user2", NameIdentifier.of("a2", "b2"));
+
+  public static final DummyPreEvent DUMMY_FORBIDDEN_PRE_EVENT_INSTANCE =
+      new DummyPreEvent("user3", NameIdentifier.of("a3", "b3"));
+
+  public static final DummyPreEvent DUMMY_EXCEPTION_PRE_EVENT_INSTANCE =
+      new DummyPreEvent("user3", NameIdentifier.of("a3", "b3"));
 
   @Test
   void testSyncListener() {
@@ -87,8 +97,6 @@ public class TestEventListenerManager {
 
     // test pre event
     eventBus.dispatchEvent(DUMMY_PRE_EVENT_INSTANCE);
-    listeners = eventBus.getPreEventListeners();
-    Assertions.assertEquals(2, listeners.size());
     names =
         listeners.stream()
             .map(
@@ -117,8 +125,9 @@ public class TestEventListenerManager {
     EventListenerManager eventListenerManager = new EventListenerManager();
     eventListenerManager.init(properties);
     eventListenerManager.start();
-
     EventBus eventBus = eventListenerManager.createEventBus();
+
+    // Test post event
     eventBus.dispatchEvent(DUMMY_POST_EVENT_INSTANCE);
     List<EventListenerPlugin> listeners = eventBus.getEventListeners();
 
@@ -135,13 +144,26 @@ public class TestEventListenerManager {
                   EventListenerPlugin userListener =
                       ((EventListenerPluginWrapper) shareQueueListener).getUserEventListener();
                   Assertions.assertTrue(userListener instanceof DummyAsyncEventListener);
-                  checkPostEvents(((DummyAsyncEventListener) userListener).tryGetEvents());
+                  checkPostEvents(((DummyAsyncEventListener) userListener).tryGetPostEvents());
                   Assertions.assertEquals(
                       0, ((DummyAsyncEventListener) userListener).getPreEvents().size());
                   return ((DummyAsyncEventListener) userListener).properties.get("name");
                 })
             .collect(Collectors.toSet());
     Assertions.assertEquals(ImmutableSet.of(async1, async2), sharedQueueListenerNames);
+
+    // Test pre event
+    eventBus.dispatchEvent(DUMMY_PRE_EVENT_INSTANCE);
+    shareQueueListeners.forEach(
+        shareQueueListener -> {
+          Assertions.assertTrue(shareQueueListener instanceof EventListenerPluginWrapper);
+          EventListenerPlugin userListener =
+              ((EventListenerPluginWrapper) shareQueueListener).getUserEventListener();
+          Assertions.assertTrue(userListener instanceof DummyAsyncEventListener);
+          checkPreEvents(((DummyAsyncEventListener) userListener).tryGetPreEvents());
+          Assertions.assertEquals(
+              0, ((DummyAsyncEventListener) userListener).getPostEvents().size());
+        });
 
     eventListenerManager.stop();
   }
@@ -176,7 +198,7 @@ public class TestEventListenerManager {
                       ((EventListenerPluginWrapper) internalListeners.get(0))
                           .getUserEventListener();
                   Assertions.assertTrue(userListener instanceof DummyAsyncEventListener);
-                  checkPostEvents(((DummyAsyncEventListener) userListener).tryGetEvents());
+                  checkPostEvents(((DummyAsyncEventListener) userListener).tryGetPostEvents());
                   Assertions.assertEquals(
                       0, ((DummyAsyncEventListener) userListener).getPreEvents().size());
                   return ((DummyAsyncEventListener) userListener).properties.get("name");
@@ -184,6 +206,41 @@ public class TestEventListenerManager {
             .collect(Collectors.toSet());
     Assertions.assertEquals(ImmutableSet.of(async1, async2), isolatedListenerNames);
 
+    eventBus.dispatchEvent(DUMMY_PRE_EVENT_INSTANCE);
+    listeners.forEach(
+        listener -> {
+          Assertions.assertTrue(listener instanceof AsyncQueueListener);
+          AsyncQueueListener asyncQueueListener = (AsyncQueueListener) listener;
+          List<EventListenerPlugin> internalListeners = asyncQueueListener.getEventListeners();
+          Assertions.assertEquals(1, internalListeners.size());
+          Assertions.assertTrue(internalListeners.get(0) instanceof EventListenerPluginWrapper);
+          EventListenerPlugin userListener =
+              ((EventListenerPluginWrapper) internalListeners.get(0)).getUserEventListener();
+          Assertions.assertTrue(userListener instanceof DummyAsyncEventListener);
+          checkPreEvents(((DummyAsyncEventListener) userListener).tryGetPreEvents());
+          Assertions.assertEquals(
+              0, ((DummyAsyncEventListener) userListener).getPostEvents().size());
+        });
+
+    eventListenerManager.stop();
+  }
+
+  @Test
+  void testForbiddenPreEvent() {
+    String sync1 = "sync1";
+    String sync2 = "sync2";
+    Map<String, String> properties = createSyncEventListenerConfig(sync1, sync2);
+
+    EventListenerManager eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(properties);
+    eventListenerManager.start();
+
+    EventBus eventBus = eventListenerManager.createEventBus();
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class, () -> eventBus.dispatchEvent(DUMMY_FORBIDDEN_PRE_EVENT_INSTANCE));
+
+    Assertions.assertDoesNotThrow(() -> eventBus.dispatchEvent(DUMMY_EXCEPTION_PRE_EVENT_INSTANCE));
     eventListenerManager.stop();
   }
 
