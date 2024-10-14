@@ -48,7 +48,7 @@ class TestCommonAuth:
     fileset_name: str = "test_client_fileset"
     fileset_comment: str = "fileset_comment"
 
-    fileset_location: str = "/tmp/TestFilesetCatalog"
+    fileset_location: str = "file:///tmp/TestFilesetCatalog"
     fileset_properties_key1: str = "fileset_properties_key1"
     fileset_properties_value1: str = "fileset_properties_value1"
     fileset_properties_key2: str = "fileset_properties_key2"
@@ -115,7 +115,7 @@ class TestCommonAuth:
             catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment="",
-            properties={self.catalog_location_prop: "/tmp/test1"},
+            properties={self.catalog_location_prop: "file:/tmp/test1"},
         )
         catalog.as_schemas().create_schema(
             schema_name=self.schema_name, comment="", properties={}

@@ -145,7 +145,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
             catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment="",
-            properties={self.catalog_location_prop: "/tmp/test1"},
+            properties={self.catalog_location_prop: "file:///tmp/test1"},
         )
         catalog.as_schemas().create_schema(
             schema_name=self.schema_name, comment="", properties={}
@@ -246,7 +246,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
         fileset_ident: NameIdentifier = NameIdentifier.of(
             self.schema_name, "test_get_file_location"
         )
-        fileset_location = "/tmp/test_get_file_location"
+        fileset_location = "file:/tmp/test_get_file_location"
         self.create_custom_fileset(fileset_ident, fileset_location)
         actual_file_location = (
             self.gravitino_client.load_catalog(name=self.catalog_name)
@@ -254,7 +254,9 @@ class TestFilesetCatalog(IntegrationTestEnv):
             .get_file_location(fileset_ident, "/test/test.txt")
         )
 
-        self.assertEqual(actual_file_location, f"file:{fileset_location}/test/test.txt")
+        self.assertEqual(
+            actual_file_location, f"file:/tmp/test_get_file_location/test/test.txt"
+        )
 
         # test rename without sub path should throw an exception
         caller_context = CallerContext(
