@@ -28,7 +28,6 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
-  implementation(project(":catalogs:catalog-common"))
 
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)

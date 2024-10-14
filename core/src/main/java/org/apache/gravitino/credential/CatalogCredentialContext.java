@@ -23,10 +23,10 @@ import com.google.common.base.Preconditions;
 import javax.validation.constraints.NotNull;
 
 /** CatalogContext is generated when user requesting catalog credentials. */
-public class CatalogContext implements Context {
+public class CatalogCredentialContext implements CredentialContext {
   @NotNull private final String userName;
 
-  public CatalogContext(String userName) {
+  public CatalogCredentialContext(String userName) {
     Preconditions.checkNotNull(userName, "User name should not be null");
     this.userName = userName;
   }

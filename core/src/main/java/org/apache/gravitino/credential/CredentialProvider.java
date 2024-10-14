@@ -52,5 +52,5 @@ public interface CredentialProvider extends Closeable {
    *     or resource. Null will be returned if no credential is available.
    */
   @Nullable
-  Credential getCredential(Context context);
+  Credential getCredential(CredentialContext context);
 }

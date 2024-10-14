@@ -27,19 +27,20 @@ import javax.validation.constraints.NotNull;
  * LocationContext is generated when user requesting resources associated with storage location like
  * table, fileset, etc.
  */
-public class LocationContext implements Context {
+public class PathBasedCredentialContext implements CredentialContext {
 
-  @NotNull private final Set<String> writeLocations;
-  @NotNull private final Set<String> readLocations;
+  @NotNull private final Set<String> writePaths;
+  @NotNull private final Set<String> readPaths;
   @NotNull private final String userName;
 
-  public LocationContext(String userName, Set<String> writeLocations, Set<String> readLocations) {
+  public PathBasedCredentialContext(
+      String userName, Set<String> writePaths, Set<String> readPaths) {
     Preconditions.checkNotNull(userName, "User name should not be null");
-    Preconditions.checkNotNull(writeLocations, "Write locations should not be null");
-    Preconditions.checkNotNull(readLocations, "Read locations should not be null");
+    Preconditions.checkNotNull(writePaths, "Write paths should not be null");
+    Preconditions.checkNotNull(readPaths, "Read paths should not be null");
     this.userName = userName;
-    this.writeLocations = writeLocations;
-    this.readLocations = readLocations;
+    this.writePaths = writePaths;
+    this.readPaths = readPaths;
   }
 
   @Override
@@ -47,11 +48,11 @@ public class LocationContext implements Context {
     return userName;
   }
 
-  public Set<String> getWriteLocations() {
-    return writeLocations;
+  public Set<String> getWritePaths() {
+    return writePaths;
   }
 
-  public Set<String> getReadLocations() {
-    return readLocations;
+  public Set<String> getReadPaths() {
+    return readPaths;
   }
 }

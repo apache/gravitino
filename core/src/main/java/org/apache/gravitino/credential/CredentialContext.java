@@ -20,7 +20,7 @@
 package org.apache.gravitino.credential;
 
 /** Contains context information to get credential from credential provider. */
-public interface Context {
+public interface CredentialContext {
   /**
    * Providing the username.
    *

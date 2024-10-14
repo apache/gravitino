@@ -42,7 +42,8 @@ public class TestCredentialProvider {
     ImmutableSet<String> writeLocations = ImmutableSet.of("location1");
     ImmutableSet<String> readLocations = ImmutableSet.of("location2");
 
-    LocationContext locationContext = new LocationContext("user", writeLocations, readLocations);
+    PathBasedCredentialContext locationContext =
+        new PathBasedCredentialContext("user", writeLocations, readLocations);
     Credential credential = dummyCredentialProvider.getCredential(locationContext);
     Assertions.assertTrue(credential instanceof DummyCredential);
     DummyCredential dummyCredential = (DummyCredential) credential;

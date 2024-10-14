@@ -24,10 +24,9 @@ import java.util.Map;
 
 /** Interface representing a credential with type, expiration time, and additional information. */
 public interface Credential {
-
   /**
-   * Returns the type of the credential. It should same with the credential type of the credential
-   * provider.
+   * Returns the type of the credential. It should be the same with the credential type of the
+   * credential provider.
    *
    * @return the credential type as a String.
    */
@@ -39,7 +38,7 @@ public interface Credential {
    *
    * @return the expiration time as a long.
    */
-  long expireTimeMs();
+  long expireTimeInMs();
 
   /**
    * Returns credential information.
@@ -57,7 +56,7 @@ public interface Credential {
     return new ImmutableMap.Builder<String, String>()
         .putAll(credentialInfo())
         .put(CredentialConstants.CREDENTIAL_TYPE, credentialType())
-        .put(CredentialConstants.EXPIRE_TIME_MS, String.valueOf(expireTimeMs()))
+        .put(CredentialConstants.EXPIRE_TIME_MS, String.valueOf(expireTimeInMs()))
         .build();
   }
 }

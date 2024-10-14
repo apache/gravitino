@@ -43,12 +43,13 @@ public class DummyCredentialProvider implements CredentialProvider {
   }
 
   @Override
-  public Credential getCredential(Context context) {
+  public Credential getCredential(CredentialContext context) {
     Preconditions.checkArgument(
-        context instanceof LocationContext || context instanceof CatalogContext,
+        context instanceof PathBasedCredentialContext
+            || context instanceof CatalogCredentialContext,
         "Doesn't support context: " + context.getClass().getSimpleName());
-    if (context instanceof LocationContext) {
-      return new DummyCredential((LocationContext) context);
+    if (context instanceof PathBasedCredentialContext) {
+      return new DummyCredential((PathBasedCredentialContext) context);
     }
     return null;
   }
@@ -58,9 +59,9 @@ public class DummyCredentialProvider implements CredentialProvider {
     @Getter private Set<String> writeLocations;
     @Getter private Set<String> readLocations;
 
-    public DummyCredential(LocationContext locationContext) {
-      this.writeLocations = locationContext.getWriteLocations();
-      this.readLocations = locationContext.getReadLocations();
+    public DummyCredential(PathBasedCredentialContext locationContext) {
+      this.writeLocations = locationContext.getWritePaths();
+      this.readLocations = locationContext.getReadPaths();
     }
 
     @Override
@@ -69,7 +70,7 @@ public class DummyCredentialProvider implements CredentialProvider {
     }
 
     @Override
-    public long expireTimeMs() {
+    public long expireTimeInMs() {
       return 0;
     }
 
