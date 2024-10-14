@@ -51,7 +51,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
     fileset_alter_name: str = fileset_name + "Alter"
     fileset_comment: str = "fileset_comment"
 
-    fileset_location: str = "/tmp/TestFilesetCatalog"
+    fileset_location: str = "file:///tmp/TestFilesetCatalog"
     fileset_properties_key1: str = "fileset_properties_key1"
     fileset_properties_value1: str = "fileset_properties_value1"
     fileset_properties_key2: str = "fileset_properties_key2"

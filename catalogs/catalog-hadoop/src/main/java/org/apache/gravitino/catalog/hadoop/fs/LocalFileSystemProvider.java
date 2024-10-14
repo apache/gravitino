@@ -18,9 +18,6 @@
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
-import static org.apache.gravitino.catalog.hadoop.HadoopCatalogOperations.DEFAULT_FS;
-import static org.apache.gravitino.catalog.hadoop.HadoopCatalogOperations.LOCAL_FILE_PATH;
-
 import java.io.IOException;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
@@ -31,8 +28,11 @@ public class LocalFileSystemProvider implements FileSystemProvider {
   @Override
   public FileSystem getFileSystem(Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
-    config.forEach(configuration::set);
-    config.put(DEFAULT_FS, LOCAL_FILE_PATH);
+    config.forEach(
+        (k, v) -> {
+          configuration.set(k.replace("gravitino.bypass.", ""), v);
+        });
+
     return FileSystem.newInstance(configuration);
   }
 

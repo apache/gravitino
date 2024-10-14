@@ -30,7 +30,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -46,8 +45,6 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider;
-import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -78,7 +75,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   public static final String DEFAULT_FS = "fs.defaultFS";
   public static final String LOCAL_FILE_PATH = "file:///";
-  public static final Map<String, FileSystemProvider> FILE_SYSTEM_PROVIDERS = Maps.newHashMap();
 
   private static final String LOCAL_FILE_SCHEMA = "file";
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
@@ -97,17 +93,11 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private Map<String, String> conf;
 
   // The bypassConfigs are the configurations that are used to initialize the Hadoop Configuration.
-  Map<String, String> bypassConfigs;
+  Map<String, String> bypassConfigs = Maps.newHashMap();
 
   private CatalogInfo catalogInfo;
 
-  static {
-    FileSystemProvider localFileSystemProvider = new LocalFileSystemProvider();
-    FileSystemProvider hdfsFileSystemProvider = new HDFSFileSystemProvider();
-
-    FILE_SYSTEM_PROVIDERS.put(localFileSystemProvider.getScheme(), localFileSystemProvider);
-    FILE_SYSTEM_PROVIDERS.put(hdfsFileSystemProvider.getScheme(), hdfsFileSystemProvider);
-  }
+  private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
 
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
@@ -142,24 +132,25 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this.propertiesMetadata = propertiesMetadata;
     this.catalogInfo = info;
 
-    // Initialize Hadoop Configuration.
     this.conf = config;
 
-    this.bypassConfigs =
-        conf.entrySet().stream()
-            .filter(e -> e.getKey().startsWith(CATALOG_BYPASS_PREFIX))
-            .collect(
-                Collectors.toMap(
-                    e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
-                    Map.Entry::getValue));
+    //    conf.entrySet().stream()
+    //        .filter(e -> e.getKey().startsWith(CATALOG_BYPASS_PREFIX))
+    //        .forEach(e -> bypassConfigs.put(e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
+    // e.getValue()));
+    //
+    //    String defaultFS = (String) propertiesMetadata.catalogPropertiesMetadata()
+    //        .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS);
+    //    if (StringUtils.isNotBlank(defaultFS)) {
+    //      bypassConfigs.put(DEFAULT_FS, defaultFS);
+    //    }
 
     String fileSystemProviders =
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
-
-    FileSystemUtils.initFileSystemProviders(fileSystemProviders, FILE_SYSTEM_PROVIDERS);
+    FileSystemUtils.initFileSystemProviders(fileSystemProviders, fileSystemProvidersMap);
 
     String catalogLocation =
         (String)
@@ -262,9 +253,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
     try {
       // formalize the path to avoid path without scheme, uri, authority, etc.
-      filesetPath = formalizePath(filesetPath, bypassConfigs);
+      filesetPath = formalizePath(filesetPath, conf);
 
-      FileSystem fs = getFileSystem(filesetPath, bypassConfigs);
+      FileSystem fs = getFileSystem(filesetPath, conf);
       if (!fs.exists(filesetPath)) {
         if (!fs.mkdirs(filesetPath)) {
           throw new RuntimeException(
@@ -367,7 +358,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
       // For managed fileset, we should delete the related files.
       if (filesetEntity.filesetType() == Fileset.Type.MANAGED) {
-        FileSystem fs = getFileSystem(filesetPath, bypassConfigs);
+        FileSystem fs = getFileSystem(filesetPath, conf);
         if (fs.exists(filesetPath)) {
           if (!fs.delete(filesetPath, true)) {
             LOG.warn("Failed to delete fileset {} location {}", ident, filesetPath);
@@ -487,7 +478,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     Path schemaPath = getSchemaPath(ident.name(), properties);
     if (schemaPath != null) {
       try {
-        FileSystem fs = getFileSystem(schemaPath, bypassConfigs);
+        FileSystem fs = getFileSystem(schemaPath, conf);
         if (!fs.exists(schemaPath)) {
           if (!fs.mkdirs(schemaPath)) {
             // Fail the operation when failed to create the schema path.
@@ -605,7 +596,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       if (schemaPath == null) {
         return false;
       }
-      FileSystem fs = getFileSystem(schemaPath, bypassConfigs);
+      FileSystem fs = getFileSystem(schemaPath, conf);
       // Nothing to delete if the schema path does not exist.
       if (!fs.exists(schemaPath)) {
         return false;
@@ -744,7 +735,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @VisibleForTesting
-  static Path formalizePath(Path path, Map<String, String> configuration) throws IOException {
+  Path formalizePath(Path path, Map<String, String> configuration) throws IOException {
     FileSystem defaultFs = getFileSystem(path, configuration);
     return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
   }
@@ -758,7 +749,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private boolean checkSingleFile(Fileset fileset) {
     try {
       Path locationPath = new Path(fileset.storageLocation());
-      return getFileSystem(locationPath, bypassConfigs).getFileStatus(locationPath).isFile();
+      return getFileSystem(locationPath, conf).getFileStatus(locationPath).isFile();
     } catch (FileNotFoundException e) {
       // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
       return false;
@@ -770,48 +761,61 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     }
   }
 
-  static FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    Map<String, String> newConfig = Maps.newHashMap(config);
-    String scheme;
+  FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
+    // Set by catalog properties 'defaultFS' explicitly.
+    String defaultFSSetByUsers =
+        (String)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS);
+
+    // Set by properties 'gravitino.bypass.fs.defaultFS'.
+    String defaultFSfromByPass = config.get(CATALOG_BYPASS_PREFIX + DEFAULT_FS);
+    String schema;
     Path fsPath;
-    if (path != null) {
-      scheme = path.toUri().getScheme();
-      if (scheme == null) {
-        // If the schema of the path is not set, we need to get the default FS from the
-        // configuration.
-        String defaultFS = config.get(DEFAULT_FS);
-        if (defaultFS == null) {
-          scheme = LOCAL_FILE_SCHEMA;
-        } else {
-          String schemaFromDefaultFS = new Path(defaultFS).toUri().getScheme();
-          scheme = schemaFromDefaultFS == null ? LOCAL_FILE_SCHEMA : schemaFromDefaultFS;
-        }
-      }
+
+    Map<String, String> newConfig = Maps.newHashMap(config);
+    if (path != null && path.toUri().getScheme() != null) {
+      schema = path.toUri().getScheme();
       fsPath = path;
     } else {
-      String defaultFS = newConfig.get(DEFAULT_FS);
-      if (defaultFS == null) {
-        // Should be the local file system.
-        scheme = LOCAL_FILE_SCHEMA;
-        fsPath = new Path(LOCAL_FILE_PATH);
+      if (defaultFSSetByUsers == null && defaultFSfromByPass == null) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Can't get the schema from the path: %s, and the `defaultFS` and"
+                    + " `gravitino.bypass.fs.defaultFS` is not set.",
+                path));
+      }
+
+      if (defaultFSSetByUsers != null) {
+        fsPath = new Path(defaultFSSetByUsers);
+        schema = fsPath.toUri().getScheme();
+        if (schema == null) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Can't get the schema from the path: %s, and can't get schema from `defaultFS`.",
+                  path));
+        }
       } else {
-        fsPath = new Path(defaultFS);
-        if (fsPath.toUri().getScheme() == null) {
-          scheme = LOCAL_FILE_SCHEMA;
-        } else {
-          scheme = fsPath.toUri().getScheme();
+        fsPath = new Path(defaultFSfromByPass);
+        schema = fsPath.toUri().getScheme();
+        if (schema == null) {
+          throw new IllegalArgumentException(
+              String.format(
+                  "Can't get the schema from the path: %s, and can't get schema from `gravitino.bypass.fs.defaultFS`.",
+                  path));
         }
       }
     }
 
     // For any non-local file system, we need to explicitly set the default FS.
-    if (!LOCAL_FILE_SCHEMA.equals(scheme) && !newConfig.containsKey(DEFAULT_FS)) {
+    if (!newConfig.containsKey(DEFAULT_FS) && !LOCAL_FILE_SCHEMA.equals(schema)) {
       newConfig.put(DEFAULT_FS, fsPath.toString());
     }
 
-    FileSystemProvider provider = FILE_SYSTEM_PROVIDERS.get(scheme);
+    FileSystemProvider provider = fileSystemProvidersMap.get(schema);
     if (provider == null) {
-      throw new IllegalArgumentException("Unsupported scheme: " + scheme);
+      throw new IllegalArgumentException("Unsupported scheme: " + schema);
     }
 
     return provider.getFileSystem(newConfig);

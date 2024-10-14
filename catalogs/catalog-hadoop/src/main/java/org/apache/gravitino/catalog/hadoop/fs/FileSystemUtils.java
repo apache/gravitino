@@ -27,7 +27,12 @@ public class FileSystemUtils {
   private FileSystemUtils() {}
 
   public static void initFileSystemProviders(
-      String fileSystemProviders, Map<String, FileSystemProvider> fileProviders) {
+      String fileSystemProviders, Map<String, FileSystemProvider> fileProvidersMap) {
+    FileSystemProvider localFileSystemProvider = new LocalFileSystemProvider();
+    FileSystemProvider hdfsFileSystemProvider = new HDFSFileSystemProvider();
+    fileProvidersMap.put(localFileSystemProvider.getScheme(), localFileSystemProvider);
+    fileProvidersMap.put(hdfsFileSystemProvider.getScheme(), hdfsFileSystemProvider);
+
     if (StringUtils.isBlank(fileSystemProviders)) {
       return;
     }
@@ -38,7 +43,7 @@ public class FileSystemUtils {
         FileSystemProvider fileSystemProvider =
             (FileSystemProvider)
                 Class.forName(provider.trim()).getDeclaredConstructor().newInstance();
-        fileProviders.put(fileSystemProvider.getScheme(), fileSystemProvider);
+        fileProvidersMap.put(fileSystemProvider.getScheme(), fileSystemProvider);
       } catch (Exception e) {
         throw new GravitinoRuntimeException(
             e, "Failed to initialize file system provider: %s", provider);

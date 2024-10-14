@@ -30,7 +30,10 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   @Override
   public FileSystem getFileSystem(Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
-    config.forEach(configuration::set);
+    config.forEach(
+        (k, v) -> {
+          configuration.set(k.replace("gravitino.bypass.", ""), v);
+        });
 
     String pathString = configuration.get("fs.defaultFS");
     if (pathString == null) {

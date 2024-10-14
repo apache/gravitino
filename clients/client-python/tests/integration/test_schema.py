@@ -89,7 +89,7 @@ class TestSchema(IntegrationTestEnv):
             catalog_type=Catalog.Type.FILESET,
             provider=self.catalog_provider,
             comment="",
-            properties={self.catalog_location_prop: "/tmp/test_schema"},
+            properties={self.catalog_location_prop: "file:///tmp/test_schema"},
         )
 
     def clean_test_data(self):

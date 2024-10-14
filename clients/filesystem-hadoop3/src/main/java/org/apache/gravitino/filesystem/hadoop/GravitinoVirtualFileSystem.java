@@ -46,8 +46,6 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider;
-import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
@@ -88,17 +86,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private static final Pattern IDENTIFIER_PATTERN =
       Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$");
   private static final String SLASH = "/";
-  private static final Map<String, FileSystemProvider> FILE_SYSTEM_PROVIDERS = Maps.newHashMap();
+  private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
   private static final String GRAVITINO_BYPASS_PREFIX = "gravitino.bypass.";
-
-  static {
-    // Register the default local and HDFS FileSystemProvider
-    FileSystemProvider localFileSystemProvider = new LocalFileSystemProvider();
-    FILE_SYSTEM_PROVIDERS.put(localFileSystemProvider.getScheme(), localFileSystemProvider);
-
-    FileSystemProvider hdfsFileSystemProvider = new HDFSFileSystemProvider();
-    FILE_SYSTEM_PROVIDERS.put(hdfsFileSystemProvider.getScheme(), hdfsFileSystemProvider);
-  }
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
@@ -143,8 +132,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
     initializeClient(configuration);
 
+    // Register the default local and HDFS FileSystemProvider
     String fileSystemProviders = configuration.get(FS_FILESYSTEM_PROVIDERS);
-    FileSystemUtils.initFileSystemProviders(fileSystemProviders, FILE_SYSTEM_PROVIDERS);
+    FileSystemUtils.initFileSystemProviders(fileSystemProviders, fileSystemProvidersMap);
 
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
@@ -395,7 +385,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             str -> {
               try {
                 Map<String, String> maps = getConfigMap(getConf(), uri);
-                FileSystemProvider provider = FILE_SYSTEM_PROVIDERS.get(scheme);
+                FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
                 if (provider == null) {
                   throw new GravitinoRuntimeException(
                       "Unsupported file system scheme: %s for %s.",
