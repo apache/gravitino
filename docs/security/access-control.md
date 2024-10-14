@@ -90,7 +90,7 @@ The owner of each entity has implicit administrative class privilege, for exampl
 Only the Owner of a securable object can fully manage that resource.
 If a securable object needs to be managed by more than one person at the same time, the owner is assigned to a user group.
 
-The metadata object which supports ownership is as follows:
+The metadata object that supports ownership is as follows:
 
 | Metadata Object Type |
 |----------------------|
