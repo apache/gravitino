@@ -74,7 +74,6 @@ import org.slf4j.LoggerFactory;
 public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
 
   public static final String DEFAULT_FS = "fs.defaultFS";
-
   private static final String LOCAL_FILE_SCHEMA = "file";
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
@@ -750,7 +749,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    // Set by catalog properties 'defaultFS' explicitly.
+    // Set by catalog properties 'default-filesystem' explicitly.
     String defaultFSSetByUsers =
         (String)
             propertiesMetadata
