@@ -23,10 +23,8 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogPaimonFileSystemIT extends CatalogPaimonBaseIT {
 
   @Override

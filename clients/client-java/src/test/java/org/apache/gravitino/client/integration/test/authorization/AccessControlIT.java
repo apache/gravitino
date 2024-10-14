@@ -54,9 +54,7 @@ import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class AccessControlIT extends BaseIT {
 
   private static String metalakeName = RandomNameUtils.genRandomName("metalake");

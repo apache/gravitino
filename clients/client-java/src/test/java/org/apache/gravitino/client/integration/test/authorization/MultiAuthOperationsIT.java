@@ -52,11 +52,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class MultiAuthOperationsIT extends BaseIT {
   private static final KerberosSecurityTestcase kdc =
       new KerberosSecurityTestcase() {

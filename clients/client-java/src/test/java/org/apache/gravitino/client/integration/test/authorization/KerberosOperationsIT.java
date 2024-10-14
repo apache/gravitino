@@ -41,10 +41,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class KerberosOperationsIT extends BaseIT {
 
   private static final KerberosSecurityTestcase kdc =
