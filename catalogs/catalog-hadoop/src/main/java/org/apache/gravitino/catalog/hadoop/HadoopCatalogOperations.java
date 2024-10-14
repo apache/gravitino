@@ -753,10 +753,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     Map<String, String> newConfig = Maps.newHashMap(config);
     if (path == null) {
       if (defaultFilesystemProvider != null) {
-        return getByFileSystemByScheme(defaultFilesystemProvider, newConfig);
+        return getFileSystemByScheme(defaultFilesystemProvider, newConfig);
       } else {
         LOG.warn("The path and default filesystem provider are both null, using local file system");
-        return getByFileSystemByScheme(LOCAL_FILE_SCHEMA, newConfig);
+        return getFileSystemByScheme(LOCAL_FILE_SCHEMA, newConfig);
       }
     }
 
@@ -766,14 +766,14 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           "Can't get schema from path: {} and default filesystem provider are both null, using"
               + " local file system",
           path);
-      return getByFileSystemByScheme(LOCAL_FILE_SCHEMA, newConfig);
+      return getFileSystemByScheme(LOCAL_FILE_SCHEMA, newConfig);
     } else {
       newConfig.put(DEFAULT_FS, path.toUri().toString());
-      return getByFileSystemByScheme(path.toUri().getScheme(), newConfig);
+      return getFileSystemByScheme(path.toUri().getScheme(), newConfig);
     }
   }
 
-  private FileSystem getByFileSystemByScheme(String scheme, Map<String, String> config)
+  private FileSystem getFileSystemByScheme(String scheme, Map<String, String> config)
       throws IOException {
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     if (provider == null) {
