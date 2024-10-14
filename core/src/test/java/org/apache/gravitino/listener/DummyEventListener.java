@@ -67,14 +67,9 @@ public class DummyEventListener implements EventListenerPlugin {
     return Mode.SYNC;
   }
 
-  public Event popEvent() {
+  public Event popPostEvent() {
     Assertions.assertTrue(postEvents.size() > 0, "No events to pop");
     return postEvents.removeLast();
-  }
-
-  public PreEvent popPreEvent() {
-    Assertions.assertTrue(preEvents.size() > 0, "No events to pop");
-    return preEvents.removeLast();
   }
 
   public static class DummyAsyncEventListener extends DummyEventListener {

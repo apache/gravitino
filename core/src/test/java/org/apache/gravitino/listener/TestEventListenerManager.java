@@ -61,7 +61,7 @@ public class TestEventListenerManager {
       new DummyPreEvent("user3", NameIdentifier.of("a3", "b3"));
 
   public static final DummyPreEvent DUMMY_EXCEPTION_PRE_EVENT_INSTANCE =
-      new DummyPreEvent("user3", NameIdentifier.of("a3", "b3"));
+      new DummyPreEvent("user4", NameIdentifier.of("a4", "b4"));
 
   @Test
   void testSyncListener() {
