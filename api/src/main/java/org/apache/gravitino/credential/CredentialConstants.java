@@ -19,10 +19,11 @@
 
 package org.apache.gravitino.credential;
 
+/** Contains credential constants used by Gravitino server and client. */
 public class CredentialConstants {
-  // Credential type in the credential
+  /** Credential type in the credential. */
   public static final String CREDENTIAL_TYPE = "credential-type";
-  // Credential expire time at ms since the epoch.
+  /** Credential expire time at ms since the epoch. */
   public static final String EXPIRE_TIME_AT_MS = "expire-time-at-ms";
 
   private CredentialConstants() {}
