@@ -74,7 +74,6 @@ import org.slf4j.LoggerFactory;
 public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
 
   public static final String DEFAULT_FS = "fs.defaultFS";
-  public static final String LOCAL_FILE_PATH = "file:///";
 
   private static final String LOCAL_FILE_SCHEMA = "file";
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
@@ -133,17 +132,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     this.catalogInfo = info;
 
     this.conf = config;
-
-    //    conf.entrySet().stream()
-    //        .filter(e -> e.getKey().startsWith(CATALOG_BYPASS_PREFIX))
-    //        .forEach(e -> bypassConfigs.put(e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
-    // e.getValue()));
-    //
-    //    String defaultFS = (String) propertiesMetadata.catalogPropertiesMetadata()
-    //        .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS);
-    //    if (StringUtils.isNotBlank(defaultFS)) {
-    //      bypassConfigs.put(DEFAULT_FS, defaultFS);
-    //    }
 
     String fileSystemProviders =
         (String)

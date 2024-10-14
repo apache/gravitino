@@ -49,7 +49,7 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    * specified, the default file system instance will be created with the schema prefix in the file
    * path.
    */
-  public static final String DEFAULT_FS = "defaultFS";
+  public static final String DEFAULT_FS = "default-filesystem";
 
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()

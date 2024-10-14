@@ -734,7 +734,7 @@ public class TestHadoopCatalogOperations {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "entityStore", new RelationalEntityStore(), true);
       try (HadoopCatalogOperations hadoopCatalogOperations = new HadoopCatalogOperations()) {
-        Map<String, String> map = ImmutableMap.of("defaultFS", "file:///");
+        Map<String, String> map = ImmutableMap.of("default-filesystem", "file:///");
         hadoopCatalogOperations.initialize(map, null, hasPropertyMetadata);
         for (int i = 0; i < paths.length; i++) {
           Path actual = hadoopCatalogOperations.formalizePath(new Path(paths[i]), map);
