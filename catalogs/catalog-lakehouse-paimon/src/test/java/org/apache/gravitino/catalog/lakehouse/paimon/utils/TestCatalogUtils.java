@@ -59,7 +59,6 @@ public class TestCatalogUtils {
   }
 
   private void assertCatalog(String metastore, Consumer<Catalog> consumer) throws Exception {
-
     try (Catalog catalog =
         loadCatalogBackend(
                 new PaimonConfig(

@@ -910,7 +910,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
     // Why needs this conversion? Because PaimonCatalogOperations#initialize will try to convert
     // Gravitino general S3 properties to Paimon specific S3 properties.
-    Map<String, String> copy = CatalogUtils.toPaimonCatalogProperties(catalogProperties);
+    Map<String, String> copy = CatalogUtils.toInnerProperty(catalogProperties, true);
 
     PaimonBackendCatalogWrapper paimonBackendCatalogWrapper =
         CatalogUtils.loadCatalogBackend(new PaimonConfig(copy));

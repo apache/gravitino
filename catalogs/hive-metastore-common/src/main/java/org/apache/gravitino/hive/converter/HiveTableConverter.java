@@ -63,7 +63,7 @@ public class HiveTableConverter {
   }
 
   public static SortOrder[] getSortOrders(Table table) {
-    SortOrder[] sortOrders = new SortOrder[0];
+    SortOrder[] sortOrders = SortOrders.NONE;
     StorageDescriptor sd = table.getSd();
     if (sd.getSortCols() != null && !sd.getSortCols().isEmpty()) {
       sortOrders =

@@ -102,6 +102,7 @@ datanucleus-core = "4.1.17"
 datanucleus-api-jdo = "4.2.4"
 datanucleus-rdbms = "4.1.19"
 datanucleus-jdo = "3.2.0-m3"
+hudi = "0.15.0"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -174,6 +175,7 @@ paimon-core = { group = "org.apache.paimon", name = "paimon-core", version.ref =
 paimon-format = { group = "org.apache.paimon", name = "paimon-format", version.ref = "paimon" }
 paimon-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog", version.ref = "paimon" }
 paimon-s3 = { group = "org.apache.paimon", name = "paimon-s3", version.ref = "paimon" }
+paimon-oss = { group = "org.apache.paimon", name = "paimon-oss", version.ref = "paimon" }
 paimon-spark = { group = "org.apache.paimon", name = "paimon-spark", version.ref = "paimon" }
 
 trino-spi= { group = "io.trino", name = "trino-spi", version.ref = "trino" }
