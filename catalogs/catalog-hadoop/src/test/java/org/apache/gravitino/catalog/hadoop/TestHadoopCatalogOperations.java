@@ -906,7 +906,6 @@ public class TestHadoopCatalogOperations {
 
     try (HadoopCatalogOperations mockOps = Mockito.mock(HadoopCatalogOperations.class)) {
       mockOps.hadoopConf = new Configuration();
-      mockOps.bypassConfigs = Maps.newHashMap();
       when(mockOps.loadFileset(filesetIdent)).thenReturn(mockFileset);
       when(mockOps.getConf()).thenReturn(Maps.newHashMap());
       String subPath = "/test/test.parquet";

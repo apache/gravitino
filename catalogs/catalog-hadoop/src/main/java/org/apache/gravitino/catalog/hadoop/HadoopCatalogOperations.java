@@ -88,9 +88,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private Map<String, String> conf;
 
-  // The bypassConfigs are the configurations that are used to initialize the Hadoop Configuration.
-  Map<String, String> bypassConfigs = Maps.newHashMap();
-
   private CatalogInfo catalogInfo;
 
   private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
@@ -113,7 +110,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   public Configuration getHadoopConf() {
     Configuration configuration = new Configuration();
-    bypassConfigs.forEach(configuration::set);
+    conf.forEach(configuration::set);
     return configuration;
   }
 
