@@ -37,7 +37,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -56,7 +56,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
-public class HudiCatalogHMSIT extends AbstractIT {
+public class HudiCatalogHMSIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static String hmsURI;
@@ -72,7 +72,7 @@ public class HudiCatalogHMSIT extends AbstractIT {
   private static final String MOR_TABLE = RandomNameUtils.genRandomName("hudi_mor_table");
 
   @BeforeAll
-  public static void prepare() {
+  public void prepare() {
     containerSuite.startHiveContainer();
     hmsURI =
         String.format(
