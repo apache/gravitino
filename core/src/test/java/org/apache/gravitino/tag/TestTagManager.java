@@ -31,8 +31,9 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.spy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -54,6 +55,9 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -66,6 +70,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -91,6 +96,10 @@ public class TestTagManager {
   private static final String SCHEMA = "schema_for_tag_test";
 
   private static final String TABLE = "table_for_tag_test";
+  private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
+  private static final CatalogDispatcher catalogDispatcher = mock(CatalogDispatcher.class);
+  private static final SchemaDispatcher schemaDispatcher = mock(SchemaDispatcher.class);
+  private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
 
   private static EntityStore entityStore;
 
@@ -166,10 +175,18 @@ public class TestTagManager {
             .build();
     entityStore.put(table, false /* overwritten */);
 
-    tagManager = spy(new TagManager(idGenerator, entityStore));
-    doReturn(true)
-        .when(tagManager)
-        .checkAndImportEntity(Mockito.any(), Mockito.any(), Mockito.any());
+    tagManager = new TagManager(idGenerator, entityStore);
+
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+    when(catalogDispatcher.catalogExists(any())).thenReturn(true);
+    when(schemaDispatcher.schemaExists(any())).thenReturn(true);
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
   }
 
   @AfterAll

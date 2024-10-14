@@ -97,15 +97,6 @@ tasks.getByName("generateMetadataFileForMavenJavaPublication") {
 }
 
 tasks.test {
-  doFirst {
-    val testMode = project.properties["testMode"] as? String ?: "embedded"
-    if (testMode == "deploy") {
-      environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
-    } else if (testMode == "embedded") {
-      environment("GRAVITINO_HOME", project.rootDir.path)
-    }
-  }
-
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests

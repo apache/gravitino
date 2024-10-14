@@ -27,7 +27,7 @@ import java.util.UUID;
 import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.integration.test.util.CommandExecutor;
-import org.apache.gravitino.integration.test.util.JdbcDriverDownloader;
+import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ProcessData;
 import org.apache.gravitino.integration.test.util.ProcessData.TypesOfData;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
@@ -51,7 +51,7 @@ public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager 
 
   @Override
   public Optional<Future<?>> doStartIcebergRESTServer() throws Exception {
-    JdbcDriverDownloader.downloadJdbcDriver(
+    DownloaderUtils.downloadFile(
         SQLITE_DRIVER_DOWNLOAD_URL,
         Paths.get(icebergRESTServerHome.toString(), "iceberg-rest-server", "libs").toString());
 

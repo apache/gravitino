@@ -184,22 +184,20 @@ This command shows the creation details of the database hive_schema, including i
 
 To access S3-stored tables using Spark, you need to configure the SparkSession appropriately. Below is an example of how to set up the SparkSession with the necessary S3 configurations:
 
-
-
 ```java
   SparkSession sparkSession =
         SparkSession.builder()
-            .master("local[1]")
-            .appName("Hive Catalog integration test")
-            .config("hive.metastore.uris", HIVE_METASTORE_URIS)
-            .config("spark.hadoop.fs.s3a.access.key", accessKey)
-            .config("spark.hadoop.fs.s3a.secret.key", secretKey)
-            .config("spark.hadoop.fs.s3a.endpoint", getS3Endpoint)
-            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-            .config("spark.hadoop.fs.s3a.path.style.access", "true")
-            .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+            .config("spark.plugins", "org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin")
+            .config("spark.sql.gravitino.uri", "http://localhost:8090")
+            .config("spark.sql.gravitino.metalake", "xx")
+            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.access.key", accessKey)
+            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.secret.key", secretKey)
+            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.endpoint", getS3Endpoint)
+            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.path.style.access", "true")
+            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.connection.ssl.enabled", "false")
             .config(
-                "spark.hadoop.fs.s3a.aws.credentials.provider",
+                "spark.sql.catalog.{hive_catalog_name}.fs.s3a.aws.credentials.provider",
                 "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
             .config("spark.sql.storeAssignmentPolicy", "LEGACY")
             .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
@@ -210,7 +208,7 @@ To access S3-stored tables using Spark, you need to configure the SparkSession a
 ```
 
 :::Note
-Please ensure that the necessary S3-related JAR files are included in the Spark classpath. If the JARs are missing, Spark will not be able to access the S3 storage.
+Please download [hadoop aws jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of the Spark. If the JARs are missing, Spark will not be able to access the S3 storage.
 :::
 
 By following these instructions, you can effectively manage and access your S3-stored data through both Hive CLI and Spark, leveraging the capabilities of Gravitino for optimal data management.

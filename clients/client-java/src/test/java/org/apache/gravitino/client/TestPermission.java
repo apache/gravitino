@@ -24,17 +24,28 @@ import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.List;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.GroupDTO;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
+import org.apache.gravitino.dto.authorization.RoleDTO;
+import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
+import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
+import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
@@ -174,8 +185,112 @@ public class TestPermission extends TestBase {
 
     // test Exception
     ErrorResponse errResp = ErrorResponse.internalError("internal error");
-    buildMockResource(Method.DELETE, groupPath, null, errResp, SC_SERVER_ERROR);
+    buildMockResource(Method.PUT, groupPath, null, errResp, SC_SERVER_ERROR);
     Assertions.assertThrows(
         RuntimeException.class, () -> gravitinoClient.revokeRolesFromGroup(roles, group));
+  }
+
+  @Test
+  public void testGrantPrivilegeToRole() throws Exception {
+    String role = "role";
+    String rolePath =
+        String.format(
+            API_PERMISSION_PATH,
+            metalakeName,
+            String.format("roles/%s/%s/%s/grant", role, "metalake", metalakeName));
+    RoleDTO roleDTO =
+        RoleDTO.builder()
+            .withName(role)
+            .withSecurableObjects(
+                new SecurableObjectDTO[] {
+                  SecurableObjectDTO.builder()
+                      .withFullName(metalakeName)
+                      .withType(MetadataObject.Type.METALAKE)
+                      .withPrivileges(
+                          new PrivilegeDTO[] {
+                            PrivilegeDTO.builder()
+                                .withName(Privilege.Name.CREATE_TABLE)
+                                .withCondition(Privilege.Condition.ALLOW)
+                                .build()
+                          })
+                      .build()
+                })
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+    RoleResponse response = new RoleResponse(roleDTO);
+
+    PrivilegeRevokeRequest request =
+        new PrivilegeRevokeRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.CREATE_TABLE)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+
+    buildMockResource(Method.PUT, rolePath, request, response, SC_OK);
+    MetadataObject object = MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE);
+    Role grantedRole =
+        gravitinoClient.grantPrivilegesToRole(
+            role, object, Lists.newArrayList(Privileges.CreateTable.allow()));
+    Assertions.assertEquals(grantedRole.name(), role);
+    Assertions.assertEquals(1, grantedRole.securableObjects().size());
+    SecurableObject securableObject = grantedRole.securableObjects().get(0);
+    Assertions.assertEquals(metalakeName, securableObject.name());
+    Assertions.assertEquals(MetadataObject.Type.METALAKE, securableObject.type());
+    Assertions.assertEquals(
+        Privilege.Name.CREATE_TABLE, securableObject.privileges().get(0).name());
+    Assertions.assertEquals(
+        Privilege.Condition.ALLOW, securableObject.privileges().get(0).condition());
+
+    // test Exception
+    ErrorResponse errResp = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.PUT, rolePath, null, errResp, SC_SERVER_ERROR);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            gravitinoClient.grantPrivilegesToRole(
+                role, object, Lists.newArrayList(Privileges.CreateTable.allow())));
+  }
+
+  @Test
+  public void testRevokePrivilegeFromRole() throws Exception {
+    String role = "role";
+    String rolePath =
+        String.format(
+            API_PERMISSION_PATH,
+            metalakeName,
+            String.format("roles/%s/%s/%s/revoke", role, "metalake", metalakeName));
+    RoleDTO roleDTO =
+        RoleDTO.builder()
+            .withName(role)
+            .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withSecurableObjects(new SecurableObjectDTO[0])
+            .build();
+    RoleResponse response = new RoleResponse(roleDTO);
+
+    PrivilegeRevokeRequest request =
+        new PrivilegeRevokeRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.CREATE_TABLE)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+
+    buildMockResource(Method.PUT, rolePath, request, response, SC_OK);
+    MetadataObject object = MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE);
+    Role revokedRole =
+        gravitinoClient.revokePrivilegesFromRole(
+            role, object, Lists.newArrayList(Privileges.CreateTable.allow()));
+    Assertions.assertEquals(revokedRole.name(), role);
+    Assertions.assertTrue(revokedRole.securableObjects().isEmpty());
+
+    // test Exception
+    ErrorResponse errResp = ErrorResponse.internalError("internal error");
+    buildMockResource(Method.PUT, rolePath, null, errResp, SC_SERVER_ERROR);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            gravitinoClient.revokePrivilegesFromRole(
+                role, object, Lists.newArrayList(Privileges.CreateTable.allow())));
   }
 }
