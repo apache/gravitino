@@ -74,10 +74,9 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     try {
       if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-        String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
         String paimonCatalogPath =
             ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-paimon", "libs");
-        DownloaderUtils.downloadFile(PAIMON_S3_JAR_URL, serverPath, paimonCatalogPath);
+        DownloaderUtils.downloadFile(PAIMON_S3_JAR_URL, paimonCatalogPath);
       }
     } catch (Exception e) {
       throw new RuntimeException("Failed to download the S3 dependency", e);

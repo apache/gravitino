@@ -81,5 +81,10 @@ public abstract class HudiSchema<DATABASE> extends BaseSchema {
      * @return the HudiSchema
      */
     protected abstract HudiSchema<T> buildFromSchema(T schema);
+
+    @Override
+    public HudiSchema<T> build() {
+      return internalBuild();
+    }
   }
 }

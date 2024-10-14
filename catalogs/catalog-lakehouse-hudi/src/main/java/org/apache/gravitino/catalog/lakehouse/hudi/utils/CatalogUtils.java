@@ -18,7 +18,11 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.utils;
 
+import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.CATALOG_BACKEND;
+
+import java.util.Locale;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.HudiHMSBackend;
 
@@ -26,9 +30,15 @@ public class CatalogUtils {
   private CatalogUtils() {}
 
   public static HudiCatalogBackend loadHudiCatalogBackend(Map<String, String> properties) {
-    // todo: load and initialize the backend based on the properties
-    HudiCatalogBackend hudiHMSBackend = new HudiHMSBackend();
-    hudiHMSBackend.initialize(properties);
-    return hudiHMSBackend;
+    BackendType backendType =
+        BackendType.valueOf(properties.get(CATALOG_BACKEND).toUpperCase(Locale.ROOT));
+    switch (backendType) {
+      case HMS:
+        HudiCatalogBackend hudiHMSBackend = new HudiHMSBackend();
+        hudiHMSBackend.initialize(properties);
+        return hudiHMSBackend;
+      default:
+        throw new UnsupportedOperationException("Unsupported backend type: " + backendType);
+    }
   }
 }
