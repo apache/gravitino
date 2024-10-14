@@ -125,13 +125,13 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 "Gravitino Paimon catalog jdbc user",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 GRAVITINO_JDBC_PASSWORD,
                 "Gravitino Paimon catalog jdbc password",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */));
+                true /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
