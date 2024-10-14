@@ -22,7 +22,7 @@ package org.apache.gravitino.credential;
 import com.google.common.base.Preconditions;
 import javax.validation.constraints.NotNull;
 
-/** CatalogContext is generated when user requesting catalog credentials. */
+/** CatalogCredentialContext is generated when user requesting catalog credentials. */
 public class CatalogCredentialContext implements CredentialContext {
   @NotNull private final String userName;
 
