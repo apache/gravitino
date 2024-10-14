@@ -1187,7 +1187,6 @@ public class TestHadoopCatalogOperations {
     if (catalogPath != null) {
       props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
     }
-    props.put(HadoopCatalogPropertiesMetadata.DEFAULT_FS, "file:///");
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(props, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);

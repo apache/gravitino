@@ -154,8 +154,7 @@ class TestCatalog(IntegrationTestEnv):
         self.assertEqual(catalog.name(), self.catalog_name)
         self.assertEqual(catalog.comment(), self.catalog_comment)
         self.assertEqual(
-            catalog.properties(),
-            {self.catalog_location_prop: "/tmp/test_schema"},
+            catalog.properties(), {self.catalog_location_prop: "/tmp/test_schema"}
         )
         self.assertEqual(catalog.audit_info().creator(), "anonymous")
 
