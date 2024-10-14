@@ -25,6 +25,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.catalog.SchemaDispatcher;
@@ -55,6 +56,10 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    // Check whether the current user exists or not
+    AuthorizationUtils.checkCurrentUser(
+        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
+
     Schema schema = dispatcher.createSchema(ident, comment, properties);
 
     // Set the creator as the owner of the schema.

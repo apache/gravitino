@@ -36,10 +36,12 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -78,6 +80,20 @@ public class AuthorizationUtils {
     } catch (IOException e) {
       LOG.error("Failed to do storage operation", e);
       throw new RuntimeException(e);
+    }
+  }
+
+  public static void checkCurrentUser(String metalake, String user) {
+    try {
+      AccessControlDispatcher dispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
+      // Only when we enable authorization, we need to check the current user
+      if (dispatcher != null) {
+        dispatcher.getUser(metalake, user);
+      }
+    } catch (NoSuchUserException nsu) {
+      throw new ForbiddenException(
+          "Current user %s doesn't exist in the metalake %s, you should add the user to the metalake first",
+          user, metalake);
     }
   }
 
