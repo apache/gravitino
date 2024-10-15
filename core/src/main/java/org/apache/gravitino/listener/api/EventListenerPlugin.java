@@ -111,14 +111,13 @@ public interface EventListenerPlugin {
   /**
    * Handles pre events generated before the operation.
    *
-   * <p>This method provides a hook for pre-operation event processing, any changes you make to the
-   * resources during the event will be reflected in the operations that follow the event listener
-   * is SYNC mode.
+   * <p> This method handles pre-operation events in SYNC or ASYNC mode, any changes to resources in
+   * the event will inflect the subsequent operations.
    *
    * @param preEvent The pre event to be processed.
    * @throws ForbiddenException The operation will be skipped if and only if throwing {@code
    *     org.apache.gravitino.exceptions.ForbiddenException} and the event listener is SYNC mode,
-   *     the exception will be ignored on other conditions.
+   *     the exception will be ignored in other conditions.
    */
   default void onPreEvent(PreEvent preEvent) throws ForbiddenException {}
 
