@@ -78,7 +78,10 @@ public class GravitinoOptions {
 
     // One way of specifying the command
     options.addOption(
-        createArgOption("x", COMMAND, "one of: list, details, create, delete, or update"));
+        createArgOption(
+            "x",
+            COMMAND,
+            "one of: list, details, create, delete, update, set, remove or properties"));
 
     // Another way of specifying the command
     options.addOption(createSimpleOption("L", LIST, "list entity children"));
@@ -104,7 +107,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("p", PASSWORD, "database password"));
     options.addOption(createArgOption("d", DATABASE, "database name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
-    options.addOption(createArgOption("t", TAG, "tag name"));
+    options.addOption(createArgOption("a", TAG, "tag name"));
 
     return options;
   }

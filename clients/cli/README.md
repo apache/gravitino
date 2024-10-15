@@ -74,13 +74,15 @@ Before you can build and run this project, it is suggested you have the followin
 To run the Gravitino CLI, use the following command structure:
 
 ```bash
-usage: gcli [metalake|catalog|schema|table] [list|details|create|delete|update|set|remove|properties] [options]
+usage: gcli [metalake|catalog|schema|table|user|group|tag] [list|details|create|delete|update|set|remove|properties] [options]
+ -a,--tag <arg>         tag name
  -b,--bootstrap <arg>   Kafka bootstrap servers
  -c,--catalog <arg>     catalog name
  -C,--create            create an entity
  -D,--details           list details about an entity
  -d,--database <arg>    database name
  -e,--entity <arg>      entity type
+ -g,--group <arg>       group name
  -h,--help              command help information
  -j,--jdbcurl <arg>     JDBC URL
  -L,--list              list entity children
@@ -88,15 +90,16 @@ usage: gcli [metalake|catalog|schema|table] [list|details|create|delete|update|s
  -n,--name <arg>        full entity name (dot separated)
  -P,--properties        show an entities properties
  -p,--password <arg>    database password
- -R,--delete            delete an entity
  -r,--rename <arg>      new entity name
+ -R,--delete            delete an entity
  -s,--schema <arg>      schema name
  -t,--table <arg>       table name
  -u,--user <arg>        database username
  -U,--update            update an entity
  -v,--value <arg>       property value
  -w,--warehouse <arg>   warehouse name
- -x,--command <arg>     one of: list, details, create, delete, or update
+ -x,--command <arg>     one of: list, details, create, delete, update,
+                        set, remove or properties
 ```
 
 The command line can be used in several ways to achieve the same results, depending on your preference.
@@ -119,6 +122,9 @@ details: Show detailed information about an entity
 create: Create a new entity
 delete: Delete an existing entity
 update: Update an existing entity
+set: Used to set properties and tags
+remove: Used to remove properties and tags
+properties: Used to list properties
 
 ### Examples
 List All Metalakes
@@ -167,6 +173,84 @@ Update a Metalake's comment
 
 ```bash
 gcli metalake update -name metalake_demo -comment "new comment" 
+```
+
+List the properties of a Metalake
+
+```bash
+gcli metalake properties --name metalake_demo
+```
+
+Set a Metalake's property
+
+```bash
+gcli metalake set --name metalake_demo --property color --value red
+```
+
+Remove a Metalake's property
+
+```bash
+gcli metalake remove --name metalake_demo --property color
+```
+
+Create a new User
+
+```bash
+gcli user create --name metalake_demo --user new_user
+```
+
+Show a User's information
+
+```bash
+gcli user details --name metalake_demo --user new_user
+```
+
+Show all Users
+
+```bash
+gcli user list --name metalake_demo
+```
+
+Delete a User
+
+```bash
+gcli user delete --name metalake_demo --user new_user
+```
+
+Create a Tag
+
+```bash
+gcli tag create --name metalake_demo --tag tagA
+```
+
+List all Tags in a Metalake
+
+```bash
+gcli tag list --name metalake_demo
+```
+
+Delete a Tag
+
+```bash
+gcli tag delete --name metalake_demo --tag tagA
+```
+
+Add a Tag to a Schema
+
+```bash
+gcli tag set --name metalake_demo.catalog_postgres.hr --tag hr
+```
+
+Remove a Tag from a Schema
+
+```bash
+gcli tag remove --name metalake_demo.catalog_postgres.hr --tag hr
+```
+
+List all tags on a Schema
+
+```bash
+gcli tag list --name metalake_demo.catalog_postgres.hr
 ```
 
 ### Setting Metalake name
