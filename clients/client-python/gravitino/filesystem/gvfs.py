@@ -48,10 +48,10 @@ PROTOCOL_NAME = "gvfs"
 
 
 class StorageType(Enum):
-    HDFS = "hdfs"
-    LOCAL = ("file",)
-    GCS = ("gs",)
-    S3 = ("s3",)
+    HDFS = "hdfs",
+    LOCAL = "file",
+    GCS = "gs",
+    S3 = "s3"
 
 
 class FilesetContextPair:

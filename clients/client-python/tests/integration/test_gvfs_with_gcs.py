@@ -66,7 +66,9 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             catalog_type=Catalog.Type.FILESET,
             provider=cls.catalog_provider,
             comment="",
-            properties={},
+            properties={
+                "filesystem.providers": "org.apache.gravitino.fileset.gcs.GCSFileSystemProvider"
+            },
         )
         catalog.as_schemas().create_schema(
             schema_name=cls.schema_name, comment="", properties={}
