@@ -20,7 +20,7 @@ package org.apache.gravitino.fileset.gcs;
 
 import java.io.IOException;
 import java.util.Map;
-import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 
@@ -28,7 +28,11 @@ public class GCSFileSystemProvider implements FileSystemProvider {
   @Override
   public FileSystem getFileSystem(Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
-    config.forEach(configuration::set);
+    config.forEach(
+        (k, v) -> {
+          configuration.set(k.replace("gravitino.bypass.", ""), v);
+        });
+
     return FileSystem.get(configuration);
   }
 
