@@ -78,10 +78,10 @@ public class EventBus {
   }
 
   private void dispatchPostEvent(Event postEvent) {
-    eventListeners.forEach(postEventListener -> postEventListener.onPostEvent(postEvent));
+    eventListeners.forEach(eventListener -> eventListener.onPostEvent(postEvent));
   }
 
   private void dispatchPreEvent(PreEvent preEvent) throws ForbiddenException {
-    eventListeners.forEach(preEventListener -> preEventListener.onPreEvent(preEvent));
+    eventListeners.forEach(eventListener -> eventListener.onPreEvent(preEvent));
   }
 }

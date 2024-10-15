@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
+import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.PreEvent;
 import org.slf4j.Logger;
@@ -69,11 +70,7 @@ public class EventListenerPluginWrapper implements EventListenerPlugin {
     try {
       userEventListener.onPostEvent(event);
     } catch (Exception e) {
-      LOG.warn(
-          "Event listener {} process post event {} failed,",
-          listenerName,
-          event.getClass().getSimpleName(),
-          e);
+      printExceptionInEventProcess(listenerName, event, e);
     }
   }
 
@@ -84,28 +81,29 @@ public class EventListenerPluginWrapper implements EventListenerPlugin {
     } catch (ForbiddenException e) {
       if (Mode.SYNC.equals(mode())) {
         LOG.warn(
-            "Event listener {} process pre event {} failed, will skip the operation.",
+            "Event listener {} process pre event {} throws ForbiddenException, will skip the "
+                + "operation.",
             listenerName,
             preEvent.getClass().getSimpleName(),
             e);
         throw e;
       }
-      LOG.warn(
-          "Event listener {} process pre event {} failed,",
-          listenerName,
-          preEvent.getClass().getSimpleName(),
-          e);
+      printExceptionInEventProcess(listenerName, preEvent, e);
     } catch (Exception e) {
-      LOG.warn(
-          "Event listener {} process pre event {} failed,",
-          listenerName,
-          preEvent.getClass().getSimpleName(),
-          e);
+      printExceptionInEventProcess(listenerName, preEvent, e);
     }
   }
 
   @VisibleForTesting
   EventListenerPlugin getUserEventListener() {
     return userEventListener;
+  }
+
+  private void printExceptionInEventProcess(String listenerName, BaseEvent baseEvent, Exception e) {
+    LOG.warn(
+        "Event listener {} process event {} failed,",
+        listenerName,
+        baseEvent.getClass().getSimpleName(),
+        e);
   }
 }

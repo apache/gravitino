@@ -97,7 +97,7 @@ public interface EventListenerPlugin {
   void stop() throws RuntimeException;
 
   /**
-   * Handles events generated after the completion of an operation.
+   * Handle post-events generated after the completion of an operation.
    *
    * <p>This method provides a hook for post-operation event processing, you couldn't change the
    * resource in the event.
@@ -109,15 +109,15 @@ public interface EventListenerPlugin {
   default void onPostEvent(Event postEvent) throws RuntimeException {}
 
   /**
-   * Handles pre events generated before the operation.
+   * Handle pre-events generated before the operation.
    *
    * <p>This method handles pre-operation events in SYNC or ASYNC mode, any changes to resources in
-   * the event will inflect the subsequent operations.
+   * the event will affect the subsequent operations.
    *
    * @param preEvent The pre event to be processed.
-   * @throws ForbiddenException The operation will be skipped if and only if throwing {@code
-   *     org.apache.gravitino.exceptions.ForbiddenException} and the event listener is SYNC mode,
-   *     the exception will be ignored in other conditions.
+   * @throws ForbiddenException The subsequent operation will be skipped if and only if the event
+   *     listener throwing {@code org.apache.gravitino.exceptions.ForbiddenException} and the event
+   *     listener is SYNC mode, the exception will be ignored and logged only in other conditions.
    */
   default void onPreEvent(PreEvent preEvent) throws ForbiddenException {}
 
