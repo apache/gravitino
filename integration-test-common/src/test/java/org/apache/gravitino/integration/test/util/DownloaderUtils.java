@@ -30,20 +30,20 @@ import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JdbcDriverDownloader {
+public class DownloaderUtils {
 
-  public static final Logger LOG = LoggerFactory.getLogger(JdbcDriverDownloader.class);
+  public static final Logger LOG = LoggerFactory.getLogger(DownloaderUtils.class);
 
-  public static void downloadJdbcDriver(String jdbcDriverUrl, String... destinationDirectories)
+  public static void downloadFile(String fileUrl, String... destinationDirectories)
       throws IOException {
-    URL url = new URL(jdbcDriverUrl);
+    URL url = new URL(fileUrl);
     URLConnection connection = url.openConnection();
     String fileName = getFileName(url);
     String destinationDirectory = destinationDirectories[0];
     Path destinationPath = Paths.get(destinationDirectory, fileName);
     File file = new File(destinationPath.toString());
     if (!file.exists()) {
-      LOG.info("Start download jdbc-driver from:{}", jdbcDriverUrl);
+      LOG.info("Start download file from:{}", fileUrl);
       try (InputStream in = connection.getInputStream()) {
 
         if (!Files.exists(Paths.get(destinationDirectory))) {
@@ -52,7 +52,7 @@ public class JdbcDriverDownloader {
 
         Files.copy(in, destinationPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         Assertions.assertTrue(new File(destinationPath.toString()).exists());
-        LOG.info("Download jdbc-driver:{} success. path:{}", fileName, destinationPath);
+        LOG.info("Download file:{} success. path:{}", fileName, destinationPath);
       }
     }
     for (int i = 1; i < destinationDirectories.length; i++) {

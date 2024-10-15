@@ -63,7 +63,7 @@ public class TestMetalakeEvent {
   void testCreateMetalakeEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake");
     dispatcher.createMetalake(identifier, metalake.comment(), metalake.properties());
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateMetalakeEvent.class, event.getClass());
     MetalakeInfo metalakeInfo = ((CreateMetalakeEvent) event).createdMetalakeInfo();
@@ -74,7 +74,7 @@ public class TestMetalakeEvent {
   void testLoadMetalakeEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake");
     dispatcher.loadMetalake(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadMetalakeEvent.class, event.getClass());
     MetalakeInfo metalakeInfo = ((LoadMetalakeEvent) event).loadedMetalakeInfo();
@@ -86,7 +86,7 @@ public class TestMetalakeEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake");
     MetalakeChange metalakeChange = MetalakeChange.setProperty("a", "b");
     dispatcher.alterMetalake(identifier, metalakeChange);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterMetalakeEvent.class, event.getClass());
     MetalakeInfo metalakeInfo = ((AlterMetalakeEvent) event).updatedMetalakeInfo();
@@ -100,7 +100,7 @@ public class TestMetalakeEvent {
   void testDropMetalakeEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake");
     dispatcher.dropMetalake(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropMetalakeEvent.class, event.getClass());
     Assertions.assertTrue(((DropMetalakeEvent) event).isExists());
@@ -109,7 +109,7 @@ public class TestMetalakeEvent {
   @Test
   void testListMetalakeEvent() {
     dispatcher.listMetalakes();
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertNull(event.identifier());
     Assertions.assertEquals(ListMetalakeEvent.class, event.getClass());
   }
@@ -122,7 +122,7 @@ public class TestMetalakeEvent {
         () ->
             failureDispatcher.createMetalake(
                 identifier, metalake.comment(), metalake.properties()));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateMetalakeFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -136,7 +136,7 @@ public class TestMetalakeEvent {
     NameIdentifier identifier = NameIdentifier.of(metalake.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.loadMetalake(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadMetalakeFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -150,7 +150,7 @@ public class TestMetalakeEvent {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () -> failureDispatcher.alterMetalake(identifier, metalakeChange));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterMetalakeFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -166,7 +166,7 @@ public class TestMetalakeEvent {
     NameIdentifier identifier = NameIdentifier.of(metalake.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.dropMetalake(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropMetalakeFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -177,7 +177,7 @@ public class TestMetalakeEvent {
   void testListMetalakeFailureEvent() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listMetalakes());
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertNull(event.identifier());
     Assertions.assertEquals(ListMetalakeFailureEvent.class, event.getClass());
     Assertions.assertEquals(

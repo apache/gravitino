@@ -91,7 +91,7 @@ dependencies {
     exclude("com.google.code.findbugs", "sr305")
     exclude("com.tdunning", "json")
     exclude("com.zaxxer", "HikariCP")
-    exclude("io.dropwizard.metricss")
+    exclude("io.dropwizard.metrics")
     exclude("javax.transaction", "transaction-api")
     exclude("org.apache.avro")
     exclude("org.apache.curator")
