@@ -24,6 +24,11 @@ import java.util.Map;
 
 /** Interface representing a credential with type, expiration time, and additional information. */
 public interface Credential {
+  /** Credential type in the credential. */
+  String CREDENTIAL_TYPE = "credential-type";
+  /** Credential expire time in ms since the epoch. */
+  String EXPIRE_TIME_IN_MS = "expire-time-in-ms";
+
   /**
    * Returns the type of the credential. It should be the same with the credential type of the
    * credential provider.
@@ -55,8 +60,8 @@ public interface Credential {
   default Map<String, String> toProperties() {
     return new ImmutableMap.Builder<String, String>()
         .putAll(credentialInfo())
-        .put(CredentialConstants.CREDENTIAL_TYPE, credentialType())
-        .put(CredentialConstants.EXPIRE_TIME_AT_MS, String.valueOf(expireTimeInMs()))
+        .put(CREDENTIAL_TYPE, credentialType())
+        .put(EXPIRE_TIME_IN_MS, String.valueOf(expireTimeInMs()))
         .build();
   }
 }
