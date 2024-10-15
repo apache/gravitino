@@ -30,7 +30,7 @@ public interface Credential {
   String EXPIRE_TIME_IN_MS = "expire-time-in-ms";
 
   /**
-   * Returns the type of the credential. It should be the same with the credential type of the
+   * Returns the type of the credential. It should be the same as the credential type of the
    * credential provider.
    *
    * @return the credential type as a String.
