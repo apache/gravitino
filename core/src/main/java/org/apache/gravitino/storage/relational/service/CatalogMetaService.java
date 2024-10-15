@@ -38,6 +38,7 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
@@ -211,6 +212,10 @@ public class CatalogMetaService {
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
                   mapper -> mapper.softDeleteTableMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TableColumnMapper.class,
+                  mapper -> mapper.softDeleteColumnsByCatalogId(catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
                   FilesetMetaMapper.class,
