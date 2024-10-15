@@ -21,56 +21,24 @@ package org.apache.gravitino.catalog.hadoop.fs;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.Map;
+import javax.annotation.Nonnull;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 
 public class HDFSFileSystemProvider implements FileSystemProvider {
 
   @Override
-  public FileSystem getFileSystem(Map<String, String> config) throws IOException {
+  public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
+      throws IOException {
     Configuration configuration = new Configuration();
     config.forEach(
         (k, v) -> {
           configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v);
         });
-
-    String pathString = configuration.get("fs.defaultFS");
-    if (pathString == null) {
-      throw new IllegalArgumentException("The path should be specified.");
-    }
-
-    URI uri = new Path(pathString).toUri();
-    if (uri.getScheme() != null && !uri.getScheme().equals("hdfs")) {
-      throw new IllegalArgumentException("The path should be a HDFS path.");
-    }
-
-    // Should we call DistributedFileSystem to create file system instance explicitly? If we
-    // explicitly create a HDFS file system here, we can't reuse the file system cache in the
-    // FileSystem class.
-    String impl = configuration.get("fs.hdfs.impl");
-    if (impl == null) {
-      configuration.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
-    } else {
-      if (!impl.equals("org.apache.hadoop.hdfs.DistributedFileSystem")) {
-        throw new IllegalArgumentException(
-            "The HDFS file system implementation class should be 'org.apache.hadoop.hdfs.DistributedFileSystem'.");
-      }
-    }
-
-    try {
-      if (HDFSFileSystemProvider.class.getClassLoader().loadClass(configuration.get("fs.hdfs.impl"))
-          == null) {
-        throw new IllegalArgumentException(
-            "The HDFS file system implementation class is not found.");
-      }
-    } catch (ClassNotFoundException e) {
-      throw new IllegalArgumentException("The HDFS file system implementation class is not found.");
-    }
-
-    return FileSystem.newInstance(uri, configuration);
+    return DistributedFileSystem.newInstance(path.toUri(), configuration);
   }
 
   @Override

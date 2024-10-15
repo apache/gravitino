@@ -374,7 +374,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         filesetCatalog.getFileLocation(
             NameIdentifier.of(identifier.namespace().level(2), identifier.name()), subPath);
 
-    URI uri = new Path(actualFileLocation).toUri();
+    Path filePath = new Path(actualFileLocation);
+    URI uri = filePath.toUri();
     // we cache the fs for the same scheme, so we can reuse it
     String scheme = uri.getScheme();
     Preconditions.checkArgument(
@@ -384,15 +385,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             scheme,
             str -> {
               try {
-                Map<String, String> maps = getConfigMap(getConf(), uri);
+                Map<String, String> maps = getConfigMap(getConf());
                 FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
                 if (provider == null) {
                   throw new GravitinoRuntimeException(
                       "Unsupported file system scheme: %s for %s.",
                       scheme, GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME);
                 }
-
-                return provider.getFileSystem(maps);
+                return provider.getFileSystem(filePath, maps);
               } catch (IOException ioe) {
                 throw new GravitinoRuntimeException(
                     "Exception occurs when create new FileSystem for actual uri: %s, msg: %s",
@@ -403,7 +403,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return new FilesetContextPair(new Path(actualFileLocation), fs);
   }
 
-  private Map<String, String> getConfigMap(Configuration configuration, URI uri) {
+  private Map<String, String> getConfigMap(Configuration configuration) {
     Map<String, String> maps = Maps.newHashMap();
     configuration.forEach(
         entry -> {
@@ -414,8 +414,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             maps.put(key, entry.getValue());
           }
         });
-
-    maps.put(FS_DEFAULT_NAME_KEY, uri.toString());
 
     return maps;
   }
