@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.postgresql.operation;
 
 import static org.apache.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations.PG_QUOTE;
 
+import com.google.common.collect.ImmutableSet;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -27,9 +28,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -45,16 +44,6 @@ import org.apache.gravitino.meta.AuditInfo;
 
 /** Database operations for PostgreSQL. */
 public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
-
-  public static final Set<String> SYS_PG_DATABASE_NAMES =
-      Collections.unmodifiableSet(
-          new HashSet<String>() {
-            {
-              add("pg_toast");
-              add("pg_catalog");
-              add("information_schema");
-            }
-          });
 
   private String database;
 
@@ -167,8 +156,13 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
   }
 
   @Override
-  protected boolean isSystemDatabase(String dbName) {
-    return SYS_PG_DATABASE_NAMES.contains(dbName.toLowerCase(Locale.ROOT));
+  protected boolean supportSchemaComment() {
+    return true;
+  }
+
+  @Override
+  protected Set<String> createSysDatabaseNameSet() {
+    return ImmutableSet.of("pg_toast", "pg_catalog", "information_schema");
   }
 
   private String getShowSchemaCommentSql(String schema) {

@@ -28,6 +28,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
@@ -144,6 +145,9 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
+    // Check whether the current user exists or not
+    AuthorizationUtils.checkCurrentUser(metalake, PrincipalUtils.getCurrentUserName());
+
     Role createdRole = dispatcher.createRole(metalake, role, properties, securableObjects);
 
     // Set the creator as the owner of role.
@@ -179,5 +183,19 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public String[] listRoleNamesByObject(String metalake, MetadataObject object)
       throws NoSuchMetalakeException, NoSuchMetadataObjectException {
     return dispatcher.listRoleNamesByObject(metalake, object);
+  }
+
+  @Override
+  public Role grantPrivilegeToRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchMetalakeException, NoSuchRoleException {
+    return dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
+  }
+
+  @Override
+  public Role revokePrivilegesFromRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchMetalakeException, NoSuchRoleException {
+    return dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
   }
 }

@@ -26,6 +26,7 @@ import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -143,6 +144,11 @@ public class ExceptionHandlers {
     return OwnerExceptionHandler.INSTANCE.handle(type, name, metalake, e);
   }
 
+  public static Response handleRolePermissionOperationException(
+      OperationType type, String name, String parent, Exception e) {
+    return RolePermissionOperationHandler.INSTANCE.handle(type, name, parent, e);
+  }
+
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new PartitionExceptionHandler();
@@ -207,6 +213,9 @@ public class ExceptionHandlers {
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else {
         return super.handle(op, table, schema, e);
       }
@@ -245,6 +254,9 @@ public class ExceptionHandlers {
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else {
         return super.handle(op, schema, catalog, e);
       }
@@ -276,6 +288,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
 
       } else if (e instanceof CatalogAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
@@ -341,6 +356,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof FilesetAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
 
       } else {
         return super.handle(op, fileset, schema, e);
@@ -444,6 +462,9 @@ public class ExceptionHandlers {
       } else if (e instanceof RoleAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else {
         return super.handle(op, role, metalake, e);
       }
@@ -475,6 +496,8 @@ public class ExceptionHandlers {
       } else if (e instanceof TopicAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
       } else {
         return super.handle(op, topic, schema, e);
       }
@@ -505,6 +528,19 @@ public class ExceptionHandlers {
       return String.format(
           "Failed to operate role(s)%s operation [%s] under group [%s], reason [%s]",
           roles, operation, parent, reason);
+    }
+  }
+
+  private static class RolePermissionOperationHandler extends BasePermissionExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new RolePermissionOperationHandler();
+
+    @Override
+    protected String getPermissionErrorMsg(
+        String object, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate object(%s) operation [%s] under role [%s], reason [%s]",
+          object, operation, parent, reason);
     }
   }
 

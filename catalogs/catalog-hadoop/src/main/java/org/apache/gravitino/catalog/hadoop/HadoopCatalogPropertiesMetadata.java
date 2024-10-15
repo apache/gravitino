@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -38,8 +39,18 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    * The implementation class name of the {@link FileSystemProvider} to be used by the catalog.
    * Gravitino supports LocalFileSystem and HDFS by default. Users can implement their own by
    * extending {@link FileSystemProvider} and specify the class name here.
+   *
+   * <p>The value can be 'xxxx.yyy.FileSystemProvider1, xxxx.yyy.FileSystemProvider2'.
    */
-  public static final String FILESYSTEM_PROVIDER = "filesystem.providers";
+  public static final String FILESYSTEM_PROVIDERS = "filesystem-providers";
+
+  /**
+   * The default file system provider. It is used to create the default file system instance; if not
+   * specified, file system instance will be created with the schema prefix in the file path like
+   * 'file:/tmp/'. If there is no schema prefix, the default file system provider will be local file
+   * system.
+   */
+  public static final String DEFAULT_FS = "default-filesystem-provider";
 
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -52,10 +63,19 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   null,
                   false /* hidden */))
           .put(
-              FILESYSTEM_PROVIDER,
+              FILESYSTEM_PROVIDERS,
               PropertyEntry.stringOptionalPropertyEntry(
-                  FILESYSTEM_PROVIDER,
-                  "The file system provider class name",
+                  FILESYSTEM_PROVIDERS,
+                  "The file system provider class name, separated by comma",
+                  false /* immutable */,
+                  null,
+                  false /* hidden */))
+          .put(
+              DEFAULT_FS,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  DEFAULT_FS,
+                  "Default file system URI, used to create the default file system "
+                      + "instance like hdfs:///, gs://bucket-name",
                   false /* immutable */,
                   null,
                   false /* hidden */))

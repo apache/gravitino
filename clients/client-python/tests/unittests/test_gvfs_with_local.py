@@ -34,9 +34,19 @@ from fsspec.implementations.local import LocalFileSystem
 
 from gravitino import gvfs, NameIdentifier
 from gravitino.auth.auth_constants import AuthConstants
-from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.exceptions.base import (
+    GravitinoRuntimeException,
+    IllegalArgumentException,
+    BadRequestException,
+)
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from tests.unittests import mock_base
+from tests.unittests.auth.mock_base import (
+    mock_jwt,
+    GENERATED_TIME,
+    mock_authentication_with_error_authentication_type,
+    mock_authentication_invalid_grant_error,
+)
 
 
 def generate_unique_random_string(length):
@@ -105,6 +115,75 @@ class TestLocalFilesystem(unittest.TestCase):
         self.assertEqual(f"{user}:dummy", token_string)
         if current_user is not None:
             os.environ["user.name"] = current_user
+
+    def test_oauth2_auth(self, *mock_methods):
+        fs_options = {
+            GVFSConfig.AUTH_TYPE: GVFSConfig.OAUTH2_AUTH_TYPE,
+            GVFSConfig.OAUTH2_SERVER_URI: "http://127.0.0.1:1082",
+            GVFSConfig.OAUTH2_CREDENTIAL: "xx:xx",
+            GVFSConfig.OAUTH2_SCOPE: "test",
+            GVFSConfig.OAUTH2_PATH: "token/test",
+        }
+        # test auth normally
+        mocked_jwt = mock_jwt(
+            sub="gravitino", exp=GENERATED_TIME + 10000, aud="service1"
+        )
+        with patch(
+            "gravitino.auth.default_oauth2_token_provider.DefaultOAuth2TokenProvider._get_access_token",
+            return_value=mocked_jwt,
+        ), patch(
+            "gravitino.auth.default_oauth2_token_provider.DefaultOAuth2TokenProvider._fetch_token",
+            return_value=mocked_jwt,
+        ):
+            fileset_storage_location = f"{self._fileset_dir}/test_oauth2_auth"
+            fileset_virtual_location = "fileset/fileset_catalog/tmp/test_oauth2_auth"
+            actual_path = fileset_storage_location
+            with patch(
+                "gravitino.catalog.fileset_catalog.FilesetCatalog.get_file_location",
+                return_value=actual_path,
+            ):
+                local_fs = LocalFileSystem()
+                local_fs.mkdir(fileset_storage_location)
+                sub_dir_path = f"{fileset_storage_location}/test_1"
+                local_fs.mkdir(sub_dir_path)
+                self.assertTrue(local_fs.exists(sub_dir_path))
+                sub_file_path = f"{fileset_storage_location}/test_file_1.par"
+                local_fs.touch(sub_file_path)
+                self.assertTrue(local_fs.exists(sub_file_path))
+                fs = gvfs.GravitinoVirtualFileSystem(
+                    server_uri="http://localhost:9090",
+                    metalake_name="metalake_demo",
+                    options=fs_options,
+                    skip_instance_cache=True,
+                )
+                # should not raise exception
+                self.assertTrue(fs.exists(fileset_virtual_location))
+
+        # test error authentication type
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post_form",
+            return_value=mock_authentication_with_error_authentication_type(),
+        ):
+            with self.assertRaises(IllegalArgumentException):
+                gvfs.GravitinoVirtualFileSystem(
+                    server_uri="http://localhost:9090",
+                    metalake_name="metalake_demo",
+                    options=fs_options,
+                    skip_instance_cache=True,
+                )
+
+        # test bad request
+        with patch(
+            "gravitino.utils.http_client.HTTPClient._make_request",
+            return_value=mock_authentication_invalid_grant_error(),
+        ):
+            with self.assertRaises(BadRequestException):
+                gvfs.GravitinoVirtualFileSystem(
+                    server_uri="http://localhost:9090",
+                    metalake_name="metalake_demo",
+                    options=fs_options,
+                    skip_instance_cache=True,
+                )
 
     def test_ls(self, *mock_methods):
         fileset_storage_location = f"{self._fileset_dir}/test_ls"

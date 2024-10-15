@@ -71,3 +71,10 @@ Gravitino catalog property names with the prefix `spark.bypass.` are passed to S
 :::caution
 When using the `spark-sql` shell client, you must explicitly set the `spark.bypass.spark.sql.hive.metastore.jars` in the Gravitino Hive catalog properties. Replace the default `builtin` value with the appropriate setting for your setup.
 :::
+
+
+## Storage
+
+### S3
+
+Please refer to [Hive catalog with s3](../hive-catalog-with-s3.md) to set up a Hive catalog with s3 storage. To query the data stored in s3, you need to add s3 secret to the Spark configuration using `spark.sql.catalog.${hive_catalog_name}.fs.s3a.access.key` and `spark.sql.catalog.${iceberg_catalog_name}.s3.fs.s3a.secret.key`. Additionally, download [hadoop aws jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of Spark.

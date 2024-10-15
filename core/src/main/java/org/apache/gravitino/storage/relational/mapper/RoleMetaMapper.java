@@ -76,6 +76,10 @@ public interface RoleMetaMapper {
       method = "insertRoleMetaOnDuplicateKeyUpdate")
   void insertRoleMetaOnDuplicateKeyUpdate(@Param("roleMeta") RolePO rolePO);
 
+  @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "updateRoleMeta")
+  Integer updateRoleMeta(
+      @Param("newRoleMeta") RolePO newRolePO, @Param("oldRoleMeta") RolePO oldRolePO);
+
   @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "softDeleteRoleMetaByRoleId")
   void softDeleteRoleMetaByRoleId(Long roleId);
 

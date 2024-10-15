@@ -18,10 +18,11 @@
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
-import org.apache.gravitino.catalog.hadoop.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -31,7 +32,10 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   @Override
   public FileSystem getFileSystem(Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
-    config.forEach(configuration::set);
+    config.forEach(
+        (k, v) -> {
+          configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v);
+        });
 
     String pathString = configuration.get("fs.defaultFS");
     if (pathString == null) {
@@ -66,7 +70,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
       throw new IllegalArgumentException("The HDFS file system implementation class is not found.");
     }
 
-    return FileSystem.get(uri, configuration);
+    return FileSystem.newInstance(uri, configuration);
   }
 
   @Override
