@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.hadoop.integration.test;
 
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS_CLASSNAMES;
+
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.URI;
@@ -39,6 +41,9 @@ import org.junit.jupiter.api.TestInstance;
         + "please change the configuration(YOUR_KEY_FILE, YOUR_BUCKET) and enable this test.")
 public class HadoopGCPCatalogIT extends HadoopCatalogIT {
 
+  public static final String BUCKET_NAME = "YOUR_BUCKET";
+  public static final String SERVICE_ACCOUNT_FILE = "YOUR_KEY_FILE";
+
   @BeforeAll
   public void setup() throws IOException {
     metalakeName = GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
@@ -48,11 +53,9 @@ public class HadoopGCPCatalogIT extends HadoopCatalogIT {
     schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     Configuration conf = new Configuration();
 
-    conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
     conf.set("fs.gs.auth.service.account.enable", "true");
-    conf.set("fs.gs.auth.service.account.json.keyfile", "YOUR_KEY_FILE");
-    conf.set("fs.defaultFS", "gs:///");
-    fileSystem = FileSystem.get(URI.create("gs://YOUR_BUCKET"), conf);
+    conf.set("fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
+    fileSystem = FileSystem.get(URI.create(String.format("gs://%s", BUCKET_NAME)), conf);
 
     createMetalake();
     createCatalog();
@@ -63,7 +66,9 @@ public class HadoopGCPCatalogIT extends HadoopCatalogIT {
     if (defaultBaseLocation == null) {
       try {
         Path bucket =
-            new Path("gs://YOUR_BUCKET/" + GravitinoITUtils.genRandomName("CatalogFilesetIT"));
+            new Path(
+                String.format(
+                    "gs://%s/%s", BUCKET_NAME, GravitinoITUtils.genRandomName("CatalogFilesetIT")));
         if (!fileSystem.exists(bucket)) {
           fileSystem.mkdirs(bucket);
         }
@@ -79,11 +84,10 @@ public class HadoopGCPCatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put("gravitino.bypass.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
     map.put("gravitino.bypass.fs.gs.auth.service.account.enable", "true");
-    map.put("gravitino.bypass.fs.gs.auth.service.account.json.keyfile", "YOUR_KEY_FILE");
-    map.put("gravitino.bypass.fs.defaultFS", "gs:///");
-    map.put("filesystem.providers", "org.apache.gravitino.fileset.gcs.GCSFileSystemProvider");
+    map.put("gravitino.bypass.fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
+    map.put(
+        FILESYSTEM_PROVIDERS_CLASSNAMES, "org.apache.gravitino.fileset.gcs.GCSFileSystemProvider");
 
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
 
