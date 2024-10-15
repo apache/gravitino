@@ -46,6 +46,7 @@ dependencies {
     exclude("com.sun.jersey")
     exclude("javax.servlet")
     exclude("org.apache.curator")
+    exclude("org.apache.hive")
     exclude("org.apache.hbase")
     exclude("org.apache.zookeeper")
     exclude("org.eclipse.jetty.aggregate:jetty-all")
@@ -69,6 +70,15 @@ dependencies {
     exclude("org.apache.paimon:paimon-codegen-loader")
     exclude("org.apache.paimon:paimon-shade-caffeine-2")
     exclude("org.apache.paimon:paimon-shade-guava-30")
+  }
+  implementation(libs.hive2.metastore) {
+    exclude("*")
+  }
+  implementation(libs.hive2.exec) {
+    exclude("*")
+  }
+  implementation(libs.hive2.common) {
+    exclude("*")
   }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
