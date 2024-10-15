@@ -40,9 +40,6 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         }
 
         cls.bucket_name = "example_qazwsx"
-        # cls.options = {
-        #     "gravitino.bypass.gcs.service-account-key-path": "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
-        # }
 
         cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
 
