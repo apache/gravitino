@@ -60,6 +60,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         )
 
         cls.config = {}
+        cls.conf = {}
         catalog = cls.gravitino_client.create_catalog(
             name=cls.catalog_name,
             catalog_type=Catalog.Type.FILESET,
