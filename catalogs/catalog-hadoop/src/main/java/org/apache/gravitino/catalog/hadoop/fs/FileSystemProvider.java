@@ -21,8 +21,10 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import java.io.IOException;
 import java.util.Map;
+import javax.annotation.Nonnull;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
 /**
  * FileSystemProvider is an interface for providing FileSystem instances. It is used by the
@@ -31,7 +33,7 @@ import org.apache.hadoop.fs.FileSystem;
 public interface FileSystemProvider {
 
   /**
-   * Get the FileSystem instance according to the configuration map.
+   * Get the FileSystem instance according to the configuration map and file path.
    *
    * <p>Compared to the {@link FileSystem#get(Configuration)} method, this method allows the
    * provider to create a FileSystem instance with a specific configuration and do further
@@ -42,10 +44,12 @@ public interface FileSystemProvider {
    * 3. More...
    *
    * @param config The configuration for the FileSystem instance.
+   * @param path The path to the file system.
    * @return The FileSystem instance.
    * @throws IOException If the FileSystem instance cannot be created.
    */
-  FileSystem getFileSystem(Map<String, String> config) throws IOException;
+  FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
+      throws IOException;
 
   /**
    * Get the scheme of this FileSystem provider. The value is 'file' for LocalFileSystem, 'hdfs' for

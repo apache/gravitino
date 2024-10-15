@@ -70,8 +70,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
-
-  public static final String DEFAULT_FS = "fs.defaultFS";
   private static final String LOCAL_FILE_SCHEME = "file";
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
@@ -752,39 +750,33 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    Map<String, String> newConfig = Maps.newHashMap(config);
     if (path == null) {
-      if (defaultFilesystemProvider != null) {
-        return getFileSystemByScheme(defaultFilesystemProvider, newConfig);
-      } else {
-        LOG.warn("The path and default filesystem provider are both null, using local file system");
-        return getFileSystemByScheme(LOCAL_FILE_SCHEME, newConfig);
-      }
+      throw new IllegalArgumentException("Path should not be null");
     }
 
-    // Path is not null;
+    // Can't get the scheme from the path like '/path/to/file', use the default filesystem provider.
     if (path.toUri().getScheme() == null) {
       if (defaultFilesystemProvider != null) {
-        return getFileSystemByScheme(defaultFilesystemProvider, newConfig);
+        return getFileSystemByScheme(defaultFilesystemProvider, config, path);
       }
+
       LOG.warn(
           "Can't get schema from path: {} and default filesystem provider is null, using"
               + " local file system",
           path);
-      return getFileSystemByScheme(LOCAL_FILE_SCHEME, newConfig);
-    } else {
-      newConfig.put(DEFAULT_FS, path.toUri().toString());
-      return getFileSystemByScheme(path.toUri().getScheme(), newConfig);
+      return getFileSystemByScheme(LOCAL_FILE_SCHEME, config, path);
     }
+
+    return getFileSystemByScheme(path.toUri().getScheme(), config, path);
   }
 
-  private FileSystem getFileSystemByScheme(String scheme, Map<String, String> config)
+  private FileSystem getFileSystemByScheme(String scheme, Map<String, String> config, Path path)
       throws IOException {
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     if (provider == null) {
       throw new IllegalArgumentException("Unsupported scheme: " + scheme);
     }
 
-    return provider.getFileSystem(config);
+    return provider.getFileSystem(path, config);
   }
 }

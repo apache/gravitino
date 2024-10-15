@@ -25,18 +25,19 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocalFileSystem;
+import org.apache.hadoop.fs.Path;
 
 public class LocalFileSystemProvider implements FileSystemProvider {
 
   @Override
-  public FileSystem getFileSystem(Map<String, String> config) throws IOException {
+  public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
     config.forEach(
         (k, v) -> {
           configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v);
         });
 
-    return LocalFileSystem.getLocal(configuration);
+    return LocalFileSystem.newInstance(path.toUri(), configuration);
   }
 
   @Override
