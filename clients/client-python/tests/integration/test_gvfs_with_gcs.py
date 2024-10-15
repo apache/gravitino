@@ -39,7 +39,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             "gravitino.bypass.gcs.service-account-key-path": "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
         }
 
-        cls.bucket_name = "gravitino-gcs-test"
+        cls.bucket_name = "example_qazwsx"
         cls.options = {
             "gravitino.bypass.gcs.service-account-key-path": "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
         }
@@ -67,7 +67,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             provider=cls.catalog_provider,
             comment="",
             properties={
-                "filesystem.providers": "org.apache.gravitino.fileset.gcs.GCSFileSystemProvider"
+                "filesystem-providers-classnames": "org.apache.gravitino.fileset.gcs.GCSFileSystemProvider"
             },
         )
         catalog.as_schemas().create_schema(
