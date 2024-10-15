@@ -50,7 +50,7 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
   GRAVITINO_OPERATION_FAILED(22, EXTERNAL),
   GRAVITINO_RUNTIME_ERROR(23, EXTERNAL),
   GRAVITINO_DUPLICATED_CATALOGS(24, EXTERNAL),
-  ;
+  GRAVITINO_EXPRESSION_ERROR(25, EXTERNAL);
 
   // suppress ImmutableEnumChecker because ErrorCode is outside the project.
   @SuppressWarnings("ImmutableEnumChecker")

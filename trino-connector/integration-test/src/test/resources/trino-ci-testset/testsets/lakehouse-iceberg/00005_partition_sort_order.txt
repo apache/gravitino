@@ -1,0 +1,71 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+"CREATE TABLE %.gt_db2.lineitem (
+   orderkey bigint,
+   partkey bigint,
+   suppkey bigint,
+   linenumber integer,
+   quantity decimal(12, 2),
+   extendedprice decimal(12, 2),
+   discount decimal(12, 2),
+   tax decimal(12, 2),
+   returnflag varchar,
+   linestatus varchar,
+   shipdate date,
+   commitdate date,
+   receiptdate date,
+   shipinstruct varchar,
+   shipmode varchar,
+   comment varchar
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/lineitem',
+   partitioning = ARRAY['year(commitdate)'],
+   sorted_by = ARRAY['partkey','extendedprice DESC']
+)"
+
+INSERT: 60175 rows
+
+"1","22","48","4","28.00","25816.56","0.09","0.06","N","O","1996-04-21","1996-03-30","1996-05-16","NONE","AIR","lites. fluffily even de"
+"1","157","10","6","32.00","33828.80","0.07","0.02","N","O","1996-01-30","1996-02-07","1996-02-03","DELIVER IN PERSON","MAIL","arefully slyly ex"
+"1","241","23","5","24.00","27389.76","0.10","0.04","N","O","1996-03-30","1996-03-14","1996-04-01","NONE","FOB"," pending foxes. slyly re"
+"1","637","38","3","8.00","12301.04","0.10","0.02","N","O","1996-01-29","1996-03-05","1996-01-31","TAKE BACK RETURN","REG AIR","riously. regular, express dep"
+"1","674","75","2","36.00","56688.12","0.09","0.06","N","O","1996-04-12","1996-02-28","1996-04-20","TAKE BACK RETURN","MAIL","ly final dependencies: slyly bold "
+
+CREATE TABLE
+
+"CREATE TABLE %.gt_db2.tb01 (
+   orderkey bigint,
+   partkey bigint,
+   suppkey bigint,
+   linenumber integer,
+   quantity decimal(12, 2),
+   extendedprice decimal(12, 2),
+   discount decimal(12, 2),
+   tax decimal(12, 2),
+   returnflag varchar,
+   linestatus varchar,
+   shipdate date,
+   commitdate date,
+   receiptdate date,
+   shipinstruct varchar,
+   shipmode varchar,
+   comment varchar
+)
+COMMENT ''
+WITH (
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01',
+   partitioning = ARRAY['day(commitdate)','month(shipdate)','bucket(partkey, 2)','truncate(shipinstruct, 2)'],
+   sorted_by = ARRAY['partkey ASC NULLS LAST','extendedprice DESC NULLS FIRST']
+)"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA
