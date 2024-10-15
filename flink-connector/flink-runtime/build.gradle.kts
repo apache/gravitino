@@ -66,6 +66,11 @@ publishing {
   }
 }
 
+tasks.register<Copy>("copy") {
+  from(configurations.runtimeClasspath)
+  into("build/libs-runtime")
+}
+
 tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
