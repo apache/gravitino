@@ -122,6 +122,11 @@ public class Main {
 
     /* Or as the bare first argument of one or two arguments. */
     String[] args = line.getArgs();
+
+    if (args.length == 0) {
+      return null;
+    }
+
     String entity = args[0];
 
     if (args.length == 1) {

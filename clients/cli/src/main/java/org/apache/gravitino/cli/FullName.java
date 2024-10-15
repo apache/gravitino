@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli;
 
+import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 
 /**
@@ -149,8 +150,13 @@ public class FullName {
     } else if (line.hasOption(GravitinoOptions.NAME)) {
       String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
       int length = names.length;
-      String [] order = {GravitinoOptions.METALAKE, GravitinoOptions.CATALOG,GravitinoOptions.SCHEMA,GravitinoOptions.TABLE};
-      int position = order.indexOf(entity);
+      String[] order = {
+        GravitinoOptions.METALAKE,
+        GravitinoOptions.CATALOG,
+        GravitinoOptions.SCHEMA,
+        GravitinoOptions.TABLE
+      };
+      int position = Arrays.asList(order).indexOf(entity);
 
       /* Adjust position if metalake is part of the full name. */
       if (metalakeEnv != null) {

@@ -27,6 +27,7 @@ import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Table;
 
@@ -53,6 +54,7 @@ public class TagEntity extends Command {
   /** Create a new tag. */
   public void handle() {
     String entity = "unknown";
+    String[] tags = new String[0];
 
     try {
       GravitinoClient client = buildClient(metalake);
@@ -67,18 +69,18 @@ public class TagEntity extends Command {
                 .loadCatalog(catalog)
                 .asTableCatalog()
                 .loadTable(NameIdentifier.of(schema, table));
-        gTable.supportsTags().associateTags(new String[] {tag}, null);
+        tags = gTable.supportsTags().associateTags(new String[] {tag}, null);
         entity = table;
       } else if (name.hasSchemaName()) {
         String catalog = name.getCatalogName();
         String schema = name.getSchemaName();
         Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
-        gSchema.supportsTags().associateTags(new String[] {tag}, null);
+        tags = gSchema.supportsTags().associateTags(new String[] {tag}, null);
         entity = schema;
       } else if (name.hasCatalogName()) {
         String catalog = name.getCatalogName();
         Catalog gCatalog = client.loadCatalog(catalog);
-        gCatalog.supportsTags().associateTags(new String[] {tag}, null);
+        tags = gCatalog.supportsTags().associateTags(new String[] {tag}, null);
         entity = catalog;
       }
     } catch (NoSuchMetalakeException err) {
@@ -86,6 +88,9 @@ public class TagEntity extends Command {
       return;
     } catch (NoSuchCatalogException err) {
       System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
       return;
     } catch (NoSuchTableException err) {
       System.err.println(ErrorMessages.UNKNOWN_TABLE);
@@ -95,6 +100,14 @@ public class TagEntity extends Command {
       return;
     }
 
-    System.out.println(entity + " tagged");
+    StringBuilder all = new StringBuilder();
+    for (int i = 0; i < tags.length; i++) {
+      if (i > 0) {
+        all.append(",");
+      }
+      all.append(tags[i]);
+    }
+
+    System.out.println(entity + " tagged with " + all);
   }
 }

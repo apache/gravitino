@@ -44,9 +44,11 @@ import org.apache.gravitino.cli.commands.DeleteTable;
 import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.DeleteUser;
 import org.apache.gravitino.cli.commands.GroupDetails;
+import org.apache.gravitino.cli.commands.ListAllTags;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
 import org.apache.gravitino.cli.commands.ListColumns;
+import org.apache.gravitino.cli.commands.ListEntityTags;
 import org.apache.gravitino.cli.commands.ListGroups;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
 import org.apache.gravitino.cli.commands.ListMetalakes;
@@ -54,7 +56,6 @@ import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
 import org.apache.gravitino.cli.commands.ListTables;
 import org.apache.gravitino.cli.commands.ListTagProperties;
-import org.apache.gravitino.cli.commands.ListTags;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
@@ -358,7 +359,11 @@ public class GravitinoCommandLine {
     if (CommandActions.DETAILS.equals(command)) {
       new TagDetails(url, metalake, tag).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListTags(url, metalake).handle();
+      if (name.hasMetalakeName() && !name.hasCatalogName()) {
+        new ListAllTags(url, metalake).handle();
+      } else {
+        new ListEntityTags(url, metalake, name).handle();
+      }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       new CreateTag(url, metalake, tag, comment).handle();
