@@ -42,7 +42,7 @@ public class TableColumnMetaService {
     return INSTANCE;
   }
 
-  public List<ColumnPO> getColumnsByTableIdAndVersion(Long tableId, Long version) {
+  List<ColumnPO> getColumnsByTableIdAndVersion(Long tableId, Long version) {
     List<ColumnPO> columnPOs =
         SessionUtils.getWithoutCommit(
             TableColumnMapper.class,
@@ -54,14 +54,17 @@ public class TableColumnMetaService {
         .collect(Collectors.toList());
   }
 
-  public void insertColumnPOs(TablePO tablePO, List<ColumnEntity> columnEntities) {
+  void insertColumnPOs(TablePO tablePO, List<ColumnEntity> columnEntities) {
     List<ColumnPO> columnPOs =
         POConverters.initializeColumnPOs(tablePO, columnEntities, ColumnPO.ColumnOpType.CREATE);
+
+    // insertColumnPOs will be done in insertTable transaction, so we don't do commit here.
     SessionUtils.doWithoutCommit(
         TableColumnMapper.class, mapper -> mapper.insertColumnPOs(columnPOs));
   }
 
-  public boolean deleteColumnsByTableId(Long tableId) {
+  boolean deleteColumnsByTableId(Long tableId) {
+    // deleteColumns will be done in deleteTable transaction, so we don't do commit here.
     Integer result =
         SessionUtils.doWithCommitAndFetchResult(
             TableColumnMapper.class, mapper -> mapper.softDeleteColumnsByTableId(tableId));
@@ -69,12 +72,13 @@ public class TableColumnMetaService {
   }
 
   public int deleteColumnsByLegacyTimeline(Long legacyTimeline, int limit) {
+    // deleteColumns will be done in the outside transaction, so we don't do commit here.
     return SessionUtils.doWithoutCommitAndFetchResult(
         TableColumnMapper.class,
         mapper -> mapper.deleteColumnPOsByLegacyTimeline(legacyTimeline, limit));
   }
 
-  public boolean isColumnUpdated(TableEntity oldTable, TableEntity newTable) {
+  boolean isColumnUpdated(TableEntity oldTable, TableEntity newTable) {
     Map<Long, ColumnEntity> oldColumns =
         oldTable.columns() == null
             ? Collections.emptyMap()
@@ -90,7 +94,7 @@ public class TableColumnMetaService {
     return oldColumns.size() != newColumns.size() || !oldColumns.equals(newColumns);
   }
 
-  public void updateColumnPOsFromTableDiff(
+  void updateColumnPOsFromTableDiff(
       TableEntity oldTable, TableEntity newTable, TablePO newTablePO) {
     Map<Long, ColumnEntity> oldColumns =
         oldTable.columns() == null
@@ -124,6 +128,7 @@ public class TableColumnMetaService {
       return;
     }
 
+    // updateColumns will be done in updateTable transaction, so we don't do commit here.
     SessionUtils.doWithoutCommit(
         TableColumnMapper.class, mapper -> mapper.insertColumnPOs(columnPOsToInsert));
   }
