@@ -33,6 +33,7 @@ dependencies {
   implementation(project(":api")) {
     exclude("*")
   }
+  implementation(libs.cglib)
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
@@ -73,6 +74,15 @@ dependencies {
   }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
+  implementation(libs.hive2.common) {
+    exclude("*")
+  }
+  implementation(libs.hive2.exec) {
+    exclude("*")
+  }
+  implementation(libs.hive2.metastore) {
+    exclude("*")
+  }
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
@@ -127,7 +137,9 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.paimon.s3)
   testImplementation(libs.paimon.spark)
-  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers) {
+    exclude("*")
+  }
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.testcontainers.mysql)
 
