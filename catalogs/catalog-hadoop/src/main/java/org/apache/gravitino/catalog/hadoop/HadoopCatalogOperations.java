@@ -92,7 +92,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
 
-  private String defaultFilesystemProvider;
+  private String defaultFileSystemProviderScheme;
 
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
@@ -133,14 +133,21 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
+                .getOrDefault(
+                    config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS_CLASSNAMES);
     FileSystemUtils.initFileSystemProviders(fileSystemProviders, fileSystemProvidersMap);
 
-    this.defaultFilesystemProvider =
+    String defaultFileSystemProviderClassName =
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER);
+                .getOrDefault(
+                    config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER_CLASSNAME);
+    this.defaultFileSystemProviderScheme =
+        StringUtils.isNotBlank(defaultFileSystemProviderClassName)
+            ? FileSystemUtils.getSchemeByFileSystemProvider(
+                defaultFileSystemProviderClassName, fileSystemProvidersMap)
+            : LOCAL_FILE_SCHEME;
 
     String catalogLocation =
         (String)
@@ -756,27 +763,17 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       throw new IllegalArgumentException("Path should not be null");
     }
 
-    // Can't get the scheme from the path like '/path/to/file', use the default filesystem provider.
-    if (path.toUri().getScheme() == null) {
-      if (defaultFilesystemProvider != null) {
-        return getFileSystemByScheme(defaultFilesystemProvider, config, path);
-      }
+    String scheme =
+        path.toUri().getScheme() != null
+            ? path.toUri().getScheme()
+            : defaultFileSystemProviderScheme;
 
-      LOG.warn(
-          "Can't get schema from path: {} and default filesystem provider is null, using"
-              + " local file system",
-          path);
-      return getFileSystemByScheme(LOCAL_FILE_SCHEME, config, path);
-    }
-
-    return getFileSystemByScheme(path.toUri().getScheme(), config, path);
-  }
-
-  private FileSystem getFileSystemByScheme(String scheme, Map<String, String> config, Path path)
-      throws IOException {
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     if (provider == null) {
-      throw new IllegalArgumentException("Unsupported scheme: " + scheme);
+      throw new IllegalArgumentException(
+          String.format(
+              "Unsupported scheme: %s, path: %s, all supported scheme: %s",
+              scheme, path, fileSystemProvidersMap.keySet()));
     }
 
     return provider.getFileSystem(path, config);
