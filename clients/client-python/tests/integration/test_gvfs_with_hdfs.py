@@ -218,6 +218,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
         )
         token = fs._client._rest_client.auth_data_provider.get_token_data()
         token_string = base64.b64decode(
@@ -730,6 +731,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         storage_options = {
             "server_uri": "http://localhost:8090",
             "metalake_name": self.metalake_name,
+            "options": self.options,
         }
         csv_file = llama_dir + "/test.csv"
         # to csv
