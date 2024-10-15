@@ -30,6 +30,7 @@ import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -303,8 +304,12 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
 
         default:
           super.accept(errorResponse);
@@ -343,6 +348,9 @@ public class ErrorHandlers {
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
 
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -379,6 +387,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new CatalogAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -495,6 +506,9 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new FilesetAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -529,6 +543,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new TopicAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -651,6 +668,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
