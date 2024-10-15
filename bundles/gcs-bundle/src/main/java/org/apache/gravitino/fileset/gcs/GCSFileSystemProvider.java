@@ -25,8 +25,12 @@ import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GCSFileSystemProvider implements FileSystemProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GCSFileSystemProvider.class);
+
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
@@ -35,6 +39,7 @@ public class GCSFileSystemProvider implements FileSystemProvider {
           configuration.set(k.replace("gravitino.bypass.", ""), v);
         });
 
+    LOGGER.info("Creating GCS file system with config: {}", config);
     return GoogleHadoopFileSystem.newInstance(path.toUri(), configuration);
   }
 

@@ -29,22 +29,22 @@ from gravitino import (
 
 
 class TestGvfsWithGCS(TestGvfsWithHDFS):
+    key_file = "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
+
+    def __init__(self):
+        super().__init__()
+        self.options = {"gravitino.bypass.gcs.service-account-key-path": self.key_file}
 
     @classmethod
     def setUpClass(cls):
         cls._get_gravitino_home()
-
-        # init gcs config
-        cls.config = {
-            "gravitino.bypass.gcs.service-account-key-path": "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
-        }
+        cls.key_file = "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
 
         cls.bucket_name = "example_qazwsx"
 
         cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
 
         # append the hadoop conf to server
-        cls._append_conf(cls.config, cls.hadoop_conf_path)
         # restart the server
         cls.restart_server()
         # create entity
@@ -66,6 +66,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             properties={
                 "filesystem-providers-classnames": "org.apache.gravitino.fileset.gcs.GCSFileSystemProvider",
                 "gravitino.bypass.fs.gs.auth.service.account.enable": "true",
+                "gravitino.bypass.fs.gs.auth.service.account.json.keyfile": cls.key_file,
             },
         )
         catalog.as_schemas().create_schema(
@@ -86,8 +87,6 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             properties=cls.fileset_properties,
         )
 
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = cls.config[
-            "gravitino.bypass.gcs.service-account-key-path"
-        ]
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = cls.key_file
         arrow_gcs_fs = GcsFileSystem()
         cls.fs = ArrowFSWrapper(arrow_gcs_fs)
