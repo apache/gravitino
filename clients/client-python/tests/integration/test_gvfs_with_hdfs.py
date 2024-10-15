@@ -216,7 +216,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
         )
         token = fs._client._rest_client.auth_data_provider.get_token_data()
         token_string = base64.b64decode(
@@ -233,7 +232,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(ls_actual_dir)
@@ -260,7 +258,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(info_actual_dir)
@@ -283,7 +280,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(exist_actual_dir)
@@ -302,7 +298,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(cp_file_actual_dir)
@@ -335,7 +330,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(mv_actual_dir)
@@ -347,7 +341,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(mv_new_actual_dir)
@@ -379,7 +372,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(rm_actual_dir)
@@ -415,7 +407,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(rm_file_actual_dir)
@@ -442,7 +433,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(rmdir_actual_dir)
@@ -469,7 +459,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(open_actual_dir)
@@ -497,7 +486,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         fs.mkdir(mkdir_dir)
@@ -524,7 +512,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         fs.makedirs(makedirs_dir)
@@ -543,7 +530,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(created_actual_dir)
@@ -559,7 +545,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(modified_actual_dir)
@@ -575,7 +560,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(cat_actual_dir)
@@ -603,7 +587,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(get_actual_dir)
@@ -643,7 +626,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(pands_actual_dir)
@@ -688,7 +670,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(pyarrow_actual_dir)
@@ -718,7 +699,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
             **self.conf,
         )
         self.fs.mkdir(llama_actual_dir)
