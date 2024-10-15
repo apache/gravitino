@@ -642,7 +642,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
     @unittest.skip("Not implemented")
     def test_pandas(self):
-        pands_dir = self.fileset_gvfs_location + "/test_pandas"
+        pands_dirclear_hadoop_env = self.fileset_gvfs_location + "/test_pandas"
         pands_actual_dir = self.fileset_storage_location + "/test_pandas"
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",

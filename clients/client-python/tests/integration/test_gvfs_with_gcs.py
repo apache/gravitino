@@ -51,6 +51,14 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         cls._init_test_entities()
 
     @classmethod
+    def tearDownClass(cls):
+        cls._clean_test_data()
+        # reset server conf
+        cls._reset_conf(cls.config, cls.hadoop_conf_path)
+        # restart server
+        cls.restart_server()
+
+    @classmethod
     def _init_test_entities(cls):
         cls.gravitino_admin_client.create_metalake(
             name=cls.metalake_name, comment="", properties={}
