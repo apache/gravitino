@@ -30,17 +30,15 @@ from gravitino import (
 
 class TestGvfsWithGCS(TestGvfsWithHDFS):
     key_file = "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
+    bucket_name = "example_qazwsx"
 
-    def __init__(self):
-        super().__init__()
+    def setUp(self):
+        super().setUp()
         self.options = {"gravitino.bypass.gcs.service-account-key-path": self.key_file}
 
     @classmethod
     def setUpClass(cls):
         cls._get_gravitino_home()
-        cls.key_file = "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
-
-        cls.bucket_name = "example_qazwsx"
 
         cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
 
@@ -58,6 +56,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         cls.gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=cls.metalake_name
         )
+        cls.conf = {}
         catalog = cls.gravitino_client.create_catalog(
             name=cls.catalog_name,
             catalog_type=Catalog.Type.FILESET,

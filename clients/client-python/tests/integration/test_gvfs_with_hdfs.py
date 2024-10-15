@@ -90,15 +90,13 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
     )
     gravitino_client: GravitinoClient = None
 
-    def __init__(self):
-        super().__init__()
+    def setUp(self):
         self.options = {}
 
     @classmethod
     def setUpClass(cls):
 
         cls._get_gravitino_home()
-        cls.options = {}
 
         cls.hdfs_container = HDFSContainer()
         hdfs_container_ip = cls.hdfs_container.get_ip()
@@ -129,7 +127,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             BaseHadoopEnvironment.clear_hadoop_env()
         finally:
             # close hdfs container
-            cls.hdfs_container.close()
+            if cls.hdfs_container is not None:
+                cls.hdfs_container.close()
 
     @classmethod
     def _init_test_entities(cls):

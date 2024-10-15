@@ -723,10 +723,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param path: The path
         :return: The stripped path
         """
-        if storage_type == StorageType.HDFS:
+        if storage_type in (StorageType.HDFS, StorageType.S3, StorageType.GCS):
             return path
         if storage_type == StorageType.LOCAL:
             return path[len(f"{StorageType.LOCAL.value}:") :]
+
         raise GravitinoRuntimeException(
             f"Storage type:{storage_type} doesn't support now."
         )
