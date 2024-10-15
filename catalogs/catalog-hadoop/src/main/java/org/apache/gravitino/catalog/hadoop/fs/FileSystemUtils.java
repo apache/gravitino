@@ -51,7 +51,7 @@ public class FileSystemUtils {
     }
   }
 
-  public static String getSchemeByProvider(
+  public static String getSchemeByFileSystemProvider(
       String providerClassName, Map<String, FileSystemProvider> fileProvidersMap) {
     for (Map.Entry<String, FileSystemProvider> entry : fileProvidersMap.entrySet()) {
       if (entry.getValue().getClass().getName().equals(providerClassName)) {
@@ -59,6 +59,9 @@ public class FileSystemUtils {
       }
     }
 
-    throw new UnsupportedOperationException("Provider class name not found: " + providerClassName);
+    throw new UnsupportedOperationException(
+        String.format(
+            "File system provider class name '%s' not found. Supported file system providers: %s",
+            providerClassName, fileProvidersMap.values()));
   }
 }

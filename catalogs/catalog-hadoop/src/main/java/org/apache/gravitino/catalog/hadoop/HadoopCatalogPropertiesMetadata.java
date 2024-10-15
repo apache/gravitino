@@ -42,7 +42,7 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    * own FileSystemProvider by specifying the class name here. The value can be
    * 'xxxx.yyy.FileSystemProvider1,xxxx.yyy.FileSystemProvider2'.
    */
-  public static final String FILESYSTEM_PROVIDERS = "filesystem-providers-classnames";
+  public static final String FILESYSTEM_PROVIDERS_CLASSNAMES = "filesystem-providers-classnames";
 
   /**
    * The default file system provider class name, used to create the default file system. If not
@@ -62,9 +62,9 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   null,
                   false /* hidden */))
           .put(
-              FILESYSTEM_PROVIDERS,
+              FILESYSTEM_PROVIDERS_CLASSNAMES,
               PropertyEntry.stringOptionalPropertyEntry(
-                  FILESYSTEM_PROVIDERS,
+                  FILESYSTEM_PROVIDERS_CLASSNAMES,
                   "The file system provider class name, separated by comma",
                   false /* immutable */,
                   null,

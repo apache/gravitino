@@ -133,7 +133,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
+                .getOrDefault(
+                    config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS_CLASSNAMES);
     FileSystemUtils.initFileSystemProviders(fileSystemProviders, fileSystemProvidersMap);
 
     String defaultFileSystemProviderClassName =
@@ -144,7 +145,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                     config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER_CLASSNAME);
     this.defaultFileSystemProviderScheme =
         StringUtils.isNotBlank(defaultFileSystemProviderClassName)
-            ? FileSystemUtils.getSchemeByProvider(
+            ? FileSystemUtils.getSchemeByFileSystemProvider(
                 defaultFileSystemProviderClassName, fileSystemProvidersMap)
             : LOCAL_FILE_SCHEME;
 
@@ -771,7 +772,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     if (provider == null) {
       throw new IllegalArgumentException(
           String.format(
-              "Unsupported scheme: %s, path: %s, supported schemas: %s",
+              "Unsupported scheme: %s, path: %s, all supported scheme: %s",
               scheme, path, fileSystemProvidersMap.keySet()));
     }
 
