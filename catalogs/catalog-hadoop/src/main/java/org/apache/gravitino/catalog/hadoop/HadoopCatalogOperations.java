@@ -72,7 +72,7 @@ import org.slf4j.LoggerFactory;
 public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
 
   public static final String DEFAULT_FS = "fs.defaultFS";
-  private static final String LOCAL_FILE_SCHEMA = "file";
+  private static final String LOCAL_FILE_SCHEME = "file";
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
@@ -91,6 +91,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private CatalogInfo catalogInfo;
 
   private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
+
+  private String defaultFilesystemProvider;
 
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
@@ -133,6 +135,12 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
     FileSystemUtils.initFileSystemProviders(fileSystemProviders, fileSystemProvidersMap);
+
+    this.defaultFilesystemProvider =
+        (String)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER);
 
     String catalogLocation =
         (String)
@@ -744,29 +752,26 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
-    String defaultFilesystemProvider =
-        (String)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER);
-
     Map<String, String> newConfig = Maps.newHashMap(config);
     if (path == null) {
       if (defaultFilesystemProvider != null) {
         return getFileSystemByScheme(defaultFilesystemProvider, newConfig);
       } else {
         LOG.warn("The path and default filesystem provider are both null, using local file system");
-        return getFileSystemByScheme(LOCAL_FILE_SCHEMA, newConfig);
+        return getFileSystemByScheme(LOCAL_FILE_SCHEME, newConfig);
       }
     }
 
     // Path is not null;
     if (path.toUri().getScheme() == null) {
+      if (defaultFilesystemProvider != null) {
+        return getFileSystemByScheme(defaultFilesystemProvider, newConfig);
+      }
       LOG.warn(
-          "Can't get schema from path: {} and default filesystem provider are both null, using"
+          "Can't get schema from path: {} and default filesystem provider is null, using"
               + " local file system",
           path);
-      return getFileSystemByScheme(LOCAL_FILE_SCHEMA, newConfig);
+      return getFileSystemByScheme(LOCAL_FILE_SCHEME, newConfig);
     } else {
       newConfig.put(DEFAULT_FS, path.toUri().toString());
       return getFileSystemByScheme(path.toUri().getScheme(), newConfig);
