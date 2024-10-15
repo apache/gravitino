@@ -89,9 +89,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         uri="http://localhost:8090"
     )
     gravitino_client: GravitinoClient = None
-
-    def setUp(self):
-        self.options = {}
+    options = {}
 
     @classmethod
     def setUpClass(cls):

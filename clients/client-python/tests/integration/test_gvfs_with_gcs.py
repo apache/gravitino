@@ -33,8 +33,10 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
     bucket_name = "example_qazwsx"
 
     def setUp(self):
-        super().setUp()
         self.options = {"gravitino.bypass.gcs.service-account-key-path": self.key_file}
+
+    def tearDown(self):
+        self.options = {}
 
     @classmethod
     def setUpClass(cls):
@@ -56,7 +58,8 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         cls.gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=cls.metalake_name
         )
-        cls.conf = {}
+
+        cls.config = {}
         catalog = cls.gravitino_client.create_catalog(
             name=cls.catalog_name,
             catalog_type=Catalog.Type.FILESET,
