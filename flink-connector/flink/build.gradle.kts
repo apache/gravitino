@@ -38,18 +38,10 @@ val scalaVersion: String = "2.12"
 val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion"
 
 dependencies {
-  implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":common"))
-
-  compileOnly(libs.bundles.log4j)
-  implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.httpclient5)
-  implementation(libs.jackson.databind)
-  implementation(libs.jackson.annotations)
-  implementation(libs.jackson.datatype.jdk8)
-  implementation(libs.jackson.datatype.jsr310)
+
+  compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
 
   compileOnly("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
@@ -76,13 +68,13 @@ dependencies {
     exclude("org.slf4j")
   }
 
-  // replace with client-java-runtime in flink connector runtime
-  compileOnly(project(":clients:client-java"))
-
   testAnnotationProcessor(libs.lombok)
-
   testCompileOnly(libs.lombok)
+
+  testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
+  testImplementation(project(":core"))
+  testImplementation(project(":common"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
