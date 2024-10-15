@@ -14,7 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
+import os
 from enum import Enum
 from pathlib import PurePosixPath
 from typing import Dict, Tuple
@@ -27,6 +27,9 @@ from fsspec.implementations.local import LocalFileSystem
 from fsspec.implementations.arrow import ArrowFSWrapper
 from fsspec.utils import infer_storage_options
 from pyarrow.fs import HadoopFileSystem
+from pyarrow.fs import GcsFileSystem
+from pyarrow.fs import S3FileSystem
+
 from readerwriterlock import rwlock
 from gravitino.audit.caller_context import CallerContext, CallerContextHolder
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
@@ -46,7 +49,9 @@ PROTOCOL_NAME = "gvfs"
 
 class StorageType(Enum):
     HDFS = "hdfs"
-    LOCAL = "file"
+    LOCAL = ("file",)
+    GCS = ("gs",)
+    S3 = ("s3",)
 
 
 class FilesetContextPair:
@@ -66,7 +71,7 @@ class FilesetContextPair:
 
 
 class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
-    """This is a virtual file system which users can access `fileset` and
+    """This is a virtual file system that users can access `fileset` and
     other resources.
 
     It obtains the actual storage location corresponding to the resource from the
@@ -149,6 +154,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         self._cache_lock = rwlock.RWLockFair()
         self._catalog_cache = LRUCache(maxsize=100)
         self._catalog_cache_lock = rwlock.RWLockFair()
+        self._options = options
 
         super().__init__(**kwargs)
 
@@ -309,7 +315,9 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         )
         dst_actual_path = dst_context_pair.actual_file_location()
 
-        if storage_type == StorageType.HDFS:
+        # convert the following to in
+
+        if storage_type in [StorageType.HDFS, StorageType.GCS, StorageType.S3]:
             src_context_pair.filesystem().mv(
                 self._strip_storage_protocol(storage_type, src_actual_path),
                 self._strip_storage_protocol(storage_type, dst_actual_path),
@@ -540,7 +548,13 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param virtual_location: Virtual location
         :return A virtual path
         """
-        if storage_location.startswith(f"{StorageType.HDFS.value}://"):
+        # If the storage path start with hdfs, gcs, s3, s3a or s3n, we should use the path as the prefix.
+
+        if (
+            storage_location.startswith(f"{StorageType.HDFS.value}://")
+            or storage_location.startswith(f"{StorageType.GCS.value}://")
+            or storage_location.startswith(f"{StorageType.S3.value}://")
+        ):
             actual_prefix = infer_storage_options(storage_location)["path"]
         elif storage_location.startswith(f"{StorageType.LOCAL.value}:/"):
             actual_prefix = storage_location[len(f"{StorageType.LOCAL.value}:") :]
@@ -681,6 +695,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             return StorageType.HDFS
         if path.startswith(f"{StorageType.LOCAL.value}:/"):
             return StorageType.LOCAL
+        if path.startswith(f"{StorageType.GCS.value}://"):
+            return StorageType.GCS
+        if path.startswith(f"{StorageType.S3.value}://"):
+            return StorageType.S3
         raise GravitinoRuntimeException(
             f"Storage type doesn't support now. Path:{path}"
         )
@@ -777,6 +795,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 fs = ArrowFSWrapper(HadoopFileSystem.from_uri(actual_file_location))
             elif storage_type == StorageType.LOCAL:
                 fs = LocalFileSystem()
+            elif storage_type == StorageType.GCS:
+                fs = ArrowFSWrapper(self._get_gcs_filesystem())
+            elif storage_type == StorageType.S3:
+                fs = ArrowFSWrapper(self._get_s3_filesystem())
             else:
                 raise GravitinoRuntimeException(
                     f"Storage type: `{storage_type}` doesn't support now."
@@ -785,6 +807,69 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             return fs
         finally:
             write_lock.release()
+
+    def _get_gcs_filesystem(self):
+        # get All keys from the options that start with 'gravitino.bypass.gcs.' and remove the prefix
+        gcs_options = {
+            key[len(GVFSConfig.GVFS_FILESYSTEM_BY_PASS_GCS) :]: value
+            for key, value in self._options.items()
+            if key.startswith(GVFSConfig.GVFS_FILESYSTEM_BY_PASS_GCS)
+        }
+
+        # get 'service-account-key' from gcs_options, if the key is not found, throw an exception
+        service_account_key_path = gcs_options.get("service-account-key-path")
+        if service_account_key_path is None:
+            raise GravitinoRuntimeException(
+                "Service account key is not found in the options."
+            )
+
+        # scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+        # credentials = service_account.Credentials.from_service_account_file(
+        #     service_account_key_path, scopes=scopes)
+        # credentials.refresh(Request())
+
+        # access_token = credentials.token
+        # expiration = credentials.expiry
+
+        # return GcsFileSystem(access_token=access_token,
+        #                        credential_token_expiration=expiration)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
+        return GcsFileSystem()
+
+    def _get_s3_filesystem(self):
+        # get All keys from the options that start with 'gravitino.bypass.s3.' and remove the prefix
+        s3_options = {
+            key[len(GVFSConfig.GVFS_FILESYSTEM_BY_PASS_S3) :]: value
+            for key, value in self._options.items()
+            if key.startswith(GVFSConfig.GVFS_FILESYSTEM_BY_PASS_S3)
+        }
+
+        # get 'aws_access_key_id' from s3_options, if the key is not found, throw an exception
+        aws_access_key_id = s3_options.get("aws_access_key_id")
+        if aws_access_key_id is None:
+            raise GravitinoRuntimeException(
+                "AWS access key id is not found in the options."
+            )
+
+        # get 'aws_secret_access_key' from s3_options, if the key is not found, throw an exception
+        aws_secret_access_key = s3_options.get("aws_secret_access_key")
+        if aws_secret_access_key is None:
+            raise GravitinoRuntimeException(
+                "AWS secret access key is not found in the options."
+            )
+
+        # get 'aws_endpoint_url' from s3_options, if the key is not found, throw an exception
+        aws_endpoint_url = s3_options.get("aws_endpoint_url")
+        if aws_endpoint_url is None:
+            raise GravitinoRuntimeException(
+                "AWS endpoint url is not found in the options."
+            )
+
+        return S3FileSystem(
+            key=aws_access_key_id,
+            secret=aws_secret_access_key,
+            endpoint_override=aws_endpoint_url,
+        )
 
 
 fsspec.register_implementation(PROTOCOL_NAME, GravitinoVirtualFileSystem)

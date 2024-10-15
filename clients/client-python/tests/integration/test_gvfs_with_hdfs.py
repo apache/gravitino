@@ -159,7 +159,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             properties=cls.fileset_properties,
         )
         arrow_hadoop_fs = HadoopFileSystem(host=cls.hdfs_container.get_ip(), port=9000)
-        cls.hdfs = ArrowFSWrapper(arrow_hadoop_fs)
+        cls.fs = ArrowFSWrapper(arrow_hadoop_fs)
         cls.conf: Dict = {"fs.defaultFS": f"hdfs://{cls.hdfs_container.get_ip()}:9000/"}
 
     @classmethod
@@ -208,7 +208,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             logger.warning("Failed to drop metalake %s", cls.metalake_name)
 
     def test_simple_auth(self):
-        options = {"auth_type": "simple"}
         current_user = (
             None if os.environ.get("user.name") is None else os.environ["user.name"]
         )
@@ -217,7 +216,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=options,
+            options=self.options,
         )
         token = fs._client._rest_client.auth_data_provider.get_token_data()
         token_string = base64.b64decode(
@@ -234,15 +233,16 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(ls_actual_dir)
-        self.assertTrue(self.hdfs.exists(ls_actual_dir))
+        self.fs.mkdir(ls_actual_dir)
+        self.assertTrue(self.fs.exists(ls_actual_dir))
 
         ls_file = self.fileset_gvfs_location + "/test_ls/test.file"
         ls_actual_file = self.fileset_storage_location + "/test_ls/test.file"
-        self.hdfs.touch(ls_actual_file)
-        self.assertTrue(self.hdfs.exists(ls_actual_file))
+        self.fs.touch(ls_actual_file)
+        self.assertTrue(self.fs.exists(ls_actual_file))
 
         # test detail = false
         file_list_without_detail = fs.ls(ls_dir, detail=False)
@@ -260,15 +260,16 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(info_actual_dir)
-        self.assertTrue(self.hdfs.exists(info_actual_dir))
+        self.fs.mkdir(info_actual_dir)
+        self.assertTrue(self.fs.exists(info_actual_dir))
 
         info_file = self.fileset_gvfs_location + "/test_info/test.file"
         info_actual_file = self.fileset_storage_location + "/test_info/test.file"
-        self.hdfs.touch(info_actual_file)
-        self.assertTrue(self.hdfs.exists(info_actual_file))
+        self.fs.touch(info_actual_file)
+        self.assertTrue(self.fs.exists(info_actual_file))
 
         dir_info = fs.info(info_dir)
         self.assertEqual(dir_info["name"], info_dir[len("gvfs://") :])
@@ -282,16 +283,17 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(exist_actual_dir)
-        self.assertTrue(self.hdfs.exists(exist_actual_dir))
+        self.fs.mkdir(exist_actual_dir)
+        self.assertTrue(self.fs.exists(exist_actual_dir))
         self.assertTrue(fs.exists(exist_dir))
 
         exist_file = self.fileset_gvfs_location + "/test_exist/test.file"
         exist_actual_file = self.fileset_storage_location + "/test_exist/test.file"
-        self.hdfs.touch(exist_actual_file)
-        self.assertTrue(self.hdfs.exists(exist_actual_file))
+        self.fs.touch(exist_actual_file)
+        self.assertTrue(self.fs.exists(exist_actual_file))
         self.assertTrue(fs.exists(exist_file))
 
     def test_cp_file(self):
@@ -300,19 +302,20 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(cp_file_actual_dir)
-        self.assertTrue(self.hdfs.exists(cp_file_actual_dir))
+        self.fs.mkdir(cp_file_actual_dir)
+        self.assertTrue(self.fs.exists(cp_file_actual_dir))
         self.assertTrue(fs.exists(cp_file_dir))
 
         cp_file_file = self.fileset_gvfs_location + "/test_cp_file/test.file"
         cp_file_actual_file = self.fileset_storage_location + "/test_cp_file/test.file"
-        self.hdfs.touch(cp_file_actual_file)
-        self.assertTrue(self.hdfs.exists(cp_file_actual_file))
+        self.fs.touch(cp_file_actual_file)
+        self.assertTrue(self.fs.exists(cp_file_actual_file))
         self.assertTrue(fs.exists(cp_file_file))
 
-        with self.hdfs.open(cp_file_actual_file, "wb") as f:
+        with self.fs.open(cp_file_actual_file, "wb") as f:
             f.write(b"test_file_1")
 
         cp_file_new_file = self.fileset_gvfs_location + "/test_cp_file/test_cp.file"
@@ -322,7 +325,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs.cp_file(cp_file_file, cp_file_new_file)
         self.assertTrue(fs.exists(cp_file_new_file))
 
-        with self.hdfs.open(cp_file_new_actual_file, "rb") as f:
+        with self.fs.open(cp_file_new_actual_file, "rb") as f:
             result = f.read()
         self.assertEqual(b"test_file_1", result)
 
@@ -332,10 +335,11 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(mv_actual_dir)
-        self.assertTrue(self.hdfs.exists(mv_actual_dir))
+        self.fs.mkdir(mv_actual_dir)
+        self.assertTrue(self.fs.exists(mv_actual_dir))
         self.assertTrue(fs.exists(mv_dir))
 
         mv_new_dir = self.fileset_gvfs_location + "/test_mv_new"
@@ -343,16 +347,17 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(mv_new_actual_dir)
-        self.assertTrue(self.hdfs.exists(mv_new_actual_dir))
+        self.fs.mkdir(mv_new_actual_dir)
+        self.assertTrue(self.fs.exists(mv_new_actual_dir))
         self.assertTrue(fs.exists(mv_new_dir))
 
         mv_file = self.fileset_gvfs_location + "/test_mv/test.file"
         mv_actual_file = self.fileset_storage_location + "/test_mv/test.file"
-        self.hdfs.touch(mv_actual_file)
-        self.assertTrue(self.hdfs.exists(mv_actual_file))
+        self.fs.touch(mv_actual_file)
+        self.assertTrue(self.fs.exists(mv_actual_file))
         self.assertTrue(fs.exists(mv_file))
 
         mv_new_file = self.fileset_gvfs_location + "/test_mv_new/test_new.file"
@@ -362,7 +367,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
         fs.mv(mv_file, mv_new_file)
         self.assertTrue(fs.exists(mv_new_file))
-        self.assertTrue(self.hdfs.exists(mv_new_actual_file))
+        self.assertTrue(self.fs.exists(mv_new_actual_file))
 
         # test rename without sub path, which should throw an exception
         with self.assertRaises(GravitinoRuntimeException):
@@ -374,16 +379,17 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(rm_actual_dir)
-        self.assertTrue(self.hdfs.exists(rm_actual_dir))
+        self.fs.mkdir(rm_actual_dir)
+        self.assertTrue(self.fs.exists(rm_actual_dir))
         self.assertTrue(fs.exists(rm_dir))
 
         rm_file = self.fileset_gvfs_location + "/test_rm/test.file"
         rm_actual_file = self.fileset_storage_location + "/test_rm/test.file"
-        self.hdfs.touch(rm_file)
-        self.assertTrue(self.hdfs.exists(rm_actual_file))
+        self.fs.touch(rm_file)
+        self.assertTrue(self.fs.exists(rm_actual_file))
         self.assertTrue(fs.exists(rm_file))
 
         # test delete file
@@ -393,8 +399,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         # test delete dir with recursive = false
         rm_new_file = self.fileset_gvfs_location + "/test_rm/test_new.file"
         rm_new_actual_file = self.fileset_storage_location + "/test_rm/test_new.file"
-        self.hdfs.touch(rm_new_actual_file)
-        self.assertTrue(self.hdfs.exists(rm_new_actual_file))
+        self.fs.touch(rm_new_actual_file)
+        self.assertTrue(self.fs.exists(rm_new_actual_file))
         self.assertTrue(fs.exists(rm_new_file))
         with self.assertRaises(ValueError):
             fs.rm(rm_dir, recursive=False)
@@ -409,16 +415,17 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(rm_file_actual_dir)
-        self.assertTrue(self.hdfs.exists(rm_file_actual_dir))
+        self.fs.mkdir(rm_file_actual_dir)
+        self.assertTrue(self.fs.exists(rm_file_actual_dir))
         self.assertTrue(fs.exists(rm_file_dir))
 
         rm_file_file = self.fileset_gvfs_location + "/test_rm_file/test.file"
         rm_file_actual_file = self.fileset_storage_location + "/test_rm_file/test.file"
-        self.hdfs.touch(rm_file_actual_file)
-        self.assertTrue(self.hdfs.exists(rm_file_actual_file))
+        self.fs.touch(rm_file_actual_file)
+        self.assertTrue(self.fs.exists(rm_file_actual_file))
         self.assertTrue(fs.exists(rm_file_file))
 
         # test delete file
@@ -435,16 +442,17 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(rmdir_actual_dir)
-        self.assertTrue(self.hdfs.exists(rmdir_actual_dir))
+        self.fs.mkdir(rmdir_actual_dir)
+        self.assertTrue(self.fs.exists(rmdir_actual_dir))
         self.assertTrue(fs.exists(rmdir_dir))
 
         rmdir_file = self.fileset_gvfs_location + "/test_rmdir/test.file"
         rmdir_actual_file = self.fileset_storage_location + "/test_rmdir/test.file"
-        self.hdfs.touch(rmdir_actual_file)
-        self.assertTrue(self.hdfs.exists(rmdir_actual_file))
+        self.fs.touch(rmdir_actual_file)
+        self.assertTrue(self.fs.exists(rmdir_actual_file))
         self.assertTrue(fs.exists(rmdir_file))
 
         # test delete file
@@ -461,16 +469,17 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(open_actual_dir)
-        self.assertTrue(self.hdfs.exists(open_actual_dir))
+        self.fs.mkdir(open_actual_dir)
+        self.assertTrue(self.fs.exists(open_actual_dir))
         self.assertTrue(fs.exists(open_dir))
 
         open_file = self.fileset_gvfs_location + "/test_open/test.file"
         open_actual_file = self.fileset_storage_location + "/test_open/test.file"
-        self.hdfs.touch(open_actual_file)
-        self.assertTrue(self.hdfs.exists(open_actual_file))
+        self.fs.touch(open_actual_file)
+        self.assertTrue(self.fs.exists(open_actual_file))
         self.assertTrue(fs.exists(open_file))
 
         # test open and write file
@@ -488,11 +497,12 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
         fs.mkdir(mkdir_dir)
         self.assertTrue(fs.exists(mkdir_dir))
-        self.assertTrue(self.hdfs.exists(mkdir_actual_dir))
+        self.assertTrue(self.fs.exists(mkdir_actual_dir))
 
         # test mkdir dir with create_parents = false
         parent_not_exist_virtual_path = mkdir_dir + "/not_exist/sub_dir"
@@ -514,11 +524,12 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
         fs.makedirs(makedirs_dir)
         self.assertTrue(fs.exists(makedirs_dir))
-        self.assertTrue(self.hdfs.exists(makedirs_actual_dir))
+        self.assertTrue(self.fs.exists(makedirs_actual_dir))
 
         # test mkdir dir not exist
         parent_not_exist_virtual_path = makedirs_dir + "/not_exist/sub_dir"
@@ -532,10 +543,11 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(created_actual_dir)
-        self.assertTrue(self.hdfs.exists(created_actual_dir))
+        self.fs.mkdir(created_actual_dir)
+        self.assertTrue(self.fs.exists(created_actual_dir))
         self.assertTrue(fs.exists(created_dir))
 
         with self.assertRaises(GravitinoRuntimeException):
@@ -547,10 +559,11 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(modified_actual_dir)
-        self.assertTrue(self.hdfs.exists(modified_actual_dir))
+        self.fs.mkdir(modified_actual_dir)
+        self.assertTrue(self.fs.exists(modified_actual_dir))
         self.assertTrue(fs.exists(modified_dir))
 
         # test mkdir dir which exists
@@ -562,16 +575,17 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(cat_actual_dir)
-        self.assertTrue(self.hdfs.exists(cat_actual_dir))
+        self.fs.mkdir(cat_actual_dir)
+        self.assertTrue(self.fs.exists(cat_actual_dir))
         self.assertTrue(fs.exists(cat_dir))
 
         cat_file = self.fileset_gvfs_location + "/test_cat/test.file"
         cat_actual_file = self.fileset_storage_location + "/test_cat/test.file"
-        self.hdfs.touch(cat_actual_file)
-        self.assertTrue(self.hdfs.exists(cat_actual_file))
+        self.fs.touch(cat_actual_file)
+        self.assertTrue(self.fs.exists(cat_actual_file))
         self.assertTrue(fs.exists(cat_file))
 
         # test open and write file
@@ -589,16 +603,17 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(get_actual_dir)
-        self.assertTrue(self.hdfs.exists(get_actual_dir))
+        self.fs.mkdir(get_actual_dir)
+        self.assertTrue(self.fs.exists(get_actual_dir))
         self.assertTrue(fs.exists(get_dir))
 
         get_file = self.fileset_gvfs_location + "/test_get/test.file"
         get_actual_file = self.fileset_storage_location + "/test_get/test.file"
-        self.hdfs.touch(get_actual_file)
-        self.assertTrue(self.hdfs.exists(get_actual_file))
+        self.fs.touch(get_actual_file)
+        self.assertTrue(self.fs.exists(get_actual_file))
         self.assertTrue(fs.exists(get_file))
 
         # test open and write file
@@ -628,10 +643,11 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(pands_actual_dir)
-        self.assertTrue(self.hdfs.exists(pands_actual_dir))
+        self.fs.mkdir(pands_actual_dir)
+        self.assertTrue(self.fs.exists(pands_actual_dir))
         self.assertTrue(fs.exists(pands_dir))
 
         data = pandas.DataFrame({"Name": ["A", "B", "C", "D"], "ID": [20, 21, 19, 18]})
@@ -642,7 +658,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         )
         data.to_parquet(parquet_file, filesystem=fs)
         self.assertTrue(fs.exists(parquet_file))
-        self.assertTrue(self.hdfs.exists(parquet_actual_file))
+        self.assertTrue(self.fs.exists(parquet_actual_file))
 
         # read parquet
         ds1 = pandas.read_parquet(path=parquet_file, filesystem=fs)
@@ -660,7 +676,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             storage_options=storage_options,
         )
         self.assertTrue(fs.exists(csv_file))
-        self.assertTrue(self.hdfs.exists(csv_actual_file))
+        self.assertTrue(self.fs.exists(csv_actual_file))
 
         # read csv
         ds2 = pandas.read_csv(csv_file, storage_options=storage_options)
@@ -672,10 +688,11 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(pyarrow_actual_dir)
-        self.assertTrue(self.hdfs.exists(pyarrow_actual_dir))
+        self.fs.mkdir(pyarrow_actual_dir)
+        self.assertTrue(self.fs.exists(pyarrow_actual_dir))
         self.assertTrue(fs.exists(pyarrow_dir))
 
         data = pandas.DataFrame({"Name": ["A", "B", "C", "D"], "ID": [20, 21, 19, 18]})
@@ -701,10 +718,11 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
+            options=self.options,
             **self.conf,
         )
-        self.hdfs.mkdir(llama_actual_dir)
-        self.assertTrue(self.hdfs.exists(llama_actual_dir))
+        self.fs.mkdir(llama_actual_dir)
+        self.assertTrue(self.fs.exists(llama_actual_dir))
         self.assertTrue(fs.exists(llama_dir))
         data = pandas.DataFrame({"Name": ["A", "B", "C", "D"], "ID": [20, 21, 19, 18]})
 
