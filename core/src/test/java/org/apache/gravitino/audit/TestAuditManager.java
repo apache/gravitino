@@ -126,7 +126,7 @@ public class TestAuditManager {
     eventBus.dispatchEvent(dummyEvent);
     Assertions.assertInstanceOf(FileAuditWriter.class, auditLogManager.getAuditLogWriter());
     Assertions.assertInstanceOf(
-        StringFormatter.class, (auditLogManager.getAuditLogWriter()).getFormatter());
+        SimpleFormatter.class, (auditLogManager.getAuditLogWriter()).getFormatter());
 
     FileAuditWriter fileAuditWriter = (FileAuditWriter) auditLogManager.getAuditLogWriter();
     String fileName = fileAuditWriter.fileName;

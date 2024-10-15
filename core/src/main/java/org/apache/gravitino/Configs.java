@@ -353,18 +353,16 @@ public class Configs {
           .createWithDefault(false);
 
   public static final ConfigEntry<String> AUDIT_LOG_WRITER_CLASS_NAME =
-      new ConfigBuilder("gravitino.audit.writer.")
+      new ConfigBuilder("gravitino.audit.writer.class")
           .doc("Gravitino audit log writer class name")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault("org.apache.gravitino.audit.FileAuditWriter");
 
   public static final ConfigEntry<String> AUDIT_LOG_FORMATTER_CLASS_NAME =
-      new ConfigBuilder("gravitino.audit.writer.class")
+      new ConfigBuilder("gravitino.audit.formatter.class")
           .doc("Gravitino event log formatter class name")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-          .createWithDefault("org.apache.gravitino.audit.StringFormatter");
+          .createWithDefault("org.apache.gravitino.audit.SimpleFormatter");
 }

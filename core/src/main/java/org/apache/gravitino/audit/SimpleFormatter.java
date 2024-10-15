@@ -25,7 +25,7 @@ import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.FailureEvent;
 
 /** The default implementation of the audit log. */
-public class StringFormatter implements Formatter {
+public class SimpleFormatter implements Formatter {
 
   @Override
   public SimpleAuditLog format(Event event) {
