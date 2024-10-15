@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -36,22 +37,19 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String LOCATION = "location";
 
   /**
-   * The implementation class name of the {@link FileSystemProvider} to be used by the catalog.
-   * Gravitino supports LocalFileSystem and HDFS by default. Users can implement their own by
-   * extending {@link FileSystemProvider} and specify the class name here.
-   *
-   * <p>The value can be 'xxxx.yyy.FileSystemProvider1, xxxx.yyy.FileSystemProvider2'.
+   * The class names of {@link FileSystemProvider} to be added to the catalog. Except built-in
+   * FileSystemProvider like LocalFileSystemProvider and HDFSFileSystemProvider, users can add their
+   * own FileSystemProvider by specifying the class name here. The value can be
+   * 'xxxx.yyy.FileSystemProvider1,xxxx.yyy.FileSystemProvider2'.
    */
-  public static final String FILESYSTEM_PROVIDERS = "filesystem-providers";
+  public static final String FILESYSTEM_PROVIDERS = "filesystem-providers-classnames";
 
   /**
-   * The default file system provider. It is used to create the default file system instance; if not
-   * specified, file system instance will be created with the schema prefix in the file path like
-   * 'file:/tmp/'. If there is no schema prefix, the default file system provider will be local file
-   * system. The candidate value is 'local' or 'hdfs' or others specified in the {@link
-   * FileSystemProvider#getScheme()}
+   * The default file system provider class name, used to create the default file system. If not
+   * specified, the default file system provider will be {@link LocalFileSystemProvider}.
    */
-  public static final String DEFAULT_FS_PROVIDER = "default-filesystem-provider";
+  public static final String DEFAULT_FS_PROVIDER_CLASSNAME =
+      "default-filesystem-provider-classname";
 
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -72,14 +70,12 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   null,
                   false /* hidden */))
           .put(
-              DEFAULT_FS_PROVIDER,
+              DEFAULT_FS_PROVIDER_CLASSNAME,
               PropertyEntry.stringOptionalPropertyEntry(
-                  DEFAULT_FS_PROVIDER,
-                  "Default file system provider, used to create the default file system "
-                      + "candidate value is 'local', 'hdfs' or others specified in the "
-                      + "FileSystemProvider#getScheme()",
+                  DEFAULT_FS_PROVIDER_CLASSNAME,
+                  "Default file system provider, used to create the default file system",
                   false /* immutable */,
-                  null,
+                  LocalFileSystemProvider.class.getCanonicalName(),
                   false /* hidden */))
           // The following two are about authentication.
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
