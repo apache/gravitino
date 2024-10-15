@@ -19,51 +19,26 @@
 
 package org.apache.gravitino.audit;
 
-import lombok.Builder;
-import lombok.SneakyThrows;
-import org.apache.gravitino.json.JsonUtils;
+import java.util.Objects;
+import org.apache.gravitino.audit.AuditLog.Status;
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.FailureEvent;
 
 /** The default implementation of the audit log. */
-@Builder
-public class DefaultAuditLog implements AuditLog {
-
-  private String user;
-
-  private Operation operation;
-
-  private String identifier;
-
-  private long timestamp;
-
-  private boolean successful;
+public class StringFormatter implements Formatter {
 
   @Override
-  public String user() {
-    return user;
-  }
-
-  @Override
-  public Operation operation() {
-    return operation;
-  }
-
-  @Override
-  public String identifier() {
-    return identifier;
-  }
-
-  @Override
-  public long timestamp() {
-    return timestamp;
-  }
-
-  @Override
-  public boolean successful() {
-    return successful;
-  }
-
-  @SneakyThrows
-  public String toString() {
-    return JsonUtils.anyFieldMapper().writeValueAsString(this);
+  public SimpleAuditLog format(Event event) {
+    Status status = event instanceof FailureEvent ? Status.FAILURE : Status.SUCCESS;
+    return SimpleAuditLog.builder()
+        .user(event.user())
+        .operation(AuditLog.Operation.fromEvent(event))
+        .identifier(
+            event.identifier() != null
+                ? Objects.requireNonNull(event.identifier()).toString()
+                : null)
+        .timestamp(event.eventTime())
+        .status(status)
+        .build();
   }
 }

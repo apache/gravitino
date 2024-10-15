@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.audit;
 
+import java.io.Closeable;
 import java.util.Map;
 import org.apache.gravitino.listener.api.event.Event;
 
@@ -26,7 +27,7 @@ import org.apache.gravitino.listener.api.event.Event;
  * Interface for writing the audit log, which can write to different storage, such as file,
  * database,mq.
  */
-public interface AuditLogWriter {
+public interface AuditLogWriter extends Closeable {
 
   /** @return formatter. */
   Formatter getFormatter();
@@ -56,4 +57,12 @@ public interface AuditLogWriter {
 
   /** Close the writer. */
   void close();
+
+  /**
+   * Define the name of the writer, which related to audit writer configuration. Audit log writer
+   * configuration start with: gravitino.audit.log.writer.${name}.*
+   *
+   * @return
+   */
+  String name();
 }

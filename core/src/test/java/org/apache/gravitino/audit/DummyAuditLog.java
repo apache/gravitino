@@ -38,7 +38,7 @@ public class DummyAuditLog implements AuditLog {
 
   private long timestamp;
 
-  private boolean successful;
+  private Status status;
 
   @Override
   public String user() {
@@ -61,7 +61,7 @@ public class DummyAuditLog implements AuditLog {
   }
 
   @Override
-  public boolean successful() {
-    return successful;
+  public Status status() {
+    return status;
   }
 }

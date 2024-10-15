@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.audit;
 
+import static org.apache.gravitino.audit.AuditLog.Status;
+
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.FailureEvent;
 
@@ -30,7 +32,7 @@ public class DummyAuditFormatter implements Formatter {
         .operation(AuditLog.Operation.fromEvent(event))
         .identifier(event.identifier() != null ? event.identifier().toString() : null)
         .timestamp(event.eventTime())
-        .successful(!(event instanceof FailureEvent))
+        .status(event instanceof FailureEvent ? Status.FAILURE : Status.SUCCESS)
         .build();
   }
 }

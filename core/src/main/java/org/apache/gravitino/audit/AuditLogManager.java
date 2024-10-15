@@ -27,6 +27,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.utils.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,7 +97,8 @@ public class AuditLogManager {
     try {
       AuditLogWriter auditLogWriter =
           (AuditLogWriter) Class.forName(className).getDeclaredConstructor().newInstance();
-      auditLogWriter.init(formatter, config);
+      Map<String, String> writerConfig = MapUtils.getPrefixMap(config, auditLogWriter.name() + ".");
+      auditLogWriter.init(formatter, writerConfig);
       return auditLogWriter;
     } catch (Exception e) {
       throw new GravitinoRuntimeException(e, "Failed to load audit log writer %s", className);

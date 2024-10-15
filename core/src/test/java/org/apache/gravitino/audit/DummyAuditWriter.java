@@ -45,4 +45,9 @@ public class DummyAuditWriter implements AuditLogWriter {
 
   @Override
   public void close() {}
+
+  @Override
+  public String name() {
+    return "dummy";
+  }
 }

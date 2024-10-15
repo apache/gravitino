@@ -19,25 +19,56 @@
 
 package org.apache.gravitino.audit;
 
-import java.util.Objects;
-import org.apache.gravitino.listener.api.event.Event;
-import org.apache.gravitino.listener.api.event.FailureEvent;
+import java.text.SimpleDateFormat;
+import lombok.Builder;
 
 /** The default implementation of the audit log. */
-public class DefaultFormatter implements Formatter {
+@Builder
+public class SimpleAuditLog implements AuditLog {
+
+  private String user;
+
+  private Operation operation;
+
+  private String identifier;
+
+  private long timestamp;
+
+  private Status status;
 
   @Override
-  public DefaultAuditLog format(Event event) {
-    boolean successful = !(event instanceof FailureEvent);
-    return DefaultAuditLog.builder()
-        .user(event.user())
-        .operation(AuditLog.Operation.fromEvent(event))
-        .identifier(
-            event.identifier() != null
-                ? Objects.requireNonNull(event.identifier()).toString()
-                : null)
-        .timestamp(event.eventTime())
-        .successful(successful)
-        .build();
+  public String user() {
+    return user;
+  }
+
+  @Override
+  public Operation operation() {
+    return operation;
+  }
+
+  @Override
+  public String identifier() {
+    return identifier;
+  }
+
+  @Override
+  public long timestamp() {
+    return timestamp;
+  }
+
+  @Override
+  public Status status() {
+    return status;
+  }
+
+  @Override
+  public String toString() {
+    return String.format(
+        "[%s] %s %s %s %s",
+        new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(timestamp),
+        user,
+        operation,
+        identifier,
+        status);
   }
 }

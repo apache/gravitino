@@ -124,11 +124,11 @@ public interface AuditLog {
   long timestamp();
 
   /**
-   * The operation is successful or not.
+   * The status of the operation.
    *
-   * @return true if the operation is successful, false otherwise.
+   * @return operation status.
    */
-  boolean successful();
+  Status status();
 
   /** Define user metadata operation. */
   enum Operation {
@@ -290,5 +290,10 @@ public interface AuditLog {
         return UNKNOWN_OPERATION;
       }
     }
+  }
+
+  enum Status {
+    SUCCESS,
+    FAILURE
   }
 }

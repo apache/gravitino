@@ -29,7 +29,6 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,8 +37,12 @@ import org.slf4j.LoggerFactory;
  * DefaultFileAuditWriter is the default implementation of AuditLogWriter, which writes audit logs
  * to a file.
  */
-public class DefaultFileAuditWriter implements AuditLogWriter {
-  private static final Logger Log = LoggerFactory.getLogger(DefaultFileAuditWriter.class);
+public class FileAuditWriter implements AuditLogWriter {
+  private static final Logger Log = LoggerFactory.getLogger(FileAuditWriter.class);
+
+  public static final String LOG_FILE_NAME_CONFIG = "name";
+
+  public static final String FILE_IMMEDIATE_FLUSH_CONFIG = "immediateFlush";
 
   private Formatter formatter;
   private Writer outWriter;
@@ -55,8 +58,9 @@ public class DefaultFileAuditWriter implements AuditLogWriter {
   @Override
   public void init(Formatter formatter, Map<String, String> properties) {
     this.formatter = formatter;
-    fileName = properties.getOrDefault("file", Configs.AUDIT_LOG_FILE_WRITER_DEFAULT_FILE_NAME);
-    immediateFlush = Boolean.parseBoolean(properties.getOrDefault("immediateFlush", "false"));
+    fileName = properties.getOrDefault(LOG_FILE_NAME_CONFIG, "default_gravitino_audit_log");
+    immediateFlush =
+        Boolean.parseBoolean(properties.getOrDefault(FILE_IMMEDIATE_FLUSH_CONFIG, "false"));
     Preconditions.checkArgument(
         StringUtils.isNotBlank(fileName), "FileAuditWriter: fileName is not set in configuration.");
     try {
@@ -90,5 +94,10 @@ public class DefaultFileAuditWriter implements AuditLogWriter {
         Log.warn("Failed to close writer", e);
       }
     }
+  }
+
+  @Override
+  public String name() {
+    return "file";
   }
 }
