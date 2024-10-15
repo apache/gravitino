@@ -748,7 +748,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS);
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER);
 
     Map<String, String> newConfig = Maps.newHashMap(config);
     if (path == null) {

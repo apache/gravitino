@@ -50,7 +50,7 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    * 'file:/tmp/'. If there is no schema prefix, the default file system provider will be local file
    * system.
    */
-  public static final String DEFAULT_FS = "default-filesystem-provider";
+  public static final String DEFAULT_FS_PROVIDER = "default-filesystem-provider";
 
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -71,11 +71,11 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   null,
                   false /* hidden */))
           .put(
-              DEFAULT_FS,
+              DEFAULT_FS_PROVIDER,
               PropertyEntry.stringOptionalPropertyEntry(
-                  DEFAULT_FS,
-                  "Default file system URI, used to create the default file system "
-                      + "instance like hdfs:///, gs://bucket-name",
+                  DEFAULT_FS_PROVIDER,
+                  "Default file system provider, used to create the default file system "
+                      + "candidate value is 'local' or 'hdfs'",
                   false /* immutable */,
                   null,
                   false /* hidden */))
