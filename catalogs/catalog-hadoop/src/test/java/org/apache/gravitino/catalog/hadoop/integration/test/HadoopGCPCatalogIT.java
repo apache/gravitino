@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.hadoop.integration.test;
 
-import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS_CLASSNAMES;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -86,7 +86,8 @@ public class HadoopGCPCatalogIT extends HadoopCatalogIT {
     Map<String, String> map = Maps.newHashMap();
     map.put("gravitino.bypass.fs.gs.auth.service.account.enable", "true");
     map.put("gravitino.bypass.fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
-    map.put(FILESYSTEM_PROVIDERS, "org.apache.gravitino.fileset.gcs.GCSFileSystemProvider");
+    map.put(
+        FILESYSTEM_PROVIDERS_CLASSNAMES, "org.apache.gravitino.fileset.gcs.GCSFileSystemProvider");
 
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
 
