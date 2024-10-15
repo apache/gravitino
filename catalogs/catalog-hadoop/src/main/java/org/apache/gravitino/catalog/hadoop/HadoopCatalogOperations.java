@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -110,7 +112,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   public Configuration getHadoopConf() {
     Configuration configuration = new Configuration();
-    conf.forEach(configuration::set);
+    conf.forEach((k, v) -> configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v));
     return configuration;
   }
 
