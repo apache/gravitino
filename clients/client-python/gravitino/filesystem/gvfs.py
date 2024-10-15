@@ -148,7 +148,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             if options is None
             else options.get(
                 GVFSConfig.CACHE_EXPIRED_TIME, GVFSConfig.DEFAULT_CACHE_EXPIRED_TIME
-            test_gvfs_with_hdfs.py)
+            )
         )
         self._cache = TTLCache(maxsize=cache_size, ttl=cache_expired_time)
         self._cache_lock = rwlock.RWLockFair()
