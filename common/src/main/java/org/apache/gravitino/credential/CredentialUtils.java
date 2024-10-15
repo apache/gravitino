@@ -25,7 +25,12 @@ import java.util.Map;
  * Helper class to generate specific credential properties for different table format and engine.
  */
 public class CredentialUtils {
-  // Generate Iceberg specific properties for Spark, IcebergRESTServer, Flink, etc.
+  /**
+   * Transforms a specific credential into a map of Iceberg properties.
+   *
+   * @param credential the credential to be transformed into Iceberg properties
+   * @return a map of Iceberg properties derived from the credential
+   */
   public static Map<String, String> toIcebergProperties(Credential credential) {
     // todo: transform specific credential to iceberg properties
     return credential.toProperties();
