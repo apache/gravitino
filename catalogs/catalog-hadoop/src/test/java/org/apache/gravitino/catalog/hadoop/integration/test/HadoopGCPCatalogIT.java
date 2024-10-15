@@ -53,10 +53,8 @@ public class HadoopGCPCatalogIT extends HadoopCatalogIT {
     schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     Configuration conf = new Configuration();
 
-    conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
     conf.set("fs.gs.auth.service.account.enable", "true");
     conf.set("fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
-    conf.set("fs.defaultFS", "gs:///" + BUCKET_NAME);
     fileSystem = FileSystem.get(URI.create(String.format("gs://%s", BUCKET_NAME)), conf);
 
     createMetalake();
@@ -86,10 +84,8 @@ public class HadoopGCPCatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put("gravitino.bypass.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
     map.put("gravitino.bypass.fs.gs.auth.service.account.enable", "true");
     map.put("gravitino.bypass.fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
-    map.put("gravitino.bypass.fs.defaultFS", "gs://" + BUCKET_NAME);
     map.put(FILESYSTEM_PROVIDERS, "org.apache.gravitino.fileset.gcs.GCSFileSystemProvider");
 
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
