@@ -43,6 +43,7 @@ import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
@@ -91,7 +92,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
 
     this.catalogManager =
-        GravitinoCatalogManager.create(() -> createGravitinoClient(gravitinoUri, metalake, conf));
+        GravitinoCatalogManager.create(
+            () -> createGravitinoClient(gravitinoUri, metalake, conf, sc.sparkUser()));
     catalogManager.loadRelationalCatalogs();
     registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
     registerSqlExtensions(conf);
@@ -165,18 +167,15 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   }
 
   private static GravitinoClient createGravitinoClient(
-      String uri, String metalake, SparkConf sparkConf) {
+      String uri, String metalake, SparkConf sparkConf, String sparkUser) {
     ClientBuilder builder = GravitinoClient.builder(uri).withMetalake(metalake);
     String authType =
         sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
     if (AuthProperties.isSimple(authType)) {
-      String username =
-          getOptionalConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_SIMPLE_USER_NAME);
-      if (StringUtils.isNotBlank(username)) {
-        builder.withSimpleAuth(username.trim());
-      } else {
-        builder.withSimpleAuth();
-      }
+      Preconditions.checkArgument(
+          !UserGroupInformation.isSecurityEnabled(),
+          "Spark simple auth mode doesn't support setting kerberos configurations");
+      builder.withSimpleAuth(sparkUser);
     } else if (AuthProperties.isOAuth2(authType)) {
       String oAuthUri = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_OAUTH2_URI);
       String credential =
