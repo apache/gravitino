@@ -42,12 +42,12 @@ public class FileSystemUtils {
             : Sets.newHashSet();
 
     // Always add the built-in LocalFileSystemProvider and HDFSFileSystemProvider to the catalog.
-    providersInUses.add(LocalFileSystemProvider.class.getName());
-    providersInUses.add(HDFSFileSystemProvider.class.getName());
+    providersInUses.add(LocalFileSystemProvider.class.getSimpleName());
+    providersInUses.add(HDFSFileSystemProvider.class.getSimpleName());
 
     allFileSystemProviders.forEach(
         fileSystemProvider -> {
-          if (providersInUses.contains(fileSystemProvider.getClass().getName())) {
+          if (providersInUses.contains(fileSystemProvider.getClass().getSimpleName())) {
             if (resultMap.containsKey(fileSystemProvider.scheme())) {
               throw new UnsupportedOperationException(
                   String.format(

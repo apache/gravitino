@@ -40,8 +40,8 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   /**
    * The name of {@link FileSystemProvider} to be added to the catalog. Except built-in
    * FileSystemProvider like LocalFileSystemProvider and HDFSFileSystemProvider, users can add their
-   * own FileSystemProvider by specifying the provider name here. The value can be
-   * find {@link FileSystemProvider#name()}.
+   * own FileSystemProvider by specifying the provider name here. The value can be find {@link
+   * FileSystemProvider#name()}.
    */
   public static final String FILESYSTEM_PROVIDERS = "filesystem-providers";
 
