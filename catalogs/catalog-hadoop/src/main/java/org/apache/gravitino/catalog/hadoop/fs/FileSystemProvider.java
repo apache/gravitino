@@ -52,10 +52,18 @@ public interface FileSystemProvider {
       throws IOException;
 
   /**
-   * Get the scheme of this FileSystem provider. The value is 'file' for LocalFileSystem, 'hdfs' for
-   * HDFS, 's3a' for S3AFileSystem, etc.
+   * Scheme of this FileSystem provider. The value is 'file' for LocalFileSystem, 'hdfs' for HDFS,
+   * etc.
    *
-   * @return The scheme of this FileSystem provider.
+   * @return The scheme of this FileSystem provider used.
    */
-  String getScheme();
+  String scheme();
+
+  /**
+   * Name of this FileSystem provider. The value is 'LocalFileSystemProvider' for LocalFileSystem,
+   * 'HDFSFileSystemProvider' for HDFS, etc.
+   *
+   * @return The name of this FileSystem provider.
+   */
+  String name();
 }

@@ -41,7 +41,12 @@ public class LocalFileSystemProvider implements FileSystemProvider {
   }
 
   @Override
-  public String getScheme() {
+  public String scheme() {
     return "file";
+  }
+
+  @Override
+  public String name() {
+    return "LocalFileSystemProvider";
   }
 }

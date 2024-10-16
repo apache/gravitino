@@ -42,7 +42,12 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   }
 
   @Override
-  public String getScheme() {
+  public String scheme() {
     return "hdfs";
+  }
+
+  @Override
+  public String name() {
+    return "HDFSFileSystemProvider";
   }
 }
