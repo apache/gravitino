@@ -80,6 +80,12 @@ class IntegrationTestEnv(unittest.TestCase):
             )
             sys.exit(0)
 
+        # remove data dir under gravitino_home
+        data_dir = os.path.join(gravitino_home, "data")
+        if os.path.exists(data_dir):
+            logger.info("Remove Gravitino data directory: %s", data_dir)
+            subprocess.run(["rm", "-rf", data_dir], check=False)
+
         logger.info("Starting integration test environment...")
 
         # Start Gravitino Server

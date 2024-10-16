@@ -40,6 +40,7 @@ class TestCatalog(IntegrationTestEnv):
     metalake_name: str = "TestSchema_metalake" + str(randint(1, 10000))
 
     catalog_name: str = "testCatalog" + str(randint(1, 10000))
+    catalog_name_bak = catalog_name
     catalog_comment: str = "catalogComment"
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
     catalog_provider: str = "hadoop"
@@ -80,21 +81,25 @@ class TestCatalog(IntegrationTestEnv):
         )
         try:
             logger.info(
-                "Drop catalog %s[%s]",
+                "TestCatalog: drop catalog %s[%s]",
                 self.catalog_ident,
                 self.gravitino_client.drop_catalog(name=self.catalog_name),
             )
         except GravitinoRuntimeException:
-            logger.warning("Failed to drop catalog %s", self.catalog_name)
+            logger.warning("TestCatalog: failed to drop catalog %s", self.catalog_name)
 
         try:
             logger.info(
-                "Drop metalake %s[%s]",
+                "TestCatalog: drop metalake %s[%s]",
                 self.metalake_name,
                 self.gravitino_admin_client.drop_metalake(self.metalake_name),
             )
         except GravitinoRuntimeException:
-            logger.warning("Failed to drop metalake %s", self.metalake_name)
+            logger.warning(
+                "TestCatalog: failed to drop metalake %s", self.metalake_name
+            )
+
+        self.catalog_name = self.catalog_name_bak
 
     def test_list_catalogs(self):
         self.create_catalog(self.catalog_name)
@@ -102,6 +107,12 @@ class TestCatalog(IntegrationTestEnv):
         self.assertTrue(self.catalog_name in catalog_names)
 
     def test_create_catalog(self):
+        try:
+            self.gravitino_client.load_catalog(self.catalog_name)
+        except NoSuchCatalogException:
+            logger.info("TestCatalog: Catalog %s does not exist", self.catalog_name)
+
+        self.gravitino_client.load_catalog(self.catalog_name)
         catalog = self.create_catalog(self.catalog_name)
         self.assertEqual(catalog.name(), self.catalog_name)
         self.assertEqual(
