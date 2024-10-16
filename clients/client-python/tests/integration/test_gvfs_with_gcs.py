@@ -104,7 +104,6 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         arrow_gcs_fs = GcsFileSystem()
         cls.fs = ArrowFSWrapper(arrow_gcs_fs)
 
-
     def test_modified(self):
         modified_dir = self.fileset_gvfs_location + "/test_modified"
         modified_actual_dir = self.fileset_storage_location + "/test_modified"
