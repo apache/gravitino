@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_LOCAL_FS_PROVIDER;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import java.io.IOException;
@@ -47,6 +48,6 @@ public class LocalFileSystemProvider implements FileSystemProvider {
 
   @Override
   public String name() {
-    return "builtin-local";
+    return BUILTIN_LOCAL_FS_PROVIDER;
   }
 }

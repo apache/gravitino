@@ -36,14 +36,9 @@ class GravitinoVirtualFileSystemConfiguration {
   public static final String FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY = "fs.gravitino.client.authType";
 
   /**
-   * Full class name of file systems that implement {@link FileSystemProvider}` spilt by a comma.
-   *
-   * <p>This configuration is used to register file system providers to the gvfs file system. For
-   * example:
-   *
-   * <pre>
-   * XFileSystemProvider, FileSystemProvider
-   * </pre>
+   * File system provider names configuration key. The value is a comma separated list of file
+   * system provider name which is defined in the service loader. Users can custom their own file
+   * system by implementing the {@link FileSystemProvider} interface.
    */
   public static final String FS_FILESYSTEM_PROVIDERS = "fs.gvfs.filesystem.providers";
 

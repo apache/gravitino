@@ -18,8 +18,12 @@
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_HDFS_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_LOCAL_FS_PROVIDER;
+
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -42,28 +46,27 @@ public class FileSystemUtils {
                 .collect(java.util.stream.Collectors.toSet())
             : Sets.newHashSet();
 
-    // Only get the file system providers that are in the use list.
-    allFileSystemProviders.forEach(
-        fileSystemProvider -> {
-          if (providersInUses.contains(fileSystemProvider.name())) {
-            if (resultMap.containsKey(fileSystemProvider.scheme())) {
-              throw new UnsupportedOperationException(
-                  String.format(
-                      "File system provider with scheme '%s' already exists in the use provider list "
-                          + "Please make sure the file system provider scheme is unique.",
-                      fileSystemProvider.name()));
-            }
-            resultMap.put(fileSystemProvider.scheme(), fileSystemProvider);
-          }
-        });
+    // Add built-in file system providers to the use list automatically.
+    providersInUses.add(BUILTIN_LOCAL_FS_PROVIDER);
+    providersInUses.add(BUILTIN_HDFS_FS_PROVIDER);
 
-    // Always add the built-in LocalFileSystemProvider and HDFSFileSystemProvider to the catalog.
-    FileSystemProvider builtInLocalFileSystemProvider = new LocalFileSystemProvider();
-    FileSystemProvider builtInHDFSFileSystemProvider = new HDFSFileSystemProvider();
-    resultMap.put(builtInLocalFileSystemProvider.scheme(), builtInLocalFileSystemProvider);
-    resultMap.put(builtInHDFSFileSystemProvider.scheme(), builtInHDFSFileSystemProvider);
+    // Only get the file system providers that are in the user list and check if the scheme is
+    // unique.
+    Streams.stream(allFileSystemProviders.iterator())
+        .filter(fileSystemProvider -> providersInUses.contains(fileSystemProvider.name()))
+        .forEach(
+            fileSystemProvider -> {
+              if (resultMap.containsKey(fileSystemProvider.scheme())) {
+                throw new UnsupportedOperationException(
+                    String.format(
+                        "File system provider: '%s' with scheme '%s' already exists in the use provider list "
+                            + "Please make sure the file system provider scheme is unique.",
+                        fileSystemProvider.getClass().getName(), fileSystemProvider.scheme()));
+              }
+              resultMap.put(fileSystemProvider.scheme(), fileSystemProvider);
+            });
 
-    // If not all providersInUses was found, throw an exception.
+    // If not all file system providers in providersInUses was found, throw an exception.
     Set<String> notFoundProviders =
         Sets.difference(
                 providersInUses,
