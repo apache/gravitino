@@ -15,12 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import logging
 import os
 from random import randint
 
 from fsspec.implementations.arrow import ArrowFSWrapper
 from pyarrow.fs import GcsFileSystem
 
+from gravitino.exceptions.base import GravitinoRuntimeException
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
 from gravitino import (
     gvfs,
@@ -29,6 +31,7 @@ from gravitino import (
     Fileset,
 )
 
+logger = logging.getLogger(__name__)
 
 class TestGvfsWithGCS(TestGvfsWithHDFS):
     key_file = "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
@@ -46,7 +49,6 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         cls._get_gravitino_home()
 
         cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
-
         # append the hadoop conf to server
         # restart the server
         cls.restart_server()
@@ -60,6 +62,28 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         cls._reset_conf(cls.config, cls.hadoop_conf_path)
         # restart server
         cls.restart_server()
+
+
+    # clear all config in the conf_path
+    @classmethod
+    def _reset_conf(cls, config, conf_path):
+        logger.info("Reset %s.", conf_path)
+        if not os.path.exists(conf_path):
+            raise GravitinoRuntimeException(
+                f"Conf file is not found at `{conf_path}`.")
+        filtered_lines = []
+        with open(conf_path, mode="r", encoding="utf-8") as file:
+            origin_lines = file.readlines()
+
+        for line in origin_lines:
+            line = line.strip()
+            if line.startswith("#"):
+                # append annotations directly
+                filtered_lines.append(line + "\n")
+
+        with open(conf_path, mode="w", encoding="utf-8") as file:
+            for line in filtered_lines:
+                file.write(line)
 
     @classmethod
     def _init_test_entities(cls):
