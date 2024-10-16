@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.fileset.gcs;
+package org.apache.gravitino.gcs.fs;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import java.io.IOException;
@@ -39,7 +39,12 @@ public class GCSFileSystemProvider implements FileSystemProvider {
   }
 
   @Override
-  public String getScheme() {
+  public String scheme() {
     return "gs";
+  }
+
+  @Override
+  public String name() {
+    return "GCSFileSystemProvider";
   }
 }
