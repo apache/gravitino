@@ -23,6 +23,7 @@ from pyarrow.fs import GcsFileSystem
 
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
 from gravitino import (
+    gvfs,
     GravitinoClient,
     Catalog,
     Fileset,
