@@ -110,7 +110,10 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     resultConf.put("catalog_uuid", info.id().toString());
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
-    this.icebergCatalogWrapper = new IcebergCatalogWrapper(icebergConfig, false);
+    this.icebergCatalogWrapper =
+        new IcebergCatalogWrapper(
+            icebergConfig,
+            false /*Gravitino server will support credential vending in separate interface*/);
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
   }

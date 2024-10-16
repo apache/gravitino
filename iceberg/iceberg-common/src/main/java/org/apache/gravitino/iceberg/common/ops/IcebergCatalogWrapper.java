@@ -363,21 +363,21 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   private Map<String, String> vendCredentials(String location) {
     // ifPresentOrElse is not supported in Java8
-    if (credentialProvider.isPresent()) {
-      Map<String, String> configs = new HashMap<>(catalogConfigToClients);
-      // todo(fanng): check user privilege.
-      PathBasedCredentialContext pathBasedCredentialContext =
-          new PathBasedCredentialContext(
-              PrincipalUtils.getCurrentUserName(), ImmutableSet.of(location), ImmutableSet.of());
-      Credential credential = credentialProvider.get().getCredential(pathBasedCredentialContext);
-      configs.putAll(CredentialUtils.toIcebergProperties(credential));
-      return configs;
-    } else {
+    if (!credentialProvider.isPresent()) {
       throw new IllegalArgumentException(
           "Credential vending is not enabled, please set "
               + CredentialConstants.CREDENTIAL_TYPE
               + " to proper values");
     }
+
+    Map<String, String> configs = new HashMap<>(catalogConfigToClients);
+    // todo(fanng): check user privilege.
+    PathBasedCredentialContext pathBasedCredentialContext =
+        new PathBasedCredentialContext(
+            PrincipalUtils.getCurrentUserName(), ImmutableSet.of(location), ImmutableSet.of());
+    Credential credential = credentialProvider.get().getCredential(pathBasedCredentialContext);
+    configs.putAll(CredentialUtils.toIcebergProperties(credential));
+    return configs;
   }
 
   @Getter
