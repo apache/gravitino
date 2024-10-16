@@ -210,6 +210,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             logger.warning("Failed to drop metalake %s", cls.metalake_name)
 
     def test_simple_auth(self):
+        options = {"auth_type": "simple"}
         current_user = (
             None if os.environ.get("user.name") is None else os.environ["user.name"]
         )
@@ -218,7 +219,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs = gvfs.GravitinoVirtualFileSystem(
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
-            options=self.options,
+            options=options,
         )
         token = fs._client._rest_client.auth_data_provider.get_token_data()
         token_string = base64.b64decode(
