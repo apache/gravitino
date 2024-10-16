@@ -28,6 +28,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
 
@@ -198,6 +199,11 @@ public class ColumnEntity implements Entity, Auditable {
 
     public ColumnEntity build() {
       columnEntity.validate();
+
+      if (columnEntity.defaultValue == null) {
+        columnEntity.defaultValue = Column.DEFAULT_VALUE_NOT_SET;
+      }
+
       return columnEntity;
     }
   }

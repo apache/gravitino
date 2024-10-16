@@ -228,7 +228,7 @@ public class AbstractIT {
               new File(
                   gravitinoHome
                       + String.format(
-                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_6_0)),
+                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_7_0)),
               "UTF-8");
 
       String[] initMySQLBackendSqls =

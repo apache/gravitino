@@ -42,6 +42,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
@@ -69,6 +70,7 @@ import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -77,6 +79,8 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.relational.converters.H2ExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.MySQLExceptionConverter;
 import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
@@ -91,6 +95,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.org.apache.commons.lang3.tuple.Pair;
 
 @Tag("gravitino-docker-test")
 public class TestEntityStorage {
@@ -570,9 +575,19 @@ public class TestEntityStorage {
 
       SchemaEntity schema1 =
           createSchemaEntity(1L, Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+      ColumnEntity column1 =
+          createColumnEntity(
+              RandomIdGenerator.INSTANCE.nextId(), "column1", Types.StringType.get(), auditInfo);
+      ColumnEntity column2 =
+          createColumnEntity(
+              RandomIdGenerator.INSTANCE.nextId(), "column2", Types.StringType.get(), auditInfo);
       TableEntity table1 =
-          createTableEntity(
-              1L, Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+          createTableEntityWithColumns(
+              1L,
+              Namespace.of("metalake", "catalog", "schema1"),
+              "table1",
+              auditInfo,
+              Lists.newArrayList(column1, column2));
       FilesetEntity fileset1 =
           createFilesetEntity(
               1L, Namespace.of("metalake", "catalog", "schema1"), "fileset1", auditInfo);
@@ -582,9 +597,19 @@ public class TestEntityStorage {
 
       SchemaEntity schema2 =
           createSchemaEntity(2L, Namespace.of("metalake", "catalog"), "schema2", auditInfo);
+      ColumnEntity column3 =
+          createColumnEntity(
+              RandomIdGenerator.INSTANCE.nextId(), "column3", Types.StringType.get(), auditInfo);
+      ColumnEntity column4 =
+          createColumnEntity(
+              RandomIdGenerator.INSTANCE.nextId(), "column4", Types.StringType.get(), auditInfo);
       TableEntity table1InSchema2 =
-          createTableEntity(
-              2L, Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
+          createTableEntityWithColumns(
+              2L,
+              Namespace.of("metalake", "catalog", "schema2"),
+              "table1",
+              auditInfo,
+              Lists.newArrayList(column3, column4));
       FilesetEntity fileset1InSchema2 =
           createFilesetEntity(
               2L, Namespace.of("metalake", "catalog", "schema2"), "fileset1", auditInfo);
@@ -705,18 +730,20 @@ public class TestEntityStorage {
       store.put(schema2New);
       // table
       TableEntity table1New =
-          createTableEntity(
+          createTableEntityWithColumns(
               RandomIdGenerator.INSTANCE.nextId(),
               table1.namespace(),
               table1.name(),
-              table1.auditInfo());
+              table1.auditInfo(),
+              table1.columns());
       store.put(table1New);
       TableEntity table1InSchema2New =
-          createTableEntity(
+          createTableEntityWithColumns(
               RandomIdGenerator.INSTANCE.nextId(),
               table1InSchema2.namespace(),
               table1InSchema2.name(),
-              table1InSchema2.auditInfo());
+              table1InSchema2.auditInfo(),
+              table1InSchema2.columns());
       store.put(table1InSchema2New);
       // fileset
       FilesetEntity fileset1New =
@@ -1228,13 +1255,32 @@ public class TestEntityStorage {
         .build();
   }
 
+  public static ColumnEntity createColumnEntity(
+      Long id, String name, Type dataType, AuditInfo auditInfo) {
+    return ColumnEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withComment("")
+        .withDataType(dataType)
+        .withNullable(true)
+        .withAutoIncrement(false)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
   public static TableEntity createTableEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    return createTableEntityWithColumns(id, namespace, name, auditInfo, Collections.emptyList());
+  }
+
+  public static TableEntity createTableEntityWithColumns(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo, List<ColumnEntity> columns) {
     return TableEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
+        .withColumns(columns)
         .build();
   }
 
@@ -1325,6 +1371,7 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.exists(table1.nameIdentifier(), Entity.EntityType.TABLE));
     // Delete again should return false
     Assertions.assertFalse(store.delete(table1.nameIdentifier(), Entity.EntityType.TABLE, true));
+    validateDeletedColumns(table1.id(), table1.type());
   }
 
   private void validateDeleteFileset(
@@ -1391,6 +1438,7 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.exists(userNew.nameIdentifier(), Entity.EntityType.USER));
     Assertions.assertFalse(store.exists(groupNew.nameIdentifier(), EntityType.GROUP));
     Assertions.assertFalse(store.exists(roleNew.nameIdentifier(), EntityType.ROLE));
+    validateDeletedColumns(metalake.id(), metalake.type());
 
     // Delete again should return false
     Assertions.assertFalse(
@@ -1407,6 +1455,7 @@ public class TestEntityStorage {
     Assertions.assertThrowsExactly(
         NoSuchEntityException.class,
         () -> store.get(id, Entity.EntityType.CATALOG, CatalogEntity.class));
+    validateDeletedColumns(catalog.id(), catalog.type());
 
     Assertions.assertThrowsExactly(
         NoSuchEntityException.class,
@@ -1423,11 +1472,12 @@ public class TestEntityStorage {
       TopicEntity topic1)
       throws IOException {
     TableEntity table1New =
-        createTableEntity(
+        createTableEntityWithColumns(
             RandomIdGenerator.INSTANCE.nextId(),
             table1.namespace(),
             table1.name(),
-            table1.auditInfo());
+            table1.auditInfo(),
+            table1.columns());
     store.put(table1New);
     FilesetEntity fileset1New =
         createFilesetEntity(
@@ -1464,6 +1514,9 @@ public class TestEntityStorage {
       Assertions.assertTrue(e instanceof NoSuchEntityException);
       Assertions.assertTrue(e.getMessage().contains("schema1"));
     }
+
+    validateDeletedColumns(schema1.id(), schema1.type());
+
     // Delete again should return false
     Assertions.assertFalse(store.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA, true));
 
@@ -1476,7 +1529,7 @@ public class TestEntityStorage {
         () -> store.get(topic1.nameIdentifier(), Entity.EntityType.TOPIC, TopicEntity.class));
   }
 
-  private static void validateDeleteMetalake(
+  private void validateDeleteMetalake(
       EntityStore store,
       BaseMetalake metalake,
       CatalogEntity catalogCopy,
@@ -1504,7 +1557,7 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
   }
 
-  private static void validateDeleteCatalog(
+  private void validateDeleteCatalog(
       EntityStore store,
       CatalogEntity catalog,
       TableEntity table1,
@@ -1521,6 +1574,7 @@ public class TestEntityStorage {
         NonEmptyEntityException.class,
         () -> store.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     store.delete(table1.nameIdentifier(), Entity.EntityType.TABLE);
+    validateDeletedColumns(table1.id(), table1.type());
     store.delete(fileset1.nameIdentifier(), Entity.EntityType.FILESET);
     store.delete(topic1.nameIdentifier(), Entity.EntityType.TOPIC);
     try {
@@ -1530,6 +1584,7 @@ public class TestEntityStorage {
     }
     store.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA);
     store.delete(table1InSchema2.nameIdentifier(), Entity.EntityType.TABLE);
+    validateDeletedColumns(table1InSchema2.id(), table1InSchema2.type());
     Assertions.assertFalse(
         store.exists(fileset1InSchema2.nameIdentifier(), Entity.EntityType.FILESET));
     Assertions.assertFalse(store.exists(topic1InSchema2.nameIdentifier(), Entity.EntityType.TOPIC));
@@ -1541,7 +1596,7 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
   }
 
-  private static void validateDeleteSchema(
+  private void validateDeleteSchema(
       EntityStore store,
       SchemaEntity schema1,
       TableEntity table1,
@@ -1559,11 +1614,13 @@ public class TestEntityStorage {
     // has not been deleted yet;
     Assertions.assertTrue(store.exists(schema1.nameIdentifier(), Entity.EntityType.SCHEMA));
     Assertions.assertTrue(store.exists(table1.nameIdentifier(), Entity.EntityType.TABLE));
+    ;
     Assertions.assertTrue(store.exists(fileset1.nameIdentifier(), Entity.EntityType.FILESET));
     Assertions.assertTrue(store.exists(topic1.nameIdentifier(), Entity.EntityType.TOPIC));
 
     // Delete table1,fileset1 and schema1
     Assertions.assertTrue(store.delete(table1.nameIdentifier(), Entity.EntityType.TABLE));
+    validateDeletedColumns(table1.id(), table1.type());
     Assertions.assertTrue(store.delete(fileset1.nameIdentifier(), Entity.EntityType.FILESET));
     Assertions.assertTrue(store.delete(topic1.nameIdentifier(), Entity.EntityType.TOPIC));
     Assertions.assertTrue(store.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA));
@@ -1667,19 +1724,23 @@ public class TestEntityStorage {
     // delete again should return false
     Assertions.assertFalse(store.delete(table1InSchema2.nameIdentifier(), Entity.EntityType.TABLE));
 
+    // Make sure all columns are deleted
+    validateDeletedColumns(table1InSchema2.id(), table1InSchema2.type());
+
     // Make sure table 'metalake.catalog.schema1.table1' still exist;
     Assertions.assertEquals(
         table1, store.get(table1.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class));
     // Make sure schema 'metalake.catalog.schema2' still exist;
     Assertions.assertEquals(
         schema2, store.get(schema2.nameIdentifier(), Entity.EntityType.SCHEMA, SchemaEntity.class));
-    // Re-insert table1Inschema2 and everything is OK
+    // Re-insert table1InSchema2 and everything is OK
     TableEntity table1InSchema2New =
-        createTableEntity(
+        createTableEntityWithColumns(
             RandomIdGenerator.INSTANCE.nextId(),
             table1InSchema2.namespace(),
             table1InSchema2.name(),
-            table1InSchema2.auditInfo());
+            table1InSchema2.auditInfo(),
+            table1InSchema2.columns());
     store.put(table1InSchema2New);
     Assertions.assertTrue(store.exists(table1InSchema2.nameIdentifier(), Entity.EntityType.TABLE));
   }
@@ -2134,6 +2195,55 @@ public class TestEntityStorage {
                 TableEntity.class,
                 Entity.EntityType.TABLE,
                 (e) -> e));
+  }
+
+  private List<Pair<Long, Pair<Long, Long>>> listAllColumnWithEntityId(
+      Long entityId, Entity.EntityType entityType) {
+    String queryTemp =
+        "SELECT column_id, table_version, deleted_at FROM "
+            + "table_column_version_info WHERE %s = %d";
+    String query;
+    switch (entityType) {
+      case TABLE:
+        query = String.format(queryTemp, "table_id", entityId);
+        break;
+      case SCHEMA:
+        query = String.format(queryTemp, "schema_id", entityId);
+        break;
+      case CATALOG:
+        query = String.format(queryTemp, "catalog_id", entityId);
+        break;
+      case METALAKE:
+        query = String.format(queryTemp, "metalake_id", entityId);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported entity type: " + entityType);
+    }
+
+    List<Pair<Long, Pair<Long, Long>>> results = Lists.newArrayList();
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      Connection connection = sqlSession.getConnection();
+      Statement statement = connection.createStatement();
+
+      ResultSet rs = statement.executeQuery(query);
+      while (rs.next()) {
+        results.add(
+            Pair.of(
+                rs.getLong("column_id"),
+                Pair.of(rs.getLong("table_version"), rs.getLong("deleted_at"))));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+
+    return results;
+  }
+
+  private void validateDeletedColumns(Long entityId, Entity.EntityType entityType) {
+    List<Pair<Long, Pair<Long, Long>>> deleteResult =
+        listAllColumnWithEntityId(entityId, entityType);
+    deleteResult.forEach(p -> Assertions.assertTrue(p.getRight().getRight() > 0));
   }
 
   @ParameterizedTest

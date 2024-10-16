@@ -110,7 +110,7 @@ public class TestPartitionEvent {
   void testAddPartitionEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
     dispatcher.addPartition(identifier, partition);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AddPartitionEvent.class, event.getClass());
     PartitionInfo partitionInfo = ((AddPartitionEvent) event).createdPartitionInfo();
@@ -121,7 +121,7 @@ public class TestPartitionEvent {
   void testDropPartitionEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
     dispatcher.dropPartition(identifier, partition.name());
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropPartitionEvent.class, event.getClass());
     Assertions.assertEquals(false, ((DropPartitionEvent) event).isExists());
@@ -131,7 +131,7 @@ public class TestPartitionEvent {
   void testPartitionExistsEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
     dispatcher.partitionExists(identifier, partition.name());
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(PartitionExistsEvent.class, event.getClass());
     Assertions.assertEquals(false, ((PartitionExistsEvent) event).isExists());
@@ -141,7 +141,7 @@ public class TestPartitionEvent {
   void testListPartitionEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
     dispatcher.listPartitions(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(ListPartitionEvent.class, event.getClass());
     Assertions.assertEquals(identifier, ((ListPartitionEvent) event).identifier());
@@ -151,7 +151,7 @@ public class TestPartitionEvent {
   void testListPartitionNamesEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
     dispatcher.listPartitionNames(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(ListPartitionNamesEvent.class, event.getClass());
     Assertions.assertEquals(identifier, ((ListPartitionNamesEvent) event).identifier());
@@ -161,7 +161,7 @@ public class TestPartitionEvent {
   void testPurgePartitionEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
     dispatcher.purgePartition(identifier, partition.name());
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(PurgePartitionEvent.class, event.getClass());
     Assertions.assertEquals(identifier, ((PurgePartitionEvent) event).identifier());
@@ -173,7 +173,7 @@ public class TestPartitionEvent {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () -> failureDispatcher.addPartition(identifier, partition));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(AddPartitionFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((AddPartitionFailureEvent) event).exception().getClass());
@@ -187,7 +187,7 @@ public class TestPartitionEvent {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () -> failureDispatcher.dropPartition(identifier, partition.name()));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(DropPartitionFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
@@ -201,7 +201,7 @@ public class TestPartitionEvent {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () -> failureDispatcher.partitionExists(identifier, partition.name()));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(PartitionExistsFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
@@ -214,7 +214,7 @@ public class TestPartitionEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listPartitions(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(ListPartitionFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
@@ -227,7 +227,7 @@ public class TestPartitionEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", "table");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listPartitionNames(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(ListPartitionNamesFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
@@ -241,7 +241,7 @@ public class TestPartitionEvent {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () -> failureDispatcher.purgePartition(identifier, partition.name()));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(PurgePartitionFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
