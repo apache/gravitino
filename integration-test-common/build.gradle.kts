@@ -27,7 +27,7 @@ repositories {
 
 dependencies {
   testImplementation(project(":api"))
-  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":clients:client-java", configuration = "shadow"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
   testImplementation(project(":server"))
