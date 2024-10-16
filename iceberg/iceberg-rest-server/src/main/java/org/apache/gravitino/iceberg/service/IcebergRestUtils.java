@@ -32,6 +32,7 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 
@@ -112,6 +113,22 @@ public class IcebergRestUtils {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static NameIdentifier getGravitinoNameIdentifier(String catalogName, Namespace namespace) {
+    Stream<String> catalogNS =
+        Stream.concat(Stream.of(catalogName), Arrays.stream(namespace.levels()));
+    return NameIdentifier.of(catalogNS.toArray(String[]::new));
+  }
+
+  public static NameIdentifier getGravitinoNameIdentifier(
+      String catalogName, TableIdentifier icebergIdentifier) {
+    Stream<String> catalogNS =
+        Stream.concat(
+            Stream.of(catalogName), Arrays.stream(icebergIdentifier.namespace().levels()));
+    String[] catalogNSTable =
+        Stream.concat(catalogNS, Stream.of(icebergIdentifier.name())).toArray(String[]::new);
+    return NameIdentifier.of(catalogNSTable);
   }
 
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to

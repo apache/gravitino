@@ -20,7 +20,10 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /**
@@ -28,6 +31,7 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
  * tables.
  */
 public interface IcebergTableOperationDispatcher {
+
   /**
    * Creates a new Iceberg table.
    *
@@ -38,4 +42,51 @@ public interface IcebergTableOperationDispatcher {
    */
   LoadTableResponse createTable(
       String catalogName, Namespace namespace, CreateTableRequest createTableRequest);
+
+  /**
+   * Updates a new Iceberg table.
+   *
+   * @param catalogName The catalog name when updating the table.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param updateTableRequest The request object containing the details for updating the table.
+   * @return A {@link LoadTableResponse} object containing the result of the operation.
+   */
+  LoadTableResponse updateTable(
+      String catalogName, TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest);
+
+  /**
+   * Drops a new Iceberg table.
+   *
+   * @param catalogName The catalog name when dropping the table.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param purgeRequested Whether to purge the table.
+   */
+  void dropTable(String catalogName, TableIdentifier tableIdentifier, boolean purgeRequested);
+
+  /**
+   * Loads a new Iceberg table.
+   *
+   * @param catalogName The catalog name when dropping the table.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @return A {@link LoadTableResponse} object containing the result of the operation.
+   */
+  LoadTableResponse loadTable(String catalogName, TableIdentifier tableIdentifier);
+
+  /**
+   * Lists Iceberg tables.
+   *
+   * @param catalogName The catalog name when dropping the table.
+   * @param namespace The Iceberg namespace.
+   * @return A {@link ListTablesResponse} object containing the list of table identifiers.
+   */
+  ListTablesResponse listTable(String catalogName, Namespace namespace);
+
+  /**
+   * Check whether Iceberg table exists.
+   *
+   * @param catalogName The catalog name when dropping the table.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @return Whether table exists.
+   */
+  boolean tableExists(String catalogName, TableIdentifier tableIdentifier);
 }
