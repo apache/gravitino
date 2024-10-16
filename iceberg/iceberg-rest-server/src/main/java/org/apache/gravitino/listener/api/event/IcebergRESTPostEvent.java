@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an abstract post event in Gravitino Iceberg REST server. */
 @DeveloperApi
 public abstract class IcebergRESTPostEvent extends Event {
-  public IcebergRESTPostEvent(String user, NameIdentifier resourceIdentifier) {
+  protected IcebergRESTPostEvent(String user, NameIdentifier resourceIdentifier) {
     super(user, resourceIdentifier);
   }
 }

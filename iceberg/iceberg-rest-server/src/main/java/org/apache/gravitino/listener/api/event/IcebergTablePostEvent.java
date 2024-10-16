@@ -23,7 +23,7 @@ import org.apache.gravitino.NameIdentifier;
 
 /** Represents an abstract table post event in Gravitino Iceberg REST server. */
 public abstract class IcebergTablePostEvent extends IcebergRESTPostEvent {
-  public IcebergTablePostEvent(String user, NameIdentifier resourceIdentifier) {
+  protected IcebergTablePostEvent(String user, NameIdentifier resourceIdentifier) {
     super(user, resourceIdentifier);
   }
 }
