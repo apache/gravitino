@@ -86,7 +86,7 @@ public class HadoopGCPCatalogIT extends HadoopCatalogIT {
     Map<String, String> map = Maps.newHashMap();
     map.put("gravitino.bypass.fs.gs.auth.service.account.enable", "true");
     map.put("gravitino.bypass.fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
-    map.put(FILESYSTEM_PROVIDERS, "GCSFileSystemProvider");
+    map.put(FILESYSTEM_PROVIDERS, "gcs");
 
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
 

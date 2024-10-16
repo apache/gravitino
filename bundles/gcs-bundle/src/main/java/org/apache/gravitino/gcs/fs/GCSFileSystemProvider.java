@@ -45,6 +45,6 @@ public class GCSFileSystemProvider implements FileSystemProvider {
 
   @Override
   public String name() {
-    return "GCSFileSystemProvider";
+    return "gcs";
   }
 }
