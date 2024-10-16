@@ -20,8 +20,12 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /**
@@ -42,5 +46,38 @@ public class IcebergTableOperationProcessor implements IcebergTableOperationDisp
     return icebergCatalogWrapperManager
         .getCatalogWrapper(catalogName)
         .createTable(RESTUtil.decodeNamespace(namespace), createTableRequest);
+  }
+
+  @Override
+  public LoadTableResponse updateTable(
+      String catalogName, TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
+    return icebergCatalogWrapperManager
+        .getCatalogWrapper(catalogName)
+        .updateTable(tableIdentifier, updateTableRequest);
+  }
+
+  @Override
+  public void dropTable(
+      String catalogName, TableIdentifier tableIdentifier, boolean purgeRequested) {
+    if (purgeRequested) {
+      icebergCatalogWrapperManager.getCatalogWrapper(catalogName).purgeTable(tableIdentifier);
+    } else {
+      icebergCatalogWrapperManager.getCatalogWrapper(catalogName).dropTable(tableIdentifier);
+    }
+  }
+
+  @Override
+  public LoadTableResponse loadTable(String catalogName, TableIdentifier tableIdentifier) {
+    return icebergCatalogWrapperManager.getCatalogWrapper(catalogName).loadTable(tableIdentifier);
+  }
+
+  @Override
+  public ListTablesResponse listTable(String catalogName, Namespace namespace) {
+    return icebergCatalogWrapperManager.getCatalogWrapper(catalogName).listTable(namespace);
+  }
+
+  @Override
+  public boolean tableExists(String catalogName, TableIdentifier tableIdentifier) {
+    return icebergCatalogWrapperManager.getCatalogWrapper(catalogName).tableExists(tableIdentifier);
   }
 }

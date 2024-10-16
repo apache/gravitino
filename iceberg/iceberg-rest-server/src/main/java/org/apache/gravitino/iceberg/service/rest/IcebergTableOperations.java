@@ -43,6 +43,7 @@ import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -86,6 +87,9 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "list-table", absolute = true)
   public Response listTable(
       @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    LOG.info("List Iceberg tables, catalog:{}, namespace: {}", catalogName, icebergNS);
     return IcebergRestUtils.ok(
         icebergCatalogWrapperManager.getOps(prefix).listTable(RESTUtil.decodeNamespace(namespace)));
   }
@@ -119,19 +123,20 @@ public class IcebergTableOperations {
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       UpdateTableRequest updateTableRequest) {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     if (LOG.isInfoEnabled()) {
       LOG.info(
-          "Update Iceberg table, namespace: {}, table: {}, updateTableRequest: {}",
-          namespace,
+          "Update Iceberg table, catalog:{}, namespace: {}, table: {}, updateTableRequest: {}",
+          catalogName,
+          icebergNS,
           table,
           SerializeUpdateTableRequest(updateTableRequest));
     }
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    return IcebergRestUtils.ok(
-        icebergCatalogWrapperManager
-            .getOps(prefix)
-            .updateTable(tableIdentifier, updateTableRequest));
+    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+    LoadTableResponse loadTableResponse =
+        tableOperationDispatcher.updateTable(catalogName, tableIdentifier, updateTableRequest);
+    return IcebergRestUtils.ok(loadTableResponse);
   }
 
   @DELETE
@@ -144,18 +149,16 @@ public class IcebergTableOperations {
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested) {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Drop Iceberg table, namespace: {}, table: {}, purgeRequested: {}",
-        namespace,
+        "Drop Iceberg table, catalog:{}, namespace: {}, table: {}, purgeRequested: {}",
+        catalogName,
+        icebergNS,
         table,
         purgeRequested);
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    if (purgeRequested) {
-      icebergCatalogWrapperManager.getOps(prefix).purgeTable(tableIdentifier);
-    } else {
-      icebergCatalogWrapperManager.getOps(prefix).dropTable(tableIdentifier);
-    }
+    TableIdentifier tableIdentifier = TableIdentifier.of(namespace, table);
+    tableOperationDispatcher.dropTable(catalogName, tableIdentifier, purgeRequested);
     return IcebergRestUtils.noContent();
   }
 
@@ -169,11 +172,17 @@ public class IcebergTableOperations {
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       @DefaultValue("all") @QueryParam("snapshots") String snapshots) {
-    // todo support snapshots
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    return IcebergRestUtils.ok(
-        icebergCatalogWrapperManager.getOps(prefix).loadTable(tableIdentifier));
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    LOG.info(
+        "Load Iceberg table, catalog:{}, namespace: {}, table: {}, purgeRequested: {}",
+        catalogName,
+        icebergNS,
+        table);
+    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+    LoadTableResponse loadTableResponse =
+        tableOperationDispatcher.loadTable(catalogName, tableIdentifier);
+    return IcebergRestUtils.ok(loadTableResponse);
   }
 
   @HEAD
