@@ -179,6 +179,26 @@ As dealing with one Metalake is a typical scenario, you can set the Metalake nam
 
 The command line option overrides the other options and the environment variable overrides the value in the configuration file.
 
+Once the metalake name is set via one of the preceding methods, if no longer needs to be specified in the command line.
+
+Show Metalake details
+
+```bash
+gcli metalake details
+```
+
+List all Catalogs in a Metalake
+
+```bash
+gcli metalake list
+```
+
+List catalog schemas
+
+```bash
+gcli catalog list --name catalog_iceberg
+```
+
 ## Running Tests
 
 This project includes a suite of unit tests to verify its functionality.
