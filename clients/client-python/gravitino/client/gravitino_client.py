@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import logging
 from typing import List, Dict
 
 from gravitino.api.catalog import Catalog
@@ -24,7 +23,6 @@ from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 
-logger = logging.getLogger(__name__)
 
 class GravitinoClient(GravitinoClientBase):
     """Gravitino Client for a user to interact with the Gravitino API, allowing the client to list,
@@ -84,14 +82,6 @@ class GravitinoClient(GravitinoClientBase):
         comment: str,
         properties: Dict[str, str],
     ) -> Catalog:
-        logger.info(
-            "Creating catalog %s with type %s, provider %s, comment %s, properties %s",
-            name,
-            catalog_type,
-            provider,
-            comment,
-            properties,
-        )
         return self.get_metalake().create_catalog(
             name, catalog_type, provider, comment, properties
         )

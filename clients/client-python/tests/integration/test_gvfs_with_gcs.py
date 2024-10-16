@@ -35,9 +35,11 @@ from gravitino.exceptions.base import GravitinoRuntimeException
 
 logger = logging.getLogger(__name__)
 
+
+@unittest.skip("This test require GCS service account key file")
 class TestGvfsWithGCS(TestGvfsWithHDFS):
-    key_file = "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
-    bucket_name = "example_qazwsx"
+    key_file = "your_key_file.json"
+    bucket_name = "your_bucket_name"
     metalake_name: str = "TestGvfsWithGCS_metalake" + str(randint(1, 10000))
 
     def setUp(self):
@@ -65,14 +67,12 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         # restart server
         cls.restart_server()
 
-
     # clear all config in the conf_path
     @classmethod
     def _reset_conf(cls, config, conf_path):
         logger.info("Reset %s.", conf_path)
         if not os.path.exists(conf_path):
-            raise GravitinoRuntimeException(
-                f"Conf file is not found at `{conf_path}`.")
+            raise GravitinoRuntimeException(f"Conf file is not found at `{conf_path}`.")
         filtered_lines = []
         with open(conf_path, mode="r", encoding="utf-8") as file:
             origin_lines = file.readlines()
