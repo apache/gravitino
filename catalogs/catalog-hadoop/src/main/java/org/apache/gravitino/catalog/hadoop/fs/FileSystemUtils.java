@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class FileSystemUtils {
 
@@ -40,13 +41,11 @@ public class FileSystemUtils {
                 .map(String::trim)
                 .collect(java.util.stream.Collectors.toSet())
             : Sets.newHashSet();
-    // Always add the built-in LocalFileSystemProvider and HDFSFileSystemProvider to the catalog.
-    providersInUses.add(LocalFileSystemProvider.class.getSimpleName());
-    providersInUses.add(HDFSFileSystemProvider.class.getSimpleName());
 
+    // Only get the file system providers that are in the use list.
     allFileSystemProviders.forEach(
         fileSystemProvider -> {
-          if (providersInUses.contains(fileSystemProvider.getClass().getSimpleName())) {
+          if (providersInUses.contains(fileSystemProvider.name())) {
             if (resultMap.containsKey(fileSystemProvider.scheme())) {
               throw new UnsupportedOperationException(
                   String.format(
@@ -54,10 +53,31 @@ public class FileSystemUtils {
                           + "Please make sure the file system provider scheme is unique.",
                       fileSystemProvider.name()));
             }
-
             resultMap.put(fileSystemProvider.scheme(), fileSystemProvider);
           }
         });
+
+    // Always add the built-in LocalFileSystemProvider and HDFSFileSystemProvider to the catalog.
+    FileSystemProvider builtInLocalFileSystemProvider = new LocalFileSystemProvider();
+    FileSystemProvider builtInHDFSFileSystemProvider = new HDFSFileSystemProvider();
+    resultMap.put(builtInLocalFileSystemProvider.scheme(), builtInLocalFileSystemProvider);
+    resultMap.put(builtInHDFSFileSystemProvider.scheme(), builtInHDFSFileSystemProvider);
+
+    // If not all providersInUses was found, throw an exception.
+    Set<String> notFoundProviders =
+        Sets.difference(
+                providersInUses,
+                resultMap.values().stream()
+                    .map(FileSystemProvider::name)
+                    .collect(Collectors.toSet()))
+            .immutableCopy();
+    if (!notFoundProviders.isEmpty()) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "File system providers %s not found in the classpath. Please make sure the file system "
+                  + "provider is in the classpath.",
+              notFoundProviders));
+    }
 
     return resultMap;
   }

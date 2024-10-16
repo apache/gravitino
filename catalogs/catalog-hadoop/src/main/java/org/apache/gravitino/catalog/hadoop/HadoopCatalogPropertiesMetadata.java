@@ -76,7 +76,7 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   DEFAULT_FS_PROVIDER,
                   "Default file system provider name",
                   false /* immutable */,
-                  LocalFileSystemProvider.class.getSimpleName(),
+                  "builtin-local", // please see LocalFileSystemProvider#name()
                   false /* hidden */))
           // The following two are about authentication.
           .putAll(KERBEROS_PROPERTY_ENTRIES)
