@@ -390,7 +390,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
         rm_file = self.fileset_gvfs_location + "/test_rm/test.file"
         rm_actual_file = self.fileset_storage_location + "/test_rm/test.file"
-        self.fs.touch(rm_file)
+        fs.touch(rm_file)
         self.assertTrue(self.fs.exists(rm_actual_file))
         self.assertTrue(fs.exists(rm_file))
 
@@ -639,6 +639,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         with self.assertRaises(GravitinoRuntimeException):
             fs.get_file(get_file, remote_path)
 
+    @unittest.skip(
+        "This test will fail for https://github.com/apache/arrow/issues/44438"
+    )
     def test_pandas(self):
         pands_dir = self.fileset_gvfs_location + "/test_pandas"
         pands_actual_dir = self.fileset_storage_location + "/test_pandas"
@@ -668,7 +671,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         storage_options = {
             "server_uri": "http://localhost:8090",
             "metalake_name": self.metalake_name,
-            "options": self.options
+            "options": self.options,
         }
         # to csv
         csv_file = self.fileset_gvfs_location + "/test_pandas/test.csv"
@@ -685,6 +688,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         ds2 = pandas.read_csv(csv_file, storage_options=storage_options)
         self.assertTrue(data.equals(ds2))
 
+    @unittest.skip(
+        "This test will fail for https://github.com/apache/arrow/issues/44438"
+    )
     def test_pyarrow(self):
         pyarrow_dir = self.fileset_gvfs_location + "/test_pyarrow"
         pyarrow_actual_dir = self.fileset_storage_location + "/test_pyarrow"

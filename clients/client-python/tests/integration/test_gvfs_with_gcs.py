@@ -16,6 +16,7 @@
 # under the License.
 
 import os
+from random import randint
 
 from fsspec.implementations.arrow import ArrowFSWrapper
 from pyarrow.fs import GcsFileSystem
@@ -31,6 +32,7 @@ from gravitino import (
 class TestGvfsWithGCS(TestGvfsWithHDFS):
     key_file = "/home/ec2-user/silken-physics-431108-g3-30ab3d97bb60.json"
     bucket_name = "example_qazwsx"
+    metalake_name: str = "TestGvfsWithGCS_metalake" + str(randint(1, 10000))
 
     def setUp(self):
         self.options = {"gravitino.bypass.gcs.service-account-key-path": self.key_file}

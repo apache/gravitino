@@ -141,6 +141,12 @@ class IntegrationTestEnv(unittest.TestCase):
                 "project root directory."
             )
 
+        # remove data dir under gravitino_home
+        data_dir = os.path.join(gravitino_home, "data")
+        if os.path.exists(data_dir):
+            logger.info("Remove Gravitino data directory: %s", data_dir)
+            subprocess.run(["rm", "-rf", data_dir], check=False)
+
         # Restart Gravitino Server
         env_vars = os.environ.copy()
         env_vars["HADOOP_USER_NAME"] = "anonymous"

@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 class TestCatalog(IntegrationTestEnv):
     metalake_name: str = "TestSchema_metalake" + str(randint(1, 10000))
 
-    catalog_name: str = "testCatalog"
+    catalog_name: str = "testCatalog" + str(randint(1, 10000))
     catalog_comment: str = "catalogComment"
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
     catalog_provider: str = "hadoop"
