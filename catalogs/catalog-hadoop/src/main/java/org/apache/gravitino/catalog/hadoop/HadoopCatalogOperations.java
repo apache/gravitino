@@ -72,7 +72,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
-  private static final String LOCAL_FILE_SCHEME = "file";
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
@@ -92,7 +91,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
 
-  private String defaultFileSystemProviderScheme;
+  private FileSystemProvider defaultFileSystemProvider;
 
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
@@ -133,21 +132,17 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(
-                    config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS_CLASSNAMES);
-    FileSystemUtils.initFileSystemProviders(fileSystemProviders, fileSystemProvidersMap);
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
+    this.fileSystemProvidersMap.putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders));
 
-    String defaultFileSystemProviderClassName =
+    String defaultFileSystemProviderName =
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(
-                    config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER_CLASSNAME);
-    this.defaultFileSystemProviderScheme =
-        StringUtils.isNotBlank(defaultFileSystemProviderClassName)
-            ? FileSystemUtils.getSchemeByFileSystemProvider(
-                defaultFileSystemProviderClassName, fileSystemProvidersMap)
-            : LOCAL_FILE_SCHEME;
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER);
+    this.defaultFileSystemProvider =
+        FileSystemUtils.getFileSystemProviderByName(
+            fileSystemProvidersMap, defaultFileSystemProviderName);
 
     String catalogLocation =
         (String)
@@ -766,14 +761,14 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     String scheme =
         path.toUri().getScheme() != null
             ? path.toUri().getScheme()
-            : defaultFileSystemProviderScheme;
+            : defaultFileSystemProvider.scheme();
 
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     if (provider == null) {
       throw new IllegalArgumentException(
           String.format(
-              "Unsupported scheme: %s, path: %s, all supported scheme: %s",
-              scheme, path, fileSystemProvidersMap.keySet()));
+              "Unsupported scheme: %s, path: %s, all supported scheme: %s and provider: %s",
+              scheme, path, fileSystemProvidersMap.keySet(), fileSystemProvidersMap.values()));
     }
 
     return provider.getFileSystem(path, config);
