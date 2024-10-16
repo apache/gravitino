@@ -47,9 +47,13 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
 
   /**
    * The default file system provider class name, used to create the default file system. If not
-   * specified, the default file system provider will be {@link LocalFileSystemProvider#name()}.
+   * specified, the default file system provider will be {@link LocalFileSystemProvider#name()}:
+   * 'builtin-local'.
    */
   public static final String DEFAULT_FS_PROVIDER = "default-filesystem-provider";
+
+  public static final String BUILTIN_LOCAL_FS_PROVIDER = "builtin-local";
+  public static final String BUILTIN_HDFS_FS_PROVIDER = "builtin-hdfs";
 
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -75,7 +79,7 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   DEFAULT_FS_PROVIDER,
                   "Default file system provider name",
                   false /* immutable */,
-                  LocalFileSystemProvider.class.getSimpleName(),
+                  BUILTIN_LOCAL_FS_PROVIDER, // please see LocalFileSystemProvider#name()
                   false /* hidden */))
           // The following two are about authentication.
           .putAll(KERBEROS_PROPERTY_ENTRIES)
