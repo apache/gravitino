@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
@@ -28,7 +29,7 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
  */
 public interface IcebergTableOperationDispatcher {
   /**
-   * Creates a new Iceberg table in the specified namespace with the given prefix.
+   * Creates a new Iceberg table.
    *
    * @param catalogName The catalog name when creating the table.
    * @param namespace The namespace within which the table should be created.
@@ -36,5 +37,5 @@ public interface IcebergTableOperationDispatcher {
    * @return A {@link LoadTableResponse} object containing the result of the operation.
    */
   LoadTableResponse createTable(
-      String catalogName, String namespace, CreateTableRequest createTableRequest);
+      String catalogName, Namespace namespace, CreateTableRequest createTableRequest);
 }

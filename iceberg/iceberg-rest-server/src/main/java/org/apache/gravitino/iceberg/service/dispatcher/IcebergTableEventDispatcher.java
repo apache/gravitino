@@ -20,11 +20,14 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTablePostEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
@@ -46,12 +49,13 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
 
   @Override
   public LoadTableResponse createTable(
-      String catalogName, String namespace, CreateTableRequest createTableRequest) {
-    NameIdentifier tableIdentifier =
-        NameIdentifier.of(catalogName, namespace, createTableRequest.name());
+      String catalogName, Namespace namespace, CreateTableRequest createTableRequest) {
+    TableIdentifier tableIdentifier = TableIdentifier.of(namespace, createTableRequest.name());
+    NameIdentifier nameIdentifier =
+        IcebergRestUtils.getGravitinoNameIdentifier(catalogName, tableIdentifier);
     eventBus.dispatchEvent(
         new IcebergCreateTablePreEvent(
-            PrincipalUtils.getCurrentUserName(), tableIdentifier, createTableRequest));
+            PrincipalUtils.getCurrentUserName(), nameIdentifier, createTableRequest));
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =
@@ -59,13 +63,13 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergCreateTableFailureEvent(
-              PrincipalUtils.getCurrentUserName(), tableIdentifier, e));
+              PrincipalUtils.getCurrentUserName(), nameIdentifier, e));
       throw e;
     }
     eventBus.dispatchEvent(
         new IcebergCreateTablePostEvent(
             PrincipalUtils.getCurrentUserName(),
-            NameIdentifier.of(namespace, createTableRequest.name()),
+            nameIdentifier,
             createTableRequest,
             loadTableResponse));
     return loadTableResponse;

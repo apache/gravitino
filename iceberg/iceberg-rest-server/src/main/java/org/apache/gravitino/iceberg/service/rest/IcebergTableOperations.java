@@ -43,6 +43,7 @@ import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -98,14 +99,16 @@ public class IcebergTableOperations {
       @PathParam("prefix") String prefix,
       @PathParam("namespace") String namespace,
       CreateTableRequest createTableRequest) {
-    LOG.info(
-        "Create Iceberg table, prefix: {}, namespace: {}, create table request: {}",
-        prefix,
-        namespace,
-        createTableRequest);
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    LOG.info(
+        "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}",
+        catalogName,
+        icebergNS,
+        createTableRequest);
+
     LoadTableResponse loadTableResponse =
-        tableOperationDispatcher.createTable(catalogName, namespace, createTableRequest);
+        tableOperationDispatcher.createTable(catalogName, icebergNS, createTableRequest);
     return IcebergRestUtils.ok(loadTableResponse);
   }
 

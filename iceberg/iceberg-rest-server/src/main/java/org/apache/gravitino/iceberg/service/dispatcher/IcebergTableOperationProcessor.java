@@ -20,7 +20,7 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
-import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
@@ -38,9 +38,9 @@ public class IcebergTableOperationProcessor implements IcebergTableOperationDisp
 
   @Override
   public LoadTableResponse createTable(
-      String catalogName, String namespace, CreateTableRequest createTableRequest) {
+      String catalogName, Namespace namespace, CreateTableRequest createTableRequest) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(catalogName)
-        .createTable(RESTUtil.decodeNamespace(namespace), createTableRequest);
+        .createTable(namespace, createTableRequest);
   }
 }

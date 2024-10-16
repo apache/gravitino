@@ -18,15 +18,21 @@
  */
 package org.apache.gravitino.iceberg.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.stream.Stream;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 
 public class IcebergRestUtils {
@@ -86,6 +92,16 @@ public class IcebergRestUtils {
     return prefix;
   }
 
+  public static NameIdentifier getGravitinoNameIdentifier(
+      String catalogName, TableIdentifier icebergIdentifier) {
+    Stream<String> catalogNS =
+        Stream.concat(
+            Stream.of(catalogName), Arrays.stream(icebergIdentifier.namespace().levels()));
+    String[] catalogNSTable =
+        Stream.concat(catalogNS, Stream.of(icebergIdentifier.name())).toArray(String[]::new);
+    return NameIdentifier.of(catalogNSTable);
+  }
+
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
   // 'iceberg_catalog'
   private static String shelling(String rawPrefix) {
@@ -96,6 +112,16 @@ public class IcebergRestUtils {
       Preconditions.checkArgument(
           rawPrefix.endsWith("/"), String.format("rawPrefix %s format is illegal", rawPrefix));
       return rawPrefix.substring(0, rawPrefix.length() - 1);
+    }
+  }
+
+  public static <T> T cloneIcebergRESTObject(Object message, Class<T> className) {
+    ObjectMapper icebergObjectMapper = IcebergObjectMapper.getInstance();
+    try {
+      byte[] values = icebergObjectMapper.writeValueAsBytes(message);
+      return icebergObjectMapper.readValue(values, className);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 }
