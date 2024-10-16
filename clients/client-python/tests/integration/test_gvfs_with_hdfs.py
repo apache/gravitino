@@ -640,9 +640,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         with self.assertRaises(GravitinoRuntimeException):
             fs.get_file(get_file, remote_path)
 
-    @unittest.skip(
-        "This test will fail for https://github.com/apache/arrow/issues/44438"
-    )
     def test_pandas(self):
         pands_dir = self.fileset_gvfs_location + "/test_pandas"
         pands_actual_dir = self.fileset_storage_location + "/test_pandas"
@@ -689,9 +686,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         ds2 = pandas.read_csv(csv_file, storage_options=storage_options)
         self.assertTrue(data.equals(ds2))
 
-    @unittest.skip(
-        "This test will fail for https://github.com/apache/arrow/issues/44438"
-    )
     def test_pyarrow(self):
         pyarrow_dir = self.fileset_gvfs_location + "/test_pyarrow"
         pyarrow_actual_dir = self.fileset_storage_location + "/test_pyarrow"

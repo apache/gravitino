@@ -22,7 +22,6 @@ from random import randint
 from fsspec.implementations.arrow import ArrowFSWrapper
 from pyarrow.fs import GcsFileSystem
 
-from gravitino.exceptions.base import GravitinoRuntimeException
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
 from gravitino import (
     gvfs,
@@ -30,6 +29,8 @@ from gravitino import (
     Catalog,
     Fileset,
 )
+from gravitino.exceptions.base import GravitinoRuntimeException
+
 
 logger = logging.getLogger(__name__)
 
@@ -148,3 +149,15 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         # >>> print(r)
         # None
         # self.assertIsNotNone(fs.modified(modified_dir))
+
+    @unittest.skip(
+        "This test will fail for https://github.com/apache/arrow/issues/44438"
+    )
+    def test_pandas(self):
+        pass
+
+    @unittest.skip(
+        "This test will fail for https://github.com/apache/arrow/issues/44438"
+    )
+    def test_pyarrow(self):
+        pass
