@@ -38,6 +38,8 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final String FETCH_TIMEOUT_SEC_KEY =
       "authentication.kerberos.keytab-fetch-timeout-sec";
 
+  public static final String KRB5_CONF_KEY = "java.security.krb5.conf";
+
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
       new ConfigBuilder(PRINCIPAL_KEY)
           .doc("The principal of the Kerberos connection")
@@ -70,6 +72,14 @@ public class KerberosConfig extends AuthenticationConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(2);
 
+  public static final ConfigEntry<String> KRB5_CONF_ENTRY =
+      new ConfigBuilder(KRB5_CONF_KEY)
+          .doc("Kerberos krb file for configuration of Kerberos.")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .create();
+
   public KerberosConfig(Map<String, String> properties) {
     super(properties);
     loadFromMap(properties, k -> true);
@@ -89,6 +99,10 @@ public class KerberosConfig extends AuthenticationConfig {
 
   public int getFetchTimeoutSec() {
     return get(FETCH_TIMEOUT_SEC_ENTRY);
+  }
+
+  public String getKrb5Conf() {
+    return get(KRB5_CONF_ENTRY);
   }
 
   public static final Map<String, PropertyEntry<?>> KERBEROS_PROPERTY_ENTRIES =
@@ -124,6 +138,14 @@ public class KerberosConfig extends AuthenticationConfig {
                   "The timeout to fetch key tab",
                   false /* immutable */,
                   60 /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              KRB5_CONF_KEY,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  KRB5_CONF_KEY,
+                  "The Kerberos krb file for the catalog",
+                  false /* immutable */,
+                  "/etc/krb5.conf" /* defaultValue */,
                   false /* hidden */))
           .build();
 }
