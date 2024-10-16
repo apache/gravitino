@@ -138,6 +138,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     clearTableAndSchema();
     metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
+    client.disableMetalake(metalakeName);
     client.dropMetalake(metalakeName);
     if (spark != null) {
       spark.close();
@@ -878,10 +879,9 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
   }
 
   private void createMetalake() {
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }

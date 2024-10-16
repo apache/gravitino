@@ -60,6 +60,7 @@ public class AuditIT extends BaseIT {
     metaLake = client.alterMetalake(metalakeAuditName, changes);
     Assertions.assertEquals(expectUser, metaLake.auditInfo().creator());
     Assertions.assertEquals(expectUser, metaLake.auditInfo().lastModifier());
+    Assertions.assertDoesNotThrow(() -> client.disableMetalake(newName));
     Assertions.assertTrue(client.dropMetalake(newName), "metaLake should be dropped");
     Assertions.assertFalse(client.dropMetalake(newName), "metalake should be non-existent");
   }

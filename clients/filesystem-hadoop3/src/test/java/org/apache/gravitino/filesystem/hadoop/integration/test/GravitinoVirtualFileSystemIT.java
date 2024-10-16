@@ -92,7 +92,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName, true);
-    client.dropMetalake(metalakeName);
+    client.dropMetalake(metalakeName, true);
 
     if (client != null) {
       client.close();
