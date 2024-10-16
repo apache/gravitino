@@ -31,7 +31,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -43,7 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class CatalogIT extends AbstractIT {
+public class CatalogIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogIT.class);
 
@@ -56,7 +56,7 @@ public class CatalogIT extends AbstractIT {
   private static String hmsUri;
 
   @BeforeAll
-  public static void startUp() {
+  public void startUp() {
     containerSuite.startHiveContainer();
     hmsUri =
         String.format(
@@ -70,7 +70,7 @@ public class CatalogIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void tearDown() {
+  public void tearDown() {
     client.dropMetalake(metalakeName);
 
     if (client != null) {

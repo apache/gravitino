@@ -38,7 +38,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.KafkaContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.server.web.JettyServerConfig;
@@ -52,7 +52,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class CheckCurrentUserIT extends AbstractIT {
+public class CheckCurrentUserIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(CheckCurrentUserIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -63,12 +63,12 @@ public class CheckCurrentUserIT extends AbstractIT {
   private static String metalakeName = RandomNameUtils.genRandomName("metalake");
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), String.valueOf(true));
     configs.put(Configs.SERVICE_ADMINS.getKey(), AuthConstants.ANONYMOUS_USER);
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
     containerSuite.startHiveContainer();
     hmsUri =
@@ -96,7 +96,7 @@ public class CheckCurrentUserIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void tearDown() {
+  public void tearDown() {
     if (client != null) {
       client.dropMetalake(metalakeName);
       client.close();

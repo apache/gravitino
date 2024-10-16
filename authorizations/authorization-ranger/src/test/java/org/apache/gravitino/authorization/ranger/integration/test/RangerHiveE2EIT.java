@@ -54,7 +54,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
@@ -71,7 +71,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class RangerHiveE2EIT extends AbstractIT {
+public class RangerHiveE2EIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveE2EIT.class);
 
   private static RangerAuthorizationPlugin rangerAuthPlugin;
@@ -99,7 +99,7 @@ public class RangerHiveE2EIT extends AbstractIT {
   private static String RANGER_ADMIN_URL = null;
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     // Enable Gravitino Authorization mode
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), String.valueOf(true));
@@ -107,7 +107,7 @@ public class RangerHiveE2EIT extends AbstractIT {
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     configs.put("SimpleAuthUserName", TEST_USER_NAME);
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
     RangerITEnv.setup();
     RangerITEnv.startHiveRangerContainer();
@@ -180,7 +180,8 @@ public class RangerHiveE2EIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() throws IOException {
+  public void stop() throws IOException {
+    client = null;
     if (client != null) {
       Arrays.stream(catalog.asSchemas().listSchemas())
           .filter(schema -> !schema.equals("default"))
@@ -204,7 +205,7 @@ public class RangerHiveE2EIT extends AbstractIT {
       LOG.error("Failed to close CloseableGroup", e);
     }
 
-    AbstractIT.client = null;
+    client = null;
   }
 
   @Test
@@ -267,7 +268,7 @@ public class RangerHiveE2EIT extends AbstractIT {
         1, rows2.stream().filter(row -> row.getString(0).equals(schemaName)).count());
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
