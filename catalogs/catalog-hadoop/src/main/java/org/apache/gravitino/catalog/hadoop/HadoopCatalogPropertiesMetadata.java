@@ -47,7 +47,8 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
 
   /**
    * The default file system provider class name, used to create the default file system. If not
-   * specified, the default file system provider will be {@link LocalFileSystemProvider#name()}.
+   * specified, the default file system provider will be {@link LocalFileSystemProvider#name()}:
+   * 'builtin-local'.
    */
   public static final String DEFAULT_FS_PROVIDER = "default-filesystem-provider";
 

@@ -60,8 +60,8 @@ public interface FileSystemProvider {
   String scheme();
 
   /**
-   * Name of this FileSystem provider. The value is 'LocalFileSystemProvider' for LocalFileSystem,
-   * 'HDFSFileSystemProvider' for HDFS, etc.
+   * Name of this FileSystem provider. The value is 'builtin-local' for LocalFileSystem,
+   * 'builtin-hdfs' for HDFS, etc.
    *
    * @return The name of this FileSystem provider.
    */

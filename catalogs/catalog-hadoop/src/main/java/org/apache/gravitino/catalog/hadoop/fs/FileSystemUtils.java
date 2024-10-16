@@ -40,7 +40,6 @@ public class FileSystemUtils {
                 .map(String::trim)
                 .collect(java.util.stream.Collectors.toSet())
             : Sets.newHashSet();
-
     // Always add the built-in LocalFileSystemProvider and HDFSFileSystemProvider to the catalog.
     providersInUses.add(LocalFileSystemProvider.class.getSimpleName());
     providersInUses.add(HDFSFileSystemProvider.class.getSimpleName());
@@ -64,9 +63,9 @@ public class FileSystemUtils {
   }
 
   public static FileSystemProvider getFileSystemProviderByName(
-      Map<String, FileSystemProvider> fileSystemProviders, String defaultFileSystemProvider) {
+      Map<String, FileSystemProvider> fileSystemProviders, String fileSystemProviderName) {
     return fileSystemProviders.entrySet().stream()
-        .filter(entry -> entry.getValue().name().equals(defaultFileSystemProvider))
+        .filter(entry -> entry.getValue().name().equals(fileSystemProviderName))
         .map(Map.Entry::getValue)
         .findFirst()
         .orElse(null);

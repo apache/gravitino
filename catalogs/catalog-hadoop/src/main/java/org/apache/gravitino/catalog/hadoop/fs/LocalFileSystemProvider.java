@@ -47,6 +47,6 @@ public class LocalFileSystemProvider implements FileSystemProvider {
 
   @Override
   public String name() {
-    return "LocalFileSystemProvider";
+    return "builtin-local";
   }
 }

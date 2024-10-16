@@ -48,6 +48,6 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
 
   @Override
   public String name() {
-    return "HDFSFileSystemProvider";
+    return "builtin-hdfs";
   }
 }
