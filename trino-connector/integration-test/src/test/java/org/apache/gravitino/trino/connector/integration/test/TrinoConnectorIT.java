@@ -37,7 +37,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.TrinoContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -68,7 +68,7 @@ import org.slf4j.LoggerFactory;
 @Disabled
 @Deprecated
 @Tag("gravitino-docker-test")
-public class TrinoConnectorIT extends AbstractIT {
+public class TrinoConnectorIT extends BaseIT {
   public static final Logger LOG = LoggerFactory.getLogger(TrinoConnectorIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -88,7 +88,7 @@ public class TrinoConnectorIT extends AbstractIT {
   private static Catalog catalog;
 
   @BeforeAll
-  public static void startDockerContainer() throws TException, InterruptedException {
+  public void startDockerContainer() throws TException, InterruptedException {
     String trinoConfDir = System.getenv("TRINO_CONF_DIR");
 
     containerSuite.startHiveContainer();
@@ -1379,7 +1379,7 @@ public class TrinoConnectorIT extends AbstractIT {
     }
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 

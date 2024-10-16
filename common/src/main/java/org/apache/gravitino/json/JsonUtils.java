@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -291,7 +292,13 @@ public class JsonUtils {
             .build()
             .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
             .registerModule(new JavaTimeModule())
-            .registerModule(new Jdk8Module());
+            .registerModule(new Jdk8Module())
+            .registerModule(
+                new SimpleModule()
+                    .addDeserializer(Type.class, new TypeDeserializer())
+                    .addSerializer(Type.class, new TypeSerializer())
+                    .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
+                    .addSerializer(Expression.class, new ColumnDefaultValueSerializer()));
   }
 
   /**

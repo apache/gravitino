@@ -134,7 +134,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
     // Register the default local and HDFS FileSystemProvider
     String fileSystemProviders = configuration.get(FS_FILESYSTEM_PROVIDERS);
-    FileSystemUtils.initFileSystemProviders(fileSystemProviders, fileSystemProvidersMap);
+    fileSystemProvidersMap.putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders));
 
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());

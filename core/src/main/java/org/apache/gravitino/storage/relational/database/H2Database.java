@@ -58,7 +58,7 @@ public class H2Database implements JDBCDatabase {
         Statement statement = connection.createStatement()) {
       String sqlContent =
           FileUtils.readFileToString(
-              new File(gravitinoHome + "/scripts/h2/schema-0.6.0-h2.sql"), StandardCharsets.UTF_8);
+              new File(gravitinoHome + "/scripts/h2/schema-0.7.0-h2.sql"), StandardCharsets.UTF_8);
 
       statement.execute(sqlContent);
     } catch (Exception e) {

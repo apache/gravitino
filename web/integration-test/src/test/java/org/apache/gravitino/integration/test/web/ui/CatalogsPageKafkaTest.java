@@ -27,10 +27,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
-import org.apache.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -41,9 +40,9 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class CatalogsPageKafkaTest extends AbstractWebIT {
-  MetalakePage metalakePage = new MetalakePage();
-  CatalogsPage catalogsPage = new CatalogsPage();
+public class CatalogsPageKafkaTest extends BaseWebIT {
+  private MetalakePage metalakePage;
+  private CatalogsPage catalogsPage;
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static GravitinoAdminClient gravitinoClient;
@@ -63,15 +62,18 @@ public class CatalogsPageKafkaTest extends AbstractWebIT {
   public static final int DEFAULT_BROKER_PORT = 9092;
 
   @BeforeAll
-  public static void before() throws Exception {
-    gravitinoClient = AbstractIT.getGravitinoClient();
+  public void before() throws Exception {
+    gravitinoClient = getGravitinoClient();
 
-    gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+    gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
 
     containerSuite.startKafkaContainer();
 
     String address = containerSuite.getKafkaContainer().getContainerIpAddress();
     kafkaUri = String.format("%s:%d", address, DEFAULT_BROKER_PORT);
+
+    metalakePage = new MetalakePage(driver);
+    catalogsPage = new CatalogsPage(driver);
   }
 
   /**

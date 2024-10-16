@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_HDFS_FS_PROVIDER;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import java.io.IOException;
@@ -42,7 +43,12 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   }
 
   @Override
-  public String getScheme() {
+  public String scheme() {
     return "hdfs";
+  }
+
+  @Override
+  public String name() {
+    return BUILTIN_HDFS_FS_PROVIDER;
   }
 }

@@ -18,50 +18,87 @@
  */
 package org.apache.gravitino.catalog.hadoop.fs;
 
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_HDFS_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_LOCAL_FS_PROVIDER;
+
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import com.google.common.collect.Streams;
+import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class FileSystemUtils {
 
   private FileSystemUtils() {}
 
-  public static void initFileSystemProviders(
-      String fileSystemProviders, Map<String, FileSystemProvider> fileProvidersMap) {
-    FileSystemProvider localFileSystemProvider = new LocalFileSystemProvider();
-    FileSystemProvider hdfsFileSystemProvider = new HDFSFileSystemProvider();
-    fileProvidersMap.put(localFileSystemProvider.getScheme(), localFileSystemProvider);
-    fileProvidersMap.put(hdfsFileSystemProvider.getScheme(), hdfsFileSystemProvider);
+  public static Map<String, FileSystemProvider> getFileSystemProviders(String fileSystemProviders) {
+    Map<String, FileSystemProvider> resultMap = Maps.newHashMap();
+    ServiceLoader<FileSystemProvider> allFileSystemProviders =
+        ServiceLoader.load(FileSystemProvider.class);
 
-    if (StringUtils.isBlank(fileSystemProviders)) {
-      return;
+    Set<String> providersInUses =
+        fileSystemProviders != null
+            ? Arrays.stream(fileSystemProviders.split(","))
+                .map(f -> f.trim().toLowerCase(Locale.ROOT))
+                .collect(java.util.stream.Collectors.toSet())
+            : Sets.newHashSet();
+
+    // Add built-in file system providers to the use list automatically.
+    providersInUses.add(BUILTIN_LOCAL_FS_PROVIDER.toLowerCase(Locale.ROOT));
+    providersInUses.add(BUILTIN_HDFS_FS_PROVIDER.toLowerCase(Locale.ROOT));
+
+    // Only get the file system providers that are in the user list and check if the scheme is
+    // unique.
+    Streams.stream(allFileSystemProviders.iterator())
+        .filter(
+            fileSystemProvider ->
+                providersInUses.contains(fileSystemProvider.name().toLowerCase(Locale.ROOT)))
+        .forEach(
+            fileSystemProvider -> {
+              if (resultMap.containsKey(fileSystemProvider.scheme())) {
+                throw new UnsupportedOperationException(
+                    String.format(
+                        "File system provider: '%s' with scheme '%s' already exists in the use provider list "
+                            + "Please make sure the file system provider scheme is unique.",
+                        fileSystemProvider.getClass().getName(), fileSystemProvider.scheme()));
+              }
+              resultMap.put(fileSystemProvider.scheme(), fileSystemProvider);
+            });
+
+    // If not all file system providers in providersInUses was found, throw an exception.
+    Set<String> notFoundProviders =
+        Sets.difference(
+                providersInUses,
+                resultMap.values().stream()
+                    .map(p -> p.name().toLowerCase(Locale.ROOT))
+                    .collect(Collectors.toSet()))
+            .immutableCopy();
+    if (!notFoundProviders.isEmpty()) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "File system providers %s not found in the classpath. Please make sure the file system "
+                  + "provider is in the classpath.",
+              notFoundProviders));
     }
 
-    String[] providers = fileSystemProviders.split(",");
-    for (String provider : providers) {
-      try {
-        FileSystemProvider fileSystemProvider =
-            (FileSystemProvider)
-                Class.forName(provider.trim()).getDeclaredConstructor().newInstance();
-        fileProvidersMap.put(fileSystemProvider.getScheme(), fileSystemProvider);
-      } catch (Exception e) {
-        throw new GravitinoRuntimeException(
-            e, "Failed to initialize file system provider: %s", provider);
-      }
-    }
+    return resultMap;
   }
 
-  public static String getSchemeByFileSystemProvider(
-      String providerClassName, Map<String, FileSystemProvider> fileProvidersMap) {
-    for (Map.Entry<String, FileSystemProvider> entry : fileProvidersMap.entrySet()) {
-      if (entry.getValue().getClass().getName().equals(providerClassName)) {
-        return entry.getKey();
-      }
-    }
-
-    throw new UnsupportedOperationException(
-        String.format(
-            "File system provider class name '%s' not found. Supported file system providers: %s",
-            providerClassName, fileProvidersMap.values()));
+  public static FileSystemProvider getFileSystemProviderByName(
+      Map<String, FileSystemProvider> fileSystemProviders, String fileSystemProviderName) {
+    return fileSystemProviders.entrySet().stream()
+        .filter(entry -> entry.getValue().name().equals(fileSystemProviderName))
+        .map(Map.Entry::getValue)
+        .findFirst()
+        .orElseThrow(
+            () ->
+                new UnsupportedOperationException(
+                    String.format(
+                        "File system provider with name '%s' not found in the file system provider list.",
+                        fileSystemProviderName)));
   }
 }

@@ -58,35 +58,42 @@ import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
+/**
+ * BaseIT can be used as a base class for integration tests. It will automatically start a Gravitino
+ * server and stop it after all tests are finished.
+ *
+ * <p>Another use case is to start a MySQL or PostgreSQL docker instance and create a database for
+ * testing or just start the Gravitino server manually.
+ */
 @ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
-public class AbstractIT {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public class BaseIT {
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  private static final Logger LOG = LoggerFactory.getLogger(AbstractIT.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BaseIT.class);
   private static final Splitter COMMA = Splitter.on(",").omitEmptyStrings().trimResults();
 
-  protected static GravitinoAdminClient client;
+  protected GravitinoAdminClient client;
 
   private static final OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
 
   protected static final CloseableGroup closer = CloseableGroup.create();
 
-  private static MiniGravitino miniGravitino;
+  private MiniGravitino miniGravitino;
 
-  protected static Config serverConfig;
+  protected Config serverConfig;
 
-  public static String testMode = "";
+  public String testMode = "";
 
-  protected static Map<String, String> customConfigs = new HashMap<>();
+  protected Map<String, String> customConfigs = new HashMap<>();
 
-  protected static boolean ignoreIcebergRestService = true;
+  protected boolean ignoreIcebergRestService = true;
 
   public static final String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
@@ -94,25 +101,25 @@ public class AbstractIT {
   public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
       "https://jdbc.postgresql.org/download/postgresql-42.7.0.jar";
 
-  private static TestDatabaseName META_DATA;
-  private static MySQLContainer MYSQL_CONTAINER;
-  private static PostgreSQLContainer POSTGRESQL_CONTAINER;
+  private TestDatabaseName META_DATA;
+  private MySQLContainer MYSQL_CONTAINER;
+  private PostgreSQLContainer POSTGRESQL_CONTAINER;
 
-  protected static String serverUri;
+  protected String serverUri;
 
-  protected static String originConfig;
+  protected String originConfig;
 
-  public static int getGravitinoServerPort() {
+  public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
     return jettyServerConfig.getHttpPort();
   }
 
-  public static void registerCustomConfigs(Map<String, String> configs) {
+  public void registerCustomConfigs(Map<String, String> configs) {
     customConfigs.putAll(configs);
   }
 
-  private static void rewriteGravitinoServerConfig() throws IOException {
+  private void rewriteGravitinoServerConfig() throws IOException {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
     if (originConfig == null) {
@@ -129,7 +136,7 @@ public class AbstractIT {
     ITUtils.rewriteConfigFile(tmpPath.toString(), configPath.toString(), customConfigs);
   }
 
-  private static void recoverGravitinoServerConfig() throws IOException {
+  private void recoverGravitinoServerConfig() throws IOException {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
 
@@ -139,7 +146,7 @@ public class AbstractIT {
     }
   }
 
-  protected static void downLoadJDBCDriver() throws IOException {
+  protected void downLoadJDBCDriver() throws IOException {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
       String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
@@ -157,7 +164,7 @@ public class AbstractIT {
     }
   }
 
-  public static String startAndInitPGBackend() {
+  public String startAndInitPGBackend() {
     META_DATA = PG_JDBC_BACKEND;
     containerSuite.startPostgreSQLContainer(META_DATA);
     POSTGRESQL_CONTAINER = containerSuite.getPostgreSQLContainer();
@@ -208,7 +215,7 @@ public class AbstractIT {
     return pgUrlWithoutSchema;
   }
 
-  public static String startAndInitMySQLBackend() {
+  public String startAndInitMySQLBackend() {
     META_DATA = TestDatabaseName.MYSQL_JDBC_BACKEND;
     containerSuite.startMySQLContainer(META_DATA);
     MYSQL_CONTAINER = containerSuite.getMySQLContainer();
@@ -228,7 +235,7 @@ public class AbstractIT {
               new File(
                   gravitinoHome
                       + String.format(
-                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_6_0)),
+                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_7_0)),
               "UTF-8");
 
       String[] initMySQLBackendSqls =
@@ -248,15 +255,8 @@ public class AbstractIT {
     }
   }
 
-  @ParameterizedTest
-  @CsvSource({
-    "embedded, jdbcBackend",
-    "embedded, kvBackend",
-    "deploy, jdbcBackend",
-    "deploy, kvBackend"
-  })
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     testMode =
         System.getProperty(ITUtils.TEST_MODE) == null
             ? ITUtils.EMBEDDED_TEST_MODE
@@ -352,7 +352,7 @@ public class AbstractIT {
   }
 
   @AfterAll
-  public static void stopIntegrationTest() throws IOException, InterruptedException {
+  public void stopIntegrationTest() throws IOException, InterruptedException {
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE) && miniGravitino != null) {
       miniGravitino.stop();
     } else {
@@ -366,7 +366,7 @@ public class AbstractIT {
     LOG.info("Tearing down Gravitino Server");
   }
 
-  public static GravitinoAdminClient getGravitinoClient() {
+  public GravitinoAdminClient getGravitinoClient() {
     return client;
   }
 
