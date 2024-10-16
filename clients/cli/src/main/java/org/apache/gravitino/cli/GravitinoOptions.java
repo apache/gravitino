@@ -55,6 +55,7 @@ public class GravitinoOptions {
   public static final String BOOTSTRAP = "bootstrap";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
+  public static final String ROLE = "role";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -108,6 +109,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("d", DATABASE, "database name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
     options.addOption(createArgOption("a", TAG, "tag name"));
+    options.addOption(createArgOption("r", ROLE, "tag name"));
 
     return options;
   }

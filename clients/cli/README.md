@@ -253,6 +253,24 @@ List all tags on a Schema
 gcli tag list --name metalake_demo.catalog_postgres.hr
 ```
 
+Show all Roles
+
+```bash
+gcli role list -name metalake_demo
+```
+
+Create an empty Role
+
+```bash
+gcli role create --name metalake_demo --role admin
+```
+
+Delete a Role
+
+```bash
+gcli role delete -name metalake_demo --role admin
+```
+
 ### Setting Metalake name
 
 As dealing with one Metalake is a typical scenario, you can set the Metalake name in several ways.

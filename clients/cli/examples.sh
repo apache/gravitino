@@ -139,6 +139,12 @@ gcli tag set --name metalake_demo.catalog_postgres.hr --tag hr # tag entity
 gcli tag remove --name metalake_demo.catalog_postgres.hr --tag hr # untag entity
 gcli tag list --name metalake_demo.catalog_postgres.hr # all tags hr has been taged with
 
+# Role examples
+gcli role list --name metalake_demo
+gcli role create --name metalake_demo --role admin
+gcli role details --name metalake_demo --role admin
+gcli role delete --name metalake_demo --role admin
+
 # Exmaples where metalake is set in an evironment variable
 export GRAVITINO_METALAKE=metalake_demo
 
