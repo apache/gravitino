@@ -37,7 +37,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -54,7 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class GravitinoVirtualFileSystemIT extends AbstractIT {
+public class GravitinoVirtualFileSystemIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
@@ -64,7 +64,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
   private static Configuration conf = new Configuration();
 
   @BeforeAll
-  public static void startUp() {
+  public void startUp() {
     containerSuite.startHiveContainer();
     Assertions.assertFalse(client.metalakeExists(metalakeName));
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
@@ -87,7 +87,7 @@ public class GravitinoVirtualFileSystemIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
+  public void tearDown() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName);

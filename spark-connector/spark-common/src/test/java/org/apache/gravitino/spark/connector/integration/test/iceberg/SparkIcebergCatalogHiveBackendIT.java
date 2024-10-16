@@ -22,11 +22,9 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.TestInstance;
 
 /** This class use Apache Iceberg HiveCatalog for backend catalog. */
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatalogIT {
 
   @Override
