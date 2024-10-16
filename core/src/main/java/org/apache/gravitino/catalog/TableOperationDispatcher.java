@@ -105,30 +105,31 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    EntityCombinedTable table =
+    EntityCombinedTable entityCombinedTable =
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
 
-    if (!table.imported()) {
+    if (!entityCombinedTable.imported()) {
       // Load the schema to make sure the schema is imported.
       SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
       // Import the table.
-      table = TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
+      entityCombinedTable =
+          TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importTable(ident));
     }
 
     // Update the column entities in Gravitino store if the columns are different from the ones
     // fetching from the underlying source.
-    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, table);
+    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
 
-    return EntityCombinedTable.of(table.tableFromCatalog(), updatedEntity)
+    return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
         .withHiddenPropertiesSet(
             getHiddenPropertyNames(
                 getCatalogIdentifier(ident),
                 HasPropertyMetadata::tablePropertiesMetadata,
-                table.tableFromCatalog().properties()))
-        .withImported(table.imported());
+                entityCombinedTable.tableFromCatalog().properties()))
+        .withImported(entityCombinedTable.imported());
   }
 
   /**
