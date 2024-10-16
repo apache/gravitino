@@ -77,8 +77,8 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
     provider.setClient(client);
 
-    IcebergCatalogWrapper hiveOps = provider.getIcebergTableOps(hiveCatalogName);
-    IcebergCatalogWrapper jdbcOps = provider.getIcebergTableOps(jdbcCatalogName);
+    IcebergCatalogWrapper hiveOps = provider.getIcebergCatalogWrapper(hiveCatalogName);
+    IcebergCatalogWrapper jdbcOps = provider.getIcebergCatalogWrapper(jdbcCatalogName);
 
     Assertions.assertEquals(hiveCatalogName, hiveOps.getCatalog().name());
     Assertions.assertEquals(jdbcCatalogName, jdbcOps.getCatalog().name());
@@ -106,11 +106,11 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
     provider.setClient(client);
 
     Assertions.assertThrowsExactly(
-        IllegalArgumentException.class, () -> provider.getIcebergTableOps(invalidCatalogName));
+        IllegalArgumentException.class, () -> provider.getIcebergCatalogWrapper(invalidCatalogName));
     Assertions.assertThrowsExactly(
-        IllegalArgumentException.class, () -> provider.getIcebergTableOps(""));
+        IllegalArgumentException.class, () -> provider.getIcebergCatalogWrapper(""));
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
-        () -> provider.getIcebergTableOps(IcebergConstants.GRAVITINO_DEFAULT_CATALOG));
+        () -> provider.getIcebergCatalogWrapper(IcebergConstants.GRAVITINO_DEFAULT_CATALOG));
   }
 }

@@ -36,5 +36,5 @@ public interface IcebergCatalogWrapperProvider {
    * @param catalogName a param send by clients.
    * @return the instance of IcebergCatalogWrapper.
    */
-  IcebergCatalogWrapper getIcebergTableOps(String catalogName);
+  IcebergCatalogWrapper getIcebergCatalogWrapper(String catalogName);
 }

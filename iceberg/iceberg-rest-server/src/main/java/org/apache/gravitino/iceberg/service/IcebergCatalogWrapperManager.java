@@ -86,7 +86,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   public IcebergCatalogWrapper getCatalogWrapper(String catalogName) {
     IcebergCatalogWrapper catalogWrapper =
-        icebergTableOpsCache.get(catalogName, k -> provider.getIcebergTableOps(catalogName));
+        icebergTableOpsCache.get(catalogName, k -> provider.getIcebergCatalogWrapper(catalogName));
     // Reload conf to reset UserGroupInformation or icebergTableOps will always use
     // Simple auth.
     catalogWrapper.reloadHadoopConf();
