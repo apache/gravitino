@@ -29,9 +29,6 @@ gcli unknown
 # unknown command and entiry
 gcli unknown unknown
 
-# unknown command and entiry
-gcli unknown unknown
-
 # unknown command 
 gcli metalake unknown
 
@@ -47,5 +44,5 @@ gcli metalake details --name unknown
 # Unknown catalog name
 gcli catalog details --name metalake_demo.unknown
 
-# Unknown catalog name
+# Missing catalog name
 gcli catalog details --name metalake_demo
