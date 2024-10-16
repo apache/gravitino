@@ -106,7 +106,8 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
     provider.setClient(client);
 
     Assertions.assertThrowsExactly(
-        IllegalArgumentException.class, () -> provider.getIcebergCatalogWrapper(invalidCatalogName));
+        IllegalArgumentException.class,
+        () -> provider.getIcebergCatalogWrapper(invalidCatalogName));
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class, () -> provider.getIcebergCatalogWrapper(""));
     Assertions.assertThrowsExactly(
