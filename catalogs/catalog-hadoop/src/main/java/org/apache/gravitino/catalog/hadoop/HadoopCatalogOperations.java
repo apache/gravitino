@@ -767,7 +767,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     if (provider == null) {
       throw new IllegalArgumentException(
           String.format(
-              "Unsupported scheme: %s, path: %s, all supported scheme: %s and provider: %s",
+              "Unsupported scheme: %s, path: %s, all supported schemes: %s and providers: %s",
               scheme, path, fileSystemProvidersMap.keySet(), fileSystemProvidersMap.values()));
     }
 
