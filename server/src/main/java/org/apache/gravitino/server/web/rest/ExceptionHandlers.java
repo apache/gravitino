@@ -343,6 +343,12 @@ public class ExceptionHandlers {
       } else if (e instanceof NoSuchMetalakeException) {
         return Utils.notFound(errorMsg, e);
 
+      } else if (e instanceof NonInUseEntityException) {
+        return Utils.nonInUse(errorMsg, e);
+
+      } else if (e instanceof EntityInUseException) {
+        return Utils.inUse(errorMsg, e);
+
       } else {
         return super.handle(op, metalake, parent, e);
       }

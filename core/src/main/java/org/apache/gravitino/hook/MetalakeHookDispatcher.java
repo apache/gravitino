@@ -27,8 +27,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -87,8 +89,19 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
   }
 
   @Override
-  public boolean dropMetalake(NameIdentifier ident) {
-    return dispatcher.dropMetalake(ident);
+  public boolean dropMetalake(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, EntityInUseException {
+    return dispatcher.dropMetalake(ident, force);
+  }
+
+  @Override
+  public void activateMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    dispatcher.activateMetalake(ident);
+  }
+
+  @Override
+  public void deactivateMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    dispatcher.deactivateMetalake(ident);
   }
 
   @Override

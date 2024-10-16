@@ -81,7 +81,7 @@ public class CatalogIT extends BaseIT {
 
   @AfterAll
   public void tearDown() {
-    client.dropMetalake(metalakeName);
+    client.dropMetalake(metalakeName, true);
 
     if (client != null) {
       client.close();

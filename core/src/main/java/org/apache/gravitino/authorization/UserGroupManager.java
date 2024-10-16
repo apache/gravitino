@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.authorization;
 
+import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
@@ -27,6 +29,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -62,7 +65,7 @@ class UserGroupManager {
 
   User addUser(String metalake, String name) throws UserAlreadyExistsException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       UserEntity userEntity =
           UserEntity.builder()
               .withId(idGenerator.nextId())
@@ -90,7 +93,7 @@ class UserGroupManager {
 
   boolean removeUser(String metalake, String user) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       return store.delete(AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
@@ -101,7 +104,7 @@ class UserGroupManager {
 
   User getUser(String metalake, String user) throws NoSuchUserException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       return store.get(
           AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
 
@@ -127,7 +130,7 @@ class UserGroupManager {
 
   Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       GroupEntity groupEntity =
           GroupEntity.builder()
               .withId(idGenerator.nextId())
@@ -155,7 +158,7 @@ class UserGroupManager {
 
   boolean removeGroup(String metalake, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       return store.delete(AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(
@@ -169,7 +172,7 @@ class UserGroupManager {
 
   Group getGroup(String metalake, String group) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
 
       return store.get(
           AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP, GroupEntity.class);
@@ -194,7 +197,7 @@ class UserGroupManager {
 
   private User[] listUsersInternal(String metalake, boolean allFields) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
 
       Namespace namespace = AuthorizationUtils.ofUserNamespace(metalake);
       return store
@@ -211,7 +214,7 @@ class UserGroupManager {
 
   private Group[] listGroupInternal(String metalake, boolean allFields) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       Namespace namespace = AuthorizationUtils.ofGroupNamespace(metalake);
       return store
           .list(namespace, GroupEntity.class, EntityType.GROUP, allFields)

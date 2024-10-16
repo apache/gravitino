@@ -22,6 +22,8 @@ import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
+import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+import static org.apache.gravitino.metalake.MetalakeManager.metalakeInUse;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -105,7 +107,6 @@ import org.slf4j.LoggerFactory;
 public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
-  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
   private static final PropertiesMetadata BASIC_CATALOG_PROPERTIES_METADATA =
       new BaseCatalogPropertiesMetadata() {
         @Override
@@ -118,8 +119,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   public static boolean catalogInUse(EntityStore store, NameIdentifier ident)
       throws NoSuchMetalakeException, NoSuchCatalogException {
-    // todo: check if the metalake is in use
-    return getInUseValue(store, ident);
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    return metalakeInUse(store, metalakeIdent) && getInUseValue(store, ident);
   }
 
   /** Wrapper class for a catalog instance and its class loader. */
@@ -292,7 +293,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public NameIdentifier[] listCatalogs(Namespace namespace) throws NoSuchMetalakeException {
     NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
-    checkMetalakeExists(metalakeIdent);
+    checkMetalake(NameIdentifier.of(namespace.level(0)), store);
 
     try {
       return store.list(namespace, CatalogEntity.class, EntityType.CATALOG).stream()
@@ -308,7 +309,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
     NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
-    checkMetalakeExists(metalakeIdent);
+    checkMetalake(metalakeIdent, store);
 
     try {
       List<CatalogEntity> catalogEntities =
@@ -333,6 +334,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    checkMetalake(metalakeIdent, store);
+
     return loadCatalogAndWrap(ident).catalog;
   }
 
@@ -356,6 +360,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    checkMetalake(metalakeIdent, store);
+
     Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
 
     long uid = idGenerator.nextId();
@@ -382,12 +389,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     boolean needClean = true;
     try {
-      NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-      if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
-        LOG.warn("Metalake {} does not exist", metalakeIdent);
-        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
-      }
-
       store.put(e, false /* overwrite */);
       CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
 
@@ -441,11 +442,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String comment,
       Map<String, String> properties) {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-    try {
-      if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
-        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
-      }
+    checkMetalake(metalakeIdent, store);
 
+    try {
       if (store.exists(ident, EntityType.CATALOG)) {
         throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
       }
@@ -491,6 +490,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public void activateCatalog(NameIdentifier ident)
       throws NoSuchCatalogException, NonInUseEntityException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    checkMetalake(metalakeIdent, store);
+
     try {
       boolean inUse = catalogInUse(store, ident);
       if (!inUse) {
@@ -519,6 +521,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   @Override
   public void deactivateCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    checkMetalake(metalakeIdent, store);
+
     try {
       boolean inUse = catalogInUse(store, ident);
       if (inUse) {
@@ -743,17 +748,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             });
 
     return Pair.of(upserts, deletes);
-  }
-
-  private void checkMetalakeExists(NameIdentifier ident) throws NoSuchMetalakeException {
-    try {
-      if (!store.exists(ident, EntityType.METALAKE)) {
-        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
-      }
-    } catch (IOException e) {
-      LOG.error("Failed to do storage operation", e);
-      throw new RuntimeException(e);
-    }
   }
 
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {

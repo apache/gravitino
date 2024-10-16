@@ -89,7 +89,7 @@ public interface PropertiesMetadata {
       throw new IllegalArgumentException("Property is not defined: " + propertyName);
     }
 
-    if (properties.containsKey(propertyName)) {
+    if (properties != null && properties.containsKey(propertyName)) {
       return propertyEntries().get(propertyName).decode(properties.get(propertyName));
     }
     return propertyEntries().get(propertyName).getDefaultValue();

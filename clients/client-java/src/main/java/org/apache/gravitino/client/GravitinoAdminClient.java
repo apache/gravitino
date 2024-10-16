@@ -22,6 +22,7 @@ package org.apache.gravitino.client;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -31,10 +32,13 @@ import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeListResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
+import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 
 /**
  * Apache Gravitino Client for the administrator to interact with the Gravitino API, allowing the
@@ -145,22 +149,70 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   }
 
   /**
-   * Drops a specific Metalake using the Gravitino API.
+   * Drop a metalake with specified name. Please make sure:
    *
-   * @param name The name of the Metalake to be dropped.
-   * @return True if the Metalake was successfully dropped, false if the Metalake does not exist.
+   * <ul>
+   *   <li>There is no catalog in the metalake. Otherwise, a {@link NonEmptyEntityException} will be
+   *       thrown.
+   *   <li>The method {@link #deactivateMetalake(String)} has been called before dropping the
+   *       metalake. Otherwise, a {@link EntityInUseException} will be thrown.
+   * </ul>
+   *
+   * It is equivalent to calling {@code dropMetalake(ident, false)}.
+   *
+   * @param name The name of the metalake.
+   * @return True if the metalake was dropped, false if the metalake does not exist.
+   * @throws NonEmptyEntityException If the metalake is not empty.
+   * @throws EntityInUseException If the metalake is in use.
    */
   @Override
-  public boolean dropMetalake(String name) {
+  public boolean dropMetalake(String name, boolean force)
+      throws NonEmptyEntityException, EntityInUseException {
     checkMetalakeName(name);
+    Map<String, String> params = new HashMap<>();
+    params.put("force", String.valueOf(force));
+
     DropResponse resp =
         restClient.delete(
             API_METALAKES_IDENTIFIER_PATH + name,
+            params,
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  @Override
+  public void activateMetalake(String name) throws NoSuchMetalakeException {
+    ErrorResponse resp =
+        restClient.get(
+            API_METALAKES_IDENTIFIER_PATH + name + "/activate",
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.metalakeErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.metalakeErrorHandler().accept(resp);
+  }
+
+  @Override
+  public void deactivateMetalake(String name) throws NoSuchMetalakeException {
+    ErrorResponse resp =
+        restClient.get(
+            API_METALAKES_IDENTIFIER_PATH + name + "/deactivate",
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.metalakeErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.metalakeErrorHandler().accept(resp);
   }
 
   /**
