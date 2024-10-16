@@ -26,10 +26,10 @@ alias gcli='java -jar clients/cli/build/libs/gravitino-cli-0.7.0-incubating-SNAP
 # No such command
 gcli unknown
 
-# unknown command and entiry
+# unknown command and entity
 gcli unknown unknown
 
-# unknown command and entiry
+# unknown command and entity
 gcli unknown unknown
 
 # unknown command 
