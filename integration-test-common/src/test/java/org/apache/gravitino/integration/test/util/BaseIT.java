@@ -64,6 +64,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
+/**
+ * BaseIT can be used as a base class for integration tests. It will automatically start a Gravitino
+ * server and stop it after all tests are finished.
+ *
+ * <p>Another use case is to start a MySQL or PostgreSQL docker instance and create a database for
+ * testing or just start the Gravitino server manually.
+ */
 @ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class BaseIT {
