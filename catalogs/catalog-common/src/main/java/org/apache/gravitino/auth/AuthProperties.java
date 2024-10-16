@@ -28,9 +28,6 @@ public class AuthProperties {
   public static final String OAUTH2_AUTH_TYPE = "oauth2";
   public static final String KERBEROS_AUTH_TYPE = "kerberos";
 
-  // simple
-  public static final String GRAVITINO_SIMPLE_USER_NAME = "simpleAuth.userName";
-
   // oauth2
   /** The configuration key for the URI of the default OAuth server. */
   public static final String GRAVITINO_OAUTH2_SERVER_URI = "oauth2.serverUri";
@@ -43,12 +40,6 @@ public class AuthProperties {
 
   /** The configuration key for the scope of the token. */
   public static final String GRAVITINO_OAUTH2_SCOPE = "oauth2.scope";
-
-  /** The configuration key for the principal. */
-  public static final String GRAVITINO_KERBEROS_PRINCIPAL = "kerberos.principal";
-
-  /** The configuration key for the keytab file path corresponding to the principal. */
-  public static final String GRAVITINO_KERBEROS_KEYTAB_FILE_PATH = "kerberos.keytabFilePath";
 
   public static boolean isKerberos(String authType) {
     return KERBEROS_AUTH_TYPE.equalsIgnoreCase(authType);

@@ -31,8 +31,6 @@ public class GravitinoSparkConfig {
 
   public static final String GRAVITINO_AUTH_TYPE =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_CLIENT_AUTH_TYPE;
-  public static final String GRAVITINO_SIMPLE_USER_NAME =
-      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_SIMPLE_USER_NAME;
   public static final String GRAVITINO_OAUTH2_URI =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_SERVER_URI;
   public static final String GRAVITINO_OAUTH2_PATH =
