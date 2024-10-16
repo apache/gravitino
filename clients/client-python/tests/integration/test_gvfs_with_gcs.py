@@ -18,6 +18,7 @@
 import logging
 import os
 from random import randint
+import unittest
 
 from fsspec.implementations.arrow import ArrowFSWrapper
 from pyarrow.fs import GcsFileSystem
