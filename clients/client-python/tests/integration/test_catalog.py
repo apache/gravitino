@@ -112,8 +112,8 @@ class TestCatalog(IntegrationTestEnv):
         except NoSuchCatalogException:
             logger.info("TestCatalog: Catalog %s does not exist", self.catalog_name)
 
-        self.gravitino_client.load_catalog(self.catalog_name)
         catalog = self.create_catalog(self.catalog_name)
+        logger.info("TestCatalog: Catalog %s created, properties: %s", catalog.name(), catalog.properties)
         self.assertEqual(catalog.name(), self.catalog_name)
         self.assertEqual(
             catalog.properties(), {self.catalog_location_prop: "/tmp/test_schema"}
