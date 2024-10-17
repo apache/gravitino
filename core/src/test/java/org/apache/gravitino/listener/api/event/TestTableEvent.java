@@ -84,7 +84,7 @@ public class TestTableEvent {
         table.distribution(),
         table.sortOrder(),
         table.index());
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateTableEvent.class, event.getClass());
     TableInfo tableInfo = ((CreateTableEvent) event).createdTableInfo();
@@ -95,7 +95,7 @@ public class TestTableEvent {
   void testLoadTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.loadTable(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadTableEvent.class, event.getClass());
     TableInfo tableInfo = ((LoadTableEvent) event).loadedTableInfo();
@@ -107,7 +107,7 @@ public class TestTableEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     TableChange change = TableChange.setProperty("a", "b");
     dispatcher.alterTable(identifier, change);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterTableEvent.class, event.getClass());
     TableInfo tableInfo = ((AlterTableEvent) event).updatedTableInfo();
@@ -120,7 +120,7 @@ public class TestTableEvent {
   void testDropTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.dropTable(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropTableEvent.class, event.getClass());
     Assertions.assertEquals(true, ((DropTableEvent) event).isExists());
@@ -130,7 +130,7 @@ public class TestTableEvent {
   void testPurgeTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.purgeTable(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(PurgeTableEvent.class, event.getClass());
     Assertions.assertEquals(true, ((PurgeTableEvent) event).isExists());
@@ -140,7 +140,7 @@ public class TestTableEvent {
   void testListTableEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     dispatcher.listTables(namespace);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListTableEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListTableEvent) event).namespace());
@@ -161,7 +161,7 @@ public class TestTableEvent {
                 table.distribution(),
                 table.sortOrder(),
                 table.index()));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -174,7 +174,7 @@ public class TestTableEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.loadTable(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -187,7 +187,7 @@ public class TestTableEvent {
     TableChange change = TableChange.setProperty("a", "b");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.alterTable(identifier, change));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -201,7 +201,7 @@ public class TestTableEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.dropTable(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -213,7 +213,7 @@ public class TestTableEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.purgeTable(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(PurgeTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -225,7 +225,7 @@ public class TestTableEvent {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listTables(namespace));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
