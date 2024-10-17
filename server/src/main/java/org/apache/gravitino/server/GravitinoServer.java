@@ -80,7 +80,7 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void initialize() {
-    gravitinoEnv.initialize(serverConfig, true);
+    gravitinoEnv.initializeBaseComponents(serverConfig);
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -144,7 +144,7 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void start() throws Exception {
-    gravitinoEnv.start(true);
+    gravitinoEnv.start();
     server.start();
   }
 

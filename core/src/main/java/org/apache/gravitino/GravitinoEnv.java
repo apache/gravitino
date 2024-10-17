@@ -78,6 +78,8 @@ public class GravitinoEnv {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoEnv.class);
 
   private Config config;
+  // Iceberg REST server init base components while Gravitino Server init all components.
+  private boolean manageAllComponents;
 
   private EntityStore entityStore;
 
@@ -130,21 +132,30 @@ public class GravitinoEnv {
   }
 
   /**
-   * Initialize the Gravitino environment.
+   * Initialize base components, used for Iceberg REST server.
    *
    * @param config The configuration object to initialize the environment.
-   * @param isGravitinoServer A boolean flag indicating whether the initialization is for the
-   *     Gravitino server. If true, server-specific components will be initialized in addition to
-   *     the base components.
    */
-  public void initialize(Config config, boolean isGravitinoServer) {
-    LOG.info("Initializing Gravitino Environment...");
+  public void initializeBaseComponents(Config config) {
+    LOG.info("Initializing Gravitino base environment...");
     this.config = config;
+    this.manageAllComponents = false;
     initBaseComponents();
-    if (isGravitinoServer) {
-      initGravitinoServerComponents();
-    }
-    LOG.info("Gravitino Environment is initialized.");
+    LOG.info("Gravitino base environment is initialized.");
+  }
+
+  /**
+   * Initialize all components, used for Gravitino server.
+   *
+   * @param config The configuration object to initialize the environment.
+   */
+  public void initializeAllComponents(Config config) {
+    LOG.info("Initializing Gravitino all Environment...");
+    this.config = config;
+    this.manageAllComponents = true;
+    initBaseComponents();
+    initGravitinoServerComponents();
+    LOG.info("Gravitino all environment is initialized.");
   }
 
   /**
@@ -307,10 +318,10 @@ public class GravitinoEnv {
     return futureGrantManager;
   }
 
-  public void start(boolean isGravitinoServer) {
+  public void start() {
     metricsSystem.start();
     eventListenerManager.start();
-    if (isGravitinoServer) {
+    if (manageAllComponents) {
       auxServiceManager.serviceStart();
     }
   }
