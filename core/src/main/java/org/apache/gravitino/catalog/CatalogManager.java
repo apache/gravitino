@@ -22,6 +22,7 @@ import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -71,10 +72,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.capability.Capability;
@@ -106,13 +105,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
-  private static final PropertiesMetadata BASIC_CATALOG_PROPERTIES_METADATA =
-      new BaseCatalogPropertiesMetadata() {
-        @Override
-        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-          return Collections.emptyMap();
-        }
-      };
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 

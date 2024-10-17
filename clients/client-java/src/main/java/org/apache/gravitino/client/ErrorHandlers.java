@@ -35,6 +35,7 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -323,7 +324,12 @@ public class ErrorHandlers {
           throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.NOT_IN_USE_CODE:
-          throw new CatalogNotInUseException(errorMessage);
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);
@@ -366,7 +372,12 @@ public class ErrorHandlers {
           throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.NOT_IN_USE_CODE:
-          throw new CatalogNotInUseException(errorMessage);
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -412,10 +423,20 @@ public class ErrorHandlers {
           throw new RuntimeException(errorMessage);
 
         case ErrorConstants.IN_USE_CODE:
-          throw new CatalogInUseException(errorMessage);
+          if (errorResponse.getType().equals(CatalogInUseException.class.getSimpleName())) {
+            throw new CatalogInUseException(errorMessage);
+
+          } else {
+            throw new InUseException(errorMessage);
+          }
 
         case ErrorConstants.NOT_IN_USE_CODE:
-          throw new CatalogNotInUseException(errorMessage);
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);
@@ -536,7 +557,12 @@ public class ErrorHandlers {
           throw new RuntimeException(errorMessage);
 
         case ErrorConstants.NOT_IN_USE_CODE:
-          throw new CatalogNotInUseException(errorMessage);
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);
@@ -577,7 +603,12 @@ public class ErrorHandlers {
           throw new RuntimeException(errorMessage);
 
         case ErrorConstants.NOT_IN_USE_CODE:
-          throw new CatalogNotInUseException(errorMessage);
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);

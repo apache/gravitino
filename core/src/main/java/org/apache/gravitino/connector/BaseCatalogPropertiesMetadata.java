@@ -28,12 +28,21 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.annotation.Evolving;
 
 @Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
+
+  public static final PropertiesMetadata BASIC_CATALOG_PROPERTIES_METADATA =
+      new BaseCatalogPropertiesMetadata() {
+        @Override
+        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+          return Collections.emptyMap();
+        }
+      };
 
   // The basic property entries for catalog entities
   private static final Map<String, PropertyEntry<?>> BASIC_CATALOG_PROPERTY_ENTRIES =
