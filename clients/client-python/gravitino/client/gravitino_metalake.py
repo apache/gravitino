@@ -23,6 +23,7 @@ from gravitino.api.catalog_change import CatalogChange
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
+from gravitino.dto.requests.catalog_set_request import CatalogSetRequest
 from gravitino.dto.requests.catalog_updates_request import CatalogUpdatesRequest
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
@@ -215,8 +216,14 @@ class GravitinoMetalake(MetalakeDTO):
         Raises:
             NoSuchCatalogException if the catalog with specified name does not exist.
         """
-        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name) + "/enable"
-        self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
+
+        catalog_enable_request = CatalogSetRequest(in_use=True)
+        catalog_enable_request.validate()
+
+        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
+        self.rest_client.patch(
+            url, json=catalog_enable_request, error_handler=CATALOG_ERROR_HANDLER
+        )
 
     def disable_catalog(self, name: str):
         """Disable the catalog with specified name. If the catalog is already disabled, this method does nothing.
@@ -227,5 +234,11 @@ class GravitinoMetalake(MetalakeDTO):
         Raises:
             NoSuchCatalogException if the catalog with specified name does not exist.
         """
-        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name) + "/disable"
-        self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
+
+        catalog_disable_request = CatalogSetRequest(in_use=False)
+        catalog_disable_request.validate()
+
+        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
+        self.rest_client.patch(
+            url, json=catalog_disable_request, error_handler=CATALOG_ERROR_HANDLER
+        )

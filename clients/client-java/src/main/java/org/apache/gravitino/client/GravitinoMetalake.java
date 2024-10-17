@@ -46,6 +46,7 @@ import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
+import org.apache.gravitino.dto.requests.CatalogSetRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
@@ -297,9 +298,12 @@ public class GravitinoMetalake extends MetalakeDTO
 
   @Override
   public void enableCatalog(String catalogName) throws NoSuchCatalogException {
+    CatalogSetRequest req = new CatalogSetRequest(true);
+
     ErrorResponse resp =
-        restClient.get(
-            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName) + "/activate",
+        restClient.patch(
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            req,
             ErrorResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
@@ -313,9 +317,12 @@ public class GravitinoMetalake extends MetalakeDTO
 
   @Override
   public void disableCatalog(String catalogName) throws NoSuchCatalogException {
+    CatalogSetRequest req = new CatalogSetRequest(false);
+
     ErrorResponse resp =
-        restClient.get(
-            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName) + "/disable",
+        restClient.patch(
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            req,
             ErrorResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());

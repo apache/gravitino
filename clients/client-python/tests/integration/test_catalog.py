@@ -145,9 +145,8 @@ class TestCatalog(IntegrationTestEnv):
 
     def test_drop_catalog(self):
         self.create_catalog(self.catalog_name)
-        self.assertTrue(
-            self.gravitino_client.drop_catalog(name=self.catalog_name, force=True)
-        )
+        self.gravitino_client.disable_catalog(self.catalog_name)
+        self.assertTrue(self.gravitino_client.drop_catalog(name=self.catalog_name))
 
     def test_list_catalogs_info(self):
         self.create_catalog(self.catalog_name)
