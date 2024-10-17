@@ -78,8 +78,9 @@ public class IcebergRestTestUtil {
       catalogConf.put(
           IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
           ConfigBasedIcebergCatalogWrapperProviderForTest.class.getName());
+      // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
-          new IcebergCatalogWrapperManager(catalogConf);
+          new IcebergCatalogWrapperManagerForTest(catalogConf);
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(

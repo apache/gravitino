@@ -194,9 +194,8 @@ public class IcebergTableOperations {
     // todo support snapshots
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    LoadTableResponse loadTableResponse = icebergCatalogWrapperManager
-        .getOps(prefix)
-        .loadTable(tableIdentifier);
+    LoadTableResponse loadTableResponse =
+        icebergCatalogWrapperManager.getOps(prefix).loadTable(tableIdentifier);
     if (isCredentialVending) {
       return IcebergRestUtils.ok(injectCredentialConfig(prefix, loadTableResponse));
     } else {

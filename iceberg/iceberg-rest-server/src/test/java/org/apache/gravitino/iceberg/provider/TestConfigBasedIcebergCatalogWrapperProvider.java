@@ -67,12 +67,12 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
     IcebergConfig hiveIcebergConfig = provider.catalogConfigs.get(hiveCatalogName);
     IcebergConfig jdbcIcebergConfig = provider.catalogConfigs.get(jdbcCatalogName);
     IcebergConfig defaultIcebergConfig = provider.catalogConfigs.get(defaultCatalogName);
-    IcebergCatalogWrapper hiveOps = new IcebergCatalogWrapper(
-        provider.getIcebergCatalogConfig(hiveCatalogName).get());
-    IcebergCatalogWrapper jdbcOps = new IcebergCatalogWrapper(
-        provider.getIcebergCatalogConfig(jdbcCatalogName).get());
-    IcebergCatalogWrapper defaultOps = new IcebergCatalogWrapper(
-        provider.getIcebergCatalogConfig(defaultCatalogName).get());
+    IcebergCatalogWrapper hiveOps =
+        new IcebergCatalogWrapper(provider.getIcebergCatalogConfig(hiveCatalogName).get());
+    IcebergCatalogWrapper jdbcOps =
+        new IcebergCatalogWrapper(provider.getIcebergCatalogConfig(jdbcCatalogName).get());
+    IcebergCatalogWrapper defaultOps =
+        new IcebergCatalogWrapper(provider.getIcebergCatalogConfig(defaultCatalogName).get());
 
     Assertions.assertEquals(
         hiveCatalogName, hiveIcebergConfig.get(IcebergConfig.CATALOG_BACKEND_NAME));

@@ -68,7 +68,7 @@ public class ConfigBasedIcebergCatalogConfigProvider implements IcebergCatalogCo
   }
 
   @Override
-  public  Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
+  public Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
     return Optional.ofNullable(catalogConfigs.get(catalogName));
   }
 

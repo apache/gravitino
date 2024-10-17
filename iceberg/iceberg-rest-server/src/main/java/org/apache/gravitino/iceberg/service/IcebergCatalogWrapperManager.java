@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -106,6 +107,11 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     return credentialProviderManager.getCredentialProvider(catalogName);
   }
 
+  @VisibleForTesting
+  protected IcebergCatalogWrapper createIcebergCatalogWrapper(IcebergConfig icebergConfig) {
+    return new IcebergCatalogWrapper(icebergConfig);
+  }
+
   private IcebergCatalogWrapper createCatalogWrapper(String catalogName) {
     Optional<IcebergConfig> icebergConfig = provider.getIcebergCatalogConfig(catalogName);
     if (!icebergConfig.isPresent()) {
@@ -120,8 +126,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
       credentialProviderManager.registerCredentialProvider(catalogName, credentialProvider);
     }
 
-    IcebergCatalogWrapper catalogWrapper = new IcebergCatalogWrapper(icebergConfig.get());
-    return catalogWrapper;
+    return createIcebergCatalogWrapper(icebergConfig.get());
   }
 
   private String getCatalogName(String rawPrefix) {
