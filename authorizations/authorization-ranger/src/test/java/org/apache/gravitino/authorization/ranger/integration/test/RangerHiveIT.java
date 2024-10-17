@@ -503,6 +503,50 @@ public class RangerHiveIT {
   }
 
   @Test
+  public void testRoleChangeUpdateDifferentMetadata() {
+    // Test same metadata namespace and different type
+    SecurableObject metalake =
+        SecurableObjects.parse(
+            String.format("%s", currentFunName()),
+            MetadataObject.Type.METALAKE,
+            Lists.newArrayList(Privileges.CreateTable.allow()));
+    SecurableObject catalog =
+        SecurableObjects.parse(
+            metalake.fullName(),
+            MetadataObject.Type.CATALOG,
+            Lists.newArrayList(Privileges.ModifyTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName())
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(metalake))
+            .build();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            rangerAuthHivePlugin.onRoleUpdated(
+                role, RoleChange.updateSecurableObject(role.name(), metalake, catalog)));
+
+    // Test different metadata namespace and same type
+    SecurableObject schema1 =
+        SecurableObjects.parse(
+            String.format("catalog1.%s", currentFunName()),
+            MetadataObject.Type.SCHEMA,
+            Lists.newArrayList(Privileges.CreateTable.allow()));
+    SecurableObject schema2 =
+        SecurableObjects.parse(
+            String.format("catalog1-diff.%s", currentFunName()),
+            schema1.type(),
+            Lists.newArrayList(Privileges.ModifyTable.allow()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            rangerAuthHivePlugin.onRoleUpdated(
+                role, RoleChange.updateSecurableObject(role.name(), schema1, schema2)));
+  }
+
+  @Test
   public void testRoleChangeUpdateCatalogSecurableObject() {
     String currentFunName = currentFunName();
     Role mockCatalogRole = mockCatalogRole(currentFunName);
