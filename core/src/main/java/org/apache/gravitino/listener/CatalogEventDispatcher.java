@@ -175,15 +175,15 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   }
 
   @Override
-  public void activateCatalog(NameIdentifier ident)
+  public void enableCatalog(NameIdentifier ident)
       throws NoSuchCatalogException, CatalogNotInUseException {
     // todo: support activate catalog event
-    dispatcher.activateCatalog(ident);
+    dispatcher.enableCatalog(ident);
   }
 
   @Override
-  public void deactivateCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    // todo: support deactivate catalog event
-    dispatcher.deactivateCatalog(ident);
+  public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    // todo: support disable catalog event
+    dispatcher.disableCatalog(ident);
   }
 }

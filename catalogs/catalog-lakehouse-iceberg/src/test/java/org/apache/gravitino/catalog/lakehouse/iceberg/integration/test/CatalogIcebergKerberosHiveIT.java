@@ -292,7 +292,7 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
     Assertions.assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
 
     // Drop catalog
-    Assertions.assertDoesNotThrow(() -> gravitinoMetalake.deactivateCatalog(CATALOG_NAME));
+    Assertions.assertDoesNotThrow(() -> gravitinoMetalake.disableCatalog(CATALOG_NAME));
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
   }
 

@@ -135,13 +135,13 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   @Override
-  public void activateCatalog(String catalogName) throws NoSuchCatalogException {
-    getMetalake().activateCatalog(catalogName);
+  public void enableCatalog(String catalogName) throws NoSuchCatalogException {
+    getMetalake().enableCatalog(catalogName);
   }
 
   @Override
-  public void deactivateCatalog(String catalogName) throws NoSuchCatalogException {
-    getMetalake().deactivateCatalog(catalogName);
+  public void disableCatalog(String catalogName) throws NoSuchCatalogException {
+    getMetalake().disableCatalog(catalogName);
   }
 
   /**

@@ -147,10 +147,10 @@ public class CatalogIT extends BaseIT {
         Assertions.assertThrows(
             CatalogInUseException.class, () -> metalake.dropCatalog(catalogName));
     Assertions.assertTrue(
-        exception.getMessage().contains("please deactivate it first or use force option"),
+        exception.getMessage().contains("please disable it first or use force option"),
         exception.getMessage());
 
-    Assertions.assertDoesNotThrow(() -> metalake.deactivateCatalog(catalogName));
+    Assertions.assertDoesNotThrow(() -> metalake.disableCatalog(catalogName));
     Assertions.assertTrue(metalake.dropCatalog(catalogName), "catalog should be dropped");
     Assertions.assertFalse(metalake.dropCatalog(catalogName), "catalog should be non-existent");
   }
@@ -167,10 +167,10 @@ public class CatalogIT extends BaseIT {
         Assertions.assertThrows(
             CatalogInUseException.class, () -> metalake.dropCatalog(catalogName));
     Assertions.assertTrue(
-        exception.getMessage().contains("please deactivate it first or use force option"),
+        exception.getMessage().contains("please disable it first or use force option"),
         exception.getMessage());
 
-    Assertions.assertDoesNotThrow(() -> metalake.deactivateCatalog(catalogName));
+    Assertions.assertDoesNotThrow(() -> metalake.disableCatalog(catalogName));
     Catalog loadedCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals("false", loadedCatalog.properties().get(PROPERTY_IN_USE));
 
@@ -235,7 +235,7 @@ public class CatalogIT extends BaseIT {
     Assertions.assertEquals("hadoop", catalog.provider());
     Assertions.assertEquals("catalog comment", catalog.comment());
     Assertions.assertEquals("true", catalog.properties().get(PROPERTY_IN_USE));
-    metalake.deactivateCatalog(catalogName);
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
 
     // test cloud related properties
@@ -266,7 +266,7 @@ public class CatalogIT extends BaseIT {
     Assertions.assertFalse(catalog.properties().isEmpty());
     Assertions.assertEquals("aws", catalog.properties().get("cloud.name"));
     Assertions.assertEquals("us-west-2", catalog.properties().get("cloud.region-code"));
-    metalake.deactivateCatalog(catalogName);
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
   }
 
@@ -286,7 +286,7 @@ public class CatalogIT extends BaseIT {
     Assertions.assertEquals("这是中文comment", catalog.comment());
     Assertions.assertTrue(catalog.properties().containsKey("metastore.uris"));
 
-    metalake.deactivateCatalog(catalogName);
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
   }
 
@@ -319,10 +319,10 @@ public class CatalogIT extends BaseIT {
     Assertions.assertTrue(ArrayUtils.contains(catalogs, relCatalog));
     Assertions.assertTrue(ArrayUtils.contains(catalogs, fileCatalog));
 
-    metalake.deactivateCatalog(relCatalogName);
+    metalake.disableCatalog(relCatalogName);
     metalake.dropCatalog(relCatalogName);
 
-    metalake.deactivateCatalog(fileCatalogName);
+    metalake.disableCatalog(fileCatalogName);
     metalake.dropCatalog(fileCatalogName);
   }
 
@@ -358,7 +358,7 @@ public class CatalogIT extends BaseIT {
     Assertions.assertEquals("catalog comment", catalog.comment());
     Assertions.assertTrue(catalog.properties().containsKey("package"));
 
-    metalake.deactivateCatalog(catalogName);
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
 
     // Test using invalid package path
@@ -392,7 +392,7 @@ public class CatalogIT extends BaseIT {
         metalake.alterCatalog(catalogName, CatalogChange.updateComment("new catalog comment"));
     Assertions.assertEquals("new catalog comment", updatedCatalog.comment());
 
-    metalake.deactivateCatalog(catalogName);
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
   }
 
@@ -423,7 +423,7 @@ public class CatalogIT extends BaseIT {
     Assertions.assertEquals(alterCloudName, alteredCatalog.properties().get(Catalog.CLOUD_NAME));
     Assertions.assertEquals(
         alterRegionCode, alteredCatalog.properties().get(Catalog.CLOUD_REGION_CODE));
-    metalake.deactivateCatalog(catalogName);
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
   }
 }

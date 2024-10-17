@@ -125,13 +125,13 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   }
 
   @Override
-  public void activateCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    dispatcher.activateCatalog(ident);
+  public void enableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    dispatcher.enableCatalog(ident);
   }
 
   @Override
-  public void deactivateCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    dispatcher.deactivateCatalog(ident);
+  public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    dispatcher.disableCatalog(ident);
   }
 
   private void validateCatalogName(String name) throws IllegalArgumentException {

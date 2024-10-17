@@ -116,8 +116,8 @@ public interface SupportsCatalogs {
    * <ul>
    *   <li>There is no schema in the catalog. Otherwise, a {@link NonEmptyEntityException} will be
    *       thrown.
-   *   <li>The method {@link #deactivateCatalog(String)} has been called before dropping the
-   *       catalog. Otherwise, a {@link CatalogInUseException} will be thrown.
+   *   <li>The method {@link #disableCatalog(String)} has been called before dropping the catalog.
+   *       Otherwise, a {@link CatalogInUseException} will be thrown.
    * </ul>
    *
    * It is equivalent to calling {@code dropCatalog(ident, false)}.
@@ -154,19 +154,19 @@ public interface SupportsCatalogs {
       throws NonEmptyEntityException, CatalogInUseException;
 
   /**
-   * Activate a catalog. If the catalog is already activated, this method does nothing.
+   * Enable a catalog. If the catalog is already enable, this method does nothing.
    *
    * @param catalogName The identifier of the catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
-  void activateCatalog(String catalogName) throws NoSuchCatalogException;
+  void enableCatalog(String catalogName) throws NoSuchCatalogException;
 
   /**
-   * Deactivate a catalog. If the catalog is already deactivated, this method does nothing. Once a
-   * catalog is deactivated:
+   * Disable a catalog. If the catalog is already disabled, this method does nothing. Once a catalog
+   * is disabled:
    *
    * <ul>
-   *   <li>It can only be listed, loaded, dropped, or activated.
+   *   <li>It can only be listed, loaded, dropped, or disable.
    *   <li>Any other operations on the catalog will throw an {@link CatalogNotInUseException}.
    *   <li>Any operation on the sub-entities (schemas, tables, etc.) will throw an {@link
    *       CatalogNotInUseException}.
@@ -175,7 +175,7 @@ public interface SupportsCatalogs {
    * @param catalogName The identifier of the catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
-  void deactivateCatalog(String catalogName) throws NoSuchCatalogException;
+  void disableCatalog(String catalogName) throws NoSuchCatalogException;
 
   /**
    * Test whether the catalog with specified parameters can be connected to before creating it.

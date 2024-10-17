@@ -128,7 +128,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
     for (String schemaName : schemaNames) {
       catalog.asSchemas().dropSchema(schemaName, true);
     }
-    metalake.deactivateCatalog(catalogName);
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
     postgreSqlService.close();

@@ -24,8 +24,8 @@ public enum OperationType {
   LOAD,
   ALTER,
   DROP,
-  ACTIVATE,
-  DEACTIVATE,
+  ENABLE,
+  DISABLE,
   /** This is a special operation type that is used to get a partition from a table. */
   GET,
   ADD,

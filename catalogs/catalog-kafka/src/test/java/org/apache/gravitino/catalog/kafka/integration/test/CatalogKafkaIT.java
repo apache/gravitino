@@ -123,7 +123,7 @@ public class CatalogKafkaIT extends BaseIT {
     Arrays.stream(metalake.listCatalogs())
         .forEach(
             (catalogName -> {
-              metalake.deactivateCatalog(catalogName);
+              metalake.disableCatalog(catalogName);
               metalake.dropCatalog(catalogName);
             }));
     client.dropMetalake(METALAKE_NAME);

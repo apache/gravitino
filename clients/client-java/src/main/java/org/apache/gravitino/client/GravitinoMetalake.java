@@ -296,7 +296,7 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   @Override
-  public void activateCatalog(String catalogName) throws NoSuchCatalogException {
+  public void enableCatalog(String catalogName) throws NoSuchCatalogException {
     ErrorResponse resp =
         restClient.get(
             String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName) + "/activate",
@@ -312,10 +312,10 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   @Override
-  public void deactivateCatalog(String catalogName) throws NoSuchCatalogException {
+  public void disableCatalog(String catalogName) throws NoSuchCatalogException {
     ErrorResponse resp =
         restClient.get(
-            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName) + "/deactivate",
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName) + "/disable",
             ErrorResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());

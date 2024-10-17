@@ -460,7 +460,7 @@ public class TestCatalogManager {
             CatalogInUseException.class, () -> catalogManager.dropCatalog(ident));
     Assertions.assertTrue(exception.getMessage().contains("Catalog metalake.test41 is in use"));
 
-    Assertions.assertDoesNotThrow(() -> catalogManager.deactivateCatalog(ident));
+    Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
     boolean dropped = catalogManager.dropCatalog(ident);
     Assertions.assertTrue(dropped);
 

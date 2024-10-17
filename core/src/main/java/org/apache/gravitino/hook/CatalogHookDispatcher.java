@@ -130,14 +130,14 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   }
 
   @Override
-  public void activateCatalog(NameIdentifier ident)
+  public void enableCatalog(NameIdentifier ident)
       throws NoSuchCatalogException, CatalogNotInUseException {
-    dispatcher.activateCatalog(ident);
+    dispatcher.enableCatalog(ident);
   }
 
   @Override
-  public void deactivateCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    dispatcher.deactivateCatalog(ident);
+  public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    dispatcher.disableCatalog(ident);
   }
 
   @Override

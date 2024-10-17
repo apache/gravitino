@@ -188,13 +188,13 @@ public class CatalogOperations {
   }
 
   @GET
-  @Path("{catalog}/activate")
+  @Path("{catalog}/enable")
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "activate-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "activate-catalog", absolute = true)
-  public Response activateCatalog(
+  @Timed(name = "enable-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "enable-catalog", absolute = true)
+  public Response enableCatalog(
       @PathParam("metalake") String metalake, @PathParam("catalog") String catalogName) {
-    LOG.info("Received activate request for catalog: {}.{}", metalake, catalogName);
+    LOG.info("Received enable request for catalog: {}.{}", metalake, catalogName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -204,29 +204,29 @@ public class CatalogOperations {
                 NameIdentifierUtil.ofMetalake(metalake),
                 LockType.WRITE,
                 () -> {
-                  catalogDispatcher.activateCatalog(ident);
+                  catalogDispatcher.enableCatalog(ident);
                   return null;
                 });
             Response response = Utils.ok(new BaseResponse());
-            LOG.info("Successfully activate catalog: {}.{}", metalake, catalogName);
+            LOG.info("Successfully enable catalog: {}.{}", metalake, catalogName);
             return response;
           });
 
     } catch (Exception e) {
-      LOG.info("Failed to activate catalog: {}.{}", metalake, catalogName);
+      LOG.info("Failed to enable catalog: {}.{}", metalake, catalogName);
       return ExceptionHandlers.handleCatalogException(
-          OperationType.ACTIVATE, catalogName, metalake, e);
+          OperationType.ENABLE, catalogName, metalake, e);
     }
   }
 
   @GET
-  @Path("{catalog}/deactivate")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "deactivate-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "deactivate-catalog", absolute = true)
-  public Response deactivateCatalog(
+  @Path("{catalog}/disable")
+  @Produces("disable/vnd.gravitino.v1+json")
+  @Timed(name = "disable-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "disable-catalog", absolute = true)
+  public Response disableCatalog(
       @PathParam("metalake") String metalake, @PathParam("catalog") String catalogName) {
-    LOG.info("Received deactivate request for catalog: {}.{}", metalake, catalogName);
+    LOG.info("Received disable request for catalog: {}.{}", metalake, catalogName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -236,18 +236,18 @@ public class CatalogOperations {
                 NameIdentifierUtil.ofMetalake(metalake),
                 LockType.WRITE,
                 () -> {
-                  catalogDispatcher.deactivateCatalog(ident);
+                  catalogDispatcher.disableCatalog(ident);
                   return null;
                 });
             Response response = Utils.ok(new BaseResponse());
-            LOG.info("Successfully deactivate catalog: {}.{}", metalake, catalogName);
+            LOG.info("Successfully disable catalog: {}.{}", metalake, catalogName);
             return response;
           });
 
     } catch (Exception e) {
-      LOG.info("Failed to deactivate catalog: {}.{}", metalake, catalogName);
+      LOG.info("Failed to disable catalog: {}.{}", metalake, catalogName);
       return ExceptionHandlers.handleCatalogException(
-          OperationType.DEACTIVATE, catalogName, metalake, e);
+          OperationType.DISABLE, catalogName, metalake, e);
     }
   }
 

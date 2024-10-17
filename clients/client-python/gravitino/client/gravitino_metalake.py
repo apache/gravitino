@@ -206,8 +206,8 @@ class GravitinoMetalake(MetalakeDTO):
 
         return drop_response.dropped()
 
-    def activate_catalog(self, name: str):
-        """Activate the catalog with specified name. If the catalog is already activated, this method does nothing.
+    def enable_catalog(self, name: str):
+        """Enable the catalog with specified name. If the catalog is already in use, this method does nothing.
 
         Args:
             name: the name of the catalog.
@@ -215,11 +215,11 @@ class GravitinoMetalake(MetalakeDTO):
         Raises:
             NoSuchCatalogException if the catalog with specified name does not exist.
         """
-        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name) + "/activate"
+        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name) + "/enable"
         self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)
 
-    def deactivate_catalog(self, name: str):
-        """Deactivate the catalog with specified name. If the catalog is already deactivated, this method does nothing.
+    def disable_catalog(self, name: str):
+        """Disable the catalog with specified name. If the catalog is already disabled, this method does nothing.
 
         Args:
             name: the name of the catalog.
@@ -227,5 +227,5 @@ class GravitinoMetalake(MetalakeDTO):
         Raises:
             NoSuchCatalogException if the catalog with specified name does not exist.
         """
-        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name) + "/deactivate"
+        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name) + "/disable"
         self.rest_client.get(url, error_handler=CATALOG_ERROR_HANDLER)

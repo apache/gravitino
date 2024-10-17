@@ -123,7 +123,7 @@ public interface SupportsCatalogs {
    * <ul>
    *   <li>There is no schema in the catalog. Otherwise, a {@link NonEmptyEntityException} will be
    *       thrown.
-   *   <li>The method {@link #deactivateCatalog(NameIdentifier)} has been called before dropping the
+   *   <li>The method {@link #disableCatalog(NameIdentifier)} has been called before dropping the
    *       catalog.
    * </ul>
    *
@@ -177,21 +177,20 @@ public interface SupportsCatalogs {
       throws Exception;
 
   /**
-   * Activate a catalog. If the catalog is already active, this method does nothing.
+   * Enable a catalog. If the catalog is already enable, this method does nothing.
    *
    * @param ident The identifier of the catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
-   * @throws CatalogNotInUseException If its parent metalake is not active.
+   * @throws CatalogNotInUseException If its parent metalake is not in use.
    */
-  void activateCatalog(NameIdentifier ident)
-      throws NoSuchCatalogException, CatalogNotInUseException;
+  void enableCatalog(NameIdentifier ident) throws NoSuchCatalogException, CatalogNotInUseException;
 
   /**
-   * Deactivate a catalog. If the catalog is already deactivated, this method does nothing. Once a
-   * catalog is deactivated:
+   * Disable a catalog. If the catalog is already disabled, this method does nothing. Once a catalog
+   * is disabled:
    *
    * <ul>
-   *   <li>It can only be listed, loaded, dropped, or activated.
+   *   <li>It can only be listed, loaded, dropped, or disable.
    *   <li>Any other operations on the catalog will throw an {@link CatalogNotInUseException}.
    *   <li>Any operation on the sub-entities (schemas, tables, etc.) will throw an {@link
    *       CatalogNotInUseException}.
@@ -200,5 +199,5 @@ public interface SupportsCatalogs {
    * @param ident The identifier of the catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
-  void deactivateCatalog(NameIdentifier ident) throws NoSuchCatalogException;
+  void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException;
 }

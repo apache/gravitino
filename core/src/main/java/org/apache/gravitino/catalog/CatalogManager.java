@@ -489,7 +489,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   @Override
-  public void activateCatalog(NameIdentifier ident)
+  public void enableCatalog(NameIdentifier ident)
       throws NoSuchCatalogException, CatalogNotInUseException {
     try {
       if (catalogInUse(store, ident)) {
@@ -518,7 +518,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   @Override
-  public void deactivateCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+  public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     try {
       if (!catalogInUse(store, ident)) {
         return;
@@ -559,8 +559,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
     if (!catalogInUse(store, ident)) {
-      throw new CatalogNotInUseException(
-          "Catalog %s is not in use, please activate it first", ident);
+      throw new CatalogNotInUseException("Catalog %s is not in use, please enable it first", ident);
     }
 
     // There could be a race issue that someone is using the catalog from cache while we are
@@ -633,7 +632,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       boolean catalogInUse = catalogInUse(store, ident);
       if (catalogInUse && !force) {
         throw new CatalogInUseException(
-            "Catalog %s is in use, please deactivate it first or use force option", ident);
+            "Catalog %s is in use, please disable it first or use force option", ident);
       }
 
       List<SchemaEntity> schemas =
@@ -652,8 +651,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
       // If reached here, it implies that the catalog is not in use or force is true.
       if (catalogInUse) {
-        // force is true, deactivate the catalog first
-        deactivateCatalog(ident);
+        // force is true, disable the catalog first
+        disableCatalog(ident);
       }
 
       catalogCache.invalidate(ident);
