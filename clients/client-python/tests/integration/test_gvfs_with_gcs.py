@@ -38,6 +38,8 @@ logger = logging.getLogger(__name__)
 
 @unittest.skip("This test require GCS service account key file")
 class TestGvfsWithGCS(TestGvfsWithHDFS):
+    # Before running this test, please set the make sure gcp-bundle-x.jar has been
+    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
     key_file = "your_key_file.json"
     bucket_name = "your_bucket_name"
     metalake_name: str = "TestGvfsWithGCS_metalake" + str(randint(1, 10000))
