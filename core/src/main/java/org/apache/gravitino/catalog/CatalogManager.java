@@ -85,7 +85,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.NonInUseEntityException;
+import org.apache.gravitino.exceptions.NotInUseEntityException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
@@ -490,28 +490,28 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   @Override
   public void activateCatalog(NameIdentifier ident)
-      throws NoSuchCatalogException, NonInUseEntityException {
+      throws NoSuchCatalogException, NotInUseEntityException {
     try {
-      boolean inUse = catalogInUse(store, ident);
-      if (!inUse) {
-        store.update(
-            ident,
-            CatalogEntity.class,
-            EntityType.CATALOG,
-            catalog -> {
-              CatalogEntity.Builder newCatalogBuilder =
-                  newCatalogBuilder(ident.namespace(), catalog);
-
-              Map<String, String> newProps =
-                  catalog.getProperties() == null
-                      ? new HashMap<>()
-                      : new HashMap<>(catalog.getProperties());
-              newProps.put(PROPERTY_IN_USE, "true");
-              newCatalogBuilder.withProperties(newProps);
-
-              return newCatalogBuilder.build();
-            });
+      if (catalogInUse(store, ident)) {
+        return;
       }
+
+      store.update(
+          ident,
+          CatalogEntity.class,
+          EntityType.CATALOG,
+          catalog -> {
+            CatalogEntity.Builder newCatalogBuilder = newCatalogBuilder(ident.namespace(), catalog);
+
+            Map<String, String> newProps =
+                catalog.getProperties() == null
+                    ? new HashMap<>()
+                    : new HashMap<>(catalog.getProperties());
+            newProps.put(PROPERTY_IN_USE, "true");
+            newCatalogBuilder.withProperties(newProps);
+
+            return newCatalogBuilder.build();
+          });
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -520,27 +520,26 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public void deactivateCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     try {
-      boolean inUse = catalogInUse(store, ident);
-      if (inUse) {
-        store.update(
-            ident,
-            CatalogEntity.class,
-            EntityType.CATALOG,
-            catalog -> {
-              CatalogEntity.Builder newCatalogBuilder =
-                  newCatalogBuilder(ident.namespace(), catalog);
-
-              Map<String, String> newProps =
-                  catalog.getProperties() == null
-                      ? new HashMap<>()
-                      : new HashMap<>(catalog.getProperties());
-              newProps.put(PROPERTY_IN_USE, "false");
-              newCatalogBuilder.withProperties(newProps);
-
-              return newCatalogBuilder.build();
-            });
-        catalogCache.invalidate(ident);
+      if (!catalogInUse(store, ident)) {
+        return;
       }
+      store.update(
+          ident,
+          CatalogEntity.class,
+          EntityType.CATALOG,
+          catalog -> {
+            CatalogEntity.Builder newCatalogBuilder = newCatalogBuilder(ident.namespace(), catalog);
+
+            Map<String, String> newProps =
+                catalog.getProperties() == null
+                    ? new HashMap<>()
+                    : new HashMap<>(catalog.getProperties());
+            newProps.put(PROPERTY_IN_USE, "false");
+            newCatalogBuilder.withProperties(newProps);
+
+            return newCatalogBuilder.build();
+          });
+      catalogCache.invalidate(ident);
 
     } catch (IOException e) {
       throw new RuntimeException(e);
@@ -560,7 +559,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
     if (!catalogInUse(store, ident)) {
-      throw new NonInUseEntityException(
+      throw new NotInUseEntityException(
           "Catalog %s is not in use, please activate it first", ident);
     }
 
@@ -808,7 +807,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   /**
-   * get the resolved properties (filter out the hidden properties and add some required default
+   * Get the resolved properties (filter out the hidden properties and add some required default
    * properties) of the catalog entity.
    *
    * @param entity The catalog entity.

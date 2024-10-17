@@ -30,7 +30,7 @@ import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.NonInUseEntityException;
+import org.apache.gravitino.exceptions.NotInUseEntityException;
 
 /**
  * Interface for supporting catalogs. It includes methods for listing, loading, creating, altering
@@ -181,9 +181,9 @@ public interface SupportsCatalogs {
    *
    * @param ident The identifier of the catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
-   * @throws NonInUseEntityException If its parent metalake is not active.
+   * @throws NotInUseEntityException If its parent metalake is not active.
    */
-  void activateCatalog(NameIdentifier ident) throws NoSuchCatalogException, NonInUseEntityException;
+  void activateCatalog(NameIdentifier ident) throws NoSuchCatalogException, NotInUseEntityException;
 
   /**
    * Deactivate a catalog. If the catalog is already deactivated, this method does nothing. Once a
@@ -191,10 +191,9 @@ public interface SupportsCatalogs {
    *
    * <ul>
    *   <li>It can only be listed, loaded, dropped, or activated.
-   *   <li>Any other operations on the catalog will throw an {@link
-   *       org.apache.gravitino.exceptions.NonInUseEntityException}.
+   *   <li>Any other operations on the catalog will throw an {@link NotInUseEntityException}.
    *   <li>Any operation on the sub-entities (schemas, tables, etc.) will throw an {@link
-   *       org.apache.gravitino.exceptions.NonInUseEntityException}.
+   *       NotInUseEntityException}.
    * </ul>
    *
    * @param ident The identifier of the catalog.

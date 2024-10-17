@@ -25,6 +25,7 @@ import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.NotInUseEntityException;
 
 /**
  * Client interface for supporting catalogs. It includes methods for listing, loading, creating,
@@ -166,10 +167,9 @@ public interface SupportsCatalogs {
    *
    * <ul>
    *   <li>It can only be listed, loaded, dropped, or activated.
-   *   <li>Any other operations on the catalog will throw an {@link
-   *       org.apache.gravitino.exceptions.NonInUseEntityException}.
+   *   <li>Any other operations on the catalog will throw an {@link NotInUseEntityException}.
    *   <li>Any operation on the sub-entities (schemas, tables, etc.) will throw an {@link
-   *       org.apache.gravitino.exceptions.NonInUseEntityException}.
+   *       NotInUseEntityException}.
    * </ul>
    *
    * @param catalogName The identifier of the catalog.

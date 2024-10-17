@@ -36,7 +36,7 @@ import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.EntityInUseException;
-import org.apache.gravitino.exceptions.NonInUseEntityException;
+import org.apache.gravitino.exceptions.NotInUseEntityException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -176,42 +176,42 @@ public class CatalogIT extends BaseIT {
 
     exception =
         Assertions.assertThrows(
-            NonInUseEntityException.class,
+            NotInUseEntityException.class,
             () -> metalake.alterCatalog(catalogName, CatalogChange.updateComment("new comment")));
     Assertions.assertTrue(
         exception.getMessage().contains("please activate it first"), exception.getMessage());
 
     // test schema operations under non-in-use catalog
     SupportsSchemas schemaOps = loadedCatalog.asSchemas();
-    Assertions.assertThrows(NonInUseEntityException.class, schemaOps::listSchemas);
+    Assertions.assertThrows(NotInUseEntityException.class, schemaOps::listSchemas);
     Assertions.assertThrows(
-        NonInUseEntityException.class, () -> schemaOps.createSchema("dummy", null, null));
-    Assertions.assertThrows(NonInUseEntityException.class, () -> schemaOps.loadSchema("dummy"));
+        NotInUseEntityException.class, () -> schemaOps.createSchema("dummy", null, null));
+    Assertions.assertThrows(NotInUseEntityException.class, () -> schemaOps.loadSchema("dummy"));
     Assertions.assertThrows(
-        NonInUseEntityException.class,
+        NotInUseEntityException.class,
         () -> schemaOps.alterSchema("dummy", SchemaChange.removeProperty("dummy")));
     Assertions.assertThrows(
-        NonInUseEntityException.class, () -> schemaOps.dropSchema("dummy", false));
+        NotInUseEntityException.class, () -> schemaOps.dropSchema("dummy", false));
 
     // test fileset operations under non-in-use catalog
     FilesetCatalog filesetOps = loadedCatalog.asFilesetCatalog();
     Assertions.assertThrows(
-        NonInUseEntityException.class, () -> filesetOps.listFilesets(Namespace.of("dummy")));
+        NotInUseEntityException.class, () -> filesetOps.listFilesets(Namespace.of("dummy")));
     Assertions.assertThrows(
-        NonInUseEntityException.class,
+        NotInUseEntityException.class,
         () -> filesetOps.loadFileset(NameIdentifier.of("dummy", "dummy")));
     Assertions.assertThrows(
-        NonInUseEntityException.class,
+        NotInUseEntityException.class,
         () ->
             filesetOps.createFileset(NameIdentifier.of("dummy", "dummy"), null, null, null, null));
     Assertions.assertThrows(
-        NonInUseEntityException.class,
+        NotInUseEntityException.class,
         () -> filesetOps.dropFileset(NameIdentifier.of("dummy", "dummy")));
     Assertions.assertThrows(
-        NonInUseEntityException.class,
+        NotInUseEntityException.class,
         () -> filesetOps.getFileLocation(NameIdentifier.of("dummy", "dummy"), "dummy"));
     Assertions.assertThrows(
-        NonInUseEntityException.class,
+        NotInUseEntityException.class,
         () ->
             filesetOps.alterFileset(
                 NameIdentifier.of("dummy", "dummy"), FilesetChange.removeComment()));

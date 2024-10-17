@@ -22,7 +22,7 @@ import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
 /** An exception thrown when operating on a non-in-use entity. */
-public class NonInUseEntityException extends GravitinoRuntimeException {
+public class NotInUseEntityException extends GravitinoRuntimeException {
   /**
    * Constructs a new exception with the specified detail message.
    *
@@ -30,7 +30,7 @@ public class NonInUseEntityException extends GravitinoRuntimeException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public NonInUseEntityException(@FormatString String message, Object... args) {
+  public NotInUseEntityException(@FormatString String message, Object... args) {
     super(message, args);
   }
 }

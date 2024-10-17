@@ -242,9 +242,9 @@ public class ErrorResponse extends BaseResponse {
    * @param throwable The throwable that caused the error.
    * @return The new instance.
    */
-  public static ErrorResponse nonInUse(String type, String message, Throwable throwable) {
+  public static ErrorResponse notInUse(String type, String message, Throwable throwable) {
     return new ErrorResponse(
-        ErrorConstants.NON_IN_USE_ENTITY_CODE, type, message, getStackTrace(throwable));
+        ErrorConstants.NOT_IN_USE_ENTITY_CODE, type, message, getStackTrace(throwable));
   }
 
   /**

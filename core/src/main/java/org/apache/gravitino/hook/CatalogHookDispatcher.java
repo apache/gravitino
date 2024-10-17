@@ -36,7 +36,7 @@ import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.NonInUseEntityException;
+import org.apache.gravitino.exceptions.NotInUseEntityException;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -131,7 +131,7 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
 
   @Override
   public void activateCatalog(NameIdentifier ident)
-      throws NoSuchCatalogException, NonInUseEntityException {
+      throws NoSuchCatalogException, NotInUseEntityException {
     dispatcher.activateCatalog(ident);
   }
 

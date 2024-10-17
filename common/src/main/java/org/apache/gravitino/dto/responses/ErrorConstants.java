@@ -49,7 +49,7 @@ public class ErrorConstants {
   public static final int FORBIDDEN_CODE = 1008;
 
   /** Error codes for operation on a no in use entity. */
-  public static final int NON_IN_USE_ENTITY_CODE = 1009;
+  public static final int NOT_IN_USE_ENTITY_CODE = 1009;
 
   /** Error codes for drop an in use entity. */
   public static final int ENTITY_IN_USE_CODE = 1010;

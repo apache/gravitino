@@ -128,7 +128,7 @@ public class Utils {
 
   public static Response nonInUse(String type, String message, Throwable throwable) {
     return Response.status(Response.Status.CONFLICT)
-        .entity(ErrorResponse.nonInUse(type, message, throwable))
+        .entity(ErrorResponse.notInUse(type, message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }

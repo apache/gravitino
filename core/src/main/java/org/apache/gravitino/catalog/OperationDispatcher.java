@@ -36,7 +36,7 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.NonInUseEntityException;
+import org.apache.gravitino.exceptions.NotInUseEntityException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -95,7 +95,7 @@ public abstract class OperationDispatcher {
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
     if (!catalogInUse(store, ident)) {
-      throw new NonInUseEntityException(
+      throw new NotInUseEntityException(
           "Catalog %s is not in use, please activate it first", ident);
     }
 
@@ -120,7 +120,7 @@ public abstract class OperationDispatcher {
       Class<E2> ex2)
       throws E1, E2 {
     if (!catalogInUse(store, ident)) {
-      throw new NonInUseEntityException(
+      throw new NotInUseEntityException(
           "Catalog %s is not in use, please activate it first", ident);
     }
 

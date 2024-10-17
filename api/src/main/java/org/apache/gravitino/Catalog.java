@@ -98,7 +98,7 @@ public interface Catalog extends Auditable {
    */
   String PROPERTY_PACKAGE = "package";
 
-  /** The property indicating the catalog is in use. */
+  /** The property indicates the catalog is in use. */
   String PROPERTY_IN_USE = "in-use";
 
   /**
