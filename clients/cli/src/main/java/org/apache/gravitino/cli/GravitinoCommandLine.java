@@ -334,6 +334,11 @@ public class GravitinoCommandLine {
       new CreateUser(url, metalake, user).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       new DeleteUser(url, metalake, user).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        new AddRoleToUser(url, metalake, user, role).handle();
+      }
     }
   }
 
