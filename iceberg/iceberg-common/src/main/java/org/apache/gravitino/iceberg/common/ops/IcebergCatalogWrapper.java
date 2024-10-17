@@ -26,7 +26,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import lombok.Getter;
 import lombok.Setter;
@@ -187,8 +186,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public LoadTableResponse loadTable(TableIdentifier tableIdentifier) {
-    return injectTableConfig(
-        () -> CatalogHandlers.loadTable(catalog, tableIdentifier), this::getCatalogConfigToClient);
+    return injectTableConfig(() -> CatalogHandlers.loadTable(catalog, tableIdentifier));
   }
 
   public boolean tableExists(TableIdentifier tableIdentifier) {
@@ -304,16 +302,15 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   // Some io and security configuration should pass to Iceberg REST client
-  private LoadTableResponse injectTableConfig(
-      Supplier<LoadTableResponse> supplier, Function<String, Map<String, String>> configInjector) {
+  private LoadTableResponse injectTableConfig(Supplier<LoadTableResponse> supplier) {
     LoadTableResponse loadTableResponse = supplier.get();
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
-        .addAllConfig(configInjector.apply(loadTableResponse.tableMetadata().location()))
+        .addAllConfig(getCatalogConfigToClient())
         .build();
   }
 
-  private Map<String, String> getCatalogConfigToClient(String location) {
+  private Map<String, String> getCatalogConfigToClient() {
     return catalogConfigToClients;
   }
 
