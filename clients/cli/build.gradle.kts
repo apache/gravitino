@@ -28,7 +28,7 @@ dependencies {
   implementation(project(":common"))
   implementation(libs.slf4j.api)
   implementation(libs.slf4j.simple)
-  implementation(libs.commons.cli.19)
+  implementation(libs.commons.cli.new)
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
