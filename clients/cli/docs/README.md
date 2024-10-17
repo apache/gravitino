@@ -76,22 +76,16 @@ To run the Gravitino CLI, use the following command structure:
 ```bash
 usage: gcli [metalake|catalog|schema|table] [list|details|create|delete|update] [options]
 Options
- -c,--catalog <arg>    catalog name
- -C,--create           create an entity
- -D,--details          list details about an entity
- -e,--entity <arg>     entity type
- -f,--name <arg>       full entity name (dot separated)
- -h,--help             command help information
- -L,--list             list entity children
- -m,--metalake <arg>   metalake name
- -R,--delete           delete an entity
- -s,--schema <arg>     schema name
- -t,--table <arg>      table name
- -u,--url <arg>        Gravitino URL (default: http://localhost:8090)
- -U,--update           update an entity
- -v,--version          Gravitino client version
- -r,--server           Gravitino server version
- -x,--command <arg>    one of: list, details, create, delete, or update
+ -C,--create       create an entity
+ -D,--details      list details about an entity
+ -f,--name <arg>   full entity name (dot separated)
+ -h,--help         command help information
+ -L,--list         list entity children
+ -r,--server       Gravitino server version
+ -R,--delete       delete an entity
+ -u,--url <arg>    Gravitino URL (default: http://localhost:8090)
+ -U,--update       update an entity
+ -v,--version      Gravitino client version
 ```
 
 ## Commands
