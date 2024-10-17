@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli;
 
-import java.util.Arrays;
 import org.apache.commons.cli.CommandLine;
 
 /**
@@ -53,11 +52,8 @@ public class FullName {
       metalakeEnv = System.getenv("GRAVITINO_METALAKE");
     }
 
-    // Check if the metalake name is specified as a command line option
-    if (line.hasOption(GravitinoOptions.METALAKE)) {
-      return line.getOptionValue(GravitinoOptions.METALAKE);
-      // Check if the metalake name is set as an environment variable
-    } else if (metalakeEnv != null) {
+    // Check if the metalake name is set as an environment variable
+    if (metalakeEnv != null) {
       return metalakeEnv;
       // Check if the metalake name is specified in the configuration file
     } else if (config.fileExists()) {
@@ -77,46 +73,42 @@ public class FullName {
   }
 
   /**
-   * Retrieves the catalog name from the command line or the second part of the full name option.
+   * Retrieves the catalog name from the second part of the full name option.
    *
    * @return The catalog name, or null if not found.
    */
   public String getCatalogName() {
-    return getNamePart(GravitinoOptions.CATALOG, 1);
+    return getNamePart(1);
   }
 
   /**
-   * Retrieves the schema name from the command line or the third part of the full name option.
+   * Retrieves the schema name from the third part of the full name option.
    *
    * @return The schema name, or null if not found.
    */
   public String getSchemaName() {
-    return getNamePart(GravitinoOptions.SCHEMA, 2);
+    return getNamePart(2);
   }
 
   /**
-   * Retrieves the table name from the command line or the fourth part of the full name option.
+   * Retrieves the table name from the fourth part of the full name option.
    *
    * @return The table name, or null if not found.
    */
   public String getTableName() {
-    return getNamePart(GravitinoOptions.TABLE, 3);
+    return getNamePart(3);
   }
 
   /**
    * Helper method to retrieve a specific part of the full name based on the position of the part.
    *
-   * @param entity The part of the name to obtain.
    * @param position The position of the name part in the full name string.
    * @return The extracted part of the name, or {@code null} if the name part is missing or
    *     malformed.
    */
-  public String getNamePart(String entity, int position) {
-    /* Check if the name is specified as a command line option. */
-    if (line.hasOption(entity)) {
-      return line.getOptionValue(entity);
-      /* Extract the name part from the full name if available. */
-    } else if (line.hasOption(GravitinoOptions.NAME)) {
+  public String getNamePart(int position) {
+    /* Extract the name part from the full name if available. */
+    if (line.hasOption(GravitinoOptions.NAME)) {
       String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
 
       /* Adjust position if metalake is part of the full name. */
@@ -139,30 +131,21 @@ public class FullName {
   /**
    * Helper method to determine a specific part of the full name exits.
    *
-   * @param entity The part of the name to obtain.
+   * @param partNo The part of the name to obtain.
    * @return True if the part exitsts.
    */
-  public boolean hasNamePart(String entity) {
-    /* Check if the name is specified as a command line option. */
-    if (line.hasOption(entity)) {
-      return true;
-      /* Extract the name part from the full name if available. */
-    } else if (line.hasOption(GravitinoOptions.NAME)) {
+  public boolean hasNamePart(int partNo) {
+    /* Extract the name part from the full name if available. */
+    if (line.hasOption(GravitinoOptions.NAME)) {
       String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
       int length = names.length;
-      String[] order = {
-        GravitinoOptions.METALAKE,
-        GravitinoOptions.CATALOG,
-        GravitinoOptions.SCHEMA,
-        GravitinoOptions.TABLE
-      };
-      int position = Arrays.asList(order).indexOf(entity);
+      int position = partNo;
 
       /* Adjust position if metalake is part of the full name. */
       if (metalakeEnv != null) {
         position = position - 1;
       }
-      return position < length;
+      return position <= length;
     }
 
     return false;
@@ -174,7 +157,7 @@ public class FullName {
    * @return True if the catalog name exists, or false if it does not.
    */
   public boolean hasMetalakeName() {
-    return hasNamePart(GravitinoOptions.METALAKE);
+    return hasNamePart(1);
   }
 
   /**
@@ -183,7 +166,7 @@ public class FullName {
    * @return True if the catalog name exists, or false if it does not.
    */
   public boolean hasCatalogName() {
-    return hasNamePart(GravitinoOptions.CATALOG);
+    return hasNamePart(2);
   }
 
   /**
@@ -192,7 +175,7 @@ public class FullName {
    * @return True if the schema name exists, or false if it does not.
    */
   public boolean hasSchemaName() {
-    return hasNamePart(GravitinoOptions.SCHEMA);
+    return hasNamePart(3);
   }
 
   /**
@@ -201,6 +184,6 @@ public class FullName {
    * @return True if the table name exists, or false if it does not.
    */
   public boolean hasTableName() {
-    return hasNamePart(GravitinoOptions.TABLE);
+    return hasNamePart(4);
   }
 }
