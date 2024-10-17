@@ -20,12 +20,10 @@
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.MissingArgumentException;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.GravitinoOptions;
@@ -39,16 +37,6 @@ public class TestFulllName {
   @BeforeEach
   public void setUp() {
     options = new GravitinoOptions().options();
-  }
-
-  @Test
-  public void entityFromCommandLineOption() throws Exception {
-    String[] args = {"--metalake", "metalake_demo"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-
-    String metalakeName = fullName.getMetalakeName();
-    assertEquals("metalake_demo", metalakeName);
   }
 
   @Test
@@ -78,44 +66,7 @@ public class TestFulllName {
   }
 
   @Test
-  public void justName() throws Exception, MissingArgumentException {
-    String[] args = {"--name"};
-
-    assertThrows(MissingArgumentException.class, () -> new DefaultParser().parse(options, args));
-  }
-
-  @Test
-  public void catalogFromCommandLineOption() throws Exception {
-    String[] args = {"--catalog", "catalogA"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-
-    String catalogName = fullName.getCatalogName();
-    assertEquals("catalogA", catalogName);
-  }
-
-  @Test
-  public void schemaFromCommandLineOption() throws Exception {
-    String[] args = {"--schema", "schemaA"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-
-    String schemaName = fullName.getSchemaName();
-    assertEquals("schemaA", schemaName);
-  }
-
-  @Test
-  public void tableFromCommandLineOption() throws Exception {
-    String[] args = {"--table", "tableA"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-
-    String tableName = fullName.getTableName();
-    assertEquals("tableA", tableName);
-  }
-
-  @Test
-  public void malformedMissingEntityName() throws Exception {
+  public void malformedName() throws Exception {
     String[] args = {"--name", "metalake.catalog"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
@@ -138,7 +89,7 @@ public class TestFulllName {
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
 
-    String namePart = fullName.getNamePart(GravitinoOptions.TABLE, 3);
+    String namePart = fullName.getNamePart(3);
     assertNull(namePart);
   }
 

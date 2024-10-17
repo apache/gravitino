@@ -180,3 +180,4 @@ gcli schema details --name catalog_hive.sales
 gcli table list --name catalog_postgres.hr.departments
 gcli table list --name catalog_mysql.db.iceberg_tables
 gcli table list --name catalog_hive.sales.products
+
