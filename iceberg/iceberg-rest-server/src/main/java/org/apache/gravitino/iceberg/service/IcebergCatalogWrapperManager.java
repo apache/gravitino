@@ -34,8 +34,8 @@ import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.CredentialProviderFactory;
 import org.apache.gravitino.credential.CredentialProviderManager;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogConfigProvider;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergCatalogConfigProvider;
 import org.apache.gravitino.iceberg.provider.GravitinoBasedIcebergCatalogConfigProvider;
 import org.slf4j.Logger;
@@ -70,7 +70,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
                 TimeUnit.MILLISECONDS)
             .removalListener(
                 (k, v, c) -> {
-                  String catalogName = (String)k;
+                  String catalogName = (String) k;
                   LOG.info("Remove IcebergCatalogWrapper cache {}.", catalogName);
                   closeIcebergCatalogWrapper((IcebergCatalogWrapper) v);
                   credentialProviderManager.unregisterCredentialProvider(catalogName);
@@ -115,7 +115,8 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     IcebergConfig config = icebergConfig.get();
     String credentialProviderType = config.get(IcebergConfig.CREDENTIAL_PROVIDER_TYPE);
     if (StringUtils.isNotBlank(credentialProviderType)) {
-      CredentialProvider credentialProvider = CredentialProviderFactory.create(credentialProviderType, config.getAllConfig());
+      CredentialProvider credentialProvider =
+          CredentialProviderFactory.create(credentialProviderType, config.getAllConfig());
       credentialProviderManager.registerCredentialProvider(catalogName, credentialProvider);
     }
 
@@ -137,7 +138,8 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   private IcebergCatalogConfigProvider createProvider(Map<String, String> properties) {
     String providerName =
         (new IcebergConfig(properties)).get(IcebergConfig.ICEBERG_REST_CATALOG_PROVIDER);
-    String className = ICEBERG_CATALOG_CONFIG_PROVIDER_NAMES.getOrDefault(providerName, providerName);
+    String className =
+        ICEBERG_CATALOG_CONFIG_PROVIDER_NAMES.getOrDefault(providerName, providerName);
     LOG.info("Load Iceberg catalog provider: {}.", className);
     try {
       Class<?> providerClz = Class.forName(className);

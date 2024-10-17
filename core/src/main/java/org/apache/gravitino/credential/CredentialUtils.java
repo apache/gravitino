@@ -20,10 +20,6 @@
 package org.apache.gravitino.credential;
 
 import com.google.common.collect.ImmutableSet;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class CredentialUtils {

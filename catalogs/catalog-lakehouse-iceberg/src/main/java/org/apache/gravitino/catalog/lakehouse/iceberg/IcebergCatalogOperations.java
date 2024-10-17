@@ -110,9 +110,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     resultConf.put("catalog_uuid", info.id().toString());
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
-    this.icebergCatalogWrapper =
-        new IcebergCatalogWrapper(
-            icebergConfig);
+    this.icebergCatalogWrapper = new IcebergCatalogWrapper(icebergConfig);
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
   }

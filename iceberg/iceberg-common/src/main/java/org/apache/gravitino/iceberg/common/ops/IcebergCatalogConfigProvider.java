@@ -23,8 +23,8 @@ import java.util.Optional;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 
 /**
- * {@code IcebergCatalogConfigProvider} is an interface defining how Iceberg REST catalog server gets
- * Iceberg catalog configurations.
+ * {@code IcebergCatalogConfigProvider} is an interface defining how Iceberg REST catalog server
+ * gets Iceberg catalog configurations.
  */
 public interface IcebergCatalogConfigProvider {
 

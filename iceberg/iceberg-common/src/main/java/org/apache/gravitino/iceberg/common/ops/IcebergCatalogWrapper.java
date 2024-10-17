@@ -31,7 +31,6 @@ import java.util.function.Supplier;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
@@ -103,8 +102,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
             key -> catalogPropertiesToClientKeys.contains(key));
 
     this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
-
-
   }
 
   private void validateNamespace(Optional<Namespace> namespace) {

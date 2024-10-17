@@ -29,7 +29,6 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

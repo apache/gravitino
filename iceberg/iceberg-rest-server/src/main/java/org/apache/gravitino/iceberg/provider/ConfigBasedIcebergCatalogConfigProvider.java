@@ -43,7 +43,8 @@ public class ConfigBasedIcebergCatalogConfigProvider implements IcebergCatalogCo
   public static final Logger LOG =
       LoggerFactory.getLogger(ConfigBasedIcebergCatalogConfigProvider.class);
 
-  public static final String CONFIG_BASE_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME = "config-based-provider";
+  public static final String CONFIG_BASE_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME =
+      "config-based-provider";
 
   @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
 

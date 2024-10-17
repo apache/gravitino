@@ -41,9 +41,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialProvider;
-import org.apache.gravitino.credential.CredentialProviderManager;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
@@ -112,7 +111,10 @@ public class IcebergTableOperations {
         accessDelegation,
         isCredentialVending);
     if (isCredentialVending) {
-      LoadTableResponse loadTableResponse = icebergCatalogWrapperManager.getOps(prefix).createTable(RESTUtil.decodeNamespace(namespace), createTableRequest);
+      LoadTableResponse loadTableResponse =
+          icebergCatalogWrapperManager
+              .getOps(prefix)
+              .createTable(RESTUtil.decodeNamespace(namespace), createTableRequest);
       return IcebergRestUtils.ok(injectCredentialConfig(prefix, loadTableResponse));
     } else {
       return IcebergRestUtils.ok(
@@ -245,20 +247,26 @@ public class IcebergTableOperations {
     }
   }
 
-  private LoadTableResponse injectCredentialConfig(String prefix,
-      LoadTableResponse loadTableResponse) {
-    CredentialProvider credentialProvider = icebergCatalogWrapperManager.getCredentialProvider(prefix);
+  private LoadTableResponse injectCredentialConfig(
+      String prefix, LoadTableResponse loadTableResponse) {
+    CredentialProvider credentialProvider =
+        icebergCatalogWrapperManager.getCredentialProvider(prefix);
     if (credentialProvider == null) {
       throw new RuntimeException("Doesn't support credential vending");
     }
-    Credential credential = CredentialUtils.vendCredential(credentialProvider,
-        loadTableResponse.tableMetadata().location());
+    Credential credential =
+        CredentialUtils.vendCredential(
+            credentialProvider, loadTableResponse.tableMetadata().location());
     if (credential == null) {
-      throw new RuntimeException("Couldn't generate credential for " + credentialProvider.credentialType());
+      throw new RuntimeException(
+          "Couldn't generate credential for " + credentialProvider.credentialType());
     }
     Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
-    return LoadTableResponse.builder().withTableMetadata(loadTableResponse.tableMetadata())
-        .addAllConfig(loadTableResponse.config()).addAllConfig(credentialConfig).build();
+    return LoadTableResponse.builder()
+        .withTableMetadata(loadTableResponse.tableMetadata())
+        .addAllConfig(loadTableResponse.config())
+        .addAllConfig(credentialConfig)
+        .build();
   }
 
   private boolean isCredentialVending(String accessDelegation) {

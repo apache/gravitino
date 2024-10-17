@@ -81,8 +81,7 @@ public class TestIcebergTableUpdate {
 
   @BeforeEach
   public void init() {
-    icebergCatalogWrapper =
-        new IcebergCatalogWrapper(new IcebergConfig(Collections.emptyMap()));
+    icebergCatalogWrapper = new IcebergCatalogWrapper(new IcebergConfig(Collections.emptyMap()));
     icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
     createNamespace(TEST_NAMESPACE_NAME);

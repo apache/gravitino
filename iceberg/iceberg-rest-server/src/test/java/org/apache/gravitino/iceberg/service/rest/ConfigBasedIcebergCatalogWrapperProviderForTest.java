@@ -19,7 +19,6 @@
 package org.apache.gravitino.iceberg.service.rest;
 
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergCatalogConfigProvider;
 
 public class ConfigBasedIcebergCatalogWrapperProviderForTest
