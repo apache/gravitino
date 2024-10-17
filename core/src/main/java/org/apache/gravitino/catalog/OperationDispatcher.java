@@ -95,8 +95,7 @@ public abstract class OperationDispatcher {
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
     if (!catalogInUse(store, ident)) {
-      throw new CatalogNotInUseException(
-          "Catalog %s is not in use, please activate it first", ident);
+      throw new CatalogNotInUseException("Catalog %s is not in use, please enable it first", ident);
     }
 
     try {
@@ -120,8 +119,7 @@ public abstract class OperationDispatcher {
       Class<E2> ex2)
       throws E1, E2 {
     if (!catalogInUse(store, ident)) {
-      throw new CatalogNotInUseException(
-          "Catalog %s is not in use, please activate it first", ident);
+      throw new CatalogNotInUseException("Catalog %s is not in use, please enable it first", ident);
     }
 
     try {
