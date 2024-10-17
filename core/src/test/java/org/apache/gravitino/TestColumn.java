@@ -40,6 +40,7 @@ public class TestColumn extends BaseColumn {
       column.comment = comment;
       column.dataType = dataType;
       column.nullable = nullable;
+      column.autoIncrement = autoIncrement;
       column.defaultValue = defaultValue;
 
       return column;
