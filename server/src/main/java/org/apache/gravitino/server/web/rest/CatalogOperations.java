@@ -202,7 +202,7 @@ public class CatalogOperations {
             NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
             TreeLockUtils.doWithTreeLock(
                 NameIdentifierUtil.ofMetalake(metalake),
-                LockType.READ,
+                LockType.WRITE,
                 () -> {
                   catalogDispatcher.activateCatalog(ident);
                   return null;
@@ -234,7 +234,7 @@ public class CatalogOperations {
             NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
             TreeLockUtils.doWithTreeLock(
                 NameIdentifierUtil.ofMetalake(metalake),
-                LockType.READ,
+                LockType.WRITE,
                 () -> {
                   catalogDispatcher.deactivateCatalog(ident);
                   return null;
