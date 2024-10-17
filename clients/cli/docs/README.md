@@ -128,49 +128,145 @@ properties: Used to list properties
 List All Metalakes
 
 ```bash
-gcli list
+gcli --list
 ```
 
 Get Details of a Specific Metalake
 
 ```bash
-gcli metalake details -name my-metalake
+gcli metalake --details -name my_metalake
 ```
 
 List Tables in a Catalog
 
 ```bash
-gcli metalake list -name my_metalake.my_catalog
+gcli metalake --list -name my_metalake.my_catalog
 ```
 
 Create a Metalake
 
 ```bash
-gcli metalake create -name my_metalake -comment "This is my metalake"
+gcli metalake --create -name my_metalake -comment "This is my metalake"
 ```
 
 Create a Catalog
 
 ```bash
-gcli catalog create -name metalake_demo.iceberg --provider iceberg --metastore thrift://hive-host:9083 --warehouse hdfs://hdfs-host:9000/user/iceberg/warehouse
+gcli catalog --create -name metalake_demo.iceberg --provider iceberg --metastore thrift://hive-host:9083 --warehouse hdfs://hdfs-host:9000/user/iceberg/warehouse
 ```
 
 Delete a Catalog
 
 ```bash
-gcli catalog delete -name my_metalake.my_catalog
+gcli catalog --delete -name my_metalake.my_catalog
 ```
 
 Rename a Metalake
 
 ```bash
-gcli metalake update -name metalake_demo -rename demo 
+gcli metalake --update -name metalake_demo -rename demo 
 ```
 
 Update a Metalake's comment
 
 ```bash
-gcli metalake update -name metalake_demo -comment "new comment" 
+gcli metalake --update -name metalake_demo -comment "new comment" 
+```
+
+List the properties of a Metalake
+
+```bash
+gcli metalake --properties --name metalake_demo
+```
+
+Set a Metalake's property
+
+```bash
+gcli metalake --set --name metalake_demo --property color --value red
+```
+
+Remove a Metalake's property
+
+```bash
+gcli metalake --remove --name metalake_demo --property color
+```
+
+Create a new User
+
+```bash
+gcli user --create --name metalake_demo --user new_user
+```
+
+Show a User's information
+
+```bash
+gcli user --details --name metalake_demo --user new_user
+```
+
+Show all Users
+
+```bash
+gcli user --list --name metalake_demo
+```
+
+Delete a User
+
+```bash
+gcli user --delete --name metalake_demo --user new_user
+```
+
+Create a Tag
+
+```bash
+gcli tag --create --name metalake_demo --tag tagA
+```
+
+List all Tags in a Metalake
+
+```bash
+gcli tag --list --name metalake_demo
+```
+
+Delete a Tag
+
+```bash
+gcli tag --delete --name metalake_demo --tag tagA
+```
+
+Add a Tag to a Schema
+
+```bash
+gcli tag --set --name metalake_demo.catalog_postgres.hr --tag hr
+```
+
+Remove a Tag from a Schema
+
+```bash
+gcli tag --remove --name metalake_demo.catalog_postgres.hr --tag hr
+```
+
+List all tags on a Schema
+
+```bash
+gcli tag --list --name metalake_demo.catalog_postgres.hr
+```
+
+Show all Roles
+
+```bash
+gcli role --list -name metalake_demo
+```
+
+Create an empty Role
+
+```bash
+gcli role --create --name metalake_demo --role admin
+```
+
+Delete a Role
+
+```bash
+gcli role --delete -name metalake_demo --role admin
 ```
 
 ### Setting Metalake name
