@@ -206,10 +206,10 @@ public class TestRoleOperations extends JerseyTest {
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respNotExist.getStatus());
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), respNotExist.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, respNotExist.getMediaType());
     ErrorResponse notExistResponse = respNotExist.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, notExistResponse.getCode());
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, notExistResponse.getCode());
 
     // Test to throw NoSuchMetalakeException
     when(catalogDispatcher.catalogExists(any())).thenReturn(true);
