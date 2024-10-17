@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.spark.connector;
 
+import org.apache.gravitino.auth.AuthProperties;
+
 public class GravitinoSparkConfig {
 
   private static final String GRAVITINO_PREFIX = "spark.sql.gravitino.";
@@ -26,6 +28,20 @@ public class GravitinoSparkConfig {
   public static final String GRAVITINO_METALAKE = GRAVITINO_PREFIX + "metalake";
   public static final String GRAVITINO_ENABLE_ICEBERG_SUPPORT =
       GRAVITINO_PREFIX + "enableIcebergSupport";
+
+  public static final String GRAVITINO_AUTH_TYPE =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_CLIENT_AUTH_TYPE;
+  public static final String GRAVITINO_OAUTH2_URI =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_SERVER_URI;
+  public static final String GRAVITINO_OAUTH2_PATH =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_TOKEN_PATH;
+  public static final String GRAVITINO_OAUTH2_CREDENTIAL =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_CREDENTIAL;
+  public static final String GRAVITINO_OAUTH2_SCOPE =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_SCOPE;
+  public static final String GRAVITINO_KERBEROS_PRINCIPAL = "spark.kerberos.principal";
+  public static final String GRAVITINO_KERBEROS_KEYTAB_FILE_PATH = "spark.kerberos.keytab";
+
   public static final String GRAVITINO_HIVE_METASTORE_URI = "metastore.uris";
   public static final String SPARK_HIVE_METASTORE_URI = "hive.metastore.uris";
 
