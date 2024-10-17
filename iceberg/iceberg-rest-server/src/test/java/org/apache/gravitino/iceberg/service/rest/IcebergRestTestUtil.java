@@ -24,10 +24,13 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergCatalogConfigProvider;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -74,10 +77,14 @@ public class IcebergRestTestUtil {
 
     if (bindIcebergTableOps) {
       Map<String, String> catalogConf = Maps.newHashMap();
-      catalogConf.put(String.format("catalog.%s.catalog-backend-name", PREFIX), PREFIX);
+      String catalogConfigPrefix = "catalog." + PREFIX;
       catalogConf.put(
           IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-          ConfigBasedIcebergCatalogWrapperProviderForTest.class.getName());
+          ConfigBasedIcebergCatalogConfigProvider.class.getName());
+      catalogConf.put(String.format("%s.catalog-backend-name", catalogConfigPrefix), PREFIX);
+      catalogConf.put(
+          CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
+          DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE);
       // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
           new IcebergCatalogWrapperManagerForTest(catalogConf);

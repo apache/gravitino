@@ -40,7 +40,7 @@ public class CredentialProviderManager {
       String catalogName, CredentialProvider credentialProvider) {
     CredentialProvider current = credentialProviders.putIfAbsent(catalogName, credentialProvider);
     Preconditions.checkState(
-        !current.equals(credentialProvider),
+        !credentialProvider.equals(current),
         String.format(
             "Should not register multi times to CredentialProviderManager, catalog:%s, credential provider:%s",
             catalogName, credentialProvider.credentialType()));
