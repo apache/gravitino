@@ -160,6 +160,7 @@ public class TestPOConverters {
         createColumnPO(
             1L,
             "test",
+            0,
             1L,
             1L,
             1L,
@@ -173,7 +174,7 @@ public class TestPOConverters {
 
     ColumnEntity expectedColumn =
         createColumn(
-            1L, "test", Types.IntegerType.get(), "test", true, true, Literals.integerLiteral(1));
+            1L, "test", 0, Types.IntegerType.get(), "test", true, true, Literals.integerLiteral(1));
 
     ColumnEntity convertedColumn = POConverters.fromColumnPO(columnPO);
     assertEquals(expectedColumn.id(), convertedColumn.id());
@@ -189,6 +190,7 @@ public class TestPOConverters {
         createColumnPO(
             1L,
             "test",
+            0,
             1L,
             1L,
             1L,
@@ -202,7 +204,7 @@ public class TestPOConverters {
 
     ColumnEntity expectedColumn1 =
         createColumn(
-            1L, "test", Types.IntegerType.get(), null, true, true, Literals.integerLiteral(1));
+            1L, "test", 0, Types.IntegerType.get(), null, true, true, Literals.integerLiteral(1));
 
     ColumnEntity convertedColumn1 = POConverters.fromColumnPO(columnPO1);
     assertEquals(expectedColumn1.comment(), convertedColumn1.comment());
@@ -215,6 +217,7 @@ public class TestPOConverters {
         createColumnPO(
             1L,
             "test1",
+            0,
             1L,
             1L,
             1L,
@@ -230,6 +233,7 @@ public class TestPOConverters {
         createColumnPO(
             2L,
             "test2",
+            1,
             1L,
             1L,
             1L,
@@ -243,11 +247,25 @@ public class TestPOConverters {
 
     ColumnEntity expectedColumn1 =
         createColumn(
-            1L, "test1", Types.IntegerType.get(), "test1", true, true, Literals.integerLiteral(1));
+            1L,
+            "test1",
+            0,
+            Types.IntegerType.get(),
+            "test1",
+            true,
+            true,
+            Literals.integerLiteral(1));
 
     ColumnEntity expectedColumn2 =
         createColumn(
-            2L, "test2", Types.StringType.get(), "test2", true, true, Literals.stringLiteral("1"));
+            2L,
+            "test2",
+            1,
+            Types.StringType.get(),
+            "test2",
+            true,
+            true,
+            Literals.stringLiteral("1"));
 
     TableEntity expectedTable =
         createTableWithColumns(
@@ -962,6 +980,7 @@ public class TestPOConverters {
   private static ColumnPO createColumnPO(
       Long id,
       String columnName,
+      Integer columnPosition,
       Long metalakeId,
       Long catalogId,
       Long schemaId,
@@ -978,6 +997,7 @@ public class TestPOConverters {
     return ColumnPO.builder()
         .withColumnId(id)
         .withColumnName(columnName)
+        .withColumnPosition(columnPosition)
         .withMetalakeId(metalakeId)
         .withCatalogId(catalogId)
         .withSchemaId(schemaId)
@@ -999,6 +1019,7 @@ public class TestPOConverters {
   private static ColumnEntity createColumn(
       Long id,
       String columnName,
+      Integer columnPosition,
       Type columnType,
       String columnComment,
       boolean columnNullable,
@@ -1009,6 +1030,7 @@ public class TestPOConverters {
     return ColumnEntity.builder()
         .withId(id)
         .withName(columnName)
+        .withPosition(columnPosition)
         .withDataType(columnType)
         .withComment(columnComment)
         .withNullable(columnNullable)
