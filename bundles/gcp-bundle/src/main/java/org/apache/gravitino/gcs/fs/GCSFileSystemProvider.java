@@ -16,38 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.hadoop.fs;
+package org.apache.gravitino.gcs.fs;
 
-import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_HDFS_FS_PROVIDER;
-import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-
+import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
 import java.io.IOException;
 import java.util.Map;
-import javax.annotation.Nonnull;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-public class HDFSFileSystemProvider implements FileSystemProvider {
-
+public class GCSFileSystemProvider implements FileSystemProvider {
   @Override
-  public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
-      throws IOException {
+  public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
     config.forEach(
         (k, v) -> {
-          configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v);
+          configuration.set(k.replace("gravitino.bypass.", ""), v);
         });
-    return FileSystem.newInstance(path.toUri(), configuration);
+
+    return GoogleHadoopFileSystem.newInstance(path.toUri(), configuration);
   }
 
   @Override
   public String scheme() {
-    return "hdfs";
+    return "gs";
   }
 
   @Override
   public String name() {
-    return BUILTIN_HDFS_FS_PROVIDER;
+    return "gcs";
   }
 }
