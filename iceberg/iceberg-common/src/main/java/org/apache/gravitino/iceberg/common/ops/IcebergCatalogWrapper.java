@@ -168,13 +168,9 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
     request.validate();
     if (request.stageCreate()) {
-      return injectTableConfig(
-          () -> CatalogHandlers.stageTableCreate(catalog, namespace, request),
-          this::getCatalogConfigToClient);
+      return injectTableConfig(() -> CatalogHandlers.stageTableCreate(catalog, namespace, request));
     }
-    return injectTableConfig(
-        () -> CatalogHandlers.createTable(catalog, namespace, request),
-        this::getCatalogConfigToClient);
+    return injectTableConfig(() -> CatalogHandlers.createTable(catalog, namespace, request));
   }
 
   public void dropTable(TableIdentifier tableIdentifier) {
