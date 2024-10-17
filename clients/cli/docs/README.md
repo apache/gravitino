@@ -119,7 +119,7 @@ gcli --list
 Get Details of a Specific Metalake
 
 ```bash
-gcli metalake --details -name my-metalake
+gcli metalake --details -name my_metalake
 ```
 
 List Tables in a Catalog
@@ -156,6 +156,102 @@ Update a Metalake's comment
 
 ```bash
 gcli metalake --update -name metalake_demo -comment "new comment" 
+```
+
+List the properties of a Metalake
+
+```bash
+gcli metalake --properties --name metalake_demo
+```
+
+Set a Metalake's property
+
+```bash
+gcli metalake --set --name metalake_demo --property color --value red
+```
+
+Remove a Metalake's property
+
+```bash
+gcli metalake --remove --name metalake_demo --property color
+```
+
+Create a new User
+
+```bash
+gcli user --create --name metalake_demo --user new_user
+```
+
+Show a User's information
+
+```bash
+gcli user --details --name metalake_demo --user new_user
+```
+
+Show all Users
+
+```bash
+gcli user --list --name metalake_demo
+```
+
+Delete a User
+
+```bash
+gcli user --delete --name metalake_demo --user new_user
+```
+
+Create a Tag
+
+```bash
+gcli tag --create --name metalake_demo --tag tagA
+```
+
+List all Tags in a Metalake
+
+```bash
+gcli tag --list --name metalake_demo
+```
+
+Delete a Tag
+
+```bash
+gcli tag --delete --name metalake_demo --tag tagA
+```
+
+Add a Tag to a Schema
+
+```bash
+gcli tag --set --name metalake_demo.catalog_postgres.hr --tag hr
+```
+
+Remove a Tag from a Schema
+
+```bash
+gcli tag --remove --name metalake_demo.catalog_postgres.hr --tag hr
+```
+
+List all tags on a Schema
+
+```bash
+gcli tag --list --name metalake_demo.catalog_postgres.hr
+```
+
+Show all Roles
+
+```bash
+gcli role --list -name metalake_demo
+```
+
+Create an empty Role
+
+```bash
+gcli role --create --name metalake_demo --role admin
+```
+
+Delete a Role
+
+```bash
+gcli role --delete -name metalake_demo --role admin
 ```
 
 ### Setting Metalake name
