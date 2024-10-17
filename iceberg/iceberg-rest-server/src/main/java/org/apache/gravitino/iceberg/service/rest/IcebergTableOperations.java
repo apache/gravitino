@@ -99,7 +99,7 @@ public class IcebergTableOperations {
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     LOG.info(
-        "Create Iceberg table, namespace: {}, create table request: {}, accessDelegation: {}, isCredentialVending:{}",
+        "Create Iceberg table, namespace: {}, create table request: {}, accessDelegation: {}, isCredentialVending: {}",
         namespace,
         createTableRequest,
         accessDelegation,
