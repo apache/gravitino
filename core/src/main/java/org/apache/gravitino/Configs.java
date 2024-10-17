@@ -342,4 +342,27 @@ public class Configs {
           .stringConf()
           .toSequence()
           .createWithDefault(Collections.emptyList());
+
+  public static final String AUDIT_LOG_WRITER_CONFIG_PREFIX = "gravitino.audit.writer.";
+
+  public static final ConfigEntry<Boolean> AUDIT_LOG_ENABLED_CONF =
+      new ConfigBuilder("gravitino.audit.enable")
+          .doc("Gravitino audit log enable flag")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  public static final ConfigEntry<String> AUDIT_LOG_WRITER_CLASS_NAME =
+      new ConfigBuilder("gravitino.audit.writer.class")
+          .doc("Gravitino audit log writer class name")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .createWithDefault("org.apache.gravitino.audit.FileAuditWriter");
+
+  public static final ConfigEntry<String> AUDIT_LOG_FORMATTER_CLASS_NAME =
+      new ConfigBuilder("gravitino.audit.formatter.class")
+          .doc("Gravitino event log formatter class name")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .createWithDefault("org.apache.gravitino.audit.SimpleFormatter");
 }
