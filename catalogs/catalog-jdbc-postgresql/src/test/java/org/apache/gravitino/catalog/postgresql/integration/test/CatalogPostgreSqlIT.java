@@ -128,7 +128,9 @@ public class CatalogPostgreSqlIT extends BaseIT {
     for (String schemaName : schemaNames) {
       catalog.asSchemas().dropSchema(schemaName, true);
     }
+    metalake.deactivateCatalog(catalogName);
     metalake.dropCatalog(catalogName);
+    client.deactivateMetalake(metalakeName);
     client.dropMetalake(metalakeName);
     postgreSqlService.close();
   }
@@ -152,10 +154,9 @@ public class CatalogPostgreSqlIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }

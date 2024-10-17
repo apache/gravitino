@@ -125,8 +125,8 @@ public class CatalogDorisIT extends BaseIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
   }
 
   @AfterEach
@@ -143,10 +143,9 @@ public class CatalogDorisIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetaLakes = client.listMetalakes();
     assertEquals(0, gravitinoMetaLakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    assertEquals(createdMetalake, loadMetalake);
+    assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }

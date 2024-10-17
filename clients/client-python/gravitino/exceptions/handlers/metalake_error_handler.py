@@ -21,6 +21,8 @@ from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 from gravitino.exceptions.base import (
     NoSuchMetalakeException,
     MetalakeAlreadyExistsException,
+    EntityInUseException,
+    NonInUseEntityException,
 )
 
 
@@ -33,8 +35,15 @@ class MetalakeErrorHandler(RestErrorHandler):
 
         if code == ErrorConstants.NOT_FOUND_CODE:
             raise NoSuchMetalakeException(error_message)
+
         if code == ErrorConstants.ALREADY_EXISTS_CODE:
             raise MetalakeAlreadyExistsException(error_message)
+
+        if code == ErrorConstants.ENTITY_IN_USE_CODE:
+            raise EntityInUseException(error_message)
+
+        if code == ErrorConstants.NON_IN_USE_ENTITY_CODE:
+            raise NonInUseEntityException(error_message)
 
         super().handle(error_response)
 

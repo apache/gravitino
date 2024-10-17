@@ -156,6 +156,10 @@ public class SecureHadoopCatalogOperations
       UserContext.clearUserContext(ident);
 
       return r;
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Schema {} does not exist", ident);
+      return false;
+
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete schema " + ident, ioe);
     }

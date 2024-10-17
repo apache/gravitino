@@ -190,10 +190,8 @@ public class RangerHiveE2EIT extends BaseIT {
                 catalog.asSchemas().dropSchema(schema, true);
               }));
       Arrays.stream(metalake.listCatalogs())
-          .forEach(
-              (catalogName -> {
-                metalake.dropCatalog(catalogName);
-              }));
+          .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
+      client.deactivateMetalake(metalakeName);
       client.dropMetalake(metalakeName);
     }
     if (sparkSession != null) {
@@ -272,10 +270,9 @@ public class RangerHiveE2EIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }

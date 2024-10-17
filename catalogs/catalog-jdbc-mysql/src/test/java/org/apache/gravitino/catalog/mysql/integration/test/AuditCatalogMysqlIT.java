@@ -77,7 +77,7 @@ public class AuditCatalogMysqlIT extends BaseIT {
 
   @AfterAll
   public void stopIntegrationTest() throws IOException, InterruptedException {
-    client.dropMetalake(metalakeName);
+    client.dropMetalake(metalakeName, true);
     mysqlService.close();
     super.stopIntegrationTest();
   }
@@ -95,7 +95,7 @@ public class AuditCatalogMysqlIT extends BaseIT {
     Assertions.assertEquals(expectUser, catalog.auditInfo().creator());
     Assertions.assertEquals(expectUser, catalog.auditInfo().lastModifier());
 
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 
   @Test
@@ -109,7 +109,7 @@ public class AuditCatalogMysqlIT extends BaseIT {
     Assertions.assertNull(schema.auditInfo().lastModifier());
 
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 
   @Test
@@ -144,7 +144,7 @@ public class AuditCatalogMysqlIT extends BaseIT {
 
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 
   private static Catalog createCatalog(String catalogName) throws SQLException {
@@ -169,10 +169,9 @@ public class AuditCatalogMysqlIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
     metalake = loadMetalake;
   }
 }

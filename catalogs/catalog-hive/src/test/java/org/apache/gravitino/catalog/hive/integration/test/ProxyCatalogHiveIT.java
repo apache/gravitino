@@ -389,10 +389,9 @@ public class ProxyCatalogHiveIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
+    client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(METALAKE_NAME, loadMetalake.name());
 
     metalake = loadMetalake;
   }

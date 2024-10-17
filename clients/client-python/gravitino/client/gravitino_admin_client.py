@@ -112,20 +112,47 @@ class GravitinoAdminClient(GravitinoClientBase):
 
         return GravitinoMetalake(metalake, self._rest_client)
 
-    def drop_metalake(self, name: str) -> bool:
+    def drop_metalake(self, name: str, force: bool = False) -> bool:
         """Drops a specific Metalake using the Gravitino API.
 
         Args:
             name: The name of the Metalake to be dropped.
+            force: Whether to force the drop operation.
 
         Returns:
-            True if the Metalake was successfully dropped, false otherwise.
+            True if the Metalake was successfully dropped, false if the Metalake does not exist.
         """
 
+        params = {"force": str(force)}
         resp = self._rest_client.delete(
             self.API_METALAKES_IDENTIFIER_PATH + name,
+            params=params,
             error_handler=METALAKE_ERROR_HANDLER,
         )
         drop_response = DropResponse.from_json(resp.body, infer_missing=True)
 
         return drop_response.dropped()
+
+    def activate_metalake(self, name: str):
+        """Activate the metalake with specified name. If the metalake is already activated, this method does nothing.
+
+        Args:
+            name: the name of the metalake.
+
+        Raises:
+            NoSuchMetalakeException if the metalake with specified name does not exist.
+        """
+        url = self.API_METALAKES_IDENTIFIER_PATH + name + "/activate"
+        self._rest_client.get(url, error_handler=METALAKE_ERROR_HANDLER)
+
+    def deactivate_metalake(self, name: str):
+        """Deactivate the metalake with specified name. If the metalake is already deactivated, does nothing.
+
+        Args:
+            name: the name of the metalake.
+
+        Raises:
+            NoSuchMetalakeException if the metalake with specified name does not exist.
+        """
+        url = self.API_METALAKES_IDENTIFIER_PATH + name + "/deactivate"
+        self._rest_client.get(url, error_handler=METALAKE_ERROR_HANDLER)

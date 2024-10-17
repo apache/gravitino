@@ -20,8 +20,10 @@ package org.apache.gravitino;
 
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.exceptions.EntityInUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 
 /**
  * Client interface for supporting metalakes. It includes methods for listing, loading, creating,
@@ -38,7 +40,7 @@ public interface SupportsMetalakes {
   Metalake[] listMetalakes();
 
   /**
-   * Load a metalake by its identifier.
+   * Load a metalake by its name.
    *
    * @param name the name of the metalake.
    * @return The metalake.
@@ -62,7 +64,7 @@ public interface SupportsMetalakes {
   }
 
   /**
-   * Create a metalake with specified identifier.
+   * Create a metalake with specified name, comment and properties.
    *
    * @param name The name of the metalake.
    * @param comment The comment of the metalake.
@@ -74,7 +76,7 @@ public interface SupportsMetalakes {
       throws MetalakeAlreadyExistsException;
 
   /**
-   * Alter a metalake with specified identifier.
+   * Alter a metalake with specified metalake name and changes.
    *
    * @param name The name of the metalake.
    * @param changes The changes to apply.
@@ -86,10 +88,70 @@ public interface SupportsMetalakes {
       throws NoSuchMetalakeException, IllegalArgumentException;
 
   /**
-   * Drop a metalake with specified identifier.
+   * Drop a metalake with specified name. Please make sure:
    *
-   * @param name The identifier of the metalake.
+   * <ul>
+   *   <li>There is no catalog in the metalake. Otherwise, a {@link NonEmptyEntityException} will be
+   *       thrown.
+   *   <li>The method {@link #deactivateMetalake(String)} has been called before dropping the
+   *       metalake. Otherwise, a {@link EntityInUseException} will be thrown.
+   * </ul>
+   *
+   * It is equivalent to calling {@code dropMetalake(ident, false)}.
+   *
+   * @param name The name of the metalake.
    * @return True if the metalake was dropped, false if the metalake does not exist.
+   * @throws NonEmptyEntityException If the metalake is not empty.
+   * @throws EntityInUseException If the metalake is in use.
    */
-  boolean dropMetalake(String name);
+  default boolean dropMetalake(String name) throws NonEmptyEntityException, EntityInUseException {
+    return dropMetalake(name, false);
+  }
+
+  /**
+   * Drop a metalake with specified name. If the force flag is true, it will:
+   *
+   * <ul>
+   *   <li>Cascade drop all sub-entities (tags, catalogs, schemas, tables, etc.) of the metalake in
+   *       Gravitino store.
+   *   <li>Drop the metalake even if it is in use.
+   *   <li>External resources (e.g. database, table, etc.) associated with sub-entities will not be
+   *       deleted unless it is managed (such as managed fileset).
+   * </ul>
+   *
+   * If the force flag is false, it is equivalent to calling {@link #dropMetalake(String)}.
+   *
+   * @param name The name of the metalake.
+   * @param force Whether to force the drop.
+   * @return True if the metalake was dropped, false if the metalake does not exist.
+   * @throws NonEmptyEntityException If the metalake is not empty and force is false.
+   * @throws EntityInUseException If the metalake is in use and force is false.
+   */
+  boolean dropMetalake(String name, boolean force)
+      throws NonEmptyEntityException, EntityInUseException;
+
+  /**
+   * Activate a metalake. If the metalake is already active, this method does nothing.
+   *
+   * @param name The name of the metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  void activateMetalake(String name) throws NoSuchMetalakeException;
+
+  /**
+   * Deactivate a metalake. If the metalake is already inactive, this method does nothing. Once a
+   * metalake is deactivated:
+   *
+   * <ul>
+   *   <li>It can only be listed, loaded, dropped, or activated.
+   *   <li>Any other operations on the metalake will throw an {@link
+   *       org.apache.gravitino.exceptions.NonInUseEntityException}.
+   *   <li>Any operation on the sub-entities (catalogs, schemas, tables, etc.) will throw an {@link
+   *       org.apache.gravitino.exceptions.NonInUseEntityException}.
+   * </ul>
+   *
+   * @param name The name of the metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  void deactivateMetalake(String name) throws NoSuchMetalakeException;
 }

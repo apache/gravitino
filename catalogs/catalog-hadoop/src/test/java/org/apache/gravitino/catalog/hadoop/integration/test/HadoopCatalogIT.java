@@ -89,8 +89,8 @@ public class HadoopCatalogIT extends BaseIT {
   public void stop() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
     if (hdfs != null) {
       hdfs.close();
     }
@@ -106,10 +106,9 @@ public class HadoopCatalogIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
@@ -162,7 +161,7 @@ public class HadoopCatalogIT extends BaseIT {
 
     Assertions.assertEquals(newLocation, modifiedCatalog.properties().get("location"));
 
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 
   @Test
@@ -608,7 +607,7 @@ public class HadoopCatalogIT extends BaseIT {
         filesetCatalog.asSchemas().schemaExists(schemaName), "schema should not be exists");
 
     // Drop the catalog.
-    dropped = metalake.dropCatalog(catalogName);
+    dropped = metalake.dropCatalog(catalogName, true);
     Assertions.assertTrue(dropped, "catalog should be dropped");
     Assertions.assertFalse(metalake.catalogExists(catalogName), "catalog should not be exists");
   }

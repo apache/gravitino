@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -205,7 +206,7 @@ public class TestMetalakeEvent {
     when(dispatcher.createMetalake(any(NameIdentifier.class), any(String.class), any(Map.class)))
         .thenReturn(metalake);
     when(dispatcher.loadMetalake(any(NameIdentifier.class))).thenReturn(metalake);
-    when(dispatcher.dropMetalake(any(NameIdentifier.class))).thenReturn(true);
+    when(dispatcher.dropMetalake(any(NameIdentifier.class), anyBoolean())).thenReturn(true);
     when(dispatcher.listMetalakes()).thenReturn(null);
     when(dispatcher.alterMetalake(any(NameIdentifier.class), any(MetalakeChange.class)))
         .thenReturn(metalake);

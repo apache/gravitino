@@ -168,8 +168,8 @@ public class OwnerIT extends BaseIT {
     // Clean up
     catalog.asFilesetCatalog().dropFileset(fileIdent);
     catalog.asSchemas().dropSchema("schema_owner", true);
-    metalake.dropCatalog(catalogNameA);
-    client.dropMetalake(metalakeNameA);
+    metalake.dropCatalog(catalogNameA, true);
+    client.dropMetalake(metalakeNameA, true);
   }
 
   @Test
@@ -219,8 +219,8 @@ public class OwnerIT extends BaseIT {
 
     // Clean up
     catalogB.asTopicCatalog().dropTopic(topicIdent);
-    metalake.dropCatalog(catalogNameB);
-    client.dropMetalake(metalakeNameB);
+    metalake.dropCatalog(catalogNameB, true);
+    client.dropMetalake(metalakeNameB, true);
   }
 
   @Test
@@ -255,7 +255,7 @@ public class OwnerIT extends BaseIT {
 
     // Clean up
     metalake.deleteRole("role_owner");
-    client.dropMetalake(metalakeNameC);
+    client.dropMetalake(metalakeNameC, true);
   }
 
   @Test
@@ -320,8 +320,8 @@ public class OwnerIT extends BaseIT {
     // Clean up
     catalog.asTableCatalog().dropTable(tableIdent);
     catalog.asSchemas().dropSchema("schema_owner", true);
-    metalake.dropCatalog(catalogNameD);
-    client.dropMetalake(metalakeNameD);
+    metalake.dropCatalog(catalogNameD, true);
+    client.dropMetalake(metalakeNameD, true);
   }
 
   @Test
@@ -352,6 +352,6 @@ public class OwnerIT extends BaseIT {
         () -> metalake.setOwner(metalakeObject, "not-existed", Owner.Type.USER));
 
     // Cleanup
-    client.dropMetalake(metalakeNameE);
+    client.dropMetalake(metalakeNameE, true);
   }
 }
