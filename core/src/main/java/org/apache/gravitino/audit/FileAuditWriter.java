@@ -20,7 +20,6 @@
 package org.apache.gravitino.audit;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -66,9 +65,9 @@ public class FileAuditWriter implements AuditLogWriter {
     try {
       OutputStream outputStream = new FileOutputStream(fileName, true);
       outWriter = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
-    } catch (FileNotFoundException e) {
+    } catch (Exception e) {
       throw new GravitinoRuntimeException(
-          String.format("Audit log file: %s is not exists", fileName));
+          String.format("Init audit log writer fail, filename is %s", fileName), e);
     }
   }
 
