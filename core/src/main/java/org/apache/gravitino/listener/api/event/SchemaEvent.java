@@ -24,7 +24,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an abstract base class for events related to schema operations. */
 @DeveloperApi
-public abstract class SchemaEvent extends Event {
+public abstract class SchemaEvent extends GravitinoPostEvent {
   protected SchemaEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
