@@ -33,7 +33,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * understanding of each event.
  */
 @DeveloperApi
-public abstract class FilesetEvent extends GravitinoPostEvent {
+public abstract class FilesetEvent extends Event {
   /**
    * Constructs a new {@code FilesetEvent} with the specified user and fileset identifier.
    *

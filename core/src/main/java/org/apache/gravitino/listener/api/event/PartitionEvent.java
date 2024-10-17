@@ -29,7 +29,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * performing the operation and the identifier of the Partition being operated on.
  */
 @DeveloperApi
-public abstract class PartitionEvent extends GravitinoPostEvent {
+public abstract class PartitionEvent extends Event {
   /**
    * Constructs a new {@code PartitionEvent} with the specified user and Partition identifier.
    *

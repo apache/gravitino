@@ -24,7 +24,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
  * An abstract class representing events that are triggered when a table operation fails due to an
- * exception. This class extends {@link GravitinoFailureEvent} to provide a more specific context
+ * exception. This class extends {@link FailureEvent} to provide a more specific context
  * related to table operations, encapsulating details about the user who initiated the operation,
  * the identifier of the table involved, and the exception that led to the failure.
  *
@@ -33,7 +33,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * and respond to issues.
  */
 @DeveloperApi
-public abstract class TableFailureEvent extends GravitinoFailureEvent {
+public abstract class TableFailureEvent extends FailureEvent {
   /**
    * Constructs a new {@code TableFailureEvent} instance, capturing information about the failed
    * table operation.
