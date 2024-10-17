@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
@@ -50,6 +51,8 @@ public class TestAuditManager {
   private static final Logger LOG = LoggerFactory.getLogger(TestAuditManager.class);
 
   private static final String DEFAULT_FILE_NAME = "gravitino_audit.log";
+
+  private static int EVENT_NUM = 2000;
 
   @BeforeAll
   public void setup() {
@@ -139,6 +142,29 @@ public class TestAuditManager {
     Assertions.assertEquals(formattedAuditLog.toString(), auditLog);
   }
 
+  @Test
+  public void testBathEvents() {
+    Config config = new Config(false) {};
+    config.set(Configs.AUDIT_LOG_ENABLED_CONF, true);
+    // set immediate flush to true for testing, so that the audit log will be read immediately
+    config.set(
+        new ConfigBuilder("gravitino.audit.writer.file.immediateFlush").stringConf(), "true");
+
+    EventListenerManager eventListenerManager = mockEventListenerManager();
+    AuditLogManager auditLogManager = mockAuditLogManager(config, eventListenerManager);
+    EventBus eventBus = eventListenerManager.createEventBus();
+
+    for (int i = 0; i < EVENT_NUM; i++) {
+      DummyEvent dummyEvent = mockDummyEvent();
+      eventBus.dispatchEvent(dummyEvent);
+    }
+
+    FileAuditWriter fileAuditWriter = (FileAuditWriter) auditLogManager.getAuditLogWriter();
+    String fileName = fileAuditWriter.fileName;
+    long auditSize = getAuditSize(fileName);
+    Assertions.assertEquals(EVENT_NUM, auditSize);
+  }
+
   @AfterEach
   public void cleanup() {
     try {
@@ -156,6 +182,14 @@ public class TestAuditManager {
     try (BufferedReader reader =
         Files.newBufferedReader(Paths.get(fileName), StandardCharsets.UTF_8)) {
       return reader.readLine();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private long getAuditSize(String fileName) {
+    try (Stream<String> lines = Files.lines(Paths.get(fileName))) {
+      return lines.count();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

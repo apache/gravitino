@@ -20,6 +20,7 @@
 package org.apache.gravitino.audit;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.BufferedWriter;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -39,9 +40,16 @@ public class FileAuditWriter implements AuditLogWriter {
 
   public static final String LOG_FILE_NAME_CONFIG = "fileName";
 
+  public static final String APPEND = "append";
+
   public static final String FILE_IMMEDIATE_FLUSH_CONFIG = "immediateFlush";
 
+  public static final String BUFFERED = "buffered";
+
+  public static final String BUFFER_SIZE = "bufferSize";
+
   public static final String LINE_SEPARATOR = "lineSeparator";
+
   private Formatter formatter;
   private Writer outWriter;
   @VisibleForTesting String fileName;
@@ -49,6 +57,12 @@ public class FileAuditWriter implements AuditLogWriter {
   boolean immediateFlush;
 
   String lineSeparator;
+
+  boolean append;
+
+  boolean buffered;
+
+  int bufferSize;
 
   @Override
   public Formatter getFormatter() {
@@ -62,12 +76,19 @@ public class FileAuditWriter implements AuditLogWriter {
     immediateFlush =
         Boolean.parseBoolean(properties.getOrDefault(FILE_IMMEDIATE_FLUSH_CONFIG, "false"));
     lineSeparator = properties.getOrDefault(LINE_SEPARATOR, "\n");
+    append = Boolean.parseBoolean(properties.getOrDefault(APPEND, "false"));
+    buffered = Boolean.parseBoolean(properties.getOrDefault(BUFFERED, "true"));
+    bufferSize = Integer.parseInt(properties.getOrDefault(BUFFER_SIZE, "8192"));
     try {
-      OutputStream outputStream = new FileOutputStream(fileName, true);
+      OutputStream outputStream = new FileOutputStream(fileName, append);
       outWriter = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
     } catch (Exception e) {
       throw new GravitinoRuntimeException(
           e, "Init audit log writer fail, filename is %s", fileName);
+    }
+
+    if (buffered) {
+      outWriter = new BufferedWriter(outWriter, bufferSize);
     }
   }
 
