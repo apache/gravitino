@@ -40,13 +40,16 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +64,7 @@ public class IcebergTableOperations {
   private IcebergMetricsManager icebergMetricsManager;
 
   private ObjectMapper icebergObjectMapper;
+  private IcebergTableOperationDispatcher tableOperationDispatcher;
 
   @SuppressWarnings("UnusedVariable")
   @Context
@@ -69,10 +73,12 @@ public class IcebergTableOperations {
   @Inject
   public IcebergTableOperations(
       IcebergCatalogWrapperManager icebergCatalogWrapperManager,
-      IcebergMetricsManager icebergMetricsManager) {
+      IcebergMetricsManager icebergMetricsManager,
+      IcebergTableOperationDispatcher tableOperationDispatcher) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
-    this.icebergObjectMapper = IcebergObjectMapper.getInstance();
     this.icebergMetricsManager = icebergMetricsManager;
+    this.tableOperationDispatcher = tableOperationDispatcher;
+    this.icebergObjectMapper = IcebergObjectMapper.getInstance();
   }
 
   @GET
@@ -93,14 +99,17 @@ public class IcebergTableOperations {
       @PathParam("prefix") String prefix,
       @PathParam("namespace") String namespace,
       CreateTableRequest createTableRequest) {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Create Iceberg table, namespace: {}, create table request: {}",
-        namespace,
+        "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}",
+        catalogName,
+        icebergNS,
         createTableRequest);
-    return IcebergRestUtils.ok(
-        icebergCatalogWrapperManager
-            .getOps(prefix)
-            .createTable(RESTUtil.decodeNamespace(namespace), createTableRequest));
+
+    LoadTableResponse loadTableResponse =
+        tableOperationDispatcher.createTable(catalogName, icebergNS, createTableRequest);
+    return IcebergRestUtils.ok(loadTableResponse);
   }
 
   @POST
