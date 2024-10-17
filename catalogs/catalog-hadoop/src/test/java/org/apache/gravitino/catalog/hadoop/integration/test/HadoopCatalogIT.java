@@ -43,7 +43,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -57,7 +57,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class HadoopCatalogIT extends AbstractIT {
+public class HadoopCatalogIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -74,7 +74,7 @@ public class HadoopCatalogIT extends AbstractIT {
   private static String defaultBaseLocation;
 
   @BeforeAll
-  public static void setup() throws IOException {
+  public void setup() throws IOException {
     containerSuite.startHiveContainer();
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", defaultBaseLocation());
@@ -86,7 +86,7 @@ public class HadoopCatalogIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stop() throws IOException {
+  public void stop() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName);
@@ -102,7 +102,7 @@ public class HadoopCatalogIT extends AbstractIT {
     }
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
@@ -114,14 +114,14 @@ public class HadoopCatalogIT extends AbstractIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalog() {
+  private void createCatalog() {
     metalake.createCatalog(
         catalogName, Catalog.Type.FILESET, provider, "comment", ImmutableMap.of());
 
     catalog = metalake.loadCatalog(catalogName);
   }
 
-  private static void createSchema() {
+  private void createSchema() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("key1", "val1");
     properties.put("key2", "val2");
