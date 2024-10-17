@@ -27,7 +27,6 @@ import javax.annotation.Nonnull;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 
 public class HDFSFileSystemProvider implements FileSystemProvider {
 
@@ -39,7 +38,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
         (k, v) -> {
           configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v);
         });
-    return DistributedFileSystem.newInstance(path.toUri(), configuration);
+    return FileSystem.newInstance(path.toUri(), configuration);
   }
 
   @Override
