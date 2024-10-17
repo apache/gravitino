@@ -83,6 +83,9 @@ PYGRAVITINO_NEXT_VERSION=$(echo $NEXT_VERSION | sed 's/-incubating-SNAPSHOT/.dev
 sed -i".tmp1" 's/version = .*$/version = '"$RELEASE_VERSION"'/g' gradle.properties
 sed -i".tmp2" 's/    version=.*$/    version="'"$PYGRAVITINO_RELEASE_VERSION"'",/g' clients/client-python/setup.py
 
+# update docs version
+"$SELF/update-java-doc-version.sh" "$RELEASE_VERSION" "$SELF/gravitino"
+
 git commit -a -m "Preparing Gravitino release $RELEASE_TAG"
 echo "Creating tag $RELEASE_TAG at the head of $GIT_BRANCH"
 git tag $RELEASE_TAG
