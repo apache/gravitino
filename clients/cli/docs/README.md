@@ -76,22 +76,26 @@ To run the Gravitino CLI, use the following command structure:
 ```bash
 usage: gcli [metalake|catalog|schema|table] [list|details|create|delete|update] [options]
 Options
- -c,--catalog <arg>    catalog name
- -C,--create           create an entity
- -D,--details          list details about an entity
- -e,--entity <arg>     entity type
- -f,--name <arg>       full entity name (dot separated)
- -h,--help             command help information
- -L,--list             list entity children
- -m,--metalake <arg>   metalake name
- -R,--delete           delete an entity
- -s,--schema <arg>     schema name
- -t,--table <arg>      table name
- -u,--url <arg>        Gravitino URL (default: http://localhost:8090)
- -U,--update           update an entity
- -v,--version          Gravitino client version
- -r,--server           Gravitino server version
- -x,--command <arg>    one of: list, details, create, delete, or update
+ -b,--bootstrap <arg>   Kafka bootstrap servers
+ -C,--create            create an entity
+ -c,--comment <arg>     entity comment
+ -D,--details           list details about an entity
+ -d,--database <arg>    database name
+ -h,--help              command help information
+ -j,--jdbcurl <arg>     JDBC URL
+ -L,--list              list entity children
+ -l,--user <arg>        database username
+ -m,--metastore <arg>   Hive metastore URI
+ -n,--name <arg>        full entity name (dot separated)
+ -P,--properties        show an entities properties
+ -p,--provider <arg>    provider one of hadoop, hive, mysql, postgres, iceberg, kafka
+ -r,--rename <arg>      new entity name
+ -R,--delete            delete an entity
+ -u,--url <arg>         Gravitino URL (default: http://localhost:8090)
+ -U,--update            update an entity
+ -v,--value <arg>       property value
+ -w,--warehouse <arg>   warehouse name
+ -z,--password <arg>    database password
 ```
 
 ## Commands
