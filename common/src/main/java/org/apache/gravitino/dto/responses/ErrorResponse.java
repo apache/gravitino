@@ -244,7 +244,7 @@ public class ErrorResponse extends BaseResponse {
    */
   public static ErrorResponse notInUse(String type, String message, Throwable throwable) {
     return new ErrorResponse(
-        ErrorConstants.NOT_IN_USE_ENTITY_CODE, type, message, getStackTrace(throwable));
+        ErrorConstants.NOT_IN_USE_CODE, type, message, getStackTrace(throwable));
   }
 
   /**
@@ -256,8 +256,7 @@ public class ErrorResponse extends BaseResponse {
    * @return The new instance.
    */
   public static ErrorResponse inUse(String type, String message, Throwable throwable) {
-    return new ErrorResponse(
-        ErrorConstants.ENTITY_IN_USE_CODE, type, message, getStackTrace(throwable));
+    return new ErrorResponse(ErrorConstants.IN_USE_CODE, type, message, getStackTrace(throwable));
   }
 
   /**

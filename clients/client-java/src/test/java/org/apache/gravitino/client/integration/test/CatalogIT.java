@@ -35,8 +35,8 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
-import org.apache.gravitino.exceptions.EntityInUseException;
-import org.apache.gravitino.exceptions.NotInUseEntityException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -145,7 +145,7 @@ public class CatalogIT extends BaseIT {
 
     Exception exception =
         Assertions.assertThrows(
-            EntityInUseException.class, () -> metalake.dropCatalog(catalogName));
+            CatalogInUseException.class, () -> metalake.dropCatalog(catalogName));
     Assertions.assertTrue(
         exception.getMessage().contains("please deactivate it first or use force option"),
         exception.getMessage());
@@ -165,7 +165,7 @@ public class CatalogIT extends BaseIT {
 
     Exception exception =
         Assertions.assertThrows(
-            EntityInUseException.class, () -> metalake.dropCatalog(catalogName));
+            CatalogInUseException.class, () -> metalake.dropCatalog(catalogName));
     Assertions.assertTrue(
         exception.getMessage().contains("please deactivate it first or use force option"),
         exception.getMessage());
@@ -176,42 +176,42 @@ public class CatalogIT extends BaseIT {
 
     exception =
         Assertions.assertThrows(
-            NotInUseEntityException.class,
+            CatalogNotInUseException.class,
             () -> metalake.alterCatalog(catalogName, CatalogChange.updateComment("new comment")));
     Assertions.assertTrue(
         exception.getMessage().contains("please activate it first"), exception.getMessage());
 
     // test schema operations under non-in-use catalog
     SupportsSchemas schemaOps = loadedCatalog.asSchemas();
-    Assertions.assertThrows(NotInUseEntityException.class, schemaOps::listSchemas);
+    Assertions.assertThrows(CatalogNotInUseException.class, schemaOps::listSchemas);
     Assertions.assertThrows(
-        NotInUseEntityException.class, () -> schemaOps.createSchema("dummy", null, null));
-    Assertions.assertThrows(NotInUseEntityException.class, () -> schemaOps.loadSchema("dummy"));
+        CatalogNotInUseException.class, () -> schemaOps.createSchema("dummy", null, null));
+    Assertions.assertThrows(CatalogNotInUseException.class, () -> schemaOps.loadSchema("dummy"));
     Assertions.assertThrows(
-        NotInUseEntityException.class,
+        CatalogNotInUseException.class,
         () -> schemaOps.alterSchema("dummy", SchemaChange.removeProperty("dummy")));
     Assertions.assertThrows(
-        NotInUseEntityException.class, () -> schemaOps.dropSchema("dummy", false));
+        CatalogNotInUseException.class, () -> schemaOps.dropSchema("dummy", false));
 
     // test fileset operations under non-in-use catalog
     FilesetCatalog filesetOps = loadedCatalog.asFilesetCatalog();
     Assertions.assertThrows(
-        NotInUseEntityException.class, () -> filesetOps.listFilesets(Namespace.of("dummy")));
+        CatalogNotInUseException.class, () -> filesetOps.listFilesets(Namespace.of("dummy")));
     Assertions.assertThrows(
-        NotInUseEntityException.class,
+        CatalogNotInUseException.class,
         () -> filesetOps.loadFileset(NameIdentifier.of("dummy", "dummy")));
     Assertions.assertThrows(
-        NotInUseEntityException.class,
+        CatalogNotInUseException.class,
         () ->
             filesetOps.createFileset(NameIdentifier.of("dummy", "dummy"), null, null, null, null));
     Assertions.assertThrows(
-        NotInUseEntityException.class,
+        CatalogNotInUseException.class,
         () -> filesetOps.dropFileset(NameIdentifier.of("dummy", "dummy")));
     Assertions.assertThrows(
-        NotInUseEntityException.class,
+        CatalogNotInUseException.class,
         () -> filesetOps.getFileLocation(NameIdentifier.of("dummy", "dummy"), "dummy"));
     Assertions.assertThrows(
-        NotInUseEntityException.class,
+        CatalogNotInUseException.class,
         () ->
             filesetOps.alterFileset(
                 NameIdentifier.of("dummy", "dummy"), FilesetChange.removeComment()));

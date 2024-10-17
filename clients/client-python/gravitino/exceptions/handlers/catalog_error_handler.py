@@ -20,11 +20,11 @@ from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 from gravitino.exceptions.base import (
     ConnectionFailedException,
-    EntityInUseException,
+    CatalogInUseException,
     NoSuchMetalakeException,
     NoSuchCatalogException,
     CatalogAlreadyExistsException,
-    NonInUseEntityException,
+    CatalogNotInUseException,
 )
 
 
@@ -48,11 +48,13 @@ class CatalogErrorHandler(RestErrorHandler):
         if code == ErrorConstants.ALREADY_EXISTS_CODE:
             raise CatalogAlreadyExistsException(error_message)
 
-        if code == ErrorConstants.ENTITY_IN_USE_CODE:
-            raise EntityInUseException(error_message)
+        if code == ErrorConstants.IN_USE_CODE:
+            if exception_type == CatalogInUseException.__name__:
+                raise CatalogInUseException(error_message)
 
-        if code == ErrorConstants.NON_IN_USE_ENTITY_CODE:
-            raise NonInUseEntityException(error_message)
+        if code == ErrorConstants.NOT_IN_USE_CODE:
+            if exception_type == CatalogNotInUseException.__name__:
+                raise CatalogNotInUseException(error_message)
 
         super().handle(error_response)
 

@@ -93,6 +93,22 @@ class NonEmptySchemaException(NotEmptyException):
     """Exception thrown when a namespace is not empty."""
 
 
+class InUseException(GravitinoRuntimeException):
+    """Base class for all exceptions thrown when an entity is in use and cannot be deleted."""
+
+
+class CatalogInUseException(InUseException):
+    """An Exception thrown when a catalog is in use and cannot be deleted."""
+
+
+class NotInUseException(GravitinoRuntimeException):
+    """Base class for all exceptions thrown when an entity is not in use."""
+
+
+class CatalogNotInUseException(NotInUseException):
+    """An exception thrown when operating on not in use catalog."""
+
+
 class UnsupportedOperationException(GravitinoRuntimeException):
     """Base class for all exceptions thrown when an operation is unsupported"""
 
@@ -111,11 +127,3 @@ class UnauthorizedException(GravitinoRuntimeException):
 
 class BadRequestException(GravitinoRuntimeException):
     """An exception thrown when the request is invalid."""
-
-
-class EntityInUseException(GravitinoRuntimeException):
-    """An Exception thrown when an entity is in use and cannot be deleted."""
-
-
-class NonInUseEntityException(GravitinoRuntimeException):
-    """An exception thrown when operating on a non-in-use entity."""

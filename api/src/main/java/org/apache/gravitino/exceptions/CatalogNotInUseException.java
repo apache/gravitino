@@ -21,8 +21,8 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** An exception thrown when operating on a non-in-use entity. */
-public class NotInUseEntityException extends GravitinoRuntimeException {
+/** An exception thrown when operating on a catalog that is not in use. */
+public class CatalogNotInUseException extends NotInUseException {
   /**
    * Constructs a new exception with the specified detail message.
    *
@@ -30,7 +30,7 @@ public class NotInUseEntityException extends GravitinoRuntimeException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public NotInUseEntityException(@FormatString String message, Object... args) {
+  public CatalogNotInUseException(@FormatString String message, Object... args) {
     super(message, args);
   }
 }

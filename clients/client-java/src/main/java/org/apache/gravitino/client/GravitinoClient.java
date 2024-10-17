@@ -34,7 +34,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
-import org.apache.gravitino.exceptions.EntityInUseException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -130,7 +130,7 @@ public class GravitinoClient extends GravitinoClientBase
 
   @Override
   public boolean dropCatalog(String catalogName, boolean force)
-      throws NonEmptyEntityException, EntityInUseException {
+      throws NonEmptyEntityException, CatalogInUseException {
     return getMetalake().dropCatalog(catalogName, force);
   }
 

@@ -26,11 +26,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
-import org.apache.gravitino.exceptions.EntityInUseException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.NotInUseEntityException;
 
 /**
  * Interface for supporting catalogs. It includes methods for listing, loading, creating, altering
@@ -132,10 +132,10 @@ public interface SupportsCatalogs {
    * @param ident the identifier of the catalog.
    * @return True if the catalog was dropped, false if the catalog does not exist.
    * @throws NonEmptyEntityException If the catalog is not empty.
-   * @throws EntityInUseException If the catalog is in use.
+   * @throws CatalogInUseException If the catalog is in use.
    */
   default boolean dropCatalog(NameIdentifier ident)
-      throws NonEmptyEntityException, EntityInUseException {
+      throws NonEmptyEntityException, CatalogInUseException {
     return dropCatalog(ident, false);
   }
 
@@ -153,10 +153,10 @@ public interface SupportsCatalogs {
    * @param force Whether to force the drop.
    * @return True if the catalog was dropped, false if the catalog does not exist.
    * @throws NonEmptyEntityException If the catalog is not empty and force is false.
-   * @throws EntityInUseException If the catalog is in use and force is false.
+   * @throws CatalogInUseException If the catalog is in use and force is false.
    */
   boolean dropCatalog(NameIdentifier ident, boolean force)
-      throws NonEmptyEntityException, EntityInUseException;
+      throws NonEmptyEntityException, CatalogInUseException;
 
   /**
    * Test whether the catalog with specified parameters can be connected to before creating it.
@@ -181,9 +181,10 @@ public interface SupportsCatalogs {
    *
    * @param ident The identifier of the catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
-   * @throws NotInUseEntityException If its parent metalake is not active.
+   * @throws CatalogNotInUseException If its parent metalake is not active.
    */
-  void activateCatalog(NameIdentifier ident) throws NoSuchCatalogException, NotInUseEntityException;
+  void activateCatalog(NameIdentifier ident)
+      throws NoSuchCatalogException, CatalogNotInUseException;
 
   /**
    * Deactivate a catalog. If the catalog is already deactivated, this method does nothing. Once a
@@ -191,9 +192,9 @@ public interface SupportsCatalogs {
    *
    * <ul>
    *   <li>It can only be listed, loaded, dropped, or activated.
-   *   <li>Any other operations on the catalog will throw an {@link NotInUseEntityException}.
+   *   <li>Any other operations on the catalog will throw an {@link CatalogNotInUseException}.
    *   <li>Any operation on the sub-entities (schemas, tables, etc.) will throw an {@link
-   *       NotInUseEntityException}.
+   *       CatalogNotInUseException}.
    * </ul>
    *
    * @param ident The identifier of the catalog.

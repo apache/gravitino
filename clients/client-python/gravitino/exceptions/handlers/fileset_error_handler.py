@@ -21,7 +21,7 @@ from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 from gravitino.exceptions.base import (
     NoSuchFilesetException,
     NoSuchSchemaException,
-    NonInUseEntityException,
+    CatalogNotInUseException,
 )
 
 
@@ -39,8 +39,8 @@ class FilesetErrorHandler(RestErrorHandler):
             if exception_type == NoSuchFilesetException.__name__:
                 raise NoSuchFilesetException(error_message)
 
-        if code == ErrorConstants.NON_IN_USE_ENTITY_CODE:
-            raise NonInUseEntityException(error_message)
+        if code == ErrorConstants.NOT_IN_USE_CODE:
+            raise CatalogNotInUseException(error_message)
 
         super().handle(error_response)
 

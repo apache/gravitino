@@ -122,11 +122,11 @@ public class Utils {
         .build();
   }
 
-  public static Response nonInUse(String message, Throwable throwable) {
-    return nonInUse(throwable.getClass().getSimpleName(), message, throwable);
+  public static Response notInUse(String message, Throwable throwable) {
+    return notInUse(throwable.getClass().getSimpleName(), message, throwable);
   }
 
-  public static Response nonInUse(String type, String message, Throwable throwable) {
+  public static Response notInUse(String type, String message, Throwable throwable) {
     return Response.status(Response.Status.CONFLICT)
         .entity(ErrorResponse.notInUse(type, message, throwable))
         .type(MediaType.APPLICATION_JSON)

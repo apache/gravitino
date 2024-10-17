@@ -21,11 +21,11 @@ package org.apache.gravitino;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
-import org.apache.gravitino.exceptions.EntityInUseException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.NotInUseEntityException;
 
 /**
  * Client interface for supporting catalogs. It includes methods for listing, loading, creating,
@@ -117,7 +117,7 @@ public interface SupportsCatalogs {
    *   <li>There is no schema in the catalog. Otherwise, a {@link NonEmptyEntityException} will be
    *       thrown.
    *   <li>The method {@link #deactivateCatalog(String)} has been called before dropping the
-   *       catalog. Otherwise, a {@link EntityInUseException} will be thrown.
+   *       catalog. Otherwise, a {@link CatalogInUseException} will be thrown.
    * </ul>
    *
    * It is equivalent to calling {@code dropCatalog(ident, false)}.
@@ -125,10 +125,10 @@ public interface SupportsCatalogs {
    * @param catalogName the name of the catalog.
    * @return True if the catalog was dropped, false if the catalog does not exist.
    * @throws NonEmptyEntityException If the catalog is not empty.
-   * @throws EntityInUseException If the catalog is in use.
+   * @throws CatalogInUseException If the catalog is in use.
    */
   default boolean dropCatalog(String catalogName)
-      throws NonEmptyEntityException, EntityInUseException {
+      throws NonEmptyEntityException, CatalogInUseException {
     return dropCatalog(catalogName, false);
   }
 
@@ -148,10 +148,10 @@ public interface SupportsCatalogs {
    * @param force Whether to force the drop.
    * @return True if the catalog was dropped, false if the catalog does not exist.
    * @throws NonEmptyEntityException If the catalog is not empty and force is false.
-   * @throws EntityInUseException If the catalog is in use and force is false.
+   * @throws CatalogInUseException If the catalog is in use and force is false.
    */
   boolean dropCatalog(String catalogName, boolean force)
-      throws NonEmptyEntityException, EntityInUseException;
+      throws NonEmptyEntityException, CatalogInUseException;
 
   /**
    * Activate a catalog. If the catalog is already activated, this method does nothing.
@@ -167,9 +167,9 @@ public interface SupportsCatalogs {
    *
    * <ul>
    *   <li>It can only be listed, loaded, dropped, or activated.
-   *   <li>Any other operations on the catalog will throw an {@link NotInUseEntityException}.
+   *   <li>Any other operations on the catalog will throw an {@link CatalogNotInUseException}.
    *   <li>Any operation on the sub-entities (schemas, tables, etc.) will throw an {@link
-   *       NotInUseEntityException}.
+   *       CatalogNotInUseException}.
    * </ul>
    *
    * @param catalogName The identifier of the catalog.

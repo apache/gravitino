@@ -77,7 +77,7 @@ import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
-import org.apache.gravitino.exceptions.EntityInUseException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -276,11 +276,11 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param force Whether to force the drop.
    * @return True if the catalog was dropped, false if the catalog does not exist.
    * @throws NonEmptyEntityException If the catalog is not empty and force is false.
-   * @throws EntityInUseException If the catalog is in use and force is false.
+   * @throws CatalogInUseException If the catalog is in use and force is false.
    */
   @Override
   public boolean dropCatalog(String catalogName, boolean force)
-      throws NonEmptyEntityException, EntityInUseException {
+      throws NonEmptyEntityException, CatalogInUseException {
     Map<String, String> params = new HashMap<>();
     params.put("force", String.valueOf(force));
 

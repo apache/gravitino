@@ -79,13 +79,13 @@ import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
-import org.apache.gravitino.exceptions.EntityInUseException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.NotInUseEntityException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
@@ -490,7 +490,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   @Override
   public void activateCatalog(NameIdentifier ident)
-      throws NoSuchCatalogException, NotInUseEntityException {
+      throws NoSuchCatalogException, CatalogNotInUseException {
     try {
       if (catalogInUse(store, ident)) {
         return;
@@ -559,7 +559,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
     if (!catalogInUse(store, ident)) {
-      throw new NotInUseEntityException(
+      throw new CatalogNotInUseException(
           "Catalog %s is not in use, please activate it first", ident);
     }
 
@@ -628,11 +628,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
-      throws NonEmptyEntityException, EntityInUseException {
+      throws NonEmptyEntityException, CatalogInUseException {
     try {
       boolean catalogInUse = catalogInUse(store, ident);
       if (catalogInUse && !force) {
-        throw new EntityInUseException(
+        throw new CatalogInUseException(
             "Catalog %s is in use, please deactivate it first or use force option", ident);
       }
 
