@@ -22,7 +22,6 @@ package org.apache.gravitino.credential;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.storage.S3Properties;
 
 public class S3SecretKeyCredential implements Credential {
   private String accessKeyId;
@@ -37,20 +36,20 @@ public class S3SecretKeyCredential implements Credential {
   }
 
   @Override
-  public String getCredentialType() {
-    return CredentialConstants.S3_SECRET_KEY_CREDENTIAL_TYPE;
+  public String credentialType() {
+    return S3_SECRET_KEY_CREDENTIAL_TYPE;
   }
 
   @Override
-  public long getExpireTime() {
+  public long expireTimeInMs() {
     return 0;
   }
 
   @Override
-  public Map<String, String> getCredentialInfo() {
+  public Map<String, String> credentialInfo() {
     return (new ImmutableMap.Builder<String, String>())
-        .put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId)
-        .put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
+        .put(GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId)
+        .put(GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
         .build();
   }
 }

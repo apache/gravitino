@@ -20,9 +20,8 @@
 package org.apache.gravitino.credential.aws;
 
 import java.util.Map;
-import org.apache.gravitino.credential.Context;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.config.S3CredentialConfig;
@@ -40,15 +39,15 @@ public class S3SecretKeyProvider implements CredentialProvider {
   }
 
   @Override
-  public void stop() {}
+  public void close() {}
 
   @Override
   public String credentialType() {
-    return CredentialConstants.S3_SECRET_KEY_CREDENTIAL_TYPE;
+    return Credential.S3_SECRET_KEY_CREDENTIAL_TYPE;
   }
 
   @Override
-  public Credential getCredential(Context context) {
+  public Credential getCredential(CredentialContext context) {
     return new S3SecretKeyCredential(accessKey, secretKey);
   }
 }

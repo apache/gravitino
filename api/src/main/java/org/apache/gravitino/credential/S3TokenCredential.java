@@ -22,42 +22,45 @@ package org.apache.gravitino.credential;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.storage.S3Properties;
+import org.apache.commons.lang3.StringUtils;
 
 public class S3TokenCredential implements Credential {
   private String accessKeyId;
   private String secretAccessKey;
   private String sessionToken;
-  private long expireMs;
+  private long expireTimeInMS;
 
   public S3TokenCredential(
-      String accessKeyId, String secretAccessKey, String sessionToken, long expireMs) {
-    Preconditions.checkNotNull(accessKeyId, "S3 access key Id should not null");
-    Preconditions.checkNotNull(secretAccessKey, "S3 secret access key should not null");
-    Preconditions.checkNotNull(sessionToken, "S3 session token should not null");
+      String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMS) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(accessKeyId), "S3 access key Id should not be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(secretAccessKey), "S3 secret access key should not be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(sessionToken), "S3 session token should not be empty");
 
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
     this.sessionToken = sessionToken;
-    this.expireMs = expireMs;
+    this.expireTimeInMS = expireTimeInMS;
   }
 
   @Override
-  public String getCredentialType() {
-    return CredentialConstants.S3_TOKEN_CREDENTIAL_TYPE;
+  public String credentialType() {
+    return S3_TOKEN_CREDENTIAL_TYPE;
   }
 
   @Override
-  public long getExpireTime() {
-    return expireMs;
+  public long expireTimeInMs() {
+    return expireTimeInMS;
   }
 
   @Override
-  public Map<String, String> getCredentialInfo() {
+  public Map<String, String> credentialInfo() {
     return (new ImmutableMap.Builder<String, String>())
-        .put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId)
-        .put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
-        .put(S3Properties.GRAVITINO_S3_TOKEN, sessionToken)
+        .put(GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId)
+        .put(GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
+        .put(GRAVITINO_S3_TOKEN, sessionToken)
         .build();
   }
 }

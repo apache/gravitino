@@ -26,11 +26,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.credential.Context;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
-import org.apache.gravitino.credential.LocationContext;
+import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.credential.config.S3CredentialConfig;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -64,7 +63,7 @@ public class S3TokenProvider implements CredentialProvider {
   }
 
   @Override
-  public void stop() {
+  public void close() {
     if (stsClient != null) {
       stsClient.close();
     }
@@ -72,26 +71,26 @@ public class S3TokenProvider implements CredentialProvider {
 
   @Override
   public String credentialType() {
-    return CredentialConstants.S3_TOKEN_CREDENTIAL_TYPE;
+    return Credential.S3_TOKEN_CREDENTIAL_TYPE;
   }
 
   @Override
-  public Credential getCredential(Context context) {
-    if (!(context instanceof LocationContext)) {
+  public Credential getCredential(CredentialContext context) {
+    if (!(context instanceof PathBasedCredentialContext)) {
       return null;
     }
-    LocationContext locationContext = (LocationContext) context;
-    Credentials s3Credentials =
+    PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
+    Credentials s3Token =
         getS3Token(
             roleArn,
-            locationContext.getReadLocations(),
-            locationContext.getWriteLocations(),
-            locationContext.getUserName());
+            pathBasedCredentialContext.getReadPaths(),
+            pathBasedCredentialContext.getWritePaths(),
+            pathBasedCredentialContext.getUserName());
     return new S3TokenCredential(
-        s3Credentials.accessKeyId(),
-        s3Credentials.secretAccessKey(),
-        s3Credentials.sessionToken(),
-        s3Credentials.expiration().toEpochMilli());
+        s3Token.accessKeyId(),
+        s3Token.secretAccessKey(),
+        s3Token.sessionToken(),
+        s3Token.expiration().toEpochMilli());
   }
 
   private StsClient createStsClient(S3CredentialConfig s3CredentialConfig) {

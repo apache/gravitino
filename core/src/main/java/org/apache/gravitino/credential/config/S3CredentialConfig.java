@@ -70,7 +70,7 @@ public class S3CredentialConfig extends Config {
           .create();
 
   public static final ConfigEntry<Integer> S3_TOKEN_EXPIRE_SECS =
-      new ConfigBuilder(CredentialConstants.EXPIRE_TIME)
+      new ConfigBuilder(CredentialConstants.TOKEN_EXPIRE_TIME)
           .doc("S3 token expire seconds")
           .version(ConfigConstants.VERSION_0_7_0)
           .intConf()
