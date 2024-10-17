@@ -143,6 +143,10 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
   }
 
   private void copyGCPJars() {
+    if (!isDeploy()) {
+      return;
+    }
+
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String jarName = String.format("gravitino-gcp-bundle-%s.jar", System.getenv("PROJECT_VERSION"));
     String gcsJars =
