@@ -195,6 +195,11 @@ public abstract class RangerAuthorizationPlugin
         if (!validAuthorizationOperation(Arrays.asList(newSecurableObject))) {
           return false;
         }
+
+        Preconditions.checkArgument(
+            (oldSecurableObject.fullName().equals(newSecurableObject.fullName())
+                && oldSecurableObject.type().equals(newSecurableObject.type())),
+            "The old and new securable objects metadata must be equal!");
         List<RangerSecurableObject> rangerOldSecurableObjects =
             translatePrivilege(oldSecurableObject);
         List<RangerSecurableObject> rangerNewSecurableObjects =
