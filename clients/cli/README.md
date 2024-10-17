@@ -119,7 +119,7 @@ gcli metalake details -name my-metalake
 List Tables in a Catalog
 
 ```bash
-gcli metalake list -name my-metalake.my-catalog
+gcli metalake list -name my-metalake
 ```
 
 ## Running Tests
