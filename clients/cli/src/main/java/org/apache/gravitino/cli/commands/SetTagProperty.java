@@ -19,51 +19,54 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.tag.TagChange;
 
-/** Update the name of a catalog. */
-public class UpdateCatalogName extends Command {
+/** Set a property of a tag. */
+public class SetTagProperty extends Command {
 
   protected String metalake;
-  protected String catalog;
-  protected String name;
+  protected String tag;
+  protected String property;
+  protected String value;
 
   /**
-   * Update the name of a catalog.
+   * Set a property of a tag.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
-   * @param catalog The name of the catalog.
-   * @param name The new metalake name.
+   * @param tag The name of the tag.
+   * @param property The name of the property.
+   * @param value The value of the property.
    */
-  public UpdateCatalogName(String url, String metalake, String catalog, String name) {
+  public SetTagProperty(String url, String metalake, String tag, String property, String value) {
     super(url);
     this.metalake = metalake;
-    this.catalog = catalog;
-    this.name = name;
+    this.tag = tag;
+    this.property = property;
+    this.value = value;
   }
 
-  /** Update the name of a catalog. */
+  /** Set a property of a tag. */
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
-      CatalogChange change = CatalogChange.rename(name);
-      client.alterCatalog(catalog, change);
+      TagChange change = TagChange.setProperty(property, value);
+      client.alterTag(tag, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (NoSuchTagException err) {
+      System.err.println(ErrorMessages.UNKNOWN_TAG);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(catalog + " name changed.");
+    System.out.println(tag + " property set.");
   }
 }

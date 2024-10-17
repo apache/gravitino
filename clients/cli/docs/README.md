@@ -74,13 +74,13 @@ Before you can build and run this project, it is suggested you have the followin
 To run the Gravitino CLI, use the following command structure:
 
 ```bash
-usage: gcli [metalake|catalog|schema|table] [list|details|create|delete|update] [options]
-Options
+usage: gcli [metalake|catalog|schema|table] [list|details|create|delete|update|set|remove|properties] [options]
  -b,--bootstrap <arg>   Kafka bootstrap servers
  -C,--create            create an entity
  -c,--comment <arg>     entity comment
  -D,--details           list details about an entity
  -d,--database <arg>    database name
+ -e,--entity <arg>      entity type
  -h,--help              command help information
  -j,--jdbcurl <arg>     JDBC URL
  -L,--list              list entity children
@@ -88,15 +88,29 @@ Options
  -m,--metastore <arg>   Hive metastore URI
  -n,--name <arg>        full entity name (dot separated)
  -P,--properties        show an entities properties
- -p,--provider <arg>    provider one of hadoop, hive, mysql, postgres, iceberg, kafka
- -r,--rename <arg>      new entity name
+ -p,--password <arg>    database password
  -R,--delete            delete an entity
- -u,--url <arg>         Gravitino URL (default: http://localhost:8090)
+ -r,--rename <arg>      new entity name
+ -s,--schema <arg>      schema name
+ -t,--table <arg>       table name
+ -u,--user <arg>        database username
  -U,--update            update an entity
  -v,--value <arg>       property value
  -w,--warehouse <arg>   warehouse name
- -z,--password <arg>    database password
+ -x,--command <arg>     one of: list, details, create, delete, or update
 ```
+
+The command line can be used in several ways to achieve the same results, depending on your preference.
+```bash
+gcli catalog details --name metalake_demo.catalog_postgres
+gcli catalog --command details -name metalake_demo.catalog_postgres
+gcli --entity catalog --command details -name metalake_demo.catalog_postgres
+gcli catalog details --metalake metalake_demo --catalog catalog_postgres
+gcli details --metalake metalake_demo --catalog catalog_postgres
+gcli --metalake metalake_demo --catalog catalog_postgres
+gcli --command details --metalake metalake_demo --catalog catalog_postgres
+```
+The form `gcli <entity> <action> [options]` is used in this document.
 
 ## Commands
 The following commands are available for entity management:
@@ -106,6 +120,9 @@ details: Show detailed information about an entity
 create: Create a new entity
 delete: Delete an existing entity
 update: Update an existing entity
+set: Used to set properties and tags
+remove: Used to remove properties and tags
+properties: Used to list properties
 
 ### Examples
 List All Metalakes
@@ -123,8 +140,48 @@ gcli metalake details -name my-metalake
 List Tables in a Catalog
 
 ```bash
-gcli metalake list -name my-metalake.my-catalog
+gcli metalake list -name my_metalake.my_catalog
 ```
+
+Create a Metalake
+
+```bash
+gcli metalake create -name my_metalake -comment "This is my metalake"
+```
+
+Create a Catalog
+
+```bash
+gcli catalog create -name metalake_demo.iceberg --provider iceberg --metastore thrift://hive-host:9083 --warehouse hdfs://hdfs-host:9000/user/iceberg/warehouse
+```
+
+Delete a Catalog
+
+```bash
+gcli catalog delete -name my_metalake.my_catalog
+```
+
+Rename a Metalake
+
+```bash
+gcli metalake update -name metalake_demo -rename demo 
+```
+
+Update a Metalake's comment
+
+```bash
+gcli metalake update -name metalake_demo -comment "new comment" 
+```
+
+### Setting Metalake name
+
+As dealing with one Metalake is a typical scenario, you can set the Metalake name in several ways.
+
+1. Passed in on the command line either as the first part of the entities name or via the `--metalake` parameter.
+2. Set via the 'GRAVITINO_METALAKE' environment variable.
+3. Placed in the Gravitino configuration file `~/.gravitino` by adding a line like `metalake=metalake_demo`.
+
+The command line option overrides the other options and the environment variable overrides the value in the configuration file.
 
 ## Running Tests
 

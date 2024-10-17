@@ -19,51 +19,47 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 
-/** Update the name of a catalog. */
-public class UpdateCatalogName extends Command {
-
+public class CreateTag extends Command {
   protected String metalake;
-  protected String catalog;
-  protected String name;
+  protected String tag;
+  protected String comment;
 
   /**
-   * Update the name of a catalog.
+   * Create a new tag.
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
-   * @param catalog The name of the catalog.
-   * @param name The new metalake name.
+   * @param tag The name of the tag.
+   * @param comment The comment of the tag.
    */
-  public UpdateCatalogName(String url, String metalake, String catalog, String name) {
+  public CreateTag(String url, String metalake, String tag, String comment) {
     super(url);
     this.metalake = metalake;
-    this.catalog = catalog;
-    this.name = name;
+    this.tag = tag;
+    this.comment = comment;
   }
 
-  /** Update the name of a catalog. */
+  /** Create a new tag. */
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
-      CatalogChange change = CatalogChange.rename(name);
-      client.alterCatalog(catalog, change);
+      client.createTag(tag, comment, null);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (TagAlreadyExistsException err) {
+      System.err.println(ErrorMessages.TAG_EXISTS);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(catalog + " name changed.");
+    System.out.println(tag + " created");
   }
 }

@@ -112,12 +112,11 @@ public class FullName {
       String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
 
       /* Adjust position if metalake is part of the full name. */
-      String metalakeEnv = System.getenv("GRAVITINO_METALAKE");
       if (metalakeEnv != null) {
         position = position - 1;
       }
 
-      if (names.length - 1 < position) {
+      if (position >= names.length) {
         System.err.println(ErrorMessages.MALFORMED_NAME);
         return null;
       }
@@ -127,5 +126,64 @@ public class FullName {
 
     System.err.println(ErrorMessages.MISSING_NAME);
     return null;
+  }
+
+  /**
+   * Helper method to determine a specific part of the full name exits.
+   *
+   * @param partNo The part of the name to obtain.
+   * @return True if the part exitsts.
+   */
+  public boolean hasNamePart(int partNo) {
+    /* Extract the name part from the full name if available. */
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
+      int length = names.length;
+      int position = partNo;
+
+      /* Adjust position if metalake is part of the full name. */
+      if (metalakeEnv != null) {
+        position = position - 1;
+      }
+      return position <= length;
+    }
+
+    return false;
+  }
+
+  /**
+   * Does the metalake name exist?
+   *
+   * @return True if the catalog name exists, or false if it does not.
+   */
+  public boolean hasMetalakeName() {
+    return hasNamePart(1);
+  }
+
+  /**
+   * Does the catalog name exist?
+   *
+   * @return True if the catalog name exists, or false if it does not.
+   */
+  public boolean hasCatalogName() {
+    return hasNamePart(2);
+  }
+
+  /**
+   * Does the schema name exist?
+   *
+   * @return True if the schema name exists, or false if it does not.
+   */
+  public boolean hasSchemaName() {
+    return hasNamePart(3);
+  }
+
+  /**
+   * Does the table name exist?
+   *
+   * @return True if the table name exists, or false if it does not.
+   */
+  public boolean hasTableName() {
+    return hasNamePart(4);
   }
 }

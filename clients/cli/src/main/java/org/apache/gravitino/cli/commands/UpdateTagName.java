@@ -19,31 +19,31 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.tag.TagChange;
 
-/** Update the name of a catalog. */
-public class UpdateCatalogName extends Command {
+/** Update the name of a tag. */
+public class UpdateTagName extends Command {
 
   protected String metalake;
-  protected String catalog;
+  protected String tag;
   protected String name;
 
   /**
-   * Update the name of a catalog.
+   * Update the name of a tag.
    *
    * @param url The URL of the Gravitino server.
-   * @param metalake The name of the metalake.
-   * @param catalog The name of the catalog.
+   * @param metalake The name of the tag.
+   * @param tag The name of the catalog.
    * @param name The new metalake name.
    */
-  public UpdateCatalogName(String url, String metalake, String catalog, String name) {
+  public UpdateTagName(String url, String metalake, String tag, String name) {
     super(url);
     this.metalake = metalake;
-    this.catalog = catalog;
+    this.tag = tag;
     this.name = name;
   }
 
@@ -51,19 +51,19 @@ public class UpdateCatalogName extends Command {
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
-      CatalogChange change = CatalogChange.rename(name);
-      client.alterCatalog(catalog, change);
+      TagChange change = TagChange.rename(name);
+      client.alterTag(tag, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (NoSuchTagException err) {
+      System.err.println(ErrorMessages.UNKNOWN_TAG);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(catalog + " name changed.");
+    System.out.println(tag + " name changed.");
   }
 }
