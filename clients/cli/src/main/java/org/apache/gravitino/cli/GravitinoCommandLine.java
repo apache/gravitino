@@ -22,6 +22,7 @@ package org.apache.gravitino.cli;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.AllMetalakeDetails;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.ClientVersion;
@@ -336,7 +337,7 @@ public class GravitinoCommandLine {
       new DeleteUser(url, metalake, user).handle();
     } else if (CommandActions.UPDATE.equals(command)) {
       String role = line.getOptionValue(GravitinoOptions.ROLE);
-      if (role != null) {
+      if (role != null && user != null) {
         new AddRoleToUser(url, metalake, user, role).handle();
       }
     }

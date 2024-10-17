@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.ArrayList;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -37,9 +38,8 @@ public class AddRoleToUser extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param metalake The name of the metalake.
+   * @param user The name of the user.
    * @param role The name of the role.
-   * @param property The name of the property.
-   * @param value The value of the property.
    */
   public AddRoleToUser(String url, String metalake, String user, String role) {
     super(url);
@@ -52,7 +52,8 @@ public class AddRoleToUser extends Command {
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
-      roles = new ArrayList<String>.roles.push(role);
+      ArrayList<String> roles = new ArrayList<String>();
+      roles.add(role);
       client.grantRolesToUser(roles, user);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
