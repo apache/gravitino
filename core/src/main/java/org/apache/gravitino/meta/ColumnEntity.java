@@ -150,6 +150,19 @@ public class ColumnEntity implements Entity, Auditable {
     return new Builder();
   }
 
+  public static ColumnEntity toColumnEntity(Column column, long uid, AuditInfo audit) {
+    return builder()
+        .withId(uid)
+        .withName(column.name())
+        .withComment(column.comment())
+        .withDataType(column.dataType())
+        .withNullable(column.nullable())
+        .withAutoIncrement(column.autoIncrement())
+        .withDefaultValue(column.defaultValue())
+        .withAuditInfo(audit)
+        .build();
+  }
+
   public static class Builder {
     private final ColumnEntity columnEntity;
 

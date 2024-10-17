@@ -168,6 +168,15 @@ public abstract class JdbcTableOperations implements TableOperation {
     return builder;
   }
 
+  protected JdbcColumn.Builder getColumnBuilder(
+      ResultSet columnsResult, String databaseName, String tableName) throws SQLException {
+    JdbcColumn.Builder builder = null;
+    if (Objects.equals(columnsResult.getString("TABLE_NAME"), tableName)) {
+      builder = getBasicJdbcColumnInfo(columnsResult);
+    }
+    return builder;
+  }
+
   @Override
   public JdbcTable load(String databaseName, String tableName) throws NoSuchTableException {
     // We should handle case sensitivity and wild card issue in some catalog tables, take MySQL
@@ -188,8 +197,8 @@ public abstract class JdbcTableOperations implements TableOperation {
       ResultSet columns = getColumns(connection, databaseName, tableName);
       while (columns.next()) {
         // TODO(yunqing): check schema and catalog also
-        if (Objects.equals(columns.getString("TABLE_NAME"), tableName)) {
-          JdbcColumn.Builder columnBuilder = getBasicJdbcColumnInfo(columns);
+        JdbcColumn.Builder columnBuilder = getColumnBuilder(columns, databaseName, tableName);
+        if (columnBuilder != null) {
           boolean autoIncrement = getAutoIncrementInfo(columns);
           columnBuilder.withAutoIncrement(autoIncrement);
           jdbcColumns.add(columnBuilder.build());
