@@ -634,11 +634,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               EntityType.SCHEMA);
       CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
 
-      if (!schemas.isEmpty()
-          && !force
-          && (!catalogEntity.getProvider().equals("kafka") || schemas.size() > 1)) {
-        throw new NonEmptyEntityException(
-            "Catalog %s has schemas, please drop them first or use force option", ident);
+      if (!schemas.isEmpty() && !force) {
+        // the Kafka catalog is special, it includes a default schema
+        if (!catalogEntity.getProvider().equals("kafka") || schemas.size() > 1) {
+          throw new NonEmptyEntityException(
+              "Catalog %s has schemas, please drop them first or use force option", ident);
+        }
       }
 
       // If reached here, it implies that the catalog is not in use or force is true.
