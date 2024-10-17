@@ -24,16 +24,16 @@ In the simple mode, the username originates from Spark, and is obtained using th
 
 In the OAuth2 mode, you could use the following configuration to fetch an OAuth2 token to access Gravitino server.
 
-| Property                              | Type   | Default Value | Description                                   | Required             | Since Version |
-|---------------------------------------|--------|---------------|-----------------------------------------------|----------------------|---------------|
-| spark.sql.gravitino.oauth2.serverUri  | string | None          | The OAuth2 server uri address.                | Yes, for OAuth2 mode | 0.7.0         |
-| spark.sql.gravitino.oauth2.tokenPath  | string | None          | The path of token interface in OAuth2 server. | Yes, for OAuth2 mode | 0.7.0         |
-| spark.sql.gravitino.oauth2.credential | string | None          | The credential to request the OAuth2 token.   | Yes, for OAuth2 mode | 0.7.0         |
-| spark.sql.gravitino.oauth2.scope      | string | None          | The scope to request the OAuth2 token.        | Yes, for OAuth2 mode | 0.7.0         |
+| Property                              | Type   | Default Value | Description                                   | Required             | Since Version    |
+|---------------------------------------|--------|---------------|-----------------------------------------------|----------------------|------------------|
+| spark.sql.gravitino.oauth2.serverUri  | string | None          | The OAuth2 server uri address.                | Yes, for OAuth2 mode | 0.7.0-incubating |
+| spark.sql.gravitino.oauth2.tokenPath  | string | None          | The path of token interface in OAuth2 server. | Yes, for OAuth2 mode | 0.7.0-incubating |
+| spark.sql.gravitino.oauth2.credential | string | None          | The credential to request the OAuth2 token.   | Yes, for OAuth2 mode | 0.7.0-incubating |
+| spark.sql.gravitino.oauth2.scope      | string | None          | The scope to request the OAuth2 token.        | Yes, for OAuth2 mode | 0.7.0-incubating |
 
 ## Kerberos mode
 
-In kerberos mode, you could use the Spark kerberos configuration to fetch a kerberos ticket to access Gravitino server.
+In kerberos mode, you could use the Spark kerberos configuration to fetch a kerberos ticket to access Gravitino server, use `spark.kerberos.principal`, `spark.kerberos.keytab` to specify kerberos principal and keytab.
 
 The principal of Gravitino server is like `HTTP/$host@$realm`, please keep the `$host` consistent with the host in Gravitino server uri address.
 Please make sure `krb5.conf` is accessible by Spark, like by specifying the configuration `spark.driver.extraJavaOptions="-Djava.security.krb5.conf=/xx/krb5.conf"`.
