@@ -1,0 +1,6 @@
+"Conventional childr","EXPRESS                       ","site_0","128","107","124","93","0"
+"Conventional childr","LIBRARY                       ","site_0","77","77","90","75","0"
+"Conventional childr","NEXT DAY                      ","site_0","109","117","114","109","0"
+"Conventional childr","OVERNIGHT                     ","site_0","78","84","83","68","0"
+"Conventional childr","REGULAR                       ","site_0","93","87","75","65","0"
+"Conventional childr","TWO DAY                       ","site_0","93","97","78","93","0"
