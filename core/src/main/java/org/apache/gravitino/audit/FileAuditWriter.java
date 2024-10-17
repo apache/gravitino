@@ -67,7 +67,7 @@ public class FileAuditWriter implements AuditLogWriter {
       outWriter = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
     } catch (Exception e) {
       throw new GravitinoRuntimeException(
-          String.format("Init audit log writer fail, filename is %s", fileName), e);
+          e, "Init audit log writer fail, filename is %s", fileName);
     }
   }
 
