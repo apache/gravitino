@@ -31,6 +31,7 @@ import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
 import javax.ws.rs.HeaderParam;
+import javax.ws.rs.NotSupportedException;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -50,6 +51,7 @@ import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
@@ -110,17 +112,14 @@ public class IcebergTableOperations {
         createTableRequest,
         accessDelegation,
         isCredentialVending);
+    LoadTableResponse loadTableResponse =
+        icebergCatalogWrapperManager
+            .getOps(prefix)
+            .createTable(RESTUtil.decodeNamespace(namespace), createTableRequest);
     if (isCredentialVending) {
-      LoadTableResponse loadTableResponse =
-          icebergCatalogWrapperManager
-              .getOps(prefix)
-              .createTable(RESTUtil.decodeNamespace(namespace), createTableRequest);
       return IcebergRestUtils.ok(injectCredentialConfig(prefix, loadTableResponse));
     } else {
-      return IcebergRestUtils.ok(
-          icebergCatalogWrapperManager
-              .getOps(prefix)
-              .createTable(RESTUtil.decodeNamespace(namespace), createTableRequest));
+      return IcebergRestUtils.ok(loadTableResponse);
     }
   }
 
@@ -195,14 +194,13 @@ public class IcebergTableOperations {
     // todo support snapshots
     TableIdentifier tableIdentifier =
         TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
+    LoadTableResponse loadTableResponse = icebergCatalogWrapperManager
+        .getOps(prefix)
+        .loadTable(tableIdentifier);
     if (isCredentialVending) {
-      return IcebergRestUtils.ok(
-          icebergCatalogWrapperManager
-              .getOps(prefix)
-              .loadTableWithCredentialVending(tableIdentifier));
+      return IcebergRestUtils.ok(injectCredentialConfig(prefix, loadTableResponse));
     } else {
-      return IcebergRestUtils.ok(
-          icebergCatalogWrapperManager.getOps(prefix).loadTable(tableIdentifier));
+      return IcebergRestUtils.ok(loadTableResponse);
     }
   }
 
@@ -252,14 +250,14 @@ public class IcebergTableOperations {
     CredentialProvider credentialProvider =
         icebergCatalogWrapperManager.getCredentialProvider(prefix);
     if (credentialProvider == null) {
-      throw new RuntimeException("Doesn't support credential vending");
+      throw new NotSupportedException("Doesn't support credential vending");
     }
     Credential credential =
         CredentialUtils.vendCredential(
             credentialProvider, loadTableResponse.tableMetadata().location());
     if (credential == null) {
-      throw new RuntimeException(
-          "Couldn't generate credential for " + credentialProvider.credentialType());
+      throw new ServiceUnavailableException(
+          "Couldn't generate credential for %s", credentialProvider.credentialType());
     }
     Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
     return LoadTableResponse.builder()
@@ -283,7 +281,7 @@ public class IcebergTableOperations {
           X_ICEBERG_ACCESS_DELEGATION
               + ": "
               + accessDelegation
-              + " is illegal, only supports:[vended-credentials,remote-signing]");
+              + " is illegal, Iceberg REST spec only supports:[vended-credentials,remote-signing], Gravitino Iceberg REST server supports: vended-credentials");
     }
   }
 }

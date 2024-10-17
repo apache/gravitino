@@ -19,14 +19,56 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class CredentialProviderManager {
 
+  private static final Logger LOG = LoggerFactory.getLogger(CredentialProviderManager.class);
+  private Map<String, CredentialProvider> credentialProviders;
+
+  public CredentialProviderManager() {
+    this.credentialProviders = new ConcurrentHashMap<>();
+  }
+
   public void registerCredentialProvider(
-      String catalogName, CredentialProvider credentialProvider) {}
+      String catalogName, CredentialProvider credentialProvider) {
+    CredentialProvider current = credentialProviders.putIfAbsent(catalogName, credentialProvider);
+    Preconditions.checkState(
+        !current.equals(credentialProvider),
+        String.format(
+            "Should not register multi times to CredentialProviderManager, catalog:%s, credential provider:%s",
+            catalogName,
+            credentialProvider.credentialType()));
+    LOG.info(
+        "Register catalog:%s credential provider:%s to CredentialProviderManager",
+        catalogName,
+        credentialProvider.credentialType());
+  }
 
-  public void unregisterCredentialProvider(String catalogName) {}
+  public void unregisterCredentialProvider(String catalogName) {
+    CredentialProvider credentialProvider = credentialProviders.remove(catalogName);
+    // Not all catalog has credential provider
+    if (credentialProvider != null) {
+      LOG.info(
+          "Unregister catalog:{} credential provider:{} to CredentialProviderManager",
+          catalogName,
+          credentialProvider.credentialType());
+      try {
+        credentialProvider.close();
+      } catch (IOException e) {
+        LOG.warn("Close credential provider failed", e);
+      }
+    }
+  }
 
+  @Nullable
   public CredentialProvider getCredentialProvider(String catalogName) {
-    return null;
+    return credentialProviders.get(catalogName);
   }
 }

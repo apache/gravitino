@@ -77,8 +77,8 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
     provider.setClient(client);
 
-    IcebergCatalogWrapper hiveOps = provider.getIcebergCatalogConfig(hiveCatalogName);
-    IcebergCatalogWrapper jdbcOps = provider.getIcebergCatalogConfig(jdbcCatalogName);
+    IcebergCatalogWrapper hiveOps = new IcebergCatalogWrapper(provider.getIcebergCatalogConfig(hiveCatalogName).get());
+    IcebergCatalogWrapper jdbcOps = new IcebergCatalogWrapper(provider.getIcebergCatalogConfig(jdbcCatalogName).get());
 
     Assertions.assertEquals(hiveCatalogName, hiveOps.getCatalog().name());
     Assertions.assertEquals(jdbcCatalogName, jdbcOps.getCatalog().name());

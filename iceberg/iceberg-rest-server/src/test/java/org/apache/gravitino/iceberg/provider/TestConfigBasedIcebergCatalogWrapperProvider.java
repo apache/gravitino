@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.provider;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
@@ -32,6 +33,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestConfigBasedIcebergCatalogWrapperProvider {
+
   @Test
   public void testValidIcebergTableOps() {
     String hiveCatalogName = "hive_backend";
@@ -65,9 +67,12 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
     IcebergConfig hiveIcebergConfig = provider.catalogConfigs.get(hiveCatalogName);
     IcebergConfig jdbcIcebergConfig = provider.catalogConfigs.get(jdbcCatalogName);
     IcebergConfig defaultIcebergConfig = provider.catalogConfigs.get(defaultCatalogName);
-    IcebergCatalogWrapper hiveOps = provider.getIcebergCatalogConfig(hiveCatalogName);
-    IcebergCatalogWrapper jdbcOps = provider.getIcebergCatalogConfig(jdbcCatalogName);
-    IcebergCatalogWrapper defaultOps = provider.getIcebergCatalogConfig(defaultCatalogName);
+    IcebergCatalogWrapper hiveOps = new IcebergCatalogWrapper(
+        provider.getIcebergCatalogConfig(hiveCatalogName).get());
+    IcebergCatalogWrapper jdbcOps = new IcebergCatalogWrapper(
+        provider.getIcebergCatalogConfig(jdbcCatalogName).get());
+    IcebergCatalogWrapper defaultOps = new IcebergCatalogWrapper(
+        provider.getIcebergCatalogConfig(defaultCatalogName).get());
 
     Assertions.assertEquals(
         hiveCatalogName, hiveIcebergConfig.get(IcebergConfig.CATALOG_BACKEND_NAME));
@@ -106,7 +111,7 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
         new ConfigBasedIcebergCatalogConfigProvider();
     provider.initialize(Maps.newHashMap());
 
-    Assertions.assertThrowsExactly(
-        RuntimeException.class, () -> provider.getIcebergCatalogConfig(catalogName));
+    Optional<IcebergConfig> config = provider.getIcebergCatalogConfig(catalogName);
+    Assertions.assertEquals(Optional.empty(), config);
   }
 }
