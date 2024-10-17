@@ -43,6 +43,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.CredentialUtils;
@@ -252,7 +253,10 @@ public class IcebergTableOperations {
     CredentialProvider credentialProvider =
         icebergCatalogWrapperManager.getCredentialProvider(prefix);
     if (credentialProvider == null) {
-      throw new NotSupportedException("Doesn't support credential vending");
+      throw new NotSupportedException(
+          "Doesn't support credential vending, please add "
+              + CredentialConstants.CREDENTIAL_PROVIDER_TYPE
+              + " to the catalog configurations");
     }
     Credential credential =
         CredentialUtils.vendCredential(
@@ -283,7 +287,7 @@ public class IcebergTableOperations {
           X_ICEBERG_ACCESS_DELEGATION
               + ": "
               + accessDelegation
-              + " is illegal, Iceberg REST spec only supports:[vended-credentials,remote-signing], Gravitino Iceberg REST server supports: vended-credentials");
+              + " is illegal, Iceberg REST spec supports:[vended-credentials,remote-signing], Gravitino Iceberg REST server supports: vended-credentials");
     }
   }
 }

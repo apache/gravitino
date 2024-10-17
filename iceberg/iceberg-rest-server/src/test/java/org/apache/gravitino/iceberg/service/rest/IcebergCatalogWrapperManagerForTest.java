@@ -24,6 +24,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 
+// Provide a custom catalogWrapper to do test like `registerTable`
 public class IcebergCatalogWrapperManagerForTest extends IcebergCatalogWrapperManager {
   public IcebergCatalogWrapperManagerForTest(Map<String, String> properties) {
     super(properties);
