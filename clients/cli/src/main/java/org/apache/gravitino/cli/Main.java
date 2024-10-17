@@ -51,15 +51,7 @@ public class Main {
    * @return The command, one of 'details', 'list', 'create', 'delete' or 'update'.
    */
   protected static String resolveCommand(CommandLine line) {
-    /* Can be specified in the form --command XXX. */
-    if (line.hasOption(GravitinoOptions.COMMAND)) {
-      String command = line.getOptionValue(GravitinoOptions.COMMAND);
-      if (CommandActions.isValidCommand(command)) {
-        return command;
-      }
-    }
-
-    /* Or as --list, --details --create --delete or --update. */
+    /* Passed as --list, --details --create --delete or --update. */
     if (line.hasOption(GravitinoOptions.LIST)) {
       return CommandActions.LIST;
     } else if (line.hasOption(GravitinoOptions.DETAILS)) {
@@ -72,20 +64,7 @@ public class Main {
       return CommandActions.UPDATE;
     }
 
-    /* Or as the bare second argument of two arguments. */
-    String[] args = line.getArgs();
-
-    if (args.length == 1 || args.length == 2) {
-      String command = args[args.length - 1];
-      if (CommandActions.isValidCommand(command)) {
-        return command;
-      } else {
-        System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
-        return null;
-      }
-    } else {
-      return CommandActions.DETAILS; /* Default to 'details' command. */
-    }
+    return CommandActions.DETAILS; /* Default to 'details' command. */
   }
 
   /**
@@ -95,29 +74,10 @@ public class Main {
    * @return The entity, e.g. metakalake, catalog, schema, table, etc.
    */
   protected static String resolveEntity(CommandLine line) {
-    /* Can be specified in the form --entity XXX. */
-    if (line.hasOption(GravitinoOptions.ENTITY)) {
-      String entity = line.getOptionValue(GravitinoOptions.ENTITY);
-      if (CommandEntities.isValidEntity(entity)) {
-        return entity;
-      }
-    }
-
-    /* Or as --metalake, --catalog, --schema, --table etc. */
-    if (line.hasOption(GravitinoOptions.METALAKE)) {
-      return CommandEntities.METALAKE;
-    } else if (line.hasOption(GravitinoOptions.CATALOG)) {
-      return CommandEntities.CATALOG;
-    } else if (line.hasOption(GravitinoOptions.SCHEMA)) {
-      return CommandEntities.SCHEMA;
-    } else if (line.hasOption(GravitinoOptions.TABLE)) {
-      return CommandEntities.TABLE;
-    }
-
-    /* Or as the bare first argument of two arguments. */
+    /* As the bare first argument. */
     String[] args = line.getArgs();
 
-    if (args.length == 2) {
+    if (args.length > 0) {
       String entity = args[0];
       if (CommandEntities.isValidEntity(entity)) {
         return entity;

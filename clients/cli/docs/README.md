@@ -36,7 +36,7 @@ Apache Gravitino CLI is a command-line tool that interacts with the Gravitino se
 - Retrieve server version
 - Provide help on usage
 - Manage Gravitino entities such as Metalakes, Catalogs, Schemas, and Tables
-- List details about Graviotino entities
+- List details about Gravitino entities
 
 ## Installation
 
@@ -44,7 +44,7 @@ Apache Gravitino CLI is a command-line tool that interacts with the Gravitino se
 
 Before you can build and run this project, it is suggested you have the following installed:
 
-- Java 11 or higher
+- Java 8 or higher
 
 ### Build the Project
 
@@ -97,29 +97,29 @@ Options
 ## Commands
 The following commands are available for entity management:
 
-list: List available entities
-details: Show detailed information about an entity
-create: Create a new entity
-delete: Delete an existing entity
-update: Update an existing entity
+--list: List available entities
+--details: Show detailed information about an entity
+--create: Create a new entity
+--delete: Delete an existing entity
+--update: Update an existing entity
 
 ### Examples
 List All Metalakes
 
 ```bash
-gcli list
+gcli --list
 ```
 
 Get Details of a Specific Metalake
 
 ```bash
-gcli metalake details -name my-metalake
+gcli metalake --details -name my-metalake
 ```
 
 List Tables in a Catalog
 
 ```bash
-gcli metalake list -name my-metalake
+gcli metalake --list -name my-metalake
 ```
 
 ## Running Tests

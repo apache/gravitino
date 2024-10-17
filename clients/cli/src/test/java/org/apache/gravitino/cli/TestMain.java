@@ -55,23 +55,10 @@ public class TestMain {
   }
 
   @Test
-  public void withCommandParameters() throws ParseException {
-    Options options = new GravitinoOptions().options();
-    CommandLineParser parser = new DefaultParser();
-    String[] args = {"--entity", "metalake", "--command", "list"};
-    CommandLine line = parser.parse(options, args);
-
-    String command = Main.resolveCommand(line);
-    assertEquals(CommandActions.LIST, command);
-    String entity = Main.resolveEntity(line);
-    assertEquals(CommandEntities.METALAKE, entity);
-  }
-
-  @Test
   public void withTwoArgsOnly() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
-    String[] args = {"metalake", "details"};
+    String[] args = {"metalake", "--details"};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);
