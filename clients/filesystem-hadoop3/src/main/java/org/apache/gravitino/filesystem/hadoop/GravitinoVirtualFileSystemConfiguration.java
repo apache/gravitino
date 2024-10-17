@@ -21,7 +21,7 @@ package org.apache.gravitino.filesystem.hadoop;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 
 /** Configuration class for Gravitino Virtual File System. */
-class GravitinoVirtualFileSystemConfiguration {
+public class GravitinoVirtualFileSystemConfiguration {
   public static final String GVFS_FILESET_PREFIX = "gvfs://fileset";
   public static final String GVFS_SCHEME = "gvfs";
   public static final String GVFS_CONFIG_PREFIX = "fs.gvfs.";
