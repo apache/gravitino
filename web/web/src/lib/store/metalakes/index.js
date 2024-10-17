@@ -39,7 +39,13 @@ import {
   updateCatalogApi,
   deleteCatalogApi
 } from '@/lib/api/catalogs'
-import { getSchemasApi, getSchemaDetailsApi } from '@/lib/api/schemas'
+import {
+  getSchemasApi,
+  getSchemaDetailsApi,
+  createSchemaApi,
+  updateSchemaApi,
+  deleteSchemaApi
+} from '@/lib/api/schemas'
 import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
 import { getFilesetsApi, getFilesetDetailsApi } from '@/lib/api/filesets'
 import { getTopicsApi, getTopicDetailsApi } from '@/lib/api/topics'
@@ -546,6 +552,67 @@ export const getSchemaDetails = createAsyncThunk(
     const { schema: resSchema } = res
 
     return resSchema
+  }
+)
+
+export const createSchema = createAsyncThunk(
+  'appMetalakes/createSchema',
+  async ({ data, metalake, catalog, type }, { dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(createSchemaApi({ data, metalake, catalog }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      return { err: true }
+    }
+
+    const { schema: schemaItem } = res
+
+    const schemaData = {
+      ...schemaItem,
+      node: 'schema',
+      id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`,
+      key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`,
+      path: `?${new URLSearchParams({ metalake, catalog, type, schema: schemaItem.name }).toString()}`,
+      name: schemaItem.name,
+      title: schemaItem.name,
+      tables: [],
+      children: []
+    }
+
+    dispatch(fetchSchemas({ metalake, catalog, type, init: true }))
+
+    return schemaData
+  }
+)
+
+export const updateSchema = createAsyncThunk(
+  'appMetalakes/updateSchema',
+  async ({ metalake, catalog, type, schema, data }, { dispatch }) => {
+    const [err, res] = await to(updateSchemaApi({ metalake, catalog, schema, data }))
+    if (err || !res) {
+      return { err: true }
+    }
+    dispatch(fetchSchemas({ metalake, catalog, type, init: true }))
+
+    return res.catalog
+  }
+)
+
+export const deleteSchema = createAsyncThunk(
+  'appMetalakes/deleteSchema',
+  async ({ metalake, catalog, type, schema }, { dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(deleteSchemaApi({ metalake, catalog, schema }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    dispatch(fetchSchemas({ metalake, catalog, type, page: 'catalogs', init: true }))
+
+    return res
   }
 )
 
@@ -1083,6 +1150,21 @@ export const appMetalakesSlice = createSlice({
       state.activatedDetails = action.payload
     })
     builder.addCase(getSchemaDetails.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(createSchema.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(updateSchema.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(deleteSchema.rejected, (state, action) => {
       if (!action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
