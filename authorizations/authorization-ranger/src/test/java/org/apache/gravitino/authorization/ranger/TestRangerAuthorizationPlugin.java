@@ -170,20 +170,20 @@ public class TestRangerAuthorizationPlugin {
     Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(createCatalog)));
 
-    // Ignore the use catalog operation
+    // Use catalog operation
     SecurableObject useCatalogInMetalake =
         SecurableObjects.parse(
             String.format("metalake"),
             MetadataObject.Type.METALAKE,
             Lists.newArrayList(Privileges.UseCatalog.allow()));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(useCatalogInMetalake)));
     SecurableObject useCatalog =
         SecurableObjects.parse(
             String.format("catalog"),
             MetadataObject.Type.CATALOG,
             Lists.newArrayList(Privileges.UseCatalog.allow()));
-    Assertions.assertFalse(rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(useCatalog)));
+    Assertions.assertTrue(rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(useCatalog)));
 
     // Create schema
     SecurableObject createSchemaInMetalake =
@@ -200,13 +200,13 @@ public class TestRangerAuthorizationPlugin {
         rangerAuthPlugin.validAuthorizationOperation(
             Arrays.asList(createSchemaInMetalake, createSchemaInCatalog)));
 
-    // Ignore the use schema operation
+    // Use schema operation
     SecurableObject useSchema =
         SecurableObjects.parse(
             String.format("catalog.schema"),
             MetadataObject.Type.SCHEMA,
             Lists.newArrayList(Privileges.UseSchema.allow()));
-    Assertions.assertFalse(rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(useSchema)));
+    Assertions.assertTrue(rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(useSchema)));
 
     // Table
     SecurableObject createTableInMetalake =

@@ -158,25 +158,9 @@ public class RangerHiveIT {
     Role mockCatalogRole = mockCatalogRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(mockCatalogRole));
     // Check if exist this policy
-    mockCatalogRole.securableObjects().stream()
-        .forEach(
-            securableObject -> {
-              rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                  .forEach(
-                      rangerSecurableObject ->
-                          Assertions.assertNotNull(
-                              rangerHelper.findManagedPolicy(rangerSecurableObject)));
-            });
+    assertFindManagedPolicy(mockCatalogRole, true);
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(mockCatalogRole));
-    mockCatalogRole.securableObjects().stream()
-        .forEach(
-            securableObject -> {
-              rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                  .forEach(
-                      rangerSecurableObject ->
-                          Assertions.assertNull(
-                              rangerHelper.findManagedPolicy(rangerSecurableObject)));
-            });
+    assertFindManagedPolicy(mockCatalogRole, false);
   }
 
   @Test
@@ -184,19 +168,12 @@ public class RangerHiveIT {
     // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    assertFindManagedPolicy(role, true);
 
     // delete this role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role));
     // Check if the policy is deleted
-    role.securableObjects().stream()
-        .forEach(
-            securableObject -> {
-              rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                  .forEach(
-                      rangerSecurableObject ->
-                          Assertions.assertNull(
-                              rangerHelper.findManagedPolicy(rangerSecurableObject)));
-            });
+    assertFindManagedPolicy(role, false);
   }
 
   @Test
@@ -207,14 +184,7 @@ public class RangerHiveIT {
     // delete this role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(mockCatalogRole));
     // Check if exist this policy
-    mockCatalogRole.securableObjects().stream()
-        .forEach(
-            securableObject ->
-                rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                    .forEach(
-                        rangerSecurableObject ->
-                            Assertions.assertNull(
-                                rangerHelper.findManagedPolicy(rangerSecurableObject))));
+    assertFindManagedPolicy(mockCatalogRole, false);
   }
 
   @Test
@@ -233,17 +203,7 @@ public class RangerHiveIT {
     // delete this role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role));
     // Because this metaobject has owner, so the policy should not be deleted
-
-    role.securableObjects().stream()
-        .forEach(
-            securableObject -> {
-              rangerAuthHivePlugin.translateOwner(securableObject).stream()
-                  .forEach(
-                      rangerSecurableObject -> {
-                        Assertions.assertNotNull(
-                            rangerHelper.findManagedPolicy(rangerSecurableObject));
-                      });
-            });
+    assertFindManagedPolicy(role, true);
   }
 
   @Test
@@ -397,17 +357,7 @@ public class RangerHiveIT {
             mockCatalogRole,
             RoleChange.addSecurableObject(
                 mockCatalogRole.name(), mockCatalogRole.securableObjects().get(0))));
-    // Check if exist this policy
-    mockCatalogRole.securableObjects().stream()
-        .forEach(
-            securableObject -> {
-              rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                  .forEach(
-                      rangerSecurableObject -> {
-                        Assertions.assertNotNull(
-                            rangerHelper.findManagedPolicy(rangerSecurableObject));
-                      });
-            });
+    assertFindManagedPolicy(mockCatalogRole, true);
   }
 
   @Test
@@ -451,17 +401,7 @@ public class RangerHiveIT {
             mockCatalogRole,
             RoleChange.removeSecurableObject(
                 mockCatalogRole.name(), mockCatalogRole.securableObjects().get(0))));
-    // Check if exist this policy
-    mockCatalogRole.securableObjects().stream()
-        .forEach(
-            securableObject -> {
-              rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                  .forEach(
-                      rangerSecurableObject -> {
-                        Assertions.assertNull(
-                            rangerHelper.findManagedPolicy(rangerSecurableObject));
-                      });
-            });
+    assertFindManagedPolicy(mockCatalogRole, false);
   }
 
   @Test
@@ -565,17 +505,7 @@ public class RangerHiveIT {
                 mockCatalogRole.name(),
                 mockCatalogRole.securableObjects().get(0),
                 newSecurableObject)));
-    // Check if exist this policy
-    mockCatalogRole.securableObjects().stream()
-        .forEach(
-            securableObject -> {
-              rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                  .forEach(
-                      rangerSecurableObject -> {
-                        Assertions.assertNull(
-                            rangerHelper.findManagedPolicy(rangerSecurableObject));
-                      });
-            });
+    assertFindManagedPolicy(mockCatalogRole, false);
   }
 
   public void testRoleChangeCombinedOperation() {
@@ -627,14 +557,7 @@ public class RangerHiveIT {
     // Delete the role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(verifyRole));
     // Because these metaobjects have an owner, so the policy will not be deleted.
-    role.securableObjects().stream()
-        .forEach(
-            securableObject ->
-                rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                    .forEach(
-                        rangerSecurableObject ->
-                            Assertions.assertNotNull(
-                                rangerHelper.findManagedPolicy(rangerSecurableObject))));
+    assertFindManagedPolicy(role, true);
     verifyOwnerInRanger(oldMetadataObject, Lists.newArrayList(userName));
   }
 
@@ -783,6 +706,24 @@ public class RangerHiveIT {
         rangerAuthHivePlugin.onRevokedRolesFromGroup(Lists.newArrayList(role), groupEntity1));
     verifyRoleInRanger(
         rangerAuthHivePlugin, role, null, null, null, Lists.newArrayList(groupName1));
+  }
+
+  private void assertFindManagedPolicy(Role role, boolean policyExist) {
+    role.securableObjects().stream()
+        .forEach(
+            securableObject ->
+                rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
+                    .forEach(
+                        rangerSecurableObject -> {
+                          LOG.info("rangerSecurableObject: " + rangerSecurableObject);
+                          if (policyExist) {
+                            Assertions.assertNotNull(
+                                rangerHelper.findManagedPolicy(rangerSecurableObject));
+                          } else {
+                            Assertions.assertNull(
+                                rangerHelper.findManagedPolicy(rangerSecurableObject));
+                          }
+                        }));
   }
 
   private static class MockOwner implements Owner {
@@ -943,525 +884,6 @@ public class RangerHiveIT {
     Assertions.assertTrue(rangerAuthHivePlugin.onGroupAcquired(group));
     Assertions.assertTrue(rangerAuthHivePlugin.onGroupRemoved(group));
     Assertions.assertFalse(rangerAuthHivePlugin.onGroupAcquired(group));
-  }
-
-  //  @Test
-  //  public void testAdjustSecurableObjectByPrivilege() {
-  //    SecurableObject createSchemaInMetalake =
-  //        SecurableObjects.parse(
-  //            String.format("metalake"),
-  //            MetadataObject.Type.METALAKE,
-  //            Lists.newArrayList(Privileges.CreateSchema.allow()));
-  //    List<SecurableObject> securableObjects =
-  //        rangerAuthPlugin.adjustSecurableObjectByPrivilege(createSchemaInMetalake);
-  //  }
-
-  @Test
-  public void testValidAuthorizationOperation() {
-    // Create Catalog
-    SecurableObject createCatalog =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.CreateCatalog.allow()));
-    Assertions.assertTrue(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createCatalog)));
-
-    // Ignore the use catalog operation
-    SecurableObject useCatalogInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.UseCatalog.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(useCatalogInMetalake)));
-    SecurableObject useCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.UseCatalog.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(useCatalog)));
-
-    // Create schema
-    SecurableObject createSchemaInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.CreateSchema.allow()));
-    SecurableObject createSchemaInCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.CreateSchema.allow()));
-    Assertions.assertTrue(
-        rangerAuthHivePlugin.validAuthorizationOperation(
-            Arrays.asList(createSchemaInMetalake, createSchemaInCatalog)));
-
-    // Ignore the use schema operation
-    SecurableObject useSchema =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.UseSchema.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(useSchema)));
-
-    // Table
-    SecurableObject createTableInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.CreateTable.allow()));
-    SecurableObject createTableInCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.CreateTable.allow()));
-    SecurableObject createTableInSchema =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.CreateTable.allow()));
-    Assertions.assertTrue(
-        rangerAuthHivePlugin.validAuthorizationOperation(
-            Arrays.asList(createTableInMetalake, createTableInCatalog, createTableInSchema)));
-
-    SecurableObject modifyTableInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.ModifyTable.allow()));
-    SecurableObject modifyTableInCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.ModifyTable.allow()));
-    SecurableObject modifyTableInSchema =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.ModifyTable.allow()));
-    SecurableObject modifyTable =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.ModifyTable.allow()));
-    Assertions.assertTrue(
-        rangerAuthHivePlugin.validAuthorizationOperation(
-            Arrays.asList(
-                modifyTableInMetalake, modifyTableInCatalog, modifyTableInSchema, modifyTable)));
-
-    SecurableObject selectTableInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.SelectTable.allow()));
-    SecurableObject selectTableInCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.SelectTable.allow()));
-    SecurableObject selectTableInSchema =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.SelectTable.allow()));
-    SecurableObject selectTable =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.SelectTable.allow()));
-    Assertions.assertTrue(
-        rangerAuthHivePlugin.validAuthorizationOperation(
-            Arrays.asList(
-                selectTableInMetalake, selectTableInCatalog, selectTableInSchema, selectTable)));
-
-    // Ignore the Fileset operation
-    SecurableObject createFilesetInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.CreateFileset.allow()));
-    SecurableObject createFilesetInCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.CreateFileset.allow()));
-    SecurableObject createFilesetInSchema =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.ReadFileset.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createFilesetInMetalake)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createFilesetInCatalog)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createFilesetInSchema)));
-
-    // Ignore the Topic operation
-    SecurableObject writeFilesetInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.WriteFileset.allow()));
-    SecurableObject writeFilesetInCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.WriteFileset.allow()));
-    SecurableObject writeFilesetInScheam =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.WriteFileset.allow()));
-    SecurableObject writeFileset =
-        SecurableObjects.parse(
-            String.format("catalog.schema.fileset"),
-            MetadataObject.Type.FILESET,
-            Lists.newArrayList(Privileges.WriteFileset.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(writeFilesetInMetalake)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(writeFilesetInCatalog)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(writeFilesetInScheam)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(writeFileset)));
-
-    // Ignore the Fileset operation
-    SecurableObject readFilesetInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.ReadFileset.allow()));
-    SecurableObject readFilesetInCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.ReadFileset.allow()));
-    SecurableObject readFilesetInSchema =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.ReadFileset.allow()));
-    SecurableObject readFileset =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.FILESET,
-            Lists.newArrayList(Privileges.ReadFileset.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(readFilesetInMetalake)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(readFilesetInCatalog)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(readFilesetInSchema)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(readFileset)));
-
-    // Ignore the Topic operation
-    SecurableObject createTopicInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.CreateTopic.allow()));
-    SecurableObject createTopicInCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.CreateTopic.allow()));
-    SecurableObject createTopicInSchema =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.CreateTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createTopicInMetalake)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createTopicInCatalog)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createTopicInSchema)));
-
-    SecurableObject produceTopicInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.ProduceTopic.allow()));
-    SecurableObject produceTopicInCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.ProduceTopic.allow()));
-    SecurableObject produceTopicInSchema =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.ProduceTopic.allow()));
-    SecurableObject produceTopic =
-        SecurableObjects.parse(
-            String.format("catalog.schema.fileset"),
-            MetadataObject.Type.TOPIC,
-            Lists.newArrayList(Privileges.ProduceTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(produceTopicInMetalake)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(produceTopicInCatalog)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(produceTopicInSchema)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(produceTopic)));
-
-    SecurableObject consumeTopicInMetalake =
-        SecurableObjects.parse(
-            String.format("metalake"),
-            MetadataObject.Type.METALAKE,
-            Lists.newArrayList(Privileges.ConsumeTopic.allow()));
-    SecurableObject consumeTopicInCatalog =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.ConsumeTopic.allow()));
-    SecurableObject consumeTopicInSchema =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.ConsumeTopic.allow()));
-    SecurableObject consumeTopic =
-        SecurableObjects.parse(
-            String.format("catalog.schema.topic"),
-            MetadataObject.Type.TOPIC,
-            Lists.newArrayList(Privileges.ConsumeTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(consumeTopicInMetalake)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(consumeTopicInCatalog)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(consumeTopicInSchema)));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(consumeTopic)));
-  }
-
-  @Test
-  public void testInvalidAuthorizationOperation() {
-    // Catalog
-    SecurableObject createCatalog1 =
-        SecurableObjects.parse(
-            String.format("catalog"),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.CreateCatalog.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createCatalog1)));
-    SecurableObject createCatalog2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.CreateCatalog.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createCatalog2)));
-    SecurableObject createCatalog3 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.CreateCatalog.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createCatalog3)));
-
-    SecurableObject useCatalog1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.UseCatalog.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(useCatalog1)));
-    SecurableObject useCatalog2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.UseCatalog.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(useCatalog2)));
-
-    // Schema
-    SecurableObject createSchema1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.CreateSchema.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createSchema1)));
-    SecurableObject createSchema2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.CreateSchema.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createSchema2)));
-
-    SecurableObject useSchema1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.UseSchema.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(useSchema1)));
-
-    // Table
-    SecurableObject createTable1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.CreateTable.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createTable1)));
-    SecurableObject createTable2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.fileset"),
-            MetadataObject.Type.FILESET,
-            Lists.newArrayList(Privileges.CreateTable.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createTable2)));
-    SecurableObject createTable3 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.topic"),
-            MetadataObject.Type.TOPIC,
-            Lists.newArrayList(Privileges.CreateTable.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createTable3)));
-
-    SecurableObject modifyTable1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.fileset"),
-            MetadataObject.Type.FILESET,
-            Lists.newArrayList(Privileges.ModifyTable.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(modifyTable1)));
-    SecurableObject modifyTable2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.topic"),
-            MetadataObject.Type.TOPIC,
-            Lists.newArrayList(Privileges.ModifyTable.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(modifyTable2)));
-
-    SecurableObject selectTable1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.fileset"),
-            MetadataObject.Type.FILESET,
-            Lists.newArrayList(Privileges.SelectTable.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(selectTable1)));
-    SecurableObject selectTable2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.topic"),
-            MetadataObject.Type.TOPIC,
-            Lists.newArrayList(Privileges.SelectTable.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(selectTable2)));
-
-    // Topic
-    SecurableObject createTopic1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.CreateTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createTopic1)));
-    SecurableObject createTopic2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.topic"),
-            MetadataObject.Type.TOPIC,
-            Lists.newArrayList(Privileges.CreateTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createTopic2)));
-    SecurableObject createTopic3 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.fileset"),
-            MetadataObject.Type.FILESET,
-            Lists.newArrayList(Privileges.CreateTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createTopic3)));
-    SecurableObject produceTopic1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.fileset"),
-            MetadataObject.Type.FILESET,
-            Lists.newArrayList(Privileges.ProduceTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(produceTopic1)));
-    SecurableObject produceTopic2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.ProduceTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(produceTopic2)));
-
-    SecurableObject consumeTopic1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.fileset"),
-            MetadataObject.Type.FILESET,
-            Lists.newArrayList(Privileges.ConsumeTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(consumeTopic1)));
-    SecurableObject consumeTopic2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.ConsumeTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(consumeTopic2)));
-
-    // Fileset
-    SecurableObject createFileset1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.CreateFileset.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createFileset1)));
-    SecurableObject createFileset2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.topic"),
-            MetadataObject.Type.TOPIC,
-            Lists.newArrayList(Privileges.CreateTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createFileset2)));
-    SecurableObject createFileset3 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.fileset"),
-            MetadataObject.Type.FILESET,
-            Lists.newArrayList(Privileges.CreateTopic.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(createFileset3)));
-    SecurableObject writeFileset1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.WriteFileset.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(writeFileset1)));
-    SecurableObject writeFileset2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.topic"),
-            MetadataObject.Type.TOPIC,
-            Lists.newArrayList(Privileges.WriteFileset.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(writeFileset2)));
-
-    SecurableObject readFileset1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.table"),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.ReadFileset.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(readFileset1)));
-    SecurableObject readFileset2 =
-        SecurableObjects.parse(
-            String.format("catalog.schema.topic"),
-            MetadataObject.Type.TOPIC,
-            Lists.newArrayList(Privileges.ReadFileset.allow()));
-    Assertions.assertFalse(
-        rangerAuthHivePlugin.validAuthorizationOperation(Arrays.asList(readFileset2)));
   }
 
   @Test
@@ -1846,40 +1268,13 @@ public class RangerHiveIT {
 
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role1));
     // Because role1's secrable object have owner, so the policy will not be deleted.
-    role1.securableObjects().stream()
-        .forEach(
-            securableObject ->
-                rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                    .forEach(
-                        rangerSecurableObject -> {
-                          LOG.info("rangerSecurableObject1: " + rangerSecurableObject);
-                          Assertions.assertNotNull(
-                              rangerHelper.findManagedPolicy(rangerSecurableObject));
-                        }));
+    assertFindManagedPolicy(role1, true);
 
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role2));
-    role2.securableObjects().stream()
-        .forEach(
-            securableObject ->
-                rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                    .forEach(
-                        rangerSecurableObject -> {
-                          LOG.info("rangerSecurableObject2: " + rangerSecurableObject);
-                          Assertions.assertNotNull(
-                              rangerHelper.findManagedPolicy(rangerSecurableObject));
-                        }));
+    assertFindManagedPolicy(role2, true);
 
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role3));
-    role3.securableObjects().stream()
-        .forEach(
-            securableObject ->
-                rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                    .forEach(
-                        rangerSecurableObject -> {
-                          LOG.info("rangerSecurableObject3: " + rangerSecurableObject);
-                          Assertions.assertNotNull(
-                              rangerHelper.findManagedPolicy(rangerSecurableObject));
-                        }));
+    assertFindManagedPolicy(role3, true);
   }
 
   private static String generatePolicyName(MetadataObject metadataObject) {

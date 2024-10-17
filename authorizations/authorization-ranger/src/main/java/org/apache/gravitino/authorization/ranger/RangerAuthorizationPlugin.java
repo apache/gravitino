@@ -34,7 +34,6 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -75,7 +74,6 @@ public abstract class RangerAuthorizationPlugin
   protected final RangerClientExtension rangerClient;
   private final RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
-  private final Set<Privilege.Name> allowPrivileges;
 
   protected RangerAuthorizationPlugin(Map<String, String> config) {
     String rangerUrl = config.get(AuthorizationPropertiesMeta.RANGER_ADMIN_URL);
@@ -90,7 +88,7 @@ public abstract class RangerAuthorizationPlugin
     Preconditions.checkArgument(password != null, "Ranger password is required");
     Preconditions.checkArgument(rangerServiceName != null, "Ranger service name is required");
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
-    allowPrivileges = allowPrivilegesRule();
+
     rangerHelper =
         new RangerHelper(
             rangerClient,
@@ -664,31 +662,30 @@ public abstract class RangerAuthorizationPlugin
 
   public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()
-        .allMatch(
+        .noneMatch(
             securableObject -> {
-              AtomicBoolean match = new AtomicBoolean(false);
+              AtomicBoolean match = new AtomicBoolean(true);
               securableObject.privileges().stream()
-                  .filter(Objects::nonNull)
                   .forEach(
                       privilege -> {
-                        if (!allowPrivileges.contains(privilege.name())) {
+                        if (!allowPrivilegesRule().contains(privilege.name())) {
                           LOG.error(
                               "Authorization to ignore privilege({}) on metadata object({})!",
                               privilege.name(),
                               securableObject.fullName());
+                          match.set(false);
                           return;
                         }
 
-                        if (privilege.canBindTo(securableObject.type())) {
-                          match.set(true);
-                        } else {
+                        if (!privilege.canBindTo(securableObject.type())) {
                           LOG.error(
                               "The privilege({}) is not supported for the metadata object({})!",
                               privilege.name(),
                               securableObject.fullName());
+                          match.set(false);
                         }
                       });
-              return match.get();
+              return !match.get();
             });
   }
 }

@@ -38,8 +38,11 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHivePrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
+  private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationHivePlugin.class);
   private static volatile RangerAuthorizationHivePlugin instance = null;
 
   private RangerAuthorizationHivePlugin(Map<String, String> config) {
@@ -61,8 +64,14 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
   /** Set the default mapping Gravitino privilege name to the Ranger rule */
   public Map<Privilege.Name, Set<RangerPrivilege>> privilegesMappingRule() {
     return ImmutableMap.of(
+        Privilege.Name.CREATE_CATALOG,
+        ImmutableSet.of(RangerHivePrivilege.CREATE),
+        Privilege.Name.USE_CATALOG,
+        ImmutableSet.of(RangerHivePrivilege.SELECT),
         Privilege.Name.CREATE_SCHEMA,
         ImmutableSet.of(RangerHivePrivilege.CREATE),
+        Privilege.Name.USE_SCHEMA,
+        ImmutableSet.of(RangerHivePrivilege.SELECT),
         Privilege.Name.CREATE_TABLE,
         ImmutableSet.of(RangerHivePrivilege.CREATE),
         Privilege.Name.MODIFY_TABLE,
@@ -92,7 +101,9 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
   public Set<Privilege.Name> allowPrivilegesRule() {
     return ImmutableSet.of(
         Privilege.Name.CREATE_CATALOG,
+        Privilege.Name.USE_CATALOG,
         Privilege.Name.CREATE_SCHEMA,
+        Privilege.Name.USE_SCHEMA,
         Privilege.Name.CREATE_TABLE,
         Privilege.Name.MODIFY_TABLE,
         Privilege.Name.SELECT_TABLE);
@@ -183,20 +194,25 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
     securableObject.privileges().stream()
         .filter(Objects::nonNull)
         .forEach(
-            privilege -> {
+            gravitinoPrivilege -> {
               Set<RangerPrivilege> rangerPrivileges = new HashSet<>();
-              privilegesMappingRule().get(privilege.name()).stream()
+              privilegesMappingRule().get(gravitinoPrivilege.name()).stream()
                   .forEach(
                       rangerPrivilege ->
                           rangerPrivileges.add(
                               new RangerPrivileges.RangerHivePrivilegeImpl(
-                                  rangerPrivilege, privilege.condition())));
+                                  rangerPrivilege, gravitinoPrivilege.condition())));
 
-              switch (privilege.name()) {
-                case CREATE_SCHEMA:
+              switch (gravitinoPrivilege.name()) {
+                case CREATE_CATALOG:
+                  // Ignore the Gravitino privilege `CREATE_CATALOG` in the
+                  // RangerAuthorizationHivePlugin
+                  break;
+                case USE_CATALOG:
                   switch (securableObject.type()) {
                     case METALAKE:
                     case CATALOG:
+                      // Add Ranger privilege(`SELECT`) to SCHEMA(`*`)
                       rangerSecurableObjects.add(
                           RangerSecurableObjects.of(
                               ImmutableList.of(RangerHelper.RESOURCE_STAR),
@@ -206,7 +222,49 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                     default:
                       throw new AuthorizationPluginException(
                           "The privilege %s is not supported for the securable object: %s",
-                          privilege.name(), securableObject.type());
+                          gravitinoPrivilege.name(), securableObject.type());
+                  }
+                  break;
+                case CREATE_SCHEMA:
+                  switch (securableObject.type()) {
+                    case METALAKE:
+                    case CATALOG:
+                      // Add Ranger privilege(`CREATE`) to SCHEMA(`*`)
+                      rangerSecurableObjects.add(
+                          RangerSecurableObjects.of(
+                              ImmutableList.of(RangerHelper.RESOURCE_STAR),
+                              MetadataObject.Type.SCHEMA,
+                              rangerPrivileges));
+                      break;
+                    default:
+                      throw new AuthorizationPluginException(
+                          "The privilege %s is not supported for the securable object: %s",
+                          gravitinoPrivilege.name(), securableObject.type());
+                  }
+                  break;
+                case USE_SCHEMA:
+                  switch (securableObject.type()) {
+                    case METALAKE:
+                    case CATALOG:
+                      // Add Ranger privilege(`SELECT`) to SCHEMA(`*`)
+                      rangerSecurableObjects.add(
+                          RangerSecurableObjects.of(
+                              ImmutableList.of(RangerHelper.RESOURCE_STAR),
+                              MetadataObject.Type.SCHEMA,
+                              rangerPrivileges));
+                      break;
+                    case SCHEMA:
+                      // Add Ranger privilege(`SELECT`) to SCHEMA(`{schema}`)
+                      rangerSecurableObjects.add(
+                          RangerSecurableObjects.of(
+                              ImmutableList.of(securableObject.name() /*Schema name*/),
+                              MetadataObject.Type.SCHEMA,
+                              rangerPrivileges));
+                      break;
+                    default:
+                      throw new AuthorizationPluginException(
+                          "The privilege %s is not supported for the securable object: %s",
+                          gravitinoPrivilege.name(), securableObject.type());
                   }
                   break;
                 case CREATE_TABLE:
@@ -252,10 +310,10 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                               rangerPrivileges));
                       break;
                     case TABLE:
-                      if (privilege.name() == Privilege.Name.CREATE_TABLE) {
+                      if (gravitinoPrivilege.name() == Privilege.Name.CREATE_TABLE) {
                         throw new AuthorizationPluginException(
                             "The privilege %s is not supported for the securable object: %s",
-                            privilege.name(), securableObject.type());
+                            gravitinoPrivilege.name(), securableObject.type());
                       } else {
                         // Add `{schema}.{table}` for the TABLE permission
                         rangerSecurableObjects.add(
@@ -275,15 +333,17 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                       }
                       break;
                     default:
-                      throw new AuthorizationPluginException(
-                          "The privilege %s is not supported for the securable object: %s",
-                          privilege.name(), securableObject.type());
+                      LOG.warn(
+                          "RangerAuthorizationHivePlugin -> privilege {} is not supported for the securable object: {}",
+                          gravitinoPrivilege.name(),
+                          securableObject.type());
                   }
                   break;
                 default:
-                  throw new AuthorizationPluginException(
-                      "The privilege %s is not supported for the securable object: %s",
-                      privilege.name(), securableObject.type());
+                  LOG.warn(
+                      "RangerAuthorizationHivePlugin -> privilege {} is not supported for the securable object: {}",
+                      gravitinoPrivilege.name(),
+                      securableObject.type());
               }
             });
 
