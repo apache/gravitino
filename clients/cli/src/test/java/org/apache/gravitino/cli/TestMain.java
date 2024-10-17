@@ -62,7 +62,7 @@ public class TestMain {
 
     String command = Main.resolveCommand(line);
     assertEquals(CommandActions.DETAILS, command);
-    String entity = Main.resolveEntity(line, true);
+    String entity = Main.resolveEntity(line);
     assertEquals(CommandEntities.METALAKE, entity);
   }
 
@@ -70,12 +70,12 @@ public class TestMain {
   public void defaultToDetails() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
-    String[] args = {"--metalake", "metalake_demo"};
+    String[] args = {"metalake", "--name", "metalake_demo"};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);
     assertEquals(CommandActions.DETAILS, command);
-    String entity = Main.resolveEntity(line, false);
+    String entity = Main.resolveEntity(line);
     assertEquals(CommandEntities.METALAKE, entity);
   }
 
@@ -105,58 +105,15 @@ public class TestMain {
   }
 
   @Test
-  public void catalogWithTwoArgs() throws ParseException {
-    Options options = new GravitinoOptions().options();
-    CommandLineParser parser = new DefaultParser();
-    String[] args = {"catalog", "details", "--name", "metalake_demo.catalog_postgres"};
-    CommandLine line = parser.parse(options, args);
-
-    String command = Main.resolveCommand(line);
-    assertEquals(CommandActions.DETAILS, command);
-    String entity = Main.resolveEntity(line, true);
-    assertEquals(CommandEntities.CATALOG, entity);
-  }
-
-  @Test
   public void catalogWithOneArg() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
-    String[] args = {"catalog", "--command", "details", "--name", "metalake_demo.catalog_postgres"};
+    String[] args = {"catalog", "--details", "--name", "metalake_demo.catalog_postgres"};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);
     assertEquals(CommandActions.DETAILS, command);
-    String entity = Main.resolveEntity(line, true);
-    assertEquals(CommandEntities.CATALOG, entity);
-  }
-
-  @Test
-  public void catalogWithEntity() throws ParseException {
-    Options options = new GravitinoOptions().options();
-    CommandLineParser parser = new DefaultParser();
-    String[] args = {
-      "--entity", "catalog", "--command", "details", "--name", "metalake_demo.catalog_postgres"
-    };
-    CommandLine line = parser.parse(options, args);
-
-    String command = Main.resolveCommand(line);
-    assertEquals(CommandActions.DETAILS, command);
-    String entity = Main.resolveEntity(line, false);
-    assertEquals(CommandEntities.CATALOG, entity);
-  }
-
-  @Test
-  public void catalogWithNoName() throws ParseException {
-    Options options = new GravitinoOptions().options();
-    CommandLineParser parser = new DefaultParser();
-    String[] args = {
-      "catalog", "details", "--metalake", "metalake_demo", "--catalog", "catalog_postgres"
-    };
-    CommandLine line = parser.parse(options, args);
-
-    String command = Main.resolveCommand(line);
-    assertEquals(CommandActions.DETAILS, command);
-    String entity = Main.resolveEntity(line, true);
+    String entity = Main.resolveEntity(line);
     assertEquals(CommandEntities.CATALOG, entity);
   }
 }

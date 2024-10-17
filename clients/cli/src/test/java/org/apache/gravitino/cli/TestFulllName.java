@@ -66,48 +66,7 @@ public class TestFulllName {
   }
 
   @Test
-<<<<<<< HEAD
-  public void justName() throws Exception, MissingArgumentException {
-    String[] args = {"--name"};
-
-    assertThrows(MissingArgumentException.class, () -> new DefaultParser().parse(options, args));
-  }
-
-  @Test
-  public void catalogFromCommandLineOption() throws Exception {
-    String[] args = {"--catalog", "catalogA"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-
-    String catalogName = fullName.getCatalogName();
-    assertEquals("catalogA", catalogName);
-  }
-
-  @Test
-  public void schemaFromCommandLineOption() throws Exception {
-    String[] args = {"--schema", "schemaA"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-
-    String schemaName = fullName.getSchemaName();
-    assertEquals("schemaA", schemaName);
-  }
-
-  @Test
-  public void tableFromCommandLineOption() throws Exception {
-    String[] args = {"--table", "tableA"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-
-    String tableName = fullName.getTableName();
-    assertEquals("tableA", tableName);
-  }
-
-  @Test
-  public void malformedMissingEntityName() throws Exception {
-=======
   public void malformedName() throws Exception {
->>>>>>> CLI
     String[] args = {"--name", "metalake.catalog"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);

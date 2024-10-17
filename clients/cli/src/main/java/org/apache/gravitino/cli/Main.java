@@ -40,7 +40,7 @@ public class Main {
         return;
       }
       String command = resolveCommand(line);
-      String entity = resolveEntity(line, command != null);
+      String entity = resolveEntity(line);
       GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, entity, command);
       commandLine.handleCommandLine();
     } catch (ParseException exp) {
@@ -76,13 +76,12 @@ public class Main {
    * Determines the entity to act upon based on the command line input.
    *
    * @param line Parsed command line object.
-   * @param command true if command is an argument
    * @return The entity, e.g. metakalake, catalog, schema, table, etc.
    */
   protected static String resolveEntity(CommandLine line) {
     /* As the bare first argument. */
     String[] args = line.getArgs();
-    
+
     if (args.length > 0) {
       String entity = args[0];
       if (CommandEntities.isValidEntity(entity)) {
