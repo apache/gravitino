@@ -122,12 +122,15 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  testImplementation(libs.h2db)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.paimon.oss)
   testImplementation(libs.paimon.s3)
   testImplementation(libs.paimon.spark)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.localstack)
+  testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

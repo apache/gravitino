@@ -21,7 +21,7 @@ package org.apache.gravitino.integration.test.web.ui.utils;
 import com.google.common.base.Function;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,13 +41,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 // AbstractWebIT provides a WebDriver instance for WEB UI tests.
-public class AbstractWebIT extends AbstractIT {
-  protected static final Logger LOG = LoggerFactory.getLogger(AbstractWebIT.class);
-  protected static WebDriver driver;
+public class BaseWebIT extends BaseIT {
+  protected static final Logger LOG = LoggerFactory.getLogger(BaseWebIT.class);
+  protected WebDriver driver;
 
   // https://www.selenium.dev/documentation/webdriver/waits/#implicit-waits
   protected static final long MAX_IMPLICIT_WAIT = 30;
-  protected static final long MAX_TIMEOUT = 20;
+  protected static final long MAX_TIMEOUT = 60;
   protected static final long EACH_TEST_SLEEP_MILLIS = 1_000;
   protected static final long ACTION_SLEEP_MILLIS = 1_000;
 
@@ -113,12 +113,12 @@ public class AbstractWebIT extends AbstractIT {
   }
 
   @BeforeAll
-  public static void startUp() {
+  public void startUp() {
     driver = WebDriverManager.getWebDriver(getGravitinoServerPort());
   }
 
   @AfterAll
-  public static void tearDown() {
+  public void tearDown() {
     driver.quit();
   }
 }

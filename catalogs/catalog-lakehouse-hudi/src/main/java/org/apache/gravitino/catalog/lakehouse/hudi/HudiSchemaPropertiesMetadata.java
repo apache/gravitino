@@ -18,14 +18,27 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi;
 
-import java.util.Collections;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class HudiSchemaPropertiesMetadata extends BasePropertiesMetadata {
+  public static final String LOCATION = "location";
+  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
+      ImmutableMap.<String, PropertyEntry<?>>builder()
+          .put(
+              LOCATION,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  LOCATION,
+                  "The directory for Hudi dataset storage",
+                  false /* immutable */,
+                  null /* default value */,
+                  false /* hidden */))
+          .build();
+
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return Collections.emptyMap();
+    return PROPERTIES_METADATA;
   }
 }

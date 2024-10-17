@@ -32,6 +32,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.FileSystemCatalog;
 import org.apache.paimon.factories.FactoryException;
+import org.apache.paimon.jdbc.JdbcCatalog;
 import org.junit.jupiter.api.Test;
 
 /** Tests for {@link org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils}. */
@@ -41,6 +42,8 @@ public class TestCatalogUtils {
   void testLoadCatalogBackend() throws Exception {
     // Test load FileSystemCatalog for filesystem metastore.
     assertCatalog(PaimonCatalogBackend.FILESYSTEM.name(), FileSystemCatalog.class);
+    // Test load JdbcCatalog for jdbc metastore.
+    assertCatalog(PaimonCatalogBackend.JDBC.name(), JdbcCatalog.class);
     // Test load catalog exception for other metastore.
     assertThrowsExactly(FactoryException.class, () -> assertCatalog("other", catalog -> {}));
   }
@@ -63,7 +66,11 @@ public class TestCatalogUtils {
                             System.getProperty("java.io.tmpdir"),
                             "paimon_catalog_warehouse"),
                         PaimonConfig.CATALOG_URI.getKey(),
-                        "uri")))
+                        "jdbc:h2:mem:testdb",
+                        PaimonConfig.CATALOG_JDBC_USER.getKey(),
+                        "user",
+                        PaimonConfig.CATALOG_JDBC_PASSWORD.getKey(),
+                        "password")))
             .getCatalog()) {
       consumer.accept(catalog);
     }

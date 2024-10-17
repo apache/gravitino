@@ -6,8 +6,8 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Before the version `0.6.0`, Apache Gravitino supports KV and Relational backend storage to store metadata.
-Since 0.6.0, Gravitino only supports using RDBMS as relational backend storage to store metadata. This doc will guide you on how to use the
+Before the version `0.6.0-incubating`, Apache Gravitino supports KV and Relational backend storage to store metadata.
+Since 0.6.0-incubating, Gravitino only supports using RDBMS as relational backend storage to store metadata. This doc will guide you on how to use the
 relational backend storage in Gravitino.
 
 Relational backend storage mainly aims to the users who are accustomed to using RDBMS to
@@ -45,7 +45,7 @@ ${GRAVITINO_HOME}/scripts/mysql/
 ```
 
 The script name is like `schema-{version}-mysql.sql`, and the `version` depends on your Gravitino version.
-For example, if your Gravitino version is `0.6.0`, then you can choose the **latest version** script.
+For example, if your Gravitino version is `0.6.0-incubating`, then you can choose the **latest version** script.
 If you used a legacy script, you can use `upgrade-{old version}-to-{new version}-mysql.sql` to upgrade the schema.
 
 ### Step 2: Initialize the database

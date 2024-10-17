@@ -382,32 +382,41 @@ public class TestGravitinoPaimonTable {
     try (PaimonCatalogOperations ops = new PaimonCatalogOperations()) {
       ops.initialize(
           initBackendCatalogProperties(), entity.toCatalogInfo(), PAIMON_PROPERTIES_METADATA);
-      Map<String, String> map = Maps.newHashMap();
-      map.put(PaimonTablePropertiesMetadata.COMMENT, "test");
-      map.put(PaimonTablePropertiesMetadata.OWNER, "test");
-      map.put(PaimonTablePropertiesMetadata.BUCKET_KEY, "test");
-      map.put(PaimonTablePropertiesMetadata.MERGE_ENGINE, "test");
-      map.put(PaimonTablePropertiesMetadata.SEQUENCE_FIELD, "test");
-      map.put(PaimonTablePropertiesMetadata.ROWKIND_FIELD, "test");
-      map.put(PaimonTablePropertiesMetadata.PRIMARY_KEY, "test");
-      map.put(PaimonTablePropertiesMetadata.PARTITION, "test");
-      for (Map.Entry<String, String> entry : map.entrySet()) {
-        HashMap<String, String> properties =
-            new HashMap<String, String>() {
-              {
-                put(entry.getKey(), entry.getValue());
-              }
-            };
-        PropertiesMetadata metadata = paimonCatalog.tablePropertiesMetadata();
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, properties));
-      }
+      HashMap<String, String> reservedProps =
+          new HashMap<String, String>() {
+            {
+              put(PaimonTablePropertiesMetadata.COMMENT, "test");
+              put(PaimonTablePropertiesMetadata.OWNER, "test");
+              put(PaimonTablePropertiesMetadata.BUCKET_KEY, "test");
+              put(PaimonTablePropertiesMetadata.PRIMARY_KEY, "test");
+              put(PaimonTablePropertiesMetadata.PARTITION, "test");
+            }
+          };
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              PropertiesMetadataHelpers.validatePropertyForCreate(
+                  paimonCatalog.tablePropertiesMetadata(), reservedProps));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              PropertiesMetadataHelpers.validatePropertyForAlter(
+                  paimonCatalog.tablePropertiesMetadata(), reservedProps, Collections.emptyMap()));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              PropertiesMetadataHelpers.validatePropertyForAlter(
+                  paimonCatalog.tablePropertiesMetadata(), Collections.emptyMap(), reservedProps));
 
-      map = Maps.newHashMap();
-      map.put("key1", "val1");
-      map.put("key2", "val2");
-      for (Map.Entry<String, String> entry : map.entrySet()) {
+      Map<String, String> immutableProps =
+          new HashMap<String, String>() {
+            {
+              put(PaimonTablePropertiesMetadata.MERGE_ENGINE, "test");
+              put(PaimonTablePropertiesMetadata.SEQUENCE_FIELD, "test");
+              put(PaimonTablePropertiesMetadata.ROWKIND_FIELD, "test");
+            }
+          };
+      for (Map.Entry<String, String> entry : immutableProps.entrySet()) {
         HashMap<String, String> properties =
             new HashMap<String, String>() {
               {
@@ -416,9 +425,17 @@ public class TestGravitinoPaimonTable {
             };
         PropertiesMetadata metadata = paimonCatalog.tablePropertiesMetadata();
         Assertions.assertDoesNotThrow(
-            () -> {
-              PropertiesMetadataHelpers.validatePropertyForCreate(metadata, properties);
-            });
+            () -> PropertiesMetadataHelpers.validatePropertyForCreate(metadata, properties));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PropertiesMetadataHelpers.validatePropertyForAlter(
+                    metadata, properties, Collections.emptyMap()));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PropertiesMetadataHelpers.validatePropertyForAlter(
+                    metadata, Collections.emptyMap(), properties));
       }
     }
   }

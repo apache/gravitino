@@ -36,7 +36,7 @@ import org.apache.gravitino.catalog.mysql.integration.test.service.MysqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
@@ -50,7 +50,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
-public class AuditCatalogMysqlIT extends AbstractIT {
+public class AuditCatalogMysqlIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final String metalakeName = GravitinoITUtils.genRandomName("audit_mysql_metalake");
   private static final String expectUser = System.getProperty("user.name");
@@ -62,11 +62,11 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   private static GravitinoMetalake metalake;
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
     containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_AUDIT_CATALOG_MYSQL_IT);
     MYSQL_CONTAINER = containerSuite.getMySQLContainer();
@@ -76,10 +76,10 @@ public class AuditCatalogMysqlIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stopIntegrationTest() throws IOException, InterruptedException {
+  public void stopIntegrationTest() throws IOException, InterruptedException {
     client.dropMetalake(metalakeName);
     mysqlService.close();
-    AbstractIT.stopIntegrationTest();
+    super.stopIntegrationTest();
   }
 
   @Test
@@ -165,7 +165,7 @@ public class AuditCatalogMysqlIT extends AbstractIT {
         catalogName, Catalog.Type.RELATIONAL, provider, "comment", catalogProperties);
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 

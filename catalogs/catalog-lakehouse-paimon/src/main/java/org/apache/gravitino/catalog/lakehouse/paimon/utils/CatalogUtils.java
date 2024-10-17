@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.utils;
 
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.GRAVITINO_CONFIG_TO_PAIMON;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.KERBEROS_CONFIGURATION;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.OSS_CONFIGURATION;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.S3_CONFIGURATION;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_BACKEND;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_URI;
@@ -123,11 +126,23 @@ public class CatalogUtils {
     }
   }
 
-  public static Map<String, String> toPaimonCatalogProperties(
-      Map<String, String> gravitinoProperties) {
-    Map<String, String> paimonProperties = new HashMap<>();
-    gravitinoProperties.forEach(
-        (key, value) -> paimonProperties.put(S3_CONFIGURATION.getOrDefault(key, key), value));
-    return paimonProperties;
+  public static Map<String, String> toInnerProperty(
+      Map<String, String> properties, boolean keepUnknown) {
+    Map<String, String> gravitinoConfig = new HashMap<>();
+    properties.forEach(
+        (key, value) -> {
+          if (GRAVITINO_CONFIG_TO_PAIMON.containsKey(key)) {
+            gravitinoConfig.put(GRAVITINO_CONFIG_TO_PAIMON.get(key), value);
+          } else if (KERBEROS_CONFIGURATION.containsKey(key)) {
+            gravitinoConfig.put(KERBEROS_CONFIGURATION.get(key), value);
+          } else if (S3_CONFIGURATION.containsKey(key)) {
+            gravitinoConfig.put(S3_CONFIGURATION.get(key), value);
+          } else if (OSS_CONFIGURATION.containsKey(key)) {
+            gravitinoConfig.put(OSS_CONFIGURATION.get(key), value);
+          } else if (keepUnknown) {
+            gravitinoConfig.put(key, value);
+          }
+        });
+    return gravitinoConfig;
   }
 }

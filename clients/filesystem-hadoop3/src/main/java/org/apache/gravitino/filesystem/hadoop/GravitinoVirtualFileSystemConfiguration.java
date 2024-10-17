@@ -18,10 +18,13 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+
 /** Configuration class for Gravitino Virtual File System. */
 class GravitinoVirtualFileSystemConfiguration {
   public static final String GVFS_FILESET_PREFIX = "gvfs://fileset";
   public static final String GVFS_SCHEME = "gvfs";
+  public static final String GVFS_CONFIG_PREFIX = "fs.gvfs.";
 
   /** The configuration key for the Gravitino server URI. */
   public static final String FS_GRAVITINO_SERVER_URI_KEY = "fs.gravitino.server.uri";
@@ -31,6 +34,13 @@ class GravitinoVirtualFileSystemConfiguration {
 
   /** The configuration key for the Gravitino client auth type. */
   public static final String FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY = "fs.gravitino.client.authType";
+
+  /**
+   * File system provider names configuration key. The value is a comma separated list of file
+   * system provider name which is defined in the service loader. Users can custom their own file
+   * system by implementing the {@link FileSystemProvider} interface.
+   */
+  public static final String FS_FILESYSTEM_PROVIDERS = "fs.gvfs.filesystem.providers";
 
   public static final String SIMPLE_AUTH_TYPE = "simple";
   public static final String OAUTH2_AUTH_TYPE = "oauth2";

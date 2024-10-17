@@ -23,14 +23,18 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.TestFileset;
 import org.apache.gravitino.TestSchema;
 import org.apache.gravitino.TestTable;
@@ -198,9 +202,16 @@ public class TestCatalogOperations
           throw new TableAlreadyExistsException("Table %s already exists", ident);
         }
       } else {
-        throw new IllegalArgumentException("Unsupported table change: " + change);
+        // do nothing
       }
     }
+
+    TableChange.ColumnChange[] columnChanges =
+        Arrays.stream(changes)
+            .filter(change -> change instanceof TableChange.ColumnChange)
+            .map(change -> (TableChange.ColumnChange) change)
+            .toArray(TableChange.ColumnChange[]::new);
+    Column[] newColumns = updateColumns(table.columns(), columnChanges);
 
     TestTable updatedTable =
         TestTable.builder()
@@ -208,7 +219,7 @@ public class TestCatalogOperations
             .withComment(table.comment())
             .withProperties(new HashMap<>(newProps))
             .withAuditInfo(updatedAuditInfo)
-            .withColumns(table.columns())
+            .withColumns(newColumns)
             .withPartitioning(table.partitioning())
             .withDistribution(table.distribution())
             .withSortOrders(table.sortOrder())
@@ -633,5 +644,127 @@ public class TestCatalogOperations
     } catch (Exception e) {
       return false;
     }
+  }
+
+  private Column[] updateColumns(Column[] columns, TableChange.ColumnChange[] columnChanges) {
+    Map<String, Column> columnMap =
+        Arrays.stream(columns).collect(Collectors.toMap(Column::name, Function.identity()));
+
+    for (TableChange.ColumnChange columnChange : columnChanges) {
+      if (columnChange instanceof TableChange.AddColumn) {
+        TableChange.AddColumn addColumn = (TableChange.AddColumn) columnChange;
+        TestColumn column =
+            TestColumn.builder()
+                .withName(String.join(".", addColumn.fieldName()))
+                .withComment(addColumn.getComment())
+                .withType(addColumn.getDataType())
+                .withNullable(addColumn.isNullable())
+                .withAutoIncrement(addColumn.isAutoIncrement())
+                .withDefaultValue(addColumn.getDefaultValue())
+                .build();
+        columnMap.put(column.name(), column);
+
+      } else if (columnChange instanceof TableChange.DeleteColumn) {
+        columnMap.remove(String.join(".", columnChange.fieldName()));
+
+      } else if (columnChange instanceof TableChange.RenameColumn) {
+        String oldName = String.join(".", columnChange.fieldName());
+        String newName = ((TableChange.RenameColumn) columnChange).getNewName();
+        Column column = columnMap.remove(oldName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(newName)
+                .withComment(column.comment())
+                .withType(column.dataType())
+                .withNullable(column.nullable())
+                .withAutoIncrement(column.autoIncrement())
+                .withDefaultValue(column.defaultValue())
+                .build();
+        columnMap.put(newName, newColumn);
+
+      } else if (columnChange instanceof TableChange.UpdateColumnDefaultValue) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
+            (TableChange.UpdateColumnDefaultValue) columnChange;
+        Column oldColumn = columnMap.get(columnName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(columnName)
+                .withComment(oldColumn.comment())
+                .withType(oldColumn.dataType())
+                .withNullable(oldColumn.nullable())
+                .withAutoIncrement(oldColumn.autoIncrement())
+                .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
+                .build();
+        columnMap.put(columnName, newColumn);
+
+      } else if (columnChange instanceof TableChange.UpdateColumnType) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) columnChange;
+        Column oldColumn = columnMap.get(columnName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(columnName)
+                .withComment(oldColumn.comment())
+                .withType(updateColumnType.getNewDataType())
+                .withNullable(oldColumn.nullable())
+                .withAutoIncrement(oldColumn.autoIncrement())
+                .withDefaultValue(oldColumn.defaultValue())
+                .build();
+        columnMap.put(columnName, newColumn);
+
+      } else if (columnChange instanceof TableChange.UpdateColumnComment) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnComment updateColumnComment =
+            (TableChange.UpdateColumnComment) columnChange;
+        Column oldColumn = columnMap.get(columnName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(columnName)
+                .withComment(updateColumnComment.getNewComment())
+                .withType(oldColumn.dataType())
+                .withNullable(oldColumn.nullable())
+                .withAutoIncrement(oldColumn.autoIncrement())
+                .withDefaultValue(oldColumn.defaultValue())
+                .build();
+        columnMap.put(columnName, newColumn);
+
+      } else if (columnChange instanceof TableChange.UpdateColumnNullability) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnNullability updateColumnNullable =
+            (TableChange.UpdateColumnNullability) columnChange;
+        Column oldColumn = columnMap.get(columnName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(columnName)
+                .withComment(oldColumn.comment())
+                .withType(oldColumn.dataType())
+                .withNullable(updateColumnNullable.nullable())
+                .withAutoIncrement(oldColumn.autoIncrement())
+                .withDefaultValue(oldColumn.defaultValue())
+                .build();
+        columnMap.put(columnName, newColumn);
+
+      } else if (columnChange instanceof TableChange.UpdateColumnAutoIncrement) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnAutoIncrement updateColumnAutoIncrement =
+            (TableChange.UpdateColumnAutoIncrement) columnChange;
+        Column oldColumn = columnMap.get(columnName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(columnName)
+                .withComment(oldColumn.comment())
+                .withType(oldColumn.dataType())
+                .withNullable(oldColumn.nullable())
+                .withAutoIncrement(updateColumnAutoIncrement.isAutoIncrement())
+                .withDefaultValue(oldColumn.defaultValue())
+                .build();
+        columnMap.put(columnName, newColumn);
+
+      } else {
+        // do nothing
+      }
+    }
+    return columnMap.values().toArray(new Column[0]);
   }
 }

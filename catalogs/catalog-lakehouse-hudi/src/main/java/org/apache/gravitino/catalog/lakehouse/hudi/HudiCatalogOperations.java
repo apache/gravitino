@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -54,7 +55,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private static final Logger LOG = LoggerFactory.getLogger(HudiCatalogOperations.class);
 
-  private HudiCatalogBackendOps hudiCatalogBackendOps;
+  @VisibleForTesting HudiCatalogBackendOps hudiCatalogBackendOps;
 
   /**
    * Load the Hudi Catalog Backend and initialize the Hudi Catalog Operations.
@@ -69,7 +70,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     HudiCatalogBackend hudiCatalogBackend = CatalogUtils.loadHudiCatalogBackend(config);
-    hudiCatalogBackendOps = hudiCatalogBackend.catalogOps();
+    hudiCatalogBackendOps = hudiCatalogBackend.backendOps();
   }
 
   /**
@@ -91,7 +92,8 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> properties)
       throws Exception {
     try {
-      hudiCatalogBackendOps.listSchemas(null);
+      hudiCatalogBackendOps.listSchemas(
+          Namespace.of(catalogIdent.namespace().level(0), catalogIdent.name()));
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run listSchemas on Hudi catalog: %s", e.getMessage());

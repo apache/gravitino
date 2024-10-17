@@ -29,12 +29,10 @@ import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.TestInstance;
 import org.testcontainers.containers.Container;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
 
   private static final String S3_BUCKET_NAME = "my-test-bucket";
@@ -76,10 +74,9 @@ public class CatalogPaimonS3IT extends CatalogPaimonBaseIT {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     try {
       if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-        String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
         String paimonCatalogPath =
             ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-paimon", "libs");
-        DownloaderUtils.downloadFile(PAIMON_S3_JAR_URL, serverPath, paimonCatalogPath);
+        DownloaderUtils.downloadFile(PAIMON_S3_JAR_URL, paimonCatalogPath);
       }
     } catch (Exception e) {
       throw new RuntimeException("Failed to download the S3 dependency", e);

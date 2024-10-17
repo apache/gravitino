@@ -30,7 +30,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
@@ -84,7 +83,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
       initIcebergRestServiceEnv();
     }
     // Start Gravitino server
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
     initHdfsFileSystem();
     initGravitinoEnv();
     initMetalakeAndCatalogs();
@@ -107,7 +106,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     if (sparkSession != null) {
       sparkSession.close();
     }
-    AbstractIT.stopIntegrationTest();
+    super.stopIntegrationTest();
   }
 
   // AbstractIT#startIntegrationTest() is static, so we couldn't update the value of
@@ -115,14 +114,14 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   // if startIntegrationTest() is auto invoked by Junit. So here we override
   // startIntegrationTest() to disable the auto invoke by junit.
   @BeforeAll
-  public static void startIntegrationTest() {}
+  public void startIntegrationTest() {}
 
   @AfterAll
-  public static void stopIntegrationTest() {}
+  public void stopIntegrationTest() {}
 
   private void initMetalakeAndCatalogs() {
-    AbstractIT.client.createMetalake(metalakeName, "", Collections.emptyMap());
-    GravitinoMetalake metalake = AbstractIT.client.loadMetalake(metalakeName);
+    client.createMetalake(metalakeName, "", Collections.emptyMap());
+    GravitinoMetalake metalake = client.loadMetalake(metalakeName);
     Map<String, String> properties = getCatalogConfigs();
     if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
       properties.put(SPARK_PROPERTY_PREFIX + ICEBERG_CATALOG_CACHE_ENABLED, "true");
@@ -133,7 +132,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   private void initGravitinoEnv() {
     // Gravitino server is already started by AbstractIT, just construct gravitinoUrl
-    int gravitinoPort = AbstractIT.getGravitinoServerPort();
+    int gravitinoPort = getGravitinoServerPort();
     gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
     icebergRestServiceUri = getIcebergRestServiceUri();
   }
@@ -173,7 +172,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             + "."
             + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
         warehouse);
-    AbstractIT.registerCustomConfigs(icebergRestServiceConfigs);
+    registerCustomConfigs(icebergRestServiceConfigs);
   }
 
   private void initHdfsFileSystem() {

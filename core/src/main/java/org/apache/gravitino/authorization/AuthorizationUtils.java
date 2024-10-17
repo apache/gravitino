@@ -18,15 +18,12 @@
  */
 package org.apache.gravitino.authorization;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -39,10 +36,12 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -81,6 +80,20 @@ public class AuthorizationUtils {
     } catch (IOException e) {
       LOG.error("Failed to do storage operation", e);
       throw new RuntimeException(e);
+    }
+  }
+
+  public static void checkCurrentUser(String metalake, String user) {
+    try {
+      AccessControlDispatcher dispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
+      // Only when we enable authorization, we need to check the current user
+      if (dispatcher != null) {
+        dispatcher.getUser(metalake, user);
+      }
+    } catch (NoSuchUserException nsu) {
+      throw new ForbiddenException(
+          "Current user %s doesn't exist in the metalake %s, you should add the user to the metalake first",
+          user, metalake);
     }
   }
 
@@ -216,58 +229,6 @@ public class AuthorizationUtils {
     return false;
   }
 
-  // Check every securable object whether exists and is imported.
-  public static void checkSecurableObject(String metalake, MetadataObject object) {
-    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-
-    Supplier<NoSuchMetadataObjectException> exceptionToThrowSupplier =
-        () ->
-            new NoSuchMetadataObjectException(
-                "Securable object %s type %s doesn't exist", object.fullName(), object.type());
-
-    switch (object.type()) {
-      case METALAKE:
-        check(
-            GravitinoEnv.getInstance().metalakeDispatcher().metalakeExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      case CATALOG:
-        check(
-            GravitinoEnv.getInstance().catalogDispatcher().catalogExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      case SCHEMA:
-        check(
-            GravitinoEnv.getInstance().schemaDispatcher().schemaExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      case FILESET:
-        check(
-            GravitinoEnv.getInstance().filesetDispatcher().filesetExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      case TABLE:
-        check(
-            GravitinoEnv.getInstance().tableDispatcher().tableExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      case TOPIC:
-        check(
-            GravitinoEnv.getInstance().topicDispatcher().topicExists(identifier),
-            exceptionToThrowSupplier);
-        break;
-
-      default:
-        throw new IllegalArgumentException(
-            String.format("Doesn't support the type %s", object.type()));
-    }
-  }
-
   public static void checkDuplicatedNamePrivilege(Collection<Privilege> privileges) {
     Set<Privilege.Name> privilegeNameSet = Sets.newHashSet();
     for (Privilege privilege : privileges) {
@@ -310,13 +271,6 @@ public class AuthorizationUtils {
         throw new NoSuchMetadataObjectException(
             "Securable object %s doesn't exist", object.fullName());
       }
-    }
-  }
-
-  private static void check(
-      final boolean expression, Supplier<? extends RuntimeException> exceptionToThrowSupplier) {
-    if (!expression) {
-      throw checkNotNull(exceptionToThrowSupplier).get();
     }
   }
 
