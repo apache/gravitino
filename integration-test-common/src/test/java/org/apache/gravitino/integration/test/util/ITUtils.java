@@ -50,6 +50,7 @@ import org.junit.jupiter.api.Assertions;
 public class ITUtils {
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
+  public static final String DEPLOY_TEST_MODE = "deploy";
 
   public static String joinPath(String... dirs) {
     return String.join(File.separator, dirs);
