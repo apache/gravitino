@@ -96,7 +96,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, "table1");
     Column[] columns =
         new Column[] {
-          Column.of("col1", Types.StringType.get()), Column.of("col2", Types.StringType.get())
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
 
     Table table1 =
@@ -175,8 +184,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, "table11");
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
 
     Table table1 =
@@ -244,8 +261,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table21");
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
 
     Table table =
@@ -310,8 +335,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
 
     schemaOperationDispatcher.createSchema(
@@ -343,8 +376,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         NameIdentifier.of(tableNs.levels()), "", Collections.emptyMap());
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
     tableOperationDispatcher.createTable(tableIdent, columns, "comment", props);
     Assertions.assertTrue(entityStore.exists(NameIdentifier.of(tableNs.levels()), SCHEMA));
@@ -362,6 +403,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col1")
+              .withPosition(0)
               .withType(Types.StringType.get())
               .withComment("comment1")
               .withNullable(true)
@@ -370,6 +412,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
               .build(),
           TestColumn.builder()
               .withName("col2")
+              .withPosition(1)
               .withType(Types.StringType.get())
               .withComment("comment2")
               .withNullable(false)
@@ -490,6 +533,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col1")
+              .withPosition(0)
               .withType(Types.StringType.get())
               .withComment("comment1")
               .withNullable(true)
@@ -498,6 +542,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
               .build(),
           TestColumn.builder()
               .withName("col2")
+              .withPosition(1)
               .withType(Types.StringType.get())
               .withComment("comment2")
               .withNullable(false)
@@ -519,6 +564,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col3")
+              .withPosition(0)
               .withType(Types.StringType.get())
               .withComment("comment1")
               .withNullable(true)
@@ -527,6 +573,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
               .build(),
           TestColumn.builder()
               .withName("col2")
+              .withPosition(1)
               .withType(Types.StringType.get())
               .withComment("comment2")
               .withNullable(false)
@@ -555,6 +602,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col4")
+              .withPosition(0)
               .withType(Types.StringType.get())
               .withComment("comment4")
               .withNullable(true)
@@ -563,6 +611,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
               .build(),
           TestColumn.builder()
               .withName("col3")
+              .withPosition(1)
               .withType(Types.StringType.get())
               .withComment("comment1")
               .withNullable(true)
@@ -571,6 +620,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
               .build(),
           TestColumn.builder()
               .withName("col2")
+              .withPosition(2)
               .withType(Types.StringType.get())
               .withComment("comment2")
               .withNullable(false)
@@ -594,6 +644,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col4")
+              .withPosition(0)
               .withType(Types.StringType.get())
               .withComment("comment4")
               .withNullable(true)
@@ -617,6 +668,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col4")
+              .withPosition(0)
               .withType(Types.StringType.get())
               .withComment("comment4")
               .withNullable(true)
@@ -639,6 +691,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col4")
+              .withPosition(0)
               .withType(Types.IntegerType.get())
               .withComment("comment4")
               .withNullable(true)
@@ -661,6 +714,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col4")
+              .withPosition(0)
               .withType(Types.IntegerType.get())
               .withComment("new comment")
               .withNullable(true)
@@ -683,6 +737,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col4")
+              .withPosition(0)
               .withType(Types.IntegerType.get())
               .withComment("new comment")
               .withNullable(false)
@@ -705,6 +760,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col4")
+              .withPosition(0)
               .withType(Types.IntegerType.get())
               .withComment("new comment")
               .withNullable(false)
@@ -730,6 +786,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName("col1")
+              .withPosition(0)
               .withType(Types.StringType.get())
               .withComment("comment1")
               .withNullable(true)
@@ -738,6 +795,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
               .build(),
           TestColumn.builder()
               .withName("col2")
+              .withPosition(1)
               .withType(Types.StringType.get())
               .withComment("comment2")
               .withNullable(false)
@@ -772,14 +830,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(expectedColumnMap.size(), actualColumnMap.size());
     expectedColumnMap.forEach(
         (name, expectedColumn) -> {
-          Column actualColumn = actualColumnMap.get(name);
+          TestColumn actualColumn = (TestColumn) actualColumnMap.get(name);
+          TestColumn e = (TestColumn) expectedColumn;
           Assertions.assertNotNull(actualColumn);
-          Assertions.assertEquals(expectedColumn.name().toLowerCase(), actualColumn.name());
-          Assertions.assertEquals(expectedColumn.dataType(), actualColumn.dataType());
-          Assertions.assertEquals(expectedColumn.comment(), actualColumn.comment());
-          Assertions.assertEquals(expectedColumn.nullable(), actualColumn.nullable());
-          Assertions.assertEquals(expectedColumn.autoIncrement(), actualColumn.autoIncrement());
-          Assertions.assertEquals(expectedColumn.defaultValue(), actualColumn.defaultValue());
+          Assertions.assertEquals(e.name().toLowerCase(), actualColumn.name());
+          Assertions.assertEquals(e.position(), actualColumn.position());
+          Assertions.assertEquals(e.dataType(), actualColumn.dataType());
+          Assertions.assertEquals(e.comment(), actualColumn.comment());
+          Assertions.assertEquals(e.nullable(), actualColumn.nullable());
+          Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
+          Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
         });
   }
 
@@ -800,13 +860,15 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     expectedColumnMap.forEach(
         (name, expectedColumn) -> {
           ColumnEntity actualColumn = actualColumnMap.get(name);
+          TestColumn e = (TestColumn) expectedColumn;
           Assertions.assertNotNull(actualColumn);
-          Assertions.assertEquals(expectedColumn.name(), actualColumn.name());
-          Assertions.assertEquals(expectedColumn.dataType(), actualColumn.dataType());
-          Assertions.assertEquals(expectedColumn.comment(), actualColumn.comment());
-          Assertions.assertEquals(expectedColumn.nullable(), actualColumn.nullable());
-          Assertions.assertEquals(expectedColumn.autoIncrement(), actualColumn.autoIncrement());
-          Assertions.assertEquals(expectedColumn.defaultValue(), actualColumn.defaultValue());
+          Assertions.assertEquals(e.name(), actualColumn.name());
+          Assertions.assertEquals(e.position(), actualColumn.position());
+          Assertions.assertEquals(e.dataType(), actualColumn.dataType());
+          Assertions.assertEquals(e.comment(), actualColumn.comment());
+          Assertions.assertEquals(e.nullable(), actualColumn.nullable());
+          Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
+          Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
         });
   }
 }

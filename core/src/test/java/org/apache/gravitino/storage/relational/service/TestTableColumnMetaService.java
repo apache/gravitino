@@ -76,6 +76,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         ColumnEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("column1")
+            .withPosition(0)
             .withComment("comment1")
             .withDataType(Types.IntegerType.get())
             .withNullable(true)
@@ -87,6 +88,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         ColumnEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("column2")
+            .withPosition(1)
             .withComment("comment2")
             .withDataType(Types.StringType.get())
             .withNullable(false)
@@ -118,6 +120,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         ColumnEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("column3")
+            .withPosition(0)
             .withComment("comment3")
             .withDataType(Types.IntegerType.get())
             .withNullable(true)
@@ -187,6 +190,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         ColumnEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("column1")
+            .withPosition(0)
             .withComment("comment1")
             .withDataType(Types.IntegerType.get())
             .withNullable(true)
@@ -222,6 +226,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         ColumnEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("column2")
+            .withPosition(1)
             .withComment("comment2")
             .withDataType(Types.StringType.get())
             .withNullable(false)
@@ -257,6 +262,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         ColumnEntity.builder()
             .withId(column1.id())
             .withName(column1.name())
+            .withPosition(column1.position())
             .withComment("comment1_updated")
             .withDataType(Types.LongType.get())
             .withNullable(column1.nullable())
@@ -331,6 +337,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         ColumnEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("column1")
+            .withPosition(0)
             .withComment("comment1")
             .withDataType(Types.IntegerType.get())
             .withNullable(true)
@@ -377,6 +384,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
         ColumnEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("column1")
+            .withPosition(0)
             .withComment("comment1")
             .withDataType(Types.IntegerType.get())
             .withNullable(true)
@@ -423,6 +431,7 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
           Assertions.assertNotNull(expectedColumn);
           Assertions.assertEquals(expectedColumn.id(), column.id());
           Assertions.assertEquals(expectedColumn.name(), column.name());
+          Assertions.assertEquals(expectedColumn.position(), column.position());
           Assertions.assertEquals(expectedColumn.comment(), column.comment());
           Assertions.assertEquals(expectedColumn.dataType(), column.dataType());
           Assertions.assertEquals(expectedColumn.nullable(), column.nullable());
