@@ -210,7 +210,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private static String getRequiredConfig(SparkConf sparkConf, String configKey) {
     String configValue = sparkConf.get(configKey, null);
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(configValue), configKey + " should not empty");
+        StringUtils.isNotBlank(configValue), configKey + " should not be empty");
     return configValue;
   }
 
