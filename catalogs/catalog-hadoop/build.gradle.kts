@@ -73,7 +73,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":bundles:gcs-bundle"))
+  testImplementation(project(":bundles:gcp-bundle"))
 
   testImplementation(libs.minikdc)
   testImplementation(libs.hadoop3.minicluster)

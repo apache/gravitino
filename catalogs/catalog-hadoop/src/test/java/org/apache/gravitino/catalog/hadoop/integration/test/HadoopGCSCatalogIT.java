@@ -32,14 +32,12 @@ import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Disabled(
-    "Disabled due to as we don't have a real GCP account to test. If you have a GCP account,"
+    "Disabled due to we don't have a real GCP account to test. If you have a GCP account,"
         + "please change the configuration(YOUR_KEY_FILE, YOUR_BUCKET) and enable this test.")
-public class HadoopGCPCatalogIT extends HadoopCatalogIT {
+public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
   public static final String BUCKET_NAME = "YOUR_BUCKET";
   public static final String SERVICE_ACCOUNT_FILE = "YOUR_KEY_FILE";
