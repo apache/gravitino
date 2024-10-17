@@ -234,9 +234,9 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .toSequence()
           .createWithDefault(Collections.emptyList());
 
-  public static final ConfigEntry<String> CREDENTIAL_TYPE =
-      new ConfigBuilder(CredentialConstants.CREDENTIAL_TYPE)
-          .doc("The credential type for Iceberg")
+  public static final ConfigEntry<String> CREDENTIAL_PROVIDER_TYPE =
+      new ConfigBuilder(CredentialConstants.CREDENTIAL_PROVIDER_TYPE)
+          .doc("The credential provider type for Iceberg")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();

@@ -24,8 +24,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperProvider;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogConfigProvider;
 import org.apache.gravitino.utils.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,11 +39,11 @@ import org.slf4j.LoggerFactory;
  * gravitino.iceberg-rest.catalog.hive_proxy.catalog-backend = hive
  * gravitino.iceberg-rest.catalog.hive_proxy.uri = thrift://{host}:{port} ...
  */
-public class ConfigBasedIcebergCatalogWrapperProvider implements IcebergCatalogWrapperProvider {
+public class ConfigBasedIcebergCatalogConfigProvider implements IcebergCatalogConfigProvider {
   public static final Logger LOG =
-      LoggerFactory.getLogger(ConfigBasedIcebergCatalogWrapperProvider.class);
+      LoggerFactory.getLogger(ConfigBasedIcebergCatalogConfigProvider.class);
 
-  public static final String CONFIG_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME = "config-based-provider";
+  public static final String CONFIG_BASE_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME = "config-based-provider";
 
   @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
 
@@ -68,14 +67,8 @@ public class ConfigBasedIcebergCatalogWrapperProvider implements IcebergCatalogW
   }
 
   @Override
-  public IcebergCatalogWrapper getIcebergTableOps(String catalogName) {
-    IcebergConfig icebergConfig = this.catalogConfigs.get(catalogName);
-    if (icebergConfig == null) {
-      String errorMsg = String.format("%s can not match any catalog", catalogName);
-      LOG.warn(errorMsg);
-      throw new RuntimeException(errorMsg);
-    }
-    return new IcebergCatalogWrapper(icebergConfig, true);
+  public IcebergConfig getIcebergCatalogConfig(String catalogName) {
+    return this.catalogConfigs.get(catalogName);
   }
 
   private Optional<String> getCatalogName(String catalogConfigKey) {

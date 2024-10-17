@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Driver;
 import java.sql.DriverManager;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -31,20 +30,13 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialProvider;
-import org.apache.gravitino.credential.CredentialProviderFactory;
-import org.apache.gravitino.credential.CredentialUtils;
-import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.MapUtils;
-import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.Transaction;
@@ -78,7 +70,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   @Getter protected Catalog catalog;
   private SupportsNamespaces asNamespaceCatalog;
   private final IcebergCatalogBackend catalogBackend;
-  private Optional<CredentialProvider> credentialProvider;
   private String catalogUri = null;
   private Map<String, String> catalogConfigToClients;
   private Map<String, String> catalogPropertiesMap;
@@ -93,7 +84,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
           IcebergConstants.ICEBERG_OSS_ACCESS_KEY_ID,
           IcebergConstants.ICEBERG_OSS_ACCESS_KEY_SECRET);
 
-  public IcebergCatalogWrapper(IcebergConfig icebergConfig, boolean supportsCredentialVending) {
+  public IcebergCatalogWrapper(IcebergConfig icebergConfig) {
     this.catalogBackend =
         IcebergCatalogBackend.valueOf(
             icebergConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
@@ -113,14 +104,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
     this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
 
-    String credentialType = icebergConfig.get(IcebergConfig.CREDENTIAL_TYPE);
-    if (StringUtils.isBlank(credentialType) || !supportsCredentialVending) {
-      this.credentialProvider = Optional.empty();
-    } else {
-      this.credentialProvider =
-          Optional.of(
-              CredentialProviderFactory.create(credentialType, icebergConfig.getAllConfig()));
-    }
+
   }
 
   private void validateNamespace(Optional<Namespace> namespace) {
@@ -175,7 +159,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   /**
    * Reload hadoop configuration, this is useful when the hadoop configuration UserGroupInformation
    * is shared by multiple threads. UserGroupInformation#authenticationMethod was first initialized
-   * in KerberosClient, however, when switching to iceberg-rest thead,
+   * in KerberosClient, however, when switching to iceberg-rest thread,
    * UserGroupInformation#authenticationMethod will be reset to the default value; we need to
    * reinitialize it again.
    */
@@ -197,18 +181,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
         this::getCatalogConfigToClient);
   }
 
-  public LoadTableResponse createTableWithCredentialVending(
-      Namespace namespace, CreateTableRequest request) {
-    request.validate();
-    if (request.stageCreate()) {
-      return injectTableConfig(
-          () -> CatalogHandlers.stageTableCreate(catalog, namespace, request),
-          this::vendCredentials);
-    }
-    return injectTableConfig(
-        () -> CatalogHandlers.createTable(catalog, namespace, request), this::vendCredentials);
-  }
-
   public void dropTable(TableIdentifier tableIdentifier) {
     CatalogHandlers.dropTable(catalog, tableIdentifier);
   }
@@ -220,11 +192,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadTableResponse loadTable(TableIdentifier tableIdentifier) {
     return injectTableConfig(
         () -> CatalogHandlers.loadTable(catalog, tableIdentifier), this::getCatalogConfigToClient);
-  }
-
-  public LoadTableResponse loadTableWithCredentialVending(TableIdentifier tableIdentifier) {
-    return injectTableConfig(
-        () -> CatalogHandlers.loadTable(catalog, tableIdentifier), this::vendCredentials);
   }
 
   public boolean tableExists(TableIdentifier tableIdentifier) {
@@ -287,14 +254,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       // JdbcCatalog and WrappedHiveCatalog need close.
       ((AutoCloseable) catalog).close();
     }
-    credentialProvider.ifPresent(
-        provider -> {
-          try {
-            provider.close();
-          } catch (Exception e) {
-            LOG.warn("Close credential provider failed,", e);
-          }
-        });
 
     // Because each catalog in Gravitino has its own classloader, after a catalog is no longer used
     // for a long time or dropped, the instance of classloader needs to be released. In order to
@@ -316,7 +275,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private void closeMySQLCatalogResource() {
     try {
       // Close thread AbandonedConnectionCleanupThread if we are using `com.mysql.cj.jdbc.Driver`,
-      // for driver `com.mysql.jdbc.Driver` (deprecated), the daemon thead maybe not this one.
+      // for driver `com.mysql.jdbc.Driver` (deprecated), the daemon thread maybe not this one.
       Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread")
           .getMethod("uncheckedShutdown")
           .invoke(null);
@@ -359,25 +318,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   private Map<String, String> getCatalogConfigToClient(String location) {
     return catalogConfigToClients;
-  }
-
-  private Map<String, String> vendCredentials(String location) {
-    // ifPresentOrElse is not supported in Java8
-    if (!credentialProvider.isPresent()) {
-      throw new IllegalArgumentException(
-          "Credential vending is not enabled, please set "
-              + CredentialConstants.CREDENTIAL_TYPE
-              + " to proper values");
-    }
-
-    Map<String, String> configs = new HashMap<>(catalogConfigToClients);
-    // todo(fanng): check user privilege.
-    PathBasedCredentialContext pathBasedCredentialContext =
-        new PathBasedCredentialContext(
-            PrincipalUtils.getCurrentUserName(), ImmutableSet.of(location), ImmutableSet.of());
-    Credential credential = credentialProvider.get().getCredential(pathBasedCredentialContext);
-    configs.putAll(CredentialUtils.toIcebergProperties(credential));
-    return configs;
   }
 
   @Getter

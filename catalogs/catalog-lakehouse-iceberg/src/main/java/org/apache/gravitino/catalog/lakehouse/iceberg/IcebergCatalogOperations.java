@@ -112,8 +112,7 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
 
     this.icebergCatalogWrapper =
         new IcebergCatalogWrapper(
-            icebergConfig,
-            false /*Gravitino server will support credential vending in separate interface*/);
+            icebergConfig);
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
   }

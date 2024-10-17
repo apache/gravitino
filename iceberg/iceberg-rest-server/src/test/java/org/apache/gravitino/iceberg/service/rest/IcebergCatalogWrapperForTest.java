@@ -34,7 +34,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class IcebergCatalogWrapperForTest extends IcebergCatalogWrapper {
   public IcebergCatalogWrapperForTest() {
-    super(new IcebergConfig(Collections.emptyMap()), false);
+    super(new IcebergConfig(Collections.emptyMap()));
   }
 
   @Override

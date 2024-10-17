@@ -19,8 +19,20 @@
 
 package org.apache.gravitino.credential;
 
-public class CredentialConstants {
-  public static final String CREDENTIAL_PROVIDER_TYPE = "credential-provider-type";
+import java.util.Map;
 
-  private CredentialConstants() {}
+/**
+ * Helper class to generate specific credential properties for different table format and engine.
+ */
+public class CredentialPropertyUtils {
+  /**
+   * Transforms a specific credential into a map of Iceberg properties.
+   *
+   * @param credential the credential to be transformed into Iceberg properties
+   * @return a map of Iceberg properties derived from the credential
+   */
+  public static Map<String, String> toIcebergProperties(Credential credential) {
+    // todo: transform specific credential to iceberg properties
+    return credential.toProperties();
+  }
 }

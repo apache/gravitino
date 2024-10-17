@@ -21,14 +21,16 @@ package org.apache.gravitino.iceberg.provider;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapperProvider;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,12 +41,12 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The catalogName is iceberg_catalog
  */
-public class GravitinoBasedIcebergCatalogWrapperProvider
-    implements IcebergCatalogWrapperProvider, AutoCloseable {
+public class GravitinoBasedIcebergCatalogConfigProvider
+    implements IcebergCatalogConfigProvider, AutoCloseable {
   public static final Logger LOG =
-      LoggerFactory.getLogger(GravitinoBasedIcebergCatalogWrapperProvider.class);
+      LoggerFactory.getLogger(GravitinoBasedIcebergCatalogConfigProvider.class);
 
-  public static final String GRAVITINO_BASE_ICEBERG_TABLE_OPS_PROVIDER_NAME =
+  public static final String GRAVITINO_BASE_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME =
       "gravitino-based-provider";
 
   private String gravitinoMetalake;
@@ -66,14 +68,19 @@ public class GravitinoBasedIcebergCatalogWrapperProvider
   }
 
   @Override
-  public IcebergCatalogWrapper getIcebergTableOps(String catalogName) {
+  public Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogName), "blank catalogName is illegal");
     Preconditions.checkArgument(
         !IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(catalogName),
         IcebergConstants.GRAVITINO_DEFAULT_CATALOG + " is illegal in gravitino-based-provider");
 
-    Catalog catalog = client.loadMetalake(gravitinoMetalake).loadCatalog(catalogName);
+    Catalog catalog;
+    try {
+      catalog = client.loadMetalake(gravitinoMetalake).loadCatalog(catalogName);
+    } catch (NoSuchCatalogException e) {
+      return Optional.empty();
+    }
 
     Preconditions.checkArgument(
         "lakehouse-iceberg".equals(catalog.provider()),
@@ -81,7 +88,7 @@ public class GravitinoBasedIcebergCatalogWrapperProvider
 
     Map<String, String> properties =
         IcebergPropertiesUtils.toIcebergCatalogProperties(catalog.properties());
-    return new IcebergCatalogWrapper(new IcebergConfig(properties), true);
+    return Optional.of(new IcebergConfig(properties));
   }
 
   @VisibleForTesting

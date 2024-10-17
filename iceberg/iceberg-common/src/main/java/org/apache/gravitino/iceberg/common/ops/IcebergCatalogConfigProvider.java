@@ -19,12 +19,14 @@
 package org.apache.gravitino.iceberg.common.ops;
 
 import java.util.Map;
+import java.util.Optional;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 
 /**
- * IcebergCatalogWrapperProvider is an interface defining how Iceberg REST catalog server gets
- * Iceberg catalogs.
+ * {@code IcebergCatalogConfigProvider} is an interface defining how Iceberg REST catalog server gets
+ * Iceberg catalog configurations.
  */
-public interface IcebergCatalogWrapperProvider {
+public interface IcebergCatalogConfigProvider {
 
   /**
    * @param properties The parameters for creating Provider which from configurations whose prefix
@@ -33,8 +35,8 @@ public interface IcebergCatalogWrapperProvider {
   void initialize(Map<String, String> properties);
 
   /**
-   * @param catalogName a param send by clients.
-   * @return the instance of IcebergCatalogWrapper.
+   * @param catalogName Iceberg catalog name.
+   * @return the configuration of Iceberg catalog.
    */
-  IcebergCatalogWrapper getIcebergTableOps(String catalogName);
+  Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName);
 }

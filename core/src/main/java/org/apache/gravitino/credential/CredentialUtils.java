@@ -19,20 +19,18 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.utils.PrincipalUtils;
 
-/**
- * Helper class to generate specific credential properties for different table format and engine.
- */
 public class CredentialUtils {
-  /**
-   * Transforms a specific credential into a map of Iceberg properties.
-   *
-   * @param credential the credential to be transformed into Iceberg properties
-   * @return a map of Iceberg properties derived from the credential
-   */
-  public static Map<String, String> toIcebergProperties(Credential credential) {
-    // todo: transform specific credential to iceberg properties
-    return credential.toProperties();
+  public static Credential vendCredential(CredentialProvider credentialProvider, String path) {
+    PathBasedCredentialContext pathBasedCredentialContext =
+        new PathBasedCredentialContext(
+            PrincipalUtils.getCurrentUserName(), ImmutableSet.of(path), ImmutableSet.of());
+    return credentialProvider.getCredential(pathBasedCredentialContext);
   }
 }

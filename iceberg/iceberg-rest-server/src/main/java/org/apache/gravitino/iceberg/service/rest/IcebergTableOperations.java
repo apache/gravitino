@@ -22,6 +22,7 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -39,6 +40,11 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialProvider;
+import org.apache.gravitino.credential.CredentialProviderManager;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
@@ -49,6 +55,7 @@ import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,11 +112,8 @@ public class IcebergTableOperations {
         accessDelegation,
         isCredentialVending);
     if (isCredentialVending) {
-      return IcebergRestUtils.ok(
-          icebergCatalogWrapperManager
-              .getOps(prefix)
-              .createTableWithCredentialVending(
-                  RESTUtil.decodeNamespace(namespace), createTableRequest));
+      LoadTableResponse loadTableResponse = icebergCatalogWrapperManager.getOps(prefix).createTable(RESTUtil.decodeNamespace(namespace), createTableRequest);
+      return IcebergRestUtils.ok(injectCredentialConfig(prefix, loadTableResponse));
     } else {
       return IcebergRestUtils.ok(
           icebergCatalogWrapperManager
@@ -239,6 +243,22 @@ public class IcebergTableOperations {
       LOG.warn("Serialize update table request failed", e);
       return updateTableRequest.toString();
     }
+  }
+
+  private LoadTableResponse injectCredentialConfig(String prefix,
+      LoadTableResponse loadTableResponse) {
+    CredentialProvider credentialProvider = icebergCatalogWrapperManager.getCredentialProvider(prefix);
+    if (credentialProvider == null) {
+      throw new RuntimeException("Doesn't support credential vending");
+    }
+    Credential credential = CredentialUtils.vendCredential(credentialProvider,
+        loadTableResponse.tableMetadata().location());
+    if (credential == null) {
+      throw new RuntimeException("Couldn't generate credential for " + credentialProvider.credentialType());
+    }
+    Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
+    return LoadTableResponse.builder().withTableMetadata(loadTableResponse.tableMetadata())
+        .addAllConfig(loadTableResponse.config()).addAllConfig(credentialConfig).build();
   }
 
   private boolean isCredentialVending(String accessDelegation) {

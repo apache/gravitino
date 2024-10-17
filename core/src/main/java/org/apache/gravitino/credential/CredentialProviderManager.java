@@ -19,19 +19,22 @@
 
 package org.apache.gravitino.credential;
 
-import org.apache.gravitino.NameIdentifier;
+import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 public class CredentialProviderManager {
 
-  void registerCredentialProvider(NameIdentifier nameIdentifier, CredentialProvider credentialProvider) {
+  public void registerCredentialProvider(String catalogName, CredentialProvider credentialProvider) {
 
   }
 
-  void unregisterCredentialProvider(NameIdentifier nameIdentifier) {
+  public void unregisterCredentialProvider(String catalogName) {
 
   }
 
-  CredentialProvider getCredentialProvider(NameIdentifier nameIdentifier, String credentialType) {
+  public CredentialProvider getCredentialProvider(String catalogName) {
     return null;
   }
 }
