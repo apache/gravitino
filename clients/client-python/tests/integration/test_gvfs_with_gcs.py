@@ -104,7 +104,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             provider=cls.catalog_provider,
             comment="",
             properties={
-                "filesystem-providers-classnames": "org.apache.gravitino.fileset.gcs.GCSFileSystemProvider",
+                "filesystem-providers": "gcs",
                 "gravitino.bypass.fs.gs.auth.service.account.enable": "true",
                 "gravitino.bypass.fs.gs.auth.service.account.json.keyfile": cls.key_file,
             },
