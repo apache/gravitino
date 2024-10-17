@@ -18,22 +18,19 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.google.errorprone.annotations.FormatMethod;
-import com.google.errorprone.annotations.FormatString;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.ranger.RangerClient;
@@ -53,9 +50,7 @@ public class RangerHelper {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHelper.class);
 
   public static final String MANAGED_BY_GRAVITINO = "MANAGED_BY_GRAVITINO";
-
-  /** Mapping Gravitino privilege name to the underlying authorization system privileges. */
-  private final Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping;
+  public static final String RESOURCE_STAR = "*";
   /** The owner privileges, the owner can do anything on the metadata object */
   private final Set<RangerPrivilege> ownerPrivileges;
   /** The policy search keys */
@@ -64,32 +59,20 @@ public class RangerHelper {
   private final RangerClient rangerClient;
   private final String rangerAdminName;
   private final String rangerServiceName;
+  public static final String GRAVITINO_METALAKE_OWNER_ROLE = "GRAVITINO_METALAKE_OWNER_ROLE";
+  public static final String GRAVITINO_CATALOG_OWNER_ROLE = "GRAVITINO_CATALOG_OWNER_ROLE";
 
   public RangerHelper(
       RangerClient rangerClient,
       String rangerAdminName,
       String rangerServiceName,
-      Map<Privilege.Name, Set<RangerPrivilege>> privilegesMapping,
       Set<RangerPrivilege> ownerPrivileges,
       List<String> resourceDefines) {
     this.rangerClient = rangerClient;
     this.rangerAdminName = rangerAdminName;
     this.rangerServiceName = rangerServiceName;
-    this.privilegesMapping = privilegesMapping;
     this.ownerPrivileges = ownerPrivileges;
     this.policyResourceDefines = resourceDefines;
-  }
-
-  /**
-   * Translate the privilege name to the corresponding privilege name in the Ranger
-   *
-   * @param name The privilege name to translate
-   * @return The corresponding Ranger privilege name in the underlying permission system
-   */
-  public Set<String> translatePrivilege(Privilege.Name name) {
-    return privilegesMapping.get(name).stream()
-        .map(RangerPrivilege::getName)
-        .collect(Collectors.toSet());
   }
 
   /**
@@ -123,56 +106,47 @@ public class RangerHelper {
    * We cannot clean the policy items because one Ranger policy maybe contains multiple Gravitino
    * securable objects. <br>
    */
-  void addPolicyItem(RangerPolicy policy, String roleName, SecurableObject securableObject) {
-    // First check the privilege if support in the Ranger Hive
-    checkPrivileges(securableObject);
-
+  void addPolicyItem(RangerPolicy policy, String roleName, RangerSecurableObject securableObject) {
     // Add the policy items by the securable object's privileges
     securableObject
         .privileges()
         .forEach(
-            gravitinoPrivilege -> {
-              // Translate the Gravitino privilege to map Ranger privilege
-              translatePrivilege(gravitinoPrivilege.name())
-                  .forEach(
-                      rangerPrivilege -> {
-                        // Find the policy item that matches Gravitino privilege
-                        List<RangerPolicy.RangerPolicyItem> matchPolicyItems =
-                            policy.getPolicyItems().stream()
-                                .filter(
-                                    policyItem -> {
-                                      return policyItem.getAccesses().stream()
-                                          .anyMatch(
-                                              access -> access.getType().equals(rangerPrivilege));
-                                    })
-                                .collect(Collectors.toList());
+            rangerPrivilege -> {
+              // Find the policy item that matches Gravitino privilege
+              List<RangerPolicy.RangerPolicyItem> matchPolicyItems =
+                  policy.getPolicyItems().stream()
+                      .filter(
+                          policyItem -> {
+                            return policyItem.getAccesses().stream()
+                                .anyMatch(
+                                    access -> access.getType().equals(rangerPrivilege.getName()));
+                          })
+                      .collect(Collectors.toList());
 
-                        if (matchPolicyItems.size() == 0) {
-                          // If the policy item does not exist, then create a new policy item
-                          RangerPolicy.RangerPolicyItem policyItem =
-                              new RangerPolicy.RangerPolicyItem();
-                          RangerPolicy.RangerPolicyItemAccess access =
-                              new RangerPolicy.RangerPolicyItemAccess();
-                          access.setType(rangerPrivilege);
-                          policyItem.getAccesses().add(access);
-                          policyItem.getRoles().add(roleName);
-                          if (Privilege.Condition.ALLOW == gravitinoPrivilege.condition()) {
-                            policy.getPolicyItems().add(policyItem);
-                          } else {
-                            policy.getDenyPolicyItems().add(policyItem);
+              if (matchPolicyItems.size() == 0) {
+                // If the policy item does not exist, then create a new policy item
+                RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+                RangerPolicy.RangerPolicyItemAccess access =
+                    new RangerPolicy.RangerPolicyItemAccess();
+                access.setType(rangerPrivilege.getName());
+                policyItem.getAccesses().add(access);
+                policyItem.getRoles().add(roleName);
+                if (Privilege.Condition.ALLOW == rangerPrivilege.condition()) {
+                  policy.getPolicyItems().add(policyItem);
+                } else {
+                  policy.getDenyPolicyItems().add(policyItem);
+                }
+              } else {
+                // If the policy item exists, then add the role to the policy item
+                matchPolicyItems.stream()
+                    .forEach(
+                        policyItem -> {
+                          // If the role is not in the policy item, then add it
+                          if (!policyItem.getRoles().contains(roleName)) {
+                            policyItem.getRoles().add(roleName);
                           }
-                        } else {
-                          // If the policy item exists, then add the role to the policy item
-                          matchPolicyItems.stream()
-                              .forEach(
-                                  policyItem -> {
-                                    // If the role is not in the policy item, then add it
-                                    if (!policyItem.getRoles().contains(roleName)) {
-                                      policyItem.getRoles().add(roleName);
-                                    }
-                                  });
-                        }
-                      });
+                        });
+              }
             });
   }
 
@@ -181,10 +155,8 @@ public class RangerHelper {
    * We cannot directly clean the policy items because one Ranger policy maybe contains multiple
    * Gravitino privilege objects. <br>
    */
-  void removePolicyItem(RangerPolicy policy, String roleName, SecurableObject securableObject) {
-    // First check the privilege if support in the Ranger Hive
-    checkPrivileges(securableObject);
-
+  void removePolicyItem(
+      RangerPolicy policy, String roleName, RangerSecurableObject securableObject) {
     // Delete the policy role base the securable object's privileges
     policy.getPolicyItems().stream()
         .forEach(
@@ -195,12 +167,9 @@ public class RangerHelper {
                       access -> {
                         boolean matchPrivilege =
                             securableObject.privileges().stream()
-                                .filter(Objects::nonNull)
-                                .flatMap(privilege -> translatePrivilege(privilege.name()).stream())
-                                .filter(Objects::nonNull)
                                 .anyMatch(
                                     privilege -> {
-                                      return access.getType().equals(privilege);
+                                      return access.getType().equals(privilege.getName());
                                     });
                         if (matchPrivilege) {
                           policyItem.getRoles().removeIf(roleName::equals);
@@ -220,33 +189,14 @@ public class RangerHelper {
   }
 
   /**
-   * Whether this privilege is underlying permission system supported
+   * Find the managed policy for the ranger securable object.
    *
-   * @param securableObject The securable object to check
-   * @return true if the privilege is supported, otherwise false
-   */
-  private boolean checkPrivileges(SecurableObject securableObject) {
-    securableObject
-        .privileges()
-        .forEach(
-            privilege -> {
-              check(
-                  privilegesMapping.containsKey(privilege.name()),
-                  "This privilege %s is not supported in the Ranger hive authorization",
-                  privilege.name());
-            });
-    return true;
-  }
-
-  /**
-   * Find the managed policy for the metadata object.
-   *
-   * @param metadataObject The metadata object to find the managed policy.
+   * @param rangerSecurableObject The ranger securable object to find the managed policy.
    * @return The managed policy for the metadata object.
    */
-  public RangerPolicy findManagedPolicy(MetadataObject metadataObject)
+  public RangerPolicy findManagedPolicy(RangerSecurableObject rangerSecurableObject)
       throws AuthorizationPluginException {
-    List<String> nsMetadataObj = getMetadataObjectNames(metadataObject);
+    List<String> nsMetadataObj = getMetadataObjectNames(rangerSecurableObject);
 
     Map<String, String> searchFilters = new HashMap<>();
     Map<String, String> preciseFilters = new HashMap<>();
@@ -323,6 +273,10 @@ public class RangerHelper {
     Set<String> groups =
         StringUtils.isEmpty(groupName) ? Sets.newHashSet() : Sets.newHashSet(groupName);
 
+    if (users.size() == 0 && groups.size() == 0) {
+      throw new AuthorizationPluginException("The user and group cannot be empty!");
+    }
+
     GrantRevokeRoleRequest roleRequest = new GrantRevokeRoleRequest();
     roleRequest.setUsers(users);
     roleRequest.setGroups(groups);
@@ -331,8 +285,25 @@ public class RangerHelper {
     return roleRequest;
   }
 
-  /** Create a Ranger role if the role does not exist. */
-  protected RangerRole createRangerRoleIfNotExists(String roleName) {
+  /**
+   * Create a Ranger role if the role does not exist.
+   *
+   * @param roleName The role name to create
+   * @param isOwnerRole The role is owner role or not
+   */
+  protected RangerRole createRangerRoleIfNotExists(String roleName, boolean isOwnerRole) {
+    if (isOwnerRole) {
+      Preconditions.checkArgument(
+          roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
+              || roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE),
+          "The role name should be GRAVITINO_METALAKE_OWNER_ROLE or GRAVITINO_CATALOG_OWNER_ROLE");
+    } else {
+      Preconditions.checkArgument(
+          !roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
+              && !roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE),
+          "The role name should not be GRAVITINO_METALAKE_OWNER_ROLE or GRAVITINO_CATALOG_OWNER_ROLE");
+    }
+
     RangerRole rangerRole = null;
     try {
       rangerRole = rangerClient.getRole(roleName, rangerAdminName, rangerServiceName);
@@ -423,14 +394,13 @@ public class RangerHelper {
             });
   }
 
-  private List<String> getMetadataObjectNames(MetadataObject metadataObject) {
+  private static List<String> getMetadataObjectNames(MetadataObject metadataObject) {
     List<String> nsMetadataObject =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
     if (nsMetadataObject.size() > 4) {
       // The max level of the securable object is `catalog.db.table.column`
       throw new RuntimeException("The length of the securable object should not be greater than 4");
     }
-    nsMetadataObject.remove(0); // remove `catalog`
     return nsMetadataObject;
   }
 
@@ -472,10 +442,73 @@ public class RangerHelper {
     return policy;
   }
 
-  @FormatMethod
-  protected static void check(boolean condition, @FormatString String message, Object... args) {
-    if (!condition) {
-      throw new AuthorizationPluginException(message, args);
-    }
+  protected RangerPolicy addOwnerRoleToNewPolicy(
+      MetadataObject metadataObject, String ownerRoleName) {
+    RangerPolicy policy = createPolicyAddResources(metadataObject);
+
+    ownerPrivileges.forEach(
+        ownerPrivilege -> {
+          // Each owner's privilege will create one RangerPolicyItemAccess in the policy
+          RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+          policyItem
+              .getAccesses()
+              .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+          policyItem.getRoles().add(ownerRoleName);
+          policy.getPolicyItems().add(policyItem);
+        });
+    return policy;
+  }
+
+  protected void updatePolicyOwnerRole(RangerPolicy policy, String ownerRoleName) {
+    // Find matching policy items based on the owner's privileges
+    List<RangerPolicy.RangerPolicyItem> matchPolicyItems =
+        policy.getPolicyItems().stream()
+            .filter(
+                policyItem -> {
+                  return policyItem.getAccesses().stream()
+                      .allMatch(
+                          policyItemAccess -> {
+                            return ownerPrivileges.stream()
+                                .anyMatch(
+                                    ownerPrivilege -> {
+                                      return ownerPrivilege.equalsTo(policyItemAccess.getType());
+                                    });
+                          });
+                })
+            .collect(Collectors.toList());
+    // Add or remove the owner role in the policy item
+    matchPolicyItems.forEach(
+        policyItem -> {
+          if (!policyItem.getRoles().contains(ownerRoleName)) {
+            policyItem.getRoles().add(ownerRoleName);
+          }
+        });
+
+    // If the policy item is not equal to owner's privileges, then update the policy
+    ownerPrivileges.stream()
+        .filter(
+            ownerPrivilege -> {
+              return matchPolicyItems.stream()
+                  .noneMatch(
+                      policyItem -> {
+                        return policyItem.getAccesses().stream()
+                            .anyMatch(
+                                policyItemAccess -> {
+                                  return ownerPrivilege.equalsTo(policyItemAccess.getType());
+                                });
+                      });
+            })
+        .forEach(
+            // Add lost owner's privilege to the policy
+            ownerPrivilege -> {
+              RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+              policyItem
+                  .getAccesses()
+                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              if (!policyItem.getRoles().contains(ownerRoleName)) {
+                policyItem.getRoles().add(ownerRoleName);
+              }
+              policy.getPolicyItems().add(policyItem);
+            });
   }
 }
