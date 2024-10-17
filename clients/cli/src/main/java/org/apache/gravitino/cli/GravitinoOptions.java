@@ -28,13 +28,7 @@ public class GravitinoOptions {
   public static final String VERSION = "version";
   public static final String SERVER = "server";
   public static final String URL = "url";
-  public static final String METALAKE = "metalake";
-  public static final String CATALOG = "catalog";
-  public static final String SCHEMA = "schema";
-  public static final String TABLE = "table";
   public static final String NAME = "name";
-  public static final String ENTITY = "entity";
-  public static final String COMMAND = "command";
   public static final String LIST = "list";
   public static final String DETAILS = "details";
   public static final String CREATE = "create";
@@ -67,18 +61,9 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("v", VERSION, "Gravitino client version"));
     options.addOption(createSimpleOption("r", SERVER, "Gravitino server version"));
     options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
-    options.addOption(createArgOption("m", METALAKE, "metalake name"));
-    options.addOption(createArgOption("c", CATALOG, "catalog name"));
-    options.addOption(createArgOption("s", SCHEMA, "schema name"));
-    options.addOption(createArgOption("t", TABLE, "table name"));
     options.addOption(createArgOption("n", NAME, "full entity name (dot separated)"));
-    options.addOption(createArgOption("e", ENTITY, "entity type"));
 
-    // One way of specifying the command
-    options.addOption(
-        createArgOption("x", COMMAND, "one of: list, details, create, delete, or update"));
-
-    // Another way of specifying the command
+    //  specifying the command
     options.addOption(createSimpleOption("L", LIST, "list entity children"));
     options.addOption(createSimpleOption("D", DETAILS, "list details about an entity"));
     options.addOption(createSimpleOption("C", CREATE, "create an entity"));
@@ -88,7 +73,7 @@ public class GravitinoOptions {
 
     // Create/update options
     options.addOption(createArgOption("r", RENAME, "new entity name"));
-    options.addOption(createArgOption("d", COMMENT, "entity comment"));
+    options.addOption(createArgOption("c", COMMENT, "entity comment"));
     options.addOption(createArgOption("p", PROPERTY, "property name"));
     options.addOption(createArgOption("v", VALUE, "property value"));
     options.addOption(
@@ -98,8 +83,8 @@ public class GravitinoOptions {
     options.addOption(createArgOption("w", WAREHOUSE, "warehouse name"));
     options.addOption(createArgOption("b", BOOTSTRAP, "Kafka bootstrap servers"));
     options.addOption(createArgOption("j", JDBCURL, "JDBC URL"));
-    options.addOption(createArgOption("u", USER, "database username"));
-    options.addOption(createArgOption("p", PASSWORD, "database password"));
+    options.addOption(createArgOption("l", USER, "database username"));
+    options.addOption(createArgOption("z", PASSWORD, "database password"));
     options.addOption(createArgOption("d", DATABASE, "database name"));
 
     return options;

@@ -26,10 +26,10 @@ alias gcli='java -jar clients/cli/build/libs/gravitino-cli-0.7.0-incubating-SNAP
 # No such command
 gcli unknown
 
-# unknown command and entity
+# unknown command and entiry
 gcli unknown unknown
 
-# unknown command and entity
+# unknown command and entiry
 gcli unknown unknown
 
 # unknown command 
@@ -41,9 +41,6 @@ gcli unknown list
 # Name not specified 
 gcli metalake details
 
-# Too many arguments
-gcli metalake details more
-
 # Unknown metalake name
 gcli metalake details --name unknown
 
@@ -52,12 +49,3 @@ gcli catalog details --name metalake_demo.unknown
 
 # Unknown catalog name
 gcli catalog details --name metalake_demo
-
-# Already exists
-gcli metalake create -name metalake_demo
-
-# Doesn't exist
-gcli metalake delete -name unknown-metalake
-
-# Malformed name
-gcli catalog details -name metalake_demo

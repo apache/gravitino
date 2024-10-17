@@ -40,16 +40,6 @@ public class TestFulllName {
   }
 
   @Test
-  public void entityFromCommandLineOption() throws Exception {
-    String[] args = {"--metalake", "metalake_demo"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-
-    String metalakeName = fullName.getMetalakeName();
-    assertEquals("metalake_demo", metalakeName);
-  }
-
-  @Test
   public void entityFromFullNameOption() throws Exception {
     String[] args = {"--name", "metalakeA.catalogB.schemaC.tableD"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
@@ -76,6 +66,7 @@ public class TestFulllName {
   }
 
   @Test
+<<<<<<< HEAD
   public void justName() throws Exception, MissingArgumentException {
     String[] args = {"--name"};
 
@@ -114,6 +105,9 @@ public class TestFulllName {
 
   @Test
   public void malformedMissingEntityName() throws Exception {
+=======
+  public void malformedName() throws Exception {
+>>>>>>> CLI
     String[] args = {"--name", "metalake.catalog"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
@@ -136,7 +130,7 @@ public class TestFulllName {
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
 
-    String namePart = fullName.getNamePart(GravitinoOptions.TABLE, 3);
+    String namePart = fullName.getNamePart(3);
     assertNull(namePart);
   }
 }
