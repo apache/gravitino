@@ -40,7 +40,7 @@ public class Main {
         return;
       }
       String command = resolveCommand(line);
-      String entity = resolveEntity(line, command != null);
+      String entity = resolveEntity(line);
       GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, entity, command);
       commandLine.handleCommandLine();
     } catch (ParseException exp) {
@@ -56,15 +56,7 @@ public class Main {
    * @return The command, one of 'details', 'list', 'create', 'delete' or 'update'.
    */
   protected static String resolveCommand(CommandLine line) {
-    /* Can be specified in the form --command XXX. */
-    if (line.hasOption(GravitinoOptions.COMMAND)) {
-      String command = line.getOptionValue(GravitinoOptions.COMMAND);
-      if (CommandActions.isValidCommand(command)) {
-        return command;
-      }
-    }
-
-    /* Or as --list, --details --create --delete or --update. */
+    /* Passed as --list, --details --create --delete or --update. */
     if (line.hasOption(GravitinoOptions.LIST)) {
       return CommandActions.LIST;
     } else if (line.hasOption(GravitinoOptions.DETAILS)) {
@@ -77,63 +69,27 @@ public class Main {
       return CommandActions.UPDATE;
     }
 
-    /* Or as the first command or bare second argument of two arguments. */
-    String[] args = line.getArgs();
-
-    if (args.length == 1 || args.length == 2) {
-      String command = args[args.length - 1];
-      if (CommandActions.isValidCommand(command)) {
-        return command;
-      } else {
-        System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
-        return null;
-      }
-    } else {
-      return CommandActions.DETAILS; /* Default to 'details' command. */
-    }
+    return CommandActions.DETAILS; /* Default to 'details' command. */
   }
 
   /**
    * Determines the entity to act upon based on the command line input.
    *
    * @param line Parsed command line object.
-   * @param command true if command is an argument
    * @return The entity, e.g. metakalake, catalog, schema, table, etc.
    */
-  protected static String resolveEntity(CommandLine line, boolean command) {
-    /* Can be specified in the form --entity XXX. */
-    if (line.hasOption(GravitinoOptions.ENTITY)) {
-      String entity = line.getOptionValue(GravitinoOptions.ENTITY);
+  protected static String resolveEntity(CommandLine line) {
+    /* As the bare first argument. */
+    String[] args = line.getArgs();
+
+    if (args.length > 0) {
+      String entity = args[0];
       if (CommandEntities.isValidEntity(entity)) {
         return entity;
+      } else {
+        System.err.println(ErrorMessages.UNKNOWN_ENTITY);
+        return null;
       }
-    }
-
-    /* Or as --metalake, --catalog, --schema, --table etc. */
-    if (line.hasOption(GravitinoOptions.TABLE)) {
-      return CommandEntities.TABLE;
-    } else if (line.hasOption(GravitinoOptions.SCHEMA)) {
-      return CommandEntities.SCHEMA;
-    } else if (line.hasOption(GravitinoOptions.CATALOG)) {
-      return CommandEntities.CATALOG;
-    } else if (line.hasOption(GravitinoOptions.METALAKE)) {
-      return CommandEntities.METALAKE;
-    }
-
-    /* Or as the bare first argument of one or two arguments. */
-    String[] args = line.getArgs();
-    String entity = args[0];
-
-    if (args.length == 1) {
-      if (CommandActions.isValidCommand(args[0])) {
-        return null; /* But not an error. */
-      }
-    }
-
-    if (CommandEntities.isValidEntity(entity)) {
-      return entity;
-    } else {
-      System.err.println(ErrorMessages.UNKNOWN_ENTITY);
     }
 
     return null;
