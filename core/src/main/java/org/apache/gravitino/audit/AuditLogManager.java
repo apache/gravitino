@@ -20,6 +20,7 @@
 package org.apache.gravitino.audit;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -73,7 +74,11 @@ public class AuditLogManager {
 
           @Override
           public void stop() throws RuntimeException {
-            auditLogWriter.close();
+            try {
+              auditLogWriter.close();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
           }
 
           @Override

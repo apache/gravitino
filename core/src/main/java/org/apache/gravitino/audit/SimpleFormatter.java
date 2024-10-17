@@ -19,12 +19,11 @@
 
 package org.apache.gravitino.audit;
 
-import java.util.Objects;
 import org.apache.gravitino.audit.AuditLog.Status;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.FailureEvent;
 
-/** The default implementation of the audit log. */
+/** The default formatter implementation of the audit log. */
 public class SimpleFormatter implements Formatter {
 
   @Override
@@ -33,10 +32,7 @@ public class SimpleFormatter implements Formatter {
     return SimpleAuditLog.builder()
         .user(event.user())
         .operation(AuditLog.Operation.fromEvent(event))
-        .identifier(
-            event.identifier() != null
-                ? Objects.requireNonNull(event.identifier()).toString()
-                : null)
+        .identifier(event.identifier() != null ? event.identifier().toString() : null)
         .timestamp(event.eventTime())
         .status(status)
         .build();

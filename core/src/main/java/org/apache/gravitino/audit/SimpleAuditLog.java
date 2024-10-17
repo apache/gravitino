@@ -20,6 +20,7 @@
 package org.apache.gravitino.audit;
 
 import java.text.SimpleDateFormat;
+import javax.annotation.Nullable;
 import lombok.Builder;
 
 /** The default implementation of the audit log. */
@@ -47,6 +48,7 @@ public class SimpleAuditLog implements AuditLog {
   }
 
   @Override
+  @Nullable
   public String identifier() {
     return identifier;
   }

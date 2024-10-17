@@ -55,9 +55,6 @@ public interface AuditLogWriter extends Closeable {
     doWrite(getFormatter().format(event));
   }
 
-  /** Close the writer. */
-  void close();
-
   /**
    * Define the name of the writer, which related to audit writer configuration. Audit log writer
    * configuration start with: gravitino.audit.log.writer.${name}.*

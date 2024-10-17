@@ -20,7 +20,6 @@
 package org.apache.gravitino.audit;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
@@ -28,7 +27,6 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,15 +38,18 @@ import org.slf4j.LoggerFactory;
 public class FileAuditWriter implements AuditLogWriter {
   private static final Logger Log = LoggerFactory.getLogger(FileAuditWriter.class);
 
-  public static final String LOG_FILE_NAME_CONFIG = "name";
+  public static final String LOG_FILE_NAME_CONFIG = "fileName";
 
   public static final String FILE_IMMEDIATE_FLUSH_CONFIG = "immediateFlush";
 
+  public static final String LINE_SEPARATOR = "lineSeparator";
   private Formatter formatter;
   private Writer outWriter;
   @VisibleForTesting String fileName;
 
   boolean immediateFlush;
+
+  String lineSeparator;
 
   @Override
   public Formatter getFormatter() {
@@ -58,11 +59,10 @@ public class FileAuditWriter implements AuditLogWriter {
   @Override
   public void init(Formatter formatter, Map<String, String> properties) {
     this.formatter = formatter;
-    fileName = properties.getOrDefault(LOG_FILE_NAME_CONFIG, "default_gravitino_audit_log");
+    fileName = properties.getOrDefault(LOG_FILE_NAME_CONFIG, "gravitino_audit.log");
     immediateFlush =
         Boolean.parseBoolean(properties.getOrDefault(FILE_IMMEDIATE_FLUSH_CONFIG, "false"));
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(fileName), "FileAuditWriter: fileName is not set in configuration.");
+    lineSeparator = properties.getOrDefault(LINE_SEPARATOR, "\n");
     try {
       OutputStream outputStream = new FileOutputStream(fileName, true);
       outWriter = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
@@ -76,7 +76,7 @@ public class FileAuditWriter implements AuditLogWriter {
   public void doWrite(AuditLog auditLog) {
     String log = auditLog.toString();
     try {
-      outWriter.write(log);
+      outWriter.write(log + lineSeparator);
       if (immediateFlush) {
         outWriter.flush();
       }

@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 public class TestAuditManager {
   private static final Logger LOG = LoggerFactory.getLogger(TestAuditManager.class);
 
-  private static final String DEFAULT_FILE_NAME = "default_gravitino_audit_log";
+  private static final String DEFAULT_FILE_NAME = "gravitino_audit.log";
 
   @BeforeAll
   public void setup() {
