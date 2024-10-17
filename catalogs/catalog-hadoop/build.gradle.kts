@@ -74,6 +74,7 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(project(":bundles:gcp-bundle"))
+  testImplementation(project(":bundles:aliyun-bundle"))
 
   testImplementation(libs.minikdc)
   testImplementation(libs.hadoop3.minicluster)
