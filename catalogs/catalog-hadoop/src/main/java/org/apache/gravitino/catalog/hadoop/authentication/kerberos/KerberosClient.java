@@ -63,6 +63,12 @@ public class KerberosClient implements Closeable {
     Preconditions.checkArgument(
         principalComponents.size() == 2, "The principal has the wrong format");
 
+    // Set Kerberos krb file
+    String krbFilePath = kerberosConfig.getKrb5Conf();
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(krbFilePath), "The Kerberos krb file can't be blank");
+    System.setProperty("java.security.krb5.conf", krbFilePath);
+
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
     UserGroupInformation.loginUserFromKeytab(catalogPrincipal, keytabFilePath);
