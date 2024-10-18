@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.URI;
@@ -29,32 +30,33 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-@Tag("gravitino-docker-test")
 @Disabled(
-    "Disabled due to we don't have a real GCP account to test. If you have a GCP account,"
-        + "please change the configuration(YOUR_KEY_FILE, YOUR_BUCKET) and enable this test.")
-public class HadoopGCSCatalogIT extends HadoopCatalogIT {
-
+    "Disabled due to we don't have a real OSS account to test. If you have a GCP account,"
+        + "please change the configuration(BUCKET_NAME, OSS_ACCESS_KEY, OSS_SECRET_KEY, OSS_ENDPOINT) and enable this test.")
+public class HadoopOSSCatalogIT extends HadoopCatalogIT {
+  private static final Logger LOG = LoggerFactory.getLogger(HadoopOSSCatalogIT.class);
   public static final String BUCKET_NAME = "YOUR_BUCKET";
-  public static final String SERVICE_ACCOUNT_FILE = "YOUR_KEY_FILE";
+  public static final String OSS_ACCESS_KEY = "YOUR_OSS_ACCESS_KEY";
+  public static final String OSS_SECRET_KEY = "YOUR_OSS_SECRET_KEY";
+  public static final String OSS_ENDPOINT = "YOUR_OSS_ENDPOINT";
 
-  @Override
-  public void startIntegrationTest() throws Exception {
-    // Do nothing.
-  }
+  @VisibleForTesting
+  public void startIntegrationTest() throws Exception {}
 
   @BeforeAll
   public void setup() throws IOException {
-    copyBundleJarsToHadoop("gcp-bundle");
+    copyBundleJarsToHadoop("aliyun-bundle");
 
     try {
       super.startIntegrationTest();
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("Failed to start integration test", e);
     }
 
     metalakeName = GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
@@ -64,13 +66,29 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
     schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     Configuration conf = new Configuration();
 
-    conf.set("fs.gs.auth.service.account.enable", "true");
-    conf.set("fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
-    fileSystem = FileSystem.get(URI.create(String.format("gs://%s", BUCKET_NAME)), conf);
+    conf.set("fs.oss.accessKeyId", OSS_ACCESS_KEY);
+    conf.set("fs.oss.accessKeySecret", OSS_SECRET_KEY);
+    conf.set("fs.oss.endpoint", OSS_ENDPOINT);
+    conf.set("fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
+    fileSystem = FileSystem.get(URI.create(String.format("oss://%s", BUCKET_NAME)), conf);
 
     createMetalake();
     createCatalog();
     createSchema();
+  }
+
+  @AfterAll
+  public void stop() throws IOException {
+    Catalog catalog = metalake.loadCatalog(catalogName);
+    catalog.asSchemas().dropSchema(schemaName, true);
+    metalake.dropCatalog(catalogName);
+    client.dropMetalake(metalakeName);
+
+    try {
+      closer.close();
+    } catch (Exception e) {
+      LOG.error("Failed to close CloseableGroup", e);
+    }
   }
 
   protected String defaultBaseLocation() {
@@ -79,7 +97,8 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
         Path bucket =
             new Path(
                 String.format(
-                    "gs://%s/%s", BUCKET_NAME, GravitinoITUtils.genRandomName("CatalogFilesetIT")));
+                    "oss://%s/%s",
+                    BUCKET_NAME, GravitinoITUtils.genRandomName("CatalogFilesetIT")));
         if (!fileSystem.exists(bucket)) {
           fileSystem.mkdirs(bucket);
         }
@@ -95,9 +114,11 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put("gravitino.bypass.fs.gs.auth.service.account.enable", "true");
-    map.put("gravitino.bypass.fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
-    map.put(FILESYSTEM_PROVIDERS, "gcs");
+    map.put("gravitino.bypass.fs.oss.accessKeyId", OSS_ACCESS_KEY);
+    map.put("gravitino.bypass.fs.oss.accessKeySecret", OSS_SECRET_KEY);
+    map.put("gravitino.bypass.fs.oss.endpoint", OSS_ENDPOINT);
+    map.put("gravitino.bypass.fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
+    map.put(FILESYSTEM_PROVIDERS, "oss");
 
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
 
