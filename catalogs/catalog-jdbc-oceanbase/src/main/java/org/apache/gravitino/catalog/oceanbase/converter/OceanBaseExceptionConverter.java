@@ -21,6 +21,10 @@ package org.apache.gravitino.catalog.oceanbase.converter;
 import java.sql.SQLException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 
 /** Exception converter to Apache Gravitino exception for OceanBase. */
 public class OceanBaseExceptionConverter extends JdbcExceptionConverter {
@@ -28,6 +32,19 @@ public class OceanBaseExceptionConverter extends JdbcExceptionConverter {
   @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
-    return new GravitinoRuntimeException("Not implemented yet.");
+    switch (se.getErrorCode()) {
+      case 1007:
+        return new SchemaAlreadyExistsException(se, se.getMessage());
+      case 1050:
+        return new TableAlreadyExistsException(se, se.getMessage());
+      case 1008:
+      case 1049:
+        return new NoSuchSchemaException(se, se.getMessage());
+      case 1146:
+      case 1051:
+        return new NoSuchTableException(se, se.getMessage());
+      default:
+        return new GravitinoRuntimeException(se, se.getMessage());
+    }
   }
 }
