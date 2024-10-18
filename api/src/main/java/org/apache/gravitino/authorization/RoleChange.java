@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.authorization;
 
+import com.google.common.base.Preconditions;
 import java.util.Objects;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 
 /** The RoleChange interface defines the public API for managing roles in an authorization. */
@@ -57,6 +59,18 @@ public interface RoleChange {
   static RoleChange updateSecurableObject(
       String roleName, SecurableObject securableObject, SecurableObject newSecurableObject) {
     return new UpdateSecurableObject(roleName, securableObject, newSecurableObject);
+  }
+
+  /**
+   * Update a metadata entity RoleChange.
+   *
+   * @param metadataObject The metadata object.
+   * @param newMetadataObject The new metadata object.
+   * @return return a RoleChange for the rename metadata object.
+   */
+  static RoleChange renameMetadataObject(
+      MetadataObject metadataObject, MetadataObject newMetadataObject) {
+    return new RenameMetadataObject(metadataObject, newMetadataObject);
   }
 
   /** A AddSecurableObject to add a securable object to a role. */
@@ -284,6 +298,80 @@ public interface RoleChange {
     @Override
     public String toString() {
       return "UPDATESECURABLEOBJECT " + roleName + " " + securableObject + " " + newSecurableObject;
+    }
+  }
+
+  /** A RenameMetadataObject is to rename securable object's metadata entity. <br> */
+  final class RenameMetadataObject implements RoleChange {
+    private final MetadataObject metadataObject;
+    private final MetadataObject newMetadataObject;
+
+    private RenameMetadataObject(MetadataObject metadataObject, MetadataObject newMetadataObject) {
+      Preconditions.checkArgument(
+          !metadataObject.fullName().equals(newMetadataObject.fullName()),
+          "The metadata object must be different!");
+      Preconditions.checkArgument(
+          metadataObject.type().equals(newMetadataObject.type()),
+          "The metadata object type must be same!");
+
+      this.metadataObject = metadataObject;
+      this.newMetadataObject = newMetadataObject;
+    }
+
+    /**
+     * Returns the metadataObject to be renamed.
+     *
+     * @return return a metadataObject.
+     */
+    public MetadataObject getMetadataObject() {
+      return this.metadataObject;
+    }
+
+    /**
+     * Returns the new metadataObject object.
+     *
+     * @return return a metadataObject object.
+     */
+    public MetadataObject getNewMetadataObject() {
+      return this.newMetadataObject;
+    }
+
+    /**
+     * Compares this RenameMetadataObject instance with another object for equality. The comparison
+     * is based on the old metadata entity and new metadata entity.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same rename metadata entity; false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      RenameMetadataObject that = (RenameMetadataObject) o;
+      return metadataObject.equals(that.metadataObject)
+          && newMetadataObject.equals(that.newMetadataObject);
+    }
+
+    /**
+     * Generates a hash code for this RenameMetadataObject instance. The hash code is based on the
+     * old metadata entity and new metadata entity.
+     *
+     * @return A hash code value for this update metadata entity operation.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(metadataObject, newMetadataObject);
+    }
+
+    /**
+     * Returns a string representation of the RenameMetadataObject instance. This string format
+     * includes the class name followed by the update metadata entity object operation.
+     *
+     * @return A string representation of the RenameMetadataObject instance.
+     */
+    @Override
+    public String toString() {
+      return "RENAMEMETADATAOBJECT " + metadataObject + " " + newMetadataObject;
     }
   }
 }
