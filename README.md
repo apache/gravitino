@@ -43,11 +43,11 @@ Gravitino aims to provide several key features:
 
 ## Contributing to Apache Gravitino
 
-Gravitino is open source software available under the Apache 2.0 license. For information on how to contribute to Gravitino, please see the [Contribution guidelines](CONTRIBUTING.md).
+Gravitino is open source software available under the Apache 2.0 license. For information on how to contribute to Gravitino, please see the [Contribution guidelines](https://gravitino.apache.org/contrib/).
 
 ## Online documentation
 
-The latest Gravitino documentation is available on our [documentation website](https://datastrato.ai/docs/0.4.0/). This README file only contains basic setup instructions.
+The latest Gravitino documentation is available on our [official website](https://gravitino.apache.org/docs/latest/). This README file only contains basic setup instructions.
 
 ## Building Apache Gravitino
 
@@ -77,7 +77,7 @@ to build a compressed distribution package.
 
 The directory `distribution` contains the generated binary distribution package.
 
-Please see [How to build Gravitino](docs/how-to-build.md) for details on building and testing Gravitino.
+Please see [How to build Gravitino](https://gravitino.apache.org/docs/latest/how-to-build/) for details on building and testing Gravitino.
 
 ## Quick start
 
@@ -110,17 +110,17 @@ And press `CTRL+C` to stop the Gravitino server.
 
 ### Gravitino Iceberg REST catalog service
 
-Gravitino provides Iceberg REST catalog service to manage Iceberg. For more details, please refer to [Gravitino Iceberg REST catalog service](docs/iceberg-rest-service.md).
+Gravitino provides Iceberg REST catalog service to manage Iceberg. For more details, please refer to [Gravitino Iceberg REST catalog service](https://gravitino.apache.org/docs/latest/iceberg-rest-service/).
 
 ### Using Trino with Apache Gravitino
 
-Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](docs/trino-connector/index.md).
+Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](https://gravitino.apache.org/docs/latest/trino-connector/index/).
 
 ## Development guide
 
-1. [How to build Gravitino](docs/how-to-build.md)
-2. [How to test Gravitino](docs/how-to-test.md)
-3. [How to publish Docker images](docs/publish-docker-images.md)
+1. [How to build Gravitino](https://gravitino.apache.org/docs/latest/how-to-build/)
+2. [How to test Gravitino](https://gravitino.apache.org/docs/latest/how-to-test/)
+3. [How to publish Docker images](https://gravitino.apache.org/docs/latest/publish-docker-images)
 
 ## License
 
