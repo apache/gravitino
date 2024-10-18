@@ -55,7 +55,7 @@ public class RangerHelper {
   /** The owner privileges, the owner can do anything on the metadata object */
   private final Set<RangerPrivilege> ownerPrivileges;
   /** The policy search keys */
-  private final List<String> policyResourceDefines;
+  protected final List<String> policyResourceDefines;
 
   private final RangerClient rangerClient;
   private final String rangerAdminName;
@@ -395,7 +395,7 @@ public class RangerHelper {
             });
   }
 
-  private static List<String> getMetadataObjectNames(MetadataObject metadataObject) {
+  protected static List<String> getMetadataObjectNames(MetadataObject metadataObject) {
     List<String> nsMetadataObject =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
     if (nsMetadataObject.size() > 4) {
@@ -412,7 +412,6 @@ public class RangerHelper {
     policy.setPolicyLabels(Lists.newArrayList(RangerHelper.MANAGED_BY_GRAVITINO));
 
     List<String> nsMetadataObject = getMetadataObjectNames(metadataObject);
-
     for (int i = 0; i < nsMetadataObject.size(); i++) {
       RangerPolicy.RangerPolicyResource policyResource =
           new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
