@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -499,8 +500,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withCreateTime(Instant.now())
             .build();
     List<ColumnEntity> columnEntityList =
-        Arrays.stream(columns)
-            .map(c -> ColumnEntity.toColumnEntity(c, idGenerator.nextId(), audit))
+        IntStream.range(0, columns.length)
+            .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
             .collect(Collectors.toList());
 
     TableEntity tableEntity =
@@ -531,13 +532,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   private List<ColumnEntity> toColumnEntities(Column[] columns, AuditInfo audit) {
     return columns == null
         ? Collections.emptyList()
-        : Arrays.stream(columns)
-            .map(c -> ColumnEntity.toColumnEntity(c, idGenerator.nextId(), audit))
+        : IntStream.range(0, columns.length)
+            .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
             .collect(Collectors.toList());
   }
 
-  private boolean isSameColumn(Column left, ColumnEntity right) {
+  private boolean isSameColumn(Column left, int columnPosition, ColumnEntity right) {
     return Objects.equal(left.name(), right.name())
+        && columnPosition == right.position()
         && Objects.equal(left.dataType(), right.dataType())
         && Objects.equal(left.comment(), right.comment())
         && left.nullable() == right.nullable()
@@ -554,11 +556,12 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       return Pair.of(false, Collections.emptyList());
     }
 
-    Map<String, Column> columnsFromCatalogTable =
+    Map<String, Pair<Integer, Column>> columnsFromCatalogTable =
         tableFromCatalog.columns() == null
             ? Collections.emptyMap()
-            : Arrays.stream(tableFromCatalog.columns())
-                .collect(Collectors.toMap(Column::name, Function.identity()));
+            : IntStream.range(0, tableFromCatalog.columns().length)
+                .mapToObj(i -> Pair.of(i, tableFromCatalog.columns()[i]))
+                .collect(Collectors.toMap(p -> p.getRight().name(), Function.identity()));
     Map<String, ColumnEntity> columnsFromTableEntity =
         tableFromGravitino.columns() == null
             ? Collections.emptyMap()
@@ -569,25 +572,27 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     List<ColumnEntity> columnsToInsert = Lists.newArrayList();
     boolean columnsNeedsUpdate = false;
     for (Map.Entry<String, ColumnEntity> entry : columnsFromTableEntity.entrySet()) {
-      Column column = columnsFromCatalogTable.get(entry.getKey());
-      if (column == null) {
+      Pair<Integer, Column> columnPair = columnsFromCatalogTable.get(entry.getKey());
+      if (columnPair == null) {
         LOG.debug(
             "Column {} is not found in the table from underlying source, it will be removed"
                 + " from the table entity",
             entry.getKey());
         columnsNeedsUpdate = true;
 
-      } else if (!isSameColumn(column, entry.getValue())) {
+      } else if (!isSameColumn(columnPair.getRight(), columnPair.getLeft(), entry.getValue())) {
         // If the column need to be updated, we create a new ColumnEntity with the same id
         LOG.debug(
             "Column {} is found in the table from underlying source, but it is different "
                 + "from the one in the table entity, it will be updated",
             entry.getKey());
 
+        Column column = columnPair.getRight();
         ColumnEntity updatedColumnEntity =
             ColumnEntity.builder()
                 .withId(entry.getValue().id())
                 .withName(column.name())
+                .withPosition(columnPair.getLeft())
                 .withDataType(column.dataType())
                 .withComment(column.comment())
                 .withNullable(column.nullable())
@@ -612,7 +617,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     }
 
     // Check if there are new columns in the table from the underlying source
-    for (Map.Entry<String, Column> entry : columnsFromCatalogTable.entrySet()) {
+    for (Map.Entry<String, Pair<Integer, Column>> entry : columnsFromCatalogTable.entrySet()) {
       if (!columnsFromTableEntity.containsKey(entry.getKey())) {
         LOG.debug(
             "Column {} is found in the table from underlying source but not in the table "
@@ -620,7 +625,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             entry.getKey());
         ColumnEntity newColumnEntity =
             ColumnEntity.toColumnEntity(
-                entry.getValue(),
+                entry.getValue().getRight(),
+                entry.getValue().getLeft(),
                 idGenerator.nextId(),
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())

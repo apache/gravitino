@@ -75,8 +75,16 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "tableNAME");
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("colNAME2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("colNAME1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("colNAME2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
     RangePartition assignedPartition =
         Partitions.range(
@@ -143,8 +151,16 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         NameIdentifier.of(tableNs, MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("colNAME2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("colNAME1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("colNAME2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
     Exception exception =
         Assertions.assertThrows(
@@ -166,6 +182,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)
+              .withPosition(0)
               .withType(Types.StringType.get())
               .build()
         };

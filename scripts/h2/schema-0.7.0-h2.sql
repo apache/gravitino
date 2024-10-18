@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `table_version` INT UNSIGNED NOT NULL COMMENT 'table version',
     `column_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'column id',
     `column_name` VARCHAR(128) NOT NULL COMMENT 'column name',
+    `column_position` INT UNSIGNED NOT NULL COMMENT 'column position',
     `column_type` TEXT NOT NULL COMMENT 'column type',
     `column_comment` VARCHAR(256) DEFAULT '' COMMENT 'column comment',
     `column_nullable` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'column nullable, 0 is not nullable, 1 is nullable',

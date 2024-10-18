@@ -452,6 +452,7 @@ public class POConverters {
       return ColumnEntity.builder()
           .withId(columnPO.getColumnId())
           .withName(columnPO.getColumnName())
+          .withPosition(columnPO.getColumnPosition())
           .withDataType(JsonUtils.anyFieldMapper().readValue(columnPO.getColumnType(), Type.class))
           .withComment(columnPO.getColumnComment())
           .withAutoIncrement(
@@ -482,6 +483,7 @@ public class POConverters {
       return ColumnPO.builder()
           .withColumnId(columnEntity.id())
           .withColumnName(columnEntity.name())
+          .withColumnPosition(columnEntity.position())
           .withMetalakeId(tablePO.getMetalakeId())
           .withCatalogId(tablePO.getCatalogId())
           .withSchemaId(tablePO.getSchemaId())
