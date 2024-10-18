@@ -16,23 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.server.web.rest;
+package org.apache.gravitino.exceptions;
 
-public enum OperationType {
-  LIST,
-  CREATE,
-  LOAD,
-  ALTER,
-  DROP,
-  ENABLE,
-  DISABLE,
-  /** This is a special operation type that is used to get a partition from a table. */
-  GET,
-  ADD,
-  REMOVE,
-  DELETE,
-  GRANT,
-  REVOKE,
-  ASSOCIATE,
-  SET,
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
+/** An exception thrown when operating on a catalog that is not in use. */
+public class CatalogNotInUseException extends NotInUseException {
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public CatalogNotInUseException(@FormatString String message, Object... args) {
+    super(message, args);
+  }
 }
