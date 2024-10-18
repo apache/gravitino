@@ -97,12 +97,20 @@ class InUseException(GravitinoRuntimeException):
     """Base class for all exceptions thrown when an entity is in use and cannot be deleted."""
 
 
+class MetalakeInUseException(InUseException):
+    """An exception thrown when a metalake is in use and cannot be deleted."""
+
+
 class CatalogInUseException(InUseException):
     """An Exception thrown when a catalog is in use and cannot be deleted."""
 
 
 class NotInUseException(GravitinoRuntimeException):
     """Base class for all exceptions thrown when an entity is not in use."""
+
+
+class MetalakeNotInUseException(NotInUseException):
+    """An exception thrown when operating on not in use metalake."""
 
 
 class CatalogNotInUseException(NotInUseException):

@@ -47,7 +47,7 @@ export const createMetalakeApi = data => {
 
 export const deleteMetalakeApi = name => {
   return defHttp.delete({
-    url: `${Apis.DELETE}/${name}`
+    url: `${Apis.DELETE}/${name}?force=true`
   })
 }
 

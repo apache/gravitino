@@ -173,6 +173,7 @@ public class TestMetalakeManager {
     Assertions.assertEquals("comment", metalake.comment());
     testProperties(props, metalake.properties());
 
+    metalakeManager.disableMetalake(ident);
     boolean dropped = metalakeManager.dropMetalake(ident);
     Assertions.assertTrue(dropped, "metalake should be dropped");
 

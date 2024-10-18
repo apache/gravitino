@@ -37,6 +37,8 @@ import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -279,6 +281,11 @@ public class ErrorHandlers {
           if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
             throw new CatalogNotInUseException(errorMessage);
 
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
           } else {
             throw new NotInUseException(errorMessage);
           }
@@ -327,6 +334,11 @@ public class ErrorHandlers {
           if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
             throw new CatalogNotInUseException(errorMessage);
 
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
           } else {
             throw new NotInUseException(errorMessage);
           }
@@ -374,6 +386,11 @@ public class ErrorHandlers {
         case ErrorConstants.NOT_IN_USE_CODE:
           if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
             throw new CatalogNotInUseException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
 
           } else {
             throw new NotInUseException(errorMessage);
@@ -426,6 +443,9 @@ public class ErrorHandlers {
           if (errorResponse.getType().equals(CatalogInUseException.class.getSimpleName())) {
             throw new CatalogInUseException(errorMessage);
 
+          } else if (errorResponse.getType().equals(MetalakeInUseException.class.getSimpleName())) {
+            throw new MetalakeInUseException(errorMessage);
+
           } else {
             throw new InUseException(errorMessage);
           }
@@ -433,6 +453,11 @@ public class ErrorHandlers {
         case ErrorConstants.NOT_IN_USE_CODE:
           if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
             throw new CatalogNotInUseException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
 
           } else {
             throw new NotInUseException(errorMessage);
@@ -465,6 +490,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.IN_USE_CODE:
+          throw new MetalakeInUseException(errorMessage);
 
         default:
           super.accept(errorResponse);
@@ -560,6 +588,11 @@ public class ErrorHandlers {
           if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
             throw new CatalogNotInUseException(errorMessage);
 
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
           } else {
             throw new NotInUseException(errorMessage);
           }
@@ -606,6 +639,11 @@ public class ErrorHandlers {
           if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
             throw new CatalogNotInUseException(errorMessage);
 
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
           } else {
             throw new NotInUseException(errorMessage);
           }
@@ -645,6 +683,9 @@ public class ErrorHandlers {
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
 
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -682,6 +723,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -732,6 +776,9 @@ public class ErrorHandlers {
         case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
 
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -780,6 +827,9 @@ public class ErrorHandlers {
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
 
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -823,6 +873,9 @@ public class ErrorHandlers {
             throw new AlreadyExistsException(errorMessage);
           }
 
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -855,6 +908,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);

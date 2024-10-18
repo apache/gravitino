@@ -156,7 +156,7 @@ public class TrinoQueryITBase {
     if (!exists) {
       return;
     }
-    gravitinoClient.dropMetalake(metalakeName);
+    gravitinoClient.dropMetalake(metalakeName, true);
   }
 
   private static void createCatalog(

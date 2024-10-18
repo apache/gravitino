@@ -88,7 +88,7 @@ public class HadoopCatalogIT extends BaseIT {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName, true);
-    client.dropMetalake(metalakeName);
+    client.dropMetalake(metalakeName, true);
     if (fileSystem != null) {
       fileSystem.close();
     }
@@ -104,10 +104,9 @@ public class HadoopCatalogIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }

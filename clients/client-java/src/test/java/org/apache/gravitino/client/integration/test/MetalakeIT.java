@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client.integration.test;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -182,6 +183,7 @@ public class MetalakeIT extends BaseIT {
   public void testDropMetalakes() {
     GravitinoMetalake metalakeA =
         client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
+    assertDoesNotThrow(() -> client.disableMetalake(metalakeA.name()));
     assertTrue(client.dropMetalake(metalakeA.name()), "metaLake should be dropped");
     NameIdentifier id = NameIdentifier.of(metalakeNameA);
     assertThrows(
@@ -205,12 +207,13 @@ public class MetalakeIT extends BaseIT {
         new MetalakeChange[] {MetalakeChange.updateComment("new metalake comment")};
     GravitinoMetalake updatedMetalake = client.alterMetalake(metalakeNameA, changes);
     assertEquals("new metalake comment", updatedMetalake.comment());
-    client.dropMetalake(metalakeNameA);
+    assertTrue(client.dropMetalake(metalakeNameA, true));
   }
 
   public void dropMetalakes() {
     GravitinoMetalake[] metaLakes = client.listMetalakes();
     for (GravitinoMetalake metalake : metaLakes) {
+      assertDoesNotThrow(() -> client.disableMetalake(metalake.name()));
       assertTrue(client.dropMetalake(metalake.name()));
     }
 

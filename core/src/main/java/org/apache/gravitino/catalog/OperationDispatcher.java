@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
-import static org.apache.gravitino.catalog.CatalogManager.catalogInUse;
+import static org.apache.gravitino.catalog.CatalogManager.checkCatalogInUse;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
@@ -35,7 +35,6 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
@@ -94,9 +93,7 @@ public abstract class OperationDispatcher {
   protected <R, E extends Throwable> R doWithCatalog(
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
-    if (!catalogInUse(store, ident)) {
-      throw new CatalogNotInUseException("Catalog %s is not in use, please enable it first", ident);
-    }
+    checkCatalogInUse(store, ident);
 
     try {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
@@ -118,9 +115,7 @@ public abstract class OperationDispatcher {
       Class<E1> ex1,
       Class<E2> ex2)
       throws E1, E2 {
-    if (!catalogInUse(store, ident)) {
-      throw new CatalogNotInUseException("Catalog %s is not in use, please enable it first", ident);
-    }
+    checkCatalogInUse(store, ident);
 
     try {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);

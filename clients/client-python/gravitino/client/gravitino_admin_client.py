@@ -22,6 +22,7 @@ from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.requests.metalake_create_request import MetalakeCreateRequest
+from gravitino.dto.requests.metalake_set_request import MetalakeSetRequest
 from gravitino.dto.requests.metalake_updates_request import MetalakeUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.metalake_list_response import MetalakeListResponse
@@ -112,20 +113,59 @@ class GravitinoAdminClient(GravitinoClientBase):
 
         return GravitinoMetalake(metalake, self._rest_client)
 
-    def drop_metalake(self, name: str) -> bool:
+    def drop_metalake(self, name: str, force: bool = False) -> bool:
         """Drops a specific Metalake using the Gravitino API.
 
         Args:
             name: The name of the Metalake to be dropped.
+            force: Whether to force the drop operation.
 
         Returns:
-            True if the Metalake was successfully dropped, false otherwise.
+            True if the Metalake was successfully dropped, false if the Metalake does not exist.
         """
 
+        params = {"force": str(force)}
         resp = self._rest_client.delete(
             self.API_METALAKES_IDENTIFIER_PATH + name,
+            params=params,
             error_handler=METALAKE_ERROR_HANDLER,
         )
         drop_response = DropResponse.from_json(resp.body, infer_missing=True)
 
         return drop_response.dropped()
+
+    def enable_metalake(self, name: str):
+        """Enable the metalake with specified name. If the metalake is already in use, this method does nothing.
+
+        Args:
+            name: the name of the metalake.
+
+        Raises:
+            NoSuchMetalakeException if the metalake with specified name does not exist.
+        """
+
+        metalake_enable_request = MetalakeSetRequest(in_use=True)
+        metalake_enable_request.validate()
+
+        url = self.API_METALAKES_IDENTIFIER_PATH + name
+        self._rest_client.patch(
+            url, json=metalake_enable_request, error_handler=METALAKE_ERROR_HANDLER
+        )
+
+    def disable_metalake(self, name: str):
+        """Disable the metalake with specified name. If the metalake is already disabled, does nothing.
+
+        Args:
+            name: the name of the metalake.
+
+        Raises:
+            NoSuchMetalakeException if the metalake with specified name does not exist.
+        """
+
+        metalake_disable_request = MetalakeSetRequest(in_use=False)
+        metalake_disable_request.validate()
+
+        url = self.API_METALAKES_IDENTIFIER_PATH + name
+        self._rest_client.patch(
+            url, json=metalake_disable_request, error_handler=METALAKE_ERROR_HANDLER
+        )
