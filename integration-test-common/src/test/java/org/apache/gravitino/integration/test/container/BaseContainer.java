@@ -18,22 +18,15 @@
  */
 package org.apache.gravitino.integration.test.container;
 
-import static java.util.Objects.requireNonNull;
-import static org.testcontainers.utility.MountableFile.forHostPath;
-
-import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.command.InspectContainerResponse;
-import com.github.dockerjava.api.model.ContainerNetwork;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
+import static java.util.Objects.requireNonNull;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.DockerClientFactory;
@@ -43,6 +36,15 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.output.OutputFrame;
 import org.testcontainers.containers.startupcheck.IsRunningStartupCheckStrategy;
 import org.testcontainers.containers.wait.strategy.Wait;
+import static org.testcontainers.utility.MountableFile.forHostPath;
+
+import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.InspectContainerResponse;
+import com.github.dockerjava.api.model.ContainerNetwork;
+import com.github.dockerjava.api.model.Ulimit;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 /**
  * The BaseContainer is the base for all containers. It's contains the common methods and settings
@@ -80,7 +82,8 @@ public abstract class BaseContainer implements AutoCloseable {
                     cmd.getHostConfig()
                         .withSysctls(
                             Collections.singletonMap(
-                                "net.ipv4.ip_local_port_range", "20000 40000")));
+                                "net.ipv4.ip_local_port_range", "20000 40000"))
+                        .withUlimits(new Ulimit[] {new Ulimit("nproc", 120000L, 120000L)}));
     this.ports = requireNonNull(ports, "ports is null");
     this.hostName = requireNonNull(hostName, "hostName is null");
     this.extraHosts = extraHosts;
