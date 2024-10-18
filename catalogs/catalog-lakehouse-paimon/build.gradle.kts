@@ -71,6 +71,15 @@ dependencies {
     exclude("org.apache.paimon:paimon-shade-caffeine-2")
     exclude("org.apache.paimon:paimon-shade-guava-30")
   }
+  implementation(libs.hive2.metastore) {
+    exclude("*")
+  }
+  implementation(libs.hive2.exec) {
+    exclude("*")
+  }
+  implementation(libs.hive2.common) {
+    exclude("*")
+  }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
