@@ -35,3 +35,4 @@ class GVFSConfig:
 
     GVFS_FILESYSTEM_BY_PASS = "gravitino.bypass"
     GVFS_FILESYSTEM_BY_PASS_GCS = "gravitino.bypass.gcs."
+    GVFS_FILESYSTEM_KEY_FILE = "service-account-key-path"

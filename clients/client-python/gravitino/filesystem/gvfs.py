@@ -814,7 +814,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         }
 
         # get 'service-account-key' from gcs_options, if the key is not found, throw an exception
-        service_account_key_path = gcs_options.get("service-account-key-path")
+        service_account_key_path = gcs_options.get(GVFSConfig.GVFS_FILESYSTEM_KEY_FILE)
         if service_account_key_path is None:
             raise GravitinoRuntimeException(
                 "Service account key is not found in the options."
