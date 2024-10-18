@@ -195,7 +195,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             logger.info(
                 "Drop catalog %s[%s]",
                 cls.catalog_name,
-                cls.gravitino_client.drop_catalog(name=cls.catalog_name),
+                cls.gravitino_client.drop_catalog(name=cls.catalog_name, force=True),
             )
         except GravitinoRuntimeException:
             logger.warning("Failed to drop catalog %s", cls.catalog_name)

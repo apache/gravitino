@@ -92,7 +92,7 @@ class TestCommonAuth:
             logger.info(
                 "Drop catalog %s[%s]",
                 self.catalog_ident,
-                self.gravitino_client.drop_catalog(name=self.catalog_name),
+                self.gravitino_client.drop_catalog(name=self.catalog_name, force=True),
             )
         except GravitinoRuntimeException:
             logger.warning("Failed to drop catalog %s", self.catalog_name)
