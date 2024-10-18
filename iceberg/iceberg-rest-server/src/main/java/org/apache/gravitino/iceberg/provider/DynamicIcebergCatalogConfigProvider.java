@@ -40,13 +40,13 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The catalogName is iceberg_catalog
  */
-public class GravitinoBasedIcebergCatalogConfigProvider
+public class DynamicIcebergCatalogConfigProvider
     implements IcebergCatalogConfigProvider, AutoCloseable {
   public static final Logger LOG =
-      LoggerFactory.getLogger(GravitinoBasedIcebergCatalogConfigProvider.class);
+      LoggerFactory.getLogger(DynamicIcebergCatalogConfigProvider.class);
 
-  public static final String GRAVITINO_BASE_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME =
-      "gravitino-based-provider";
+  public static final String DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME =
+      "dynamic-config-provider";
 
   private String gravitinoMetalake;
 

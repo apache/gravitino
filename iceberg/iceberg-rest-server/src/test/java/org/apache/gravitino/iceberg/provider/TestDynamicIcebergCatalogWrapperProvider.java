@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestGravitinoBasedIcebergCatalogWrapperProvider {
+public class TestDynamicIcebergCatalogWrapperProvider {
   @Test
   public void testValidIcebergTableOps() {
     String hiveCatalogName = "hive_backend";
@@ -71,8 +71,8 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
               }
             });
 
-    GravitinoBasedIcebergCatalogConfigProvider provider =
-        new GravitinoBasedIcebergCatalogConfigProvider();
+    DynamicIcebergCatalogConfigProvider provider =
+        new DynamicIcebergCatalogConfigProvider();
     GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
     provider.setClient(client);
@@ -103,8 +103,8 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
     GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
 
-    GravitinoBasedIcebergCatalogConfigProvider provider =
-        new GravitinoBasedIcebergCatalogConfigProvider();
+    DynamicIcebergCatalogConfigProvider provider =
+        new DynamicIcebergCatalogConfigProvider();
     provider.setClient(client);
 
     Assertions.assertThrowsExactly(

@@ -26,7 +26,7 @@ import java.util.logging.Logger;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergCatalogConfigProvider;
+import org.apache.gravitino.iceberg.provider.StaticIcebergCatalogConfigProvider;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
@@ -80,7 +80,7 @@ public class IcebergRestTestUtil {
       String catalogConfigPrefix = "catalog." + PREFIX;
       catalogConf.put(
           IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-          ConfigBasedIcebergCatalogConfigProvider.class.getName());
+          StaticIcebergCatalogConfigProvider.class.getName());
       catalogConf.put(String.format("%s.catalog-backend-name", catalogConfigPrefix), PREFIX);
       catalogConf.put(
           CredentialConstants.CREDENTIAL_PROVIDER_TYPE,

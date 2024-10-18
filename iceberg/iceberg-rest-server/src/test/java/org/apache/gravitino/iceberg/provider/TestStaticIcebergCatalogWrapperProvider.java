@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-public class TestConfigBasedIcebergCatalogWrapperProvider {
+public class TestStaticIcebergCatalogWrapperProvider {
 
   @Test
   public void testValidIcebergTableOps() {
@@ -60,8 +60,8 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
     config.put("catalog-backend", "memory");
     config.put("warehouse", "/tmp/");
 
-    ConfigBasedIcebergCatalogConfigProvider provider =
-        new ConfigBasedIcebergCatalogConfigProvider();
+    StaticIcebergCatalogConfigProvider provider =
+        new StaticIcebergCatalogConfigProvider();
     provider.initialize(config);
 
     IcebergConfig hiveIcebergConfig = provider.catalogConfigs.get(hiveCatalogName);
@@ -107,8 +107,8 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
   @ParameterizedTest
   @ValueSource(strings = {"", "not_match"})
   public void testInvalidIcebergTableOps(String catalogName) {
-    ConfigBasedIcebergCatalogConfigProvider provider =
-        new ConfigBasedIcebergCatalogConfigProvider();
+    StaticIcebergCatalogConfigProvider provider =
+        new StaticIcebergCatalogConfigProvider();
     provider.initialize(Maps.newHashMap());
 
     Optional<IcebergConfig> config = provider.getIcebergCatalogConfig(catalogName);
