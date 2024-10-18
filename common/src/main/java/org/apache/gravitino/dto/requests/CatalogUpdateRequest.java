@@ -124,9 +124,7 @@ public interface CatalogUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(newComment),
-          "\"newComment\" field is required and cannot be empty");
+      return;
     }
 
     @Override
