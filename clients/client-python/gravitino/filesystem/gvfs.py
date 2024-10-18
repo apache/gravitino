@@ -28,10 +28,6 @@ from fsspec.implementations.local import LocalFileSystem
 from fsspec.implementations.arrow import ArrowFSWrapper
 from fsspec.utils import infer_storage_options
 
-
-# from pyarrow.fs import HadoopFileSystem
-# from pyarrow.fs import GcsFileSystem
-
 from readerwriterlock import rwlock
 from gravitino.audit.caller_context import CallerContext, CallerContextHolder
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
