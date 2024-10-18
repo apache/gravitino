@@ -76,6 +76,7 @@ const TableView = () => {
   const metalake = searchParams.get('metalake') || ''
   const catalog = searchParams.get('catalog') || ''
   const type = searchParams.get('type') || ''
+
   const isKafkaSchema =
     paramsSize == 3 &&
     searchParams.has('metalake') &&
