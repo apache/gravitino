@@ -23,6 +23,8 @@ import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.audit.FileAuditWriter;
+import org.apache.gravitino.audit.SimpleFormatter;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -353,16 +355,16 @@ public class Configs {
           .createWithDefault(false);
 
   public static final ConfigEntry<String> AUDIT_LOG_WRITER_CLASS_NAME =
-      new ConfigBuilder("gravitino.audit.writer.class")
+      new ConfigBuilder("gravitino.audit.writer.className")
           .doc("Gravitino audit log writer class name")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
-          .createWithDefault("org.apache.gravitino.audit.FileAuditWriter");
+          .createWithDefault(FileAuditWriter.class.getName());
 
   public static final ConfigEntry<String> AUDIT_LOG_FORMATTER_CLASS_NAME =
-      new ConfigBuilder("gravitino.audit.formatter.class")
+      new ConfigBuilder("gravitino.audit.formatter.className")
           .doc("Gravitino event log formatter class name")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
-          .createWithDefault("org.apache.gravitino.audit.SimpleFormatter");
+          .createWithDefault(SimpleFormatter.class.getName());
 }

@@ -66,7 +66,7 @@ public class SimpleAuditLog implements AuditLog {
   @Override
   public String toString() {
     return String.format(
-        "[%s] \"%s\" \"%s\" \"%s\" %s",
+        "[%s]\t%s\t%s\t%s\t%s",
         new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(timestamp),
         user,
         operation,
