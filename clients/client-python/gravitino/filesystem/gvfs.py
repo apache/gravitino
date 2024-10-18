@@ -19,11 +19,10 @@ from enum import Enum
 from pathlib import PurePosixPath
 from typing import Dict, Tuple
 import re
+import importlib
 import fsspec
 
-
 from cachetools import TTLCache, LRUCache
-import importlib
 from fsspec import AbstractFileSystem
 from fsspec.implementations.local import LocalFileSystem
 from fsspec.implementations.arrow import ArrowFSWrapper
