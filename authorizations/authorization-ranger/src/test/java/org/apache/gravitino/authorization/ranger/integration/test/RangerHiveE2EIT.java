@@ -47,8 +47,6 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationHivePlugin;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
@@ -74,7 +72,6 @@ import org.slf4j.LoggerFactory;
 public class RangerHiveE2EIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveE2EIT.class);
 
-  private static RangerAuthorizationPlugin rangerAuthPlugin;
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("RangerHiveE2EIT_metalake").toLowerCase();
   public static final String catalogName =
@@ -109,7 +106,7 @@ public class RangerHiveE2EIT extends BaseIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
-    RangerITEnv.setup();
+    RangerITEnv.init();
     RangerITEnv.startHiveRangerContainer();
 
     RANGER_ADMIN_URL =
@@ -145,7 +142,7 @@ public class RangerHiveE2EIT extends BaseIT {
             .getOrCreate();
 
     createMetalake();
-    createCatalogAndRangerAuthPlugin();
+    createCatalog();
   }
 
   private static void generateRangerSparkSecurityXML() throws IOException {
@@ -180,8 +177,8 @@ public class RangerHiveE2EIT extends BaseIT {
   }
 
   @AfterAll
-  public void stop() throws IOException {
-    client = null;
+  public void stop() {
+    RangerITEnv.cleanup();
     if (client != null) {
       Arrays.stream(catalog.asSchemas().listSchemas())
           .filter(schema -> !schema.equals("default"))
@@ -221,8 +218,8 @@ public class RangerHiveE2EIT extends BaseIT {
     // Create a role with CREATE_SCHEMA privilege
     SecurableObject securableObject1 =
         SecurableObjects.parse(
-            String.format("%s.%s", catalogName, schemaName),
-            MetadataObject.Type.SCHEMA,
+            String.format("%s", catalogName),
+            MetadataObject.Type.CATALOG,
             Lists.newArrayList(Privileges.CreateSchema.allow()));
     RoleEntity role =
         RoleEntity.builder()
@@ -231,7 +228,7 @@ public class RangerHiveE2EIT extends BaseIT {
             .withAuditInfo(auditInfo)
             .withSecurableObjects(Lists.newArrayList(securableObject1))
             .build();
-    rangerAuthPlugin.onRoleCreated(role);
+    RangerITEnv.rangerAuthHivePlugin.onRoleCreated(role);
 
     // Granted this role to the spark execution user `HADOOP_USER_NAME`
     String userName1 = System.getenv(HADOOP_USER_NAME);
@@ -244,7 +241,8 @@ public class RangerHiveE2EIT extends BaseIT {
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(
-        rangerAuthPlugin.onGrantedRolesToUser(Lists.newArrayList(role), userEntity1));
+        RangerITEnv.rangerAuthHivePlugin.onGrantedRolesToUser(
+            Lists.newArrayList(role), userEntity1));
 
     // After Ranger Authorization, Must wait a period of time for the Ranger Spark plugin to update
     // the policy Sleep time must be greater than the policy update interval
@@ -277,21 +275,7 @@ public class RangerHiveE2EIT extends BaseIT {
     metalake = loadMetalake;
   }
 
-  private static void createCatalogAndRangerAuthPlugin() {
-    rangerAuthPlugin =
-        RangerAuthorizationHivePlugin.getInstance(
-            ImmutableMap.of(
-                AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
-                RANGER_ADMIN_URL,
-                RANGER_AUTH_TYPE,
-                RangerContainer.authType,
-                RANGER_USERNAME,
-                RangerContainer.rangerUserName,
-                RANGER_PASSWORD,
-                RangerContainer.rangerPassword,
-                RANGER_SERVICE_NAME,
-                RangerITEnv.RANGER_HIVE_REPO_NAME));
-
+  private static void createCatalog() {
     Map<String, String> properties =
         ImmutableMap.of(
             HiveConstants.METASTORE_URIS,

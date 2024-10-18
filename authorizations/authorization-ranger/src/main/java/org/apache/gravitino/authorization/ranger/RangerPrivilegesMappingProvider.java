@@ -21,7 +21,9 @@ package org.apache.gravitino.authorization.ranger;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.SecurableObject;
 
 /**
  * Ranger authorization use this provider to mapping Gravitino privilege to the Ranger privileges.
@@ -37,4 +39,13 @@ public interface RangerPrivilegesMappingProvider {
 
   /** Set the policy resource defines rule. */
   List<String> policyResourceDefinesRule();
+
+  /** Allow privilege operation defines rule. */
+  Set<Privilege.Name> allowPrivilegesRule();
+
+  /** Translate the Gravitino securable object to the Ranger securable object. */
+  List<RangerSecurableObject> translatePrivilege(SecurableObject securableObject);
+
+  /** Translate the Gravitino securable object to the Ranger owner securable object. */
+  List<RangerSecurableObject> translateOwner(MetadataObject metadataObject);
 }

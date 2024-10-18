@@ -18,18 +18,111 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.List;
+import org.apache.gravitino.authorization.Privilege;
 
 public class RangerPrivileges {
+  /** Ranger Hive privileges enumeration. */
+  public enum RangerHivePrivilege implements RangerPrivilege {
+    ALL("all"),
+    SELECT("select"),
+    UPDATE("update"),
+    CREATE("create"),
+    DROP("drop"),
+    ALTER("alter"),
+    INDEX("index"),
+    LOCK("lock"),
+    READ("read"),
+    WRITE("write"),
+    REPLADMIN("repladmin"),
+    SERVICEADMIN("serviceadmin");
+
+    private final String name; // Access a type in the Ranger policy item
+
+    RangerHivePrivilege(String name) {
+      this.name = name;
+    }
+
+    @Override
+    public String getName() {
+      return name;
+    }
+
+    @Override
+    public Privilege.Condition condition() {
+      return null;
+    }
+
+    @Override
+    public boolean equalsTo(String value) {
+      return name.equalsIgnoreCase(value);
+    }
+  }
+
+  public static class RangerHivePrivilegeImpl implements RangerPrivilege {
+    private RangerPrivilege rangerHivePrivilege;
+    private Privilege.Condition condition;
+
+    public RangerHivePrivilegeImpl(
+        RangerPrivilege rangerHivePrivilege, Privilege.Condition condition) {
+      this.rangerHivePrivilege = rangerHivePrivilege;
+      this.condition = condition;
+    }
+
+    @Override
+    public String getName() {
+      return rangerHivePrivilege.getName();
+    }
+
+    @Override
+    public Privilege.Condition condition() {
+      return condition;
+    }
+
+    @Override
+    public boolean equalsTo(String value) {
+      return rangerHivePrivilege.equalsTo(value);
+    }
+  }
+
+  /** Ranger HDFS privileges enumeration. */
+  public enum RangerHdfsPrivilege implements RangerPrivilege {
+    READ("read"),
+    WRITE("write"),
+    EXECUTE("execute");
+
+    private final String name; // Access a type in the Ranger policy item
+
+    RangerHdfsPrivilege(String name) {
+      this.name = name;
+    }
+
+    @Override
+    public String getName() {
+      return name;
+    }
+
+    @Override
+    public Privilege.Condition condition() {
+      return null;
+    }
+
+    @Override
+    public boolean equalsTo(String value) {
+      return name.equalsIgnoreCase(value);
+    }
+  }
+
   static List<Class<? extends Enum<? extends RangerPrivilege>>> allRangerPrivileges =
       Lists.newArrayList(
-          RangerPrivilege.RangerHivePrivilege.class, RangerPrivilege.RangerHdfsPrivilege.class);
+          RangerPrivileges.RangerHivePrivilege.class, RangerPrivileges.RangerHdfsPrivilege.class);
 
-  public static RangerPrivilege valueOf(String string) {
-    RangerHelper.check(string != null, "Privilege name string cannot be null!");
+  public static RangerPrivilege valueOf(String name) {
+    Preconditions.checkArgument(name != null, "Privilege name string cannot be null!");
 
-    String strPrivilege = string.trim().toLowerCase();
+    String strPrivilege = name.trim().toLowerCase();
     for (Class<? extends Enum<? extends RangerPrivilege>> enumClass : allRangerPrivileges) {
       for (Enum<? extends RangerPrivilege> privilege : enumClass.getEnumConstants()) {
         if (((RangerPrivilege) privilege).equalsTo(strPrivilege)) {
@@ -37,6 +130,6 @@ public class RangerPrivileges {
         }
       }
     }
-    throw new IllegalArgumentException("Unknown privilege string: " + string);
+    throw new IllegalArgumentException("Unknown privilege name: " + name);
   }
 }
