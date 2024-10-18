@@ -21,13 +21,17 @@ from typing import Dict, Tuple
 import re
 import fsspec
 
+
 from cachetools import TTLCache, LRUCache
+import importlib
 from fsspec import AbstractFileSystem
 from fsspec.implementations.local import LocalFileSystem
 from fsspec.implementations.arrow import ArrowFSWrapper
 from fsspec.utils import infer_storage_options
-from pyarrow.fs import HadoopFileSystem
-from pyarrow.fs import GcsFileSystem
+
+
+# from pyarrow.fs import HadoopFileSystem
+# from pyarrow.fs import GcsFileSystem
 
 from readerwriterlock import rwlock
 from gravitino.audit.caller_context import CallerContext, CallerContextHolder
@@ -787,7 +791,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             if cache_value is not None:
                 return cache_value
             if storage_type == StorageType.HDFS:
-                fs = ArrowFSWrapper(HadoopFileSystem.from_uri(actual_file_location))
+                fs_class = importlib.import_module("pyarrow.fs").HadoopFileSystem
+                fs = ArrowFSWrapper(fs_class.from_uri(actual_file_location))
             elif storage_type == StorageType.LOCAL:
                 fs = LocalFileSystem()
             elif storage_type == StorageType.GCS:
@@ -816,7 +821,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 "Service account key is not found in the options."
             )
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
-        return GcsFileSystem()
+
+        return importlib.import_module("pyarrow.fs").GcsFileSystem()
 
 
 fsspec.register_implementation(PROTOCOL_NAME, GravitinoVirtualFileSystem)
