@@ -72,3 +72,5 @@ include("web:web", "web:integration-test")
 include("docs")
 include("integration-test-common")
 include(":bundles:gcp-bundle")
+include("bundles:aliyun-bundle")
+findProject(":bundles:aliyun-bundle")?.name = "aliyun-bundle"

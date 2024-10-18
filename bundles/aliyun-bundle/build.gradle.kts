@@ -27,19 +27,25 @@ plugins {
 dependencies {
   compileOnly(project(":catalogs:catalog-hadoop"))
   compileOnly(libs.hadoop3.common)
-  implementation(libs.hadoop3.gcs)
+  implementation(libs.hadoop3.oss)
+
+  // oss needs StringUtils from commons-lang or the following error will occur in 3.1.0
+  // java.lang.NoClassDefFoundError: org/apache/commons/lang/StringUtils
+  // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystemStore.initialize(AliyunOSSFileSystemStore.java:111)
+  // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem.initialize(AliyunOSSFileSystem.java:323)
+  // org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:3611)
+  implementation(libs.commons.lang)
 }
 
 tasks.withType(ShadowJar::class.java) {
   isZip64 = true
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
+  mergeServiceFiles()
 
   // Relocate dependencies to avoid conflicts
-  relocate("org.apache.httpcomponents", "org.apache.gravitino.shaded.org.apache.httpcomponents")
-  relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")
-  relocate("com.google.guava", "org.apache.gravitino.shaded.com.google.guava")
-  relocate("com.google.code", "org.apache.gravitino.shaded.com.google.code")
+  relocate("org.jdom", "org.apache.gravitino.shaded.org.jdom")
+  relocate("org.apache.commons.lang", "org.apache.gravitino.shaded.org.apache.commons.lang")
 }
 
 tasks.jar {
