@@ -66,12 +66,12 @@ public class GravitinoBasedIcebergCatalogWrapperProvider
   }
 
   @Override
-  public IcebergCatalogWrapper getIcebergTableOps(String catalogName) {
+  public IcebergCatalogWrapper getIcebergCatalogWrapper(String catalogName) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogName), "blank catalogName is illegal");
     Preconditions.checkArgument(
-        !IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(catalogName),
-        IcebergConstants.GRAVITINO_DEFAULT_CATALOG + " is illegal in gravitino-based-provider");
+        !IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG.equals(catalogName),
+        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG + " is illegal in gravitino-based-provider");
 
     Catalog catalog = client.loadMetalake(gravitinoMetalake).loadCatalog(catalogName);
 

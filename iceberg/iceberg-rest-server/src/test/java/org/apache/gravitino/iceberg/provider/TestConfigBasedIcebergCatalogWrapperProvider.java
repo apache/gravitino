@@ -36,7 +36,7 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
   public void testValidIcebergTableOps() {
     String hiveCatalogName = "hive_backend";
     String jdbcCatalogName = "jdbc_backend";
-    String defaultCatalogName = IcebergConstants.GRAVITINO_DEFAULT_CATALOG;
+    String defaultCatalogName = IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
 
     Map<String, String> config = Maps.newHashMap();
     // hive backend catalog
@@ -65,9 +65,9 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
     IcebergConfig hiveIcebergConfig = provider.catalogConfigs.get(hiveCatalogName);
     IcebergConfig jdbcIcebergConfig = provider.catalogConfigs.get(jdbcCatalogName);
     IcebergConfig defaultIcebergConfig = provider.catalogConfigs.get(defaultCatalogName);
-    IcebergCatalogWrapper hiveOps = provider.getIcebergTableOps(hiveCatalogName);
-    IcebergCatalogWrapper jdbcOps = provider.getIcebergTableOps(jdbcCatalogName);
-    IcebergCatalogWrapper defaultOps = provider.getIcebergTableOps(defaultCatalogName);
+    IcebergCatalogWrapper hiveOps = provider.getIcebergCatalogWrapper(hiveCatalogName);
+    IcebergCatalogWrapper jdbcOps = provider.getIcebergCatalogWrapper(jdbcCatalogName);
+    IcebergCatalogWrapper defaultOps = provider.getIcebergCatalogWrapper(defaultCatalogName);
 
     Assertions.assertEquals(
         hiveCatalogName, hiveIcebergConfig.get(IcebergConfig.CATALOG_BACKEND_NAME));
@@ -107,6 +107,6 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
     provider.initialize(Maps.newHashMap());
 
     Assertions.assertThrowsExactly(
-        RuntimeException.class, () -> provider.getIcebergTableOps(catalogName));
+        RuntimeException.class, () -> provider.getIcebergCatalogWrapper(catalogName));
   }
 }

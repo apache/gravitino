@@ -24,7 +24,7 @@ import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergCatalogWrapperPro
 public class ConfigBasedIcebergCatalogWrapperProviderForTest
     extends ConfigBasedIcebergCatalogWrapperProvider {
   @Override
-  public IcebergCatalogWrapper getIcebergTableOps(String prefix) {
+  public IcebergCatalogWrapper getIcebergCatalogWrapper(String prefix) {
     return new IcebergCatalogWrapperForTest();
   }
 }
