@@ -99,6 +99,10 @@ public class EventListenerManager {
     return new EventBus(eventListeners);
   }
 
+  public void addEventListener(String listenerName, EventListenerPlugin listener) {
+    eventListeners.add(new EventListenerPluginWrapper(listenerName, listener));
+  }
+
   private List<EventListenerPlugin> assembleEventListeners(
       Map<String, EventListenerPlugin> userEventListeners) {
     List<EventListenerPlugin> sharedQueueListeners = new ArrayList<>();
