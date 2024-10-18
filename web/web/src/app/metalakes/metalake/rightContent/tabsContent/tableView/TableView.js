@@ -76,6 +76,7 @@ const TableView = () => {
   const metalake = searchParams.get('metalake') || ''
   const catalog = searchParams.get('catalog') || ''
   const type = searchParams.get('type') || ''
+  const isKafkaSchema = paramsSize == 3 && searchParams.has('metalake') && searchParams.has('catalog') && searchParams.get('type') === 'messaging'
 
   const defaultPaginationConfig = { pageSize: 10, page: 0 }
   const pageSizeOptions = [10, 25, 50]
@@ -262,7 +263,7 @@ const TableView = () => {
             <ViewIcon viewBox='0 0 24 22' />
           </IconButton>
 
-          <IconButton
+          {!isKafkaSchema && <IconButton
             title='Edit'
             size='small'
             sx={{ color: theme => theme.palette.text.secondary }}
@@ -270,9 +271,9 @@ const TableView = () => {
             data-refer={`edit-entity-${row.name}`}
           >
             <EditIcon />
-          </IconButton>
+          </IconButton>}
 
-          <IconButton
+          {!isKafkaSchema && <IconButton
             title='Delete'
             size='small'
             sx={{ color: theme => theme.palette.error.light }}
@@ -280,7 +281,7 @@ const TableView = () => {
             data-refer={`delete-entity-${row.name}`}
           >
             <DeleteIcon />
-          </IconButton>
+          </IconButton>}
         </>
       )
     }
