@@ -79,7 +79,7 @@ public class IcebergRestTestUtil {
       Map<String, String> catalogConf = Maps.newHashMap();
       String catalogConfigPrefix = "catalog." + PREFIX;
       catalogConf.put(
-          IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
+          IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
           StaticIcebergCatalogConfigProvider.class.getName());
       catalogConf.put(String.format("%s.catalog-backend-name", catalogConfigPrefix), PREFIX);
       catalogConf.put(

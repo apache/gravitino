@@ -47,9 +47,9 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   private static final ImmutableMap<String, String> ICEBERG_CATALOG_CONFIG_PROVIDER_NAMES =
       ImmutableMap.of(
-          StaticIcebergCatalogConfigProvider.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
+          IcebergConstants.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
           StaticIcebergCatalogConfigProvider.class.getCanonicalName(),
-          DynamicIcebergCatalogConfigProvider.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
+          IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
           DynamicIcebergCatalogConfigProvider.class.getCanonicalName());
 
   private final Cache<String, IcebergCatalogWrapper> icebergCatalogWrapperCache;
@@ -60,7 +60,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   public IcebergCatalogWrapperManager(Map<String, String> properties) {
     this.credentialProviderManager = new CredentialProviderManager();
-    this.provider = createProvider(properties);
+    this.provider = createIcebergCatalogConfigProvider(properties);
     this.provider.initialize(properties);
     this.icebergCatalogWrapperCache =
         Caffeine.newBuilder()
@@ -139,9 +139,10 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     return prefix;
   }
 
-  private IcebergCatalogConfigProvider createProvider(Map<String, String> properties) {
+  private IcebergCatalogConfigProvider createIcebergCatalogConfigProvider(
+      Map<String, String> properties) {
     String providerName =
-        (new IcebergConfig(properties)).get(IcebergConfig.ICEBERG_REST_CATALOG_PROVIDER);
+        (new IcebergConfig(properties)).get(IcebergConfig.ICEBERG_REST_CATALOG_CONFIG_PROVIDER);
     String className =
         ICEBERG_CATALOG_CONFIG_PROVIDER_NAMES.getOrDefault(providerName, providerName);
     LOG.info("Load Iceberg catalog provider: {}.", className);

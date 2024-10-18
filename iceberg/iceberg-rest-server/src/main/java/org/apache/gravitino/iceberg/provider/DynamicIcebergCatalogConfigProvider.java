@@ -45,9 +45,6 @@ public class DynamicIcebergCatalogConfigProvider
   public static final Logger LOG =
       LoggerFactory.getLogger(DynamicIcebergCatalogConfigProvider.class);
 
-  public static final String DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME =
-      "dynamic-config-provider";
-
   private String gravitinoMetalake;
 
   private GravitinoAdminClient client;
