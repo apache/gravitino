@@ -24,12 +24,30 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
+/** S3 token credential. */
 public class S3TokenCredential implements Credential {
   private String accessKeyId;
   private String secretAccessKey;
   private String sessionToken;
   private long expireTimeInMS;
 
+  /**
+   * Constructs an instance of {@link S3SecretKeyCredential} with the specified AWS S3 access key ID
+   * and secret access key.
+   *
+   * <p>This constructor validates that both the access key ID and the secret access key are not
+   * null. If either of these parameters is null, it will throw a {@link NullPointerException} with
+   * an appropriate error message.
+   *
+   * <p>The provided credentials are used to authenticate requests made to AWS S3 services.
+   *
+   * @param accessKeyId the AWS S3 access key ID used for authentication. Must not be null.
+   * @param secretAccessKey the AWS S3 secret access key used for authentication. Must not be null.
+   * @param sessionToken AWS S3 access key ID used for authentication. Must not be null.
+   * @param expireTimeInMS AWS S3 access key ID used for authentication. Must not be null.
+   * @throws NullPointerException if either {@code accessKeyId} or {@code secretAccessKey} is null.
+   * @since [Your Library Version]
+   */
   public S3TokenCredential(
       String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMS) {
     Preconditions.checkArgument(
