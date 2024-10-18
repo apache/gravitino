@@ -16,15 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.service.rest;
+package org.apache.gravitino.iceberg.common.ops;
 
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergCatalogWrapperProvider;
+import java.util.Map;
+import java.util.Optional;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 
-public class ConfigBasedIcebergCatalogWrapperProviderForTest
-    extends ConfigBasedIcebergCatalogWrapperProvider {
-  @Override
-  public IcebergCatalogWrapper getIcebergTableOps(String prefix) {
-    return new IcebergCatalogWrapperForTest();
-  }
+/**
+ * {@code IcebergCatalogConfigProvider} is an interface defining how Iceberg REST catalog server
+ * gets Iceberg catalog configurations.
+ */
+public interface IcebergCatalogConfigProvider {
+
+  /**
+   * @param properties The parameters for creating Provider which from configurations whose prefix
+   *     is 'gravitino.iceberg-rest.'
+   */
+  void initialize(Map<String, String> properties);
+
+  /**
+   * @param catalogName Iceberg catalog name.
+   * @return the configuration of Iceberg catalog.
+   */
+  Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName);
 }

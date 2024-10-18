@@ -29,6 +29,8 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
@@ -55,6 +57,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
 
+  private static final Schema tableSchema =
+      new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
+
+  private static final Schema newTableSchema =
+      new Schema(NestedField.of(2, false, "foo_string1", StringType.get()));
+
   @Override
   protected Application configure() {
     ResourceConfig resourceConfig =
@@ -66,11 +74,163 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     return resourceConfig;
   }
 
-  private static final Schema tableSchema =
-      new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
+  @Test
+  void testCreateTable() {
+    verifyCreateTableFail("create_foo1", 404);
 
-  private static final Schema newTableSchema =
-      new Schema(NestedField.of(2, false, "foo_string1", StringType.get()));
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+
+    verifyCreateTableSucc("create_foo1");
+
+    verifyCreateTableFail("create_foo1", 409);
+    verifyCreateTableFail("", 400);
+  }
+
+  @Test
+  void testLoadTable() {
+    verifyLoadTableFail("load_foo1", 404);
+
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyCreateTableSucc("load_foo1");
+    verifyLoadTableSucc("load_foo1");
+
+    verifyLoadTableFail("load_foo2", 404);
+  }
+
+  @Test
+  void testDropTable() {
+    verifyDropTableFail("drop_foo1", 404);
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyDropTableFail("drop_foo1", 404);
+
+    verifyCreateTableSucc("drop_foo1");
+    verifyDropTableSucc("drop_foo1");
+    verifyLoadTableFail("drop_foo1", 404);
+  }
+
+  @Test
+  void testUpdateTable() {
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyCreateTableSucc("update_foo1");
+    TableMetadata metadata = getTableMeta("update_foo1");
+    verifyUpdateSucc("update_foo1", metadata);
+
+    verifyDropTableSucc("update_foo1");
+    verifyUpdateTableFail("update_foo1", 404, metadata);
+
+    verifyDropNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyUpdateTableFail("update_foo1", 404, metadata);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  void testListTables(String prefix) {
+    setUrlPathWithPrefix(prefix);
+    verifyListTableFail(404);
+
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyCreateTableSucc("list_foo1");
+    verifyCreateTableSucc("list_foo2");
+    verifyListTableSucc(ImmutableSet.of("list_foo1", "list_foo2"));
+  }
+
+  @Test
+  void testTableExits() {
+    verifyTableExistsStatusCode("exists_foo2", 404);
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyTableExistsStatusCode("exists_foo2", 404);
+
+    verifyCreateTableSucc("exists_foo1");
+    verifyTableExistsStatusCode("exists_foo1", 200);
+    verifyLoadTableSucc("exists_foo1");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  void testRenameTable(String prefix) {
+    setUrlPathWithPrefix(prefix);
+    // namespace not exits
+    verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
+
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyCreateTableSucc("rename_foo1");
+    // rename
+    verifyRenameTableSucc("rename_foo1", "rename_foo2");
+    verifyLoadTableFail("rename_foo1", 404);
+    verifyLoadTableSucc("rename_foo2");
+
+    // source table not exists
+    verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
+
+    // dest table exists
+    verifyCreateTableSucc("rename_foo3");
+    verifyRenameTableFail("rename_foo2", "rename_foo3", 409);
+  }
+
+  @Test
+  void testReportTableMetrics() {
+
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyCreateTableSucc("metrics_foo1");
+
+    ImmutableCommitMetricsResult commitMetrics = ImmutableCommitMetricsResult.builder().build();
+    CommitReport commitReport =
+        ImmutableCommitReport.builder()
+            .tableName("metrics_foo1")
+            .snapshotId(-1)
+            .sequenceNumber(-1)
+            .operation("append")
+            .commitMetrics(commitMetrics)
+            .build();
+    ReportMetricsRequest request = ReportMetricsRequest.of(commitReport);
+    Response response =
+        getReportMetricsClientBuilder("metrics_foo1")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  void testCreateTableWithCredentialVending() {
+    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+
+    // create the table without credential vending
+    Response response = doCreateTable("create_without_credential_vending");
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertTrue(!loadTableResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
+
+    // create the table with credential vending
+    String tableName = "create_with_credential_vending";
+    response = doCreateTableWithCredentialVending(tableName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertEquals(
+        DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
+        loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
+
+    // load the table without credential vending
+    response = doLoadTable(tableName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertTrue(!loadTableResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
+
+    // load the table with credential vending
+    response = doLoadTableWithCredentialVending(tableName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertEquals(
+        DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
+        loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
+  }
+
+  private Response doCreateTableWithCredentialVending(String name) {
+    CreateTableRequest createTableRequest =
+        CreateTableRequest.builder().withName(name).withSchema(tableSchema).build();
+    return getTableClientBuilder()
+        .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+        .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
 
   private Response doCreateTable(String name) {
     CreateTableRequest createTableRequest =
@@ -103,6 +263,12 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     return getTableClientBuilder(Optional.of(name)).head();
   }
 
+  private Response doLoadTableWithCredentialVending(String name) {
+    return getTableClientBuilder(Optional.of(name))
+        .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+        .get();
+  }
+
   private Response doLoadTable(String name) {
     return getTableClientBuilder(Optional.of(name)).get();
   }
@@ -114,6 +280,12 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     UpdateTableRequest updateTableRequest = new UpdateTableRequest(requirements, metadataUpdates);
     return getTableClientBuilder(Optional.of(name))
         .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private TableMetadata getTableMeta(String tableName) {
+    Response response = doLoadTable(tableName);
+    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
+    return loadTableResponse.tableMetadata();
   }
 
   private void verifyUpdateTableFail(String name, int status, TableMetadata base) {
@@ -203,127 +375,5 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   private void verifyCreateTableFail(String name, int status) {
     Response response = doCreateTable(name);
     Assertions.assertEquals(status, response.getStatus());
-  }
-
-  @Test
-  void testCreateTable() {
-    verifyCreateTableFail("create_foo1", 404);
-
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-
-    verifyCreateTableSucc("create_foo1");
-
-    verifyCreateTableFail("create_foo1", 409);
-    verifyCreateTableFail("", 400);
-  }
-
-  @Test
-  void testLoadTable() {
-    verifyLoadTableFail("load_foo1", 404);
-
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateTableSucc("load_foo1");
-    verifyLoadTableSucc("load_foo1");
-
-    verifyLoadTableFail("load_foo2", 404);
-  }
-
-  @Test
-  void testDropTable() {
-    verifyDropTableFail("drop_foo1", 404);
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyDropTableFail("drop_foo1", 404);
-
-    verifyCreateTableSucc("drop_foo1");
-    verifyDropTableSucc("drop_foo1");
-    verifyLoadTableFail("drop_foo1", 404);
-  }
-
-  private TableMetadata getTableMeta(String tableName) {
-    Response response = doLoadTable(tableName);
-    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
-    return loadTableResponse.tableMetadata();
-  }
-
-  @Test
-  void testUpdateTable() {
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateTableSucc("update_foo1");
-    TableMetadata metadata = getTableMeta("update_foo1");
-    verifyUpdateSucc("update_foo1", metadata);
-
-    verifyDropTableSucc("update_foo1");
-    verifyUpdateTableFail("update_foo1", 404, metadata);
-
-    verifyDropNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyUpdateTableFail("update_foo1", 404, metadata);
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  void testListTables(String prefix) {
-    setUrlPathWithPrefix(prefix);
-    verifyListTableFail(404);
-
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateTableSucc("list_foo1");
-    verifyCreateTableSucc("list_foo2");
-    verifyListTableSucc(ImmutableSet.of("list_foo1", "list_foo2"));
-  }
-
-  @Test
-  void testTableExits() {
-    verifyTableExistsStatusCode("exists_foo2", 404);
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyTableExistsStatusCode("exists_foo2", 404);
-
-    verifyCreateTableSucc("exists_foo1");
-    verifyTableExistsStatusCode("exists_foo1", 200);
-    verifyLoadTableSucc("exists_foo1");
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  void testRenameTable(String prefix) {
-    setUrlPathWithPrefix(prefix);
-    // namespace not exits
-    verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
-
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateTableSucc("rename_foo1");
-    // rename
-    verifyRenameTableSucc("rename_foo1", "rename_foo2");
-    verifyLoadTableFail("rename_foo1", 404);
-    verifyLoadTableSucc("rename_foo2");
-
-    // source table not exists
-    verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
-
-    // dest table exists
-    verifyCreateTableSucc("rename_foo3");
-    verifyRenameTableFail("rename_foo2", "rename_foo3", 409);
-  }
-
-  @Test
-  void testReportTableMetrics() {
-
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateTableSucc("metrics_foo1");
-
-    ImmutableCommitMetricsResult commitMetrics = ImmutableCommitMetricsResult.builder().build();
-    CommitReport commitReport =
-        ImmutableCommitReport.builder()
-            .tableName("metrics_foo1")
-            .snapshotId(-1)
-            .sequenceNumber(-1)
-            .operation("append")
-            .commitMetrics(commitMetrics)
-            .build();
-    ReportMetricsRequest request = ReportMetricsRequest.of(commitReport);
-    Response response =
-        getReportMetricsClientBuilder("metrics_foo1")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 }
