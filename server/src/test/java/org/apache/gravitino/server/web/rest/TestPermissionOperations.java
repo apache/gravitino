@@ -186,7 +186,7 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
 
-    // Test to throw NoSuchRoleException
+    // Test to throw IllegalRoleException
     doThrow(new IllegalRoleException("mock error"))
         .when(manager)
         .grantRolesToUser(any(), any(), any());
