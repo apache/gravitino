@@ -154,7 +154,7 @@ public interface SupportsCatalogs {
       throws NonEmptyEntityException, CatalogInUseException;
 
   /**
-   * Enable a catalog. If the catalog is already enable, this method does nothing.
+   * Enable a catalog. If the catalog is already enabled, this method does nothing.
    *
    * @param catalogName The identifier of the catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
