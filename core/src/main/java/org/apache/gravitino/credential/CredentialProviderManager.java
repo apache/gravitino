@@ -43,7 +43,8 @@ public class CredentialProviderManager {
         !credentialProvider.equals(current),
         String.format(
             "Should not register multiple times to CredentialProviderManager, catalog: %s, "
-                + "credential provider: %s", catalogName, credentialProvider.credentialType()));
+                + "credential provider: %s",
+            catalogName, credentialProvider.credentialType()));
     LOG.info(
         "Register catalog:%s credential provider:%s to CredentialProviderManager",
         catalogName, credentialProvider.credentialType());
