@@ -190,7 +190,8 @@ public class IcebergTableOperations {
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     LOG.info(
-        "Load iceberg table, namespace: {}, table: {}, accessDelegation: {}, is credential vending: {}",
+        "Load iceberg table, namespace: {}, table: {}, access delegation: {}, "
+            + "credential vending: {}",
         namespace,
         table,
         accessDelegation,
@@ -279,7 +280,8 @@ public class IcebergTableOperations {
     }
     if ("vended-credentials".equalsIgnoreCase(accessDelegation)) {
       return true;
-    } else if ("remote-signing".equalsIgnoreCase(accessDelegation)) {
+    }
+    if ("remote-signing".equalsIgnoreCase(accessDelegation)) {
       throw new UnsupportedOperationException(
           "Gravitino IcebergRESTServer doesn't support remote signing");
     } else {
@@ -287,7 +289,8 @@ public class IcebergTableOperations {
           X_ICEBERG_ACCESS_DELEGATION
               + ": "
               + accessDelegation
-              + " is illegal, Iceberg REST spec supports:[vended-credentials,remote-signing], Gravitino Iceberg REST server supports: vended-credentials");
+              + " is illegal, Iceberg REST spec supports:[vended-credentials,remote-signing], "
+              + "Gravitino Iceberg REST server supports: vended-credentials");
     }
   }
 }

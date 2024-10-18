@@ -42,8 +42,8 @@ public class CredentialProviderManager {
     Preconditions.checkState(
         !credentialProvider.equals(current),
         String.format(
-            "Should not register multi times to CredentialProviderManager, catalog:%s, credential provider:%s",
-            catalogName, credentialProvider.credentialType()));
+            "Should not register multiple times to CredentialProviderManager, catalog: %s, "
+                + "credential provider: %s", catalogName, credentialProvider.credentialType()));
     LOG.info(
         "Register catalog:%s credential provider:%s to CredentialProviderManager",
         catalogName, credentialProvider.credentialType());
