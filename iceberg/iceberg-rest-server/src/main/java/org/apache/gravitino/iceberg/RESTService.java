@@ -30,7 +30,7 @@ import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
-import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationProcessor;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.metrics.MetricsSystem;
@@ -77,10 +77,10 @@ public class RESTService implements GravitinoAuxiliaryService {
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     icebergCatalogWrapperManager = new IcebergCatalogWrapperManager(icebergConfig.getAllConfig());
     icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
-    IcebergTableOperationProcessor icebergTableOperationProcessor =
-        new IcebergTableOperationProcessor(icebergCatalogWrapperManager);
+    IcebergTableOperationExecutor icebergTableOperationExecutor =
+        new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
     IcebergTableEventDispatcher icebergTableEventDispatcher =
-        new IcebergTableEventDispatcher(icebergTableOperationProcessor, eventBus);
+        new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus);
     config.register(
         new AbstractBinder() {
           @Override

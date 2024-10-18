@@ -84,19 +84,21 @@ public class IcebergRestUtils {
   public static String getCatalogName(String rawPrefix) {
     String prefix = normalizePrefix(rawPrefix);
     Preconditions.checkArgument(
-        !IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(prefix),
+        !IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG.equals(prefix),
         String.format("%s is conflict with reserved key, please replace it", prefix));
     if (StringUtils.isBlank(prefix)) {
-      return IcebergConstants.GRAVITINO_DEFAULT_CATALOG;
+      return IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
     }
     return prefix;
   }
 
   public static NameIdentifier getGravitinoNameIdentifier(
       String catalogName, TableIdentifier icebergIdentifier) {
+    // todo(fanng): use a more general way to get metalake
     Stream<String> catalogNS =
         Stream.concat(
-            Stream.of(catalogName), Arrays.stream(icebergIdentifier.namespace().levels()));
+            Stream.of(IcebergConstants.ICEBERG_REST_DEFAULT_METALAKE, catalogName),
+            Arrays.stream(icebergIdentifier.namespace().levels()));
     String[] catalogNSTable =
         Stream.concat(catalogNS, Stream.of(icebergIdentifier.name())).toArray(String[]::new);
     return NameIdentifier.of(catalogNSTable);

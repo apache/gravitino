@@ -22,8 +22,8 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
-import org.apache.gravitino.listener.api.event.IcebergCreateTablePostEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Namespace;
@@ -32,8 +32,8 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /**
- * {@code IcebergTableEventDispatcher} is a decorator for {@link IcebergTableOperationProcessor}
- * that not only delegates table operations to the underlying dispatcher but also dispatches
+ * {@code IcebergTableEventDispatcher} is a decorator for {@link IcebergTableOperationExecutor} that
+ * not only delegates table operations to the underlying dispatcher but also dispatches
  * corresponding events to an {@link org.apache.gravitino.listener.EventBus}.
  */
 public class IcebergTableEventDispatcher implements IcebergTableOperationDispatcher {
@@ -67,7 +67,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergCreateTablePostEvent(
+        new IcebergCreateTableEvent(
             PrincipalUtils.getCurrentUserName(),
             nameIdentifier,
             createTableRequest,

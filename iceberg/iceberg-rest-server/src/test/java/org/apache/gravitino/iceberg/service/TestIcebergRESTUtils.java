@@ -38,7 +38,10 @@ public class TestIcebergRESTUtils {
     TableIdentifier tableIdentifier = TableIdentifier.of("ns1", "ns2", "table");
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(catalogName, tableIdentifier);
-    Assertions.assertEquals(NameIdentifier.of(catalogName, "ns1", "ns2", "table"), nameIdentifier);
+    Assertions.assertEquals(
+        NameIdentifier.of(
+            IcebergConstants.ICEBERG_REST_DEFAULT_METALAKE, catalogName, "ns1", "ns2", "table"),
+        nameIdentifier);
   }
 
   @Test
@@ -46,10 +49,10 @@ public class TestIcebergRESTUtils {
     String prefix = "catalog/";
     Assertions.assertEquals("catalog", IcebergRestUtils.getCatalogName(prefix));
     Assertions.assertEquals(
-        IcebergConstants.GRAVITINO_DEFAULT_CATALOG, IcebergRestUtils.getCatalogName(""));
+        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, IcebergRestUtils.getCatalogName(""));
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
-        () -> IcebergRestUtils.getCatalogName(IcebergConstants.GRAVITINO_DEFAULT_CATALOG + "/"));
+        () -> IcebergRestUtils.getCatalogName(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG + "/"));
   }
 
   @Test

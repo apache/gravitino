@@ -36,7 +36,7 @@ public class TestConfigBasedIcebergCatalogWrapperProvider {
   public void testValidIcebergTableOps() {
     String hiveCatalogName = "hive_backend";
     String jdbcCatalogName = "jdbc_backend";
-    String defaultCatalogName = IcebergConstants.GRAVITINO_DEFAULT_CATALOG;
+    String defaultCatalogName = IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
 
     Map<String, String> config = Maps.newHashMap();
     // hive backend catalog

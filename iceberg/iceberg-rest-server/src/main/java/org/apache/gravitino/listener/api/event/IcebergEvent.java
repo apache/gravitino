@@ -20,10 +20,12 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an abstract table post event in Gravitino Iceberg REST server. */
-public abstract class IcebergTablePostEvent extends IcebergRESTPostEvent {
-  protected IcebergTablePostEvent(String user, NameIdentifier resourceIdentifier) {
+/** Represents an abstract post event in Gravitino Iceberg REST server. */
+@DeveloperApi
+public abstract class IcebergEvent extends Event {
+  protected IcebergEvent(String user, NameIdentifier resourceIdentifier) {
     super(user, resourceIdentifier);
   }
 }

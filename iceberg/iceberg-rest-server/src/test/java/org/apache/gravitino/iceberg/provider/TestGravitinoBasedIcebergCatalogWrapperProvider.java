@@ -112,6 +112,6 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
         IllegalArgumentException.class, () -> provider.getIcebergCatalogWrapper(""));
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
-        () -> provider.getIcebergCatalogWrapper(IcebergConstants.GRAVITINO_DEFAULT_CATALOG));
+        () -> provider.getIcebergCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG));
   }
 }

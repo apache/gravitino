@@ -21,11 +21,34 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 
-/** Represents an abstract post event in Gravitino Iceberg REST server. */
+/** Represent an event after creating Iceberg table successfully. */
 @DeveloperApi
-public abstract class IcebergRESTPostEvent extends Event {
-  protected IcebergRESTPostEvent(String user, NameIdentifier resourceIdentifier) {
+public class IcebergCreateTableEvent extends IcebergTableEvent {
+
+  private CreateTableRequest createTableRequest;
+  private LoadTableResponse loadTableResponse;
+
+  public IcebergCreateTableEvent(
+      String user,
+      NameIdentifier resourceIdentifier,
+      CreateTableRequest createTableRequest,
+      LoadTableResponse loadTableResponse) {
     super(user, resourceIdentifier);
+    this.createTableRequest =
+        IcebergRestUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
+    this.loadTableResponse =
+        IcebergRestUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
+  }
+
+  public CreateTableRequest createTableRequest() {
+    return createTableRequest;
+  }
+
+  public LoadTableResponse loadTableResponse() {
+    return loadTableResponse;
   }
 }

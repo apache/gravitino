@@ -24,15 +24,11 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
-/**
- * The {@code IcebergTableOperationProcessor} locates the corresponding {@code
- * IcebergCatalogWrapper} based on the prefix in order to perform the actual table operations.
- */
-public class IcebergTableOperationProcessor implements IcebergTableOperationDispatcher {
+public class IcebergTableOperationExecutor implements IcebergTableOperationDispatcher {
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
 
-  public IcebergTableOperationProcessor(IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+  public IcebergTableOperationExecutor(IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
   }
 

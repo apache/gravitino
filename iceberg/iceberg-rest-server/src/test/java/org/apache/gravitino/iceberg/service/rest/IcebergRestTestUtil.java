@@ -31,7 +31,7 @@ import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
-import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationProcessor;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.listener.EventBus;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -87,10 +87,10 @@ public class IcebergRestTestUtil {
           new IcebergCatalogWrapperManager(catalogConf);
 
       EventBus eventBus = new EventBus(Arrays.asList());
-      IcebergTableOperationProcessor icebergTableOperationProcessor =
-          new IcebergTableOperationProcessor(icebergCatalogWrapperManager);
+      IcebergTableOperationExecutor icebergTableOperationExecutor =
+          new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
       IcebergTableEventDispatcher icebergTableEventDispatcher =
-          new IcebergTableEventDispatcher(icebergTableOperationProcessor, eventBus);
+          new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus);
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(
