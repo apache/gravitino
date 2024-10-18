@@ -226,6 +226,10 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
         .forEach(
             gravitinoPrivilege -> {
               Set<RangerPrivilege> rangerPrivileges = new HashSet<>();
+              // Ignore unsupported privileges
+              if (!privilegesMappingRule().containsKey(gravitinoPrivilege.name())) {
+                return;
+              }
               privilegesMappingRule().get(gravitinoPrivilege.name()).stream()
                   .forEach(
                       rangerPrivilege ->
