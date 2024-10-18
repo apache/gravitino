@@ -80,7 +80,9 @@ import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -785,12 +787,12 @@ public class GravitinoMetalake extends MetalakeDTO
    * @return The created Role instance.
    * @throws RoleAlreadyExistsException If a Role with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws NoSuchMetadataObjectException If the securable object doesn't exist
+   * @throws IllegalMetadataObjectException If the securable object is invalid
    * @throws RuntimeException If creating the Role encounters storage issues.
    */
   public Role createRole(
       String role, Map<String, String> properties, List<SecurableObject> securableObjects)
-      throws RoleAlreadyExistsException, NoSuchMetalakeException, NoSuchMetadataObjectException {
+      throws RoleAlreadyExistsException, NoSuchMetalakeException, IllegalMetadataObjectException {
     RoleCreateRequest req =
         new RoleCreateRequest(
             role,
@@ -837,12 +839,12 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param roles The names of the Role.
    * @return The Group after granted.
    * @throws NoSuchUserException If the User with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws IllegalRoleException If the Role with the given name is invalid.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If granting roles to a user encounters storage issues.
    */
   public User grantRolesToUser(List<String> roles, String user)
-      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     RoleGrantRequest request = new RoleGrantRequest(roles);
     request.validate();
 
@@ -868,7 +870,7 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param roles The names of the Role.
    * @return The Group after granted.
    * @throws NoSuchGroupException If the Group with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws IllegalRoleException If the Role with the given name is invalid.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If granting roles to a group encounters storage issues.
    */
@@ -899,7 +901,7 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param roles The names of the Role.
    * @return The User after revoked.
    * @throws NoSuchUserException If the User with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws IllegalRoleException If the Role with the given name is invalid.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If revoking roles from a user encounters storage issues.
    */
@@ -930,12 +932,12 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param roles The names of the Role.
    * @return The Group after revoked.
    * @throws NoSuchGroupException If the Group with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws IllegalRoleException If the Role with the given name is invalid.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If revoking roles from a group encounters storage issues.
    */
   public Group revokeRolesFromGroup(List<String> roles, String group)
-      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     RoleRevokeRequest request = new RoleRevokeRequest(roles);
     request.validate();
 

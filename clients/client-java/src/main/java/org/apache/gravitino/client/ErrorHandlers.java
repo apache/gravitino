@@ -34,7 +34,9 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -706,6 +708,10 @@ public class ErrorHandlers {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
           if (errorResponse.getType().equals(IllegalPrivilegeException.class.getSimpleName())) {
             throw new IllegalPrivilegeException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(IllegalMetadataObjectException.class.getSimpleName())) {
+            throw new IllegalMetadataObjectException(errorMessage);
           } else {
             throw new IllegalArgumentException(errorMessage);
           }
@@ -756,6 +762,8 @@ public class ErrorHandlers {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
           if (errorResponse.getType().equals(IllegalPrivilegeException.class.getSimpleName())) {
             throw new IllegalPrivilegeException(errorMessage);
+          } else if (errorResponse.getType().equals(IllegalRoleException.class.getSimpleName())) {
+            throw new IllegalRoleException(errorMessage);
           } else {
             throw new IllegalArgumentException(errorMessage);
           }
