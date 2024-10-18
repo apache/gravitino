@@ -26,7 +26,9 @@ import org.apache.gravitino.annotation.Unstable;
  * The Ranger securable object is the entity which access can be granted. Unless allowed by a grant,
  * access is denied. <br>
  * You can use the helper class `RangerSecurableObjects` to create the Ranger securable object which
- * you need.
+ * you need. </br> There is a clear difference between Ranger's Securable Object and Gravitino's
+ * Securable Object, Ranger's Securable Object does not have the concept of `METALAKE`, so it needs
+ * to be defined specifically.
  */
 @Unstable
 public interface RangerSecurableObject extends MetadataObject {

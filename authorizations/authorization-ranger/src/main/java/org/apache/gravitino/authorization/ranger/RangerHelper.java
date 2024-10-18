@@ -124,7 +124,7 @@ public class RangerHelper {
                           })
                       .collect(Collectors.toList());
 
-              if (matchPolicyItems.size() == 0) {
+              if (matchPolicyItems.isEmpty()) {
                 // If the policy item does not exist, then create a new policy item
                 RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
                 RangerPolicy.RangerPolicyItemAccess access =

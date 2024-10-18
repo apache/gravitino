@@ -660,9 +660,9 @@ public abstract class RangerAuthorizationPlugin
   @Override
   public void close() throws IOException {}
 
-  public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
+  boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()
-        .noneMatch(
+        .allMatch(
             securableObject -> {
               AtomicBoolean match = new AtomicBoolean(true);
               securableObject.privileges().stream()
@@ -685,7 +685,7 @@ public abstract class RangerAuthorizationPlugin
                           match.set(false);
                         }
                       });
-              return !match.get();
+              return match.get();
             });
   }
 }
