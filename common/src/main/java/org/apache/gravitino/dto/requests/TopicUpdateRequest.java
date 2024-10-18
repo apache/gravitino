@@ -73,16 +73,10 @@ public interface TopicUpdateRequest extends RESTRequest {
     }
 
     /**
-     * Validates the request.
-     *
-     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     * Validates the fields of the request. Always pass.
      */
     @Override
-    public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(newComment),
-          "\"newComment\" field is required and cannot be empty");
-    }
+    public void validate() throws IllegalArgumentException {}
 
     /**
      * Returns the topic change.

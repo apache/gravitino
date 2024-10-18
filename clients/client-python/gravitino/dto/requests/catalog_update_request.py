@@ -78,8 +78,8 @@ class CatalogUpdateRequest:
             return CatalogChange.update_comment(self._new_comment)
 
         def validate(self):
-            if not self._new_comment:
-                raise ValueError('"newComment" field is required and cannot be empty')
+            """Validates the fields of the request. Always pass."""
+            pass
 
     @dataclass
     class SetCatalogPropertyRequest(CatalogUpdateRequestBase):
