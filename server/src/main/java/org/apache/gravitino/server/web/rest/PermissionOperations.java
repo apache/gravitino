@@ -45,8 +45,6 @@ import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.exceptions.IllegalRoleException;
-import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
@@ -89,17 +87,12 @@ public class PermissionOperations {
                       TreeLockUtils.doWithTreeLock(
                           NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
                           LockType.READ,
-                          () -> {
-                            try {
-                              return Utils.ok(
+                          () ->
+                              Utils.ok(
                                   new UserResponse(
                                       DTOConverters.toDTO(
                                           accessControlManager.grantRolesToUser(
-                                              metalake, request.getRoleNames(), user))));
-                            } catch (NoSuchRoleException nsr) {
-                              throw new IllegalRoleException(nsr);
-                            }
-                          })));
+                                              metalake, request.getRoleNames(), user)))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
           OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), user, e);
@@ -126,17 +119,12 @@ public class PermissionOperations {
                       TreeLockUtils.doWithTreeLock(
                           NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
                           LockType.READ,
-                          () -> {
-                            try {
-                              return Utils.ok(
+                          () ->
+                              Utils.ok(
                                   new GroupResponse(
                                       DTOConverters.toDTO(
                                           accessControlManager.grantRolesToGroup(
-                                              metalake, request.getRoleNames(), group))));
-                            } catch (NoSuchRoleException nsr) {
-                              throw new IllegalRoleException(nsr);
-                            }
-                          })));
+                                              metalake, request.getRoleNames(), group)))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
           OperationType.GRANT, StringUtils.join(request.getRoleNames(), ","), group, e);
@@ -163,17 +151,12 @@ public class PermissionOperations {
                       TreeLockUtils.doWithTreeLock(
                           NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
                           LockType.READ,
-                          () -> {
-                            try {
-                              return Utils.ok(
+                          () ->
+                              Utils.ok(
                                   new UserResponse(
                                       DTOConverters.toDTO(
                                           accessControlManager.revokeRolesFromUser(
-                                              metalake, request.getRoleNames(), user))));
-                            } catch (NoSuchRoleException nsr) {
-                              throw new IllegalRoleException(nsr);
-                            }
-                          })));
+                                              metalake, request.getRoleNames(), user)))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
           OperationType.REVOKE, StringUtils.join(request.getRoleNames(), ","), user, e);
@@ -200,17 +183,12 @@ public class PermissionOperations {
                       TreeLockUtils.doWithTreeLock(
                           NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
                           LockType.READ,
-                          () -> {
-                            try {
-                              return Utils.ok(
+                          () ->
+                              Utils.ok(
                                   new GroupResponse(
                                       DTOConverters.toDTO(
                                           accessControlManager.revokeRolesFromGroup(
-                                              metalake, request.getRoleNames(), group))));
-                            } catch (NoSuchRoleException nsr) {
-                              throw new IllegalRoleException(nsr);
-                            }
-                          })));
+                                              metalake, request.getRoleNames(), group)))))));
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
           OperationType.REVOKE, StringUtils.join(request.getRoleNames()), group, e);

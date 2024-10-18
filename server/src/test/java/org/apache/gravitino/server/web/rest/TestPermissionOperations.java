@@ -57,7 +57,6 @@ import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -188,7 +187,7 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw NoSuchRoleException
-    doThrow(new NoSuchRoleException("mock error"))
+    doThrow(new IllegalRoleException("mock error"))
         .when(manager)
         .grantRolesToUser(any(), any(), any());
     resp1 =
@@ -285,8 +284,8 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
 
-    // Test to throw NoSuchRoleException
-    doThrow(new NoSuchRoleException("mock error"))
+    // Test to throw IllegalRoleException
+    doThrow(new IllegalRoleException("mock error"))
         .when(manager)
         .grantRolesToGroup(any(), any(), any());
     resp1 =
@@ -364,8 +363,8 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
 
-    // Test to throw NoSuchRoleException
-    doThrow(new NoSuchRoleException("mock error"))
+    // Test to throw IllegalRoleException
+    doThrow(new IllegalRoleException("mock error"))
         .when(manager)
         .revokeRolesFromUser(any(), any(), any());
     Response nsrResponse =
@@ -426,8 +425,8 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
 
-    // Test to throw NoSuchRoleException
-    doThrow(new NoSuchRoleException("mock error"))
+    // Test to throw IllegalRoleException
+    doThrow(new IllegalRoleException("mock error"))
         .when(manager)
         .revokeRolesFromGroup(any(), any(), any());
     Response nsrResponse =
