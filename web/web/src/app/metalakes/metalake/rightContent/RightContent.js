@@ -25,22 +25,36 @@ import { Box, Button, IconButton } from '@mui/material'
 import Icon from '@/components/Icon'
 import MetalakePath from './MetalakePath'
 import CreateCatalogDialog from './CreateCatalogDialog'
+import CreateSchemaDialog from './CreateSchemaDialog'
 import TabsContent from './tabsContent/TabsContent'
 import { useSearchParams } from 'next/navigation'
 
 const RightContent = () => {
   const [open, setOpen] = useState(false)
+  const [openSchema, setOpenSchema] = useState(false)
   const searchParams = useSearchParams()
   const [isShowBtn, setBtnVisiable] = useState(true)
+  const [isShowSchemaBtn, setSchemaBtnVisiable] = useState(false)
 
   const handleCreateCatalog = () => {
     setOpen(true)
   }
 
+  const handleCreateSchema = () => {
+    setOpenSchema(true)
+  }
+
   useEffect(() => {
     const paramsSize = [...searchParams.keys()].length
-    const isMetalakePage = paramsSize == 1 && searchParams.get('metalake')
-    setBtnVisiable(isMetalakePage)
+    const isCatalogList = paramsSize == 1 && searchParams.get('metalake')
+    setBtnVisiable(isCatalogList)
+
+    const isSchemaList =
+      paramsSize == 3 &&
+      searchParams.get('metalake') &&
+      searchParams.get('catalog') &&
+      searchParams.get('type') !== 'messaging'
+    setSchemaBtnVisiable(isSchemaList)
   }, [searchParams])
 
   return (
@@ -74,6 +88,20 @@ const RightContent = () => {
               Create Catalog
             </Button>
             <CreateCatalogDialog open={open} setOpen={setOpen} />
+          </Box>
+        )}
+        {isShowSchemaBtn && (
+          <Box className={`twc-flex twc-items-center`}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleCreateSchema}
+              sx={{ width: 200 }}
+              data-refer='create-schema-btn'
+            >
+              Create Schema
+            </Button>
+            <CreateSchemaDialog open={openSchema} setOpen={setOpenSchema} />
           </Box>
         )}
       </Box>
