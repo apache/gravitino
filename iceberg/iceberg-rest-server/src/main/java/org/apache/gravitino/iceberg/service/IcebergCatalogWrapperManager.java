@@ -37,8 +37,8 @@ import org.apache.gravitino.credential.CredentialProviderManager;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogConfigProvider;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.provider.StaticIcebergCatalogConfigProvider;
 import org.apache.gravitino.iceberg.provider.DynamicIcebergCatalogConfigProvider;
+import org.apache.gravitino.iceberg.provider.StaticIcebergCatalogConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,8 +49,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
       ImmutableMap.of(
           StaticIcebergCatalogConfigProvider.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
           StaticIcebergCatalogConfigProvider.class.getCanonicalName(),
-          DynamicIcebergCatalogConfigProvider
-              .DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
+          DynamicIcebergCatalogConfigProvider.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
           DynamicIcebergCatalogConfigProvider.class.getCanonicalName());
 
   private final Cache<String, IcebergCatalogWrapper> icebergCatalogWrapperCache;

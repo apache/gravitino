@@ -60,8 +60,7 @@ public class TestStaticIcebergCatalogWrapperProvider {
     config.put("catalog-backend", "memory");
     config.put("warehouse", "/tmp/");
 
-    StaticIcebergCatalogConfigProvider provider =
-        new StaticIcebergCatalogConfigProvider();
+    StaticIcebergCatalogConfigProvider provider = new StaticIcebergCatalogConfigProvider();
     provider.initialize(config);
 
     IcebergConfig hiveIcebergConfig = provider.catalogConfigs.get(hiveCatalogName);
@@ -107,8 +106,7 @@ public class TestStaticIcebergCatalogWrapperProvider {
   @ParameterizedTest
   @ValueSource(strings = {"", "not_match"})
   public void testInvalidIcebergTableOps(String catalogName) {
-    StaticIcebergCatalogConfigProvider provider =
-        new StaticIcebergCatalogConfigProvider();
+    StaticIcebergCatalogConfigProvider provider = new StaticIcebergCatalogConfigProvider();
     provider.initialize(Maps.newHashMap());
 
     Optional<IcebergConfig> config = provider.getIcebergCatalogConfig(catalogName);

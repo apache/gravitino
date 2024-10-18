@@ -43,8 +43,7 @@ public class StaticIcebergCatalogConfigProvider implements IcebergCatalogConfigP
   public static final Logger LOG =
       LoggerFactory.getLogger(StaticIcebergCatalogConfigProvider.class);
 
-  public static final String STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME =
-      "static-config-provider";
+  public static final String STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME = "static-config-provider";
 
   @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
 
