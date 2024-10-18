@@ -32,6 +32,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
@@ -201,13 +202,13 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .longConf()
           .createWithDefault(3600000L);
 
-  public static final ConfigEntry<String> ICEBERG_REST_CATALOG_PROVIDER =
-      new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER)
+  public static final ConfigEntry<String> ICEBERG_REST_CATALOG_CONFIG_PROVIDER =
+      new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER)
           .doc(
-              "Catalog provider class name, you can develop a class that implements `IcebergCatalogWrapperProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
+              "Catalog provider class name, you can develop a class that implements `IcebergCatalogConfigProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
-          .createWithDefault("config-based-provider");
+          .createWithDefault(IcebergConstants.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME);
 
   public static final ConfigEntry<String> GRAVITINO_URI =
       new ConfigBuilder(IcebergConstants.GRAVITINO_URI)
@@ -232,6 +233,13 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .toSequence()
           .createWithDefault(Collections.emptyList());
+
+  public static final ConfigEntry<String> CREDENTIAL_PROVIDER_TYPE =
+      new ConfigBuilder(CredentialConstants.CREDENTIAL_PROVIDER_TYPE)
+          .doc("The credential provider type for Iceberg")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
 
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
