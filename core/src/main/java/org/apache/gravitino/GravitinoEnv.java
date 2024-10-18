@@ -78,8 +78,8 @@ public class GravitinoEnv {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoEnv.class);
 
   private Config config;
-  // Iceberg REST server init base components while Gravitino Server init all components.
-  private boolean manageAllComponents;
+  // Iceberg REST server use base components while Gravitino Server use all components.
+  private boolean manageAllComponents = true;
 
   private EntityStore entityStore;
 
