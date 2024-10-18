@@ -68,7 +68,7 @@ public class ConfigBasedIcebergCatalogWrapperProvider implements IcebergCatalogW
   }
 
   @Override
-  public IcebergCatalogWrapper getIcebergTableOps(String catalogName) {
+  public IcebergCatalogWrapper getIcebergCatalogWrapper(String catalogName) {
     IcebergConfig icebergConfig = this.catalogConfigs.get(catalogName);
     if (icebergConfig == null) {
       String errorMsg = String.format("%s can not match any catalog", catalogName);

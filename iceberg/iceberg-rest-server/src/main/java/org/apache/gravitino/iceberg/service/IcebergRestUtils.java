@@ -18,12 +18,20 @@
  */
 package org.apache.gravitino.iceberg.service;
 
+import com.google.common.base.Preconditions;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.stream.Stream;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 
 public class IcebergRestUtils {
@@ -70,5 +78,45 @@ public class IcebergRestUtils {
       nextHourDateTime = currentDateTime.minusHours(-hours);
     }
     return nextHourDateTime.atZone(ZoneId.systemDefault()).toInstant();
+  }
+
+  public static String getCatalogName(String rawPrefix) {
+    String prefix = shelling(rawPrefix);
+    Preconditions.checkArgument(
+        !IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(prefix),
+        String.format("%s is conflict with reserved key, please replace it", prefix));
+    if (StringUtils.isBlank(prefix)) {
+      return IcebergConstants.GRAVITINO_DEFAULT_CATALOG;
+    }
+    return prefix;
+  }
+
+  public static NameIdentifier getGravitinoNameIdentifier(String catalogName, Namespace namespace) {
+    Stream<String> catalogNS =
+        Stream.concat(Stream.of(catalogName), Arrays.stream(namespace.levels()));
+    return NameIdentifier.of(catalogNS.toArray(String[]::new));
+  }
+
+  public static NameIdentifier getGravitinoNameIdentifier(
+      String catalogName, TableIdentifier icebergIdentifier) {
+    Stream<String> catalogNS =
+        Stream.concat(
+            Stream.of(catalogName), Arrays.stream(icebergIdentifier.namespace().levels()));
+    String[] catalogNSTable =
+        Stream.concat(catalogNS, Stream.of(icebergIdentifier.name())).toArray(String[]::new);
+    return NameIdentifier.of(catalogNSTable);
+  }
+
+  // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
+  // 'iceberg_catalog'
+  private static String shelling(String rawPrefix) {
+    if (StringUtils.isBlank(rawPrefix)) {
+      return rawPrefix;
+    } else {
+      // rawPrefix is a string matching ([^/]*/) which end with /
+      Preconditions.checkArgument(
+          rawPrefix.endsWith("/"), String.format("rawPrefix %s format is illegal", rawPrefix));
+      return rawPrefix.substring(0, rawPrefix.length() - 1);
+    }
   }
 }

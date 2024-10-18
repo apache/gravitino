@@ -66,7 +66,7 @@ public class GravitinoBasedIcebergCatalogWrapperProvider
   }
 
   @Override
-  public IcebergCatalogWrapper getIcebergTableOps(String catalogName) {
+  public IcebergCatalogWrapper getIcebergCatalogWrapper(String catalogName) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogName), "blank catalogName is illegal");
     Preconditions.checkArgument(

@@ -52,6 +52,7 @@ public class GravitinoIcebergRESTServer {
   }
 
   private void start() {
+    gravitinoEnv.start(false);
     icebergRESTService.serviceStart();
   }
 

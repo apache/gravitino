@@ -32,7 +32,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * specific type of table operation being represented.
  */
 @DeveloperApi
-public abstract class TableEvent extends Event {
+public abstract class TableEvent extends GravitinoPostEvent {
   /**
    * Constructs a new {@code TableEvent} with the specified user and table identifier.
    *

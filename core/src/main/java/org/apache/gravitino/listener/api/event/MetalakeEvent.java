@@ -29,7 +29,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * performing the operation and the identifier of the Metalake being operated on.
  */
 @DeveloperApi
-public abstract class MetalakeEvent extends Event {
+public abstract class MetalakeEvent extends GravitinoPostEvent {
   /**
    * Constructs a new {@code MetalakeEvent} with the specified user and Metalake identifier.
    *
