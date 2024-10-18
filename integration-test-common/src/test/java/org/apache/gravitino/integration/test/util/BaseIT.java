@@ -38,6 +38,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -384,6 +385,38 @@ public class BaseIT {
     } catch (IOException e) {
       LOG.warn("Can't get git commit id for:", e);
       return "";
+    }
+  }
+
+  private static boolean isDeploy() {
+    String mode =
+        System.getProperty(ITUtils.TEST_MODE) == null
+            ? ITUtils.EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
+
+    return Objects.equals(mode, ITUtils.DEPLOY_TEST_MODE);
+  }
+
+  protected void copyBundleJarsToHadoop(String bundleName) {
+    if (!isDeploy()) {
+      return;
+    }
+
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    String jarName =
+        String.format("gravitino-%s-%s.jar", bundleName, System.getenv("PROJECT_VERSION"));
+    String gcsJars =
+        ITUtils.joinPath(
+            gravitinoHome, "..", "..", "bundles", bundleName, "build", "libs", jarName);
+    gcsJars = "file://" + gcsJars;
+    try {
+      if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
+        String hadoopLibDirs = ITUtils.joinPath(gravitinoHome, "catalogs", "hadoop", "libs");
+        DownloaderUtils.downloadFile(gcsJars, hadoopLibDirs);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Failed to copy the %s dependency jars: %s", bundleName, gcsJars), e);
     }
   }
 }

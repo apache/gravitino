@@ -34,7 +34,6 @@ dependencies {
   // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystemStore.initialize(AliyunOSSFileSystemStore.java:111)
   // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem.initialize(AliyunOSSFileSystem.java:323)
   // org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:3611)
-
   implementation(libs.commons.lang)
 }
 
@@ -43,6 +42,10 @@ tasks.withType(ShadowJar::class.java) {
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
   mergeServiceFiles()
+
+  // Relocate dependencies to avoid conflicts
+  relocate("org.jdom", "org.apache.gravitino.shaded.org.jdom")
+  relocate("org.apache.commons.lang", "org.apache.gravitino.shaded.org.apache.commons.lang")
 }
 
 tasks.jar {

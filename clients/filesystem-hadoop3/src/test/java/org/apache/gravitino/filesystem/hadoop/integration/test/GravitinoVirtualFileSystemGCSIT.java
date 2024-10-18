@@ -26,11 +26,8 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -55,7 +52,7 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
 
   @BeforeAll
   public void startUp() throws Exception {
-    copyGCPJars();
+    copyBundleJarsToHadoop("gcp-bundle");
     // Need to download jars to gravitino server
     super.startIntegrationTest();
 
@@ -131,37 +128,6 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
 
   protected String genStorageLocation(String fileset) {
     return String.format("gs://%s/%s", BUCKET_NAME, fileset);
-  }
-
-  private static boolean isDeploy() {
-    String mode =
-        System.getProperty(ITUtils.TEST_MODE) == null
-            ? ITUtils.EMBEDDED_TEST_MODE
-            : System.getProperty(ITUtils.TEST_MODE);
-
-    return Objects.equals(mode, ITUtils.DEPLOY_TEST_MODE);
-  }
-
-  private void copyGCPJars() {
-    if (!isDeploy()) {
-      return;
-    }
-
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String jarName = String.format("gravitino-gcp-bundle-%s.jar", System.getenv("PROJECT_VERSION"));
-    String gcsJars =
-        ITUtils.joinPath(
-            gravitinoHome, "..", "..", "bundles", "gcp-bundle", "build", "libs", jarName);
-    gcsJars = "file://" + gcsJars;
-    try {
-      if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-        String hadoopLibDirs = ITUtils.joinPath(gravitinoHome, "catalogs", "hadoop", "libs");
-        DownloaderUtils.downloadFile(gcsJars, hadoopLibDirs);
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Failed to copy the gcs dependency jars: %s", gcsJars), e);
-    }
   }
 
   @Disabled(

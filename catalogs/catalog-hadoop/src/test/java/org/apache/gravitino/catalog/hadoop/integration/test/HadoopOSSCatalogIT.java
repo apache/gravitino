@@ -25,11 +25,8 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -54,9 +51,7 @@ public class HadoopOSSCatalogIT extends HadoopCatalogIT {
 
   @BeforeAll
   public void setup() throws IOException {
-    if (isDeploy()) {
-      copyAliyunJars();
-    }
+    copyBundleJarsToHadoop("aliyun-bundle");
 
     try {
       super.startIntegrationTest();
@@ -132,37 +127,5 @@ public class HadoopOSSCatalogIT extends HadoopCatalogIT {
 
   protected String generateLocation(String filesetName) {
     return String.format("%s/%s", defaultBaseLocation, filesetName);
-  }
-
-  private static boolean isDeploy() {
-    String mode =
-        System.getProperty(ITUtils.TEST_MODE) == null
-            ? ITUtils.EMBEDDED_TEST_MODE
-            : System.getProperty(ITUtils.TEST_MODE);
-
-    return Objects.equals(mode, ITUtils.DEPLOY_TEST_MODE);
-  }
-
-  private void copyAliyunJars() {
-    if (!isDeploy()) {
-      return;
-    }
-
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String jarName =
-        String.format("gravitino-aliyun-bundle-%s.jar", System.getenv("PROJECT_VERSION"));
-    String gcsJars =
-        ITUtils.joinPath(
-            gravitinoHome, "..", "..", "bundles", "aliyun-bundle", "build", "libs", jarName);
-    gcsJars = "file://" + gcsJars;
-    try {
-      if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-        String hadoopLibDirs = ITUtils.joinPath(gravitinoHome, "catalogs", "hadoop", "libs");
-        DownloaderUtils.downloadFile(gcsJars, hadoopLibDirs);
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Failed to copy the aliyun dependency jars: %s", gcsJars), e);
-    }
   }
 }
