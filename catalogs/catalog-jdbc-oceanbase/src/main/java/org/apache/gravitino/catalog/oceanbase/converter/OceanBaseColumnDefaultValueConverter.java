@@ -18,10 +18,20 @@
  */
 package org.apache.gravitino.catalog.oceanbase.converter;
 
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Objects;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Types;
 
 public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
 
@@ -31,6 +41,73 @@ public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValue
       String columnDefaultValue,
       boolean isExpression,
       boolean nullable) {
-    throw new GravitinoRuntimeException("Not implemented yet.");
+    if (Objects.isNull(columnDefaultValue)) {
+      return nullable ? Literals.NULL : DEFAULT_VALUE_NOT_SET;
+    }
+
+    if (columnDefaultValue.equalsIgnoreCase(NULL)) {
+      return Literals.NULL;
+    }
+
+    if (isExpression) {
+      if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
+        return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
+      }
+      // The parsing of OceanBase expressions is complex, so we are not currently undertaking the
+      // parsing.
+      return UnparsedExpression.of(columnDefaultValue);
+    }
+
+    switch (type.getTypeName().toLowerCase()) {
+      case OceanBaseTypeConverter.TINYINT:
+        return Literals.byteLiteral(Byte.valueOf(columnDefaultValue));
+      case OceanBaseTypeConverter.TINYINT_UNSIGNED:
+        return Literals.unsignedByteLiteral(Short.valueOf(columnDefaultValue));
+      case OceanBaseTypeConverter.SMALLINT:
+        return Literals.shortLiteral(Short.valueOf(columnDefaultValue));
+      case OceanBaseTypeConverter.SMALLINT_UNSIGNED:
+        return Literals.unsignedShortLiteral(Integer.valueOf(columnDefaultValue));
+      case OceanBaseTypeConverter.INT:
+        return Literals.integerLiteral(Integer.valueOf(columnDefaultValue));
+      case OceanBaseTypeConverter.INT_UNSIGNED:
+        return Literals.unsignedIntegerLiteral(Long.valueOf(columnDefaultValue));
+      case OceanBaseTypeConverter.BIGINT:
+        return Literals.longLiteral(Long.valueOf(columnDefaultValue));
+      case OceanBaseTypeConverter.BIGINT_UNSIGNED:
+        return Literals.unsignedLongLiteral(Decimal.of(columnDefaultValue));
+      case OceanBaseTypeConverter.FLOAT:
+        return Literals.floatLiteral(Float.valueOf(columnDefaultValue));
+      case OceanBaseTypeConverter.DOUBLE:
+        return Literals.doubleLiteral(Double.valueOf(columnDefaultValue));
+      case OceanBaseTypeConverter.NUMBER:
+      case OceanBaseTypeConverter.NUMERIC:
+      case OceanBaseTypeConverter.DECIMAL:
+        return Literals.decimalLiteral(
+            Decimal.of(
+                columnDefaultValue,
+                Integer.parseInt(type.getColumnSize()),
+                Integer.parseInt(type.getScale())));
+      case JdbcTypeConverter.DATE:
+        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
+      case JdbcTypeConverter.TIME:
+        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+      case JdbcTypeConverter.TIMESTAMP:
+      case OceanBaseTypeConverter.DATETIME:
+        return CURRENT_TIMESTAMP.equals(columnDefaultValue)
+            ? DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
+            : Literals.timestampLiteral(
+                LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+      case JdbcTypeConverter.VARCHAR:
+        return Literals.of(
+            columnDefaultValue, Types.VarCharType.of(Integer.parseInt(type.getColumnSize())));
+      case OceanBaseTypeConverter.CHAR:
+        return Literals.of(
+            columnDefaultValue, Types.FixedCharType.of(Integer.parseInt(type.getColumnSize())));
+      case OceanBaseTypeConverter.JSON:
+      case JdbcTypeConverter.TEXT:
+        return Literals.stringLiteral(columnDefaultValue);
+      default:
+        return UnparsedExpression.of(columnDefaultValue);
+    }
   }
 }
