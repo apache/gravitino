@@ -76,7 +76,11 @@ const TableView = () => {
   const metalake = searchParams.get('metalake') || ''
   const catalog = searchParams.get('catalog') || ''
   const type = searchParams.get('type') || ''
-  const isKafkaSchema = paramsSize == 3 && searchParams.has('metalake') && searchParams.has('catalog') && searchParams.get('type') === 'messaging'
+  const isKafkaSchema =
+    paramsSize == 3 &&
+    searchParams.has('metalake') &&
+    searchParams.has('catalog') &&
+    searchParams.get('type') === 'messaging'
 
   const defaultPaginationConfig = { pageSize: 10, page: 0 }
   const pageSizeOptions = [10, 25, 50]
@@ -263,25 +267,29 @@ const TableView = () => {
             <ViewIcon viewBox='0 0 24 22' />
           </IconButton>
 
-          {!isKafkaSchema && <IconButton
-            title='Edit'
-            size='small'
-            sx={{ color: theme => theme.palette.text.secondary }}
-            onClick={() => handleShowEditDialog({ row, type: row.node })}
-            data-refer={`edit-entity-${row.name}`}
-          >
-            <EditIcon />
-          </IconButton>}
+          {!isKafkaSchema && (
+            <IconButton
+              title='Edit'
+              size='small'
+              sx={{ color: theme => theme.palette.text.secondary }}
+              onClick={() => handleShowEditDialog({ row, type: row.node })}
+              data-refer={`edit-entity-${row.name}`}
+            >
+              <EditIcon />
+            </IconButton>
+          )}
 
-          {!isKafkaSchema && <IconButton
-            title='Delete'
-            size='small'
-            sx={{ color: theme => theme.palette.error.light }}
-            onClick={() => handleDelete({ name: row.name, type: row.node, catalogType: row.type })}
-            data-refer={`delete-entity-${row.name}`}
-          >
-            <DeleteIcon />
-          </IconButton>}
+          {!isKafkaSchema && (
+            <IconButton
+              title='Delete'
+              size='small'
+              sx={{ color: theme => theme.palette.error.light }}
+              onClick={() => handleDelete({ name: row.name, type: row.node, catalogType: row.type })}
+              data-refer={`delete-entity-${row.name}`}
+            >
+              <DeleteIcon />
+            </IconButton>
+          )}
         </>
       )
     }
