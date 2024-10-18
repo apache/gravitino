@@ -50,7 +50,8 @@ public class RangerHelper {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHelper.class);
 
   public static final String MANAGED_BY_GRAVITINO = "MANAGED_BY_GRAVITINO";
-  public static final String RESOURCE_STAR = "*";
+  /** The `*` gives access to all resources */
+  public static final String RESOURCE_ALL = "*";
   /** The owner privileges, the owner can do anything on the metadata object */
   private final Set<RangerPrivilege> ownerPrivileges;
   /** The policy search keys */

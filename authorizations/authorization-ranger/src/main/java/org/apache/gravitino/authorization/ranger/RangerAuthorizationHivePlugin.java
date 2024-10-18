@@ -119,22 +119,22 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
         // Add `*` for the SCHEMA permission
         rangerSecurableObjects.add(
             RangerSecurableObjects.of(
-                ImmutableList.of(RangerHelper.RESOURCE_STAR),
+                ImmutableList.of(RangerHelper.RESOURCE_ALL),
                 MetadataObject.Type.SCHEMA,
                 ownerMappingRule()));
         // Add `*.*` for the TABLE permission
         rangerSecurableObjects.add(
             RangerSecurableObjects.of(
-                ImmutableList.of(RangerHelper.RESOURCE_STAR, RangerHelper.RESOURCE_STAR),
+                ImmutableList.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
                 MetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `*.*.*` for the COLUMN permission
         rangerSecurableObjects.add(
             RangerSecurableObjects.of(
                 ImmutableList.of(
-                    RangerHelper.RESOURCE_STAR,
-                    RangerHelper.RESOURCE_STAR,
-                    RangerHelper.RESOURCE_STAR),
+                    RangerHelper.RESOURCE_ALL,
+                    RangerHelper.RESOURCE_ALL,
+                    RangerHelper.RESOURCE_ALL),
                 MetadataObject.Type.COLUMN,
                 ownerMappingRule()));
         break;
@@ -148,7 +148,7 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
         // Add `{schema}.*` for the TABLE permission
         rangerSecurableObjects.add(
             RangerSecurableObjects.of(
-                ImmutableList.of(metadataObject.name() /*Schema name*/, RangerHelper.RESOURCE_STAR),
+                ImmutableList.of(metadataObject.name() /*Schema name*/, RangerHelper.RESOURCE_ALL),
                 MetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `{schema}.*.*` for the COLUMN permission
@@ -156,8 +156,8 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
             RangerSecurableObjects.of(
                 ImmutableList.of(
                     metadataObject.name() /*Schema name*/,
-                    RangerHelper.RESOURCE_STAR,
-                    RangerHelper.RESOURCE_STAR),
+                    RangerHelper.RESOURCE_ALL,
+                    RangerHelper.RESOURCE_ALL),
                 MetadataObject.Type.COLUMN,
                 ownerMappingRule()));
         break;
@@ -173,7 +173,7 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
             RangerSecurableObjects.of(
                 Stream.concat(
                         convertToRangerMetadataObject(metadataObject).stream(),
-                        Stream.of(RangerHelper.RESOURCE_STAR))
+                        Stream.of(RangerHelper.RESOURCE_ALL))
                     .collect(Collectors.toList()),
                 MetadataObject.Type.COLUMN,
                 ownerMappingRule()));
@@ -215,7 +215,7 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                       // Add Ranger privilege(`SELECT`) to SCHEMA(`*`)
                       rangerSecurableObjects.add(
                           RangerSecurableObjects.of(
-                              ImmutableList.of(RangerHelper.RESOURCE_STAR),
+                              ImmutableList.of(RangerHelper.RESOURCE_ALL),
                               MetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
@@ -232,7 +232,7 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                       // Add Ranger privilege(`CREATE`) to SCHEMA(`*`)
                       rangerSecurableObjects.add(
                           RangerSecurableObjects.of(
-                              ImmutableList.of(RangerHelper.RESOURCE_STAR),
+                              ImmutableList.of(RangerHelper.RESOURCE_ALL),
                               MetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
@@ -249,7 +249,7 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                       // Add Ranger privilege(`SELECT`) to SCHEMA(`*`)
                       rangerSecurableObjects.add(
                           RangerSecurableObjects.of(
-                              ImmutableList.of(RangerHelper.RESOURCE_STAR),
+                              ImmutableList.of(RangerHelper.RESOURCE_ALL),
                               MetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
@@ -277,16 +277,16 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                       rangerSecurableObjects.add(
                           RangerSecurableObjects.of(
                               ImmutableList.of(
-                                  RangerHelper.RESOURCE_STAR, RangerHelper.RESOURCE_STAR),
+                                  RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
                               MetadataObject.Type.TABLE,
                               rangerPrivileges));
                       // Add `*.*.*` for the COLUMN permission
                       rangerSecurableObjects.add(
                           RangerSecurableObjects.of(
                               ImmutableList.of(
-                                  RangerHelper.RESOURCE_STAR,
-                                  RangerHelper.RESOURCE_STAR,
-                                  RangerHelper.RESOURCE_STAR),
+                                  RangerHelper.RESOURCE_ALL,
+                                  RangerHelper.RESOURCE_ALL,
+                                  RangerHelper.RESOURCE_ALL),
                               MetadataObject.Type.COLUMN,
                               rangerPrivileges));
                       break;
@@ -296,7 +296,7 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                           RangerSecurableObjects.of(
                               ImmutableList.of(
                                   securableObject.name() /*Schema name*/,
-                                  RangerHelper.RESOURCE_STAR),
+                                  RangerHelper.RESOURCE_ALL),
                               MetadataObject.Type.TABLE,
                               rangerPrivileges));
                       // Add `{schema}.*.*` for the COLUMN permission
@@ -304,8 +304,8 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                           RangerSecurableObjects.of(
                               ImmutableList.of(
                                   securableObject.name() /*Schema name*/,
-                                  RangerHelper.RESOURCE_STAR,
-                                  RangerHelper.RESOURCE_STAR),
+                                  RangerHelper.RESOURCE_ALL,
+                                  RangerHelper.RESOURCE_ALL),
                               MetadataObject.Type.COLUMN,
                               rangerPrivileges));
                       break;
@@ -326,7 +326,7 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                             RangerSecurableObjects.of(
                                 Stream.concat(
                                         convertToRangerMetadataObject(securableObject).stream(),
-                                        Stream.of(RangerHelper.RESOURCE_STAR))
+                                        Stream.of(RangerHelper.RESOURCE_ALL))
                                     .collect(Collectors.toList()),
                                 MetadataObject.Type.COLUMN,
                                 rangerPrivileges));
