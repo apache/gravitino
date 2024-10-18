@@ -642,12 +642,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         }
       }
 
-      // If reached here, it implies that the catalog is not in use or force is true.
-      if (catalogInUse) {
-        // force is true, disable the catalog first
-        disableCatalog(ident);
-      }
-
       catalogCache.invalidate(ident);
       return store.delete(ident, EntityType.CATALOG, true);
 
