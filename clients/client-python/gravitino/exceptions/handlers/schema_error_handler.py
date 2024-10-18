@@ -21,6 +21,7 @@ from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 from gravitino.exceptions.base import (
     NoSuchCatalogException,
     NoSuchSchemaException,
+    CatalogNotInUseException,
     SchemaAlreadyExistsException,
     NonEmptySchemaException,
 )
@@ -39,11 +40,15 @@ class SchemaErrorHandler(RestErrorHandler):
                 raise NoSuchCatalogException(error_message)
             if exception_type == NoSuchSchemaException.__name__:
                 raise NoSuchSchemaException(error_message)
+
         if code == ErrorConstants.ALREADY_EXISTS_CODE:
             raise SchemaAlreadyExistsException(error_message)
 
         if code == ErrorConstants.NON_EMPTY_CODE:
             raise NonEmptySchemaException(error_message)
+
+        if code == ErrorConstants.NOT_IN_USE_CODE:
+            raise CatalogNotInUseException(error_message)
 
         super().handle(error_response)
 

@@ -34,6 +34,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -43,6 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -127,8 +129,19 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   @Override
-  public boolean dropCatalog(String catalogName) {
-    return getMetalake().dropCatalog(catalogName);
+  public boolean dropCatalog(String catalogName, boolean force)
+      throws NonEmptyEntityException, CatalogInUseException {
+    return getMetalake().dropCatalog(catalogName, force);
+  }
+
+  @Override
+  public void enableCatalog(String catalogName) throws NoSuchCatalogException {
+    getMetalake().enableCatalog(catalogName);
+  }
+
+  @Override
+  public void disableCatalog(String catalogName) throws NoSuchCatalogException {
+    getMetalake().disableCatalog(catalogName);
   }
 
   /**

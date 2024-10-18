@@ -240,6 +240,11 @@ class HTTPClient:
             "put", endpoint, json=json, error_handler=error_handler, **kwargs
         )
 
+    def patch(self, endpoint, json=None, error_handler=None, **kwargs):
+        return self._request(
+            "patch", endpoint, json=json, error_handler=error_handler, **kwargs
+        )
+
     def post_form(self, endpoint, data=None, error_handler=None, **kwargs):
         return self._request(
             "post", endpoint, data=data, error_handler=error_handler, **kwargs

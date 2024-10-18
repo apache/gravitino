@@ -21,8 +21,11 @@ package org.apache.gravitino;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 
 /**
  * Client interface for supporting catalogs. It includes methods for listing, loading, creating,
@@ -48,9 +51,9 @@ public interface SupportsCatalogs {
   Catalog[] listCatalogsInfo() throws NoSuchMetalakeException;
 
   /**
-   * Load a catalog by its identifier.
+   * Load a catalog by its name.
    *
-   * @param catalogName the identifier of the catalog.
+   * @param catalogName the name of the catalog.
    * @return The catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
@@ -59,7 +62,7 @@ public interface SupportsCatalogs {
   /**
    * Check if a catalog exists.
    *
-   * @param catalogName The identifier of the catalog.
+   * @param catalogName The name of the catalog.
    * @return True if the catalog exists, false otherwise.
    */
   default boolean catalogExists(String catalogName) {
@@ -72,7 +75,7 @@ public interface SupportsCatalogs {
   }
 
   /**
-   * Create a catalog with specified identifier.
+   * Create a catalog with specified catalog name, type, provider, comment, and properties.
    *
    * <p>The parameter "provider" is a short name of the catalog, used to tell Gravitino which
    * catalog should be created. The short name should be the same as the {@link CatalogProvider}
@@ -96,9 +99,9 @@ public interface SupportsCatalogs {
       throws NoSuchMetalakeException, CatalogAlreadyExistsException;
 
   /**
-   * Alter a catalog with specified identifier.
+   * Alter a catalog with specified catalog name and changes.
    *
-   * @param catalogName the identifier of the catalog.
+   * @param catalogName the name of the catalog.
    * @param changes the changes to apply to the catalog.
    * @return The altered catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
@@ -108,12 +111,71 @@ public interface SupportsCatalogs {
       throws NoSuchCatalogException, IllegalArgumentException;
 
   /**
-   * Drop a catalog with specified identifier.
+   * Drop a catalog with specified name. Please make sure:
+   *
+   * <ul>
+   *   <li>There is no schema in the catalog. Otherwise, a {@link NonEmptyEntityException} will be
+   *       thrown.
+   *   <li>The method {@link #disableCatalog(String)} has been called before dropping the catalog.
+   *       Otherwise, a {@link CatalogInUseException} will be thrown.
+   * </ul>
+   *
+   * It is equivalent to calling {@code dropCatalog(ident, false)}.
    *
    * @param catalogName the name of the catalog.
-   * @return True if the catalog was dropped, false otherwise.
+   * @return True if the catalog was dropped, false if the catalog does not exist.
+   * @throws NonEmptyEntityException If the catalog is not empty.
+   * @throws CatalogInUseException If the catalog is in use.
    */
-  boolean dropCatalog(String catalogName);
+  default boolean dropCatalog(String catalogName)
+      throws NonEmptyEntityException, CatalogInUseException {
+    return dropCatalog(catalogName, false);
+  }
+
+  /**
+   * Drop a catalog with specified name. If the force flag is true, it will:
+   *
+   * <ul>
+   *   <li>Cascade drop all sub-entities (schemas, tables, etc.) of the catalog in Gravitino store.
+   *   <li>Drop the catalog even if it is in use.
+   *   <li>External resources (e.g. database, table, etc.) associated with sub-entities will not be
+   *       dropped unless it is managed (such as managed fileset).
+   * </ul>
+   *
+   * If the force flag is false, it is equivalent to calling {@link #dropCatalog(String)}.
+   *
+   * @param catalogName The identifier of the catalog.
+   * @param force Whether to force the drop.
+   * @return True if the catalog was dropped, false if the catalog does not exist.
+   * @throws NonEmptyEntityException If the catalog is not empty and force is false.
+   * @throws CatalogInUseException If the catalog is in use and force is false.
+   */
+  boolean dropCatalog(String catalogName, boolean force)
+      throws NonEmptyEntityException, CatalogInUseException;
+
+  /**
+   * Enable a catalog. If the catalog is already enabled, this method does nothing.
+   *
+   * @param catalogName The identifier of the catalog.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   */
+  void enableCatalog(String catalogName) throws NoSuchCatalogException;
+
+  /**
+   * Disable a catalog. If the catalog is already disabled, this method does nothing. Once a catalog
+   * is disabled:
+   *
+   * <ul>
+   *   <li>It can only be listed, loaded, dropped, or disable.
+   *   <li>Any other operations on the catalog will throw an {@link CatalogNotInUseException}.
+   *   <li>Any operation on the sub-entities (schemas, tables, etc.) will throw an {@link
+   *       CatalogNotInUseException}.
+   * </ul>
+   *
+   * @param catalogName The identifier of the catalog.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   */
+  void disableCatalog(String catalogName) throws NoSuchCatalogException;
 
   /**
    * Test whether the catalog with specified parameters can be connected to before creating it.

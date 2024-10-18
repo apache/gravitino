@@ -228,10 +228,7 @@ public class CatalogHiveIT extends BaseIT {
                 catalog.asSchemas().dropSchema(schema, true);
               }));
       Arrays.stream(metalake.listCatalogs())
-          .forEach(
-              (catalogName -> {
-                metalake.dropCatalog(catalogName);
-              }));
+          .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
       client.dropMetalake(metalakeName);
     }
     if (hiveClientPool != null) {
@@ -1672,7 +1669,7 @@ public class CatalogHiveIT extends BaseIT {
         });
 
     newCatalog.asSchemas().dropSchema("schema", true);
-    metalake.dropCatalog(nameOfCatalog);
+    metalake.dropCatalog(nameOfCatalog, true);
   }
 
   private void createCatalogWithCustomOperation(String catalogName, String customImpl) {

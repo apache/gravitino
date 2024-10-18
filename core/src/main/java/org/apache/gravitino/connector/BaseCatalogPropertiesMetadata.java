@@ -21,18 +21,28 @@ package org.apache.gravitino.connector;
 
 import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
+import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.Catalog.PROPERTY_PACKAGE;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.annotation.Evolving;
 
 @Evolving
 public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetadata {
+
+  public static final PropertiesMetadata BASIC_CATALOG_PROPERTIES_METADATA =
+      new BaseCatalogPropertiesMetadata() {
+        @Override
+        protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+          return Collections.emptyMap();
+        }
+      };
 
   // The basic property entries for catalog entities
   private static final Map<String, PropertyEntry<?>> BASIC_CATALOG_PROPERTY_ENTRIES =
@@ -73,6 +83,11 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   "The region code of the cloud that the catalog is running on",
                   false /* immutable */,
                   null /* The default value does not work because if the user does not set it, this property will not be displayed */,
+                  false /* hidden */),
+              PropertyEntry.booleanReservedPropertyEntry(
+                  PROPERTY_IN_USE,
+                  "The property indicating the catalog is in use",
+                  true /* default value */,
                   false /* hidden */)),
           PropertyEntry::getName);
 

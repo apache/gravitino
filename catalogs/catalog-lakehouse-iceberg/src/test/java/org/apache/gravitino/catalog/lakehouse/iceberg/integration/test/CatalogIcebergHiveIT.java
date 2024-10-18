@@ -77,6 +77,6 @@ public class CatalogIcebergHiveIT extends CatalogIcebergBaseIT {
         () -> createdCatalog.asSchemas().createSchema("schema1", "", null));
 
     createdCatalog.asSchemas().dropSchema("schema1", false);
-    metalake.dropCatalog(catalogNm);
+    metalake.dropCatalog(catalogNm, true);
   }
 }

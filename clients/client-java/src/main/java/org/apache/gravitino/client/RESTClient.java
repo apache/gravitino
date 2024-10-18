@@ -380,6 +380,24 @@ public interface RESTClient extends Closeable {
       Consumer<ErrorResponse> errorHandler);
 
   /**
+   * Perform a PATCH request on the specified path with given information.
+   *
+   * @param path The path to be requested.
+   * @param body The request body to be included in the PATCH request.
+   * @param responseType The class representing the type of the response.
+   * @param headers The headers to be included in the request.
+   * @param errorHandler The consumer for handling error responses.
+   * @return The response of the PATCH request.
+   * @param <T> The type of the response.
+   */
+  <T extends RESTResponse> T patch(
+      String path,
+      RESTRequest body,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler);
+
+  /**
    * Perform a POST request with form data on the specified path with the given information.
    *
    * @param path The path to be requested.

@@ -43,6 +43,7 @@ class TestCatalog(IntegrationTestEnv):
     catalog_comment: str = "catalogComment"
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
     catalog_provider: str = "hadoop"
+    catalog_in_use_prop: str = "in-use"
 
     catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
 
@@ -82,7 +83,7 @@ class TestCatalog(IntegrationTestEnv):
             logger.info(
                 "Drop catalog %s[%s]",
                 self.catalog_ident,
-                self.gravitino_client.drop_catalog(name=self.catalog_name),
+                self.gravitino_client.drop_catalog(name=self.catalog_name, force=True),
             )
         except GravitinoRuntimeException:
             logger.warning("Failed to drop catalog %s", self.catalog_name)
@@ -105,7 +106,11 @@ class TestCatalog(IntegrationTestEnv):
         catalog = self.create_catalog(self.catalog_name)
         self.assertEqual(catalog.name(), self.catalog_name)
         self.assertEqual(
-            catalog.properties(), {self.catalog_location_prop: "/tmp/test_schema"}
+            catalog.properties(),
+            {
+                self.catalog_location_prop: "/tmp/test_schema",
+                self.catalog_in_use_prop: "true",
+            },
         )
 
     def test_failed_create_catalog(self):
@@ -140,6 +145,7 @@ class TestCatalog(IntegrationTestEnv):
 
     def test_drop_catalog(self):
         self.create_catalog(self.catalog_name)
+        self.gravitino_client.disable_catalog(self.catalog_name)
         self.assertTrue(self.gravitino_client.drop_catalog(name=self.catalog_name))
 
     def test_list_catalogs_info(self):
@@ -154,7 +160,11 @@ class TestCatalog(IntegrationTestEnv):
         self.assertEqual(catalog.name(), self.catalog_name)
         self.assertEqual(catalog.comment(), self.catalog_comment)
         self.assertEqual(
-            catalog.properties(), {self.catalog_location_prop: "/tmp/test_schema"}
+            catalog.properties(),
+            {
+                self.catalog_location_prop: "/tmp/test_schema",
+                self.catalog_in_use_prop: "true",
+            },
         )
         self.assertEqual(catalog.audit_info().creator(), "anonymous")
 

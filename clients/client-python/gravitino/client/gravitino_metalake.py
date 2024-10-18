@@ -23,6 +23,7 @@ from gravitino.api.catalog_change import CatalogChange
 from gravitino.dto.dto_converters import DTOConverters
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
+from gravitino.dto.requests.catalog_set_request import CatalogSetRequest
 from gravitino.dto.requests.catalog_updates_request import CatalogUpdatesRequest
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
@@ -185,19 +186,59 @@ class GravitinoMetalake(MetalakeDTO):
             self.name(), catalog_response.catalog(), self.rest_client
         )
 
-    def drop_catalog(self, name: str) -> bool:
+    def drop_catalog(self, name: str, force: bool = False) -> bool:
         """Drop the catalog with specified name.
 
         Args:
-            name the name of the catalog.
+            name: the name of the catalog.
+            force: whether to force drop the catalog.
 
         Returns:
-            true if the catalog is dropped successfully, false otherwise.
+            true if the catalog is dropped successfully, false if the catalog does not exist.
         """
+        params = {"force": str(force)}
         url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
-        response = self.rest_client.delete(url, error_handler=CATALOG_ERROR_HANDLER)
+        response = self.rest_client.delete(
+            url, params=params, error_handler=CATALOG_ERROR_HANDLER
+        )
 
         drop_response = DropResponse.from_json(response.body, infer_missing=True)
         drop_response.validate()
 
         return drop_response.dropped()
+
+    def enable_catalog(self, name: str):
+        """Enable the catalog with specified name. If the catalog is already in use, this method does nothing.
+
+        Args:
+            name: the name of the catalog.
+
+        Raises:
+            NoSuchCatalogException if the catalog with specified name does not exist.
+        """
+
+        catalog_enable_request = CatalogSetRequest(in_use=True)
+        catalog_enable_request.validate()
+
+        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
+        self.rest_client.patch(
+            url, json=catalog_enable_request, error_handler=CATALOG_ERROR_HANDLER
+        )
+
+    def disable_catalog(self, name: str):
+        """Disable the catalog with specified name. If the catalog is already disabled, this method does nothing.
+
+        Args:
+            name: the name of the catalog.
+
+        Raises:
+            NoSuchCatalogException if the catalog with specified name does not exist.
+        """
+
+        catalog_disable_request = CatalogSetRequest(in_use=False)
+        catalog_disable_request.validate()
+
+        url = self.API_METALAKES_CATALOGS_PATH.format(self.name(), name)
+        self.rest_client.patch(
+            url, json=catalog_disable_request, error_handler=CATALOG_ERROR_HANDLER
+        )

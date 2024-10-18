@@ -235,6 +235,31 @@ public class ErrorResponse extends BaseResponse {
   }
 
   /**
+   * Create a new entity in use error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse notInUse(String type, String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.NOT_IN_USE_CODE, type, message, getStackTrace(throwable));
+  }
+
+  /**
+   * Create a new entity in use error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse inUse(String type, String message, Throwable throwable) {
+    return new ErrorResponse(ErrorConstants.IN_USE_CODE, type, message, getStackTrace(throwable));
+  }
+
+  /**
    * Create a new non-empty error instance of {@link ErrorResponse}.
    *
    * @param type The type of the error.

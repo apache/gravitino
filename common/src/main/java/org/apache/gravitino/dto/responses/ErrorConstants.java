@@ -48,6 +48,12 @@ public class ErrorConstants {
   /** Error codes for forbidden operation. */
   public static final int FORBIDDEN_CODE = 1008;
 
+  /** Error codes for operation on a no in use entity. */
+  public static final int NOT_IN_USE_CODE = 1009;
+
+  /** Error codes for drop an in use entity. */
+  public static final int IN_USE_CODE = 1010;
+
   /** Error codes for invalid state. */
   public static final int UNKNOWN_ERROR_CODE = 1100;
 

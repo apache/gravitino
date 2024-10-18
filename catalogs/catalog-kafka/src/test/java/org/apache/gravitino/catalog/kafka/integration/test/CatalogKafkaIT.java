@@ -123,6 +123,7 @@ public class CatalogKafkaIT extends BaseIT {
     Arrays.stream(metalake.listCatalogs())
         .forEach(
             (catalogName -> {
+              metalake.disableCatalog(catalogName);
               metalake.dropCatalog(catalogName);
             }));
     client.dropMetalake(METALAKE_NAME);
@@ -171,7 +172,7 @@ public class CatalogKafkaIT extends BaseIT {
     Assertions.assertFalse(alteredCatalog.properties().containsKey("key1"));
 
     // test drop catalog
-    boolean dropped = metalake.dropCatalog(catalogName);
+    boolean dropped = metalake.dropCatalog(catalogName, true);
     Assertions.assertTrue(dropped);
     Exception exception =
         Assertions.assertThrows(

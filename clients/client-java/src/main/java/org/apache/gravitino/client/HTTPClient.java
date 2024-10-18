@@ -562,6 +562,31 @@ public class HTTPClient implements RESTClient {
   }
 
   /**
+   * Sends an HTTP PATCH request to the specified path with the provided request body and processes
+   * the response with support for response headers.
+   *
+   * @param path The URL path to send the PATCH request to.
+   * @param body The REST request to place in the request body.
+   * @param responseType The class type of the response for deserialization (Must be registered with
+   *     the ObjectMapper).
+   * @param headers A map of request headers (key-value pairs) to include in the request (can be
+   *     null).
+   * @param errorHandler The error handler delegated for HTTP responses, which handles server error
+   *     responses.
+   * @return The response entity parsed and converted to its type T.
+   * @param <T> The class type of the response for deserialization.
+   */
+  @Override
+  public <T extends RESTResponse> T patch(
+      String path,
+      RESTRequest body,
+      Class<T> responseType,
+      Map<String, String> headers,
+      Consumer<ErrorResponse> errorHandler) {
+    return execute(Method.PATCH, path, null, body, responseType, headers, errorHandler);
+  }
+
+  /**
    * Sends an HTTP DELETE request to the specified path without query parameters and processes the
    * response.
    *
