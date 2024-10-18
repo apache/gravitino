@@ -1372,6 +1372,7 @@ public class TrinoConnectorIT extends BaseIT {
       boolean success = checkTrinoHasLoaded(sql, 30);
       Assertions.assertTrue(success, "Trino should load the catalog: " + sql);
 
+      createdMetalake.disableCatalog(catalogName);
       createdMetalake.dropCatalog(catalogName);
       // We need to test we can't load this catalog any more by Trino.
       success = checkTrinoHasRemoved(sql, 30);
