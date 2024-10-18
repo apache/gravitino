@@ -78,8 +78,8 @@ public class GravitinoEnv {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoEnv.class);
 
   private Config config;
-  // Iceberg REST server use base components while Gravitino Server use all components.
-  private boolean manageAllComponents = true;
+  // Iceberg REST server use base components while Gravitino Server use full components.
+  private boolean manageFullComponents = true;
 
   private EntityStore entityStore;
 
@@ -139,7 +139,7 @@ public class GravitinoEnv {
   public void initializeBaseComponents(Config config) {
     LOG.info("Initializing Gravitino base environment...");
     this.config = config;
-    this.manageAllComponents = false;
+    this.manageFullComponents = false;
     initBaseComponents();
     LOG.info("Gravitino base environment is initialized.");
   }
@@ -149,13 +149,13 @@ public class GravitinoEnv {
    *
    * @param config The configuration object to initialize the environment.
    */
-  public void initializeAllComponents(Config config) {
-    LOG.info("Initializing Gravitino all Environment...");
+  public void initializeFullComponents(Config config) {
+    LOG.info("Initializing Gravitino full Environment...");
     this.config = config;
-    this.manageAllComponents = true;
+    this.manageFullComponents = true;
     initBaseComponents();
     initGravitinoServerComponents();
-    LOG.info("Gravitino all environment is initialized.");
+    LOG.info("Gravitino full environment is initialized.");
   }
 
   /**
@@ -321,7 +321,7 @@ public class GravitinoEnv {
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
-    if (manageAllComponents) {
+    if (manageFullComponents) {
       auxServiceManager.serviceStart();
     }
   }

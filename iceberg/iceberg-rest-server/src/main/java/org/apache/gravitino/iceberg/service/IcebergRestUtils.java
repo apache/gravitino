@@ -82,7 +82,7 @@ public class IcebergRestUtils {
   }
 
   public static String getCatalogName(String rawPrefix) {
-    String prefix = shelling(rawPrefix);
+    String prefix = normalizePrefix(rawPrefix);
     Preconditions.checkArgument(
         !IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(prefix),
         String.format("%s is conflict with reserved key, please replace it", prefix));
@@ -104,7 +104,7 @@ public class IcebergRestUtils {
 
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
   // 'iceberg_catalog'
-  private static String shelling(String rawPrefix) {
+  private static String normalizePrefix(String rawPrefix) {
     if (StringUtils.isBlank(rawPrefix)) {
       return rawPrefix;
     } else {

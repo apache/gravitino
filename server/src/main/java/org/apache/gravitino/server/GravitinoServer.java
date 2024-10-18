@@ -80,7 +80,7 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void initialize() {
-    gravitinoEnv.initializeAllComponents(serverConfig);
+    gravitinoEnv.initializeFullComponents(serverConfig);
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
