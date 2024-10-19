@@ -790,7 +790,10 @@ tasks {
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
-      ":catalogs:catalog-kafka:copyLibAndConfig"
+      ":catalogs:catalog-kafka:copyLibAndConfig",
+      ":bundles:aliyun-bundle:copyLibAndConfig",
+      ":bundles:aws-bundle:copyLibAndConfig",
+      ":bundles:gcp-bundle:copyLibAndConfig"
     )
   }
 

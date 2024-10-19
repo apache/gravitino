@@ -44,3 +44,9 @@ tasks.jar {
 tasks.compileJava {
   dependsOn(":catalogs:catalog-hadoop:runtimeJars")
 }
+
+// build the jar file when running the copyLibAndConfig task, this is to make sure we can copy the
+// jar file to the right place when executing filesystem test in the deploy mode
+tasks.register("copyLibAndConfig") {
+  dependsOn(tasks.jar)
+}
