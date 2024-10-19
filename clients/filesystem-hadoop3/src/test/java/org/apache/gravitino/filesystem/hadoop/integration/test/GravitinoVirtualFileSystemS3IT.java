@@ -44,7 +44,7 @@ import org.testcontainers.shaded.org.awaitility.Awaitility;
 public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemS3IT.class);
 
-  private String bucketName = "s3-bucket-" +  UUID.randomUUID().toString().replace("-", "");
+  private String bucketName = "s3-bucket-" + UUID.randomUUID().toString().replace("-", "");
   private String accessKey;
   private String secretKey;
   private String s3Endpoint;

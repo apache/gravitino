@@ -124,7 +124,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     this.propertiesMetadata = propertiesMetadata;
-
     this.catalogInfo = info;
 
     this.conf = config;

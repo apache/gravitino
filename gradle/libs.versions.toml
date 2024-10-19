@@ -214,7 +214,7 @@ prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwiza
 prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", version.ref = "prometheus" }
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
-minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop3"}
+minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop-minikdc"}
 immutables-value = { module = "org.immutables:value", version.ref = "immutables-value" }
 commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
 sun-activation = { group = "com.sun.activation", name = "javax.activation", version.ref = "sun-activation-version" }

@@ -34,12 +34,6 @@ tasks.withType(ShadowJar::class.java) {
   isZip64 = true
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
-
-  // Relocate dependencies to avoid conflicts
-  // relocate("org.apache.httpcomponents", "org.apache.gravitino.shaded.org.apache.httpcomponents")
-  // relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")
-  // relocate("com.google.guava", "org.apache.gravitino.shaded.com.google.guava")
-  // relocate("com.google.code", "org.apache.gravitino.shaded.com.google.code")
 }
 
 tasks.jar {

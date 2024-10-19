@@ -44,7 +44,7 @@ import org.testcontainers.shaded.org.awaitility.Awaitility;
 @Tag("gravitino 艰-docker-test")
 public class HadoopS3CatalogIT extends HadoopCatalogIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopOSSCatalogIT.class);
-  private String bucketName = "s3-bucket-" +  UUID.randomUUID().toString().replace("-", "");
+  private String bucketName = "s3-bucket-" + UUID.randomUUID().toString().replace("-", "");
   private String accessKey;
   private String secretKey;
   private String s3Endpoint;
