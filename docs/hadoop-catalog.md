@@ -82,12 +82,12 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 
 ### Fileset properties
 
-| Property name                                      | Description                                                                                            | Default value            | Required | Since Version   |
-|----------------------------------------------------|--------------------------------------------------------------------------------------------------------|--------------------------|----------|-----------------|
-| `authentication.impersonation-enable`              | Whether to enable impersonation for the Hadoop catalog fileset.                                        | The parent(schema) value | No       | 0.6.0           |
-| `authentication.type`                              | The type of authentication for Hadoop catalog fileset, currently we only support `kerberos`, `simple`. | The parent(schema) value | No       | 0.6.0           |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication for the fileset.                                          | The parent(schema) value | No       | 0.6.0           |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication for the fileset.                                 | The parent(schema) value | No       | 0.6.0           |
+| Property name                         | Description                                                                                            | Default value            | Required | Since Version    |
+|---------------------------------------|--------------------------------------------------------------------------------------------------------|--------------------------|----------|------------------|
+| `authentication.impersonation-enable` | Whether to enable impersonation for the Hadoop catalog fileset.                                        | The parent(schema) value | No       | 0.6.0-incubating |
+| `authentication.type`                 | The type of authentication for Hadoop catalog fileset, currently we only support `kerberos`, `simple`. | The parent(schema) value | No       | 0.6.0-incubating |
+| `authentication.kerberos.principal`   | The principal of the Kerberos authentication for the fileset.                                          | The parent(schema) value | No       | 0.6.0-incubating |
+| `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for the fileset.                                 | The parent(schema) value | No       | 0.6.0-incubating |
 
 ### Fileset operations
 

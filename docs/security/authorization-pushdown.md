@@ -17,14 +17,14 @@ This module translates Gravitino's authorization model into the permission rules
 
 In order to use the Authorization Ranger Hive Plugin, you need to configure the following properties and [Apache Hive catalog properties](../apache-hive-catalog.md#catalog-properties):
 
-| Property Name                       | Description                                                                                                                                          | Default Value | Required | Since Version |
-|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `authorization-provider`            | Providers to use to implement authorization plugin such as `ranger`.                                                                                 | (none)        | No       | 0.6.0         |
-| `authorization.ranger.admin.url`    | The Apache Ranger web URIs.                                                                                                                          | (none)        | No       | 0.6.0         |
-| `authorization.ranger.auth.type`    | The Apache Ranger authentication type `simple` or `kerberos`.                                                                                        | `simple`      | No       | 0.6.0         |
-| `authorization.ranger.username`     | The Apache Ranger admin web login username (auth type=simple), or kerberos principal(auth type=kerberos), Need have Ranger administrator permission. | (none)        | No       | 0.6.0         |
-| `authorization.ranger.password`     | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)        | No       | 0.6.0         |
-| `authorization.ranger.service.name` | The Apache Ranger service name.                                                                                                                      | (none)        | No       | 0.6.0         |
+| Property Name                       | Description                                                                                                                                          | Default Value | Required | Since Version    |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `authorization-provider`            | Providers to use to implement authorization plugin such as `ranger`.                                                                                 | (none)        | No       | 0.6.0-incubating |
+| `authorization.ranger.admin.url`    | The Apache Ranger web URIs.                                                                                                                          | (none)        | No       | 0.6.0-incubating |
+| `authorization.ranger.auth.type`    | The Apache Ranger authentication type `simple` or `kerberos`.                                                                                        | `simple`      | No       | 0.6.0-incubating |
+| `authorization.ranger.username`     | The Apache Ranger admin web login username (auth type=simple), or kerberos principal(auth type=kerberos), Need have Ranger administrator permission. | (none)        | No       | 0.6.0-incubating |
+| `authorization.ranger.password`     | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)        | No       | 0.6.0-incubating |
+| `authorization.ranger.service.name` | The Apache Ranger service name.                                                                                                                      | (none)        | No       | 0.6.0-incubating |
 
 Once you have used the correct configuration, you can perform authorization operations by calling Gravitino [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-roles-to-a-user).
 
