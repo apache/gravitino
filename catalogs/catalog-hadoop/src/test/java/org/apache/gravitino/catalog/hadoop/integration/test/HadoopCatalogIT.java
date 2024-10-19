@@ -61,15 +61,15 @@ public class HadoopCatalogIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  public String metalakeName = GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
-  public String catalogName = GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
-  public static final String SCHEMA_PREFIX = "CatalogFilesetIT_schema";
-  public String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+  protected String metalakeName = GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
+  protected String catalogName = GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
+  public final String SCHEMA_PREFIX = "CatalogFilesetIT_schema";
+  protected String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
   protected static final String provider = "hadoop";
-  protected static GravitinoMetalake metalake;
-  protected static Catalog catalog;
-  protected static FileSystem fileSystem;
-  protected static String defaultBaseLocation;
+  protected GravitinoMetalake metalake;
+  protected Catalog catalog;
+  protected FileSystem fileSystem;
+  protected String defaultBaseLocation;
 
   protected void startNecessaryContainer() {
     containerSuite.startHiveContainer();
