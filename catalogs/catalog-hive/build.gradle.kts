@@ -128,7 +128,7 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.localstack)
-  testImplementation(libs.hadoop2.s3)
+  testImplementation(libs.hadoop2.aws)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

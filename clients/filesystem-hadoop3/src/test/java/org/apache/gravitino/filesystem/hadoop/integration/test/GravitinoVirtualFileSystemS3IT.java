@@ -26,7 +26,10 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
@@ -35,29 +38,86 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.Container;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 
-@Disabled(
-    "Disabled due to we don't have a real GCP account to test. If you have a GCP account,"
-        + "please change the configuration(YOUR_KEY_FILE, YOUR_BUCKET) and enable this test.")
-public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemIT {
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemGCSIT.class);
+public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT {
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemS3IT.class);
 
-  public static final String BUCKET_NAME = "YOUR_BUCKET";
-  public static final String SERVICE_ACCOUNT_FILE = "YOUR_KEY_FILE";
+  private String bucketName = "s3-bucket-" +  UUID.randomUUID().toString().replace("-", "");
+  private String accessKey;
+  private String secretKey;
+  private String s3Endpoint;
+
+  private GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
   @BeforeAll
   public void startIntegrationTest() {
     // Do nothing
   }
 
+  private void startS3Mocker() {
+    containerSuite.startLocalStackContainer();
+    gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
+
+    Awaitility.await()
+        .atMost(60, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try {
+                Container.ExecResult result =
+                    gravitinoLocalStackContainer.executeInContainer(
+                        "awslocal", "iam", "create-user", "--user-name", "anonymous");
+                return result.getExitCode() == 0;
+              } catch (Exception e) {
+                LOG.info("LocalStack is not ready yet for: ", e);
+                return false;
+              }
+            });
+
+    gravitinoLocalStackContainer.executeInContainer("awslocal", "s3", "mb", "s3://" + bucketName);
+
+    Container.ExecResult result =
+        gravitinoLocalStackContainer.executeInContainer(
+            "awslocal", "iam", "create-access-key", "--user-name", "anonymous");
+
+    gravitinoLocalStackContainer.executeInContainer(
+        "awslocal",
+        "s3api",
+        "put-bucket-acl",
+        "--bucket",
+        "my-test-bucket",
+        "--acl",
+        "public-read-write");
+
+    // Get access key and secret key from result
+    String[] lines = result.getStdout().split("\n");
+    accessKey = lines[3].split(":")[1].trim().substring(1, 21);
+    secretKey = lines[5].split(":")[1].trim().substring(1, 41);
+
+    LOG.info("Access key: " + accessKey);
+    LOG.info("Secret key: " + secretKey);
+
+    s3Endpoint =
+        String.format("http://%s:%d", gravitinoLocalStackContainer.getContainerIpAddress(), 4566);
+  }
+
   @BeforeAll
   public void startUp() throws Exception {
-    copyBundleJarsToHadoop("gcp-bundle");
+    copyBundleJarsToHadoop("s3-bundle");
+
+    // Start s3 simulator
+    startS3Mocker();
+
     // Need to download jars to gravitino server
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 64 * 1024 * 1024;
+    defaultBockSize = 32 * 1024 * 1024;
+
+    // The value is 1 for S3
+    defaultReplication = 1;
 
     metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
     catalogName = GravitinoITUtils.genRandomName("catalog");
@@ -68,9 +128,13 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     Assertions.assertTrue(client.metalakeExists(metalakeName));
 
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(FILESYSTEM_PROVIDERS, "gcs");
+    properties.put("gravitino.bypass.fs.s3a.access.key", accessKey);
+    properties.put("gravitino.bypass.fs.s3a.secret.key", secretKey);
+    properties.put("gravitino.bypass.fs.s3a.endpoint", s3Endpoint);
     properties.put(
-        "gravitino.bypass.fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
+        "gravitino.bypass.fs.s3a.aws.credentials.provider",
+        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
+    properties.put(FILESYSTEM_PROVIDERS, "s3");
 
     Catalog catalog =
         metalake.createCatalog(
@@ -87,16 +151,19 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set("gravitino.bypass.fs.gs.auth.service.account.enable", "true");
-    conf.set("gravitino.bypass.fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
-    conf.set(FS_FILESYSTEM_PROVIDERS, "gcs");
+    conf.set("fs.s3a.access.key", accessKey);
+    conf.set("fs.s3a.secret.key", secretKey);
+    conf.set("fs.s3a.endpoint", s3Endpoint);
+    conf.set(
+        "fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
+    conf.set(FS_FILESYSTEM_PROVIDERS, "s3");
   }
 
   @AfterAll
   public void tearDown() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
     client.dropMetalake(metalakeName);
 
     if (client != null) {
@@ -127,7 +194,7 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
   }
 
   protected String genStorageLocation(String fileset) {
-    return String.format("gs://%s/%s", BUCKET_NAME, fileset);
+    return String.format("s3a://%s/%s", bucketName, fileset);
   }
 
   @Disabled(

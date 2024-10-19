@@ -17,4 +17,4 @@
 # under the License.
 #
 
-org.apache.gravitino.gcs.fs.GCSFileSystemProvider
+org.apache.gravitino.s3.fs.S3FileSystemProvider
