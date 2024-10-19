@@ -31,21 +31,47 @@ import org.apache.gravitino.authorization.SecurableObject;
  * HBase, etc.
  */
 public interface RangerPrivilegesMappingProvider {
-  /** Set the mapping Gravitino privilege name to the Ranger privileges rule. */
+  /**
+   * Set the mapping Gravitino privilege name to the Ranger privileges rule.
+   *
+   * @return The mapping Gravitino privilege name to the Ranger privileges rule.
+   */
   Map<Privilege.Name, Set<RangerPrivilege>> privilegesMappingRule();
 
-  /** Set the owner privileges rule. */
+  /**
+   * Set the owner Ranger privileges rule.
+   *
+   * @return The owner Ranger privileges rule.
+   */
   Set<RangerPrivilege> ownerMappingRule();
 
-  /** Set the policy resource defines rule. */
+  /**
+   * Set the Ranger policy resource defines rule.
+   *
+   * @return The policy resource defines rule.
+   */
   List<String> policyResourceDefinesRule();
 
-  /** Allow privilege operation defines rule. */
+  /**
+   * Allow Gravitino privilege operation defines rule.
+   *
+   * @return The allow Gravitino privilege operation defines rule.
+   */
   Set<Privilege.Name> allowPrivilegesRule();
 
-  /** Translate the Gravitino securable object to the Ranger securable object. */
+  /**
+   * Translate the Gravitino securable object to the Ranger securable object.
+   *
+   * @param securableObject The Gravitino securable object.
+   * @return The Ranger securable object list.
+   */
   List<RangerSecurableObject> translatePrivilege(SecurableObject securableObject);
 
-  /** Translate the Gravitino securable object to the Ranger owner securable object. */
+  /**
+   * Translate the Gravitino securable object to the Ranger owner securable object.
+   *
+   * @param metadataObject The Gravitino metadata object.
+   * @return The Ranger owner securable object list.
+   */
   List<RangerSecurableObject> translateOwner(MetadataObject metadataObject);
 }
