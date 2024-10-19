@@ -156,6 +156,10 @@ public class SecureHadoopCatalogOperations
       UserContext.clearUserContext(ident);
 
       return r;
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Schema {} does not exist", ident);
+      return false;
+
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete schema " + ident, ioe);
     }
@@ -221,7 +225,7 @@ public class SecureHadoopCatalogOperations
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
-    throw new UnsupportedOperationException("Not implemented");
+    return hadoopCatalogOperations.getFileLocation(ident, subPath);
   }
 
   @Override

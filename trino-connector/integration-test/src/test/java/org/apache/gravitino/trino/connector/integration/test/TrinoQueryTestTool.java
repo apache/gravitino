@@ -136,7 +136,16 @@ public class TrinoQueryTestTool {
       TrinoQueryIT.ciTestsets.clear();
 
       String testHost = commandLine.getOptionValue("test_host");
-      TrinoQueryIT.testHost = Strings.isBlank(testHost) ? TrinoQueryIT.testHost : testHost;
+      if (Strings.isNotEmpty(testHost)) {
+        TrinoQueryIT.testHost = testHost;
+        TrinoQueryIT.gravitinoUri = String.format("http://%s:8090", testHost);
+        TrinoQueryIT.trinoUri = String.format("http://%s:8080", testHost);
+        TrinoQueryIT.hiveMetastoreUri = String.format("thrift://%s:9083", testHost);
+        TrinoQueryIT.hdfsUri = String.format("hdfs://%s:9000", testHost);
+        TrinoQueryIT.mysqlUri = String.format("jdbc:mysql://%s", testHost);
+        TrinoQueryIT.postgresqlUri = String.format("jdbc:postgresql://%s", testHost);
+      }
+
       String gravitinoUri = commandLine.getOptionValue("gravitino_uri");
       TrinoQueryIT.gravitinoUri =
           Strings.isBlank(gravitinoUri) ? TrinoQueryIT.gravitinoUri : gravitinoUri;
@@ -208,8 +217,8 @@ public class TrinoQueryTestTool {
       TrinoQueryITBase.autoStart = autoStart;
       TrinoQueryITBase.autoStartGravitino = autoStartGravitino;
 
-      TrinoQueryIT.setup();
       TrinoQueryIT testerRunner = new TrinoQueryIT();
+      testerRunner.setup();
 
       if (commandLine.hasOption("gen_output")) {
         String catalogFileName = "catalog_" + catalog + "_prepare.sql";

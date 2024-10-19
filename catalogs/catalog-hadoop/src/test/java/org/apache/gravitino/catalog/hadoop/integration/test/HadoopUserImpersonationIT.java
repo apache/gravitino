@@ -45,7 +45,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -67,8 +67,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class HadoopUserImpersonationIT extends AbstractIT {
-  private static final Logger LOG = LoggerFactory.getLogger(HadoopUserImpersonationIT.class);
+public class HadoopUserImpersonationIT extends BaseIT {
+  private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
 
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("CatalogHadoopIT_metalake");
@@ -111,7 +111,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
   }
 
   @BeforeAll
-  public static void setup() throws Exception {
+  public void setup() throws Exception {
     if (!isEmbedded()) {
       return;
     }
@@ -254,7 +254,7 @@ public class HadoopUserImpersonationIT extends AbstractIT {
             });
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 

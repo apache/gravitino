@@ -59,15 +59,23 @@ public enum Strategy {
    * @return The distribution strategy.
    */
   public static Strategy getByName(String name) {
-    for (Strategy strategy : Strategy.values()) {
-      if (strategy.name().equalsIgnoreCase(name)) {
-        return strategy;
-      }
+    String upperName = name.toUpperCase();
+    switch (upperName) {
+      case "NONE":
+        return NONE;
+      case "HASH":
+        return HASH;
+      case "RANGE":
+        return RANGE;
+      case "EVEN":
+      case "RANDOM":
+        return EVEN;
+      default:
+        throw new IllegalArgumentException(
+            "Invalid distribution strategy: "
+                + name
+                + ". Valid values are: "
+                + Arrays.toString(Strategy.values()));
     }
-    throw new IllegalArgumentException(
-        "Invalid distribution strategy: "
-            + name
-            + ". Valid values are: "
-            + Arrays.toString(Strategy.values()));
   }
 }

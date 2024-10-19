@@ -22,19 +22,20 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.UserMetaPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.h2.UserMetaH2Provider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.UserMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 public class UserMetaSQLProviderFactory {
 
-  private static final Map<JDBCBackendType, UserMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
-          ImmutableMap.of(
-              JDBCBackendType.MYSQL, new UserMetaMySQLProvider(),
-              JDBCBackendType.H2, new UserMetaH2Provider(),
-              JDBCBackendType.POSTGRESQL, new UserMetaPostgreSQLProvider());
+  private static final Map<JDBCBackendType, UserMetaBaseSQLProvider> USER_META_SQL_PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL, new UserMetaMySQLProvider(),
+          JDBCBackendType.H2, new UserMetaH2Provider(),
+          JDBCBackendType.POSTGRESQL, new UserMetaPostgreSQLProvider());
 
   public static UserMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -44,12 +45,10 @@ public class UserMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return USER_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class UserMetaMySQLProvider extends UserMetaBaseSQLProvider {}
-
-  static class UserMetaH2Provider extends UserMetaBaseSQLProvider {}
 
   public static String selectUserIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String userName) {
@@ -84,6 +83,14 @@ public class UserMetaSQLProviderFactory {
 
   public static String listUsersByRoleId(@Param("roleId") Long roleId) {
     return getProvider().listUsersByRoleId(roleId);
+  }
+
+  public static String listUserPOsByMetalake(@Param("metalakeName") String metalakeName) {
+    return getProvider().listUserPOsByMetalake(metalakeName);
+  }
+
+  public static String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return getProvider().listExtendedUserPOsByMetalakeId(metalakeId);
   }
 
   public static String deleteUserMetasByLegacyTimeline(

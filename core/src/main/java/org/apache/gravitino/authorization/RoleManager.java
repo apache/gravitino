@@ -19,31 +19,28 @@
 
 package org.apache.gravitino.authorization;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Scheduler;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,34 +52,13 @@ import org.slf4j.LoggerFactory;
 class RoleManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(RoleManager.class);
+  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
   private final EntityStore store;
   private final IdGenerator idGenerator;
-  private final Cache<NameIdentifier, RoleEntity> cache;
 
-  RoleManager(EntityStore store, IdGenerator idGenerator, Config config) {
+  RoleManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;
-
-    long cacheEvictionIntervalInMs = config.get(Configs.ROLE_CACHE_EVICTION_INTERVAL_MS);
-    // One role entity is about 40 bytes using jol estimate, there are usually about 100w+
-    // roles in the production environment, this won't bring too much memory cost, but it
-    // can improve the performance significantly.
-    this.cache =
-        Caffeine.newBuilder()
-            .expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS)
-            .removalListener(
-                (k, v, c) -> {
-                  LOG.info("Remove role {} from the cache.", k);
-                })
-            .scheduler(
-                Scheduler.forScheduledExecutorService(
-                    new ScheduledThreadPoolExecutor(
-                        1,
-                        new ThreadFactoryBuilder()
-                            .setDaemon(true)
-                            .setNameFormat("role-cleaner-%d")
-                            .build())))
-            .build();
   }
 
   RoleEntity createRole(
@@ -107,7 +83,6 @@ class RoleManager {
             .build();
     try {
       store.put(roleEntity, false /* overwritten */);
-      cache.put(roleEntity.nameIdentifier(), roleEntity);
 
       AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
           metalake,
@@ -141,7 +116,6 @@ class RoleManager {
     try {
       AuthorizationUtils.checkMetalakeExists(metalake);
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);
-      cache.invalidate(ident);
 
       try {
         RoleEntity roleEntity = store.get(ident, Entity.EntityType.ROLE, RoleEntity.class);
@@ -162,21 +136,57 @@ class RoleManager {
     }
   }
 
-  private RoleEntity getRoleEntity(NameIdentifier identifier) {
-    return cache.get(
-        identifier,
-        id -> {
-          try {
-            return store.get(identifier, Entity.EntityType.ROLE, RoleEntity.class);
-          } catch (IOException ioe) {
-            LOG.error("Failed to get roles {} due to storage issues", identifier, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+  String[] listRoleNames(String metalake) {
+    try {
+      AuthorizationUtils.checkMetalakeExists(metalake);
+      Namespace namespace = AuthorizationUtils.ofRoleNamespace(metalake);
+      return store.list(namespace, RoleEntity.class, Entity.EntityType.ROLE).stream()
+          .map(Role::name)
+          .toArray(String[]::new);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Metalake {} does not exist", metalake, e);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Listing user under metalake {} failed due to storage issues", metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
-  @VisibleForTesting
-  Cache<NameIdentifier, RoleEntity> getCache() {
-    return cache;
+  String[] listRoleNamesByObject(String metalake, MetadataObject object) {
+    try {
+      AuthorizationUtils.checkMetalakeExists(metalake);
+
+      return store.relationOperations()
+          .listEntitiesByRelation(
+              SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+              MetadataObjectUtil.toEntityIdent(metalake, object),
+              MetadataObjectUtil.toEntityType(object),
+              false /* allFields */)
+          .stream()
+          .map(entity -> ((RoleEntity) entity).name())
+          .toArray(String[]::new);
+
+    } catch (NoSuchEntityException nse) {
+      LOG.error("Metadata object {} (type {}) doesn't exist", object.fullName(), object.type());
+      throw new NoSuchMetadataObjectException(
+          "Metadata object %s (type %s) doesn't exist", object.fullName(), object.type());
+    } catch (IOException ioe) {
+      LOG.error(
+          "Listing roles under metalake {} by object full name {} and type {} failed due to storage issues",
+          metalake,
+          object.fullName(),
+          object.type(),
+          ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  private RoleEntity getRoleEntity(NameIdentifier identifier) {
+    try {
+      return store.get(identifier, Entity.EntityType.ROLE, RoleEntity.class);
+    } catch (IOException ioe) {
+      LOG.error("Failed to get roles {} due to storage issues", identifier, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 }

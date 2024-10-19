@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.mysql.operation;
 
-import static org.apache.gravitino.catalog.mysql.operation.MysqlDatabaseOperations.SYS_MYSQL_DATABASE_NAMES;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -45,8 +43,11 @@ public class TestMysqlDatabaseOperations extends TestMysql {
     // Mysql database creation does not support incoming comments.
     String comment = null;
     List<String> databases = DATABASE_OPERATIONS.listDatabases();
-    SYS_MYSQL_DATABASE_NAMES.forEach(
-        sysMysqlDatabaseName -> Assertions.assertFalse(databases.contains(sysMysqlDatabaseName)));
+    ((MysqlDatabaseOperations) DATABASE_OPERATIONS)
+        .createSysDatabaseNameSet()
+        .forEach(
+            sysMysqlDatabaseName ->
+                Assertions.assertFalse(databases.contains(sysMysqlDatabaseName)));
     testBaseOperation(databaseName, properties, comment);
     testDropDatabase(databaseName);
   }

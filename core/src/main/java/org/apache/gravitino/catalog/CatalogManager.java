@@ -18,10 +18,11 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
-import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -31,7 +32,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.Streams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
@@ -45,6 +45,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.ServiceLoader;
@@ -52,6 +53,7 @@ import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -76,10 +78,13 @@ import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
@@ -102,6 +107,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
+
+  public static boolean catalogInUse(EntityStore store, NameIdentifier ident)
+      throws NoSuchMetalakeException, NoSuchCatalogException {
+    // todo: check if the metalake is in use
+    return getInUseValue(store, ident);
+  }
 
   /** Wrapper class for a catalog instance and its class loader. */
   public static class CatalogWrapper {
@@ -295,15 +306,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       List<CatalogEntity> catalogEntities =
           store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
 
-      // Using provider as key to avoid loading the same type catalog instance multiple times
-      Map<String, Set<String>> hiddenProps = new HashMap<>();
-      Multimaps.index(catalogEntities, CatalogEntity::getProvider)
-          .asMap()
-          .forEach((p, e) -> hiddenProps.put(p, getHiddenPropertyNames(e.iterator().next())));
-
       return catalogEntities.stream()
-          .map(e -> e.toCatalogInfoWithoutHiddenProps(hiddenProps.get(e.getProvider())))
+          .map(e -> e.toCatalogInfoWithResolvedProps(getResolvedProperties(e)))
           .toArray(Catalog[]::new);
+
     } catch (IOException ioe) {
       LOG.error("Failed to list catalogs in metalake {}", metalakeIdent, ioe);
       throw new RuntimeException(ioe);
@@ -366,7 +372,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     .build())
             .build();
 
-    boolean createSuccess = false;
+    boolean needClean = true;
     try {
       NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
       if (!store.exists(metalakeIdent, EntityType.METALAKE)) {
@@ -375,14 +381,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       }
 
       store.put(e, false /* overwrite */);
-      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e));
-      createSuccess = true;
+      CatalogWrapper wrapper = catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
+
+      needClean = false;
       return wrapper.catalog;
+
     } catch (EntityAlreadyExistsException e1) {
+      needClean = false;
       LOG.warn("Catalog {} already exists", ident, e1);
       throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
+
     } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
       throw e2;
+
     } catch (Exception e3) {
       catalogCache.invalidate(ident);
       LOG.error("Failed to create catalog {}", ident, e3);
@@ -390,8 +401,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         throw (RuntimeException) e3;
       }
       throw new RuntimeException(e3);
+
     } finally {
-      if (!createSuccess) {
+      if (needClean) {
+        // since we put the catalog entity into the store but failed to create the catalog instance,
+        // we need to clean up the entity stored.
         try {
           store.delete(ident, EntityType.CATALOG, true);
         } catch (IOException e4) {
@@ -449,7 +463,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       .build())
               .build();
 
-      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity);
+      CatalogWrapper wrapper = createCatalogWrapper(dummyEntity, mergedConfig);
       wrapper.doWithCatalogOps(
           c -> {
             c.testConnection(ident, type, provider, comment, mergedConfig);
@@ -466,6 +480,64 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
+  @Override
+  public void enableCatalog(NameIdentifier ident)
+      throws NoSuchCatalogException, CatalogNotInUseException {
+    try {
+      if (catalogInUse(store, ident)) {
+        return;
+      }
+
+      store.update(
+          ident,
+          CatalogEntity.class,
+          EntityType.CATALOG,
+          catalog -> {
+            CatalogEntity.Builder newCatalogBuilder = newCatalogBuilder(ident.namespace(), catalog);
+
+            Map<String, String> newProps =
+                catalog.getProperties() == null
+                    ? new HashMap<>()
+                    : new HashMap<>(catalog.getProperties());
+            newProps.put(PROPERTY_IN_USE, "true");
+            newCatalogBuilder.withProperties(newProps);
+
+            return newCatalogBuilder.build();
+          });
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    try {
+      if (!catalogInUse(store, ident)) {
+        return;
+      }
+      store.update(
+          ident,
+          CatalogEntity.class,
+          EntityType.CATALOG,
+          catalog -> {
+            CatalogEntity.Builder newCatalogBuilder = newCatalogBuilder(ident.namespace(), catalog);
+
+            Map<String, String> newProps =
+                catalog.getProperties() == null
+                    ? new HashMap<>()
+                    : new HashMap<>(catalog.getProperties());
+            newProps.put(PROPERTY_IN_USE, "false");
+            newCatalogBuilder.withProperties(newProps);
+
+            return newCatalogBuilder.build();
+          });
+      catalogCache.invalidate(ident);
+
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   /**
    * Alters an existing catalog with the specified changes.
    *
@@ -478,6 +550,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
+    if (!catalogInUse(store, ident)) {
+      throw new CatalogNotInUseException("Catalog %s is not in use, please enable it first", ident);
+    }
+
     // There could be a race issue that someone is using the catalog from cache while we are
     // updating it.
 
@@ -511,22 +587,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               EntityType.CATALOG,
               catalog -> {
                 CatalogEntity.Builder newCatalogBuilder =
-                    CatalogEntity.builder()
-                        .withId(catalog.id())
-                        .withName(catalog.name())
-                        .withNamespace(ident.namespace())
-                        .withType(catalog.getType())
-                        .withProvider(catalog.getProvider())
-                        .withComment(catalog.getComment());
-
-                AuditInfo newInfo =
-                    AuditInfo.builder()
-                        .withCreator(catalog.auditInfo().creator())
-                        .withCreateTime(catalog.auditInfo().createTime())
-                        .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                        .withLastModifiedTime(Instant.now())
-                        .build();
-                newCatalogBuilder.withAuditInfo(newInfo);
+                    newCatalogBuilder(ident.namespace(), catalog);
 
                 Map<String, String> newProps =
                     catalog.getProperties() == null
@@ -536,8 +597,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                 return newCatalogBuilder.build();
               });
-      return catalogCache.get(
-              updatedCatalog.nameIdentifier(), id -> createCatalogWrapper(updatedCatalog))
+      return Objects.requireNonNull(
+              catalogCache.get(
+                  updatedCatalog.nameIdentifier(),
+                  id -> createCatalogWrapper(updatedCatalog, null)))
           .catalog;
 
     } catch (NoSuchEntityException ne) {
@@ -554,38 +617,39 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
-  /**
-   * Drops (deletes) the catalog with the specified identifier.
-   *
-   * @param ident The identifier of the catalog to drop.
-   * @return {@code true} if the catalog was successfully dropped, {@code false} otherwise.
-   */
   @Override
-  public boolean dropCatalog(NameIdentifier ident) {
-    // There could be a race issue that someone is using the catalog while we are dropping it.
-    catalogCache.invalidate(ident);
-
+  public boolean dropCatalog(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, CatalogInUseException {
     try {
+      boolean catalogInUse = catalogInUse(store, ident);
+      if (catalogInUse && !force) {
+        throw new CatalogInUseException(
+            "Catalog %s is in use, please disable it first or use force option", ident);
+      }
+
+      List<SchemaEntity> schemas =
+          store.list(
+              Namespace.of(ident.namespace().level(0), ident.name()),
+              SchemaEntity.class,
+              EntityType.SCHEMA);
       CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      if (catalogEntity.getProvider().equals("kafka")) {
-        // Kafka catalog needs to cascade drop the default schema
-        List<SchemaEntity> schemas =
-            store.list(
-                Namespace.of(ident.namespace().level(0), ident.name()),
-                SchemaEntity.class,
-                EntityType.SCHEMA);
-        // If there is only one schema, it must be the default schema, because we don't allow to
-        // drop the default schema.
-        if (schemas.size() == 1) {
-          return store.delete(ident, EntityType.CATALOG, true);
+
+      if (!schemas.isEmpty() && !force) {
+        // the Kafka catalog is special, it includes a default schema
+        if (!catalogEntity.getProvider().equals("kafka") || schemas.size() > 1) {
+          throw new NonEmptyEntityException(
+              "Catalog %s has schemas, please drop them first or use force option", ident);
         }
       }
-      return store.delete(ident, EntityType.CATALOG);
-    } catch (NoSuchEntityException e) {
+
+      catalogCache.invalidate(ident);
+      return store.delete(ident, EntityType.CATALOG, true);
+
+    } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
       return false;
-    } catch (IOException ioe) {
-      LOG.error("Failed to drop catalog {}", ident, ioe);
-      throw new RuntimeException(ioe);
+
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -599,6 +663,44 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   public CatalogWrapper loadCatalogAndWrap(NameIdentifier ident) throws NoSuchCatalogException {
     return catalogCache.get(ident, this::loadCatalogInternal);
+  }
+
+  private static boolean getInUseValue(EntityStore store, NameIdentifier catalogIdent) {
+    try {
+      CatalogEntity catalogEntity =
+          store.get(catalogIdent, EntityType.CATALOG, CatalogEntity.class);
+      return (boolean)
+          BASIC_CATALOG_PROPERTIES_METADATA.getOrDefault(
+              catalogEntity.getProperties(), PROPERTY_IN_USE);
+
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Catalog {} does not exist", catalogIdent, e);
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, catalogIdent);
+
+    } catch (IOException e) {
+      LOG.error("Failed to do store operation", e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  private CatalogEntity.Builder newCatalogBuilder(Namespace namespace, CatalogEntity catalog) {
+    CatalogEntity.Builder builder =
+        CatalogEntity.builder()
+            .withId(catalog.id())
+            .withName(catalog.name())
+            .withNamespace(namespace)
+            .withType(catalog.getType())
+            .withProvider(catalog.getProvider())
+            .withComment(catalog.getComment());
+
+    AuditInfo newInfo =
+        AuditInfo.builder()
+            .withCreator(catalog.auditInfo().creator())
+            .withCreateTime(catalog.auditInfo().createTime())
+            .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+            .withLastModifiedTime(Instant.now())
+            .build();
+    return builder.withAuditInfo(newInfo);
   }
 
   private Map<String, String> buildCatalogConf(String provider, Map<String, String> properties) {
@@ -642,7 +744,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
     try {
       CatalogEntity entity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      return createCatalogWrapper(entity);
+      return createCatalogWrapper(entity, null);
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
@@ -654,7 +756,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
-  private CatalogWrapper createCatalogWrapper(CatalogEntity entity) {
+  /**
+   * Create a catalog wrapper from the catalog entity and validate the given properties for
+   * creation. The properties can be null if it is not needed to validate.
+   *
+   * @param entity The catalog entity.
+   * @param propsToValidate The properties to validate.
+   * @return The created catalog wrapper.
+   */
+  private CatalogWrapper createCatalogWrapper(
+      CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();
 
@@ -665,9 +776,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Validate catalog properties and initialize the config
     classLoader.withClassLoader(
         cl -> {
-          Map<String, String> configWithoutId = Maps.newHashMap(conf);
-          configWithoutId.remove(ID_KEY);
-          validatePropertyForCreate(catalog.catalogPropertiesMetadata(), configWithoutId);
+          validatePropertyForCreate(catalog.catalogPropertiesMetadata(), propsToValidate);
 
           // Call wrapper.catalog.properties() to make BaseCatalog#properties in IsolatedClassLoader
           // not null. Why do we do this? Because wrapper.catalog.properties() needs to be called in
@@ -681,6 +790,23 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         IllegalArgumentException.class);
 
     return wrapper;
+  }
+
+  /**
+   * Get the resolved properties (filter out the hidden properties and add some required default
+   * properties) of the catalog entity.
+   *
+   * @param entity The catalog entity.
+   * @return The resolved properties.
+   */
+  private Map<String, String> getResolvedProperties(CatalogEntity entity) {
+    Map<String, String> conf = entity.getProperties();
+    String provider = entity.getProvider();
+
+    try (IsolatedClassLoader classLoader = createClassLoader(provider, conf)) {
+      BaseCatalog<?> catalog = createBaseCatalog(classLoader, entity);
+      return classLoader.withClassLoader(cl -> catalog.properties(), RuntimeException.class);
+    }
   }
 
   private Set<String> getHiddenPropertyNames(CatalogEntity entity) {

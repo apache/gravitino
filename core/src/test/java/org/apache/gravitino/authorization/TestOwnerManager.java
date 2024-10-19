@@ -125,7 +125,8 @@ public class TestOwnerManager {
         UserEntity.builder()
             .withId(idGenerator.nextId())
             .withName(USER)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withNamespace(AuthorizationUtils.ofUserNamespace(METALAKE))
             .withAuditInfo(audit)
             .build();
@@ -135,7 +136,8 @@ public class TestOwnerManager {
         GroupEntity.builder()
             .withId(idGenerator.nextId())
             .withName(GROUP)
-            .withRoles(Collections.emptyList())
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
             .withNamespace(AuthorizationUtils.ofUserNamespace(METALAKE))
             .withAuditInfo(audit)
             .build();

@@ -21,18 +21,19 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.GroupMetaPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.GroupMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.h2.GroupMetaH2Provider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.GroupMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaSQLProviderFactory {
-  private static final Map<JDBCBackendType, GroupMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
-          ImmutableMap.of(
-              JDBCBackendType.MYSQL, new GroupMetaMySQLProvider(),
-              JDBCBackendType.H2, new GroupMetaH2Provider(),
-              JDBCBackendType.POSTGRESQL, new GroupMetaPostgreSQLProvider());
+  private static final Map<JDBCBackendType, GroupMetaBaseSQLProvider> GROUP_META_SQL_PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL, new GroupMetaMySQLProvider(),
+          JDBCBackendType.H2, new GroupMetaH2Provider(),
+          JDBCBackendType.POSTGRESQL, new GroupMetaPostgreSQLProvider());
 
   public static GroupMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -42,12 +43,10 @@ public class GroupMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return GROUP_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class GroupMetaMySQLProvider extends GroupMetaBaseSQLProvider {}
-
-  static class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {}
 
   public static String selectGroupIdBySchemaIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name) {
@@ -82,6 +81,14 @@ public class GroupMetaSQLProviderFactory {
 
   public static String listGroupsByRoleId(@Param("roleId") Long roleId) {
     return getProvider().listGroupsByRoleId(roleId);
+  }
+
+  public static String listGroupPOsByMetalake(@Param("metalakeName") String metalakeName) {
+    return getProvider().listGroupPOsByMetalake(metalakeName);
+  }
+
+  public static String listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return getProvider().listExtendedGroupPOsByMetalakeId(metalakeId);
   }
 
   public static String deleteGroupMetasByLegacyTimeline(

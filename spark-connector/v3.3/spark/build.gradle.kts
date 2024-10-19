@@ -48,6 +48,9 @@ dependencies {
     exclude("org.apache.logging.log4j")
     exclude("org.slf4j")
   }
+  testImplementation(project(":catalogs:hive-metastore-common")) {
+    exclude("*")
+  }
   testImplementation(project(":clients:client-java")) {
     exclude("org.apache.logging.log4j")
     exclude("org.slf4j")
@@ -95,7 +98,7 @@ dependencies {
     exclude("com.tdunning", "json")
     exclude("com.zaxxer", "HikariCP")
     exclude("com.sun.jersey")
-    exclude("io.dropwizard.metricss")
+    exclude("io.dropwizard.metrics")
     exclude("javax.transaction", "transaction-api")
     exclude("org.apache.avro")
     exclude("org.apache.curator")
@@ -136,21 +139,14 @@ dependencies {
 }
 
 tasks.test {
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
-
   val skipITs = project.hasProperty("skipITs")
-  val skipSparkITs = project.hasProperty("skipSparkITs")
   val enableSparkSQLITs = project.hasProperty("enableSparkSQLITs")
   if (!enableSparkSQLITs) {
     exclude("**/integration/test/sql/**")
   }
-  if (skipITs || skipSparkITs) {
+  if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")

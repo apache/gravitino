@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.rel.TableCatalog;
@@ -96,6 +97,9 @@ public interface Catalog extends Auditable {
    * different location, the "package" property is needed.
    */
   String PROPERTY_PACKAGE = "package";
+
+  /** The property indicates the catalog is in use. */
+  String PROPERTY_IN_USE = "in-use";
 
   /**
    * The property to specify the cloud that the catalog is running on. The value should be one of
@@ -180,5 +184,13 @@ public interface Catalog extends Auditable {
    */
   default SupportsTags supportsTags() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support tag operations");
+  }
+
+  /**
+   * @return the {@link SupportsRoles} if the catalog supports role operations.
+   * @throws UnsupportedOperationException if the catalog does not support role operations.
+   */
+  default SupportsRoles supportsRoles() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support role operations");
   }
 }

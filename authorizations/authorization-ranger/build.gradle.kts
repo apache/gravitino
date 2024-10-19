@@ -24,6 +24,10 @@ plugins {
   id("idea")
 }
 
+val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val sparkVersion: String = libs.versions.spark35.get()
+val kyuubiVersion: String = libs.versions.kyuubi4spark35.get()
+
 dependencies {
   implementation(project(":api")) {
     exclude(group = "*")
@@ -69,23 +73,30 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
   testRuntimeOnly(libs.junit.jupiter.engine)
-  testImplementation(libs.ranger.intg) {
-    exclude("org.apache.hive", "hive-storage-api")
-    exclude("org.apache.lucene")
-    exclude("org.apache.solr")
-    exclude("org.apache.kafka")
-    exclude("org.eclipse.jetty")
-    exclude("org.elasticsearch")
-    exclude("org.elasticsearch.client")
-    exclude("org.elasticsearch.plugin")
-    exclude("javax.ws.rs")
-    exclude("org.apache.ranger", "ranger-plugin-classloader")
-  }
-  testImplementation(libs.hive2.jdbc) {
-    exclude("org.slf4j")
-    exclude("org.eclipse.jetty.aggregate")
-  }
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.postgresql.driver)
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
+  testImplementation("org.apache.kyuubi:kyuubi-spark-authz_$scalaVersion:$kyuubiVersion") {
+    exclude("com.sun.jersey")
+  }
+  testImplementation(libs.hadoop3.client)
+  testImplementation(libs.hadoop3.common) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet", "servlet-api")
+  }
+  testImplementation(libs.hadoop3.hdfs) {
+    exclude("com.sun.jersey")
+    exclude("javax.servlet", "servlet-api")
+    exclude("io.netty")
+  }
 }
 
 tasks {
@@ -95,7 +106,7 @@ tasks {
   }
 
   val copyAuthorizationLibs by registering(Copy::class) {
-    dependsOn("jar", "runtimeJars")
+    dependsOn("jar", runtimeJars)
     from("build/libs") {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
@@ -107,20 +118,19 @@ tasks {
   register("copyLibAndConfig", Copy::class) {
     dependsOn(copyAuthorizationLibs)
   }
+
+  jar {
+    dependsOn(runtimeJars)
+  }
 }
 
 tasks.test {
   dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
-  val skipUTs = project.hasProperty("skipTests")
-  if (skipUTs) {
-    // Only run integration tests
-    include("**/integration/**")
-  }
 
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
-    exclude("**/integration/**")
+    exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
   }

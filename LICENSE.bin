@@ -282,10 +282,13 @@
    ApacheDS I18n
    ApacheDS Protocol Kerberos Codec
    Apache Hadoop
+   Apache Hadoop Aliyun connector
+   Apache Hadoop GCS connector
    Apache Hadoop Annotatations
    Apache Hadoop Auth
    Apache Hadoop Client Aggregator
    Apache Hadoop Common
+   Apache Hadoop HDFS
    Apache Hadoop HDFS Client
    Apache Hadoop MapReduce Common
    Apache Hadoop MapReduce Core
@@ -301,6 +304,7 @@
    Apache Iceberg AWS
    Apache Iceberg core
    Apache Iceberg Hive metastore
+   Apache Iceberg GCP
    Apache Ivy
    Apache Log4j 1.x Compatibility API
    Apache Log4j API

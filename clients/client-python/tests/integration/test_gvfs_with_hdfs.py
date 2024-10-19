@@ -1,21 +1,19 @@
-"""
-Licensed to the Apache Software Foundation (ASF) under one
-or more contributor license agreements.  See the NOTICE file
-distributed with this work for additional information
-regarding copyright ownership.  The ASF licenses this file
-to you under the Apache License, Version 2.0 (the
-"License"); you may not use this file except in compliance
-with the License.  You may obtain a copy of the License at
-
-  http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing,
-software distributed under the License is distributed on an
-"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-KIND, either express or implied.  See the License for the
-specific language governing permissions and limitations
-under the License.
-"""
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 # pylint: disable=protected-access
 
@@ -195,7 +193,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             logger.info(
                 "Drop catalog %s[%s]",
                 cls.catalog_name,
-                cls.gravitino_client.drop_catalog(name=cls.catalog_name),
+                cls.gravitino_client.drop_catalog(name=cls.catalog_name, force=True),
             )
         except GravitinoRuntimeException:
             logger.warning("Failed to drop catalog %s", cls.catalog_name)
@@ -365,6 +363,10 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         fs.mv(mv_file, mv_new_file)
         self.assertTrue(fs.exists(mv_new_file))
         self.assertTrue(self.hdfs.exists(mv_new_actual_file))
+
+        # test rename without sub path, which should throw an exception
+        with self.assertRaises(GravitinoRuntimeException):
+            fs.mv(self.fileset_gvfs_location, self.fileset_gvfs_location + "/test_mv")
 
     def test_rm(self):
         rm_dir = self.fileset_gvfs_location + "/test_rm"

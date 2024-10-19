@@ -2,7 +2,6 @@ name: Trino Integration Test
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main", "branch-*" ]
   pull_request:
@@ -33,7 +32,10 @@ jobs:
               - core/**
               - dev/**
               - gradle/**
+              - iceberg/**
+              - integration-test-common/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
               - trino-connector/**
@@ -45,7 +47,7 @@ jobs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
   # Integration test for AMD64 architecture
-  test-amd64-arch:
+  TrinoIT:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
@@ -94,6 +96,7 @@ jobs:
           path: |
             build/reports
             trino-connector/integrate-test/build/*.log
+            trino-connector/integrate-test/build/*.tar
             integration-test-common/build/trino-ci-container-log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log

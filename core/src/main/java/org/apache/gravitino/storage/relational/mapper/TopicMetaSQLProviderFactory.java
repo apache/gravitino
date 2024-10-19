@@ -22,19 +22,19 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.TopicMetaPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.TopicMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.TopicMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 public class TopicMetaSQLProviderFactory {
 
-  private static final Map<JDBCBackendType, TopicMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
-          ImmutableMap.of(
-              JDBCBackendType.MYSQL, new TopicMetaMySQLProvider(),
-              JDBCBackendType.H2, new TopicMetaH2Provider(),
-              JDBCBackendType.POSTGRESQL, new TopicMetaPostgreSQLProvider());
+  private static final Map<JDBCBackendType, TopicMetaBaseSQLProvider> TOPIC_META_SQL_PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL, new TopicMetaMySQLProvider(),
+          JDBCBackendType.H2, new TopicMetaH2Provider(),
+          JDBCBackendType.POSTGRESQL, new TopicMetaPostgreSQLProvider());
 
   public static TopicMetaBaseSQLProvider getProvider() {
     String databaseId =
@@ -44,7 +44,7 @@ public class TopicMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return TOPIC_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class TopicMetaMySQLProvider extends TopicMetaBaseSQLProvider {}

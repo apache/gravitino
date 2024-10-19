@@ -168,13 +168,14 @@ allprojects {
       param.environment("PROJECT_VERSION", project.version)
 
       // Gravitino CI Docker image
-      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.13")
+      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.14")
       param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.5")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
       param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.1")
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
       param.environment("GRAVITINO_CI_S3MOCK_DOCKER_IMAGE", "adobe/s3mock:3.10.0")
+      param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:latest")
 
       val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
       val macDockerConnector = project.rootProject.extra["macDockerConnector"] as? Boolean ?: false
@@ -203,6 +204,13 @@ allprojects {
         param.systemProperty("testMode", "embedded")
       } else {
         throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
+      }
+
+      param.useJUnitPlatform()
+      val skipUTs = project.hasProperty("skipTests")
+      if (skipUTs) {
+        // Only run integration tests
+        param.include("**/integration/test/**")
       }
 
       param.useJUnitPlatform {
@@ -506,10 +514,13 @@ tasks.rat {
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
     "clients/client-python/.venv/*",
+    "clients/client-python/venv/*",
     "clients/client-python/apache_gravitino.egg-info/*",
     "clients/client-python/gravitino/utils/http_client.py",
     "clients/client-python/tests/unittests/htmlcov/*",
-    "clients/client-python/tests/integration/htmlcov/*"
+    "clients/client-python/tests/integration/htmlcov/*",
+    "clients/client-python/docs/build",
+    "clients/client-python/docs/source/generated"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
@@ -613,13 +624,13 @@ tasks {
 
       copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-iceberg-rest-server/licenses") }
-        from(projectDir.file("LICENSE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
-        from(projectDir.file("NOTICE.bin")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
+        from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("DISCLAIMER_WIP.txt")) { into("${rootProject.name}-iceberg-rest-server") }
         into(outputDir)
         rename { fileName ->
-          fileName.replace(".bin", "")
+          fileName.replace(".rest", "")
         }
       }
     }
@@ -735,7 +746,9 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("authorization") &&
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink") && !it.name.startsWith("s3")
+        it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink") &&
+        it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink") &&
+        it.name != "gcp-bundle" && it.name != "aliyun-bundle" && it.name != "aws-bundle"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -755,7 +768,8 @@ tasks {
         !it.name.startsWith("flink") &&
         !it.name.startsWith("trino-connector") &&
         it.name != "bundled-catalog" &&
-        !it.name.startsWith("s3")
+        it.name != "hive-metastore-common" && it.name != "gcp-bundle" &&
+        it.name != "aliyun-bundle" && it.name != "aws-bundle"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")
@@ -771,6 +785,7 @@ tasks {
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-paimon:copyLibAndConfig",
+      "catalogs:catalog-lakehouse-hudi:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",

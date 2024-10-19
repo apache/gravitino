@@ -22,14 +22,15 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.FilesetMetaPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.FilesetMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.FilesetMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 public class FilesetMetaSQLProviderFactory {
   private static final Map<JDBCBackendType, FilesetMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      FILESET_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new FilesetMetaMySQLProvider(),
               JDBCBackendType.H2, new FilesetMetaH2Provider(),
@@ -43,7 +44,7 @@ public class FilesetMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return FILESET_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class FilesetMetaMySQLProvider extends FilesetMetaBaseSQLProvider {}

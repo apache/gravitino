@@ -23,6 +23,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
@@ -64,6 +65,10 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
       String storageLocation,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    // Check whether the current user exists or not
+    AuthorizationUtils.checkCurrentUser(
+        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
+
     Fileset fileset = dispatcher.createFileset(ident, comment, type, storageLocation, properties);
 
     // Set the creator as the owner of the fileset.
@@ -97,6 +102,6 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
-    throw new UnsupportedOperationException("Not implemented");
+    return dispatcher.getFileLocation(ident, subPath);
   }
 }

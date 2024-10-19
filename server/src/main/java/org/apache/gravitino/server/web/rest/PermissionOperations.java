@@ -20,6 +20,8 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Locale;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -29,12 +31,18 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
+import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
+import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleGrantRequest;
 import org.apache.gravitino.dto.requests.RoleRevokeRequest;
 import org.apache.gravitino.dto.responses.GroupResponse;
+import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.lock.LockType;
@@ -42,6 +50,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 @NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/permissions")
@@ -183,6 +192,96 @@ public class PermissionOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
           OperationType.REVOKE, StringUtils.join(request.getRoleNames()), group, e);
+    }
+  }
+
+  @PUT
+  @Path("roles/{role}/{type}/{fullName}/grant/")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "grant-privilege-to-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "grant-privilege-to-role", absolute = true)
+  public Response grantPrivilegeToRole(
+      @PathParam("metalake") String metalake,
+      @PathParam("role") String role,
+      @PathParam("type") String type,
+      @PathParam("fullName") String fullName,
+      PrivilegeGrantRequest privilegeGrantRequest) {
+    try {
+      MetadataObject object =
+          MetadataObjects.parse(
+              fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            for (PrivilegeDTO privilegeDTO : privilegeGrantRequest.getPrivileges()) {
+              AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
+            }
+
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
+            return TreeLockUtils.doWithTreeLock(
+                AuthorizationUtils.ofRole(metalake, role),
+                LockType.WRITE,
+                () ->
+                    Utils.ok(
+                        new RoleResponse(
+                            DTOConverters.toDTO(
+                                accessControlManager.grantPrivilegeToRole(
+                                    metalake,
+                                    role,
+                                    object,
+                                    privilegeGrantRequest.getPrivileges().stream()
+                                        .map(DTOConverters::fromPrivilegeDTO)
+                                        .collect(Collectors.toList()))))));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleRolePermissionOperationException(
+          OperationType.GRANT, fullName, role, e);
+    }
+  }
+
+  @PUT
+  @Path("roles/{role}/{type}/{fullName}/revoke/")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "revoke-privilege-from-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "revoke-privilege-from-role", absolute = true)
+  public Response revokePrivilegeFromRole(
+      @PathParam("metalake") String metalake,
+      @PathParam("role") String role,
+      @PathParam("type") String type,
+      @PathParam("fullName") String fullName,
+      PrivilegeRevokeRequest privilegeRevokeRequest) {
+    try {
+      MetadataObject object =
+          MetadataObjects.parse(
+              fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            for (PrivilegeDTO privilegeDTO : privilegeRevokeRequest.getPrivileges()) {
+              AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
+            }
+
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
+            return TreeLockUtils.doWithTreeLock(
+                AuthorizationUtils.ofRole(metalake, role),
+                LockType.WRITE,
+                () ->
+                    Utils.ok(
+                        new RoleResponse(
+                            DTOConverters.toDTO(
+                                accessControlManager.revokePrivilegesFromRole(
+                                    metalake,
+                                    role,
+                                    object,
+                                    privilegeRevokeRequest.getPrivileges().stream()
+                                        .map(DTOConverters::fromPrivilegeDTO)
+                                        .collect(Collectors.toList()))))));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleRolePermissionOperationException(
+          OperationType.REVOKE, fullName, role, e);
     }
   }
 }

@@ -2,7 +2,6 @@ name: Python Client Integration Test
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main", "branch-*" ]
   pull_request:
@@ -24,27 +23,37 @@ jobs:
             source_changes:
               - .github/**
               - api/**
-              - catalogs/catalog-hadoop/**
+              - authorizations/**
+              - bin/**
+              - catalogs/**
               - clients/client-python/**
               - common/**
               - conf/**
               - core/**
+              - dev/**
+              - gradle/**
+              - iceberg/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - setting.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  # Integration test for AMD64 architecture
-  test-amd64-arch:
+  PythonIT:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     strategy:
       matrix:
+        # Integration test for AMD64 architecture
         architecture: [linux/amd64]
-        java-version: [ 8 ]
+        java-version: [ 17 ]
     env:
       PLATFORM: ${{ matrix.architecture }}
     steps:

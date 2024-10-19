@@ -31,11 +31,15 @@ airlift-json = "237"
 airlift-resolver = "1.6"
 hive2 = "2.3.9"
 hadoop2 = "2.10.2"
-hadoop3 = "3.3.6"
+hadoop3 = "3.1.0"
+hadoop3-gcs = "1.9.4-hadoop3"
+hadoop3-aliyun = "3.1.0"
+hadoop-minikdc = "3.3.6"
 htrace-core4 = "4.1.0-incubating"
 httpclient5 = "5.2.1"
 mockserver = "5.15.0"
 commons-lang3 = "3.14.0"
+commons-lang = "2.6"
 commons-io = "2.15.0"
 commons-collections4 = "4.4"
 commons-collections3 = "3.2.2"
@@ -96,6 +100,12 @@ mail = "1.4.1"
 rome = "1.0"
 jettison = "1.1"
 thrift = "0.12.0"
+derby = "10.14.2.0"
+datanucleus-core = "4.1.17"
+datanucleus-api-jdo = "4.2.4"
+datanucleus-rdbms = "4.1.19"
+datanucleus-jdo = "3.2.0-m3"
+hudi = "0.15.0"
 
 [libraries]
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protoc" }
@@ -137,19 +147,24 @@ hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = 
 hive2-jdbc = { group = "org.apache.hive", name = "hive-jdbc", version.ref = "hive2"}
 hadoop2-auth = { group = "org.apache.hadoop", name = "hadoop-auth", version.ref = "hadoop2" }
 hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
+hadoop2-hdfs-client = { group = "org.apache.hadoop", name = "hadoop-hdfs-client", version.ref = "hadoop2" }
 hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
+hadoop2-aws = { group = "org.apache.hadoop", name = "hadoop-aws", version.ref = "hadoop2"}
 hadoop3-aws = { group = "org.apache.hadoop", name = "hadoop-aws", version.ref = "hadoop3"}
 hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop3" }
 hadoop3-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop3"}
 hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.ref = "hadoop3"}
-hadoop3-minicluster = { group = "org.apache.hadoop", name = "hadoop-minicluster", version.ref = "hadoop3"}
+hadoop3-minicluster = { group = "org.apache.hadoop", name = "hadoop-minicluster", version.ref = "hadoop-minikdc"}
+hadoop3-gcs = { group = "com.google.cloud.bigdataoss", name = "gcs-connector", version.ref = "hadoop3-gcs"}
+hadoop3-oss = { group = "org.apache.hadoop", name = "hadoop-aliyun", version.ref = "hadoop3-aliyun"}
 htrace-core4 = { group = "org.apache.htrace", name = "htrace-core4", version.ref = "htrace-core4" }
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
+commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
@@ -162,9 +177,14 @@ iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref 
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
+iceberg-gcp = { group = "org.apache.iceberg", name = "iceberg-gcp", version.ref = "iceberg" }
 paimon-core = { group = "org.apache.paimon", name = "paimon-core", version.ref = "paimon" }
 paimon-format = { group = "org.apache.paimon", name = "paimon-format", version.ref = "paimon" }
 paimon-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog", version.ref = "paimon" }
+paimon-s3 = { group = "org.apache.paimon", name = "paimon-s3", version.ref = "paimon" }
+paimon-oss = { group = "org.apache.paimon", name = "paimon-oss", version.ref = "paimon" }
+paimon-spark = { group = "org.apache.paimon", name = "paimon-spark", version.ref = "paimon" }
+
 trino-spi= { group = "io.trino", name = "trino-spi", version.ref = "trino" }
 trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trino" }
 trino-memory= { group = "io.trino", name = "trino-memory", version.ref = "trino" }
@@ -176,6 +196,7 @@ testcontainers = { group = "org.testcontainers", name = "testcontainers", versio
 testcontainers-mysql = { group = "org.testcontainers", name = "mysql", version.ref = "testcontainers" }
 testcontainers-postgresql = { group = "org.testcontainers", name = "postgresql", version.ref = "testcontainers" }
 testcontainers-junit-jupiter = { group = "org.testcontainers", name = "junit-jupiter", version.ref = "testcontainers" }
+testcontainers-localstack = { group = "org.testcontainers", name = "localstack", version.ref = "testcontainers" }
 trino-jdbc = { group = "io.trino", name = "trino-jdbc", version.ref = "trino" }
 jwt-api = { group = "io.jsonwebtoken", name = "jjwt-api", version.ref = "jwt"}
 jwt-impl = { group = "io.jsonwebtoken", name = "jjwt-impl", version.ref = "jwt"}
@@ -203,6 +224,11 @@ curator-test = { group = "org.apache.curator", name = "curator-test", version.re
 cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
 woodstox-core = { group = "com.fasterxml.woodstox", name = "woodstox-core", version.ref = "woodstox-core"}
 thrift = { group = "org.apache.thrift", name = "libthrift", version.ref = "thrift"}
+derby = { group = "org.apache.derby", name = "derby", version.ref = "derby"}
+datanucleus-core = { group = "org.datanucleus", name = "datanucleus-core", version.ref = "datanucleus-core" }
+datanucleus-api-jdo = { group = "org.datanucleus", name = "datanucleus-api-jdo", version.ref = "datanucleus-api-jdo" }
+datanucleus-rdbms = { group = "org.datanucleus", name = "datanucleus-rdbms", version.ref = "datanucleus-rdbms" }
+datanucleus-jdo = { group = "org.datanucleus", name = "javax.jdo", version.ref = "datanucleus-jdo" }
 
 ranger-intg = { group = "org.apache.ranger", name = "ranger-intg", version.ref = "ranger" }
 javax-jaxb-api = { group = "javax.xml.bind", name = "jaxb-api", version.ref = "javax-jaxb-api" }

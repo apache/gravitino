@@ -22,14 +22,15 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.TagMetaPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.TagMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.TagMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 public class TagMetaSQLProviderFactory {
 
-  private static final Map<JDBCBackendType, TagMetaBaseSQLProvider> METALAKE_META_SQL_PROVIDER_MAP =
+  private static final Map<JDBCBackendType, TagMetaBaseSQLProvider> TAG_META_SQL_PROVIDER_MAP =
       ImmutableMap.of(
           JDBCBackendType.MYSQL, new TagMetaMySQLProvider(),
           JDBCBackendType.H2, new TagMetaH2Provider(),
@@ -43,7 +44,7 @@ public class TagMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return TAG_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class TagMetaMySQLProvider extends TagMetaBaseSQLProvider {}

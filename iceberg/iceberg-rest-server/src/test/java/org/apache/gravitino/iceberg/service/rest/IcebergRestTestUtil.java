@@ -25,9 +25,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
-import org.apache.gravitino.iceberg.service.IcebergTableOpsManager;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -44,7 +44,11 @@ public class IcebergRestTestUtil {
   public static final String UPDATE_NAMESPACE_POSTFIX = "properties";
   public static final String TEST_NAMESPACE_NAME = "gravitino-test";
   public static final String TABLE_PATH = NAMESPACE_PATH + "/" + TEST_NAMESPACE_NAME + "/tables";
+
+  public static final String VIEW_PATH = NAMESPACE_PATH + "/" + TEST_NAMESPACE_NAME + "/views";
   public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";
+
+  public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";
   public static final String REPORT_METRICS_POSTFIX = "metrics";
 
   public static final boolean DEBUG_SERVER_LOG_ENABLED = true;
@@ -73,15 +77,16 @@ public class IcebergRestTestUtil {
       catalogConf.put(String.format("catalog.%s.catalog-backend-name", PREFIX), PREFIX);
       catalogConf.put(
           IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-          ConfigBasedIcebergTableOpsProviderForTest.class.getName());
-      IcebergTableOpsManager icebergTableOpsManager = new IcebergTableOpsManager(catalogConf);
+          ConfigBasedIcebergCatalogWrapperProviderForTest.class.getName());
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager =
+          new IcebergCatalogWrapperManager(catalogConf);
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(
           new AbstractBinder() {
             @Override
             protected void configure() {
-              bind(icebergTableOpsManager).to(IcebergTableOpsManager.class).ranked(2);
+              bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(2);
               bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(2);
             }
           });

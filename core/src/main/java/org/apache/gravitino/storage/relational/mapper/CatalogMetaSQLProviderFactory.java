@@ -22,7 +22,8 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.CatalogMetaPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.CatalogMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.CatalogMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -30,7 +31,7 @@ import org.apache.ibatis.annotations.Param;
 public class CatalogMetaSQLProviderFactory {
 
   private static final Map<JDBCBackendType, CatalogMetaBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      CATALOG_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new CatalogMetaMySQLProvider(),
               JDBCBackendType.H2, new CatalogMetaH2Provider(),
@@ -44,7 +45,7 @@ public class CatalogMetaSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return CATALOG_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class CatalogMetaMySQLProvider extends CatalogMetaBaseSQLProvider {}

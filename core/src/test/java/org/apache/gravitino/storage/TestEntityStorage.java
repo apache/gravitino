@@ -19,10 +19,7 @@
 
 package org.apache.gravitino.storage;
 
-import static org.apache.gravitino.Configs.DEFAULT_ENTITY_KV_STORE;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
-import static org.apache.gravitino.Configs.ENTITY_KV_ROCKSDB_BACKEND_PATH;
-import static org.apache.gravitino.Configs.ENTITY_KV_STORE;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
@@ -32,7 +29,6 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
-import static org.apache.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 
 import com.google.common.base.Preconditions;
@@ -51,6 +47,7 @@ import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -68,9 +65,12 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -79,14 +79,28 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.relational.converters.H2ExceptionConverter;
+import org.apache.gravitino.storage.relational.converters.MySQLExceptionConverter;
+import org.apache.gravitino.storage.relational.converters.PostgreSQLExceptionConverter;
+import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.org.apache.commons.lang3.tuple.Pair;
 
+@Tag("gravitino-docker-test")
 public class TestEntityStorage {
+  private static final Logger LOG = LoggerFactory.getLogger(TestEntityStorage.class);
+
   public static final String KV_STORE_PATH =
       "/tmp/gravitino_kv_entityStore_" + UUID.randomUUID().toString().replace("-", "");
 
@@ -96,50 +110,73 @@ public class TestEntityStorage {
   private static final String H2_FILE = DB_DIR + ".mv.db";
 
   static Object[] storageProvider() {
-    return new Object[] {Configs.RELATIONAL_ENTITY_STORE};
+    return new Object[] {"h2", "mysql", "postgresql"};
+  }
+
+  @AfterEach
+  void closeSuit() throws IOException {
+    ContainerSuite.getInstance().close();
   }
 
   private void init(String type, Config config) {
     Preconditions.checkArgument(StringUtils.isNotBlank(type));
-    if (type.equals(Configs.KV_STORE_KEY)) {
-      try {
-        FileUtils.deleteDirectory(FileUtils.getFile(KV_STORE_PATH));
-      } catch (Exception e) {
-        // Ignore
+    File dir = new File(DB_DIR);
+    if (dir.exists() || !dir.isDirectory()) {
+      dir.delete();
+    }
+    dir.mkdirs();
+    Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
+    Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(DB_DIR);
+    Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
+    Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    BaseIT baseIT = new BaseIT();
+
+    try {
+      if (type.equalsIgnoreCase("h2")) {
+        // The following properties are used to create the JDBC connection; they are just for test,
+        // in the real world, they will be set automatically by the configuration file if you set
+        // ENTITY_RELATIONAL_STOR as EMBEDDED_ENTITY_RELATIONAL_STORE.
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
+            .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+
+        FieldUtils.writeStaticField(
+            SQLExceptionConverterFactory.class, "converter", new H2ExceptionConverter(), true);
+
+      } else if (type.equalsIgnoreCase("mysql")) {
+        String mysqlJdbcUrl = baseIT.startAndInitMySQLBackend();
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(mysqlJdbcUrl);
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
+            .thenReturn("com.mysql.cj.jdbc.Driver");
+
+        FieldUtils.writeStaticField(
+            SQLExceptionConverterFactory.class, "converter", new MySQLExceptionConverter(), true);
+
+      } else if (type.equalsIgnoreCase("postgresql")) {
+        String postgreSQLJdbcUrl = baseIT.startAndInitPGBackend();
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(postgreSQLJdbcUrl);
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("root");
+        Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
+            .thenReturn("org.postgresql.Driver");
+
+        FieldUtils.writeStaticField(
+            SQLExceptionConverterFactory.class,
+            "converter",
+            new PostgreSQLExceptionConverter(),
+            true);
+
+      } else {
+        throw new UnsupportedOperationException("Unsupported entity store type: " + type);
       }
-      Mockito.when(config.get(ENTITY_STORE)).thenReturn("kv");
-      Mockito.when(config.get(ENTITY_KV_STORE)).thenReturn(DEFAULT_ENTITY_KV_STORE);
-      Mockito.when(config.get(Configs.ENTITY_SERDE)).thenReturn("proto");
-      Mockito.when(config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH)).thenReturn(KV_STORE_PATH);
-
-      Assertions.assertEquals(KV_STORE_PATH, config.get(ENTITY_KV_ROCKSDB_BACKEND_PATH));
-      Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
-      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
-      Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
-    } else if (type.equals(Configs.RELATIONAL_ENTITY_STORE)) {
-      File dir = new File(DB_DIR);
-      if (dir.exists() || !dir.isDirectory()) {
-        dir.delete();
-      }
-      dir.mkdirs();
-      Mockito.when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
-      Mockito.when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PATH)).thenReturn(DB_DIR);
-
-      // The following properties are used to create the JDBC connection; they are just for test, in
-      // the real world,
-      // they will be set automatically by the configuration file if you set ENTITY_RELATIONAL_STORE
-      // as EMBEDDED_ENTITY_RELATIONAL_STORE.
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-          .thenReturn(String.format("jdbc:h2:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
-      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
-
-      Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
-      Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
-    } else {
-      throw new UnsupportedOperationException("Unsupported entity store type: " + type);
+    } catch (Exception e) {
+      LOG.error("Failed to init entity store", e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -151,7 +188,7 @@ public class TestEntityStorage {
       } catch (Exception e) {
         // Ignore
       }
-    } else if (type.equals(Configs.RELATIONAL_ENTITY_STORE)) {
+    } else if (type.equalsIgnoreCase("h2") || type.equalsIgnoreCase("mysql")) {
       dropAllTables();
       File dir = new File(DB_DIR);
       if (dir.exists()) {
@@ -159,6 +196,8 @@ public class TestEntityStorage {
       }
 
       FileUtils.deleteQuietly(new File(H2_FILE));
+    } else if (type.equalsIgnoreCase("postgresql")) {
+      // Do nothing
     } else {
       throw new UnsupportedOperationException("Unsupported entity store type: " + type);
     }
@@ -537,9 +576,19 @@ public class TestEntityStorage {
 
       SchemaEntity schema1 =
           createSchemaEntity(1L, Namespace.of("metalake", "catalog"), "schema1", auditInfo);
+      ColumnEntity column1 =
+          createColumnEntity(
+              RandomIdGenerator.INSTANCE.nextId(), "column1", Types.StringType.get(), auditInfo);
+      ColumnEntity column2 =
+          createColumnEntity(
+              RandomIdGenerator.INSTANCE.nextId(), "column2", Types.StringType.get(), auditInfo);
       TableEntity table1 =
-          createTableEntity(
-              1L, Namespace.of("metalake", "catalog", "schema1"), "table1", auditInfo);
+          createTableEntityWithColumns(
+              1L,
+              Namespace.of("metalake", "catalog", "schema1"),
+              "table1",
+              auditInfo,
+              Lists.newArrayList(column1, column2));
       FilesetEntity fileset1 =
           createFilesetEntity(
               1L, Namespace.of("metalake", "catalog", "schema1"), "fileset1", auditInfo);
@@ -549,9 +598,19 @@ public class TestEntityStorage {
 
       SchemaEntity schema2 =
           createSchemaEntity(2L, Namespace.of("metalake", "catalog"), "schema2", auditInfo);
+      ColumnEntity column3 =
+          createColumnEntity(
+              RandomIdGenerator.INSTANCE.nextId(), "column3", Types.StringType.get(), auditInfo);
+      ColumnEntity column4 =
+          createColumnEntity(
+              RandomIdGenerator.INSTANCE.nextId(), "column4", Types.StringType.get(), auditInfo);
       TableEntity table1InSchema2 =
-          createTableEntity(
-              2L, Namespace.of("metalake", "catalog", "schema2"), "table1", auditInfo);
+          createTableEntityWithColumns(
+              2L,
+              Namespace.of("metalake", "catalog", "schema2"),
+              "table1",
+              auditInfo,
+              Lists.newArrayList(column3, column4));
       FilesetEntity fileset1InSchema2 =
           createFilesetEntity(
               2L, Namespace.of("metalake", "catalog", "schema2"), "fileset1", auditInfo);
@@ -672,18 +731,20 @@ public class TestEntityStorage {
       store.put(schema2New);
       // table
       TableEntity table1New =
-          createTableEntity(
+          createTableEntityWithColumns(
               RandomIdGenerator.INSTANCE.nextId(),
               table1.namespace(),
               table1.name(),
-              table1.auditInfo());
+              table1.auditInfo(),
+              table1.columns());
       store.put(table1New);
       TableEntity table1InSchema2New =
-          createTableEntity(
+          createTableEntityWithColumns(
               RandomIdGenerator.INSTANCE.nextId(),
               table1InSchema2.namespace(),
               table1InSchema2.name(),
-              table1InSchema2.auditInfo());
+              table1InSchema2.auditInfo(),
+              table1InSchema2.columns());
       store.put(table1InSchema2New);
       // fileset
       FilesetEntity fileset1New =
@@ -876,6 +937,8 @@ public class TestEntityStorage {
       store.get(identifier, Entity.EntityType.TABLE, TableEntity.class);
       store.get(identifier, Entity.EntityType.FILESET, FilesetEntity.class);
       store.get(changedNameIdentifier, Entity.EntityType.TOPIC, TopicEntity.class);
+
+      destroy(type);
     }
   }
 
@@ -1193,13 +1256,32 @@ public class TestEntityStorage {
         .build();
   }
 
+  public static ColumnEntity createColumnEntity(
+      Long id, String name, Type dataType, AuditInfo auditInfo) {
+    return ColumnEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withComment("")
+        .withDataType(dataType)
+        .withNullable(true)
+        .withAutoIncrement(false)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
   public static TableEntity createTableEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    return createTableEntityWithColumns(id, namespace, name, auditInfo, Collections.emptyList());
+  }
+
+  public static TableEntity createTableEntityWithColumns(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo, List<ColumnEntity> columns) {
     return TableEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
         .withAuditInfo(auditInfo)
+        .withColumns(columns)
         .build();
   }
 
@@ -1235,7 +1317,7 @@ public class TestEntityStorage {
         .withNamespace(AuthorizationUtils.ofUserNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(null)
         .build();
   }
 
@@ -1246,7 +1328,7 @@ public class TestEntityStorage {
         .withNamespace(AuthorizationUtils.ofGroupNamespace(metalake))
         .withName(name)
         .withAuditInfo(auditInfo)
-        .withRoles(Collections.emptyList())
+        .withRoleNames(null)
         .build();
   }
 
@@ -1290,6 +1372,7 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.exists(table1.nameIdentifier(), Entity.EntityType.TABLE));
     // Delete again should return false
     Assertions.assertFalse(store.delete(table1.nameIdentifier(), Entity.EntityType.TABLE, true));
+    validateDeletedColumns(table1.id(), table1.type());
   }
 
   private void validateDeleteFileset(
@@ -1356,6 +1439,7 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.exists(userNew.nameIdentifier(), Entity.EntityType.USER));
     Assertions.assertFalse(store.exists(groupNew.nameIdentifier(), EntityType.GROUP));
     Assertions.assertFalse(store.exists(roleNew.nameIdentifier(), EntityType.ROLE));
+    validateDeletedColumns(metalake.id(), metalake.type());
 
     // Delete again should return false
     Assertions.assertFalse(
@@ -1372,6 +1456,7 @@ public class TestEntityStorage {
     Assertions.assertThrowsExactly(
         NoSuchEntityException.class,
         () -> store.get(id, Entity.EntityType.CATALOG, CatalogEntity.class));
+    validateDeletedColumns(catalog.id(), catalog.type());
 
     Assertions.assertThrowsExactly(
         NoSuchEntityException.class,
@@ -1388,11 +1473,12 @@ public class TestEntityStorage {
       TopicEntity topic1)
       throws IOException {
     TableEntity table1New =
-        createTableEntity(
+        createTableEntityWithColumns(
             RandomIdGenerator.INSTANCE.nextId(),
             table1.namespace(),
             table1.name(),
-            table1.auditInfo());
+            table1.auditInfo(),
+            table1.columns());
     store.put(table1New);
     FilesetEntity fileset1New =
         createFilesetEntity(
@@ -1429,6 +1515,9 @@ public class TestEntityStorage {
       Assertions.assertTrue(e instanceof NoSuchEntityException);
       Assertions.assertTrue(e.getMessage().contains("schema1"));
     }
+
+    validateDeletedColumns(schema1.id(), schema1.type());
+
     // Delete again should return false
     Assertions.assertFalse(store.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA, true));
 
@@ -1441,7 +1530,7 @@ public class TestEntityStorage {
         () -> store.get(topic1.nameIdentifier(), Entity.EntityType.TOPIC, TopicEntity.class));
   }
 
-  private static void validateDeleteMetalake(
+  private void validateDeleteMetalake(
       EntityStore store,
       BaseMetalake metalake,
       CatalogEntity catalogCopy,
@@ -1469,7 +1558,7 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
   }
 
-  private static void validateDeleteCatalog(
+  private void validateDeleteCatalog(
       EntityStore store,
       CatalogEntity catalog,
       TableEntity table1,
@@ -1486,6 +1575,7 @@ public class TestEntityStorage {
         NonEmptyEntityException.class,
         () -> store.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
     store.delete(table1.nameIdentifier(), Entity.EntityType.TABLE);
+    validateDeletedColumns(table1.id(), table1.type());
     store.delete(fileset1.nameIdentifier(), Entity.EntityType.FILESET);
     store.delete(topic1.nameIdentifier(), Entity.EntityType.TOPIC);
     try {
@@ -1495,6 +1585,7 @@ public class TestEntityStorage {
     }
     store.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA);
     store.delete(table1InSchema2.nameIdentifier(), Entity.EntityType.TABLE);
+    validateDeletedColumns(table1InSchema2.id(), table1InSchema2.type());
     Assertions.assertFalse(
         store.exists(fileset1InSchema2.nameIdentifier(), Entity.EntityType.FILESET));
     Assertions.assertFalse(store.exists(topic1InSchema2.nameIdentifier(), Entity.EntityType.TOPIC));
@@ -1506,7 +1597,7 @@ public class TestEntityStorage {
     Assertions.assertFalse(store.delete(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
   }
 
-  private static void validateDeleteSchema(
+  private void validateDeleteSchema(
       EntityStore store,
       SchemaEntity schema1,
       TableEntity table1,
@@ -1524,11 +1615,13 @@ public class TestEntityStorage {
     // has not been deleted yet;
     Assertions.assertTrue(store.exists(schema1.nameIdentifier(), Entity.EntityType.SCHEMA));
     Assertions.assertTrue(store.exists(table1.nameIdentifier(), Entity.EntityType.TABLE));
+    ;
     Assertions.assertTrue(store.exists(fileset1.nameIdentifier(), Entity.EntityType.FILESET));
     Assertions.assertTrue(store.exists(topic1.nameIdentifier(), Entity.EntityType.TOPIC));
 
     // Delete table1,fileset1 and schema1
     Assertions.assertTrue(store.delete(table1.nameIdentifier(), Entity.EntityType.TABLE));
+    validateDeletedColumns(table1.id(), table1.type());
     Assertions.assertTrue(store.delete(fileset1.nameIdentifier(), Entity.EntityType.FILESET));
     Assertions.assertTrue(store.delete(topic1.nameIdentifier(), Entity.EntityType.TOPIC));
     Assertions.assertTrue(store.delete(schema1.nameIdentifier(), Entity.EntityType.SCHEMA));
@@ -1632,19 +1725,23 @@ public class TestEntityStorage {
     // delete again should return false
     Assertions.assertFalse(store.delete(table1InSchema2.nameIdentifier(), Entity.EntityType.TABLE));
 
+    // Make sure all columns are deleted
+    validateDeletedColumns(table1InSchema2.id(), table1InSchema2.type());
+
     // Make sure table 'metalake.catalog.schema1.table1' still exist;
     Assertions.assertEquals(
         table1, store.get(table1.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class));
     // Make sure schema 'metalake.catalog.schema2' still exist;
     Assertions.assertEquals(
         schema2, store.get(schema2.nameIdentifier(), Entity.EntityType.SCHEMA, SchemaEntity.class));
-    // Re-insert table1Inschema2 and everything is OK
+    // Re-insert table1InSchema2 and everything is OK
     TableEntity table1InSchema2New =
-        createTableEntity(
+        createTableEntityWithColumns(
             RandomIdGenerator.INSTANCE.nextId(),
             table1InSchema2.namespace(),
             table1InSchema2.name(),
-            table1InSchema2.auditInfo());
+            table1InSchema2.auditInfo(),
+            table1InSchema2.columns());
     store.put(table1InSchema2New);
     Assertions.assertTrue(store.exists(table1InSchema2.nameIdentifier(), Entity.EntityType.TABLE));
   }
@@ -2101,10 +2198,59 @@ public class TestEntityStorage {
                 (e) -> e));
   }
 
+  private List<Pair<Long, Pair<Long, Long>>> listAllColumnWithEntityId(
+      Long entityId, Entity.EntityType entityType) {
+    String queryTemp =
+        "SELECT column_id, table_version, deleted_at FROM "
+            + "table_column_version_info WHERE %s = %d";
+    String query;
+    switch (entityType) {
+      case TABLE:
+        query = String.format(queryTemp, "table_id", entityId);
+        break;
+      case SCHEMA:
+        query = String.format(queryTemp, "schema_id", entityId);
+        break;
+      case CATALOG:
+        query = String.format(queryTemp, "catalog_id", entityId);
+        break;
+      case METALAKE:
+        query = String.format(queryTemp, "metalake_id", entityId);
+        break;
+      default:
+        throw new IllegalArgumentException("Unsupported entity type: " + entityType);
+    }
+
+    List<Pair<Long, Pair<Long, Long>>> results = Lists.newArrayList();
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      Connection connection = sqlSession.getConnection();
+      Statement statement = connection.createStatement();
+
+      ResultSet rs = statement.executeQuery(query);
+      while (rs.next()) {
+        results.add(
+            Pair.of(
+                rs.getLong("column_id"),
+                Pair.of(rs.getLong("table_version"), rs.getLong("deleted_at"))));
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+
+    return results;
+  }
+
+  private void validateDeletedColumns(Long entityId, Entity.EntityType entityType) {
+    List<Pair<Long, Pair<Long, Long>>> deleteResult =
+        listAllColumnWithEntityId(entityId, entityType);
+    deleteResult.forEach(p -> Assertions.assertTrue(p.getRight().getRight() > 0));
+  }
+
   @ParameterizedTest
   @MethodSource("storageProvider")
   void testOptimizedDeleteForKv(String type) throws IOException {
-    if ("relational".equalsIgnoreCase(type)) {
+    if (!"kv".equalsIgnoreCase(type)) {
       return;
     }
 
@@ -2182,6 +2328,8 @@ public class TestEntityStorage {
       Assertions.assertDoesNotThrow(
           () ->
               store.get(filesetEntity1.nameIdentifier(), EntityType.FILESET, FilesetEntity.class));
+
+      destroy(type);
     }
   }
 }

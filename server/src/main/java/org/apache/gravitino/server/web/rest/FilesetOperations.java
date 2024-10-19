@@ -52,6 +52,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -268,7 +269,7 @@ public class FilesetOperations {
         catalog,
         schema,
         fileset,
-        subPath);
+        RESTUtils.decodeString(subPath));
     try {
       return Utils.doAs(
           httpRequest,
@@ -283,11 +284,16 @@ public class FilesetOperations {
             }
             String actualFileLocation =
                 TreeLockUtils.doWithTreeLock(
-                    ident, LockType.READ, () -> dispatcher.getFileLocation(ident, subPath));
+                    ident,
+                    LockType.READ,
+                    () -> dispatcher.getFileLocation(ident, RESTUtils.decodeString(subPath)));
             return Utils.ok(new FileLocationResponse(actualFileLocation));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleFilesetException(OperationType.GET, fileset, schema, e);
+    } finally {
+      // Clear the caller context
+      CallerContext.CallerContextHolder.remove();
     }
   }
 }

@@ -2,7 +2,6 @@ name: Spark Integration Test
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main", "branch-*" ]
   pull_request:
@@ -28,19 +27,18 @@ jobs:
               - catalogs/**
               - clients/client-java/**
               - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/filesystem-hadoop3-runtime/**
               - common/**
               - conf/**
               - core/**
               - dev/**
               - gradle/**
               - iceberg/**
+              - integration-test-common/**
               - meta/**
+              - scripts/**
               - server/**
               - server-common/**
               - spark-connector/**
-              - docs/open-api/**
               - build.gradle.kts
               - gradle.properties
               - gradlew
@@ -48,63 +46,36 @@ jobs:
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
-  # Integration test for AMD64 architecture
-  test-amd64-arch:
+  SparkIT-on-push:
     needs: changes
-    if: needs.changes.outputs.source_changes == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
+    if: (github.event_name == 'push' && needs.changes.outputs.source_changes == 'true')
     strategy:
       matrix:
+        # Integration test for AMD64 architecture
         architecture: [linux/amd64]
         java-version: [ 8, 11, 17 ]
         scala-version: [ 2.12 ]
         test-mode: [ embedded, deploy ]
-    env:
-      PLATFORM: ${{ matrix.architecture }}
-    steps:
-      - uses: actions/checkout@v3
+    uses: ./.github/workflows/spark-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+      scala-version: ${{ matrix.scala-version }}
+      test-mode: ${{ matrix.test-mode }}
 
-      - uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java-version }}
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
-      - name: Check required command
-        run: |
-          dev/ci/check_commands.sh
-
-      - name: Package Gravitino
-        if : ${{ matrix.test-mode == 'deploy' }}
-        run: |
-          ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
-
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh
-
-      - name: Spark Integration Test
-        id: integrationTest
-        run: |
-          if [ "${{ matrix.scala-version }}" == "2.12" ];then 
-            ./gradlew -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ matrix.scala-version }} -PskipDockerTests=false :spark-connector:spark-3.3:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
-          fi
-          ./gradlew -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ matrix.scala-version }} -PskipDockerTests=false :spark-connector:spark-3.4:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
-          ./gradlew -PskipTests -PtestMode=${{ matrix.test-mode }} -PjdkVersion=${{ matrix.java-version }} -PscalaVersion=${{ matrix.scala-version }} -PskipDockerTests=false :spark-connector:spark-3.5:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
-
-      - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v3
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
-        with:
-          name: spark-connector-integrate-test-reports-${{ matrix.java-version }}-${{ matrix.test-mode }}
-          path: |
-            build/reports
-            spark-connector/v3.3/spark/build/spark-3.3-integration-test.log
-            spark-connector/v3.4/spark/build/spark-3.4-integration-test.log
-            spark-connector/v3.5/spark/build/spark-3.5-integration-test.log
-            distribution/package/logs/*.out
-            distribution/package/logs/*.log
+  SparkIT-on-pr:
+    needs: changes
+    if: (github.event_name == 'pull_request' && needs.changes.outputs.source_changes == 'true')
+    strategy:
+      matrix:
+        # Integration test for AMD64 architecture
+        architecture: [linux/amd64]
+        java-version: [ 17 ]
+        scala-version: [ 2.12 ]
+        test-mode: [ embedded, deploy ]
+    uses: ./.github/workflows/spark-integration-test-action.yml
+    with:
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
+      scala-version: ${{ matrix.scala-version }}
+      test-mode: ${{ matrix.test-mode }}

@@ -23,7 +23,8 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.UserRoleRelPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.UserRoleRelBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.UserRoleRelPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -31,7 +32,7 @@ import org.apache.ibatis.annotations.Param;
 public class UserRoleRelSQLProviderFactory {
 
   private static final Map<JDBCBackendType, UserRoleRelBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      USER_ROLE_RELATIONAL_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new UserRoleRelMySQLProvider(),
               JDBCBackendType.H2, new UserRoleRelH2Provider(),
@@ -45,7 +46,7 @@ public class UserRoleRelSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return USER_ROLE_RELATIONAL_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class UserRoleRelMySQLProvider extends UserRoleRelBaseSQLProvider {}

@@ -22,7 +22,8 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.SecurableObjectPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.SecurableObjectBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.SecurableObjectPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -30,7 +31,7 @@ import org.apache.ibatis.annotations.Param;
 public class SecurableObjectSQLProviderFactory {
 
   private static final Map<JDBCBackendType, SecurableObjectBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      SECURABLE_OBJECTS_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new SecurableObjectMySQLProvider(),
               JDBCBackendType.H2, new SecurableObjectH2Provider(),
@@ -44,7 +45,7 @@ public class SecurableObjectSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return SECURABLE_OBJECTS_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class SecurableObjectMySQLProvider extends SecurableObjectBaseSQLProvider {}
@@ -54,6 +55,11 @@ public class SecurableObjectSQLProviderFactory {
   public static String batchInsertSecurableObjects(
       @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
     return getProvider().batchInsertSecurableObjects(securableObjectPOs);
+  }
+
+  public static String batchSoftDeleteSecurableObjects(
+      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
+    return getProvider().batchSoftDeleteSecurableObjects(securableObjectPOs);
   }
 
   public static String softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId) {

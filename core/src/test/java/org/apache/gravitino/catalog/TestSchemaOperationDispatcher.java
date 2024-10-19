@@ -23,6 +23,7 @@ import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -151,7 +152,9 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, loadedSchema.auditInfo().creator());
 
     // Case 2: Test if the schema is not found in entity store
-    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), any(), any());
+    doThrow(new NoSuchEntityException("mock error"))
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.SCHEMA), any());
     entityStore.delete(schemaIdent, Entity.EntityType.SCHEMA);
     Schema loadedSchema1 = dispatcher.loadSchema(schemaIdent);
     Assertions.assertEquals(schema.name(), loadedSchema1.name());
@@ -165,7 +168,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
     // Case 3: Test if entity store is failed to get the schema entity
     reset(entityStore);
-    doThrow(new IOException()).when(entityStore).get(any(), any(), any());
+    doThrow(new IOException()).when(entityStore).get(any(), eq(Entity.EntityType.SCHEMA), any());
     entityStore.delete(schemaIdent, Entity.EntityType.SCHEMA);
     Schema loadedSchema2 = dispatcher.loadSchema(schemaIdent);
     // Succeed to import the topic entity
@@ -189,7 +192,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
                     .withCreateTime(Instant.now())
                     .build())
             .build();
-    doReturn(unmatchedEntity).when(entityStore).get(any(), any(), any());
+    doReturn(unmatchedEntity).when(entityStore).get(any(), eq(Entity.EntityType.SCHEMA), any());
     Schema loadedSchema3 = dispatcher.loadSchema(schemaIdent);
     // Succeed to import the schema entity
     reset(entityStore);

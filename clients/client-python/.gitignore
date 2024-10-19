@@ -28,7 +28,6 @@ dist
 build
 README.md
 gravitino/version.ini
-docs
 
 # Unit test / coverage reports
 htmlcov/
@@ -44,3 +43,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+
+# Documentation Related
+docs/build
+docs/source/generated

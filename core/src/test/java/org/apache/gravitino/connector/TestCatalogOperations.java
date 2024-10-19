@@ -18,22 +18,33 @@
  */
 package org.apache.gravitino.connector;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.TestFileset;
 import org.apache.gravitino.TestSchema;
 import org.apache.gravitino.TestTable;
 import org.apache.gravitino.TestTopic;
+import org.apache.gravitino.audit.CallerContext;
+import org.apache.gravitino.audit.FilesetAuditConstants;
+import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -59,9 +70,12 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TestCatalogOperations
     implements CatalogOperations, TableCatalog, FilesetCatalog, TopicCatalog, SupportsSchemas {
+  private static final Logger LOG = LoggerFactory.getLogger(TestCatalogOperations.class);
 
   private final Map<NameIdentifier, TestTable> tables;
 
@@ -74,6 +88,8 @@ public class TestCatalogOperations
   public static final String FAIL_CREATE = "fail-create";
 
   public static final String FAIL_TEST = "need-fail";
+
+  private static final String SLASH = "/";
 
   public TestCatalogOperations(Map<String, String> config) {
     tables = Maps.newHashMap();
@@ -186,9 +202,16 @@ public class TestCatalogOperations
           throw new TableAlreadyExistsException("Table %s already exists", ident);
         }
       } else {
-        throw new IllegalArgumentException("Unsupported table change: " + change);
+        // do nothing
       }
     }
+
+    TableChange.ColumnChange[] columnChanges =
+        Arrays.stream(changes)
+            .filter(change -> change instanceof TableChange.ColumnChange)
+            .map(change -> (TableChange.ColumnChange) change)
+            .toArray(TableChange.ColumnChange[]::new);
+    Column[] newColumns = updateColumns(table.columns(), columnChanges);
 
     TestTable updatedTable =
         TestTable.builder()
@@ -196,7 +219,7 @@ public class TestCatalogOperations
             .withComment(table.comment())
             .withProperties(new HashMap<>(newProps))
             .withAuditInfo(updatedAuditInfo)
-            .withColumns(table.columns())
+            .withColumns(newColumns)
             .withPartitioning(table.partitioning())
             .withDistribution(table.distribution())
             .withSortOrders(table.sortOrder())
@@ -432,7 +455,73 @@ public class TestCatalogOperations
 
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath) {
-    throw new UnsupportedOperationException("Not implemented");
+    Preconditions.checkArgument(subPath != null, "subPath must not be null");
+    String processedSubPath;
+    if (!subPath.trim().isEmpty() && !subPath.trim().startsWith(SLASH)) {
+      processedSubPath = SLASH + subPath.trim();
+    } else {
+      processedSubPath = subPath.trim();
+    }
+
+    Fileset fileset = loadFileset(ident);
+
+    boolean isSingleFile = checkSingleFile(fileset);
+    // if the storage location is a single file, it cannot have sub path to access.
+    if (isSingleFile && StringUtils.isBlank(processedSubPath)) {
+      throw new GravitinoRuntimeException(
+          "Sub path should always be blank, because the fileset only mounts a single file.");
+    }
+
+    // do checks for some data operations.
+    if (hasCallerContext()) {
+      Map<String, String> contextMap = CallerContext.CallerContextHolder.get().context();
+      String operation =
+          contextMap.getOrDefault(
+              FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
+              FilesetDataOperation.UNKNOWN.name());
+      if (!FilesetDataOperation.checkValid(operation)) {
+        LOG.warn(
+            "The data operation: {} is not valid, we cannot do some checks for this operation.",
+            operation);
+      } else {
+        FilesetDataOperation dataOperation = FilesetDataOperation.valueOf(operation);
+        switch (dataOperation) {
+          case RENAME:
+            // Fileset only mounts a single file, the storage location of the fileset cannot be
+            // renamed; Otherwise the metadata in the Gravitino server may be inconsistent.
+            if (isSingleFile) {
+              throw new GravitinoRuntimeException(
+                  "Cannot rename the fileset: %s which only mounts to a single file.", ident);
+            }
+            // if the sub path is blank, it cannot be renamed,
+            // otherwise the metadata in the Gravitino server may be inconsistent.
+            if (StringUtils.isBlank(processedSubPath)
+                || (processedSubPath.startsWith(SLASH) && processedSubPath.length() == 1)) {
+              throw new GravitinoRuntimeException(
+                  "subPath cannot be blank when need to rename a file or a directory.");
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+
+    String fileLocation;
+    // 1. if the storage location is a single file, we pass the storage location directly
+    // 2. if the processed sub path is blank, we pass the storage location directly
+    if (isSingleFile || StringUtils.isBlank(processedSubPath)) {
+      fileLocation = fileset.storageLocation();
+    } else {
+      // the processed sub path always starts with "/" if it is not blank,
+      // so we can safely remove the tailing slash if storage location ends with "/".
+      String storageLocation =
+          fileset.storageLocation().endsWith(SLASH)
+              ? fileset.storageLocation().substring(0, fileset.storageLocation().length() - 1)
+              : fileset.storageLocation();
+      fileLocation = String.format("%s%s", storageLocation, processedSubPath);
+    }
+    return fileLocation;
   }
 
   @Override
@@ -540,5 +629,142 @@ public class TestCatalogOperations
     if ("true".equals(properties.get(FAIL_TEST))) {
       throw new ConnectionFailedException("Connection failed");
     }
+  }
+
+  private boolean hasCallerContext() {
+    return CallerContext.CallerContextHolder.get() != null
+        && CallerContext.CallerContextHolder.get().context() != null
+        && !CallerContext.CallerContextHolder.get().context().isEmpty();
+  }
+
+  private boolean checkSingleFile(Fileset fileset) {
+    try {
+      File locationPath = new File(fileset.storageLocation());
+      return locationPath.isFile();
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private Column[] updateColumns(Column[] columns, TableChange.ColumnChange[] columnChanges) {
+    Map<String, Column> columnMap =
+        Arrays.stream(columns).collect(Collectors.toMap(Column::name, Function.identity()));
+
+    for (TableChange.ColumnChange columnChange : columnChanges) {
+      if (columnChange instanceof TableChange.AddColumn) {
+        TableChange.AddColumn addColumn = (TableChange.AddColumn) columnChange;
+        TestColumn column =
+            TestColumn.builder()
+                .withName(String.join(".", addColumn.fieldName()))
+                .withComment(addColumn.getComment())
+                .withType(addColumn.getDataType())
+                .withNullable(addColumn.isNullable())
+                .withAutoIncrement(addColumn.isAutoIncrement())
+                .withDefaultValue(addColumn.getDefaultValue())
+                .build();
+        columnMap.put(column.name(), column);
+
+      } else if (columnChange instanceof TableChange.DeleteColumn) {
+        columnMap.remove(String.join(".", columnChange.fieldName()));
+
+      } else if (columnChange instanceof TableChange.RenameColumn) {
+        String oldName = String.join(".", columnChange.fieldName());
+        String newName = ((TableChange.RenameColumn) columnChange).getNewName();
+        Column column = columnMap.remove(oldName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(newName)
+                .withComment(column.comment())
+                .withType(column.dataType())
+                .withNullable(column.nullable())
+                .withAutoIncrement(column.autoIncrement())
+                .withDefaultValue(column.defaultValue())
+                .build();
+        columnMap.put(newName, newColumn);
+
+      } else if (columnChange instanceof TableChange.UpdateColumnDefaultValue) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
+            (TableChange.UpdateColumnDefaultValue) columnChange;
+        Column oldColumn = columnMap.get(columnName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(columnName)
+                .withComment(oldColumn.comment())
+                .withType(oldColumn.dataType())
+                .withNullable(oldColumn.nullable())
+                .withAutoIncrement(oldColumn.autoIncrement())
+                .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
+                .build();
+        columnMap.put(columnName, newColumn);
+
+      } else if (columnChange instanceof TableChange.UpdateColumnType) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) columnChange;
+        Column oldColumn = columnMap.get(columnName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(columnName)
+                .withComment(oldColumn.comment())
+                .withType(updateColumnType.getNewDataType())
+                .withNullable(oldColumn.nullable())
+                .withAutoIncrement(oldColumn.autoIncrement())
+                .withDefaultValue(oldColumn.defaultValue())
+                .build();
+        columnMap.put(columnName, newColumn);
+
+      } else if (columnChange instanceof TableChange.UpdateColumnComment) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnComment updateColumnComment =
+            (TableChange.UpdateColumnComment) columnChange;
+        Column oldColumn = columnMap.get(columnName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(columnName)
+                .withComment(updateColumnComment.getNewComment())
+                .withType(oldColumn.dataType())
+                .withNullable(oldColumn.nullable())
+                .withAutoIncrement(oldColumn.autoIncrement())
+                .withDefaultValue(oldColumn.defaultValue())
+                .build();
+        columnMap.put(columnName, newColumn);
+
+      } else if (columnChange instanceof TableChange.UpdateColumnNullability) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnNullability updateColumnNullable =
+            (TableChange.UpdateColumnNullability) columnChange;
+        Column oldColumn = columnMap.get(columnName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(columnName)
+                .withComment(oldColumn.comment())
+                .withType(oldColumn.dataType())
+                .withNullable(updateColumnNullable.nullable())
+                .withAutoIncrement(oldColumn.autoIncrement())
+                .withDefaultValue(oldColumn.defaultValue())
+                .build();
+        columnMap.put(columnName, newColumn);
+
+      } else if (columnChange instanceof TableChange.UpdateColumnAutoIncrement) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnAutoIncrement updateColumnAutoIncrement =
+            (TableChange.UpdateColumnAutoIncrement) columnChange;
+        Column oldColumn = columnMap.get(columnName);
+        TestColumn newColumn =
+            TestColumn.builder()
+                .withName(columnName)
+                .withComment(oldColumn.comment())
+                .withType(oldColumn.dataType())
+                .withNullable(oldColumn.nullable())
+                .withAutoIncrement(updateColumnAutoIncrement.isAutoIncrement())
+                .withDefaultValue(oldColumn.defaultValue())
+                .build();
+        columnMap.put(columnName, newColumn);
+
+      } else {
+        // do nothing
+      }
+    }
+    return columnMap.values().toArray(new Column[0]);
   }
 }

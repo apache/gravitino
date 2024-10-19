@@ -30,3 +30,5 @@ readerwriterlock==1.0.9
 docker==7.1.0
 pyjwt[crypto]==2.8.0
 jwcrypto==1.5.6
+sphinx==7.1.2
+furo==2024.8.6

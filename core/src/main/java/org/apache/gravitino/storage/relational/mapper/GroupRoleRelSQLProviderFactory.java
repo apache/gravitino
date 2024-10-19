@@ -22,7 +22,8 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.GroupRoleRelPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.GroupRoleRelBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.GroupRoleRelPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -30,7 +31,7 @@ import org.apache.ibatis.annotations.Param;
 public class GroupRoleRelSQLProviderFactory {
 
   private static final Map<JDBCBackendType, GroupRoleRelBaseSQLProvider>
-      METALAKE_META_SQL_PROVIDER_MAP =
+      GROUP_ROLE_RELATION_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new GroupRoleRelMySQLProvider(),
               JDBCBackendType.H2, new GroupRoleRelH2Provider(),
@@ -44,7 +45,7 @@ public class GroupRoleRelSQLProviderFactory {
             .getDatabaseId();
 
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return METALAKE_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return GROUP_ROLE_RELATION_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
   static class GroupRoleRelMySQLProvider extends GroupRoleRelBaseSQLProvider {}

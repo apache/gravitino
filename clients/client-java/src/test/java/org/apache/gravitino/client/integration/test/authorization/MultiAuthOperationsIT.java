@@ -41,7 +41,7 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoVersion;
 import org.apache.gravitino.client.KerberosTokenProvider;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
 import org.apache.gravitino.server.authentication.OAuthConfig;
@@ -55,7 +55,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
 @Tag("gravitino-docker-test")
-public class MultiAuthOperationsIT extends AbstractIT {
+public class MultiAuthOperationsIT extends BaseIT {
   private static final KerberosSecurityTestcase kdc =
       new KerberosSecurityTestcase() {
         @Override
@@ -73,7 +73,7 @@ public class MultiAuthOperationsIT extends AbstractIT {
   private static GravitinoAdminClient kerberosClient;
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(
         Configs.AUTHENTICATORS.getKey(),
@@ -86,7 +86,7 @@ public class MultiAuthOperationsIT extends AbstractIT {
     configKerberos(configs);
 
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
     oauthClient =
         GravitinoAdminClient.builder(serverUri)
@@ -107,8 +107,8 @@ public class MultiAuthOperationsIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stopIntegrationTest() throws IOException, InterruptedException {
-    AbstractIT.stopIntegrationTest();
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    super.stopIntegrationTest();
     kdc.stopMiniKdc();
   }
 
@@ -121,7 +121,10 @@ public class MultiAuthOperationsIT extends AbstractIT {
       final String gitCommitId = readGitCommitIdFromGitFile();
       Assertions.assertEquals(gitCommitId, gravitinoVersion1.gitCommit());
     }
-    new KerberosOperationsIT().testAuthenticationApi();
+
+    KerberosOperationsIT kerberosOperationsIT = new KerberosOperationsIT();
+    kerberosOperationsIT.setGravitinoAdminClient(client);
+    kerberosOperationsIT.testAuthenticationApi();
 
     GravitinoVersion gravitinoVersion2 = kerberosClient.serverVersion();
     Assertions.assertEquals(System.getenv("PROJECT_VERSION"), gravitinoVersion2.version());

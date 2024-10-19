@@ -534,6 +534,8 @@ public class TestFilesetCatalog extends TestBase {
             NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath);
     Assertions.assertEquals(FilesetDataOperation.GET_FILE_STATUS.name(), dataOperation.get());
     Assertions.assertEquals(InternalClientType.HADOOP_GVFS.name(), internalClientType.get());
+    // the caller context should be cleared after `getFileLocation`
+    Assertions.assertNull(CallerContext.CallerContextHolder.get());
   }
 
   private FilesetDTO mockFilesetDTO(

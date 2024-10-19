@@ -51,11 +51,14 @@ dependencies {
   testCompileOnly(libs.lombok)
 
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server-common"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
