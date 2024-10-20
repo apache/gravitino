@@ -37,7 +37,7 @@ import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
-import org.apache.gravitino.iceberg.service.provider.StaticIcebergCatalogConfigProvider;
+import org.apache.gravitino.iceberg.service.provider.StaticIcebergConfigProvider;
 import org.apache.gravitino.listener.EventBus;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -87,7 +87,7 @@ public class IcebergRestTestUtil {
       String catalogConfigPrefix = "catalog." + PREFIX;
       catalogConf.put(
           IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
-          StaticIcebergCatalogConfigProvider.class.getName());
+          StaticIcebergConfigProvider.class.getName());
       catalogConf.put(String.format("%s.catalog-backend-name", catalogConfigPrefix), PREFIX);
       catalogConf.put(
           CredentialConstants.CREDENTIAL_PROVIDER_TYPE,

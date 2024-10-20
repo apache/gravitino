@@ -37,7 +37,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
  *
  * <p>The catalogName is iceberg_catalog
  */
-public class DynamicIcebergCatalogConfigProvider implements IcebergConfigProvider {
+public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   private String gravitinoMetalake;
 
   private GravitinoAdminClient client;

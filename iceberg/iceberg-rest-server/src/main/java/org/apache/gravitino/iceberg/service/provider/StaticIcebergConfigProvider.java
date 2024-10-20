@@ -38,9 +38,8 @@ import org.slf4j.LoggerFactory;
  * gravitino.iceberg-rest.catalog.hive_proxy.catalog-backend = hive
  * gravitino.iceberg-rest.catalog.hive_proxy.uri = thrift://{host}:{port} ...
  */
-public class StaticIcebergCatalogConfigProvider implements IcebergConfigProvider {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(StaticIcebergCatalogConfigProvider.class);
+public class StaticIcebergConfigProvider implements IcebergConfigProvider {
+  public static final Logger LOG = LoggerFactory.getLogger(StaticIcebergConfigProvider.class);
 
   @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
 
