@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.SupportsMetalakes;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
+import org.apache.gravitino.dto.requests.MetalakeSetRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -187,9 +188,12 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
   @Override
   public void enableMetalake(String name) throws NoSuchMetalakeException {
+    MetalakeSetRequest req = new MetalakeSetRequest(true);
+
     ErrorResponse resp =
-        restClient.get(
-            API_METALAKES_IDENTIFIER_PATH + name + "/activate",
+        restClient.patch(
+            API_METALAKES_IDENTIFIER_PATH + name,
+            req,
             ErrorResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());
@@ -203,9 +207,12 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
 
   @Override
   public void disableMetalake(String name) throws NoSuchMetalakeException {
+    MetalakeSetRequest req = new MetalakeSetRequest(false);
+
     ErrorResponse resp =
-        restClient.get(
-            API_METALAKES_IDENTIFIER_PATH + name + "/deactivate",
+        restClient.patch(
+            API_METALAKES_IDENTIFIER_PATH + name,
+            req,
             ErrorResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());

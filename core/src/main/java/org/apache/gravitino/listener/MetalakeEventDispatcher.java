@@ -147,13 +147,13 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
 
   @Override
   public void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    // todo: support activate metalake event
+    // todo: support enable metalake event
     dispatcher.enableMetalake(ident);
   }
 
   @Override
   public void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    // todo: support deactivate metalake event
+    // todo: support disable metalake event
     dispatcher.disableMetalake(ident);
   }
 }

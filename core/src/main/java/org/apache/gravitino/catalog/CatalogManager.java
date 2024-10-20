@@ -116,7 +116,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
     checkMetalake(metalakeIdent, store);
 
-    if (!getInUseValue(store, ident)) {
+    if (!getCatalogInUseValue(store, ident)) {
       throw new CatalogNotInUseException("Catalog %s is not in use, please enable it first", ident);
     }
   }
@@ -677,10 +677,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static boolean catalogInUse(EntityStore store, NameIdentifier ident)
       throws NoSuchMetalakeException, NoSuchCatalogException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
-    return metalakeInUse(store, metalakeIdent) && getInUseValue(store, ident);
+    return metalakeInUse(store, metalakeIdent) && getCatalogInUseValue(store, ident);
   }
 
-  private static boolean getInUseValue(EntityStore store, NameIdentifier catalogIdent) {
+  private static boolean getCatalogInUseValue(EntityStore store, NameIdentifier catalogIdent) {
     try {
       CatalogEntity catalogEntity =
           store.get(catalogIdent, EntityType.CATALOG, CatalogEntity.class);

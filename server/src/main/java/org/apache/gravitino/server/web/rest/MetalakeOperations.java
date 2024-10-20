@@ -191,64 +191,6 @@ public class MetalakeOperations {
     }
   }
 
-  @GET
-  @Path("{name}/activate")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "activate-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "activate-metalake", absolute = true)
-  public Response activateMetalake(@PathParam("name") String metalakeName) {
-    LOG.info("Received activate request for metalake: {}", metalakeName);
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
-            TreeLockUtils.doWithTreeLock(
-                identifier,
-                LockType.READ,
-                () -> {
-                  metalakeDispatcher.enableMetalake(identifier);
-                  return null;
-                });
-            Response response = Utils.ok(new BaseResponse());
-            LOG.info("Metalake activated: {}", metalakeName);
-            return response;
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handleMetalakeException(OperationType.LOAD, metalakeName, e);
-    }
-  }
-
-  @GET
-  @Path("{name}/deactivate")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "deactivate-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "deactivate-metalake", absolute = true)
-  public Response deactivateMetalake(@PathParam("name") String metalakeName) {
-    LOG.info("Received deactivate request for metalake: {}", metalakeName);
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
-            TreeLockUtils.doWithTreeLock(
-                identifier,
-                LockType.READ,
-                () -> {
-                  metalakeDispatcher.disableMetalake(identifier);
-                  return null;
-                });
-            Response response = Utils.ok(new BaseResponse());
-            LOG.info("Metalake deactivated: {}", metalakeName);
-            return response;
-          });
-
-    } catch (Exception e) {
-      return ExceptionHandlers.handleMetalakeException(OperationType.LOAD, metalakeName, e);
-    }
-  }
-
   @PUT
   @Path("{name}")
   @Produces("application/vnd.gravitino.v1+json")

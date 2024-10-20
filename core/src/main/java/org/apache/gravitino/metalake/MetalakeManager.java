@@ -82,7 +82,7 @@ public class MetalakeManager implements MetalakeDispatcher {
     boolean metalakeInUse = metalakeInUse(store, ident);
     if (!metalakeInUse) {
       throw new MetalakeNotInUseException(
-          "Metalake %s is not in use, please activate it first", ident);
+          "Metalake %s is not in use, please enable it first", ident);
     }
   }
 
@@ -208,7 +208,7 @@ public class MetalakeManager implements MetalakeDispatcher {
     try {
       if (!metalakeInUse(store, ident)) {
         throw new MetalakeNotInUseException(
-            "Metalake %s is not in use, please activate it first", ident);
+            "Metalake %s is not in use, please enable it first", ident);
       }
 
       return store.update(
@@ -248,7 +248,7 @@ public class MetalakeManager implements MetalakeDispatcher {
       boolean inUse = metalakeInUse(store, ident);
       if (inUse && !force) {
         throw new MetalakeInUseException(
-            "Metalake %s is in use, please deactivate it first or use force option", ident);
+            "Metalake %s is in use, please disable it first or use force option", ident);
       }
 
       List<CatalogEntity> catalogEntities =
@@ -256,12 +256,6 @@ public class MetalakeManager implements MetalakeDispatcher {
       if (!catalogEntities.isEmpty() && !force) {
         throw new NonEmptyEntityException(
             "Metalake %s has catalogs, please drop them first or use force option", ident);
-      }
-
-      // If reached here, it implies that the metalake is not in use or force is true.
-      if (inUse) {
-        // force is true, so deactivate the metalake first.
-        disableMetalake(ident);
       }
 
       return store.delete(ident, EntityType.METALAKE, true);
