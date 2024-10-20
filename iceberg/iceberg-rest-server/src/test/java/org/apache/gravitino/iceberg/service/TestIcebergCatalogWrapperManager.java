@@ -42,6 +42,7 @@ public class TestIcebergCatalogWrapperManager {
     Map<String, String> config = Maps.newHashMap();
     config.put(String.format("catalog.%s.catalog-backend-name", prefix), prefix);
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
+    configProvider.initialize(config);
     IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
 
     IcebergCatalogWrapper ops = manager.getOps(rawPrefix);
@@ -58,6 +59,7 @@ public class TestIcebergCatalogWrapperManager {
   public void testInvalidGetOps(String rawPrefix) {
     Map<String, String> config = Maps.newHashMap();
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
+    configProvider.initialize(config);
     IcebergCatalogWrapperManager manager = new IcebergCatalogWrapperManager(config, configProvider);
 
     Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> manager.getOps(rawPrefix));
