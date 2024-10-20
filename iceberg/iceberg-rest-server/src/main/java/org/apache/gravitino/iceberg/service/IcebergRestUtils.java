@@ -81,17 +81,6 @@ public class IcebergRestUtils {
     return nextHourDateTime.atZone(ZoneId.systemDefault()).toInstant();
   }
 
-  public static String getCatalogName(String rawPrefix) {
-    String prefix = normalizePrefix(rawPrefix);
-    Preconditions.checkArgument(
-        !IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG.equals(prefix),
-        String.format("%s is conflict with reserved key, please replace it", prefix));
-    if (StringUtils.isBlank(prefix)) {
-      return IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
-    }
-    return prefix;
-  }
-
   public static NameIdentifier getGravitinoNameIdentifier(
       String catalogName, TableIdentifier icebergIdentifier) {
     // todo(fanng): use a more general way to get metalake
@@ -104,6 +93,27 @@ public class IcebergRestUtils {
     return NameIdentifier.of(catalogNSTable);
   }
 
+  public static String getCatalogName(String rawPrefix) {
+    String catalogName = normalizePrefix(rawPrefix);
+    Preconditions.checkArgument(
+        !IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG.equals(catalogName),
+        String.format("%s is conflict with default catalog name, please replace it", catalogName));
+    if (StringUtils.isBlank(catalogName)) {
+      return IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
+    }
+    return catalogName;
+  }
+
+  public static <T> T cloneIcebergRESTObject(Object message, Class<T> className) {
+    ObjectMapper icebergObjectMapper = IcebergObjectMapper.getInstance();
+    try {
+      byte[] values = icebergObjectMapper.writeValueAsBytes(message);
+      return icebergObjectMapper.readValue(values, className);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
   // 'iceberg_catalog'
   private static String normalizePrefix(String rawPrefix) {
@@ -114,16 +124,6 @@ public class IcebergRestUtils {
       Preconditions.checkArgument(
           rawPrefix.endsWith("/"), String.format("rawPrefix %s format is illegal", rawPrefix));
       return rawPrefix.substring(0, rawPrefix.length() - 1);
-    }
-  }
-
-  public static <T> T cloneIcebergRESTObject(Object message, Class<T> className) {
-    ObjectMapper icebergObjectMapper = IcebergObjectMapper.getInstance();
-    try {
-      byte[] values = icebergObjectMapper.writeValueAsBytes(message);
-      return icebergObjectMapper.readValue(values, className);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
   }
 }

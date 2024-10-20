@@ -22,7 +22,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Map;
@@ -92,17 +91,21 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
    * @return the instance of IcebergCatalogWrapper.
    */
   public IcebergCatalogWrapper getOps(String rawPrefix) {
-    String catalogName = getCatalogName(rawPrefix);
-    IcebergCatalogWrapper tableOps =
+    String catalogName = IcebergRestUtils.getCatalogName(rawPrefix);
+    return getCatalogWrapper(catalogName);
+  }
+
+  public IcebergCatalogWrapper getCatalogWrapper(String catalogName) {
+    IcebergCatalogWrapper catalogWrapper =
         icebergCatalogWrapperCache.get(catalogName, k -> createCatalogWrapper(catalogName));
     // Reload conf to reset UserGroupInformation or icebergTableOps will always use
     // Simple auth.
-    tableOps.reloadHadoopConf();
-    return tableOps;
+    catalogWrapper.reloadHadoopConf();
+    return catalogWrapper;
   }
 
   public CredentialProvider getCredentialProvider(String prefix) {
-    String catalogName = getCatalogName(prefix);
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
     return credentialProviderManager.getCredentialProvider(catalogName);
   }
 
@@ -128,17 +131,6 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     return createIcebergCatalogWrapper(icebergConfig.get());
   }
 
-  private String getCatalogName(String rawPrefix) {
-    String prefix = shelling(rawPrefix);
-    Preconditions.checkArgument(
-        !IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(prefix),
-        String.format("%s is conflict with reserved key, please replace it", prefix));
-    if (StringUtils.isBlank(prefix)) {
-      return IcebergConstants.GRAVITINO_DEFAULT_CATALOG;
-    }
-    return prefix;
-  }
-
   private IcebergCatalogConfigProvider createIcebergCatalogConfigProvider(
       Map<String, String> properties) {
     String providerName =
@@ -153,7 +145,6 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
       throw new RuntimeException(e);
     }
   }
-
 
   private void closeIcebergCatalogWrapper(IcebergCatalogWrapper catalogWrapper) {
     try {
