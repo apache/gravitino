@@ -150,7 +150,7 @@ public class GravitinoEnv {
    * @param config The configuration object to initialize the environment.
    */
   public void initializeFullComponents(Config config) {
-    LOG.info("Initializing Gravitino full Environment...");
+    LOG.info("Initializing Gravitino full environment...");
     this.config = config;
     this.manageFullComponents = true;
     initBaseComponents();
