@@ -82,11 +82,10 @@ public class IcebergRestUtils {
   }
 
   public static NameIdentifier getGravitinoNameIdentifier(
-      String catalogName, TableIdentifier icebergIdentifier) {
-    // todo(fanng): use a more general way to get metalake
+      String metalakeName, String catalogName, TableIdentifier icebergIdentifier) {
     Stream<String> catalogNS =
         Stream.concat(
-            Stream.of(IcebergConstants.ICEBERG_REST_DEFAULT_METALAKE, catalogName),
+            Stream.of(metalakeName, catalogName),
             Arrays.stream(icebergIdentifier.namespace().levels()));
     String[] catalogNSTable =
         Stream.concat(catalogNS, Stream.of(icebergIdentifier.name())).toArray(String[]::new);

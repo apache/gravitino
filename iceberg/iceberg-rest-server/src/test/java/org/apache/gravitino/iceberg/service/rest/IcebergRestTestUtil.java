@@ -27,7 +27,6 @@ import java.util.logging.Logger;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.provider.StaticIcebergCatalogConfigProvider;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
@@ -36,6 +35,9 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDisp
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
+import org.apache.gravitino.iceberg.service.provider.StaticIcebergCatalogConfigProvider;
 import org.apache.gravitino.listener.EventBus;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -90,15 +92,19 @@ public class IcebergRestTestUtil {
       catalogConf.put(
           CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
           DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE);
+      IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
+      configProvider.initialize(catalogConf);
       // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
-          new IcebergCatalogWrapperManagerForTest(catalogConf);
+          new IcebergCatalogWrapperManagerForTest(catalogConf, configProvider);
 
       EventBus eventBus = new EventBus(Arrays.asList());
+
       IcebergTableOperationExecutor icebergTableOperationExecutor =
           new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
       IcebergTableEventDispatcher icebergTableEventDispatcher =
-          new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus);
+          new IcebergTableEventDispatcher(
+              icebergTableOperationExecutor, eventBus, configProvider.getMetalakeName());
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(

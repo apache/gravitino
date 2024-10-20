@@ -32,6 +32,8 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableEventDispatch
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationExecutor;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
@@ -58,6 +60,7 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
+  private IcebergConfigProvider configProvider;
 
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
@@ -74,13 +77,18 @@ public class RESTService implements GravitinoAuxiliaryService {
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);
 
+    Map<String, String> configProperties = icebergConfig.getAllConfig();
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
-    icebergCatalogWrapperManager = new IcebergCatalogWrapperManager(icebergConfig.getAllConfig());
-    icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    this.configProvider = IcebergConfigProviderFactory.create(configProperties);
+    configProvider.initialize(configProperties);
+    String metalakeName = configProvider.getMetalakeName();
+    this.icebergCatalogWrapperManager =
+        new IcebergCatalogWrapperManager(configProperties, configProvider);
+    this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
     IcebergTableOperationExecutor icebergTableOperationExecutor =
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
     IcebergTableEventDispatcher icebergTableEventDispatcher =
-        new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus);
+        new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus, metalakeName);
     config.register(
         new AbstractBinder() {
           @Override
@@ -127,6 +135,9 @@ public class RESTService implements GravitinoAuxiliaryService {
     if (server != null) {
       server.stop();
       LOG.info("Iceberg REST service stopped");
+    }
+    if (configProvider != null) {
+      configProvider.close();
     }
     if (icebergCatalogWrapperManager != null) {
       icebergCatalogWrapperManager.close();

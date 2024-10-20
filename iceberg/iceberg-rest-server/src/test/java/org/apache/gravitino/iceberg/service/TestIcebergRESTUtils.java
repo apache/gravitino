@@ -34,14 +34,13 @@ public class TestIcebergRESTUtils {
 
   @Test
   void testGetGravitinoNameIdentifier() {
+    String metalakeName = "metalake";
     String catalogName = "catalog";
     TableIdentifier tableIdentifier = TableIdentifier.of("ns1", "ns2", "table");
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(catalogName, tableIdentifier);
+        IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, catalogName, tableIdentifier);
     Assertions.assertEquals(
-        NameIdentifier.of(
-            IcebergConstants.ICEBERG_REST_DEFAULT_METALAKE, catalogName, "ns1", "ns2", "table"),
-        nameIdentifier);
+        NameIdentifier.of(metalakeName, catalogName, "ns1", "ns2", "table"), nameIdentifier);
   }
 
   @Test

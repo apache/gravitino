@@ -40,11 +40,15 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
 
   private IcebergTableOperationDispatcher icebergTableOperationDispatcher;
   private EventBus eventBus;
+  private String metalakeName;
 
   public IcebergTableEventDispatcher(
-      IcebergTableOperationDispatcher icebergTableOperationDispatcher, EventBus eventBus) {
+      IcebergTableOperationDispatcher icebergTableOperationDispatcher,
+      EventBus eventBus,
+      String metalakeName) {
     this.icebergTableOperationDispatcher = icebergTableOperationDispatcher;
     this.eventBus = eventBus;
+    this.metalakeName = metalakeName;
   }
 
   @Override
@@ -52,7 +56,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       String catalogName, Namespace namespace, CreateTableRequest createTableRequest) {
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, createTableRequest.name());
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(catalogName, tableIdentifier);
+        IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, catalogName, tableIdentifier);
     eventBus.dispatchEvent(
         new IcebergCreateTablePreEvent(
             PrincipalUtils.getCurrentUserName(), nameIdentifier, createTableRequest));
