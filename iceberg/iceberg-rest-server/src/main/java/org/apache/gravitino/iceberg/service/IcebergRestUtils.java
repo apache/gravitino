@@ -96,7 +96,8 @@ public class IcebergRestUtils {
     String catalogName = normalizePrefix(rawPrefix);
     Preconditions.checkArgument(
         !IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG.equals(catalogName),
-        String.format("%s is conflict with default catalog name, please replace it", catalogName));
+        String.format(
+            "%s is conflicted with reserved catalog name, please replace it", catalogName));
     if (StringUtils.isBlank(catalogName)) {
       return IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
     }
