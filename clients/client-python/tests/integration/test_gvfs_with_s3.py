@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 @unittest.skip("This test require S3 service account")
-class TestGvfsWithGCS(TestGvfsWithHDFS):
+class TestGvfsWithS3(TestGvfsWithHDFS):
     # Before running this test, please set the make sure aws-bundle-x.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
     s3_access_key = "your_access_key"
