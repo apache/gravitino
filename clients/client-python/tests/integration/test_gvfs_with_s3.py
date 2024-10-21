@@ -124,7 +124,7 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         )
 
         cls.fileset_storage_location: str = (
-            f"gs://{cls.bucket_name}/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
+            f"s3a://{cls.bucket_name}/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
         )
         cls.fileset_gvfs_location = (
             f"gvfs://fileset/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
