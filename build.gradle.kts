@@ -512,6 +512,7 @@ tasks.rat {
     "DISCLAIMER.txt",
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
+    "clients/client-python/**/__pycache__",
     "clients/client-python/.venv/*",
     "clients/client-python/venv/*",
     "clients/client-python/apache_gravitino.egg-info/*",
