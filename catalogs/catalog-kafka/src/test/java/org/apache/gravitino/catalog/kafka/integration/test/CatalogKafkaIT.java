@@ -126,6 +126,7 @@ public class CatalogKafkaIT extends BaseIT {
               metalake.disableCatalog(catalogName);
               metalake.dropCatalog(catalogName);
             }));
+    client.disableMetalake(METALAKE_NAME);
     client.dropMetalake(METALAKE_NAME);
     if (adminClient != null) {
       adminClient.close();
@@ -554,10 +555,9 @@ public class CatalogKafkaIT extends BaseIT {
   }
 
   private void createMetalake() {
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
+    client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(METALAKE_NAME, loadMetalake.name());
 
     metalake = loadMetalake;
   }

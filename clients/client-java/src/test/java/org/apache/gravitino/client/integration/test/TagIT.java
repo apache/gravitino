@@ -115,7 +115,7 @@ public class TagIT extends BaseIT {
     relationalCatalog.asTableCatalog().dropTable(NameIdentifier.of(schema.name(), table.name()));
     relationalCatalog.asSchemas().dropSchema(schema.name(), true);
     metalake.dropCatalog(relationalCatalog.name(), true);
-    client.dropMetalake(metalakeName);
+    client.dropMetalake(metalakeName, true);
 
     if (client != null) {
       client.close();

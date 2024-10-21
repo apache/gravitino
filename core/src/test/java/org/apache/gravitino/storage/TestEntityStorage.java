@@ -695,9 +695,7 @@ public class TestEntityStorage {
       // metalake
       BaseMetalake metalakeNew =
           createBaseMakeLake(
-              RandomIdGenerator.INSTANCE.nextId(),
-              metalake.name(),
-              (AuditInfo) metalake.auditInfo());
+              RandomIdGenerator.INSTANCE.nextId(), metalake.name(), metalake.auditInfo());
       store.put(metalakeNew);
       // catalog
       CatalogEntity catalogNew =
@@ -976,7 +974,7 @@ public class TestEntityStorage {
           NameIdentifier.of("metalake1"),
           BaseMetalake.class,
           Entity.EntityType.METALAKE,
-          e -> createBaseMakeLake(metalake1New.id(), "metalake2", (AuditInfo) e.auditInfo()));
+          e -> createBaseMakeLake(metalake1New.id(), "metalake2", e.auditInfo()));
 
       // Rename metalake3 --> metalake1
       BaseMetalake metalake3New1 =
@@ -986,7 +984,7 @@ public class TestEntityStorage {
           NameIdentifier.of("metalake3"),
           BaseMetalake.class,
           Entity.EntityType.METALAKE,
-          e -> createBaseMakeLake(metalake3New1.id(), "metalake1", (AuditInfo) e.auditInfo()));
+          e -> createBaseMakeLake(metalake3New1.id(), "metalake1", e.auditInfo()));
 
       // Rename metalake3 --> metalake2
       BaseMetalake metalake3New2 =
@@ -998,7 +996,7 @@ public class TestEntityStorage {
           NameIdentifier.of("metalake3"),
           BaseMetalake.class,
           Entity.EntityType.METALAKE,
-          e -> createBaseMakeLake(metalake3New2.id(), "metalake2", (AuditInfo) e.auditInfo()));
+          e -> createBaseMakeLake(metalake3New2.id(), "metalake2", e.auditInfo()));
 
       // Finally, only metalake2 and metalake1 are left.
       Assertions.assertDoesNotThrow(

@@ -25,12 +25,15 @@ import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.PATCH;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -40,8 +43,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
+import org.apache.gravitino.dto.requests.MetalakeSetRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
+import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.MetalakeListResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
@@ -149,6 +154,43 @@ public class MetalakeOperations {
     }
   }
 
+  @PATCH
+  @Path("{name}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "set-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "set-metalake", absolute = true)
+  public Response setMetalake(@PathParam("name") String metalakeName, MetalakeSetRequest request) {
+    LOG.info("Received set request for metalake: {}", metalakeName);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
+            TreeLockUtils.doWithTreeLock(
+                identifier,
+                LockType.WRITE,
+                () -> {
+                  if (request.isInUse()) {
+                    metalakeDispatcher.enableMetalake(identifier);
+                  } else {
+                    metalakeDispatcher.disableMetalake(identifier);
+                  }
+                  return null;
+                });
+            Response response = Utils.ok(new BaseResponse());
+            LOG.info(
+                "Successfully {} metalake: {}",
+                request.isInUse() ? "enable" : "disable",
+                metalakeName);
+            return response;
+          });
+
+    } catch (Exception e) {
+      LOG.info("Failed to {} metalake: {}", request.isInUse() ? "enable" : "disable", metalakeName);
+      return ExceptionHandlers.handleMetalakeException(OperationType.LOAD, metalakeName, e);
+    }
+  }
+
   @PUT
   @Path("{name}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -186,7 +228,9 @@ public class MetalakeOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-metalake", absolute = true)
-  public Response dropMetalake(@PathParam("name") String metalakeName) {
+  public Response dropMetalake(
+      @PathParam("name") String metalakeName,
+      @DefaultValue("false") @QueryParam("force") boolean force) {
     LOG.info("Received drop metalake request for metalake: {}", metalakeName);
     try {
       return Utils.doAs(
@@ -195,7 +239,7 @@ public class MetalakeOperations {
             NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
             boolean dropped =
                 TreeLockUtils.doWithRootTreeLock(
-                    LockType.WRITE, () -> metalakeDispatcher.dropMetalake(identifier));
+                    LockType.WRITE, () -> metalakeDispatcher.dropMetalake(identifier, force));
             if (!dropped) {
               LOG.warn("Failed to drop metalake by name {}", metalakeName);
             }
