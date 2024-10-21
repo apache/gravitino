@@ -90,6 +90,11 @@ tasks.test {
   } else {
     dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
   }
+
+  // this task depends on :bundles:aws-bundle:shadowJar
+  dependsOn(":bundles:aws-bundle:jar")
+  dependsOn(":bundles:aliyun-bundle:jar")
+  dependsOn(":bundles:gcp-bundle:jar")
 }
 
 tasks.javadoc {

@@ -162,6 +162,11 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
   }
+
+  // this task depends on :bundles:aws-bundle:jar
+  dependsOn(":bundles:aws-bundle:jar")
+  dependsOn(":bundles:aliyun-bundle:jar")
+  dependsOn(":bundles:gcp-bundle:jar")
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {
