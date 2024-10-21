@@ -98,7 +98,7 @@ public interface SupportsMetalakes {
    *       Otherwise, a {@link MetalakeInUseException} will be thrown.
    * </ul>
    *
-   * It is equivalent to calling {@code dropMetalake(ident, false)}.
+   * It is equivalent to calling {@code dropMetalake(name, false)}.
    *
    * @param name The name of the metalake.
    * @return True if the metalake was dropped, false if the metalake does not exist.
