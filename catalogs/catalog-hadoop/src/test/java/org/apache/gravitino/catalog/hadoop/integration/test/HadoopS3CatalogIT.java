@@ -139,7 +139,7 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName, true);
-    client.dropMetalake(metalakeName);
+    client.dropMetalake(metalakeName, true);
 
     try {
       closer.close();
