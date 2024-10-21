@@ -20,7 +20,6 @@
 package org.apache.gravitino.proto;
 
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.meta.AuditInfo;
 
 /** A class for serializing and deserializing BaseMetalake objects. */
 class BaseMetalakeSerDe implements ProtoSerDe<org.apache.gravitino.meta.BaseMetalake, Metalake> {
@@ -38,7 +37,7 @@ class BaseMetalakeSerDe implements ProtoSerDe<org.apache.gravitino.meta.BaseMeta
         Metalake.newBuilder()
             .setId(baseMetalake.id())
             .setName(baseMetalake.name())
-            .setAuditInfo(new AuditInfoSerDe().serialize((AuditInfo) baseMetalake.auditInfo()));
+            .setAuditInfo(new AuditInfoSerDe().serialize(baseMetalake.auditInfo()));
 
     if (baseMetalake.comment() != null) {
       builder.setComment(baseMetalake.comment());

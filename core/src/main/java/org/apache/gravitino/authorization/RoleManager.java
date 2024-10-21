@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.authorization;
 
+import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
@@ -33,7 +35,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -52,7 +53,6 @@ import org.slf4j.LoggerFactory;
 class RoleManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(RoleManager.class);
-  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
   private final EntityStore store;
   private final IdGenerator idGenerator;
 
@@ -67,7 +67,7 @@ class RoleManager {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException {
-    AuthorizationUtils.checkMetalakeExists(metalake);
+    checkMetalake(NameIdentifier.of(metalake), store);
     RoleEntity roleEntity =
         RoleEntity.builder()
             .withId(idGenerator.nextId())
@@ -104,7 +104,7 @@ class RoleManager {
 
   RoleEntity getRole(String metalake, String role) throws NoSuchRoleException {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       return getRoleEntity(AuthorizationUtils.ofRole(metalake, role));
     } catch (NoSuchEntityException e) {
       LOG.warn("Role {} does not exist in the metalake {}", role, metalake, e);
@@ -114,7 +114,7 @@ class RoleManager {
 
   boolean deleteRole(String metalake, String role) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       NameIdentifier ident = AuthorizationUtils.ofRole(metalake, role);
 
       try {
@@ -138,14 +138,11 @@ class RoleManager {
 
   String[] listRoleNames(String metalake) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
       Namespace namespace = AuthorizationUtils.ofRoleNamespace(metalake);
       return store.list(namespace, RoleEntity.class, Entity.EntityType.ROLE).stream()
           .map(Role::name)
           .toArray(String[]::new);
-    } catch (NoSuchEntityException e) {
-      LOG.warn("Metalake {} does not exist", metalake, e);
-      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
     } catch (IOException ioe) {
       LOG.error("Listing user under metalake {} failed due to storage issues", metalake, ioe);
       throw new RuntimeException(ioe);
@@ -154,7 +151,7 @@ class RoleManager {
 
   String[] listRoleNamesByObject(String metalake, MetadataObject object) {
     try {
-      AuthorizationUtils.checkMetalakeExists(metalake);
+      checkMetalake(NameIdentifier.of(metalake), store);
 
       return store.relationOperations()
           .listEntitiesByRelation(

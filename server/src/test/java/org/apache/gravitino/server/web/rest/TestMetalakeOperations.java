@@ -22,6 +22,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -381,7 +382,7 @@ public class TestMetalakeOperations extends JerseyTest {
 
   @Test
   public void testDropMetalake() {
-    when(metalakeManager.dropMetalake(any())).thenReturn(true);
+    when(metalakeManager.dropMetalake(any(), anyBoolean())).thenReturn(true);
     Response resp =
         target("/metalakes/test")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -396,7 +397,7 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertTrue(dropped);
 
     // Test when failed to drop metalake
-    when(metalakeManager.dropMetalake(any())).thenReturn(false);
+    when(metalakeManager.dropMetalake(any(), anyBoolean())).thenReturn(false);
     Response resp2 =
         target("/metalakes/test")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -408,7 +409,9 @@ public class TestMetalakeOperations extends JerseyTest {
     Assertions.assertFalse(dropResponse2.dropped());
 
     // Test throw an exception when deleting tenant.
-    doThrow(new RuntimeException("Internal error")).when(metalakeManager).dropMetalake(any());
+    doThrow(new RuntimeException("Internal error"))
+        .when(metalakeManager)
+        .dropMetalake(any(), anyBoolean());
 
     Response resp1 =
         target("/metalakes/test")

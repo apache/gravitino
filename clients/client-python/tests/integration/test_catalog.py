@@ -93,7 +93,9 @@ class TestCatalog(IntegrationTestEnv):
             logger.info(
                 "TestCatalog: drop metalake %s[%s]",
                 self.metalake_name,
-                self.gravitino_admin_client.drop_metalake(self.metalake_name),
+                self.gravitino_admin_client.drop_metalake(
+                    self.metalake_name, force=True
+                ),
             )
         except GravitinoRuntimeException:
             logger.warning(

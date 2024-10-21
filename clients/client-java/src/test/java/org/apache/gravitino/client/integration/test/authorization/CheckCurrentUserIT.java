@@ -98,7 +98,7 @@ public class CheckCurrentUserIT extends BaseIT {
   @AfterAll
   public void tearDown() {
     if (client != null) {
-      client.dropMetalake(metalakeName);
+      client.dropMetalake(metalakeName, true);
       client.close();
       client = null;
     }

@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.tag;
 
+import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -35,7 +37,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
@@ -93,7 +94,7 @@ public class TagManager {
         NameIdentifier.of(ofTagNamespace(metalake).levels()),
         LockType.READ,
         () -> {
-          checkMetalakeExists(metalake, entityStore);
+          checkMetalake(NameIdentifier.of(metalake), entityStore);
 
           try {
             return entityStore
@@ -114,7 +115,7 @@ public class TagManager {
         NameIdentifier.of(ofTagNamespace(metalake).levels()),
         LockType.WRITE,
         () -> {
-          checkMetalakeExists(metalake, entityStore);
+          checkMetalake(NameIdentifier.of(metalake), entityStore);
 
           TagEntity tagEntity =
               TagEntity.builder()
@@ -148,7 +149,7 @@ public class TagManager {
         ofTagIdent(metalake, name),
         LockType.READ,
         () -> {
-          checkMetalakeExists(metalake, entityStore);
+          checkMetalake(NameIdentifier.of(metalake), entityStore);
 
           try {
             return entityStore.get(
@@ -169,7 +170,7 @@ public class TagManager {
         NameIdentifier.of(ofTagNamespace(metalake).levels()),
         LockType.WRITE,
         () -> {
-          checkMetalakeExists(metalake, entityStore);
+          checkMetalake(NameIdentifier.of(metalake), entityStore);
 
           try {
             return entityStore.update(
@@ -195,7 +196,7 @@ public class TagManager {
         NameIdentifier.of(ofTagNamespace(metalake).levels()),
         LockType.WRITE,
         () -> {
-          checkMetalakeExists(metalake, entityStore);
+          checkMetalake(NameIdentifier.of(metalake), entityStore);
 
           try {
             return entityStore.delete(ofTagIdent(metalake, name), Entity.EntityType.TAG);
@@ -213,7 +214,7 @@ public class TagManager {
         tagId,
         LockType.READ,
         () -> {
-          checkMetalakeExists(metalake, entityStore);
+          checkMetalake(NameIdentifier.of(metalake), entityStore);
 
           try {
             if (!entityStore.exists(tagId, Entity.EntityType.TAG)) {
@@ -354,19 +355,6 @@ public class TagManager {
                     throw new RuntimeException(e);
                   }
                 }));
-  }
-
-  private static void checkMetalakeExists(String metalake, EntityStore entityStore) {
-    try {
-      NameIdentifier metalakeIdent = NameIdentifier.of(metalake);
-      if (!entityStore.exists(metalakeIdent, Entity.EntityType.METALAKE)) {
-        LOG.warn("Metalake {} does not exist", metalakeIdent);
-        throw new NoSuchMetalakeException("Metalake %s does not exist", metalakeIdent);
-      }
-    } catch (IOException ioe) {
-      LOG.error("Failed to check if metalake exists", ioe);
-      throw new RuntimeException(ioe);
-    }
   }
 
   public static Namespace ofTagNamespace(String metalake) {

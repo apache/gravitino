@@ -21,25 +21,18 @@ package org.apache.gravitino.filesystem.hadoop.integration.test;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +60,9 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
 
     // This value can be by tune by the user, please change it accordingly.
     defaultBockSize = 64 * 1024 * 1024;
+
+    // The default replication factor is 1.
+    defaultReplication = 1;
 
     metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
     catalogName = GravitinoITUtils.genRandomName("catalog");
@@ -111,7 +107,7 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
   public void tearDown() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
     client.dropMetalake(metalakeName);
 
     if (client != null) {
@@ -143,30 +139,6 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
 
   protected String genStorageLocation(String fileset) {
     return String.format("oss://%s/%s", BUCKET_NAME, fileset);
-  }
-
-  @Test
-  public void testGetDefaultReplications() throws IOException {
-    String filesetName = GravitinoITUtils.genRandomName("test_get_default_replications");
-    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
-    Catalog catalog = metalake.loadCatalog(catalogName);
-    String storageLocation = genStorageLocation(filesetName);
-    catalog
-        .asFilesetCatalog()
-        .createFileset(
-            filesetIdent,
-            "fileset comment",
-            Fileset.Type.MANAGED,
-            storageLocation,
-            new HashMap<>());
-    Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(filesetIdent));
-    Path gvfsPath = genGvfsPath(filesetName);
-    try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-      // Here HDFS is 3, but for oss is 1.
-      assertEquals(1, gvfs.getDefaultReplication(gvfsPath));
-    }
-
-    catalog.asFilesetCatalog().dropFileset(filesetIdent);
   }
 
   @Disabled(
