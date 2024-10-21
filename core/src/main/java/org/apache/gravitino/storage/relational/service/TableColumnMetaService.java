@@ -110,12 +110,14 @@ public class TableColumnMetaService {
     List<ColumnPO> columnPOsToInsert = Lists.newArrayList();
     for (ColumnEntity newColumn : newColumns.values()) {
       ColumnEntity oldColumn = oldColumns.get(newColumn.id());
+      // If the column is not existed in old columns, or if the column is updated, mark it as UPDATE
       if (oldColumn == null || !oldColumn.equals(newColumn)) {
         columnPOsToInsert.add(
             POConverters.initializeColumnPO(newTablePO, newColumn, ColumnPO.ColumnOpType.UPDATE));
       }
     }
 
+    // Mark the columns to DELETE if they are not existed in new columns.
     for (ColumnEntity oldColumn : oldColumns.values()) {
       if (!newColumns.containsKey(oldColumn.id())) {
         columnPOsToInsert.add(
