@@ -174,7 +174,6 @@ allprojects {
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
       param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.1")
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
-      param.environment("GRAVITINO_CI_S3MOCK_DOCKER_IMAGE", "adobe/s3mock:3.10.0")
       param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:latest")
 
       val dockerRunning = project.rootProject.extra["dockerRunning"] as? Boolean ?: false
