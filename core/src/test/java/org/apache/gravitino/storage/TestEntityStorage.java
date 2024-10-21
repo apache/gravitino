@@ -578,10 +578,10 @@ public class TestEntityStorage {
           createSchemaEntity(1L, Namespace.of("metalake", "catalog"), "schema1", auditInfo);
       ColumnEntity column1 =
           createColumnEntity(
-              RandomIdGenerator.INSTANCE.nextId(), "column1", Types.StringType.get(), auditInfo);
+              RandomIdGenerator.INSTANCE.nextId(), "column1", 0, Types.StringType.get(), auditInfo);
       ColumnEntity column2 =
           createColumnEntity(
-              RandomIdGenerator.INSTANCE.nextId(), "column2", Types.StringType.get(), auditInfo);
+              RandomIdGenerator.INSTANCE.nextId(), "column2", 1, Types.StringType.get(), auditInfo);
       TableEntity table1 =
           createTableEntityWithColumns(
               1L,
@@ -600,10 +600,10 @@ public class TestEntityStorage {
           createSchemaEntity(2L, Namespace.of("metalake", "catalog"), "schema2", auditInfo);
       ColumnEntity column3 =
           createColumnEntity(
-              RandomIdGenerator.INSTANCE.nextId(), "column3", Types.StringType.get(), auditInfo);
+              RandomIdGenerator.INSTANCE.nextId(), "column3", 2, Types.StringType.get(), auditInfo);
       ColumnEntity column4 =
           createColumnEntity(
-              RandomIdGenerator.INSTANCE.nextId(), "column4", Types.StringType.get(), auditInfo);
+              RandomIdGenerator.INSTANCE.nextId(), "column4", 3, Types.StringType.get(), auditInfo);
       TableEntity table1InSchema2 =
           createTableEntityWithColumns(
               2L,
@@ -1257,10 +1257,11 @@ public class TestEntityStorage {
   }
 
   public static ColumnEntity createColumnEntity(
-      Long id, String name, Type dataType, AuditInfo auditInfo) {
+      Long id, String name, int position, Type dataType, AuditInfo auditInfo) {
     return ColumnEntity.builder()
         .withId(id)
         .withName(name)
+        .withPosition(position)
         .withComment("")
         .withDataType(dataType)
         .withNullable(true)
