@@ -22,46 +22,34 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.CredentialProviderFactory;
 import org.apache.gravitino.credential.CredentialProviderManager;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogConfigProvider;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.provider.DynamicIcebergCatalogConfigProvider;
-import org.apache.gravitino.iceberg.provider.StaticIcebergCatalogConfigProvider;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class IcebergCatalogWrapperManager implements AutoCloseable {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapperManager.class);
 
-  private static final ImmutableMap<String, String> ICEBERG_CATALOG_CONFIG_PROVIDER_NAMES =
-      ImmutableMap.of(
-          IcebergConstants.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
-          StaticIcebergCatalogConfigProvider.class.getCanonicalName(),
-          IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
-          DynamicIcebergCatalogConfigProvider.class.getCanonicalName());
-
   private final Cache<String, IcebergCatalogWrapper> icebergCatalogWrapperCache;
 
-  private final IcebergCatalogConfigProvider provider;
+  private final IcebergConfigProvider configProvider;
 
   private CredentialProviderManager credentialProviderManager;
 
-  public IcebergCatalogWrapperManager(Map<String, String> properties) {
+  public IcebergCatalogWrapperManager(
+      Map<String, String> properties, IcebergConfigProvider configProvider) {
     this.credentialProviderManager = new CredentialProviderManager();
-    this.provider = createIcebergCatalogConfigProvider(properties);
-    this.provider.initialize(properties);
+    this.configProvider = configProvider;
     this.icebergCatalogWrapperCache =
         Caffeine.newBuilder()
             .expireAfterWrite(
@@ -92,17 +80,21 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
    * @return the instance of IcebergCatalogWrapper.
    */
   public IcebergCatalogWrapper getOps(String rawPrefix) {
-    String catalogName = getCatalogName(rawPrefix);
-    IcebergCatalogWrapper tableOps =
+    String catalogName = IcebergRestUtils.getCatalogName(rawPrefix);
+    return getCatalogWrapper(catalogName);
+  }
+
+  public IcebergCatalogWrapper getCatalogWrapper(String catalogName) {
+    IcebergCatalogWrapper catalogWrapper =
         icebergCatalogWrapperCache.get(catalogName, k -> createCatalogWrapper(catalogName));
     // Reload conf to reset UserGroupInformation or icebergTableOps will always use
     // Simple auth.
-    tableOps.reloadHadoopConf();
-    return tableOps;
+    catalogWrapper.reloadHadoopConf();
+    return catalogWrapper;
   }
 
   public CredentialProvider getCredentialProvider(String prefix) {
-    String catalogName = getCatalogName(prefix);
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
     return credentialProviderManager.getCredentialProvider(catalogName);
   }
 
@@ -112,7 +104,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   }
 
   private IcebergCatalogWrapper createCatalogWrapper(String catalogName) {
-    Optional<IcebergConfig> icebergConfig = provider.getIcebergCatalogConfig(catalogName);
+    Optional<IcebergConfig> icebergConfig = configProvider.getIcebergCatalogConfig(catalogName);
     if (!icebergConfig.isPresent()) {
       throw new RuntimeException("Couldn't find Iceberg configuration for " + catalogName);
     }
@@ -128,43 +120,6 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     return createIcebergCatalogWrapper(icebergConfig.get());
   }
 
-  private String getCatalogName(String rawPrefix) {
-    String prefix = shelling(rawPrefix);
-    Preconditions.checkArgument(
-        !IcebergConstants.GRAVITINO_DEFAULT_CATALOG.equals(prefix),
-        String.format("%s is conflict with reserved key, please replace it", prefix));
-    if (StringUtils.isBlank(prefix)) {
-      return IcebergConstants.GRAVITINO_DEFAULT_CATALOG;
-    }
-    return prefix;
-  }
-
-  private IcebergCatalogConfigProvider createIcebergCatalogConfigProvider(
-      Map<String, String> properties) {
-    String providerName =
-        (new IcebergConfig(properties)).get(IcebergConfig.ICEBERG_REST_CATALOG_CONFIG_PROVIDER);
-    String className =
-        ICEBERG_CATALOG_CONFIG_PROVIDER_NAMES.getOrDefault(providerName, providerName);
-    LOG.info("Load Iceberg catalog provider: {}.", className);
-    try {
-      Class<?> providerClz = Class.forName(className);
-      return (IcebergCatalogConfigProvider) providerClz.getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private String shelling(String rawPrefix) {
-    if (StringUtils.isBlank(rawPrefix)) {
-      return rawPrefix;
-    } else {
-      // rawPrefix is a string matching ([^/]*/) which end with /
-      Preconditions.checkArgument(
-          rawPrefix.endsWith("/"), String.format("rawPrefix %s format is illegal", rawPrefix));
-      return rawPrefix.substring(0, rawPrefix.length() - 1);
-    }
-  }
-
   private void closeIcebergCatalogWrapper(IcebergCatalogWrapper catalogWrapper) {
     try {
       catalogWrapper.close();
@@ -176,8 +131,5 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   @Override
   public void close() throws Exception {
     icebergCatalogWrapperCache.invalidateAll();
-    if (provider instanceof AutoCloseable) {
-      ((AutoCloseable) provider).close();
-    }
   }
 }
