@@ -77,12 +77,6 @@ const TableView = () => {
   const catalog = searchParams.get('catalog') || ''
   const type = searchParams.get('type') || ''
 
-  const isKafkaSchema =
-    paramsSize == 3 &&
-    searchParams.has('metalake') &&
-    searchParams.has('catalog') &&
-    searchParams.get('type') === 'messaging'
-
   const defaultPaginationConfig = { pageSize: 10, page: 0 }
   const pageSizeOptions = [10, 25, 50]
 
@@ -99,6 +93,15 @@ const TableView = () => {
   const [openSchemaDialog, setOpenSchemaDialog] = useState(false)
   const [dialogData, setDialogData] = useState({})
   const [dialogType, setDialogType] = useState('create')
+  const [isHideSchemaEdit, setIsHideSchemaEdit] = useState(true)
+
+  useEffect(() => {
+    if (store.catalogs.length) {
+      const currentCatalog = store.catalogs.filter(ca => ca.name === catalog)[0]
+      const isHideSchemaAction = ['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3
+      setIsHideSchemaEdit(isHideSchemaAction)
+    }
+  }, [store.catalogs, store.catalogs.length, paramsSize, catalog])
 
   const handleClickUrl = path => {
     if (!path) {
@@ -268,7 +271,7 @@ const TableView = () => {
             <ViewIcon viewBox='0 0 24 22' />
           </IconButton>
 
-          {!isKafkaSchema && (
+          {!isHideSchemaEdit && (
             <IconButton
               title='Edit'
               size='small'
@@ -280,7 +283,7 @@ const TableView = () => {
             </IconButton>
           )}
 
-          {!isKafkaSchema && (
+          {!isHideSchemaEdit && (
             <IconButton
               title='Delete'
               size='small'

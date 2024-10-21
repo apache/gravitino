@@ -28,6 +28,7 @@ import CreateCatalogDialog from './CreateCatalogDialog'
 import CreateSchemaDialog from './CreateSchemaDialog'
 import TabsContent from './tabsContent/TabsContent'
 import { useSearchParams } from 'next/navigation'
+import { useAppSelector } from '@/lib/hooks/useStore'
 
 const RightContent = () => {
   const [open, setOpen] = useState(false)
@@ -35,6 +36,7 @@ const RightContent = () => {
   const searchParams = useSearchParams()
   const [isShowBtn, setBtnVisiable] = useState(true)
   const [isShowSchemaBtn, setSchemaBtnVisiable] = useState(false)
+  const store = useAppSelector(state => state.metalakes)
 
   const handleCreateCatalog = () => {
     setOpen(true)
@@ -49,13 +51,12 @@ const RightContent = () => {
     const isCatalogList = paramsSize == 1 && searchParams.get('metalake')
     setBtnVisiable(isCatalogList)
 
-    const isSchemaList =
-      paramsSize == 3 &&
-      searchParams.get('metalake') &&
-      searchParams.get('catalog') &&
-      searchParams.get('type') !== 'messaging'
-    setSchemaBtnVisiable(isSchemaList)
-  }, [searchParams])
+    if (store.catalogs.length) {
+      const currentCatalog = store.catalogs.filter(ca => ca.name === searchParams.get('catalog'))[0]
+      const isHideSchemaAction = ['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3
+      setSchemaBtnVisiable(!isHideSchemaAction && !isCatalogList)
+    }
+  }, [searchParams, store.catalogs, store.catalogs.length])
 
   return (
     <Box className={`twc-w-0 twc-grow twc-h-full twc-bg-customs-white twc-overflow-hidden`}>
