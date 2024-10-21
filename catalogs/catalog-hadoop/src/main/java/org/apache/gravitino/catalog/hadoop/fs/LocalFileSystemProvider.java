@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
 
 public class LocalFileSystemProvider implements FileSystemProvider {
@@ -38,7 +37,7 @@ public class LocalFileSystemProvider implements FileSystemProvider {
           configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v);
         });
 
-    return LocalFileSystem.newInstance(path.toUri(), configuration);
+    return FileSystem.newInstance(path.toUri(), configuration);
   }
 
   @Override

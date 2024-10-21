@@ -89,5 +89,11 @@ class GravitinoClient(GravitinoClientBase):
     def alter_catalog(self, name: str, *changes: CatalogChange):
         return self.get_metalake().alter_catalog(name, *changes)
 
-    def drop_catalog(self, name: str):
-        return self.get_metalake().drop_catalog(name)
+    def drop_catalog(self, name: str, force: bool = False) -> bool:
+        return self.get_metalake().drop_catalog(name, force)
+
+    def enable_catalog(self, name: str):
+        return self.get_metalake().enable_catalog(name)
+
+    def disable_catalog(self, name: str):
+        return self.get_metalake().disable_catalog(name)

@@ -95,7 +95,7 @@ public class AuditCatalogMysqlIT extends BaseIT {
     Assertions.assertEquals(expectUser, catalog.auditInfo().creator());
     Assertions.assertEquals(expectUser, catalog.auditInfo().lastModifier());
 
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 
   @Test
@@ -109,7 +109,7 @@ public class AuditCatalogMysqlIT extends BaseIT {
     Assertions.assertNull(schema.auditInfo().lastModifier());
 
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 
   @Test
@@ -144,7 +144,7 @@ public class AuditCatalogMysqlIT extends BaseIT {
 
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 
   private static Catalog createCatalog(String catalogName) throws SQLException {

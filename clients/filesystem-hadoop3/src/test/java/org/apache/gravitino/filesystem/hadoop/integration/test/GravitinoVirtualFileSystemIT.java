@@ -57,14 +57,15 @@ import org.slf4j.LoggerFactory;
 public class GravitinoVirtualFileSystemIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemIT.class);
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
-  private static final String metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
-  private static final String catalogName = GravitinoITUtils.genRandomName("catalog");
-  private static final String schemaName = GravitinoITUtils.genRandomName("schema");
-  private static GravitinoMetalake metalake;
-  private static Configuration conf = new Configuration();
+  protected String metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
+  protected String catalogName = GravitinoITUtils.genRandomName("catalog");
+  protected String schemaName = GravitinoITUtils.genRandomName("schema");
+  protected GravitinoMetalake metalake;
+  protected Configuration conf = new Configuration();
+  protected int defaultBockSize = 128 * 1024 * 1024;
 
   @BeforeAll
-  public void startUp() {
+  public void startUp() throws Exception {
     containerSuite.startHiveContainer();
     Assertions.assertFalse(client.metalakeExists(metalakeName));
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
@@ -90,7 +91,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
   public void tearDown() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
     client.dropMetalake(metalakeName);
 
     if (client != null) {
@@ -112,10 +113,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     }
   }
 
+  protected Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
+    return gvfsConf;
+  }
+
   @Test
   public void testCreate() throws IOException {
     // create fileset
-    String filesetName = "test_fileset_create";
+    String filesetName = GravitinoITUtils.genRandomName("test_fileset_create");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
@@ -131,25 +136,28 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
 
     // test gvfs create
     Path hdfsPath = new Path(storageLocation);
-    try (FileSystem fs = hdfsPath.getFileSystem(conf)) {
+    try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
       Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
         Assertions.assertTrue(gvfs.exists(gvfsPath));
         String fileName = "test.txt";
         Path createPath = new Path(gvfsPath + "/" + fileName);
-        gvfs.create(createPath);
+        // GCS need to close the stream to create the file manually.
+        gvfs.create(createPath).close();
         Assertions.assertTrue(gvfs.exists(createPath));
         Assertions.assertTrue(gvfs.getFileStatus(createPath).isFile());
         Assertions.assertTrue(fs.exists(new Path(storageLocation + "/" + fileName)));
       }
     }
+
+    catalog.asFilesetCatalog().dropFileset(filesetIdent);
   }
 
   @Test
   public void testAppend() throws IOException {
     // create fileset
-    String filesetName = "test_fileset_append";
+    String filesetName = GravitinoITUtils.genRandomName("test_fileset_append");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
@@ -165,7 +173,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
 
     // test gvfs append
     Path hdfsPath = new Path(storageLocation);
-    try (FileSystem fs = hdfsPath.getFileSystem(conf)) {
+    try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
       Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       String fileName = "test.txt";
@@ -173,7 +181,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
 
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
         Assertions.assertTrue(gvfs.exists(gvfsPath));
-        gvfs.create(appendPath);
+        gvfs.create(appendPath).close();
         Assertions.assertTrue(gvfs.exists(appendPath));
         Assertions.assertTrue(gvfs.getFileStatus(appendPath).isFile());
         Assertions.assertTrue(fs.exists(new Path(storageLocation + "/" + fileName)));
@@ -203,12 +211,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
         }
       }
     }
+
+    catalog.asFilesetCatalog().dropFileset(filesetIdent);
   }
 
   @Test
   public void testDelete() throws IOException {
     // create fileset
-    String filesetName = "test_fileset_delete";
+    String filesetName = GravitinoITUtils.genRandomName("test_fileset_delete");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
@@ -224,14 +234,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
 
     // test gvfs delete
     Path hdfsPath = new Path(storageLocation);
-    try (FileSystem fs = hdfsPath.getFileSystem(conf)) {
+    try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
       Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       String fileName = "test.txt";
       Path deletePath = new Path(gvfsPath + "/" + fileName);
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
         Assertions.assertTrue(gvfs.exists(gvfsPath));
-        gvfs.create(deletePath);
+        gvfs.create(deletePath).close();
         Assertions.assertTrue(gvfs.exists(deletePath));
         Assertions.assertTrue(gvfs.getFileStatus(deletePath).isFile());
         Assertions.assertTrue(fs.exists(new Path(storageLocation + "/" + fileName)));
@@ -242,12 +252,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
         Assertions.assertFalse(fs.exists(new Path(storageLocation + "/" + fileName)));
       }
     }
+
+    catalog.asFilesetCatalog().dropFileset(filesetIdent);
   }
 
   @Test
   public void testGetStatus() throws IOException {
     // create fileset
-    String filesetName = "test_fileset_get_status";
+    String filesetName = GravitinoITUtils.genRandomName("test_fileset_get_status");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
@@ -263,14 +275,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
 
     // test gvfs get status
     Path hdfsPath = new Path(storageLocation);
-    try (FileSystem fs = hdfsPath.getFileSystem(conf)) {
+    try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
       Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       String fileName = "test.txt";
       Path statusPath = new Path(gvfsPath + "/" + fileName);
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
         Assertions.assertTrue(gvfs.exists(gvfsPath));
-        gvfs.create(statusPath);
+        gvfs.create(statusPath).close();
         Assertions.assertTrue(gvfs.exists(statusPath));
         Assertions.assertTrue(gvfs.getFileStatus(statusPath).isFile());
         Assertions.assertTrue(fs.exists(new Path(storageLocation + "/" + fileName)));
@@ -284,12 +296,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
                 .replaceFirst(genGvfsPath(filesetName).toString(), storageLocation));
       }
     }
+
+    catalog.asFilesetCatalog().dropFileset(filesetIdent);
   }
 
   @Test
   public void testListStatus() throws IOException {
     // create fileset
-    String filesetName = "test_fileset_list_status";
+    String filesetName = GravitinoITUtils.genRandomName("test_fileset_list_status");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
@@ -305,7 +319,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
 
     // test gvfs list status
     Path hdfsPath = new Path(storageLocation);
-    try (FileSystem fs = hdfsPath.getFileSystem(conf)) {
+    try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
       Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       for (int i = 0; i < 10; i++) {
@@ -313,7 +327,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
         Path statusPath = new Path(gvfsPath + "/" + fileName);
         try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
           Assertions.assertTrue(gvfs.exists(gvfsPath));
-          gvfs.create(statusPath);
+          gvfs.create(statusPath).close();
           Assertions.assertTrue(gvfs.exists(statusPath));
           Assertions.assertTrue(gvfs.getFileStatus(statusPath).isFile());
           Assertions.assertTrue(fs.exists(new Path(storageLocation + "/" + fileName)));
@@ -340,12 +354,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
         }
       }
     }
+
+    catalog.asFilesetCatalog().dropFileset(filesetIdent);
   }
 
   @Test
   public void testMkdirs() throws IOException {
     // create fileset
-    String filesetName = "test_fileset_mkdirs";
+    String filesetName = GravitinoITUtils.genRandomName("test_fileset_mkdirs");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
@@ -361,7 +377,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
 
     // test gvfs mkdirs
     Path hdfsPath = new Path(storageLocation);
-    try (FileSystem fs = hdfsPath.getFileSystem(conf)) {
+    try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
       Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
@@ -374,12 +390,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
         Assertions.assertTrue(fs.exists(new Path(storageLocation + "/" + dirName)));
       }
     }
+
+    catalog.asFilesetCatalog().dropFileset(filesetIdent);
   }
 
   @Test
   public void testRename() throws IOException {
     // create fileset
-    String filesetName = "test_fileset_rename";
+    String filesetName = GravitinoITUtils.genRandomName("test_fileset_rename");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
@@ -395,7 +413,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
 
     // test gvfs rename
     Path hdfsPath = new Path(storageLocation);
-    try (FileSystem fs = hdfsPath.getFileSystem(conf)) {
+    try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
       Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       String srcName = "test_src";
@@ -420,11 +438,13 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
         Assertions.assertFalse(fs.exists(new Path(storageLocation + "/" + srcName)));
       }
     }
+
+    catalog.asFilesetCatalog().dropFileset(filesetIdent);
   }
 
   @Test
   public void testGetDefaultReplications() throws IOException {
-    String filesetName = "test_get_default_replications";
+    String filesetName = GravitinoITUtils.genRandomName("test_get_default_replications");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
@@ -441,11 +461,13 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
       assertEquals(3, gvfs.getDefaultReplication(gvfsPath));
     }
+
+    catalog.asFilesetCatalog().dropFileset(filesetIdent);
   }
 
   @Test
   public void testGetDefaultBlockSizes() throws IOException {
-    String filesetName = "test_get_default_block_sizes";
+    String filesetName = GravitinoITUtils.genRandomName("test_get_default_block_sizes");
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     Catalog catalog = metalake.loadCatalog(catalogName);
     String storageLocation = genStorageLocation(filesetName);
@@ -460,15 +482,17 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(filesetIdent));
     Path gvfsPath = genGvfsPath(filesetName);
     try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-      assertEquals(128 * 1024 * 1024, gvfs.getDefaultBlockSize(gvfsPath));
+      assertEquals(defaultBockSize, gvfs.getDefaultBlockSize(gvfsPath));
     }
+
+    catalog.asFilesetCatalog().dropFileset(filesetIdent);
   }
 
-  private String genStorageLocation(String fileset) {
+  protected String genStorageLocation(String fileset) {
     return String.format("%s/%s", baseHdfsPath(), fileset);
   }
 
-  private static String baseHdfsPath() {
+  private String baseHdfsPath() {
     return String.format(
         "hdfs://%s:%d/%s/%s",
         containerSuite.getHiveContainer().getContainerIpAddress(),
@@ -477,7 +501,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
         schemaName);
   }
 
-  private Path genGvfsPath(String fileset) {
+  protected Path genGvfsPath(String fileset) {
     return new Path(String.format("gvfs://fileset/%s/%s/%s", catalogName, schemaName, fileset));
   }
 }

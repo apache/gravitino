@@ -39,6 +39,8 @@ dependencies {
   testImplementation(project(":server-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":bundles:gcp-bundle"))
+  testImplementation(project(":bundles:aliyun-bundle"))
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)

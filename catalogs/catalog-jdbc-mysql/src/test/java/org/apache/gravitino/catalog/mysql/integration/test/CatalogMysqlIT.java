@@ -142,6 +142,7 @@ public class CatalogMysqlIT extends BaseIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
     client.dropMetalake(metalakeName);
     mysqlService.close();
@@ -1987,6 +1988,6 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertDoesNotThrow(() -> loadCatalog.asSchemas().createSchema("test", "", null));
 
     loadCatalog.asSchemas().dropSchema("test", true);
-    metalake.dropCatalog(testCatalogName);
+    metalake.dropCatalog(testCatalogName, true);
   }
 }
