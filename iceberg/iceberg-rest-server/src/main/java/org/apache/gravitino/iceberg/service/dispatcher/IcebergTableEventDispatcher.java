@@ -25,20 +25,20 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergDropTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableFailureEvent;
-import org.apache.gravitino.listener.api.event.IcebergDropTablePostEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
-import org.apache.gravitino.listener.api.event.IcebergListTablePostEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableFailureEvent;
-import org.apache.gravitino.listener.api.event.IcebergLoadTablePostEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergTableExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsFailureEvent;
-import org.apache.gravitino.listener.api.event.IcebergTableExistsPostEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsPreEvent;
+import org.apache.gravitino.listener.api.event.IcebergUpdateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableFailureEvent;
-import org.apache.gravitino.listener.api.event.IcebergUpdateTablePostEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Namespace;
@@ -116,7 +116,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergUpdateTablePostEvent(
+        new IcebergUpdateTableEvent(
             PrincipalUtils.getCurrentUserName(),
             gravitinoNameIdentifier,
             updateTableRequest,
@@ -141,7 +141,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergDropTablePostEvent(
+        new IcebergDropTableEvent(
             PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier, purgeRequested));
   }
 
@@ -161,7 +161,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergLoadTablePostEvent(
+        new IcebergLoadTableEvent(
             PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier, loadTableResponse));
     return loadTableResponse;
   }
@@ -182,8 +182,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergListTablePostEvent(
-            PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier));
+        new IcebergListTableEvent(PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier));
     return listTablesResponse;
   }
 
@@ -204,7 +203,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergTableExistsPostEvent(
+        new IcebergTableExistsEvent(
             PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier, isExists));
     return isExists;
   }

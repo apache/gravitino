@@ -21,31 +21,19 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.iceberg.service.IcebergSerdeUtils;
-import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 
-/** Represent an event after updating Iceberg table successfully. */
+/** Represent an event after loading Iceberg table successfully. */
 @DeveloperApi
-public class IcebergUpdateTablePostEvent extends IcebergTablePostEvent {
-
-  private UpdateTableRequest updateTableRequest;
+public class IcebergLoadTableEvent extends IcebergTableEvent {
   private LoadTableResponse loadTableResponse;
 
-  public IcebergUpdateTablePostEvent(
-      String user,
-      NameIdentifier resourceIdentifier,
-      UpdateTableRequest updateTableRequest,
-      LoadTableResponse loadTableResponse) {
+  public IcebergLoadTableEvent(
+      String user, NameIdentifier resourceIdentifier, LoadTableResponse loadTableResponse) {
     super(user, resourceIdentifier);
-    this.updateTableRequest =
-        IcebergSerdeUtils.cloneIcebergRESTObject(this.updateTableRequest, UpdateTableRequest.class);
     this.loadTableResponse =
-        IcebergSerdeUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
-  }
-
-  public UpdateTableRequest createTableRequest() {
-    return updateTableRequest;
+        IcebergRestUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
   }
 
   public LoadTableResponse loadTableResponse() {

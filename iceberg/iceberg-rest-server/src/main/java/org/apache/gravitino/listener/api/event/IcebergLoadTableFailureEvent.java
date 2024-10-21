@@ -24,7 +24,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represent a failure event when loading Iceberg table failed. */
 @DeveloperApi
-public class IcebergLoadTableFailureEvent extends IcebergRESTFailureEvent {
+public class IcebergLoadTableFailureEvent extends IcebergTableFailureEvent {
   public IcebergLoadTableFailureEvent(String user, NameIdentifier nameIdentifier, Exception e) {
     super(user, nameIdentifier, e);
   }

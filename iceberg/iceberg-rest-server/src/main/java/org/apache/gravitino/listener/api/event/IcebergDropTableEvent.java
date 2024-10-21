@@ -21,22 +21,19 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.iceberg.service.IcebergSerdeUtils;
-import org.apache.iceberg.rest.responses.LoadTableResponse;
 
-/** Represent an event after loading Iceberg table successfully. */
+/** Represent an event after dropping Iceberg table successfully. */
 @DeveloperApi
-public class IcebergLoadTablePostEvent extends IcebergTablePostEvent {
-  private LoadTableResponse loadTableResponse;
+public class IcebergDropTableEvent extends IcebergTableEvent {
+  private boolean purgeRequested;
 
-  public IcebergLoadTablePostEvent(
-      String user, NameIdentifier resourceIdentifier, LoadTableResponse loadTableResponse) {
+  public IcebergDropTableEvent(
+      String user, NameIdentifier resourceIdentifier, boolean purgeRequested) {
     super(user, resourceIdentifier);
-    this.loadTableResponse =
-        IcebergSerdeUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
+    this.purgeRequested = purgeRequested;
   }
 
-  public LoadTableResponse loadTableResponse() {
-    return loadTableResponse;
+  public boolean purgeRequested() {
+    return purgeRequested;
   }
 }

@@ -22,18 +22,16 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represent an event after dropping Iceberg table successfully. */
+/**
+ * Represent an event after listing Iceberg table successfully.
+ *
+ * <p>To optimize memory usage and avoid the potential overhead associated with storing a large
+ * number of tables directly within the ListTableEvent, the actual tables listed are not maintained
+ * in this event.
+ */
 @DeveloperApi
-public class IcebergDropTablePostEvent extends IcebergTablePostEvent {
-  private boolean purgeRequested;
-
-  public IcebergDropTablePostEvent(
-      String user, NameIdentifier resourceIdentifier, boolean purgeRequested) {
+public class IcebergListTableEvent extends IcebergTableEvent {
+  public IcebergListTableEvent(String user, NameIdentifier resourceIdentifier) {
     super(user, resourceIdentifier);
-    this.purgeRequested = purgeRequested;
-  }
-
-  public boolean purgeRequested() {
-    return purgeRequested;
   }
 }

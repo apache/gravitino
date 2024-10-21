@@ -21,19 +21,34 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 
-/** Represent an event after check Iceberg table exists successfully. */
+/** Represent an event after updating Iceberg table successfully. */
 @DeveloperApi
-public class IcebergTableExistsPostEvent extends IcebergTablePostEvent {
-  private boolean isExists;
+public class IcebergUpdateTableEvent extends IcebergTableEvent {
 
-  public IcebergTableExistsPostEvent(
-      String user, NameIdentifier resourceIdentifier, boolean isExists) {
+  private UpdateTableRequest updateTableRequest;
+  private LoadTableResponse loadTableResponse;
+
+  public IcebergUpdateTableEvent(
+      String user,
+      NameIdentifier resourceIdentifier,
+      UpdateTableRequest updateTableRequest,
+      LoadTableResponse loadTableResponse) {
     super(user, resourceIdentifier);
-    this.isExists = isExists;
+    this.updateTableRequest =
+        IcebergRestUtils.cloneIcebergRESTObject(this.updateTableRequest, UpdateTableRequest.class);
+    this.loadTableResponse =
+        IcebergRestUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
   }
 
-  public boolean isExists() {
-    return isExists;
+  public UpdateTableRequest createTableRequest() {
+    return updateTableRequest;
+  }
+
+  public LoadTableResponse loadTableResponse() {
+    return loadTableResponse;
   }
 }

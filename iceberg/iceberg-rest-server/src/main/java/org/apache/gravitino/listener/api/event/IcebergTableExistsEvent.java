@@ -22,16 +22,17 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/**
- * Represent an event after listing Iceberg table successfully.
- *
- * <p>To optimize memory usage and avoid the potential overhead associated with storing a large
- * number of tables directly within the ListTableEvent, the actual tables listed are not maintained
- * in this event.
- */
+/** Represent an event after check Iceberg table exists successfully. */
 @DeveloperApi
-public class IcebergListTablePostEvent extends IcebergTablePostEvent {
-  public IcebergListTablePostEvent(String user, NameIdentifier resourceIdentifier) {
+public class IcebergTableExistsEvent extends IcebergTableEvent {
+  private boolean isExists;
+
+  public IcebergTableExistsEvent(String user, NameIdentifier resourceIdentifier, boolean isExists) {
     super(user, resourceIdentifier);
+    this.isExists = isExists;
+  }
+
+  public boolean isExists() {
+    return isExists;
   }
 }
