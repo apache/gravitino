@@ -65,7 +65,7 @@ public class TestTopicEvent {
   void testCreateTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.createTopic(identifier, topic.comment(), null, topic.properties());
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateTopicEvent.class, event.getClass());
     TopicInfo topicInfo = ((CreateTopicEvent) event).createdTopicInfo();
@@ -76,7 +76,7 @@ public class TestTopicEvent {
   void testLoadTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.loadTopic(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadTopicEvent.class, event.getClass());
     TopicInfo topicInfo = ((LoadTopicEvent) event).loadedTopicInfo();
@@ -88,7 +88,7 @@ public class TestTopicEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     TopicChange topicChange = TopicChange.setProperty("a", "b");
     dispatcher.alterTopic(identifier, topicChange);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterTopicEvent.class, event.getClass());
     TopicInfo topicInfo = ((AlterTopicEvent) event).updatedTopicInfo();
@@ -101,7 +101,7 @@ public class TestTopicEvent {
   void testDropTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.dropTopic(identifier);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropTopicEvent.class, event.getClass());
     Assertions.assertEquals(true, ((DropTopicEvent) event).isExists());
@@ -111,7 +111,7 @@ public class TestTopicEvent {
   void testListTopicEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     dispatcher.listTopics(namespace);
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListTopicEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListTopicEvent) event).namespace());
@@ -123,7 +123,7 @@ public class TestTopicEvent {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () -> failureDispatcher.createTopic(identifier, topic.comment(), null, topic.properties()));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateTopicFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -136,7 +136,7 @@ public class TestTopicEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.loadTopic(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadTopicFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -150,7 +150,7 @@ public class TestTopicEvent {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () -> failureDispatcher.alterTopic(identifier, topicChange));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterTopicFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -164,7 +164,7 @@ public class TestTopicEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.dropTopic(identifier));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropTopicFailureEvent.class, event.getClass());
     Assertions.assertEquals(
@@ -176,7 +176,7 @@ public class TestTopicEvent {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listTopics(namespace));
-    Event event = dummyEventListener.popEvent();
+    Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListTopicFailureEvent.class, event.getClass());
     Assertions.assertEquals(

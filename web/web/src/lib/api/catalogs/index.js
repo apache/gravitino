@@ -27,7 +27,7 @@ const Apis = {
   UPDATE: ({ metalake, catalog }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`,
   DELETE: ({ metalake, catalog }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}?force=true`
 }
 
 export const getCatalogsApi = params => {

@@ -53,3 +53,7 @@ include clients/client-python/.gitignore
 **/metastore_db
 **/spark-warehouse
 derby.log
+
+web/node_modules
+web/dist
+web/.next

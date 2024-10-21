@@ -1,0 +1,457 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.storage.relational.service;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.collect.Lists;
+
+public class TestTableColumnMetaService extends TestJDBCBackend {
+
+  private static final String METALAKE_NAME = "metalake_for_table_column_test";
+
+  private final AuditInfo auditInfo =
+      AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+  @Test
+  public void testInsertAndGetTableColumns() throws IOException {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName);
+
+    // Create a table entity without columns
+    TableEntity createdTable =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, catalogName, schemaName),
+            "table1",
+            auditInfo);
+    TableMetaService.getInstance().insertTable(createdTable, false);
+
+    TableEntity retrievedTable =
+        TableMetaService.getInstance().getTableByIdentifier(createdTable.nameIdentifier());
+    Assertions.assertEquals(createdTable.id(), retrievedTable.id());
+    Assertions.assertEquals(createdTable.name(), retrievedTable.name());
+    Assertions.assertEquals(createdTable.namespace(), retrievedTable.namespace());
+    Assertions.assertEquals(createdTable.auditInfo(), retrievedTable.auditInfo());
+    Assertions.assertTrue(retrievedTable.columns().isEmpty());
+
+    // Create a table entity with columns
+    ColumnEntity column1 =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withComment("comment1")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.integerLiteral(1))
+            .withAuditInfo(auditInfo)
+            .build();
+    ColumnEntity column2 =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column2")
+            .withComment("comment2")
+            .withDataType(Types.StringType.get())
+            .withNullable(false)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.stringLiteral("1"))
+            .withAuditInfo(auditInfo)
+            .build();
+    TableEntity createdTable2 =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table2")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(column1, column2))
+            .withAuditInfo(auditInfo)
+            .build();
+    TableMetaService.getInstance().insertTable(createdTable2, false);
+
+    TableEntity retrievedTable2 =
+        TableMetaService.getInstance().getTableByIdentifier(createdTable2.nameIdentifier());
+    Assertions.assertEquals(createdTable2.id(), retrievedTable2.id());
+    Assertions.assertEquals(createdTable2.name(), retrievedTable2.name());
+    Assertions.assertEquals(createdTable2.namespace(), retrievedTable2.namespace());
+    Assertions.assertEquals(createdTable2.auditInfo(), retrievedTable2.auditInfo());
+    Assertions.assertEquals(createdTable2.columns().size(), retrievedTable2.columns().size());
+    compareTwoColumns(createdTable2.columns(), retrievedTable2.columns());
+
+    // test insert with overwrite
+    ColumnEntity column3 =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column3")
+            .withComment("comment3")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.integerLiteral(1))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableEntity createdTable3 =
+        TableEntity.builder()
+            .withId(createdTable2.id())
+            .withName("table3")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(column3))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableMetaService.getInstance().insertTable(createdTable3, true);
+    TableEntity retrievedTable3 =
+        TableMetaService.getInstance().getTableByIdentifier(createdTable3.nameIdentifier());
+    Assertions.assertEquals(createdTable3.id(), retrievedTable3.id());
+    Assertions.assertEquals(createdTable3.name(), retrievedTable3.name());
+    Assertions.assertEquals(createdTable3.namespace(), retrievedTable3.namespace());
+    Assertions.assertEquals(createdTable3.auditInfo(), retrievedTable3.auditInfo());
+    Assertions.assertEquals(createdTable3.columns().size(), retrievedTable3.columns().size());
+    compareTwoColumns(createdTable3.columns(), retrievedTable3.columns());
+  }
+
+  @Test
+  public void testUpdateTable() throws IOException {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName);
+
+    // Create a table entity without columns
+    TableEntity createdTable =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, catalogName, schemaName),
+            "table1",
+            auditInfo);
+    TableMetaService.getInstance().insertTable(createdTable, false);
+
+    // Test update table with new name
+    TableEntity updatedTable =
+        TableEntity.builder()
+            .withId(createdTable.id())
+            .withName("table2")
+            .withNamespace(createdTable.namespace())
+            .withColumns(createdTable.columns())
+            .withAuditInfo(auditInfo)
+            .build();
+    Function<TableEntity, TableEntity> updater = oldTable -> updatedTable;
+
+    TableMetaService.getInstance().updateTable(createdTable.nameIdentifier(), updater);
+    TableEntity retrievedTable =
+        TableMetaService.getInstance().getTableByIdentifier(updatedTable.nameIdentifier());
+
+    Assertions.assertEquals(updatedTable.id(), retrievedTable.id());
+    Assertions.assertEquals(updatedTable.name(), retrievedTable.name());
+    Assertions.assertEquals(updatedTable.namespace(), retrievedTable.namespace());
+    Assertions.assertEquals(updatedTable.auditInfo(), retrievedTable.auditInfo());
+    Assertions.assertTrue(retrievedTable.columns().isEmpty());
+
+    // Test update table with adding one new column
+    ColumnEntity column1 =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withComment("comment1")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.integerLiteral(1))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableEntity updatedTable2 =
+        TableEntity.builder()
+            .withId(updatedTable.id())
+            .withName(updatedTable.name())
+            .withNamespace(updatedTable.namespace())
+            .withColumns(Lists.newArrayList(column1))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Function<TableEntity, TableEntity> updater2 = oldTable -> updatedTable2;
+    TableMetaService.getInstance().updateTable(updatedTable.nameIdentifier(), updater2);
+
+    TableEntity retrievedTable2 =
+        TableMetaService.getInstance().getTableByIdentifier(updatedTable2.nameIdentifier());
+
+    Assertions.assertEquals(updatedTable2.id(), retrievedTable2.id());
+    Assertions.assertEquals(updatedTable2.name(), retrievedTable2.name());
+    Assertions.assertEquals(updatedTable2.namespace(), retrievedTable2.namespace());
+    Assertions.assertEquals(updatedTable2.auditInfo(), retrievedTable2.auditInfo());
+    Assertions.assertEquals(updatedTable2.columns().size(), retrievedTable2.columns().size());
+    compareTwoColumns(updatedTable2.columns(), retrievedTable2.columns());
+
+    // Update the table with add one more column
+    ColumnEntity column2 =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column2")
+            .withComment("comment2")
+            .withDataType(Types.StringType.get())
+            .withNullable(false)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.stringLiteral("1"))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableEntity updatedTable3 =
+        TableEntity.builder()
+            .withId(updatedTable2.id())
+            .withName(updatedTable2.name())
+            .withNamespace(updatedTable2.namespace())
+            .withColumns(Lists.newArrayList(column1, column2))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Function<TableEntity, TableEntity> updater3 = oldTable -> updatedTable3;
+    TableMetaService.getInstance().updateTable(updatedTable2.nameIdentifier(), updater3);
+
+    TableEntity retrievedTable3 =
+        TableMetaService.getInstance().getTableByIdentifier(updatedTable3.nameIdentifier());
+
+    Assertions.assertEquals(updatedTable3.id(), retrievedTable3.id());
+    Assertions.assertEquals(updatedTable3.name(), retrievedTable3.name());
+    Assertions.assertEquals(updatedTable3.namespace(), retrievedTable3.namespace());
+    Assertions.assertEquals(updatedTable3.auditInfo(), retrievedTable3.auditInfo());
+    Assertions.assertEquals(updatedTable3.columns().size(), retrievedTable3.columns().size());
+    compareTwoColumns(updatedTable3.columns(), retrievedTable3.columns());
+
+    // Update the table with updating one column
+    ColumnEntity updatedColumn1 =
+        ColumnEntity.builder()
+            .withId(column1.id())
+            .withName(column1.name())
+            .withComment("comment1_updated")
+            .withDataType(Types.LongType.get())
+            .withNullable(column1.nullable())
+            .withAutoIncrement(column1.autoIncrement())
+            .withDefaultValue(null)
+            .withAuditInfo(auditInfo)
+            .build();
+    TableEntity updatedTable4 =
+        TableEntity.builder()
+            .withId(updatedTable3.id())
+            .withName(updatedTable3.name())
+            .withNamespace(updatedTable3.namespace())
+            .withColumns(Lists.newArrayList(updatedColumn1, column2))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Function<TableEntity, TableEntity> updater4 = oldTable -> updatedTable4;
+    TableMetaService.getInstance().updateTable(updatedTable3.nameIdentifier(), updater4);
+
+    TableEntity retrievedTable4 =
+        TableMetaService.getInstance().getTableByIdentifier(updatedTable4.nameIdentifier());
+
+    Assertions.assertEquals(updatedTable4.id(), retrievedTable4.id());
+    Assertions.assertEquals(updatedTable4.name(), retrievedTable4.name());
+    Assertions.assertEquals(updatedTable4.namespace(), retrievedTable4.namespace());
+    Assertions.assertEquals(updatedTable4.auditInfo(), retrievedTable4.auditInfo());
+    Assertions.assertEquals(updatedTable4.columns().size(), retrievedTable4.columns().size());
+    compareTwoColumns(updatedTable4.columns(), retrievedTable4.columns());
+
+    // Update the table with removing one column
+    TableEntity updatedTable5 =
+        TableEntity.builder()
+            .withId(updatedTable4.id())
+            .withName(updatedTable4.name())
+            .withNamespace(updatedTable4.namespace())
+            .withColumns(Lists.newArrayList(column2))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Function<TableEntity, TableEntity> updater5 = oldTable -> updatedTable5;
+    TableMetaService.getInstance().updateTable(updatedTable4.nameIdentifier(), updater5);
+
+    TableEntity retrievedTable5 =
+        TableMetaService.getInstance().getTableByIdentifier(updatedTable5.nameIdentifier());
+    compareTwoColumns(updatedTable5.columns(), retrievedTable5.columns());
+
+    // update the table with removing all columns
+    TableEntity updatedTable6 =
+        TableEntity.builder()
+            .withId(updatedTable5.id())
+            .withName(updatedTable5.name())
+            .withNamespace(updatedTable5.namespace())
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Function<TableEntity, TableEntity> updater6 = oldTable -> updatedTable6;
+    TableMetaService.getInstance().updateTable(updatedTable5.nameIdentifier(), updater6);
+
+    TableEntity retrievedTable6 =
+        TableMetaService.getInstance().getTableByIdentifier(updatedTable6.nameIdentifier());
+    Assertions.assertTrue(retrievedTable6.columns().isEmpty());
+  }
+
+  @Test
+  public void testCreateAndDeleteTable() throws IOException {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName);
+
+    // Create a table entity with column
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withComment("comment1")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.integerLiteral(1))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableEntity createdTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table1")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(column))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableMetaService.getInstance().insertTable(createdTable, false);
+
+    TableEntity retrievedTable =
+        TableMetaService.getInstance().getTableByIdentifier(createdTable.nameIdentifier());
+    Assertions.assertEquals(createdTable.id(), retrievedTable.id());
+    Assertions.assertEquals(createdTable.name(), retrievedTable.name());
+    Assertions.assertEquals(createdTable.namespace(), retrievedTable.namespace());
+    Assertions.assertEquals(createdTable.auditInfo(), retrievedTable.auditInfo());
+    compareTwoColumns(createdTable.columns(), retrievedTable.columns());
+
+    Assertions.assertTrue(
+        TableMetaService.getInstance().deleteTable(retrievedTable.nameIdentifier()));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> TableMetaService.getInstance().getTableByIdentifier(retrievedTable.nameIdentifier()));
+  }
+
+  @Test
+  public void testDeleteMetalake() throws IOException {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName);
+
+    // Create a table entity with column
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withComment("comment1")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.integerLiteral(1))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableEntity createdTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table1")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(column))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableMetaService.getInstance().insertTable(createdTable, false);
+
+    TableEntity retrievedTable =
+        TableMetaService.getInstance().getTableByIdentifier(createdTable.nameIdentifier());
+    Assertions.assertEquals(createdTable.id(), retrievedTable.id());
+    Assertions.assertEquals(createdTable.name(), retrievedTable.name());
+    Assertions.assertEquals(createdTable.namespace(), retrievedTable.namespace());
+    Assertions.assertEquals(createdTable.auditInfo(), retrievedTable.auditInfo());
+    compareTwoColumns(createdTable.columns(), retrievedTable.columns());
+
+    Assertions.assertTrue(
+        MetalakeMetaService.getInstance().deleteMetalake(NameIdentifier.of(METALAKE_NAME), true));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> TableMetaService.getInstance().getTableByIdentifier(retrievedTable.nameIdentifier()));
+  }
+
+  private void compareTwoColumns(
+      List<ColumnEntity> expectedColumns, List<ColumnEntity> actualColumns) {
+    Assertions.assertEquals(expectedColumns.size(), actualColumns.size());
+    Map<String, ColumnEntity> expectedColumnsMap =
+        expectedColumns.stream().collect(Collectors.toMap(ColumnEntity::name, Function.identity()));
+    actualColumns.forEach(
+        column -> {
+          ColumnEntity expectedColumn = expectedColumnsMap.get(column.name());
+          Assertions.assertNotNull(expectedColumn);
+          Assertions.assertEquals(expectedColumn.id(), column.id());
+          Assertions.assertEquals(expectedColumn.name(), column.name());
+          Assertions.assertEquals(expectedColumn.comment(), column.comment());
+          Assertions.assertEquals(expectedColumn.dataType(), column.dataType());
+          Assertions.assertEquals(expectedColumn.nullable(), column.nullable());
+          Assertions.assertEquals(expectedColumn.autoIncrement(), column.autoIncrement());
+          Assertions.assertEquals(expectedColumn.defaultValue(), column.defaultValue());
+          Assertions.assertEquals(expectedColumn.auditInfo(), column.auditInfo());
+        });
+  }
+
+  private void createParentEntities(String metalakeName, String catalogName, String schemaName)
+      throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName),
+            catalogName,
+            auditInfo);
+    backend.insert(catalog, false);
+
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name()),
+            schemaName,
+            auditInfo);
+    backend.insert(schema, false);
+  }
+}

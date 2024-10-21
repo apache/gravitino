@@ -29,10 +29,9 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
 import org.apache.gravitino.integration.test.web.ui.pages.CatalogsPage;
 import org.apache.gravitino.integration.test.web.ui.pages.MetalakePage;
-import org.apache.gravitino.integration.test.web.ui.utils.AbstractWebIT;
+import org.apache.gravitino.integration.test.web.ui.utils.BaseWebIT;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -48,9 +47,9 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class CatalogsPageDorisTest extends AbstractWebIT {
-  MetalakePage metalakePage = new MetalakePage();
-  CatalogsPage catalogsPage = new CatalogsPage();
+public class CatalogsPageDorisTest extends BaseWebIT {
+  private MetalakePage metalakePage;
+  private CatalogsPage catalogsPage;
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static GravitinoAdminClient gravitinoClient;
@@ -77,9 +76,9 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
   private static final String PROPERTIES_VALUE1 = "val1";
 
   @BeforeAll
-  public static void before() throws Exception {
-    gravitinoClient = AbstractIT.getGravitinoClient();
-    gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+  public void before() throws Exception {
+    gravitinoClient = getGravitinoClient();
+    gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
 
     containerSuite.startDorisContainer();
 
@@ -89,6 +88,9 @@ public class CatalogsPageDorisTest extends AbstractWebIT {
             containerSuite.getDorisContainer().getContainerIpAddress(),
             DorisContainer.FE_MYSQL_PORT);
     LOG.info("Doris jdbc url: {}", dorisJdbcConnectionUri);
+
+    metalakePage = new MetalakePage(driver);
+    catalogsPage = new CatalogsPage(driver);
   }
 
   /**

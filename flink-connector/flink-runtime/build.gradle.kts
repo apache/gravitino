@@ -56,7 +56,6 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   relocate("com.google", "org.apache.gravitino.shaded.com.google")
   relocate("google", "org.apache.gravitino.shaded.google")
   relocate("org.apache.hc", "org.apache.gravitino.shaded.org.apache.hc")
-  relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")
 }
 
 publishing {
