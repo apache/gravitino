@@ -35,6 +35,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -269,10 +270,10 @@ public class TestCatalogManager {
 
     // test before creation
     Assertions.assertThrows(
-        NoSuchMetalakeException.class,
+        CatalogAlreadyExistsException.class,
         () ->
             catalogManager.testConnection(
-                ident2, Catalog.Type.RELATIONAL, provider, "comment", props));
+                ident, Catalog.Type.RELATIONAL, provider, "comment", props));
 
     // Test create with duplicated name
     Throwable exception2 =
@@ -309,7 +310,8 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     failedIdent, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(
-        exception4.getMessage().contains("Properties are reserved and cannot be set"));
+        exception4.getMessage().contains("Properties are reserved and cannot be set"),
+        exception4.getMessage());
     Assertions.assertNull(catalogManager.catalogCache.getIfPresent(failedIdent));
   }
 
@@ -453,6 +455,12 @@ public class TestCatalogManager {
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
 
     // Test drop catalog
+    Exception exception =
+        Assertions.assertThrows(
+            CatalogInUseException.class, () -> catalogManager.dropCatalog(ident));
+    Assertions.assertTrue(exception.getMessage().contains("Catalog metalake.test41 is in use"));
+
+    Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
     boolean dropped = catalogManager.dropCatalog(ident);
     Assertions.assertTrue(dropped);
 

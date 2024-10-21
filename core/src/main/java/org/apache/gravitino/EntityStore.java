@@ -55,15 +55,41 @@ public interface EntityStore extends Closeable {
    * <p>Note. Depends on the isolation levels provided by the underlying storage, the returned list
    * may not be consistent.
    *
-   * @param namespace the namespace of the entities
    * @param <E> class of the entity
+   * @param namespace the namespace of the entities
    * @param type the detailed type of the entity
    * @param entityType the general type of the entity
-   * @throws IOException if the list operation fails
    * @return the list of entities
+   * @throws IOException if the list operation fails
    */
-  <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Class<E> type, EntityType entityType) throws IOException;
+  default <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, EntityType entityType) throws IOException {
+    return list(namespace, type, entityType, true /* allFields */);
+  }
+
+  /**
+   * List all the entities with the specified {@link org.apache.gravitino.Namespace}, and
+   * deserialize them into the specified {@link Entity} object.
+   *
+   * <p>Note. Depends on the isolation levels provided by the underlying storage, the returned list
+   * may not be consistent.
+   *
+   * @param <E> class of the entity
+   * @param namespace the namespace of the entities
+   * @param type the detailed type of the entity
+   * @param entityType the general type of the entity
+   * @param allFields Some fields may have a relatively high acquisition cost, EntityStore provides
+   *     an optional setting to avoid fetching these high-cost fields to improve the performance. If
+   *     true, the method will fetch all the fields, Otherwise, the method will fetch all the fields
+   *     except for high-cost fields.
+   * @return the list of entities
+   * @throws IOException if the list operation fails
+   */
+  default <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, EntityType entityType, boolean allFields)
+      throws IOException {
+    throw new UnsupportedOperationException("Don't support to skip fields");
+  }
 
   /**
    * Check if the entity with the specified {@link org.apache.gravitino.NameIdentifier} exists.

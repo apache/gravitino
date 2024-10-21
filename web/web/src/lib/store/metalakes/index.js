@@ -96,7 +96,7 @@ export const updateMetalake = createAsyncThunk('appMetalakes/updateMetalake', as
 
 export const setIntoTreeNodeWithFetch = createAsyncThunk(
   'appMetalakes/setIntoTreeNodeWithFetch',
-  async ({ key }, { getState, dispatch }) => {
+  async ({ key, reload }, { getState, dispatch }) => {
     let result = {
       key,
       data: [],
@@ -137,20 +137,42 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
       }
 
       const { identifiers = [] } = res
+      const expandedKeys = getState().metalakes.expandedNodes
+      const loadedNodes = getState().metalakes.loadedNodes
+      let reloadedEpxpandedKeys = []
+      let reloadedKeys = []
 
       result.data = identifiers.map(schemaItem => {
+        if (reload) {
+          if (expandedKeys.includes(`{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`)) {
+            reloadedEpxpandedKeys.push(`{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`)
+          }
+          if (loadedNodes.includes(`{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`)) {
+            reloadedKeys.push(`{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`)
+          }
+        }
+
         return {
           ...schemaItem,
           node: 'schema',
           id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`,
           key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schemaItem.name}}}`,
           path: `?${new URLSearchParams({ metalake, catalog, type, schema: schemaItem.name }).toString()}`,
+          isLeaf: reload ? false : undefined,
           name: schemaItem.name,
           title: schemaItem.name,
           tables: [],
           children: []
         }
       })
+      if (reloadedEpxpandedKeys.length > 0) {
+        const epxpanded = expandedKeys.filter(key => !reloadedEpxpandedKeys.includes(key))
+        dispatch(resetExpandNode(epxpanded))
+      }
+      if (reloadedKeys.length > 0) {
+        const loaded = loadedNodes.filter(key => !reloadedKeys.includes(key))
+        dispatch(setLoadedNodes(loaded))
+      }
     } else if (pathArr.length === 4 && type === 'relational') {
       const [err, res] = await to(getTablesApi({ metalake, catalog, schema }))
 
@@ -933,7 +955,7 @@ export const appMetalakesSlice = createSlice({
       state.expandedNodes = expandedNodes
     },
     resetExpandNode(state, action) {
-      state.expandedNodes = []
+      state.expandedNodes = action.payload || []
     },
     resetTableData(state, action) {
       state.tableData = []

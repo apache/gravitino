@@ -30,6 +30,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
@@ -49,6 +50,7 @@ import org.junit.jupiter.api.Assertions;
 public class ITUtils {
   public static final String TEST_MODE = "testMode";
   public static final String EMBEDDED_TEST_MODE = "embedded";
+  public static final String DEPLOY_TEST_MODE = "deploy";
 
   public static String joinPath(String... dirs) {
     return String.join(File.separator, dirs);
@@ -173,6 +175,15 @@ public class ITUtils {
               ((IdentityPartitionDTO) expected).values(),
               ((IdentityPartitionDTO) actual).values()));
     }
+  }
+
+  public static boolean isEmbedded() {
+    String mode =
+        System.getProperty(TEST_MODE) == null
+            ? EMBEDDED_TEST_MODE
+            : System.getProperty(ITUtils.TEST_MODE);
+
+    return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
   }
 
   private ITUtils() {}

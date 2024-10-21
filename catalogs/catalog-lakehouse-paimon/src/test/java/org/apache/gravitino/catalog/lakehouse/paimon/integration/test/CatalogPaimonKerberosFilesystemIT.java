@@ -40,7 +40,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -56,13 +56,11 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
+public class CatalogPaimonKerberosFilesystemIT extends BaseIT {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CatalogPaimonKerberosFilesystemIT.class);
@@ -99,7 +97,7 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
   private static final String FILESYSTEM_COL_NAME3 = "col3";
 
   @BeforeAll
-  public static void startIntegrationTest() {
+  public void startIntegrationTest() {
     containerSuite.startKerberosHiveContainer();
     kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
 
@@ -122,14 +120,14 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
       addKerberosConfig();
 
       // Start Gravitino server
-      AbstractIT.startIntegrationTest();
+      super.startIntegrationTest();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
   @AfterAll
-  public static void stop() {
+  public void stop() {
     // Reset the UGI
     UserGroupInformation.reset();
 
@@ -138,7 +136,7 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
     System.clearProperty("java.security.krb5.conf");
     System.clearProperty("sun.security.krb5.debug");
 
-    AbstractIT.client = null;
+    client = null;
   }
 
   private static void prepareKerberosConfig() throws Exception {
@@ -194,14 +192,12 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
     }
   }
 
-  private static void addKerberosConfig() {
-    AbstractIT.customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
+  private void addKerberosConfig() {
+    customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
+    customConfigs.put("gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
+    customConfigs.put("gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
   }
 
   @Test
@@ -275,7 +271,7 @@ public class CatalogPaimonKerberosFilesystemIT extends AbstractIT {
     Assertions.assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
 
     // Drop catalog
-    Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
+    Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME, true));
 
     // Drop warehouse path
     kerberosHiveContainer.executeInContainer(

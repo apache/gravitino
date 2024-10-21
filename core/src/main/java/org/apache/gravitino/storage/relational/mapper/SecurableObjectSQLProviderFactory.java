@@ -22,7 +22,8 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.SecurableObjectPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.SecurableObjectBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.SecurableObjectPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -54,6 +55,11 @@ public class SecurableObjectSQLProviderFactory {
   public static String batchInsertSecurableObjects(
       @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
     return getProvider().batchInsertSecurableObjects(securableObjectPOs);
+  }
+
+  public static String batchSoftDeleteSecurableObjects(
+      @Param("securableObjects") List<SecurableObjectPO> securableObjectPOs) {
+    return getProvider().batchSoftDeleteSecurableObjects(securableObjectPOs);
   }
 
   public static String softDeleteSecurableObjectsByRoleId(@Param("roleId") Long roleId) {

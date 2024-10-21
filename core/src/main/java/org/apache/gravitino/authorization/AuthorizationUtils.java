@@ -18,14 +18,13 @@
  */
 package org.apache.gravitino.authorization;
 
-import com.google.common.collect.Lists;
-import java.io.IOException;
+import com.google.common.collect.Sets;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -33,11 +32,15 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /* The utilization class of authorization module*/
 public class AuthorizationUtils {
@@ -45,32 +48,30 @@ public class AuthorizationUtils {
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in th metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
-  private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
-  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
-  private static final List<Privilege.Name> pluginNotSupportsPrivileges =
-      Lists.newArrayList(
-          Privilege.Name.CREATE_CATALOG,
-          Privilege.Name.USE_CATALOG,
-          Privilege.Name.MANAGE_GRANTS,
-          Privilege.Name.MANAGE_USERS,
-          Privilege.Name.MANAGE_GROUPS,
-          Privilege.Name.CREATE_ROLE);
+  private static final Set<Privilege.Name> FILESET_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_FILESET, Privilege.Name.WRITE_FILESET, Privilege.Name.READ_FILESET);
+  private static final Set<Privilege.Name> TABLE_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_TABLE, Privilege.Name.MODIFY_TABLE, Privilege.Name.SELECT_TABLE);
+  private static final Set<Privilege.Name> TOPIC_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);
 
   private AuthorizationUtils() {}
 
-  static void checkMetalakeExists(String metalake) throws NoSuchMetalakeException {
+  public static void checkCurrentUser(String metalake, String user) {
     try {
-      EntityStore store = GravitinoEnv.getInstance().entityStore();
-
-      NameIdentifier metalakeIdent = NameIdentifier.of(metalake);
-      if (!store.exists(metalakeIdent, Entity.EntityType.METALAKE)) {
-        LOG.warn("Metalake {} does not exist", metalakeIdent);
-        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
+      AccessControlDispatcher dispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
+      // Only when we enable authorization, we need to check the current user
+      if (dispatcher != null) {
+        dispatcher.getUser(metalake, user);
       }
-    } catch (IOException e) {
-      LOG.error("Failed to do storage operation", e);
-      throw new RuntimeException(e);
+    } catch (NoSuchUserException nsu) {
+      throw new ForbiddenException(
+          "Current user %s doesn't exist in the metalake %s, you should add the user to the metalake first",
+          user, metalake);
     }
   }
 
@@ -195,16 +196,70 @@ public class AuthorizationUtils {
   }
 
   public static boolean needApplyAuthorizationPluginAllCatalogs(SecurableObject securableObject) {
-    // TODO: Add `supportsSecurableObjects` method for every privilege to simplify this code
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
       for (Privilege privilege : privileges) {
-        if (!pluginNotSupportsPrivileges.contains(privilege.name())) {
+        if (privilege.canBindTo(MetadataObject.Type.CATALOG)) {
           return true;
         }
       }
     }
     return false;
+  }
+
+  public static void checkDuplicatedNamePrivilege(Collection<Privilege> privileges) {
+    Set<Privilege.Name> privilegeNameSet = Sets.newHashSet();
+    for (Privilege privilege : privileges) {
+      if (privilegeNameSet.contains(privilege.name())) {
+        throw new IllegalPrivilegeException(
+            "Doesn't support duplicated privilege name %s with different condition",
+            privilege.name());
+      }
+      privilegeNameSet.add(privilege.name());
+    }
+  }
+
+  public static void checkPrivilege(
+      PrivilegeDTO privilegeDTO, MetadataObject object, String metalake) {
+    Privilege privilege = DTOConverters.fromPrivilegeDTO(privilegeDTO);
+
+    if (!privilege.canBindTo(object.type())) {
+      throw new IllegalPrivilegeException(
+          "Securable object %s type %s don't support binding privilege %s",
+          object.fullName(), object.type(), privilege);
+    }
+
+    if (object.type() == MetadataObject.Type.CATALOG
+        || object.type() == MetadataObject.Type.SCHEMA) {
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+      NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
+      try {
+        if (FILESET_PRIVILEGES.contains(privilege.name())) {
+          checkCatalogType(catalogIdent, Catalog.Type.FILESET, privilege);
+        }
+
+        if (TABLE_PRIVILEGES.contains(privilege.name())) {
+          checkCatalogType(catalogIdent, Catalog.Type.RELATIONAL, privilege);
+        }
+
+        if (TOPIC_PRIVILEGES.contains(privilege.name())) {
+          checkCatalogType(catalogIdent, Catalog.Type.MESSAGING, privilege);
+        }
+      } catch (NoSuchCatalogException ne) {
+        throw new NoSuchMetadataObjectException(
+            "Securable object %s doesn't exist", object.fullName());
+      }
+    }
+  }
+
+  private static void checkCatalogType(
+      NameIdentifier catalogIdent, Catalog.Type type, Privilege privilege) {
+    Catalog catalog = GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(catalogIdent);
+    if (catalog.type() != type) {
+      throw new IllegalPrivilegeException(
+          "Catalog %s type %s doesn't support privilege %s",
+          catalogIdent, catalog.type(), privilege);
+    }
   }
 
   private static boolean needApplyAuthorizationPluginAllCatalogs(MetadataObject.Type type) {

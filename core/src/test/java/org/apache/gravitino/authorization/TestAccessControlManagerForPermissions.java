@@ -28,15 +28,19 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -117,6 +121,34 @@ public class TestAccessControlManagerForPermissions {
           .withAuditInfo(auditInfo)
           .build();
 
+  private static RoleEntity grantedRoleEntity =
+      RoleEntity.builder()
+          .withNamespace(
+              Namespace.of(METALAKE, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
+          .withId(1L)
+          .withName("grantedRole")
+          .withProperties(Maps.newHashMap())
+          .withSecurableObjects(
+              Lists.newArrayList(
+                  SecurableObjects.ofCatalog(
+                      CATALOG, Lists.newArrayList(Privileges.UseCatalog.allow()))))
+          .withAuditInfo(auditInfo)
+          .build();
+
+  private static RoleEntity revokedRoleEntity =
+      RoleEntity.builder()
+          .withNamespace(
+              Namespace.of(METALAKE, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME))
+          .withId(1L)
+          .withName("revokedRole")
+          .withProperties(Maps.newHashMap())
+          .withSecurableObjects(
+              Lists.newArrayList(
+                  SecurableObjects.ofCatalog(
+                      CATALOG, Lists.newArrayList(Privileges.UseCatalog.allow()))))
+          .withAuditInfo(auditInfo)
+          .build();
+
   @BeforeAll
   public static void setUp() throws Exception {
     config = new Config(false) {};
@@ -130,6 +162,8 @@ public class TestAccessControlManagerForPermissions {
     entityStore.put(userEntity, true);
     entityStore.put(groupEntity, true);
     entityStore.put(roleEntity, true);
+    entityStore.put(grantedRoleEntity, true);
+    entityStore.put(revokedRoleEntity, true);
 
     accessControlManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
 
@@ -139,6 +173,8 @@ public class TestAccessControlManagerForPermissions {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
     BaseCatalog catalog = Mockito.mock(BaseCatalog.class);
     Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+    Mockito.when(catalogManager.listCatalogsInfo(Mockito.any()))
+        .thenReturn(new Catalog[] {catalog});
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
     Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
   }
@@ -180,9 +216,9 @@ public class TestAccessControlManagerForPermissions {
         NoSuchMetalakeException.class,
         () -> accessControlManager.grantRolesToUser(notExist, ROLE, USER));
 
-    // Throw NoSuchRoleException
+    // Throw IllegalRoleException
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () -> accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList(notExist), USER));
 
     // Throw NoSuchUserException
@@ -214,9 +250,9 @@ public class TestAccessControlManagerForPermissions {
         NoSuchMetalakeException.class,
         () -> accessControlManager.revokeRolesFromUser(notExist, ROLE, USER));
 
-    // Throw NoSuchRoleException
+    // Throw IllegalRoleException
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () ->
             accessControlManager.revokeRolesFromUser(METALAKE, Lists.newArrayList(notExist), USER));
 
@@ -258,9 +294,9 @@ public class TestAccessControlManagerForPermissions {
         NoSuchMetalakeException.class,
         () -> accessControlManager.grantRolesToGroup(notExist, ROLE, GROUP));
 
-    // Throw NoSuchRoleException
+    // Throw IllegalRoleException
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () ->
             accessControlManager.grantRolesToGroup(METALAKE, Lists.newArrayList(notExist), GROUP));
 
@@ -293,9 +329,9 @@ public class TestAccessControlManagerForPermissions {
         NoSuchMetalakeException.class,
         () -> accessControlManager.revokeRolesFromGroup(notExist, ROLE, GROUP));
 
-    // Throw NoSuchRoleException
+    // Throw IllegalRoleException
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () ->
             accessControlManager.revokeRolesFromGroup(
                 METALAKE, Lists.newArrayList(notExist), GROUP));
@@ -308,5 +344,86 @@ public class TestAccessControlManagerForPermissions {
     Assertions.assertThrows(
         NoSuchGroupException.class,
         () -> accessControlManager.revokeRolesFromGroup(METALAKE, ROLE, notExist));
+  }
+
+  @Test
+  public void testGrantPrivilegeToRole() {
+    reset(authorizationPlugin);
+    String notExist = "not-exist";
+
+    Role role =
+        accessControlManager.grantPrivilegeToRole(
+            METALAKE,
+            "grantedRole",
+            MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+            Lists.newArrayList(Privileges.CreateTable.allow()));
+
+    List<SecurableObject> objects = role.securableObjects();
+
+    // Test authorization plugin
+    verify(authorizationPlugin).onRoleUpdated(any(), any());
+
+    Assertions.assertEquals(2, objects.size());
+
+    // Repeat to grant
+    role =
+        accessControlManager.grantPrivilegeToRole(
+            METALAKE,
+            "grantedRole",
+            MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+            Lists.newArrayList(Privileges.CreateTable.allow()));
+    objects = role.securableObjects();
+
+    Assertions.assertEquals(2, objects.size());
+
+    // Throw IllegalRoleException
+    Assertions.assertThrows(
+        NoSuchRoleException.class,
+        () ->
+            accessControlManager.grantPrivilegeToRole(
+                METALAKE,
+                notExist,
+                MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+                Lists.newArrayList(Privileges.CreateTable.allow())));
+  }
+
+  @Test
+  public void testRevokePrivilegeFromRole() {
+    reset(authorizationPlugin);
+    String notExist = "not-exist";
+
+    Role role =
+        accessControlManager.revokePrivilegesFromRole(
+            METALAKE,
+            "revokedRole",
+            MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
+            Lists.newArrayList(Privileges.UseCatalog.allow()));
+
+    // Test authorization plugin
+    verify(authorizationPlugin).onRoleUpdated(any(), any());
+
+    List<SecurableObject> objects = role.securableObjects();
+
+    Assertions.assertTrue(objects.isEmpty());
+
+    // repeat to revoke
+    role =
+        accessControlManager.revokePrivilegesFromRole(
+            METALAKE,
+            "revokedRole",
+            MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
+            Lists.newArrayList(Privileges.UseCatalog.allow()));
+    objects = role.securableObjects();
+    Assertions.assertTrue(objects.isEmpty());
+
+    // Throw NoSuchRoleException
+    Assertions.assertThrows(
+        NoSuchRoleException.class,
+        () ->
+            accessControlManager.revokePrivilegesFromRole(
+                METALAKE,
+                notExist,
+                MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE),
+                Lists.newArrayList(Privileges.CreateTable.allow())));
   }
 }

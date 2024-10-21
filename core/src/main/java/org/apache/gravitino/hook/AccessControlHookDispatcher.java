@@ -22,16 +22,20 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -70,6 +74,16 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public User[] listUsers(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listUsers(metalake);
+  }
+
+  @Override
+  public String[] listUserNames(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listUserNames(metalake);
+  }
+
+  @Override
   public Group addGroup(String metalake, String group)
       throws GroupAlreadyExistsException, NoSuchMetalakeException {
     return dispatcher.addGroup(metalake, group);
@@ -87,26 +101,36 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public Group[] listGroups(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listGroups(metalake);
+  }
+
+  @Override
+  public String[] listGroupNames(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listGroupNames(metalake);
+  }
+
+  @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)
-      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     return dispatcher.grantRolesToUser(metalake, roles, user);
   }
 
   @Override
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
-      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     return dispatcher.grantRolesToGroup(metalake, roles, group);
   }
 
   @Override
   public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
-      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     return dispatcher.revokeRolesFromGroup(metalake, roles, group);
   }
 
   @Override
   public User revokeRolesFromUser(String metalake, List<String> roles, String user)
-      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     return dispatcher.revokeRolesFromUser(metalake, roles, user);
   }
 
@@ -122,6 +146,9 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
+    // Check whether the current user exists or not
+    AuthorizationUtils.checkCurrentUser(metalake, PrincipalUtils.getCurrentUserName());
+
     Role createdRole = dispatcher.createRole(metalake, role, properties, securableObjects);
 
     // Set the creator as the owner of role.
@@ -146,5 +173,30 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
     return dispatcher.deleteRole(metalake, role);
+  }
+
+  @Override
+  public String[] listRoleNames(String metalake) throws NoSuchMetalakeException {
+    return dispatcher.listRoleNames(metalake);
+  }
+
+  @Override
+  public String[] listRoleNamesByObject(String metalake, MetadataObject object)
+      throws NoSuchMetalakeException, NoSuchMetadataObjectException {
+    return dispatcher.listRoleNamesByObject(metalake, object);
+  }
+
+  @Override
+  public Role grantPrivilegeToRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchMetalakeException, NoSuchRoleException {
+    return dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
+  }
+
+  @Override
+  public Role revokePrivilegesFromRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges)
+      throws NoSuchMetalakeException, NoSuchRoleException {
+    return dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
   }
 }

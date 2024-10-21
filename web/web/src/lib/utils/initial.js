@@ -274,5 +274,24 @@ export const providers = [
         hide: 'simple'
       }
     ]
+  },
+  {
+    label: 'Apache Hudi',
+    value: 'lakehouse-hudi',
+    defaultProps: [
+      {
+        key: 'catalog-backend',
+        value: 'hms',
+        defaultValue: 'hms',
+        required: true,
+        description: 'Apache Hudi catalog type choose properties'
+      },
+      {
+        key: 'uri',
+        value: '',
+        required: true,
+        description: 'Apache Hudi catalog uri config'
+      }
+    ]
   }
 ]

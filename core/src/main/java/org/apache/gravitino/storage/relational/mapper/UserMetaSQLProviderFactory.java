@@ -22,7 +22,9 @@ package org.apache.gravitino.storage.relational.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.postgresql.UserMetaPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.h2.UserMetaH2Provider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.UserMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -47,8 +49,6 @@ public class UserMetaSQLProviderFactory {
   }
 
   static class UserMetaMySQLProvider extends UserMetaBaseSQLProvider {}
-
-  static class UserMetaH2Provider extends UserMetaBaseSQLProvider {}
 
   public static String selectUserIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String userName) {
@@ -83,6 +83,14 @@ public class UserMetaSQLProviderFactory {
 
   public static String listUsersByRoleId(@Param("roleId") Long roleId) {
     return getProvider().listUsersByRoleId(roleId);
+  }
+
+  public static String listUserPOsByMetalake(@Param("metalakeName") String metalakeName) {
+    return getProvider().listUserPOsByMetalake(metalakeName);
+  }
+
+  public static String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return getProvider().listExtendedUserPOsByMetalakeId(metalakeId);
   }
 
   public static String deleteUserMetasByLegacyTimeline(

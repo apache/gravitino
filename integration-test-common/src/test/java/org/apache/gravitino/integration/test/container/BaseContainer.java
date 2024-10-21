@@ -24,6 +24,7 @@ import static org.testcontainers.utility.MountableFile.forHostPath;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.model.ContainerNetwork;
+import com.github.dockerjava.api.model.Ulimit;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -79,8 +80,8 @@ public abstract class BaseContainer implements AutoCloseable {
                 cmd ->
                     cmd.getHostConfig()
                         .withSysctls(
-                            Collections.singletonMap(
-                                "net.ipv4.ip_local_port_range", "20000 40000")));
+                            Collections.singletonMap("net.ipv4.ip_local_port_range", "20000 40000"))
+                        .withUlimits(new Ulimit[] {new Ulimit("nproc", 120000L, 120000L)}));
     this.ports = requireNonNull(ports, "ports is null");
     this.hostName = requireNonNull(hostName, "hostName is null");
     this.extraHosts = extraHosts;

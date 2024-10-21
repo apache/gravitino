@@ -24,4 +24,14 @@ class GVFSConfig:
     DEFAULT_CACHE_EXPIRED_TIME = 3600
 
     AUTH_TYPE = "auth_type"
-    DEFAULT_AUTH_TYPE = "simple"
+    SIMPLE_AUTH_TYPE = "simple"
+
+    OAUTH2_AUTH_TYPE = "oauth2"
+    OAUTH2_SERVER_URI = "oauth2_server_uri"
+    OAUTH2_CREDENTIAL = "oauth2_credential"
+    OAUTH2_PATH = "oauth2_path"
+    OAUTH2_SCOPE = "oauth2_scope"
+
+    GVFS_FILESYSTEM_BY_PASS = "gravitino.bypass"
+    GVFS_FILESYSTEM_BY_PASS_GCS = "gravitino.bypass.gcs."
+    GVFS_FILESYSTEM_KEY_FILE = "service-account-key-path"

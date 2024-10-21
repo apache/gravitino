@@ -18,10 +18,13 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig.KERBEROS_PROPERTY_ENTRIES;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -34,6 +37,24 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   // If not, users have to specify the storage location in the Schema or Fileset level.
   public static final String LOCATION = "location";
 
+  /**
+   * The name of {@link FileSystemProvider} to be added to the catalog. Except built-in
+   * FileSystemProvider like LocalFileSystemProvider and HDFSFileSystemProvider, users can add their
+   * own FileSystemProvider by specifying the provider name here. The value can be find {@link
+   * FileSystemProvider#name()}.
+   */
+  public static final String FILESYSTEM_PROVIDERS = "filesystem-providers";
+
+  /**
+   * The default file system provider class name, used to create the default file system. If not
+   * specified, the default file system provider will be {@link LocalFileSystemProvider#name()}:
+   * 'builtin-local'.
+   */
+  public static final String DEFAULT_FS_PROVIDER = "default-filesystem-provider";
+
+  public static final String BUILTIN_LOCAL_FS_PROVIDER = "builtin-local";
+  public static final String BUILTIN_HDFS_FS_PROVIDER = "builtin-hdfs";
+
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
@@ -44,8 +65,24 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* immutable */,
                   null,
                   false /* hidden */))
+          .put(
+              FILESYSTEM_PROVIDERS,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  FILESYSTEM_PROVIDERS,
+                  "The file system provider names, separated by comma",
+                  false /* immutable */,
+                  null,
+                  false /* hidden */))
+          .put(
+              DEFAULT_FS_PROVIDER,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  DEFAULT_FS_PROVIDER,
+                  "Default file system provider name",
+                  false /* immutable */,
+                  BUILTIN_LOCAL_FS_PROVIDER, // please see LocalFileSystemProvider#name()
+                  false /* hidden */))
           // The following two are about authentication.
-          .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
+          .putAll(KERBEROS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
           .build();
 

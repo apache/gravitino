@@ -128,6 +128,14 @@ public final class EntityCombinedTable implements Table {
     return imported;
   }
 
+  public Table tableFromCatalog() {
+    return table;
+  }
+
+  public TableEntity tableFromGravitino() {
+    return tableEntity;
+  }
+
   @Override
   public Audit auditInfo() {
     AuditInfo mergedAudit =

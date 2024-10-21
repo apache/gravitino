@@ -134,7 +134,7 @@ public class GravitinoCatalogManager {
    * @return boolean
    */
   public boolean dropCatalog(String catalogName) {
-    return metalake.dropCatalog(catalogName);
+    return metalake.dropCatalog(catalogName, true);
   }
 
   /**

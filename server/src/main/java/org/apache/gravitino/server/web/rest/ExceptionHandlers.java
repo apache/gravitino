@@ -26,11 +26,16 @@ import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -128,6 +133,9 @@ public class ExceptionHandlers {
     } else if (e instanceof AlreadyExistsException) {
       response = ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), e);
 
+    } else if (e instanceof NotInUseException) {
+      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), e);
+
     } else {
       return Utils.internalError(e.getMessage(), e);
     }
@@ -141,6 +149,11 @@ public class ExceptionHandlers {
   public static Response handleOwnerException(
       OperationType type, String name, String metalake, Exception e) {
     return OwnerExceptionHandler.INSTANCE.handle(type, name, metalake, e);
+  }
+
+  public static Response handleRolePermissionOperationException(
+      OperationType type, String name, String parent, Exception e) {
+    return RolePermissionOperationHandler.INSTANCE.handle(type, name, parent, e);
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -171,6 +184,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
 
       } else {
         return super.handle(op, partition, table, e);
@@ -206,6 +222,12 @@ public class ExceptionHandlers {
 
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
 
       } else {
         return super.handle(op, table, schema, e);
@@ -245,6 +267,12 @@ public class ExceptionHandlers {
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
       } else {
         return super.handle(op, schema, catalog, e);
       }
@@ -277,8 +305,17 @@ public class ExceptionHandlers {
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else if (e instanceof CatalogAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else if (e instanceof InUseException) {
+        return Utils.inUse(errorMsg, e);
 
       } else {
         return super.handle(op, catalog, metalake, e);
@@ -311,6 +348,12 @@ public class ExceptionHandlers {
       } else if (e instanceof NoSuchMetalakeException) {
         return Utils.notFound(errorMsg, e);
 
+      } else if (e instanceof MetalakeNotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else if (e instanceof MetalakeInUseException) {
+        return Utils.inUse(errorMsg, e);
+
       } else {
         return super.handle(op, metalake, parent, e);
       }
@@ -341,6 +384,12 @@ public class ExceptionHandlers {
 
       } else if (e instanceof FilesetAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
 
       } else {
         return super.handle(op, fileset, schema, e);
@@ -380,6 +429,9 @@ public class ExceptionHandlers {
       } else if (e instanceof UserAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
       } else {
         return super.handle(op, user, metalake, e);
       }
@@ -411,6 +463,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof GroupAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
 
       } else {
         return super.handle(op, group, metalake, e);
@@ -444,6 +499,12 @@ public class ExceptionHandlers {
       } else if (e instanceof RoleAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
       } else {
         return super.handle(op, role, metalake, e);
       }
@@ -474,6 +535,12 @@ public class ExceptionHandlers {
 
       } else if (e instanceof TopicAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
 
       } else {
         return super.handle(op, topic, schema, e);
@@ -508,6 +575,19 @@ public class ExceptionHandlers {
     }
   }
 
+  private static class RolePermissionOperationHandler extends BasePermissionExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new RolePermissionOperationHandler();
+
+    @Override
+    protected String getPermissionErrorMsg(
+        String object, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate object(%s) operation [%s] under role [%s], reason [%s]",
+          object, operation, parent, reason);
+    }
+  }
+
   private abstract static class BasePermissionExceptionHandler extends BaseExceptionHandler {
 
     protected abstract String getPermissionErrorMsg(
@@ -524,6 +604,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
 
       } else {
         return super.handle(op, roles, parent, e);
@@ -560,6 +643,9 @@ public class ExceptionHandlers {
       } else if (e instanceof TagAlreadyAssociatedException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
       } else {
         return super.handle(op, tag, parent, e);
       }
@@ -587,6 +673,10 @@ public class ExceptionHandlers {
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
       } else {
         return super.handle(op, name, parent, e);
       }

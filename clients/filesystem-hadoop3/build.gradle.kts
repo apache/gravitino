@@ -26,6 +26,10 @@ plugins {
 dependencies {
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly(libs.hadoop3.common)
+  implementation(project(":catalogs:catalog-hadoop")) {
+    exclude(group = "*")
+  }
+
   implementation(libs.caffeine)
 
   testImplementation(project(":api"))
@@ -35,6 +39,9 @@ dependencies {
   testImplementation(project(":server-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":bundles:gcp-bundle"))
+  testImplementation(project(":bundles:aliyun-bundle"))
+  testImplementation(project(":bundles:aws-bundle"))
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
@@ -71,6 +78,11 @@ tasks.build {
   dependsOn("javadoc")
 }
 
+tasks.compileJava {
+  dependsOn(":catalogs:catalog-hadoop:jar")
+  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+}
+
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
@@ -78,6 +90,11 @@ tasks.test {
   } else {
     dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
   }
+
+  // this task depends on :bundles:aws-bundle:shadowJar
+  dependsOn(":bundles:aws-bundle:jar")
+  dependsOn(":bundles:aliyun-bundle:jar")
+  dependsOn(":bundles:gcp-bundle:jar")
 }
 
 tasks.javadoc {

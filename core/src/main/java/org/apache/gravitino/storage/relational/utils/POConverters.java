@@ -22,8 +22,10 @@ package org.apache.gravitino.storage.relational.utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
@@ -33,11 +35,14 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.dto.rel.expressions.FunctionArg;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -47,7 +52,13 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
+import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
@@ -377,12 +388,21 @@ public class POConverters {
    *
    * @param oldTablePO the old TablePO object
    * @param newTable the new TableEntity object
+   * @param needUpdateVersion whether need to update the version
    * @return TablePO object with updated version
    */
-  public static TablePO updateTablePOWithVersion(TablePO oldTablePO, TableEntity newTable) {
-    Long lastVersion = oldTablePO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+  public static TablePO updateTablePOWithVersion(
+      TablePO oldTablePO, TableEntity newTable, boolean needUpdateVersion) {
+    Long lastVersion;
+    Long currentVersion;
+    if (needUpdateVersion) {
+      lastVersion = oldTablePO.getLastVersion() + 1;
+      currentVersion = lastVersion;
+    } else {
+      lastVersion = oldTablePO.getLastVersion();
+      currentVersion = oldTablePO.getCurrentVersion();
+    }
+
     try {
       return TablePO.builder()
           .withTableId(oldTablePO.getTableId())
@@ -391,8 +411,8 @@ public class POConverters {
           .withCatalogId(oldTablePO.getCatalogId())
           .withSchemaId(oldTablePO.getSchemaId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newTable.auditInfo()))
-          .withCurrentVersion(nextVersion)
-          .withLastVersion(nextVersion)
+          .withCurrentVersion(currentVersion)
+          .withLastVersion(lastVersion)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
@@ -408,17 +428,92 @@ public class POConverters {
    * @return TableEntity object from TablePO object
    */
   public static TableEntity fromTablePO(TablePO tablePO, Namespace namespace) {
+    return fromTableAndColumnPOs(tablePO, Collections.emptyList(), namespace);
+  }
+
+  public static TableEntity fromTableAndColumnPOs(
+      TablePO tablePO, List<ColumnPO> columnPOs, Namespace namespace) {
     try {
       return TableEntity.builder()
           .withId(tablePO.getTableId())
           .withName(tablePO.getTableName())
           .withNamespace(namespace)
+          .withColumns(fromColumnPOs(columnPOs))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(tablePO.getAuditInfo(), AuditInfo.class))
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }
+  }
+
+  public static ColumnEntity fromColumnPO(ColumnPO columnPO) {
+    try {
+      return ColumnEntity.builder()
+          .withId(columnPO.getColumnId())
+          .withName(columnPO.getColumnName())
+          .withPosition(columnPO.getColumnPosition())
+          .withDataType(JsonUtils.anyFieldMapper().readValue(columnPO.getColumnType(), Type.class))
+          .withComment(columnPO.getColumnComment())
+          .withAutoIncrement(
+              ColumnPO.AutoIncrement.fromValue(columnPO.getAutoIncrement()).autoIncrement())
+          .withNullable(ColumnPO.Nullable.fromValue(columnPO.getNullable()).nullable())
+          .withDefaultValue(
+              columnPO.getDefaultValue() == null
+                  ? Column.DEFAULT_VALUE_NOT_SET
+                  : DTOConverters.fromFunctionArg(
+                      (FunctionArg)
+                          JsonUtils.anyFieldMapper()
+                              .readValue(columnPO.getDefaultValue(), Expression.class)))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(columnPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static List<ColumnEntity> fromColumnPOs(List<ColumnPO> columnPOs) {
+    return columnPOs.stream().map(POConverters::fromColumnPO).collect(Collectors.toList());
+  }
+
+  public static ColumnPO initializeColumnPO(
+      TablePO tablePO, ColumnEntity columnEntity, ColumnPO.ColumnOpType opType) {
+    try {
+      return ColumnPO.builder()
+          .withColumnId(columnEntity.id())
+          .withColumnName(columnEntity.name())
+          .withColumnPosition(columnEntity.position())
+          .withMetalakeId(tablePO.getMetalakeId())
+          .withCatalogId(tablePO.getCatalogId())
+          .withSchemaId(tablePO.getSchemaId())
+          .withTableId(tablePO.getTableId())
+          .withTableVersion(tablePO.getCurrentVersion())
+          .withColumnType(JsonUtils.anyFieldMapper().writeValueAsString(columnEntity.dataType()))
+          .withColumnComment(columnEntity.comment())
+          .withNullable(ColumnPO.Nullable.fromBoolean(columnEntity.nullable()).value())
+          .withAutoIncrement(
+              ColumnPO.AutoIncrement.fromBoolean(columnEntity.autoIncrement()).value())
+          .withDefaultValue(
+              columnEntity.defaultValue() == null
+                      || columnEntity.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)
+                  ? null
+                  : JsonUtils.anyFieldMapper()
+                      .writeValueAsString(DTOConverters.toFunctionArg(columnEntity.defaultValue())))
+          .withColumnOpType(opType.value())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(columnEntity.auditInfo()))
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static List<ColumnPO> initializeColumnPOs(
+      TablePO tablePO, List<ColumnEntity> columnEntities, ColumnPO.ColumnOpType opType) {
+    return columnEntities.stream()
+        .map(columnEntity -> initializeColumnPO(tablePO, columnEntity, opType))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -729,6 +824,56 @@ public class POConverters {
   }
 
   /**
+   * Convert {@link ExtendedUserPO} to {@link UserEntity}
+   *
+   * @param userPO ExtendedUserPO object to be converted
+   * @param namespace Namespace object to be associated with the user
+   * @return UserEntity object from ExtendedUserPO object
+   */
+  public static UserEntity fromExtendedUserPO(ExtendedUserPO userPO, Namespace namespace) {
+    try {
+      UserEntity.Builder builder =
+          UserEntity.builder()
+              .withId(userPO.getUserId())
+              .withName(userPO.getUserName())
+              .withNamespace(namespace)
+              .withAuditInfo(
+                  JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
+      if (StringUtils.isNotBlank(userPO.getRoleNames())) {
+        List<String> roleNamesFromJson =
+            JsonUtils.anyFieldMapper().readValue(userPO.getRoleNames(), List.class);
+        List<String> roleNames =
+            roleNamesFromJson.stream().filter(StringUtils::isNotBlank).collect(Collectors.toList());
+        if (!roleNames.isEmpty()) {
+          builder.withRoleNames(roleNames);
+        }
+      }
+
+      if (StringUtils.isNotBlank(userPO.getRoleIds())) {
+        // Different JSON AGG from backends will produce different types data, we
+        // can only use Object. PostSQL produces the data with type Long. H2 produces
+        // the data with type String.
+        List<Object> roleIdsFromJson =
+            JsonUtils.anyFieldMapper().readValue(userPO.getRoleIds(), List.class);
+        List<Long> roleIds =
+            roleIdsFromJson.stream()
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .filter(StringUtils::isNotBlank)
+                .map(Long::valueOf)
+                .collect(Collectors.toList());
+
+        if (!roleIds.isEmpty()) {
+          builder.withRoleIds(roleIds);
+        }
+      }
+      return builder.build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
    * Convert {@link GroupPO} to {@link GroupEntity}
    *
    * @param groupPO GroupPO object to be converted
@@ -755,6 +900,57 @@ public class POConverters {
       }
       if (!roleIds.isEmpty()) {
         builder.withRoleIds(roleIds);
+      }
+      return builder.build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  /**
+   * Convert {@link ExtendedGroupPO} to {@link GroupEntity}
+   *
+   * @param groupPO ExtendedGroupPO object to be converted
+   * @param namespace Namespace object to be associated with the user
+   * @return GroupEntity object from ExtendedGroupPO object
+   */
+  public static GroupEntity fromExtendedGroupPO(ExtendedGroupPO groupPO, Namespace namespace) {
+    try {
+      GroupEntity.Builder builder =
+          GroupEntity.builder()
+              .withId(groupPO.getGroupId())
+              .withName(groupPO.getGroupName())
+              .withNamespace(namespace)
+              .withAuditInfo(
+                  JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
+
+      if (StringUtils.isNotBlank(groupPO.getRoleNames())) {
+        List<String> roleNamesFromJson =
+            JsonUtils.anyFieldMapper().readValue(groupPO.getRoleNames(), List.class);
+        List<String> roleNames =
+            roleNamesFromJson.stream().filter(StringUtils::isNotBlank).collect(Collectors.toList());
+        if (!roleNames.isEmpty()) {
+          builder.withRoleNames(roleNames);
+        }
+      }
+
+      if (StringUtils.isNotBlank(groupPO.getRoleIds())) {
+        // Different JSON AGG from backends will produce different types data, we
+        // can only use Object. PostSQL produces the data with type Long. H2 produces
+        // the data with type String.
+        List<Object> roleIdsFromJson =
+            JsonUtils.anyFieldMapper().readValue(groupPO.getRoleIds(), List.class);
+        List<Long> roleIds =
+            roleIdsFromJson.stream()
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .filter(StringUtils::isNotBlank)
+                .map(Long::valueOf)
+                .collect(Collectors.toList());
+
+        if (!roleIds.isEmpty()) {
+          builder.withRoleIds(roleIds);
+        }
       }
       return builder.build();
     } catch (JsonProcessingException e) {
@@ -960,6 +1156,27 @@ public class POConverters {
           .withDeletedAt(DEFAULT_DELETED_AT);
 
       return builder;
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static RolePO updateRolePOWithVersion(RolePO oldRolePO, RoleEntity newRole) {
+    Long lastVersion = oldRolePO.getLastVersion();
+    // TODO: set the version to the last version + 1 when having some fields need be multiple
+    // version
+    Long nextVersion = lastVersion;
+    try {
+      return RolePO.builder()
+          .withRoleId(oldRolePO.getRoleId())
+          .withRoleName(newRole.name())
+          .withMetalakeId(oldRolePO.getMetalakeId())
+          .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newRole.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newRole.auditInfo()))
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }

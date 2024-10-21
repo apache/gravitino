@@ -20,11 +20,14 @@ package org.apache.gravitino.client;
 
 import static org.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
 
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
@@ -302,17 +305,19 @@ class DTOConverters {
     return SecurableObjectDTO.builder()
         .withFullName(securableObject.fullName())
         .withType(securableObject.type())
-        .withPrivileges(
-            securableObject.privileges().stream()
-                .map(
-                    privilege -> {
-                      return PrivilegeDTO.builder()
-                          .withCondition(privilege.condition())
-                          .withName(privilege.name())
-                          .build();
-                    })
-                .toArray(PrivilegeDTO[]::new))
+        .withPrivileges(toPrivileges(securableObject.privileges()).toArray(new PrivilegeDTO[0]))
         .build();
+  }
+
+  static List<PrivilegeDTO> toPrivileges(List<Privilege> privileges) {
+    return privileges.stream()
+        .map(
+            privilege ->
+                PrivilegeDTO.builder()
+                    .withCondition(privilege.condition())
+                    .withName(privilege.name())
+                    .build())
+        .collect(Collectors.toList());
   }
 
   static TagUpdateRequest toTagUpdateRequest(TagChange change) {

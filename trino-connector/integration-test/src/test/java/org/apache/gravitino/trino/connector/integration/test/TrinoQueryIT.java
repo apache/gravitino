@@ -46,10 +46,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
 
@@ -67,6 +69,8 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   static Set<String> ciTestsets = new HashSet<>();
 
+  static TrinoQueryITBase trinoQueryITBase;
+
   static {
     testsetsDir = TrinoQueryIT.class.getClassLoader().getResource("trino-ci-testset").getPath();
     testsetsDir = ITUtils.joinPath(testsetsDir, "testsets");
@@ -79,8 +83,9 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   @BeforeAll
-  public static void setup() throws Exception {
-    TrinoQueryITBase.setup();
+  public void setup() throws Exception {
+    trinoQueryITBase = new TrinoQueryITBase();
+    trinoQueryITBase.setup();
     cleanupTestEnv();
 
     queryParams.put("mysql_uri", mysqlUri);

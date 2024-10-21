@@ -372,14 +372,18 @@ public class GravitinoEnv {
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
 
-    // Create and initialize metalake related modules
+    // Create and initialize metalake related modules, the operation chain is:
+    // MetalakeEventDispatcher -> MetalakeNormalizeDispatcher -> MetalakeHookDispatcher ->
+    // MetalakeManager
     MetalakeDispatcher metalakeManager = new MetalakeManager(entityStore, idGenerator);
     MetalakeHookDispatcher metalakeHookDispatcher = new MetalakeHookDispatcher(metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
         new MetalakeNormalizeDispatcher(metalakeHookDispatcher);
     this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
 
-    // Create and initialize Catalog related modules
+    // Create and initialize Catalog related modules, the operation chain is:
+    // CatalogEventDispatcher -> CatalogNormalizeDispatcher -> CatalogHookDispatcher ->
+    // CatalogManager
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     CatalogHookDispatcher catalogHookDispatcher = new CatalogHookDispatcher(catalogManager);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =

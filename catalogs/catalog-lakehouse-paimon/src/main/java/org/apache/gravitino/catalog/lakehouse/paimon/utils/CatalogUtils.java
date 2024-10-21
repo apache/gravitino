@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.utils;
 
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.GRAVITINO_CONFIG_TO_PAIMON;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.KERBEROS_CONFIGURATION;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.OSS_CONFIGURATION;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.S3_CONFIGURATION;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_BACKEND;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_URI;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_WAREHOUSE;
@@ -26,6 +30,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
@@ -119,5 +124,25 @@ public class CatalogUtils {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");
     }
+  }
+
+  public static Map<String, String> toInnerProperty(
+      Map<String, String> properties, boolean keepUnknown) {
+    Map<String, String> gravitinoConfig = new HashMap<>();
+    properties.forEach(
+        (key, value) -> {
+          if (GRAVITINO_CONFIG_TO_PAIMON.containsKey(key)) {
+            gravitinoConfig.put(GRAVITINO_CONFIG_TO_PAIMON.get(key), value);
+          } else if (KERBEROS_CONFIGURATION.containsKey(key)) {
+            gravitinoConfig.put(KERBEROS_CONFIGURATION.get(key), value);
+          } else if (S3_CONFIGURATION.containsKey(key)) {
+            gravitinoConfig.put(S3_CONFIGURATION.get(key), value);
+          } else if (OSS_CONFIGURATION.containsKey(key)) {
+            gravitinoConfig.put(OSS_CONFIGURATION.get(key), value);
+          } else if (keepUnknown) {
+            gravitinoConfig.put(key, value);
+          }
+        });
+    return gravitinoConfig;
   }
 }

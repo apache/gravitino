@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import static org.apache.gravitino.authorization.AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG;
+import static org.apache.gravitino.authorization.AuthorizationUtils.ROLE_DOES_NOT_EXIST_MSG;
 import static org.apache.gravitino.authorization.AuthorizationUtils.USER_DOES_NOT_EXIST_MSG;
 
 import com.google.common.collect.Lists;
@@ -26,12 +27,16 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -125,6 +130,8 @@ class PermissionManager {
     } catch (NoSuchEntityException nse) {
       LOG.warn("Failed to grant, user {} does not exist in the metalake {}", user, metalake, nse);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
+    } catch (NoSuchRoleException nsr) {
+      throw new IllegalRoleException(nsr);
     } catch (IOException ioe) {
       LOG.error(
           "Failed to grant role {} to user {} in the metalake {} due to storage issues",
@@ -204,6 +211,8 @@ class PermissionManager {
     } catch (NoSuchEntityException nse) {
       LOG.warn("Failed to grant, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
+    } catch (NoSuchRoleException nsr) {
+      throw new IllegalRoleException(nsr);
     } catch (IOException ioe) {
       LOG.error(
           "Failed to grant role {} to group {} in the metalake {} due to storage issues",
@@ -284,6 +293,8 @@ class PermissionManager {
       LOG.warn(
           "Failed to revoke, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
+    } catch (NoSuchRoleException nsr) {
+      throw new IllegalRoleException(nsr);
     } catch (IOException ioe) {
       LOG.error(
           "Failed to revoke role {} from  group {} in the metalake {} due to storage issues",
@@ -362,6 +373,8 @@ class PermissionManager {
     } catch (NoSuchEntityException nse) {
       LOG.warn("Failed to revoke, user {} does not exist in the metalake {}", user, metalake, nse);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
+    } catch (NoSuchRoleException nsr) {
+      throw new IllegalRoleException(nsr);
     } catch (IOException ioe) {
       LOG.error(
           "Failed to revoke role {} from  user {} in the metalake {} due to storage issues",
@@ -373,11 +386,304 @@ class PermissionManager {
     }
   }
 
-  private List<String> toRoleNames(List<RoleEntity> roleEntities) {
-    return roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList());
+  Role grantPrivilegesToRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges) {
+    try {
+      AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper =
+          new AuthorizationPluginCallbackWrapper();
+
+      Role updatedRole =
+          store.update(
+              AuthorizationUtils.ofRole(metalake, role),
+              RoleEntity.class,
+              Entity.EntityType.ROLE,
+              roleEntity -> {
+                List<SecurableObject> grantedSecurableObjects =
+                    generateNewSecurableObjects(
+                        roleEntity.securableObjects(),
+                        object,
+                        targetObject -> {
+                          if (targetObject == null) {
+                            return createNewSecurableObject(
+                                metalake,
+                                role,
+                                object,
+                                privileges,
+                                roleEntity,
+                                authorizationPluginCallbackWrapper);
+                          } else {
+                            return updateGrantedSecurableObject(
+                                metalake,
+                                role,
+                                object,
+                                privileges,
+                                roleEntity,
+                                targetObject,
+                                authorizationPluginCallbackWrapper);
+                          }
+                        });
+
+                AuditInfo auditInfo =
+                    AuditInfo.builder()
+                        .withCreator(roleEntity.auditInfo().creator())
+                        .withCreateTime(roleEntity.auditInfo().createTime())
+                        .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                        .withLastModifiedTime(Instant.now())
+                        .build();
+
+                return RoleEntity.builder()
+                    .withId(roleEntity.id())
+                    .withName(roleEntity.name())
+                    .withNamespace(roleEntity.namespace())
+                    .withProperties(roleEntity.properties())
+                    .withAuditInfo(auditInfo)
+                    .withSecurableObjects(grantedSecurableObjects)
+                    .build();
+              });
+
+      // Execute the authorization plugin callback
+      authorizationPluginCallbackWrapper.execute();
+      return updatedRole;
+    } catch (NoSuchEntityException nse) {
+      LOG.error("Failed to grant, role {} does not exist in the metalake {}", role, metalake, nse);
+      throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Grant privileges to {} failed due to storage issues", role, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  private static SecurableObject updateGrantedSecurableObject(
+      String metalake,
+      String role,
+      MetadataObject object,
+      List<Privilege> privileges,
+      RoleEntity roleEntity,
+      SecurableObject targetObject,
+      AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
+    // Removed duplicated privileges by set
+    Set<Privilege> updatePrivileges = Sets.newHashSet();
+    updatePrivileges.addAll(targetObject.privileges());
+    // If old object contains all the privileges to grant, the object doesn't
+    // need to update.
+    if (updatePrivileges.containsAll(privileges)) {
+      return targetObject;
+    } else {
+      updatePrivileges.addAll(privileges);
+      AuthorizationUtils.checkDuplicatedNamePrivilege(privileges);
+
+      SecurableObject newSecurableObject =
+          SecurableObjects.parse(
+              targetObject.fullName(), targetObject.type(), Lists.newArrayList(updatePrivileges));
+
+      // We set authorization callback here, we won't execute this callback in this place.
+      // We will execute the callback after we execute the SQL transaction.
+      authorizationPluginCallbackWrapper.setCallback(
+          () ->
+              AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                  metalake,
+                  object,
+                  authorizationPlugin -> {
+                    authorizationPlugin.onRoleUpdated(
+                        roleEntity,
+                        RoleChange.updateSecurableObject(role, targetObject, newSecurableObject));
+                  }));
+
+      return newSecurableObject;
+    }
+  }
+
+  Role revokePrivilegesFromRole(
+      String metalake, String role, MetadataObject object, List<Privilege> privileges) {
+    try {
+      AuthorizationPluginCallbackWrapper authorizationCallbackWrapper =
+          new AuthorizationPluginCallbackWrapper();
+
+      RoleEntity updatedRole =
+          store.update(
+              AuthorizationUtils.ofRole(metalake, role),
+              RoleEntity.class,
+              Entity.EntityType.ROLE,
+              roleEntity -> {
+                List<SecurableObject> revokedSecurableObjects =
+                    generateNewSecurableObjects(
+                        roleEntity.securableObjects(),
+                        object,
+                        targetObject -> {
+                          // If the securable object doesn't exist, we do nothing except for
+                          // logging.
+                          if (targetObject == null) {
+                            LOG.warn(
+                                "Securable object {} type {} doesn't exist in the role {}",
+                                object.fullName(),
+                                object.type(),
+                                role);
+                            return null;
+                          } else {
+                            // If the securable object exists, we remove the privileges of the
+                            // securable object and will remove duplicated privileges at the same
+                            // time.
+                            return updateRevokedSecurableObject(
+                                metalake,
+                                role,
+                                object,
+                                privileges,
+                                roleEntity,
+                                targetObject,
+                                authorizationCallbackWrapper);
+                          }
+                        });
+
+                AuditInfo auditInfo =
+                    AuditInfo.builder()
+                        .withCreator(roleEntity.auditInfo().creator())
+                        .withCreateTime(roleEntity.auditInfo().createTime())
+                        .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                        .withLastModifiedTime(Instant.now())
+                        .build();
+
+                return RoleEntity.builder()
+                    .withId(roleEntity.id())
+                    .withName(roleEntity.name())
+                    .withNamespace(roleEntity.namespace())
+                    .withProperties(roleEntity.properties())
+                    .withAuditInfo(auditInfo)
+                    .withSecurableObjects(revokedSecurableObjects)
+                    .build();
+              });
+
+      authorizationCallbackWrapper.execute();
+
+      return updatedRole;
+    } catch (NoSuchEntityException nse) {
+      LOG.error("Failed to revoke, role {} does not exist in the metalake {}", role, metalake, nse);
+      throw new NoSuchRoleException(ROLE_DOES_NOT_EXIST_MSG, role, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Revoke privileges from {} failed due to storage issues", role, ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  private static SecurableObject createNewSecurableObject(
+      String metalake,
+      String role,
+      MetadataObject object,
+      List<Privilege> privileges,
+      RoleEntity roleEntity,
+      AuthorizationPluginCallbackWrapper authorizationPluginCallbackWrapper) {
+    // Add a new securable object if there doesn't exist the object in the role
+    SecurableObject securableObject =
+        SecurableObjects.parse(object.fullName(), object.type(), Lists.newArrayList(privileges));
+
+    // We set authorization callback here, we won't execute this callback in this place.
+    // We will execute the callback after we execute the SQL transaction.
+    authorizationPluginCallbackWrapper.setCallback(
+        () ->
+            AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                metalake,
+                object,
+                authorizationPlugin -> {
+                  authorizationPlugin.onRoleUpdated(
+                      roleEntity, RoleChange.addSecurableObject(role, securableObject));
+                }));
+
+    return securableObject;
+  }
+
+  private static SecurableObject updateRevokedSecurableObject(
+      String metalake,
+      String role,
+      MetadataObject object,
+      List<Privilege> privileges,
+      RoleEntity roleEntity,
+      SecurableObject targetObject,
+      AuthorizationPluginCallbackWrapper authorizationCallbackWrapper) {
+    // Use set to deduplicate the privileges
+    Set<Privilege> updatePrivileges = Sets.newHashSet();
+    updatePrivileges.addAll(targetObject.privileges());
+    privileges.forEach(updatePrivileges::remove);
+
+    // If the object still contains privilege, we should update the object
+    // with new privileges
+    if (!updatePrivileges.isEmpty()) {
+      SecurableObject newSecurableObject =
+          SecurableObjects.parse(
+              targetObject.fullName(), targetObject.type(), Lists.newArrayList(updatePrivileges));
+
+      // We set authorization callback here, we won't execute this callback in this place.
+      // We will execute the callback after we execute the SQL transaction.
+      authorizationCallbackWrapper.setCallback(
+          () ->
+              AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                  metalake,
+                  object,
+                  authorizationPlugin -> {
+                    authorizationPlugin.onRoleUpdated(
+                        roleEntity,
+                        RoleChange.updateSecurableObject(role, targetObject, newSecurableObject));
+                  }));
+
+      return newSecurableObject;
+    } else {
+      // If the object doesn't contain any privilege, we remove this object.
+      // We set authorization callback here, we won't execute this callback in this place.
+      // We will execute the callback after we execute the SQL transaction.
+      authorizationCallbackWrapper.setCallback(
+          () ->
+              AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+                  metalake,
+                  object,
+                  authorizationPlugin -> {
+                    authorizationPlugin.onRoleUpdated(
+                        roleEntity, RoleChange.removeSecurableObject(role, targetObject));
+                  }));
+      // If we return null, the newly generated objects won't contain this object, the storage will
+      // delete this object.
+      return null;
+    }
+  }
+
+  // This method will generate all the securable objects after granting or revoking privileges
+  private List<SecurableObject> generateNewSecurableObjects(
+      List<SecurableObject> securableObjects,
+      MetadataObject targetObject,
+      Function<SecurableObject, SecurableObject> objectUpdater) {
+
+    // Find a matched securable object to update privileges
+    List<SecurableObject> updateSecurableObjects = Lists.newArrayList(securableObjects);
+    SecurableObject matchedSecurableObject =
+        securableObjects.stream().filter(targetObject::equals).findFirst().orElse(null);
+    if (matchedSecurableObject != null) {
+      updateSecurableObjects.remove(matchedSecurableObject);
+    }
+
+    // Apply the updates for the matched object
+    SecurableObject newSecurableObject = objectUpdater.apply(matchedSecurableObject);
+    if (newSecurableObject != null) {
+      updateSecurableObjects.add(newSecurableObject);
+    }
+    return updateSecurableObjects;
+  }
+
+  private static class AuthorizationPluginCallbackWrapper {
+    private Runnable callback;
+
+    public void setCallback(Runnable callback) {
+      this.callback = callback;
+    }
+
+    public void execute() {
+      if (callback != null) {
+        callback.run();
+      }
+    }
   }
 
   private List<Long> toRoleIds(List<RoleEntity> roleEntities) {
     return roleEntities.stream().map(RoleEntity::id).collect(Collectors.toList());
+  }
+
+  private List<String> toRoleNames(List<RoleEntity> roleEntities) {
+    return roleEntities.stream().map(RoleEntity::name).collect(Collectors.toList());
   }
 }

@@ -26,20 +26,20 @@ public abstract class HudiCatalogBackend {
 
   private final BackendType backendType;
 
-  private final HudiCatalogBackendOps catalogOps;
+  private final HudiCatalogBackendOps backendOps;
 
   public abstract void initialize(Map<String, String> properties);
 
-  protected HudiCatalogBackend(BackendType backendType, HudiCatalogBackendOps catalogOps) {
+  protected HudiCatalogBackend(BackendType backendType, HudiCatalogBackendOps backendOps) {
     this.backendType = backendType;
-    this.catalogOps = catalogOps;
+    this.backendOps = backendOps;
   }
 
   public BackendType type() {
     return backendType;
   }
 
-  public HudiCatalogBackendOps catalogOps() {
-    return catalogOps;
+  public HudiCatalogBackendOps backendOps() {
+    return backendOps;
   }
 }

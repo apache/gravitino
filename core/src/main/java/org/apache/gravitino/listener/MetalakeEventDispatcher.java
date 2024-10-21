@@ -24,7 +24,9 @@ import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.listener.api.event.AlterMetalakeEvent;
 import org.apache.gravitino.listener.api.event.AlterMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateMetalakeEvent;
@@ -129,9 +131,10 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
   }
 
   @Override
-  public boolean dropMetalake(NameIdentifier ident) {
+  public boolean dropMetalake(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, MetalakeInUseException {
     try {
-      boolean isExists = dispatcher.dropMetalake(ident);
+      boolean isExists = dispatcher.dropMetalake(ident, force);
       eventBus.dispatchEvent(
           new DropMetalakeEvent(PrincipalUtils.getCurrentUserName(), ident, isExists));
       return isExists;
@@ -140,5 +143,17 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
           new DropMetalakeFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
       throw e;
     }
+  }
+
+  @Override
+  public void enableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    // todo: support enable metalake event
+    dispatcher.enableMetalake(ident);
+  }
+
+  @Override
+  public void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
+    // todo: support disable metalake event
+    dispatcher.disableMetalake(ident);
   }
 }

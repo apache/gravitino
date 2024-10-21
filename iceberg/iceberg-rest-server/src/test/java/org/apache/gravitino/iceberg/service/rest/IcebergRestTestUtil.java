@@ -24,10 +24,13 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.provider.StaticIcebergCatalogConfigProvider;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -44,7 +47,11 @@ public class IcebergRestTestUtil {
   public static final String UPDATE_NAMESPACE_POSTFIX = "properties";
   public static final String TEST_NAMESPACE_NAME = "gravitino-test";
   public static final String TABLE_PATH = NAMESPACE_PATH + "/" + TEST_NAMESPACE_NAME + "/tables";
+
+  public static final String VIEW_PATH = NAMESPACE_PATH + "/" + TEST_NAMESPACE_NAME + "/views";
   public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";
+
+  public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";
   public static final String REPORT_METRICS_POSTFIX = "metrics";
 
   public static final boolean DEBUG_SERVER_LOG_ENABLED = true;
@@ -70,12 +77,17 @@ public class IcebergRestTestUtil {
 
     if (bindIcebergTableOps) {
       Map<String, String> catalogConf = Maps.newHashMap();
-      catalogConf.put(String.format("catalog.%s.catalog-backend-name", PREFIX), PREFIX);
+      String catalogConfigPrefix = "catalog." + PREFIX;
       catalogConf.put(
-          IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER,
-          ConfigBasedIcebergCatalogWrapperProviderForTest.class.getName());
+          IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
+          StaticIcebergCatalogConfigProvider.class.getName());
+      catalogConf.put(String.format("%s.catalog-backend-name", catalogConfigPrefix), PREFIX);
+      catalogConf.put(
+          CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
+          DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE);
+      // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
-          new IcebergCatalogWrapperManager(catalogConf);
+          new IcebergCatalogWrapperManagerForTest(catalogConf);
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
       resourceConfig.register(

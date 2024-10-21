@@ -30,7 +30,7 @@ import java.util.Map;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.GravitinoVersion;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
 import org.apache.gravitino.server.authentication.OAuthConfig;
@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class OAuth2OperationsIT extends AbstractIT {
+public class OAuth2OperationsIT extends BaseIT {
 
   private static final KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
   private static final String publicKey =
@@ -49,7 +49,7 @@ public class OAuth2OperationsIT extends AbstractIT {
 
   @SuppressWarnings("JavaUtilDate")
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     token =
         Jwts.builder()
@@ -68,7 +68,7 @@ public class OAuth2OperationsIT extends AbstractIT {
     registerCustomConfigs(configs);
     OAuthMockDataProvider mockDataProvider = OAuthMockDataProvider.getInstance();
     mockDataProvider.setTokenData(token.getBytes(StandardCharsets.UTF_8));
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
   }
 
   @Test

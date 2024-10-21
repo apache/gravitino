@@ -179,7 +179,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
     // set the property 'replication_num' to 1 explicitly.
-    if (!properties.containsKey(REPLICATION_FACTOR)) {
+    if (!resultMap.containsKey(REPLICATION_FACTOR)) {
       // Try to check the number of backend servers.
       String query = "select count(*) from information_schema.backends where Alive = 'true'";
 
@@ -221,7 +221,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     Preconditions.checkArgument(
         Strategy.HASH == distribution.strategy() || Strategy.EVEN == distribution.strategy(),
-        "Doris only supports HASH or EVEN distribution strategy");
+        "Doris only supports HASH or EVEN(RANDOM) distribution strategy");
 
     if (distribution.strategy() == Strategy.HASH) {
       // Check if the distribution column exists
@@ -235,6 +235,10 @@ public class DorisTableOperations extends JdbcTableOperations {
                       "Distribution column "
                           + expression
                           + " does not exist in the table columns"));
+    } else if (distribution.strategy() == Strategy.EVEN) {
+      Preconditions.checkArgument(
+          distribution.expressions().length == 0,
+          "Doris does not support distribution column in EVEN distribution strategy");
     }
   }
 
@@ -805,5 +809,18 @@ public class DorisTableOperations extends JdbcTableOperations {
           "Index does not exist");
     }
     return "DROP INDEX " + deleteIndex.getName();
+  }
+
+  @Override
+  protected Distribution getDistributionInfo(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+
+    String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    try (Statement statement = connection.createStatement();
+        ResultSet result = statement.executeQuery(showCreateTableSql)) {
+      result.next();
+      String createTableSyntax = result.getString("Create Table");
+      return DorisUtils.extractDistributionInfoFromSql(createTableSyntax);
+    }
   }
 }

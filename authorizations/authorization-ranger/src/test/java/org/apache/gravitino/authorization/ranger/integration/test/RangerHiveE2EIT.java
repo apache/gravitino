@@ -19,7 +19,8 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
-import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_ADMIN_URL;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
+import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_PASSWORD;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_SERVICE_NAME;
@@ -29,40 +30,36 @@ import static org.apache.gravitino.integration.test.container.RangerContainer.RA
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
-import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.authorization.Privileges;
-import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationHivePlugin;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.rel.expressions.NamedReference;
-import org.apache.gravitino.rel.expressions.distributions.Distribution;
-import org.apache.gravitino.rel.expressions.distributions.Distributions;
-import org.apache.gravitino.rel.expressions.distributions.Strategy;
-import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
-import org.apache.gravitino.rel.expressions.sorts.SortDirection;
-import org.apache.gravitino.rel.expressions.sorts.SortOrder;
-import org.apache.gravitino.rel.expressions.sorts.SortOrders;
-import org.apache.gravitino.rel.expressions.transforms.Transforms;
-import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.UserEntity;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -72,112 +69,231 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class RangerHiveE2EIT extends AbstractIT {
+public class RangerHiveE2EIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveE2EIT.class);
 
-  private static RangerAuthorizationPlugin rangerAuthPlugin;
   public static final String metalakeName =
-      GravitinoITUtils.genRandomName("RangerHiveAuthIT_metalake").toLowerCase();
+      GravitinoITUtils.genRandomName("RangerHiveE2EIT_metalake").toLowerCase();
   public static final String catalogName =
-      GravitinoITUtils.genRandomName("RangerHiveAuthIT_catalog").toLowerCase();
+      GravitinoITUtils.genRandomName("RangerHiveE2EIT_catalog").toLowerCase();
   public static final String schemaName =
-      GravitinoITUtils.genRandomName("RangerHiveAuthIT_schema").toLowerCase();
-  public static final String tableName =
-      GravitinoITUtils.genRandomName("RangerHiveAuthIT_table").toLowerCase();
-
-  public static final String HIVE_COL_NAME1 = "hive_col_name1";
-  public static final String HIVE_COL_NAME2 = "hive_col_name2";
-  public static final String HIVE_COL_NAME3 = "hive_col_name3";
+      GravitinoITUtils.genRandomName("RangerHiveE2EIT_schema").toLowerCase();
 
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
   private static final String provider = "hive";
   private static String HIVE_METASTORE_URIS;
 
+  private static SparkSession sparkSession = null;
+  private final AuditInfo auditInfo =
+      AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+  private static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
+  private static final String TEST_USER_NAME = "e2e_it_user";
+
+  private static final String SQL_SHOW_DATABASES =
+      String.format("SHOW DATABASES like '%s'", schemaName);
+
+  private static String RANGER_ADMIN_URL = null;
+
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
+    // Enable Gravitino Authorization mode
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), String.valueOf(true));
-    configs.put(Configs.SERVICE_ADMINS.getKey(), AuthConstants.ANONYMOUS_USER);
+    configs.put(Configs.SERVICE_ADMINS.getKey(), RangerITEnv.HADOOP_USER_NAME);
+    configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
+    configs.put("SimpleAuthUserName", TEST_USER_NAME);
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
-    RangerITEnv.setup();
-    containerSuite.startHiveContainer();
+    RangerITEnv.init();
+    RangerITEnv.startHiveRangerContainer();
+
+    RANGER_ADMIN_URL =
+        String.format(
+            "http://%s:%d",
+            containerSuite.getRangerContainer().getContainerIpAddress(), RANGER_SERVER_PORT);
+
     HIVE_METASTORE_URIS =
         String.format(
             "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
+            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
             HiveContainer.HIVE_METASTORE_PORT);
 
+    generateRangerSparkSecurityXML();
+
+    sparkSession =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("Ranger Hive E2E integration test")
+            .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config(
+                "spark.sql.warehouse.dir",
+                String.format(
+                    "hdfs://%s:%d/user/hive/warehouse",
+                    containerSuite.getHiveRangerContainer().getContainerIpAddress(),
+                    HiveContainer.HDFS_DEFAULTFS_PORT))
+            .config("spark.sql.storeAssignmentPolicy", "LEGACY")
+            .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
+            .config(
+                "spark.sql.extensions",
+                "org.apache.kyuubi.plugin.spark.authz.ranger.RangerSparkExtension")
+            .enableHiveSupport()
+            .getOrCreate();
+
     createMetalake();
-    createCatalogAndRangerAuthPlugin();
-    createSchema();
-    createHiveTable();
+    createCatalog();
+  }
+
+  private static void generateRangerSparkSecurityXML() throws IOException {
+    String templatePath =
+        String.join(
+            File.separator,
+            System.getenv("GRAVITINO_ROOT_DIR"),
+            "authorizations",
+            "authorization-ranger",
+            "src",
+            "test",
+            "resources",
+            "ranger-spark-security.xml.template");
+    String xmlPath =
+        String.join(
+            File.separator,
+            System.getenv("GRAVITINO_ROOT_DIR"),
+            "authorizations",
+            "authorization-ranger",
+            "build",
+            "resources",
+            "test",
+            "ranger-spark-security.xml");
+
+    String templateContext =
+        FileUtils.readFileToString(new File(templatePath), StandardCharsets.UTF_8);
+    templateContext =
+        templateContext
+            .replace("__REPLACE__RANGER_ADMIN_URL", RANGER_ADMIN_URL)
+            .replace("__REPLACE__RANGER_HIVE_REPO_NAME", RangerITEnv.RANGER_HIVE_REPO_NAME);
+    FileUtils.writeStringToFile(new File(xmlPath), templateContext, StandardCharsets.UTF_8);
   }
 
   @AfterAll
-  public static void stop() throws IOException {
-    AbstractIT.client = null;
+  public void stop() {
+    RangerITEnv.cleanup();
+    if (client != null) {
+      Arrays.stream(catalog.asSchemas().listSchemas())
+          .filter(schema -> !schema.equals("default"))
+          .forEach(
+              (schema -> {
+                catalog.asSchemas().dropSchema(schema, true);
+              }));
+      Arrays.stream(metalake.listCatalogs())
+          .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
+      client.disableMetalake(metalakeName);
+      client.dropMetalake(metalakeName);
+    }
+    if (sparkSession != null) {
+      sparkSession.close();
+    }
+    try {
+      closer.close();
+    } catch (Exception e) {
+      LOG.error("Failed to close CloseableGroup", e);
+    }
+
+    client = null;
   }
 
   @Test
-  void testCreateRole() {
-    String roleName = RangerITEnv.currentFunName();
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("k1", "v1");
+  void testAllowUseSchemaPrivilege() throws InterruptedException {
+    // First, create a schema use Gravitino client
+    createSchema();
 
-    SecurableObject table1 =
+    // Use Spark to show this databases(schema)
+    Dataset dataset1 = sparkSession.sql(SQL_SHOW_DATABASES);
+    dataset1.show();
+    List<Row> rows1 = dataset1.collectAsList();
+    // The schema should not be shown, because the user does not have the permission
+    Assertions.assertEquals(
+        0, rows1.stream().filter(row -> row.getString(0).equals(schemaName)).count());
+
+    // Create a role with CREATE_SCHEMA privilege
+    SecurableObject securableObject1 =
         SecurableObjects.parse(
-            String.format("%s.%s.%s", catalogName, schemaName, tableName),
-            MetadataObject.Type.TABLE,
-            Lists.newArrayList(Privileges.SelectTable.allow()));
-    Role role = metalake.createRole(roleName, properties, Lists.newArrayList(table1));
-    RangerITEnv.verifyRoleInRanger(rangerAuthPlugin, role);
+            String.format("%s", catalogName),
+            MetadataObject.Type.CATALOG,
+            Lists.newArrayList(Privileges.CreateSchema.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName())
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(securableObject1))
+            .build();
+    RangerITEnv.rangerAuthHivePlugin.onRoleCreated(role);
+
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    UserEntity userEntity1 =
+        UserEntity.builder()
+            .withId(1L)
+            .withName(userName1)
+            .withRoleNames(Collections.emptyList())
+            .withRoleIds(Collections.emptyList())
+            .withAuditInfo(auditInfo)
+            .build();
+    Assertions.assertTrue(
+        RangerITEnv.rangerAuthHivePlugin.onGrantedRolesToUser(
+            Lists.newArrayList(role), userEntity1));
+
+    // After Ranger Authorization, Must wait a period of time for the Ranger Spark plugin to update
+    // the policy Sleep time must be greater than the policy update interval
+    // (ranger.plugin.spark.policy.pollIntervalMs) in the
+    // `resources/ranger-spark-security.xml.template`
+    Thread.sleep(1000L);
+
+    // Use Spark to show this databases(schema) again
+    Dataset dataset2 = sparkSession.sql(SQL_SHOW_DATABASES);
+    dataset2.show(100, 100);
+    List<Row> rows2 = dataset2.collectAsList();
+    rows2.stream()
+        .filter(row -> row.getString(0).equals(schemaName))
+        .findFirst()
+        .orElseThrow(() -> new IllegalStateException("Database not found: " + schemaName));
+    // The schema should be shown, because the user has the permission
+    Assertions.assertEquals(
+        1, rows2.stream().filter(row -> row.getString(0).equals(schemaName)).count());
   }
 
-  private static void createMetalake() {
+  private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
 
-  private static void createCatalogAndRangerAuthPlugin() {
-    rangerAuthPlugin =
-        RangerAuthorizationHivePlugin.getInstance(
-            ImmutableMap.of(
-                AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
-                String.format(
-                    "http://%s:%d",
-                    containerSuite.getRangerContainer().getContainerIpAddress(),
-                    RangerContainer.RANGER_SERVER_PORT),
-                AuthorizationPropertiesMeta.RANGER_AUTH_TYPE,
-                RangerContainer.authType,
-                AuthorizationPropertiesMeta.RANGER_USERNAME,
-                RangerContainer.rangerUserName,
-                AuthorizationPropertiesMeta.RANGER_PASSWORD,
-                RangerContainer.rangerPassword,
-                AuthorizationPropertiesMeta.RANGER_SERVICE_NAME,
-                RangerITEnv.RANGER_HIVE_REPO_NAME));
-
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put(HiveConstants.METASTORE_URIS, HIVE_METASTORE_URIS);
-    properties.put(AUTHORIZATION_PROVIDER, "ranger");
-    properties.put(RANGER_SERVICE_NAME, RangerITEnv.RANGER_HIVE_REPO_NAME);
-    properties.put(
-        RANGER_ADMIN_URL,
-        String.format(
-            "http://localhost:%s",
-            containerSuite.getRangerContainer().getMappedPort(RANGER_SERVER_PORT)));
-    properties.put(RANGER_AUTH_TYPE, RangerContainer.authType);
-    properties.put(RANGER_USERNAME, RangerContainer.rangerUserName);
-    properties.put(RANGER_PASSWORD, RangerContainer.rangerPassword);
+  private static void createCatalog() {
+    Map<String, String> properties =
+        ImmutableMap.of(
+            HiveConstants.METASTORE_URIS,
+            HIVE_METASTORE_URIS,
+            IMPERSONATION_ENABLE,
+            "true",
+            AUTHORIZATION_PROVIDER,
+            "ranger",
+            RANGER_SERVICE_NAME,
+            RangerITEnv.RANGER_HIVE_REPO_NAME,
+            AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
+            RANGER_ADMIN_URL,
+            RANGER_AUTH_TYPE,
+            RangerContainer.authType,
+            RANGER_USERNAME,
+            RangerContainer.rangerUserName,
+            RANGER_PASSWORD,
+            RangerContainer.rangerPassword);
 
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
     catalog = metalake.loadCatalog(catalogName);
@@ -192,7 +308,7 @@ public class RangerHiveE2EIT extends AbstractIT {
         "location",
         String.format(
             "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
+            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
     String comment = "comment";
@@ -200,43 +316,5 @@ public class RangerHiveE2EIT extends AbstractIT {
     catalog.asSchemas().createSchema(schemaName, comment, properties);
     Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
     Assertions.assertEquals(schemaName.toLowerCase(), loadSchema.name());
-  }
-
-  public static void createHiveTable() {
-    // Create table from Gravitino API
-    Column[] columns = createColumns();
-    NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
-
-    Distribution distribution =
-        Distributions.of(Strategy.EVEN, 10, NamedReference.field(HIVE_COL_NAME1));
-
-    final SortOrder[] sortOrders =
-        new SortOrder[] {
-          SortOrders.of(
-              NamedReference.field(HIVE_COL_NAME2),
-              SortDirection.DESCENDING,
-              NullOrdering.NULLS_FIRST)
-        };
-
-    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
-    Table createdTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                nameIdentifier,
-                columns,
-                "table_comment",
-                properties,
-                Transforms.EMPTY_TRANSFORM,
-                distribution,
-                sortOrders);
-    LOG.info("Table created: {}", createdTable);
-  }
-
-  private static Column[] createColumns() {
-    Column col1 = Column.of(HIVE_COL_NAME1, Types.ByteType.get(), "col_1_comment");
-    Column col2 = Column.of(HIVE_COL_NAME2, Types.DateType.get(), "col_2_comment");
-    Column col3 = Column.of(HIVE_COL_NAME3, Types.StringType.get(), "col_3_comment");
-    return new Column[] {col1, col2, col3};
   }
 }

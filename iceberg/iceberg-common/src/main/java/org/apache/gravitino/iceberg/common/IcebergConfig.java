@@ -19,7 +19,10 @@
 
 package org.apache.gravitino.iceberg.common;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -29,12 +32,14 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
 public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final String ICEBERG_CONFIG_PREFIX = "gravitino.iceberg-rest.";
+  @VisibleForTesting public static final String ICEBERG_EXTENSION_PACKAGES = "extension-packages";
 
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
@@ -197,13 +202,13 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .longConf()
           .createWithDefault(3600000L);
 
-  public static final ConfigEntry<String> ICEBERG_REST_CATALOG_PROVIDER =
-      new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_PROVIDER)
+  public static final ConfigEntry<String> ICEBERG_REST_CATALOG_CONFIG_PROVIDER =
+      new ConfigBuilder(IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER)
           .doc(
-              "Catalog provider class name, you can develop a class that implements `IcebergCatalogWrapperProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
+              "Catalog provider class name, you can develop a class that implements `IcebergCatalogConfigProvider` and add the corresponding jar file to the Iceberg REST service classpath directory.")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
-          .createWithDefault("config-based-provider");
+          .createWithDefault(IcebergConstants.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME);
 
   public static final ConfigEntry<String> GRAVITINO_URI =
       new ConfigBuilder(IcebergConstants.GRAVITINO_URI)
@@ -217,6 +222,21 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
       new ConfigBuilder(IcebergConstants.GRAVITINO_METALAKE)
           .doc(
               "The metalake name that `gravitino-based-provider` used to request to Gravitino, only worked if `catalog-provider` is `gravitino-based-provider`.")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<List<String>> REST_API_EXTENSION_PACKAGES =
+      new ConfigBuilder(ICEBERG_EXTENSION_PACKAGES)
+          .doc("Comma-separated list of Iceberg REST API packages to expand")
+          .version(ConfigConstants.VERSION_0_7_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(Collections.emptyList());
+
+  public static final ConfigEntry<String> CREDENTIAL_PROVIDER_TYPE =
+      new ConfigBuilder(CredentialConstants.CREDENTIAL_PROVIDER_TYPE)
+          .doc("The credential provider type for Iceberg")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
           .create();

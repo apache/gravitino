@@ -90,6 +90,18 @@ The owner of each entity has implicit administrative class privilege, for exampl
 Only the Owner of a securable object can fully manage that resource.
 If a securable object needs to be managed by more than one person at the same time, the owner is assigned to a user group.
 
+The metadata object that supports ownership is as follows:
+
+| Metadata Object Type |
+|----------------------|
+| Metalake             |
+| Catalog              |
+| Schema               |
+| Table                |
+| Topic                |
+| Fileset              |
+| Role                 |
+
 ### User
 Users are generally granted one or multiple Roles, and users have different operating privileges depending on their Role.
 
@@ -152,16 +164,16 @@ You can also create a dedicated role for your business by API or the client.
 
 ### Permission privileges
 
-| Name          | Supports Securable Object | Operation              |
-|---------------|---------------------------|------------------------|
-| MANAGE_GRANTS | Metalake                  | grant or revoke a role |
+| Name          | Supports Securable Object | Operation                                                                                                     |
+|---------------|---------------------------|---------------------------------------------------------------------------------------------------------------|
+| MANAGE_GRANTS | Metalake                  | Manages roles granted to or revoked from the user or group, and privilege granted to or revoked from the role |
 
 ### Catalog privileges
 
 | Name           | Supports Securable Object | Operation        |
 |----------------|---------------------------|------------------|
 | CREATE_CATALOG | Metalake                  | Create a catalog |
-| USE_CATALOG    | Metalake, Catalog         |                  |
+| USE_CATALOG    | Metalake, Catalog         | Use a catalog    |
 
 :::info
 
@@ -282,6 +294,35 @@ User user =
 </TabItem>
 </Tabs>
 
+### List users
+
+You can list the created users in a metalake.
+Returns the list of users if details is true, otherwise returns the list of user name.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/users/
+
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/users/?details=true
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = ...
+String[] usernames = client.listUserNames();
+
+User[] users = client.listUsers();
+```
+
+</TabItem>
+</Tabs>
+
 ### Get a user
 
 You can get a user by its name.
@@ -353,6 +394,35 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 GravitinoClient client = ...
 Group group =
     client.addGroup("group1");
+```
+
+</TabItem>
+</Tabs>
+
+### List groups
+
+You can list the created groups in a metalake.
+Returns the list of groups if details is true, otherwise returns the list of group name.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/groups/
+
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/groups/?details=true
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = ...
+String[] usernames = client.listGroupNames();
+
+User[] users = client.listGroups();
 ```
 
 </TabItem>
@@ -457,6 +527,60 @@ Role role =
 </TabItem>
 </Tabs>
 
+### List roles
+
+You can list the created roles in a metalake.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/test/roles/
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = ...
+String[] usernames = client.listRoleNames();
+```
+
+</TabItem>
+</Tabs>
+
+### List roles for the metadata object
+
+You can list the binding roles for a metadata object in a metalake.
+
+The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/roles`.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags
+
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Catalog catalog1 = ..
+String[] roles = catalog1.supportsRoles().listBindingRoleNames();
+
+Schema schema1 = ...
+String[] roles = schema1.supportsRoles().listBindingRoleNames();
+```
+
+</TabItem>
+</Tabs>
+
 ### Get a role
 
 You can get a role by its name.
@@ -506,6 +630,97 @@ boolean deleted =
 </Tabs>
 
 ## Permission Operation
+
+### Grant privileges to a role
+
+You can grant specific privileges to a role.
+The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/grant`.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+    "privileges": [
+      {
+      "name": "SELECT_TABLE",
+      "condition": "ALLOW"
+      }]
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/schema/catalog1.schema1/grant
+
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+    "privileges": [
+      {
+      "name": "SELECT_TABLE",
+      "condition": "ALLOW"
+      }]
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/table/catalog1.schema1.table1/grant
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = ...
+
+// Grant the privilege allowing `SELEC_TABLE` for the `schema` to `role1`        
+MetadataObject schema = ...
+Role role = client.grantPrivilegesToRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));        
+
+// Grant the privilege allowing `SELEC_TABLE` for the `table` to `role1`        
+MetadataObject table = ...
+Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
+```
+</TabItem>
+</Tabs>
+
+### Revoke privileges from a role
+
+You can revoke specific privileges from a role.
+The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/revoke`.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+    "privileges": [
+      {
+      "name": "SELECT_TABLE",
+      "condition": "ALLOW"
+      }]
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/schema/catalog1.schema1/revoke
+
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+    "privileges": [
+      {
+      "name": "SELECT_TABLE",
+      "condition": "ALLOW"
+      }]
+}' http://localhost:8090/api/metalakes/test/permissions/roles/role1/table/catalog1.schema1.table1/revoke
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient client = ...
+
+// Revoke the privilege allowing `SELEC_TABLE` for the `schema` from `role1`         
+MetadataObject schema = ...
+Role role = client.revokePrivilegesFromRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));
+
+// Revoke the privilege allowing `SELEC_TABLE` for the `table` from `role1`         
+MetadataObject table = ...
+Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
+
+```
+</TabItem>
+</Tabs>
 
 ### Grant roles to a user
 

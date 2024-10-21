@@ -14,13 +14,16 @@ You can deploy the service with the Gravitino Docker image.
 Container startup commands
 
 ```shell
-docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.6.0-incubating
+docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.6.1-incubating
 ```
 
 Changelog
 
+- apache/gravitino:0.6.1-incubating
+  - Based on Gravitino 0.6.1-incubating, you can know more information from 0.6.1-incubating release notes.
+
 - apache/gravitino:0.6.0-incubating (Switch to Apache official DockerHub repository)
-  - Use the latest Gravitino version 0.6.0 source code to build the image.
+  - Use the latest Gravitino version 0.6.0-incubating source code to build the image.
 
 - datastrato/gravitino:0.5.1
   - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
@@ -48,10 +51,13 @@ You can deploy the standalone Gravitino Iceberg REST server with the Docker imag
 Container startup commands
 
 ```shell
-docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.6.0-incubating
+docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.6.1-incubating
 ```
 
 Changelog
+
+- apache/gravitino-iceberg-rest:0.6.1-incubating
+  - Based on Gravitino 0.6.1-incubating, you can know more information from 0.6.1-incubating release notes.
 
 - apache/gravitino-iceberg-rest:0.6.0-incubating.
   - Gravitino Iceberg REST Server with memory catalog backend.
@@ -82,6 +88,8 @@ Changelog
 ### Trino image
 
 Changelog
+- apache/gravitino-playground:trino-435-gravitino-0.6.1-incubating
+  - Use Gravitino release 0.6.1-incubating Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-0.6.0-incubating (Switch to Apache official DockerHub repository)
   - Use Gravitino release 0.6.0 Dockerfile to build the image.

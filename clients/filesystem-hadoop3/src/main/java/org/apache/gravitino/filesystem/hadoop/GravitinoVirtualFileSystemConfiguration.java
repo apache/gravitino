@@ -18,10 +18,22 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+
 /** Configuration class for Gravitino Virtual File System. */
-class GravitinoVirtualFileSystemConfiguration {
+public class GravitinoVirtualFileSystemConfiguration {
+
+  /**
+   * The prefix of the Gravitino fileset URI. The URI of the Gravitino fileset should start with
+   * this prefix.
+   */
   public static final String GVFS_FILESET_PREFIX = "gvfs://fileset";
+
+  /** The scheme of the Gravitino Virtual File System. */
   public static final String GVFS_SCHEME = "gvfs";
+
+  /** The prefix of the Gravitino Virtual File System. */
+  public static final String GVFS_CONFIG_PREFIX = "fs.gvfs.";
 
   /** The configuration key for the Gravitino server URI. */
   public static final String FS_GRAVITINO_SERVER_URI_KEY = "fs.gravitino.server.uri";
@@ -32,8 +44,19 @@ class GravitinoVirtualFileSystemConfiguration {
   /** The configuration key for the Gravitino client auth type. */
   public static final String FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY = "fs.gravitino.client.authType";
 
+  /**
+   * File system provider names configuration key. The value is a comma separated list of file
+   * system provider name which is defined in the service loader. Users can custom their own file
+   * system by implementing the {@link FileSystemProvider} interface.
+   */
+  public static final String FS_FILESYSTEM_PROVIDERS = "fs.gvfs.filesystem.providers";
+
+  /** The authentication type for simple authentication. */
   public static final String SIMPLE_AUTH_TYPE = "simple";
+  /** The authentication type for oauth2 authentication. */
   public static final String OAUTH2_AUTH_TYPE = "oauth2";
+
+  /** The authentication type for kerberos authentication. */
   public static final String KERBEROS_AUTH_TYPE = "kerberos";
   // oauth2
   /** The configuration key for the URI of the default OAuth server. */
@@ -64,6 +87,10 @@ class GravitinoVirtualFileSystemConfiguration {
   public static final String FS_GRAVITINO_FILESET_CACHE_MAX_CAPACITY_KEY =
       "fs.gravitino.fileset.cache.maxCapacity";
 
+  /**
+   * The default value for the maximum capacity of the Gravitino fileset cache. The default value is
+   * 20.
+   */
   public static final int FS_GRAVITINO_FILESET_CACHE_MAX_CAPACITY_DEFAULT = 20;
 
   /**
@@ -73,6 +100,10 @@ class GravitinoVirtualFileSystemConfiguration {
   public static final String FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_KEY =
       "fs.gravitino.fileset.cache.evictionMillsAfterAccess";
 
+  /**
+   * The default value for the eviction time of the Gravitino fileset cache, measured in mills after
+   * access.
+   */
   public static final long FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_DEFAULT =
       1000L * 60 * 60;
 

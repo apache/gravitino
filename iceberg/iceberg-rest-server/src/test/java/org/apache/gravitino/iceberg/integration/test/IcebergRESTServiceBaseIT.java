@@ -76,6 +76,10 @@ public abstract class IcebergRESTServiceBaseIT {
     return !catalogType.equals(IcebergCatalogBackend.MEMORY);
   }
 
+  boolean isSupportsViewCatalog() {
+    return !catalogType.equals(IcebergCatalogBackend.HIVE);
+  }
+
   abstract void initEnv();
 
   abstract Map<String, String> getCatalogConfig();
@@ -173,6 +177,10 @@ public abstract class IcebergRESTServiceBaseIT {
 
   protected Map<String, String> getTableInfo(String tableName) {
     return convertToStringMap(sql("desc table extended " + tableName));
+  }
+
+  protected Map<String, String> getViewInfo(String viewName) {
+    return convertToStringMap(sql("desc extended " + viewName));
   }
 
   protected List<String> getTableColumns(String tableName) {

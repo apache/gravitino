@@ -47,7 +47,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.rel.Column;
@@ -55,6 +55,7 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -73,16 +74,14 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-test")
-@TestInstance(Lifecycle.PER_CLASS)
-public class CatalogDorisIT extends AbstractIT {
+public class CatalogDorisIT extends BaseIT {
 
   private static final String provider = "jdbc-doris";
 
@@ -126,8 +125,8 @@ public class CatalogDorisIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
-    metalake.dropCatalog(catalogName);
-    AbstractIT.client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
   }
 
   @AfterEach
@@ -141,13 +140,12 @@ public class CatalogDorisIT extends AbstractIT {
   }
 
   private void createMetalake() {
-    GravitinoMetalake[] gravitinoMetaLakes = AbstractIT.client.listMetalakes();
+    GravitinoMetalake[] gravitinoMetaLakes = client.listMetalakes();
     assertEquals(0, gravitinoMetaLakes.length);
 
-    GravitinoMetalake createdMetalake =
-        AbstractIT.client.createMetalake(metalakeName, "comment", Collections.emptyMap());
-    GravitinoMetalake loadMetalake = AbstractIT.client.loadMetalake(metalakeName);
-    assertEquals(createdMetalake, loadMetalake);
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
+    assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
@@ -894,5 +892,46 @@ public class CatalogDorisIT extends AbstractIT {
 
     assertThrows(
         UnsupportedOperationException.class, () -> tablePartitionOperations.dropPartition("p1"));
+  }
+
+  @Test
+  void testAllDistribution() {
+    Distribution[] distributions =
+        new Distribution[] {
+          Distributions.even(1, Expression.EMPTY_EXPRESSION),
+          Distributions.hash(1, NamedReference.field(DORIS_COL_NAME1)),
+          Distributions.even(10, Expression.EMPTY_EXPRESSION),
+          Distributions.hash(0, NamedReference.field(DORIS_COL_NAME1)),
+          Distributions.hash(11, NamedReference.field(DORIS_COL_NAME1)),
+          Distributions.hash(
+              12, NamedReference.field(DORIS_COL_NAME1), NamedReference.field(DORIS_COL_NAME2))
+        };
+
+    for (Distribution distribution : distributions) {
+      String tableName = GravitinoITUtils.genRandomName("test_distribution_table");
+      NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+      Column[] columns = createColumns();
+      Index[] indexes = Indexes.EMPTY_INDEXES;
+      Map<String, String> properties = createTableProperties();
+      Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+      TableCatalog tableCatalog = catalog.asTableCatalog();
+      tableCatalog.createTable(
+          tableIdentifier,
+          columns,
+          table_comment,
+          properties,
+          partitioning,
+          distribution,
+          null,
+          indexes);
+      // load table
+      Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+      Assertions.assertEquals(distribution.strategy(), loadTable.distribution().strategy());
+      Assertions.assertArrayEquals(
+          distribution.expressions(), loadTable.distribution().expressions());
+
+      tableCatalog.dropTable(tableIdentifier);
+    }
   }
 }

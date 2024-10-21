@@ -32,7 +32,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +42,6 @@ import org.slf4j.LoggerFactory;
  * -PenableSparkSQLITs
  */
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class SparkSQLRegressionTest {
   private static final Logger LOG = LoggerFactory.getLogger(SparkSQLRegressionTest.class);
   private static final String SPARK_TEST_CONFIG_FILE = "configFile";

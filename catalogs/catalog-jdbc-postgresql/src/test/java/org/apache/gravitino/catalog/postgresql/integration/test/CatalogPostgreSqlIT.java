@@ -49,7 +49,7 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.PGImageName;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -82,7 +82,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-public class CatalogPostgreSqlIT extends AbstractIT {
+public class CatalogPostgreSqlIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final PGImageName DEFAULT_POSTGRES_IMAGE = PGImageName.VERSION_13;
 
@@ -128,7 +128,9 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     for (String schemaName : schemaNames) {
       catalog.asSchemas().dropSchema(schemaName, true);
     }
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
+    client.disableMetalake(metalakeName);
     client.dropMetalake(metalakeName);
     postgreSqlService.close();
   }
@@ -152,10 +154,9 @@ public class CatalogPostgreSqlIT extends AbstractIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Driver;
 import java.sql.DriverManager;
-import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -43,9 +42,11 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.CreateViewRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
@@ -55,6 +56,7 @@ import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,10 +103,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
   }
 
-  public IcebergCatalogWrapper() {
-    this(new IcebergConfig(Collections.emptyMap()));
-  }
-
   private void validateNamespace(Optional<Namespace> namespace) {
     namespace.ifPresent(
         n ->
@@ -114,6 +112,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       throw new UnsupportedOperationException(
           "The underlying catalog doesn't support namespace operation");
     }
+  }
+
+  private ViewCatalog getViewCatalog() {
+    if (!(catalog instanceof ViewCatalog)) {
+      throw new UnsupportedOperationException(catalog.name() + " is not support view");
+    }
+    return (ViewCatalog) catalog;
   }
 
   public CreateNamespaceResponse createNamespace(CreateNamespaceRequest request) {
@@ -150,7 +155,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   /**
    * Reload hadoop configuration, this is useful when the hadoop configuration UserGroupInformation
    * is shared by multiple threads. UserGroupInformation#authenticationMethod was first initialized
-   * in KerberosClient, however, when switching to iceberg-rest thead,
+   * in KerberosClient, however, when switching to iceberg-rest thread,
    * UserGroupInformation#authenticationMethod will be reset to the default value; we need to
    * reinitialize it again.
    */
@@ -203,6 +208,37 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return loadTable(icebergTableChange.getTableIdentifier());
   }
 
+  public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {
+    request.validate();
+    return CatalogHandlers.createView(getViewCatalog(), namespace, request);
+  }
+
+  public LoadViewResponse updateView(TableIdentifier viewIdentifier, UpdateTableRequest request) {
+    request.validate();
+    return CatalogHandlers.updateView(getViewCatalog(), viewIdentifier, request);
+  }
+
+  public LoadViewResponse loadView(TableIdentifier viewIdentifier) {
+    return CatalogHandlers.loadView(getViewCatalog(), viewIdentifier);
+  }
+
+  public void dropView(TableIdentifier viewIdentifier) {
+    CatalogHandlers.dropView(getViewCatalog(), viewIdentifier);
+  }
+
+  public void renameView(RenameTableRequest request) {
+    request.validate();
+    CatalogHandlers.renameView(getViewCatalog(), request);
+  }
+
+  public boolean existView(TableIdentifier viewIdentifier) {
+    return getViewCatalog().viewExists(viewIdentifier);
+  }
+
+  public ListTablesResponse listView(Namespace namespace) {
+    return CatalogHandlers.listViews(getViewCatalog(), namespace);
+  }
+
   @Override
   public void close() throws Exception {
     if (catalog instanceof AutoCloseable) {
@@ -230,7 +266,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private void closeMySQLCatalogResource() {
     try {
       // Close thread AbandonedConnectionCleanupThread if we are using `com.mysql.cj.jdbc.Driver`,
-      // for driver `com.mysql.jdbc.Driver` (deprecated), the daemon thead maybe not this one.
+      // for driver `com.mysql.jdbc.Driver` (deprecated), the daemon thread maybe not this one.
       Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread")
           .getMethod("uncheckedShutdown")
           .invoke(null);

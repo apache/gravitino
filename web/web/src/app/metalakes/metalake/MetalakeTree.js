@@ -70,6 +70,8 @@ const MetalakeTree = props => {
             return 'custom-icons-doris'
           case 'lakehouse-paimon':
             return 'custom-icons-paimon'
+          case 'lakehouse-hudi':
+            return 'custom-icons-hudi'
           default:
             return 'bx:book'
         }
@@ -111,7 +113,7 @@ const MetalakeTree = props => {
         break
       }
       default:
-        dispatch(setIntoTreeNodeWithFetch({ key: nodeProps.data.key }))
+        dispatch(setIntoTreeNodeWithFetch({ key: nodeProps.data.key, reload: true }))
     }
   }
 
