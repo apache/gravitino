@@ -31,3 +31,7 @@ class GVFSConfig:
     OAUTH2_CREDENTIAL = "oauth2_credential"
     OAUTH2_PATH = "oauth2_path"
     OAUTH2_SCOPE = "oauth2_scope"
+
+    GVFS_FILESYSTEM_BY_PASS = "gravitino.bypass"
+    GVFS_FILESYSTEM_BY_PASS_GCS = "gravitino.bypass.gcs."
+    GVFS_FILESYSTEM_KEY_FILE = "service-account-key-path"

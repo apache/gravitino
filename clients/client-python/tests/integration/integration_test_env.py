@@ -21,6 +21,7 @@ import unittest
 import subprocess
 import time
 import sys
+import shutil
 
 import requests
 
@@ -79,6 +80,12 @@ class IntegrationTestEnv(unittest.TestCase):
                 cls.gravitino_startup_script,
             )
             sys.exit(0)
+
+        # remove data dir under gravitino_home
+        data_dir = os.path.join(cls.gravitino_home, "data")
+        if os.path.exists(data_dir):
+            logger.info("Remove Gravitino data directory: %s", data_dir)
+            shutil.rmtree(data_dir)
 
         logger.info("Starting integration test environment...")
 
@@ -140,6 +147,12 @@ class IntegrationTestEnv(unittest.TestCase):
                 "Please execute `./gradlew compileDistribution -x test` in the Gravitino "
                 "project root directory."
             )
+
+        # remove data dir under gravitino_home
+        data_dir = os.path.join(gravitino_home, "data")
+        if os.path.exists(data_dir):
+            logger.info("Remove Gravitino data directory: %s", data_dir)
+            shutil.rmtree(data_dir)
 
         # Restart Gravitino Server
         env_vars = os.environ.copy()

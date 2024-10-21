@@ -28,6 +28,7 @@ public class TableColumnBaseSQLProvider {
   public String listColumnPOsByTableIdAndVersion(
       @Param("tableId") Long tableId, @Param("tableVersion") Long tableVersion) {
     return "SELECT t1.column_id AS columnId, t1.column_name AS columnName,"
+        + " t1.column_position AS columnPosition,"
         + " t1.metalake_id AS metalakeId, t1.catalog_id AS catalogId,"
         + " t1.schema_id AS schemaId, t1.table_id AS tableId,"
         + " t1.table_version AS tableVersion, t1.column_type AS columnType,"
@@ -50,15 +51,16 @@ public class TableColumnBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + "(column_id, column_name, metalake_id, catalog_id, schema_id, table_id, table_version,"
-        + " column_type, column_comment, column_nullable, column_auto_increment, "
+        + "(column_id, column_name, column_position, metalake_id, catalog_id, schema_id,"
+        + " table_id, table_version,"
+        + " column_type, column_comment, column_nullable, column_auto_increment,"
         + " column_default_value, column_op_type, deleted_at, audit_info)"
         + " VALUES "
         + "<foreach collection='columnPOs' item='item' separator=','>"
-        + "(#{item.columnId}, #{item.columnName}, #{item.metalakeId}, #{item.catalogId},"
-        + " #{item.schemaId}, #{item.tableId}, #{item.tableVersion}, #{item.columnType}, "
-        + " #{item.columnComment}, #{item.nullable}, #{item.autoIncrement}, #{item.defaultValue},"
-        + " #{item.columnOpType}, #{item.deletedAt}, #{item.auditInfo})"
+        + "(#{item.columnId}, #{item.columnName}, #{item.columnPosition}, #{item.metalakeId},"
+        + " #{item.catalogId}, #{item.schemaId}, #{item.tableId}, #{item.tableVersion},"
+        + " #{item.columnType}, #{item.columnComment}, #{item.nullable}, #{item.autoIncrement},"
+        + " #{item.defaultValue}, #{item.columnOpType}, #{item.deletedAt}, #{item.auditInfo})"
         + "</foreach>"
         + "</script>";
   }

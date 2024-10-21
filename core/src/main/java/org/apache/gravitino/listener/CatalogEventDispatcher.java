@@ -177,7 +177,7 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   @Override
   public void enableCatalog(NameIdentifier ident)
       throws NoSuchCatalogException, CatalogNotInUseException {
-    // todo: support activate catalog event
+    // todo: support enable catalog event
     dispatcher.enableCatalog(ident);
   }
 

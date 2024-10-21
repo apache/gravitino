@@ -41,6 +41,8 @@ public class ColumnEntity implements Entity, Auditable {
 
   public static final Field ID = Field.required("id", Long.class, "The column's unique identifier");
   public static final Field NAME = Field.required("name", String.class, "The column's name");
+  public static final Field POSITION =
+      Field.required("position", Integer.class, "The column's position");
   public static final Field TYPE = Field.required("dataType", Type.class, "The column's data type");
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The column's comment");
@@ -56,6 +58,8 @@ public class ColumnEntity implements Entity, Auditable {
   private Long id;
 
   private String name;
+
+  private Integer position;
 
   private Type dataType;
 
@@ -76,6 +80,7 @@ public class ColumnEntity implements Entity, Auditable {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
     fields.put(NAME, name);
+    fields.put(POSITION, position);
     fields.put(TYPE, dataType);
     fields.put(COMMENT, comment);
     fields.put(NULLABLE, nullable);
@@ -102,6 +107,10 @@ public class ColumnEntity implements Entity, Auditable {
 
   public String name() {
     return name;
+  }
+
+  public Integer position() {
+    return position;
   }
 
   public Type dataType() {
@@ -132,6 +141,7 @@ public class ColumnEntity implements Entity, Auditable {
     ColumnEntity that = (ColumnEntity) o;
     return Objects.equal(id, that.id)
         && Objects.equal(name, that.name)
+        && Objects.equal(position, that.position)
         && Objects.equal(dataType, that.dataType)
         && Objects.equal(comment, that.comment)
         && Objects.equal(nullable, that.nullable)
@@ -143,17 +153,19 @@ public class ColumnEntity implements Entity, Auditable {
   @Override
   public int hashCode() {
     return Objects.hashCode(
-        id, name, dataType, comment, nullable, autoIncrement, defaultValue, auditInfo);
+        id, name, position, dataType, comment, nullable, autoIncrement, defaultValue, auditInfo);
   }
 
   public static Builder builder() {
     return new Builder();
   }
 
-  public static ColumnEntity toColumnEntity(Column column, long uid, AuditInfo audit) {
+  public static ColumnEntity toColumnEntity(
+      Column column, int position, long uid, AuditInfo audit) {
     return builder()
         .withId(uid)
         .withName(column.name())
+        .withPosition(position)
         .withComment(column.comment())
         .withDataType(column.dataType())
         .withNullable(column.nullable())
@@ -177,6 +189,11 @@ public class ColumnEntity implements Entity, Auditable {
 
     public Builder withName(String name) {
       columnEntity.name = name;
+      return this;
+    }
+
+    public Builder withPosition(Integer position) {
+      columnEntity.position = position;
       return this;
     }
 
