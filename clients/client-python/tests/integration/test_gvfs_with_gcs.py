@@ -55,7 +55,6 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         cls._get_gravitino_home()
 
         cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
-        # append the hadoop conf to server
         # restart the server
         cls.restart_server()
         # create entity
@@ -64,7 +63,8 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
     @classmethod
     def tearDownClass(cls):
         cls._clean_test_data()
-        # reset server conf
+        # reset server conf in case of other ITs like HDFS has changed it and fail
+        # to reset it
         cls._reset_conf(cls.config, cls.hadoop_conf_path)
         # restart server
         cls.restart_server()
@@ -146,12 +146,19 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         self.assertTrue(self.fs.exists(modified_actual_dir))
         self.assertTrue(fs.exists(modified_dir))
 
-        # Disable the following test case as it is not working for GCS
+        # GCP only supports getting the `object` modify time, so the modified time will be None
+        # if it's a directory.
         # >>> gcs.mkdir('example_qazwsx/catalog/schema/fileset3')
         # >>> r = gcs.modified('example_qazwsx/catalog/schema/fileset3')
         # >>> print(r)
         # None
-        # self.assertIsNotNone(fs.modified(modified_dir))
+        self.assertIsNone(fs.modified(modified_dir))
+
+        # create a file under the dir 'modified_dir'.
+        file_path = modified_dir + "/test.txt"
+        fs.touch(file_path)
+        self.assertTrue(fs.exists(file_path))
+        self.assertIsNotNone(fs.modified(file_path))
 
     @unittest.skip(
         "This test will fail for https://github.com/apache/arrow/issues/44438"

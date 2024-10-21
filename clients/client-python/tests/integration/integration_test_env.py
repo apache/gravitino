@@ -21,6 +21,7 @@ import unittest
 import subprocess
 import time
 import sys
+import shutil
 
 import requests
 
@@ -84,7 +85,7 @@ class IntegrationTestEnv(unittest.TestCase):
         data_dir = os.path.join(cls.gravitino_home, "data")
         if os.path.exists(data_dir):
             logger.info("Remove Gravitino data directory: %s", data_dir)
-            subprocess.run(["rm", "-rf", data_dir], check=False)
+            shutil.rmtree(data_dir)
 
         logger.info("Starting integration test environment...")
 
@@ -151,7 +152,7 @@ class IntegrationTestEnv(unittest.TestCase):
         data_dir = os.path.join(gravitino_home, "data")
         if os.path.exists(data_dir):
             logger.info("Remove Gravitino data directory: %s", data_dir)
-            subprocess.run(["rm", "-rf", data_dir], check=False)
+            shutil.rmtree(data_dir)
 
         # Restart Gravitino Server
         env_vars = os.environ.copy()
