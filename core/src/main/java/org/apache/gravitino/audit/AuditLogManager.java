@@ -47,14 +47,11 @@ public class AuditLogManager {
       LOG.info("Audit log is not enabled");
       return;
     }
-
-    // If formatter class name is not config, use default formatter class name
     String formatterClassName = config.get(Configs.AUDIT_LOG_FORMATTER_CLASS_NAME);
     Formatter formatter = loadFormatter(formatterClassName);
     LOG.info("Audit log formatter class name:{}", formatterClassName);
 
     String writerClassName = config.get(Configs.AUDIT_LOG_WRITER_CLASS_NAME);
-    // If writer class name is not config, use default writer class name
     auditLogWriter =
         loadAuditLogWriter(
             writerClassName,

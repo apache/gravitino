@@ -28,7 +28,7 @@ public interface Formatter {
    * Format the event, returning the unified audit log format.
    *
    * @param event The event to format.
-   * @return The formatted event.
+   * @return The formatted AuditLog.
    */
   AuditLog format(Event event);
 }

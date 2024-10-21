@@ -20,7 +20,6 @@
 package org.apache.gravitino.audit;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.BufferedWriter;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -38,31 +37,17 @@ import org.slf4j.LoggerFactory;
 public class FileAuditWriter implements AuditLogWriter {
   private static final Logger Log = LoggerFactory.getLogger(FileAuditWriter.class);
 
-  public static final String LOG_FILE_NAME_CONFIG = "fileName";
+  public static final String AUDIT_LOG_FILE_NAME = "fileName";
 
   public static final String APPEND = "append";
 
-  public static final String FILE_IMMEDIATE_FLUSH_CONFIG = "immediateFlush";
+  public static final String LINE_SEPARATOR = System.lineSeparator();
 
-  public static final String BUFFERED = "buffered";
-
-  public static final String BUFFER_SIZE = "bufferSize";
-
-  public static final String LINE_SEPARATOR = "lineSeparator";
-
-  private Formatter formatter;
-  private Writer outWriter;
+  Formatter formatter;
+  @VisibleForTesting Writer outWriter;
   @VisibleForTesting String fileName;
 
-  boolean immediateFlush;
-
-  String lineSeparator;
-
   boolean append;
-
-  boolean buffered;
-
-  int bufferSize;
 
   @Override
   public Formatter getFormatter() {
@@ -75,13 +60,8 @@ public class FileAuditWriter implements AuditLogWriter {
     this.fileName =
         System.getProperty("gravitino.log.path")
             + "/"
-            + properties.getOrDefault(LOG_FILE_NAME_CONFIG, "gravitino_audit.log");
-    this.immediateFlush =
-        Boolean.parseBoolean(properties.getOrDefault(FILE_IMMEDIATE_FLUSH_CONFIG, "false"));
-    this.lineSeparator = properties.getOrDefault(LINE_SEPARATOR, "\n");
+            + properties.getOrDefault(AUDIT_LOG_FILE_NAME, "gravitino_audit.log");
     this.append = Boolean.parseBoolean(properties.getOrDefault(APPEND, "true"));
-    this.buffered = Boolean.parseBoolean(properties.getOrDefault(BUFFERED, "true"));
-    this.bufferSize = Integer.parseInt(properties.getOrDefault(BUFFER_SIZE, "8192"));
     try {
       OutputStream outputStream = new FileOutputStream(fileName, append);
       this.outWriter = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
@@ -89,20 +69,13 @@ public class FileAuditWriter implements AuditLogWriter {
       throw new GravitinoRuntimeException(
           e, "Init audit log writer fail, filename is %s", fileName);
     }
-
-    if (buffered) {
-      this.outWriter = new BufferedWriter(outWriter, bufferSize);
-    }
   }
 
   @Override
   public void doWrite(AuditLog auditLog) {
     String log = auditLog.toString();
     try {
-      outWriter.write(log + lineSeparator);
-      if (immediateFlush) {
-        outWriter.flush();
-      }
+      outWriter.write(log + LINE_SEPARATOR);
     } catch (Exception e) {
       Log.warn("Failed to write audit log: {}", log, e);
     }

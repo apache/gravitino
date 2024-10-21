@@ -52,7 +52,7 @@ public class TestAuditManager {
 
   private static final String DEFAULT_FILE_NAME = "gravitino_audit.log";
 
-  private static int EVENT_NUM = 2000;
+  private static final int EVENT_NUM = 2000;
 
   private Path logPath;
 
@@ -129,10 +129,6 @@ public class TestAuditManager {
   public void testFileAuditLog() {
     Config config = new Config(false) {};
     config.set(Configs.AUDIT_LOG_ENABLED_CONF, true);
-    // set immediate flush to true for testing, so that the audit log will be read immediately
-    config.set(
-        new ConfigBuilder("gravitino.audit.writer.file.immediateFlush").stringConf(), "true");
-
     DummyEvent dummyEvent = mockDummyEvent();
     EventListenerManager eventListenerManager = mockEventListenerManager();
     AuditLogManager auditLogManager = mockAuditLogManager(config, eventListenerManager);
@@ -144,8 +140,13 @@ public class TestAuditManager {
 
     FileAuditWriter fileAuditWriter = (FileAuditWriter) auditLogManager.getAuditLogWriter();
     String fileName = fileAuditWriter.fileName;
-    String auditLog = readAuditLog(fileName);
+    try {
+      fileAuditWriter.outWriter.flush();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
 
+    String auditLog = readAuditLog(fileName);
     Formatter formatter = fileAuditWriter.getFormatter();
     SimpleAuditLog formattedAuditLog = (SimpleAuditLog) formatter.format(dummyEvent);
 
@@ -172,6 +173,11 @@ public class TestAuditManager {
 
     FileAuditWriter fileAuditWriter = (FileAuditWriter) auditLogManager.getAuditLogWriter();
     String fileName = fileAuditWriter.fileName;
+    try {
+      fileAuditWriter.outWriter.flush();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
     long auditSize = getAuditSize(fileName);
     Assertions.assertEquals(EVENT_NUM, auditSize);
   }
