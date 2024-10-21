@@ -35,3 +35,8 @@ class GVFSConfig:
     GVFS_FILESYSTEM_BY_PASS = "gravitino.bypass"
     GVFS_FILESYSTEM_BY_PASS_GCS = "gravitino.bypass.gcs."
     GVFS_FILESYSTEM_KEY_FILE = "service-account-key-path"
+
+    GVFS_FILESYSTEM_BY_PASS_S3 = "gravitino.bypass.s3."
+    GVFS_FILESYSTEM_S3_ACCESS_KEY = "access-key"
+    GVFS_FILESYSTEM_S3_SECRET_KEY = "secret-key"
+    GVFS_FILESYSTEM_S3_ENDPOINT = "endpoint"
