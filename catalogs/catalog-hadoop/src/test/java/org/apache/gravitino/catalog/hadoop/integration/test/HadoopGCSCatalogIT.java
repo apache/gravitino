@@ -44,7 +44,7 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
   @Override
   public void startIntegrationTest() throws Exception {
-    // Do nothing.
+    // Just overwrite super, do nothing.
   }
 
   @BeforeAll
