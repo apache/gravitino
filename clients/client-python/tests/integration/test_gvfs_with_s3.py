@@ -43,6 +43,7 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
     s3_access_key = "your_access_key"
     s3_secret_key = "your_secret_key"
     s3_endpoint = "your_endpoint"
+    bucket_name = "your_bucket_name"
 
     metalake_name: str = "TestGvfsWithS3_metalake" + str(randint(1, 10000))
 
@@ -136,9 +137,12 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
             properties=cls.fileset_properties,
         )
 
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = cls.key_file
-        arrow_gcs_fs = S3FileSystem()
-        cls.fs = ArrowFSWrapper(arrow_gcs_fs)
+        arrow_s3_fs = S3FileSystem(
+            access_key=cls.s3_access_key,
+            secret_key=cls.s3_secret_key,
+            endpoint_override=cls.s3_endpoint,
+        )
+        cls.fs = ArrowFSWrapper(arrow_s3_fs)
 
     def test_modified(self):
         modified_dir = self.fileset_gvfs_location + "/test_modified"
@@ -161,14 +165,14 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         self.assertTrue(fs.exists(file_path))
         self.assertIsNotNone(fs.modified(file_path))
 
-    @unittest.skip(
-        "This test will fail for https://github.com/apache/arrow/issues/44438"
-    )
-    def test_pandas(self):
-        pass
-
-    @unittest.skip(
-        "This test will fail for https://github.com/apache/arrow/issues/44438"
-    )
-    def test_pyarrow(self):
-        pass
+    # @unittest.skip(
+    #     "This test will fail for https://github.com/apache/arrow/issues/44438"
+    # )
+    # def test_pandas(self):
+    #     pass
+    #
+    # @unittest.skip(
+    #     "This test will fail for https://github.com/apache/arrow/issues/44438"
+    # )
+    # def test_pyarrow(self):
+    #     pass
