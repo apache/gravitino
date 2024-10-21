@@ -49,7 +49,8 @@ public class MetadataObjects {
     Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
     Preconditions.checkArgument(type != null, "Cannot create a metadata object with no type");
 
-    return new MetadataObjectImpl(parent, name, type);
+    String fullName = parent == null ? name : DOT_JOINER.join(parent, name);
+    return parse(fullName, type);
   }
 
   /**
