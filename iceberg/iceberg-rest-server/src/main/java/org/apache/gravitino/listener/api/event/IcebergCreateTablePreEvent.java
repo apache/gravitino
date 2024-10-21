@@ -17,23 +17,24 @@
  *  under the License.
  */
 
-package org.apache.gravitino.iceberg.service.rest;
+package org.apache.gravitino.listener.api.event;
 
-import java.util.Map;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
-import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
 
-// Provide a custom catalogWrapper to do test like `registerTable`
-public class IcebergCatalogWrapperManagerForTest extends IcebergCatalogWrapperManager {
-  public IcebergCatalogWrapperManagerForTest(
-      Map<String, String> properties, IcebergConfigProvider configProvider) {
-    super(properties, configProvider);
+/** Represent a pre event before creating Iceberg table. */
+@DeveloperApi
+public class IcebergCreateTablePreEvent extends IcebergTablePreEvent {
+  private CreateTableRequest createTableRequest;
+
+  public IcebergCreateTablePreEvent(
+      String user, NameIdentifier resourceIdentifier, CreateTableRequest createTableRequest) {
+    super(user, resourceIdentifier);
+    this.createTableRequest = createTableRequest;
   }
 
-  @Override
-  public IcebergCatalogWrapper createIcebergCatalogWrapper(IcebergConfig icebergConfig) {
-    return new IcebergCatalogWrapperForTest(icebergConfig);
+  public CreateTableRequest createTableRequest() {
+    return createTableRequest;
   }
 }
