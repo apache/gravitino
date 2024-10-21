@@ -229,7 +229,7 @@ public class CatalogHiveIT extends BaseIT {
               }));
       Arrays.stream(metalake.listCatalogs())
           .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
-      client.dropMetalake(metalakeName);
+      client.dropMetalake(metalakeName, true);
     }
     if (hiveClientPool != null) {
       hiveClientPool.close();
@@ -264,10 +264,9 @@ public class CatalogHiveIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
@@ -1429,8 +1428,8 @@ public class CatalogHiveIT extends BaseIT {
     client.createMetalake(metalakeName1, "comment", Collections.emptyMap());
     client.createMetalake(metalakeName2, "comment", Collections.emptyMap());
 
-    client.dropMetalake(metalakeName1);
-    client.dropMetalake(metalakeName2);
+    client.dropMetalake(metalakeName1, true);
+    client.dropMetalake(metalakeName2, true);
 
     client.createMetalake(metalakeName1, "comment", Collections.emptyMap());
 
