@@ -55,8 +55,8 @@ import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -186,8 +186,8 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
 
-    // Test to throw NoSuchRoleException
-    doThrow(new NoSuchRoleException("mock error"))
+    // Test to throw IllegalRoleException
+    doThrow(new IllegalRoleException("mock error"))
         .when(manager)
         .grantRolesToUser(any(), any(), any());
     resp1 =
@@ -196,12 +196,12 @@ public class TestPermissionOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp1.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
 
     errorResponse = resp1.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
-    Assertions.assertEquals(NoSuchRoleException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(IllegalRoleException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw internal RuntimeException
     doThrow(new RuntimeException("mock error")).when(manager).grantRolesToUser(any(), any(), any());
@@ -284,8 +284,8 @@ public class TestPermissionOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
 
-    // Test to throw NoSuchRoleException
-    doThrow(new NoSuchRoleException("mock error"))
+    // Test to throw IllegalRoleException
+    doThrow(new IllegalRoleException("mock error"))
         .when(manager)
         .grantRolesToGroup(any(), any(), any());
     resp1 =
@@ -294,12 +294,12 @@ public class TestPermissionOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp1.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
 
     errorResponse = resp1.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
-    Assertions.assertEquals(NoSuchRoleException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(IllegalRoleException.class.getSimpleName(), errorResponse.getType());
 
     // Test to throw internal RuntimeException
     doThrow(new RuntimeException("mock error"))
@@ -362,6 +362,23 @@ public class TestPermissionOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw IllegalRoleException
+    doThrow(new IllegalRoleException("mock error"))
+        .when(manager)
+        .revokeRolesFromUser(any(), any(), any());
+    Response nsrResponse =
+        target("/metalakes/metalake1/permissions/users/user/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), nsrResponse.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, nsrResponse.getMediaType());
+
+    errorResponse = nsrResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(IllegalRoleException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test
@@ -407,6 +424,23 @@ public class TestPermissionOperations extends JerseyTest {
     ErrorResponse errorResponse = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+
+    // Test to throw IllegalRoleException
+    doThrow(new IllegalRoleException("mock error"))
+        .when(manager)
+        .revokeRolesFromGroup(any(), any(), any());
+    Response nsrResponse =
+        target("/metalakes/metalake1/permissions/groups/group/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), nsrResponse.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, nsrResponse.getMediaType());
+
+    errorResponse = nsrResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(IllegalRoleException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test

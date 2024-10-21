@@ -40,6 +40,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -215,9 +216,9 @@ public class TestAccessControlManagerForPermissions {
         NoSuchMetalakeException.class,
         () -> accessControlManager.grantRolesToUser(notExist, ROLE, USER));
 
-    // Throw NoSuchRoleException
+    // Throw IllegalRoleException
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () -> accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList(notExist), USER));
 
     // Throw NoSuchUserException
@@ -249,9 +250,9 @@ public class TestAccessControlManagerForPermissions {
         NoSuchMetalakeException.class,
         () -> accessControlManager.revokeRolesFromUser(notExist, ROLE, USER));
 
-    // Throw NoSuchRoleException
+    // Throw IllegalRoleException
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () ->
             accessControlManager.revokeRolesFromUser(METALAKE, Lists.newArrayList(notExist), USER));
 
@@ -293,9 +294,9 @@ public class TestAccessControlManagerForPermissions {
         NoSuchMetalakeException.class,
         () -> accessControlManager.grantRolesToGroup(notExist, ROLE, GROUP));
 
-    // Throw NoSuchRoleException
+    // Throw IllegalRoleException
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () ->
             accessControlManager.grantRolesToGroup(METALAKE, Lists.newArrayList(notExist), GROUP));
 
@@ -328,9 +329,9 @@ public class TestAccessControlManagerForPermissions {
         NoSuchMetalakeException.class,
         () -> accessControlManager.revokeRolesFromGroup(notExist, ROLE, GROUP));
 
-    // Throw NoSuchRoleException
+    // Throw IllegalRoleException
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () ->
             accessControlManager.revokeRolesFromGroup(
                 METALAKE, Lists.newArrayList(notExist), GROUP));
@@ -375,7 +376,7 @@ public class TestAccessControlManagerForPermissions {
 
     Assertions.assertEquals(2, objects.size());
 
-    // Throw NoSuchRoleException
+    // Throw IllegalRoleException
     Assertions.assertThrows(
         NoSuchRoleException.class,
         () ->
