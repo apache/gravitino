@@ -26,7 +26,10 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
@@ -35,33 +38,85 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.Container;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
 
-@Disabled(
-    "Disabled due to we don't have a real OSS account to test. If you have a GCP account,"
-        + "please change the configuration(BUCKET_NAME, OSS_ACCESS_KEY, OSS_SECRET_KEY, OSS_ENDPOINT) and enable this test.")
-public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemIT {
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemOSSIT.class);
+public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT {
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemS3IT.class);
 
-  public static final String BUCKET_NAME = "YOUR_BUCKET";
-  public static final String OSS_ACCESS_KEY = "YOUR_OSS_ACCESS_KEY";
-  public static final String OSS_SECRET_KEY = "YOUR_OSS_SECRET_KEY";
-  public static final String OSS_ENDPOINT = "YOUR_OSS_ENDPOINT";
+  private String bucketName = "s3-bucket-" + UUID.randomUUID().toString().replace("-", "");
+  private String accessKey;
+  private String secretKey;
+  private String s3Endpoint;
+
+  private GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
   @BeforeAll
   public void startIntegrationTest() {
     // Do nothing
   }
 
+  private void startS3Mocker() {
+    containerSuite.startLocalStackContainer();
+    gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
+
+    Awaitility.await()
+        .atMost(60, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .until(
+            () -> {
+              try {
+                Container.ExecResult result =
+                    gravitinoLocalStackContainer.executeInContainer(
+                        "awslocal", "iam", "create-user", "--user-name", "anonymous");
+                return result.getExitCode() == 0;
+              } catch (Exception e) {
+                LOG.info("LocalStack is not ready yet for: ", e);
+                return false;
+              }
+            });
+
+    gravitinoLocalStackContainer.executeInContainer("awslocal", "s3", "mb", "s3://" + bucketName);
+
+    Container.ExecResult result =
+        gravitinoLocalStackContainer.executeInContainer(
+            "awslocal", "iam", "create-access-key", "--user-name", "anonymous");
+
+    gravitinoLocalStackContainer.executeInContainer(
+        "awslocal",
+        "s3api",
+        "put-bucket-acl",
+        "--bucket",
+        "my-test-bucket",
+        "--acl",
+        "public-read-write");
+
+    // Get access key and secret key from result
+    String[] lines = result.getStdout().split("\n");
+    accessKey = lines[3].split(":")[1].trim().substring(1, 21);
+    secretKey = lines[5].split(":")[1].trim().substring(1, 41);
+
+    LOG.info("Access key: " + accessKey);
+    LOG.info("Secret key: " + secretKey);
+
+    s3Endpoint =
+        String.format("http://%s:%d", gravitinoLocalStackContainer.getContainerIpAddress(), 4566);
+  }
+
   @BeforeAll
   public void startUp() throws Exception {
-    copyBundleJarsToHadoop("aliyun-bundle");
+    copyBundleJarsToHadoop("aws-bundle");
+
+    // Start s3 simulator
+    startS3Mocker();
+
     // Need to download jars to gravitino server
     super.startIntegrationTest();
 
     // This value can be by tune by the user, please change it accordingly.
-    defaultBockSize = 64 * 1024 * 1024;
+    defaultBockSize = 32 * 1024 * 1024;
 
-    // The default replication factor is 1.
+    // The value is 1 for S3
     defaultReplication = 1;
 
     metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
@@ -73,12 +128,13 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
     Assertions.assertTrue(client.metalakeExists(metalakeName));
 
     Map<String, String> properties = Maps.newHashMap();
-    properties.put(FILESYSTEM_PROVIDERS, "oss");
-    properties.put("gravitino.bypass.fs.oss.accessKeyId", OSS_ACCESS_KEY);
-    properties.put("gravitino.bypass.fs.oss.accessKeySecret", OSS_SECRET_KEY);
-    properties.put("gravitino.bypass.fs.oss.endpoint", OSS_ENDPOINT);
+    properties.put("gravitino.bypass.fs.s3a.access.key", accessKey);
+    properties.put("gravitino.bypass.fs.s3a.secret.key", secretKey);
+    properties.put("gravitino.bypass.fs.s3a.endpoint", s3Endpoint);
     properties.put(
-        "gravitino.bypass.fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
+        "gravitino.bypass.fs.s3a.aws.credentials.provider",
+        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
+    properties.put(FILESYSTEM_PROVIDERS, "s3");
 
     Catalog catalog =
         metalake.createCatalog(
@@ -95,12 +151,12 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set("gravitino.bypass.fs.oss.accessKeyId", OSS_ACCESS_KEY);
-    conf.set("gravitino.bypass.fs.oss.accessKeySecret", OSS_SECRET_KEY);
-    conf.set("gravitino.bypass.fs.oss.endpoint", OSS_ENDPOINT);
-    conf.set("gravitino.bypass.fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
-
-    conf.set(FS_FILESYSTEM_PROVIDERS, "oss");
+    conf.set("fs.s3a.access.key", accessKey);
+    conf.set("fs.s3a.secret.key", secretKey);
+    conf.set("fs.s3a.endpoint", s3Endpoint);
+    conf.set(
+        "fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
+    conf.set(FS_FILESYSTEM_PROVIDERS, "s3");
   }
 
   @AfterAll
@@ -138,10 +194,10 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
   }
 
   protected String genStorageLocation(String fileset) {
-    return String.format("oss://%s/%s", BUCKET_NAME, fileset);
+    return String.format("s3a://%s/%s", bucketName, fileset);
   }
 
   @Disabled(
-      "OSS does not support append, java.io.IOException: The append operation is not supported")
+      "GCS does not support append, java.io.IOException: The append operation is not supported")
   public void testAppend() throws IOException {}
 }

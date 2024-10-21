@@ -41,6 +41,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":bundles:gcp-bundle"))
   testImplementation(project(":bundles:aliyun-bundle"))
+  testImplementation(project(":bundles:aws-bundle"))
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
@@ -89,6 +90,11 @@ tasks.test {
   } else {
     dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
   }
+
+  // this task depends on :bundles:aws-bundle:shadowJar
+  dependsOn(":bundles:aws-bundle:jar")
+  dependsOn(":bundles:aliyun-bundle:jar")
+  dependsOn(":bundles:gcp-bundle:jar")
 }
 
 tasks.javadoc {
