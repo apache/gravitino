@@ -16,25 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.ops;
+package org.apache.gravitino.exceptions;
 
-import java.util.Map;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 
-/**
- * IcebergCatalogWrapperProvider is an interface defining how Iceberg REST catalog server gets
- * Iceberg catalogs.
- */
-public interface IcebergCatalogWrapperProvider {
-
+/** An exception thrown when operating on a catalog that is not in use. */
+public class CatalogNotInUseException extends NotInUseException {
   /**
-   * @param properties The parameters for creating Provider which from configurations whose prefix
-   *     is 'gravitino.iceberg-rest.'
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
    */
-  void initialize(Map<String, String> properties);
-
-  /**
-   * @param catalogName a param send by clients.
-   * @return the instance of IcebergCatalogWrapper.
-   */
-  IcebergCatalogWrapper getIcebergTableOps(String catalogName);
+  @FormatMethod
+  public CatalogNotInUseException(@FormatString String message, Object... args) {
+    super(message, args);
+  }
 }

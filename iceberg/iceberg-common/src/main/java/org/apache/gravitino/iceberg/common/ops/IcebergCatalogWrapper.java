@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.sql.Driver;
 import java.sql.DriverManager;
-import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -104,10 +103,6 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     this.catalogPropertiesMap = icebergConfig.getIcebergCatalogProperties();
   }
 
-  public IcebergCatalogWrapper() {
-    this(new IcebergConfig(Collections.emptyMap()));
-  }
-
   private void validateNamespace(Optional<Namespace> namespace) {
     namespace.ifPresent(
         n ->
@@ -160,7 +155,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   /**
    * Reload hadoop configuration, this is useful when the hadoop configuration UserGroupInformation
    * is shared by multiple threads. UserGroupInformation#authenticationMethod was first initialized
-   * in KerberosClient, however, when switching to iceberg-rest thead,
+   * in KerberosClient, however, when switching to iceberg-rest thread,
    * UserGroupInformation#authenticationMethod will be reset to the default value; we need to
    * reinitialize it again.
    */
@@ -271,7 +266,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private void closeMySQLCatalogResource() {
     try {
       // Close thread AbandonedConnectionCleanupThread if we are using `com.mysql.cj.jdbc.Driver`,
-      // for driver `com.mysql.jdbc.Driver` (deprecated), the daemon thead maybe not this one.
+      // for driver `com.mysql.jdbc.Driver` (deprecated), the daemon thread maybe not this one.
       Class.forName("com.mysql.cj.jdbc.AbandonedConnectionCleanupThread")
           .getMethod("uncheckedShutdown")
           .invoke(null);

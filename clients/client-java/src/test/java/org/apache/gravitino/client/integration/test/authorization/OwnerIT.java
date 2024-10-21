@@ -39,7 +39,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.KafkaContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
@@ -52,7 +52,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class OwnerIT extends AbstractIT {
+public class OwnerIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(OwnerIT.class);
 
@@ -61,12 +61,12 @@ public class OwnerIT extends AbstractIT {
   private static String kafkaBootstrapServers;
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), String.valueOf(true));
     configs.put(Configs.SERVICE_ADMINS.getKey(), AuthConstants.ANONYMOUS_USER);
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
     containerSuite.startHiveContainer();
     hmsUri =
@@ -84,7 +84,7 @@ public class OwnerIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void tearDown() {
+  public void tearDown() {
     if (client != null) {
       client.close();
       client = null;
@@ -168,7 +168,7 @@ public class OwnerIT extends AbstractIT {
     // Clean up
     catalog.asFilesetCatalog().dropFileset(fileIdent);
     catalog.asSchemas().dropSchema("schema_owner", true);
-    metalake.dropCatalog(catalogNameA);
+    metalake.dropCatalog(catalogNameA, true);
     client.dropMetalake(metalakeNameA);
   }
 
@@ -219,7 +219,7 @@ public class OwnerIT extends AbstractIT {
 
     // Clean up
     catalogB.asTopicCatalog().dropTopic(topicIdent);
-    metalake.dropCatalog(catalogNameB);
+    metalake.dropCatalog(catalogNameB, true);
     client.dropMetalake(metalakeNameB);
   }
 
@@ -320,7 +320,7 @@ public class OwnerIT extends AbstractIT {
     // Clean up
     catalog.asTableCatalog().dropTable(tableIdent);
     catalog.asSchemas().dropSchema("schema_owner", true);
-    metalake.dropCatalog(catalogNameD);
+    metalake.dropCatalog(catalogNameD, true);
     client.dropMetalake(metalakeNameD);
   }
 

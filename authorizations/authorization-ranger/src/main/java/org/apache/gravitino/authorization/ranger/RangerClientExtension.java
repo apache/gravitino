@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.sun.jersey.api.client.GenericType;
 import com.sun.jersey.api.client.UniformInterfaceException;
@@ -32,6 +33,7 @@ import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
 import org.apache.ranger.RangerClient;
 import org.apache.ranger.RangerServiceException;
+import org.apache.ranger.plugin.model.RangerPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -96,6 +98,19 @@ public class RangerClientExtension extends RangerClient {
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public RangerPolicy createPolicy(RangerPolicy policy) throws RangerServiceException {
+    Preconditions.checkArgument(
+        policy.getResources().size() > 0, "Ranger policy resources can not be empty!");
+    return super.createPolicy(policy);
+  }
+
+  public RangerPolicy updatePolicy(long policyId, RangerPolicy policy)
+      throws RangerServiceException {
+    Preconditions.checkArgument(
+        policy.getResources().size() > 0, "Ranger policy resources can not be empty!");
+    return super.updatePolicy(policyId, policy);
   }
 
   public Boolean createUser(VXUser user) throws RuntimeException {

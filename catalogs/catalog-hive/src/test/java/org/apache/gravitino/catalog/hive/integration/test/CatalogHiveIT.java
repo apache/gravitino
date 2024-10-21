@@ -70,7 +70,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.hive.HiveClientPool;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -108,13 +108,11 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class CatalogHiveIT extends AbstractIT {
+public class CatalogHiveIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogHiveIT.class);
   public static final String metalakeName =
       GravitinoITUtils.genRandomName("CatalogHiveIT_metalake");
@@ -230,10 +228,7 @@ public class CatalogHiveIT extends AbstractIT {
                 catalog.asSchemas().dropSchema(schema, true);
               }));
       Arrays.stream(metalake.listCatalogs())
-          .forEach(
-              (catalogName -> {
-                metalake.dropCatalog(catalogName);
-              }));
+          .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
       client.dropMetalake(metalakeName);
     }
     if (hiveClientPool != null) {
@@ -253,7 +248,7 @@ public class CatalogHiveIT extends AbstractIT {
       LOG.error("Failed to close CloseableGroup", e);
     }
 
-    AbstractIT.client = null;
+    client = null;
   }
 
   @AfterEach
@@ -1674,7 +1669,7 @@ public class CatalogHiveIT extends AbstractIT {
         });
 
     newCatalog.asSchemas().dropSchema("schema", true);
-    metalake.dropCatalog(nameOfCatalog);
+    metalake.dropCatalog(nameOfCatalog, true);
   }
 
   private void createCatalogWithCustomOperation(String catalogName, String customImpl) {

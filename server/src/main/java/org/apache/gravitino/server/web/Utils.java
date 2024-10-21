@@ -122,6 +122,28 @@ public class Utils {
         .build();
   }
 
+  public static Response notInUse(String message, Throwable throwable) {
+    return notInUse(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  public static Response notInUse(String type, String message, Throwable throwable) {
+    return Response.status(Response.Status.CONFLICT)
+        .entity(ErrorResponse.notInUse(type, message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  public static Response inUse(String message, Throwable throwable) {
+    return inUse(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  public static Response inUse(String type, String message, Throwable throwable) {
+    return Response.status(Response.Status.CONFLICT)
+        .entity(ErrorResponse.inUse(type, message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
   public static Response nonEmpty(String type, String message) {
     return nonEmpty(type, message, null);
   }

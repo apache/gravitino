@@ -29,9 +29,12 @@ import java.util.Locale;
 import java.util.function.Consumer;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.FileSystemCatalog;
 import org.apache.paimon.factories.FactoryException;
+import org.apache.paimon.hive.HiveCatalog;
 import org.apache.paimon.jdbc.JdbcCatalog;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +47,8 @@ public class TestCatalogUtils {
     assertCatalog(PaimonCatalogBackend.FILESYSTEM.name(), FileSystemCatalog.class);
     // Test load JdbcCatalog for jdbc metastore.
     assertCatalog(PaimonCatalogBackend.JDBC.name(), JdbcCatalog.class);
+    // Test load HiveCatalog for hive metastore.
+    assertCatalog(PaimonCatalogBackend.HIVE.name(), HiveCatalog.class);
     // Test load catalog exception for other metastore.
     assertThrowsExactly(FactoryException.class, () -> assertCatalog("other", catalog -> {}));
   }
@@ -66,7 +71,7 @@ public class TestCatalogUtils {
                             System.getProperty("java.io.tmpdir"),
                             "paimon_catalog_warehouse"),
                         PaimonConfig.CATALOG_URI.getKey(),
-                        "jdbc:h2:mem:testdb",
+                        generateUri(metastore),
                         PaimonConfig.CATALOG_JDBC_USER.getKey(),
                         "user",
                         PaimonConfig.CATALOG_JDBC_PASSWORD.getKey(),
@@ -74,5 +79,21 @@ public class TestCatalogUtils {
             .getCatalog()) {
       consumer.accept(catalog);
     }
+  }
+
+  private static String generateUri(String metastore) {
+    String uri = "uri";
+    if (PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(metastore)) {
+      uri = "jdbc:h2:mem:testdb";
+    } else if (PaimonCatalogBackend.HIVE.name().equalsIgnoreCase(metastore)) {
+      ContainerSuite containerSuite = ContainerSuite.getInstance();
+      containerSuite.startHiveContainer();
+      uri =
+          String.format(
+              "thrift://%s:%d",
+              containerSuite.getHiveContainer().getContainerIpAddress(),
+              HiveContainer.HIVE_METASTORE_PORT);
+    }
+    return uri;
   }
 }

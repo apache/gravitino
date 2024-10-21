@@ -512,6 +512,7 @@ tasks.rat {
     "DISCLAIMER.txt",
     "ROADMAP.md",
     "clients/client-python/.pytest_cache/*",
+    "clients/client-python/**/__pycache__",
     "clients/client-python/.venv/*",
     "clients/client-python/venv/*",
     "clients/client-python/apache_gravitino.egg-info/*",
@@ -745,7 +746,7 @@ tasks {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("authorization") &&
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
-        it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink")
+        it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink") && it.name != "gcp-bundle" && it.name != "aliyun-bundle"
       ) {
         from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
@@ -764,7 +765,8 @@ tasks {
         !it.name.startsWith("integration-test") &&
         !it.name.startsWith("flink") &&
         !it.name.startsWith("trino-connector") &&
-        it.name != "hive-metastore-common"
+        it.name != "hive-metastore-common" && it.name != "gcp-bundle" &&
+        it.name != "aliyun-bundle"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")

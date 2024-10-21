@@ -18,12 +18,14 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.integration.test;
 
+import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.CATALOG_BACKEND;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.URI;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiSchemaPropertiesMetadata.LOCATION;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,7 +39,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -56,7 +58,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
-public class HudiCatalogHMSIT extends AbstractIT {
+public class HudiCatalogHMSIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static String hmsURI;
@@ -72,7 +74,7 @@ public class HudiCatalogHMSIT extends AbstractIT {
   private static final String MOR_TABLE = RandomNameUtils.genRandomName("hudi_mor_table");
 
   @BeforeAll
-  public static void prepare() {
+  public void prepare() {
     containerSuite.startHiveContainer();
     hmsURI =
         String.format(
@@ -146,7 +148,9 @@ public class HudiCatalogHMSIT extends AbstractIT {
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
     Assertions.assertEquals("lakehouse-hudi", catalog.provider());
     Assertions.assertEquals(comment, catalog.comment());
-    Assertions.assertEquals(properties, catalog.properties());
+    Map<String, String> expectedProperties = new HashMap<>(properties);
+    expectedProperties.put(PROPERTY_IN_USE, "true");
+    Assertions.assertEquals(expectedProperties, catalog.properties());
 
     // test list
     String[] catalogs = metalake.listCatalogs();
