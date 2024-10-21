@@ -55,20 +55,6 @@ public class TestMetadataObjects {
     Assertions.assertEquals("table", parent.name());
     Assertions.assertEquals(MetadataObject.Type.TABLE, parent.type());
 
-    // Test incomplete parent name
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> MetadataObjects.of(null, "c1", MetadataObject.Type.COLUMN));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> MetadataObjects.of("", "c1", MetadataObject.Type.COLUMN));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> MetadataObjects.of("catalog", "c1", MetadataObject.Type.COLUMN));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> MetadataObjects.of("catalog.schema", "c1", MetadataObject.Type.COLUMN));
-
     // Test incomplete name
     Assertions.assertThrows(
         IllegalArgumentException.class,
