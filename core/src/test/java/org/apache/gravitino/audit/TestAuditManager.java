@@ -54,14 +54,25 @@ public class TestAuditManager {
 
   private static int EVENT_NUM = 2000;
 
+  private Path logPath;
+
   @BeforeAll
   public void setup() {
-    Path path = Paths.get(DEFAULT_FILE_NAME);
-    if (Files.exists(path)) {
+    String logDir = System.getProperty("gravitino.log.path");
+    Path logDirPath = Paths.get(logDir);
+    if (!Files.exists(logDirPath)) {
+      try {
+        Files.createDirectories(logDirPath);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    this.logPath = Paths.get(logDir + "/" + DEFAULT_FILE_NAME);
+    if (Files.exists(logPath)) {
       LOG.warn(
           String.format("tmp audit log file: %s already exists, delete it", DEFAULT_FILE_NAME));
       try {
-        Files.delete(path);
+        Files.delete(logPath);
         LOG.warn(String.format("delete tmp audit log file: %s success", DEFAULT_FILE_NAME));
       } catch (IOException e) {
         throw new RuntimeException(e);
@@ -168,9 +179,8 @@ public class TestAuditManager {
   @AfterEach
   public void cleanup() {
     try {
-      Path path = Paths.get(DEFAULT_FILE_NAME);
-      if (Files.exists(path)) {
-        Files.delete(path);
+      if (Files.exists(logPath)) {
+        Files.delete(logPath);
         LOG.warn(String.format("delete tmp audit log file: %s success", DEFAULT_FILE_NAME));
       }
     } catch (IOException e) {

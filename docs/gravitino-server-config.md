@@ -140,8 +140,9 @@ For more details, please refer to the definition of the plugin.
 
 ### Audit log configuration
 
-The audit log framework defines how metadata changes are logged to various storages. The formatter defines an interface that transforms different `Event` types into a unified `AuditLog`.
-The writer defines an interface for writing to different storage types.
+The audit log framework defines how audit logs are formatted and written to various storages. The formatter defines an interface that transforms different `Event` types into a unified `AuditLog`. The writer defines an interface to writing AuditLog to different storages.
+
+Gravitino provides a default implement to log basic audit information to a file, you could extend the audit system by implementation corresponding interfaces.
 
 | Property name                         | Description                           | Default value                               | Required | Since Version |
 |---------------------------------------|---------------------------------------|---------------------------------------------|----------|---------------|
