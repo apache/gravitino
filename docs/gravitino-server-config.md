@@ -163,10 +163,7 @@ Writer configuration begins with `gravitino.audit.writer.${name}`, where ${name}
 | Property name                                       | Description                                                                             | Default value       | Required | Since Version              |
 |-----------------------------------------------------|-----------------------------------------------------------------------------------------|---------------------|----------|----------------------------|
 | `gravitino.audit.writer.file.fileName`              | The audit log file name, the path is ${sys:gravitino.log.path}/${fileName}.             | gravitino_audit.log | NO       | 0.7.0-incubating           |
-| `gravitino.audit.writer.file.immediateFlush`        | Whether the writer will flush at the end of each write operation.                       | false               | NO       | 0.7.0-incubating           | 
-| `gravitino.audit.writer.file.append`                | Whether the log will be written to the end or the beginning of the file.                | true                | NO       | 0.7.0-incubating           | 
-| `gravitino.audit.writer.file.buffered`              | Whether the writer use an internal `ByteBuffer` to store audit log before writing them. | true                | NO       | 0.7.0-incubating           | 
-| `gravitino.audit.writer.file.bufferSize`            | The size of the `ByteBuffer`.                                                           | 8192                | NO       | 0.7.0-incubating           |
+| `gravitino.audit.writer.file.append`                | Whether the log will be written to the end or the beginning of the file.                | true                | NO       | 0.7.0-incubating           |
 
 ### Security configuration
 
