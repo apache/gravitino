@@ -78,10 +78,11 @@ public class RESTService implements GravitinoAuxiliaryService {
     metricsSystem.register(httpServerMetricsSource);
 
     Map<String, String> configProperties = icebergConfig.getAllConfig();
-    EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.configProvider = IcebergConfigProviderFactory.create(configProperties);
     configProvider.initialize(configProperties);
     String metalakeName = configProvider.getMetalakeName();
+
+    EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.icebergCatalogWrapperManager =
         new IcebergCatalogWrapperManager(configProperties, configProvider);
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
@@ -89,6 +90,7 @@ public class RESTService implements GravitinoAuxiliaryService {
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
     IcebergTableEventDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationExecutor, eventBus, metalakeName);
+
     config.register(
         new AbstractBinder() {
           @Override

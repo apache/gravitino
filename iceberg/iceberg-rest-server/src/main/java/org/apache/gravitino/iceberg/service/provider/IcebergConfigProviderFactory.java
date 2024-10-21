@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 
 public class IcebergConfigProviderFactory {
   public static final Logger LOG = LoggerFactory.getLogger(IcebergConfigProviderFactory.class);
+
   private static final ImmutableMap<String, String> ICEBERG_CATALOG_CONFIG_PROVIDER_NAMES =
       ImmutableMap.of(
           IcebergConstants.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,

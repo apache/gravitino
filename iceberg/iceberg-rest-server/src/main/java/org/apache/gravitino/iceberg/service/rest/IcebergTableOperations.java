@@ -118,7 +118,8 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, accessDelegation: {}, isCredentialVending: {}",
+        "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, "
+            + "accessDelegation: {}, isCredentialVending: {}",
         catalogName,
         icebergNS,
         createTableRequest,
