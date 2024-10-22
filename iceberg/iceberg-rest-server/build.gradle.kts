@@ -176,3 +176,7 @@ tasks.clean {
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {
   dependsOn("copyDepends")
 }
+
+tasks.test {
+    jvmArgs("-verbose:class")
+}
