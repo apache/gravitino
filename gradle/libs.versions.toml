@@ -33,11 +33,13 @@ hive2 = "2.3.9"
 hadoop2 = "2.10.2"
 hadoop3 = "3.1.0"
 hadoop3-gcs = "1.9.4-hadoop3"
+hadoop3-aliyun = "3.1.0"
 hadoop-minikdc = "3.3.6"
 htrace-core4 = "4.1.0-incubating"
 httpclient5 = "5.2.1"
 mockserver = "5.15.0"
 commons-lang3 = "3.14.0"
+commons-lang = "2.6"
 commons-io = "2.15.0"
 commons-collections4 = "4.4"
 commons-collections3 = "3.2.2"
@@ -148,18 +150,21 @@ hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref 
 hadoop2-hdfs-client = { group = "org.apache.hadoop", name = "hadoop-hdfs-client", version.ref = "hadoop2" }
 hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
 hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
-hadoop2-s3 = { group = "org.apache.hadoop", name = "hadoop-aws", version.ref = "hadoop2"}
+hadoop2-aws = { group = "org.apache.hadoop", name = "hadoop-aws", version.ref = "hadoop2"}
+hadoop3-aws = { group = "org.apache.hadoop", name = "hadoop-aws", version.ref = "hadoop3"}
 hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop3" }
 hadoop3-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop3"}
 hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.ref = "hadoop3"}
 hadoop3-minicluster = { group = "org.apache.hadoop", name = "hadoop-minicluster", version.ref = "hadoop-minikdc"}
 hadoop3-gcs = { group = "com.google.cloud.bigdataoss", name = "gcs-connector", version.ref = "hadoop3-gcs"}
+hadoop3-oss = { group = "org.apache.hadoop", name = "hadoop-aliyun", version.ref = "hadoop3-aliyun"}
 htrace-core4 = { group = "org.apache.htrace", name = "htrace-core4", version.ref = "htrace-core4" }
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
+commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }

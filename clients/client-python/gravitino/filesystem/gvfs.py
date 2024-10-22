@@ -14,11 +14,12 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
+import os
 from enum import Enum
 from pathlib import PurePosixPath
 from typing import Dict, Tuple
 import re
+import importlib
 import fsspec
 
 from cachetools import TTLCache, LRUCache
@@ -26,7 +27,7 @@ from fsspec import AbstractFileSystem
 from fsspec.implementations.local import LocalFileSystem
 from fsspec.implementations.arrow import ArrowFSWrapper
 from fsspec.utils import infer_storage_options
-from pyarrow.fs import HadoopFileSystem
+
 from readerwriterlock import rwlock
 from gravitino.audit.caller_context import CallerContext, CallerContextHolder
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
@@ -47,6 +48,7 @@ PROTOCOL_NAME = "gvfs"
 class StorageType(Enum):
     HDFS = "hdfs"
     LOCAL = "file"
+    GCS = "gs"
 
 
 class FilesetContextPair:
@@ -66,7 +68,7 @@ class FilesetContextPair:
 
 
 class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
-    """This is a virtual file system which users can access `fileset` and
+    """This is a virtual file system that users can access `fileset` and
     other resources.
 
     It obtains the actual storage location corresponding to the resource from the
@@ -149,6 +151,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         self._cache_lock = rwlock.RWLockFair()
         self._catalog_cache = LRUCache(maxsize=100)
         self._catalog_cache_lock = rwlock.RWLockFair()
+        self._options = options
 
         super().__init__(**kwargs)
 
@@ -309,7 +312,9 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         )
         dst_actual_path = dst_context_pair.actual_file_location()
 
-        if storage_type == StorageType.HDFS:
+        # convert the following to in
+
+        if storage_type in [StorageType.HDFS, StorageType.GCS]:
             src_context_pair.filesystem().mv(
                 self._strip_storage_protocol(storage_type, src_actual_path),
                 self._strip_storage_protocol(storage_type, dst_actual_path),
@@ -540,7 +545,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param virtual_location: Virtual location
         :return A virtual path
         """
-        if storage_location.startswith(f"{StorageType.HDFS.value}://"):
+
+        # If the storage path starts with hdfs, gcs, we should use the path as the prefix.
+        if storage_location.startswith(
+            f"{StorageType.HDFS.value}://"
+        ) or storage_location.startswith(f"{StorageType.GCS.value}://"):
             actual_prefix = infer_storage_options(storage_location)["path"]
         elif storage_location.startswith(f"{StorageType.LOCAL.value}:/"):
             actual_prefix = storage_location[len(f"{StorageType.LOCAL.value}:") :]
@@ -681,6 +690,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             return StorageType.HDFS
         if path.startswith(f"{StorageType.LOCAL.value}:/"):
             return StorageType.LOCAL
+        if path.startswith(f"{StorageType.GCS.value}://"):
+            return StorageType.GCS
         raise GravitinoRuntimeException(
             f"Storage type doesn't support now. Path:{path}"
         )
@@ -705,10 +716,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param path: The path
         :return: The stripped path
         """
-        if storage_type == StorageType.HDFS:
+        if storage_type in (StorageType.HDFS, StorageType.GCS):
             return path
         if storage_type == StorageType.LOCAL:
             return path[len(f"{StorageType.LOCAL.value}:") :]
+
         raise GravitinoRuntimeException(
             f"Storage type:{storage_type} doesn't support now."
         )
@@ -774,9 +786,12 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             if cache_value is not None:
                 return cache_value
             if storage_type == StorageType.HDFS:
-                fs = ArrowFSWrapper(HadoopFileSystem.from_uri(actual_file_location))
+                fs_class = importlib.import_module("pyarrow.fs").HadoopFileSystem
+                fs = ArrowFSWrapper(fs_class.from_uri(actual_file_location))
             elif storage_type == StorageType.LOCAL:
                 fs = LocalFileSystem()
+            elif storage_type == StorageType.GCS:
+                fs = ArrowFSWrapper(self._get_gcs_filesystem())
             else:
                 raise GravitinoRuntimeException(
                     f"Storage type: `{storage_type}` doesn't support now."
@@ -785,6 +800,24 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             return fs
         finally:
             write_lock.release()
+
+    def _get_gcs_filesystem(self):
+        # get All keys from the options that start with 'gravitino.bypass.gcs.' and remove the prefix
+        gcs_options = {
+            key[len(GVFSConfig.GVFS_FILESYSTEM_BY_PASS_GCS) :]: value
+            for key, value in self._options.items()
+            if key.startswith(GVFSConfig.GVFS_FILESYSTEM_BY_PASS_GCS)
+        }
+
+        # get 'service-account-key' from gcs_options, if the key is not found, throw an exception
+        service_account_key_path = gcs_options.get(GVFSConfig.GVFS_FILESYSTEM_KEY_FILE)
+        if service_account_key_path is None:
+            raise GravitinoRuntimeException(
+                "Service account key is not found in the options."
+            )
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
+
+        return importlib.import_module("pyarrow.fs").GcsFileSystem()
 
 
 fsspec.register_implementation(PROTOCOL_NAME, GravitinoVirtualFileSystem)

@@ -1,22 +1,22 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-package org.apache.gravitino.iceberg.provider;
+package org.apache.gravitino.iceberg.service.provider;
 
 import java.util.HashMap;
 import org.apache.gravitino.Catalog;
@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestGravitinoBasedIcebergCatalogWrapperProvider {
+public class TestDynamicIcebergConfigProvider {
   @Test
   public void testValidIcebergTableOps() {
     String hiveCatalogName = "hive_backend";
@@ -71,14 +71,15 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
               }
             });
 
-    GravitinoBasedIcebergCatalogWrapperProvider provider =
-        new GravitinoBasedIcebergCatalogWrapperProvider();
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
     GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
     provider.setClient(client);
 
-    IcebergCatalogWrapper hiveOps = provider.getIcebergTableOps(hiveCatalogName);
-    IcebergCatalogWrapper jdbcOps = provider.getIcebergTableOps(jdbcCatalogName);
+    IcebergCatalogWrapper hiveOps =
+        new IcebergCatalogWrapper(provider.getIcebergCatalogConfig(hiveCatalogName).get());
+    IcebergCatalogWrapper jdbcOps =
+        new IcebergCatalogWrapper(provider.getIcebergCatalogConfig(jdbcCatalogName).get());
 
     Assertions.assertEquals(hiveCatalogName, hiveOps.getCatalog().name());
     Assertions.assertEquals(jdbcCatalogName, jdbcOps.getCatalog().name());
@@ -101,16 +102,15 @@ public class TestGravitinoBasedIcebergCatalogWrapperProvider {
     GravitinoAdminClient client = Mockito.mock(GravitinoAdminClient.class);
     Mockito.when(client.loadMetalake(Mockito.any())).thenReturn(gravitinoMetalake);
 
-    GravitinoBasedIcebergCatalogWrapperProvider provider =
-        new GravitinoBasedIcebergCatalogWrapperProvider();
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
     provider.setClient(client);
 
     Assertions.assertThrowsExactly(
-        IllegalArgumentException.class, () -> provider.getIcebergTableOps(invalidCatalogName));
+        IllegalArgumentException.class, () -> provider.getIcebergCatalogConfig(invalidCatalogName));
     Assertions.assertThrowsExactly(
-        IllegalArgumentException.class, () -> provider.getIcebergTableOps(""));
+        IllegalArgumentException.class, () -> provider.getIcebergCatalogConfig(""));
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
-        () -> provider.getIcebergTableOps(IcebergConstants.GRAVITINO_DEFAULT_CATALOG));
+        () -> provider.getIcebergCatalogConfig(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG));
   }
 }

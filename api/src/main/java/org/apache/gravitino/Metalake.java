@@ -29,6 +29,9 @@ import org.apache.gravitino.authorization.SupportsRoles;
 @Evolving
 public interface Metalake extends Auditable {
 
+  /** The property indicating the metalake is in use. */
+  String PROPERTY_IN_USE = "in-use";
+
   /**
    * The name of the metalake.
    *
