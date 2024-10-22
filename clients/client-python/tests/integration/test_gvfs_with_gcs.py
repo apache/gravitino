@@ -23,6 +23,7 @@ import unittest
 from fsspec.implementations.arrow import ArrowFSWrapper
 from pyarrow.fs import GcsFileSystem
 
+
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
 from gravitino import (
     gvfs,
@@ -31,7 +32,7 @@ from gravitino import (
     Fileset,
 )
 from gravitino.exceptions.base import GravitinoRuntimeException
-
+from gravitino.filesystem.gvfs_config import GVFSConfig
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,9 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
     metalake_name: str = "TestGvfsWithGCS_metalake" + str(randint(1, 10000))
 
     def setUp(self):
-        self.options = {"gravitino.bypass.gcs.service-account-key-path": self.key_file}
+        self.options = {
+            f"{GVFSConfig.GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE}": self.key_file
+        }
 
     def tearDown(self):
         self.options = {}

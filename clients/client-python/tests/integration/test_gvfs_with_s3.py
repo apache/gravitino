@@ -49,9 +49,9 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
 
     def setUp(self):
         self.options = {
-            f"{GVFSConfig.GVFS_FILESYSTEM_BY_PASS_S3}{GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY}": self.s3_access_key,
-            f"{GVFSConfig.GVFS_FILESYSTEM_BY_PASS_S3}{GVFSConfig.GVFS_FILESYSTEM_S3_SECRET_KEY}": self.s3_secret_key,
-            f"{GVFSConfig.GVFS_FILESYSTEM_BY_PASS_S3}{GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT}": self.s3_endpoint,
+            f"{GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY}": self.s3_access_key,
+            f"{GVFSConfig.GVFS_FILESYSTEM_S3_SECRET_KEY}": self.s3_secret_key,
+            f"{GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT}": self.s3_endpoint,
         }
 
     def tearDown(self):
