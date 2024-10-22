@@ -39,6 +39,7 @@ from gravitino.auth.simple_auth_provider import SimpleAuthProvider
 from gravitino.catalog.fileset_catalog import FilesetCatalog
 from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.filesystem.gravitino_fs_wrapper import GravitinoArrowFSWrapper
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.name_identifier import NameIdentifier
 
@@ -814,7 +815,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             elif storage_type == StorageType.S3A:
                 fs = ArrowFSWrapper(self._get_s3_filesystem())
             elif storage_type == StorageType.OSS:
-                fs = ArrowFSWrapper(self._get_oss_filesystem())
+                fs = GravitinoArrowFSWrapper(self._get_oss_filesystem())
             else:
                 raise GravitinoRuntimeException(
                     f"Storage type: `{storage_type}` doesn't support now."
