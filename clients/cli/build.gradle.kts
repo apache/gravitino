@@ -23,12 +23,12 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":clients:client-java"))
-  implementation(project(":api"))
-  implementation(project(":common"))
+  implementation(libs.commons.cli.new)
   implementation(libs.slf4j.api)
   implementation(libs.slf4j.simple)
-  implementation(libs.commons.cli.new)
+  implementation(project(":api"))
+  implementation(project(":clients:client-java"))
+  implementation(project(":common"))
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
