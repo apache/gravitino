@@ -23,9 +23,9 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.TestJdbc;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseColumnDefaultValueConverter;
-import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseExceptionConverter;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.OceanBaseContainer;
@@ -44,7 +44,7 @@ public class TestOceanBase extends TestJdbc {
 
     DATABASE_OPERATIONS = new OceanBaseDatabaseOperations();
     TABLE_OPERATIONS = new OceanBaseTableOperations();
-    JDBC_EXCEPTION_CONVERTER = new OceanBaseExceptionConverter();
+    JDBC_EXCEPTION_CONVERTER = new JdbcExceptionConverter();
     DATABASE_OPERATIONS.initialize(DATA_SOURCE, JDBC_EXCEPTION_CONVERTER, Collections.emptyMap());
     TABLE_OPERATIONS.initialize(
         DATA_SOURCE,
