@@ -588,7 +588,6 @@ public class IcebergCatalogOperations implements CatalogOperations, SupportsSche
     }
   }
 
-  // TODO. We should figure out a better way to get the current user from servlet container.
   private static String currentUser() {
     return PrincipalUtils.getCurrentUserName();
   }
