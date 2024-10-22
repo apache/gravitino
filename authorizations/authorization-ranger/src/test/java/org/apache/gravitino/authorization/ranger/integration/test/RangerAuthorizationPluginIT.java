@@ -29,6 +29,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
+import org.apache.gravitino.authorization.ranger.RangerMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerSecurableObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -56,7 +57,8 @@ public class RangerAuthorizationPluginIT {
         rangerAuthPlugin.translatePrivilege(createSchemaInMetalake);
     Assertions.assertEquals(1, createSchemaInMetalake1.size());
     Assertions.assertEquals("*", createSchemaInMetalake1.get(0).fullName());
-    Assertions.assertEquals(MetadataObject.Type.SCHEMA, createSchemaInMetalake1.get(0).type());
+    Assertions.assertEquals(
+        RangerMetadataObject.Type.SCHEMA, createSchemaInMetalake1.get(0).type());
 
     SecurableObject createSchemaInCatalog =
         SecurableObjects.parse(
@@ -67,7 +69,7 @@ public class RangerAuthorizationPluginIT {
         rangerAuthPlugin.translatePrivilege(createSchemaInCatalog);
     Assertions.assertEquals(1, createSchemaInCatalog1.size());
     Assertions.assertEquals("*", createSchemaInCatalog1.get(0).fullName());
-    Assertions.assertEquals(MetadataObject.Type.SCHEMA, createSchemaInCatalog1.get(0).type());
+    Assertions.assertEquals(RangerMetadataObject.Type.SCHEMA, createSchemaInCatalog1.get(0).type());
 
     for (Privilege privilege :
         ImmutableList.of(
@@ -82,9 +84,9 @@ public class RangerAuthorizationPluginIT {
       List<RangerSecurableObject> metalake1 = rangerAuthPlugin.translatePrivilege(metalake);
       Assertions.assertEquals(2, metalake1.size());
       Assertions.assertEquals("*.*", metalake1.get(0).fullName());
-      Assertions.assertEquals(MetadataObject.Type.TABLE, metalake1.get(0).type());
+      Assertions.assertEquals(RangerMetadataObject.Type.TABLE, metalake1.get(0).type());
       Assertions.assertEquals("*.*.*", metalake1.get(1).fullName());
-      Assertions.assertEquals(MetadataObject.Type.COLUMN, metalake1.get(1).type());
+      Assertions.assertEquals(RangerMetadataObject.Type.COLUMN, metalake1.get(1).type());
 
       SecurableObject catalog =
           SecurableObjects.parse(
@@ -94,9 +96,9 @@ public class RangerAuthorizationPluginIT {
       List<RangerSecurableObject> catalog1 = rangerAuthPlugin.translatePrivilege(catalog);
       Assertions.assertEquals(2, catalog1.size());
       Assertions.assertEquals("*.*", catalog1.get(0).fullName());
-      Assertions.assertEquals(MetadataObject.Type.TABLE, catalog1.get(0).type());
+      Assertions.assertEquals(RangerMetadataObject.Type.TABLE, catalog1.get(0).type());
       Assertions.assertEquals("*.*.*", catalog1.get(1).fullName());
-      Assertions.assertEquals(MetadataObject.Type.COLUMN, catalog1.get(1).type());
+      Assertions.assertEquals(RangerMetadataObject.Type.COLUMN, catalog1.get(1).type());
 
       SecurableObject schema =
           SecurableObjects.parse(
@@ -106,9 +108,9 @@ public class RangerAuthorizationPluginIT {
       List<RangerSecurableObject> schema1 = rangerAuthPlugin.translatePrivilege(schema);
       Assertions.assertEquals(2, schema1.size());
       Assertions.assertEquals("schema1.*", schema1.get(0).fullName());
-      Assertions.assertEquals(MetadataObject.Type.TABLE, schema1.get(0).type());
+      Assertions.assertEquals(RangerMetadataObject.Type.TABLE, schema1.get(0).type());
       Assertions.assertEquals("schema1.*.*", schema1.get(1).fullName());
-      Assertions.assertEquals(MetadataObject.Type.COLUMN, schema1.get(1).type());
+      Assertions.assertEquals(RangerMetadataObject.Type.COLUMN, schema1.get(1).type());
 
       if (!privilege.equals(Privileges.CreateTable.allow())) {
         // `CREATE_TABLE` not support securable object for table, So ignore check for table.
@@ -120,9 +122,9 @@ public class RangerAuthorizationPluginIT {
         List<RangerSecurableObject> table1 = rangerAuthPlugin.translatePrivilege(table);
         Assertions.assertEquals(2, table1.size());
         Assertions.assertEquals("schema1.table1", table1.get(0).fullName());
-        Assertions.assertEquals(MetadataObject.Type.TABLE, table1.get(0).type());
+        Assertions.assertEquals(RangerMetadataObject.Type.TABLE, table1.get(0).type());
         Assertions.assertEquals("schema1.table1.*", table1.get(1).fullName());
-        Assertions.assertEquals(MetadataObject.Type.COLUMN, table1.get(1).type());
+        Assertions.assertEquals(RangerMetadataObject.Type.COLUMN, table1.get(1).type());
       }
     }
   }
@@ -135,31 +137,31 @@ public class RangerAuthorizationPluginIT {
       List<RangerSecurableObject> metalakeOwner = rangerAuthPlugin.translateOwner(metalake);
       Assertions.assertEquals(3, metalakeOwner.size());
       Assertions.assertEquals("*", metalakeOwner.get(0).fullName());
-      Assertions.assertEquals(MetadataObject.Type.SCHEMA, metalakeOwner.get(0).type());
+      Assertions.assertEquals(RangerMetadataObject.Type.SCHEMA, metalakeOwner.get(0).type());
       Assertions.assertEquals("*.*", metalakeOwner.get(1).fullName());
-      Assertions.assertEquals(MetadataObject.Type.TABLE, metalakeOwner.get(1).type());
+      Assertions.assertEquals(RangerMetadataObject.Type.TABLE, metalakeOwner.get(1).type());
       Assertions.assertEquals("*.*.*", metalakeOwner.get(2).fullName());
-      Assertions.assertEquals(MetadataObject.Type.COLUMN, metalakeOwner.get(2).type());
+      Assertions.assertEquals(RangerMetadataObject.Type.COLUMN, metalakeOwner.get(2).type());
     }
 
     MetadataObject schema = MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA);
     List<RangerSecurableObject> schemaOwner = rangerAuthPlugin.translateOwner(schema);
     Assertions.assertEquals(3, schemaOwner.size());
     Assertions.assertEquals("schema1", schemaOwner.get(0).fullName());
-    Assertions.assertEquals(MetadataObject.Type.SCHEMA, schemaOwner.get(0).type());
+    Assertions.assertEquals(RangerMetadataObject.Type.SCHEMA, schemaOwner.get(0).type());
     Assertions.assertEquals("schema1.*", schemaOwner.get(1).fullName());
-    Assertions.assertEquals(MetadataObject.Type.TABLE, schemaOwner.get(1).type());
+    Assertions.assertEquals(RangerMetadataObject.Type.TABLE, schemaOwner.get(1).type());
     Assertions.assertEquals("schema1.*.*", schemaOwner.get(2).fullName());
-    Assertions.assertEquals(MetadataObject.Type.COLUMN, schemaOwner.get(2).type());
+    Assertions.assertEquals(RangerMetadataObject.Type.COLUMN, schemaOwner.get(2).type());
 
     MetadataObject table =
         MetadataObjects.parse("catalog1.schema1.table1", MetadataObject.Type.TABLE);
     List<RangerSecurableObject> tableOwner = rangerAuthPlugin.translateOwner(table);
     Assertions.assertEquals(2, tableOwner.size());
     Assertions.assertEquals("schema1.table1", tableOwner.get(0).fullName());
-    Assertions.assertEquals(MetadataObject.Type.TABLE, tableOwner.get(0).type());
+    Assertions.assertEquals(RangerMetadataObject.Type.TABLE, tableOwner.get(0).type());
     Assertions.assertEquals("schema1.table1.*", tableOwner.get(1).fullName());
-    Assertions.assertEquals(MetadataObject.Type.COLUMN, tableOwner.get(1).type());
+    Assertions.assertEquals(RangerMetadataObject.Type.COLUMN, tableOwner.get(1).type());
   }
 
   @Test

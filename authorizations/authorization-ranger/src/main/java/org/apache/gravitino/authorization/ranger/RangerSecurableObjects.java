@@ -62,7 +62,7 @@ public class RangerSecurableObjects {
 
     @Override
     public RangerMetadataObject.Type type() {
-      return null;
+      return super.type();
     }
 
     @Override
