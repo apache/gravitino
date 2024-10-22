@@ -17,7 +17,7 @@
   under the License.
 -->
 
-# Apache Gravitino CLI
+# Apache Gravitino Command Line Interface
 
 Apache Gravitino CLI is a command-line tool that interacts with the Gravitino server to manage and query entities like metalakes, catalogs, schemas, and tables. The tool provides options for listing information about Gravitino entities and in future versions support creating, deleting, and updating these entities.
 
@@ -111,6 +111,24 @@ List Tables in a Catalog
 ```bash
 gcli metalake list --metalake my-metalake
 ```
+
+### Setting the Metalake name
+
+As dealing with one Metalake is a typical scenario, you can set the Metalake name in several ways.
+
+1. Passed in on the command line via the `--metalake` parameter.
+2. Set via the 'GRAVITINO_METALAKE' environment variable.
+
+The command line option overrides the environment variable.
+
+### Setting the Gravitino URL
+
+As you need to set the Gravitino URL for every command, you can set the URL in several ways.
+
+1. Passed in on the command line via the `--url` parameter.
+2. Set via the 'GRAVITINO_URL' environment variable.
+
+The command line option overrides the environment variable.
 
 ## Running Tests
 
