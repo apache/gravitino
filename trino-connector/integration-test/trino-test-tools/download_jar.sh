@@ -26,6 +26,11 @@ download_jar() {
   local download_url=$2
   local target_directory=$3
 
+  if [ ! -d "$target_directory" ]; then
+    echo "Target directory does not exist. Creating directory: $target_directory"
+    mkdir -p "$target_directory"
+  fi
+
   local full_path="$target_directory/$jar_file_name"
 
   if [ ! -f "$full_path" ]; then

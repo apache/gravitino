@@ -32,6 +32,13 @@ cp "$trino_conf_dir/config/catalog/trino.properties" /etc/trino/catalog/trino.pr
 cp -r /opt/gravitino-server /tmp/gravitino-server
 rm -fr /tmp/gravitino-server/logs
 rm -fr /tmp/gravitino-server/data
+
+web_path=/tmp/gravitino-server/web
+if [ ! -f "$full_path" ]; then
+   mkdir $web_path
+   touch $web_path/gravitino-web-1.0.war
+fi
+
 /tmp/gravitino-server/bin/gravitino.sh start
 
 #create test metalake
