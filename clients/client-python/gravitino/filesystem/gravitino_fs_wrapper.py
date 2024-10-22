@@ -15,15 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import logging
+
 from fsspec.implementations.arrow import ArrowFSWrapper
 from fsspec.utils import infer_storage_options
 
+from gravitino.exceptions.base import GravitinoRuntimeException
 
+logger = logging.getLogger(__name__)
+
+
+# This class is a wrapper for ArrowFSWrapper, which is only used for OSS.
 class GravitinoArrowFSWrapper(ArrowFSWrapper):
     @classmethod
     def _strip_protocol(cls, path):
         ops = infer_storage_options(path)
+
         path = ops["path"]
+
+        logger.info("OSS123456: %s", ops)
         if path.startswith("//") or (path.startswith("/") and ops["protocol"] == "oss"):
             # special case for "hdfs://path" (without the triple slash)
             # special case for "oss://path" (without the double slash)
@@ -31,10 +41,12 @@ class GravitinoArrowFSWrapper(ArrowFSWrapper):
         return path
 
     def _rm(self, path):
-        pass
+        raise GravitinoRuntimeException(
+            "Deprecated method, use `rm_file` method instead."
+        )
 
     def created(self, path):
-        pass
+        raise GravitinoRuntimeException("Created is not implemented for OSS.")
 
     def sign(self, path, expiration=100, **kwargs):
-        pass
+        raise GravitinoRuntimeException("Sign is not implemented for OSS.")
