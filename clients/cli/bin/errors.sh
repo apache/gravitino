@@ -21,28 +21,29 @@
 
 # Some of these examples assume you have the Apache Gravitino playground running.
 
-alias gcli='java -jar clients/cli/build/libs/gravitino-cli-0.7.0-incubating-SNAPSHOT.jar'
+shopt -s expand_aliases
+alias gcli='java -jar ../../cli/build/libs/gravitino-cli-*-incubating-SNAPSHOT.jar'
 
 # No such command
 gcli unknown
 
 # unknown command and entiry
-gcli unknown --unknown
+gcli unknown unknown
 
 # unknown command 
-gcli metalake --unknown
+gcli metalake unknown
 
 # unknown entity 
-gcli unknown --list
+gcli unknown list
 
 # Name not specified 
-gcli metalake --details
+gcli metalake details
 
 # Unknown metalake name
-gcli metalake --details --name unknown
+gcli metalake details --name unknown
 
 # Unknown catalog name
-gcli catalog --details --name metalake_demo.unknown
+gcli catalog details --name metalake_demo.unknown
 
 # Missing catalog name
-gcli catalog --details --name metalake_demo
+gcli catalog details --name metalake_demo

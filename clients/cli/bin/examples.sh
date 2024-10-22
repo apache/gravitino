@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -17,12 +19,11 @@
 # under the License.
 #
 
-#!/bin/bash
-
 # These examples assume you have the Apache Gravitino playground running.
 
 unset GRAVITINO_METALAKE
-alias gcli='java -jar clients/cli/build/libs/gravitino-cli-0.7.0-incubating-SNAPSHOT.jar'
+shopt -s expand_aliases
+alias gcli='java -jar ../../cli/build/libs/gravitino-cli-*-incubating-SNAPSHOT.jar'
 
 # display help
 gcli --help
@@ -31,73 +32,75 @@ gcli --help
 gcli --version
 
 # metalake details
-gcli --details
+gcli details
 
 # metalake list
-gcli --list
+gcli list
 
 # list all catalogs in a metalake 
-gcli metalake --list --name metalake_demo
+gcli metalake list --metalake metalake_demo
 
 # list catalog schema
-gcli catalog --list --name metalake_demo.catalog_iceberg
-gcli catalog --list --name metalake_demo.catalog_mysql
-gcli catalog --list --name metalake_demo.catalog_postgres
-gcli catalog --list --name metalake_demo.catalog_hive
+gcli catalog list --metalake metalake_demo --name catalog_iceberg
+gcli catalog list --metalake metalake_demo --name catalog_mysql
+gcli catalog list --metalake metalake_demo --name catalog_postgres
+gcli catalog list --metalake metalake_demo --name catalog_hive
 
 # list catalog details
-gcli catalog --details --name metalake_demo.catalog_iceberg
-gcli catalog --details --name metalake_demo.catalog_mysql
-gcli catalog --details --name metalake_demo.catalog_postgres
-gcli catalog --details --name metalake_demo.catalog_hive
+gcli catalog details --metalake metalake_demo --name catalog_iceberg
+gcli catalog details --metalake metalake_demo --name catalog_mysql
+gcli catalog details --metalake metalake_demo --name catalog_postgres
+gcli catalog details --metalake metalake_demo --name catalog_hive
 
 # list schema tables
-gcli schema --list --name metalake_demo.catalog_postgres.hr
-gcli schema --list --name metalake_demo.catalog_mysql.db
-gcli schema --list --name metalake_demo.catalog_hive.sales
+gcli schema list --metalake metalake_demo --name catalog_postgres.hr
+gcli schema list --metalake metalake_demo --name catalog_mysql.db
+gcli schema list --metalake metalake_demo --name catalog_hive.sales
 
 # list schema details
-gcli schema --details --name metalake_demo.catalog_postgres.hr
-gcli schema --details --name metalake_demo.catalog_mysql.db
-gcli schema --details --name metalake_demo.catalog_hive.sales
+gcli schema details --metalake metalake_demo --name catalog_postgres.hr
+gcli schema details --metalake metalake_demo --name catalog_mysql.db
+gcli schema details --metalake metalake_demo --name catalog_hive.sales
 
 # list table details
-gcli table --list --name metalake_demo.catalog_postgres.hr.departments
-gcli table --list --name metalake_demo.catalog_mysql.db.iceberg_tables
-gcli table --list --name metalake_demo.catalog_hive.sales.products
+gcli table list --metalake metalake_demo --name catalog_postgres.hr.departments
+gcli table list --metalake metalake_demo --name catalog_mysql.db.iceberg_tables
+gcli table list --metalake metalake_demo --name catalog_hive.sales.products
 
 # Exmaples where metalake is set in an evironment variable
 export GRAVITINO_METALAKE=metalake_demo
 
 # metalake details
-gcli metalake --details
+gcli metalake details
 
 # list all catalogs in a metalake 
-gcli metalake --list
+gcli metalake list
 
 # list catalog schema
-gcli catalog --list --name catalog_iceberg
-gcli catalog --list --name catalog_mysql
-gcli catalog --list --name catalog_postgres
-gcli catalog --list --name catalog_hive
+gcli catalog list --name catalog_iceberg
+gcli catalog list --name catalog_mysql
+gcli catalog list --name catalog_postgres
+gcli catalog list --name catalog_hive
 
 # list catalog details
-gcli catalog --details --name catalog_iceberg
-gcli catalog --details --name catalog_mysql
-gcli catalog --details --name catalog_postgres
-gcli catalog --details --name catalog_hive
+gcli catalog details --name catalog_iceberg
+gcli catalog details --name catalog_mysql
+gcli catalog details --name catalog_postgres
+gcli catalog details --name catalog_hive
 
 # list schema tables
-gcli schema --list --name catalog_postgres.hr
-gcli schema --list --name catalog_mysql.db
-gcli schema --list --name catalog_hive.sales
+gcli schema list --name catalog_postgres.hr
+gcli schema list --name catalog_mysql.db
+gcli schema list --name catalog_hive.sales
 
 # list schema details
-gcli schema --details --name catalog_postgres.hr
-gcli schema --details --name catalog_mysql.db
-gcli schema --details --name catalog_hive.sales
+gcli schema details --name catalog_postgres.hr
+gcli schema details --name catalog_mysql.db
+gcli schema details --name catalog_hive.sales
 
 # list table details
-gcli table --list --name catalog_postgres.hr.departments
-gcli table --list --name catalog_mysql.db.iceberg_tables
-gcli table --list --name catalog_hive.sales.products
+gcli table list --name catalog_postgres.hr.departments
+gcli table list --name catalog_mysql.db.iceberg_tables
+gcli table list --name catalog_hive.sales.products
+
+unset GRAVITINO_METALAKE
