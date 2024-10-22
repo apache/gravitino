@@ -875,5 +875,4 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             endpoint_override=aws_endpoint_url,
         )
 
-
 fsspec.register_implementation(PROTOCOL_NAME, GravitinoVirtualFileSystem)

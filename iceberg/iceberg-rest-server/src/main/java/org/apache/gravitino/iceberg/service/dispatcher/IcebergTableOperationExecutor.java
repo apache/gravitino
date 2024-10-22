@@ -17,23 +17,26 @@
  *  under the License.
  */
 
-package org.apache.gravitino.iceberg.service.rest;
+package org.apache.gravitino.iceberg.service.dispatcher;
 
-import java.util.Map;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
-import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 
-// Provide a custom catalogWrapper to do test like `registerTable`
-public class IcebergCatalogWrapperManagerForTest extends IcebergCatalogWrapperManager {
-  public IcebergCatalogWrapperManagerForTest(
-      Map<String, String> properties, IcebergConfigProvider configProvider) {
-    super(properties, configProvider);
+public class IcebergTableOperationExecutor implements IcebergTableOperationDispatcher {
+
+  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
+
+  public IcebergTableOperationExecutor(IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+    this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
   }
 
   @Override
-  public IcebergCatalogWrapper createIcebergCatalogWrapper(IcebergConfig icebergConfig) {
-    return new IcebergCatalogWrapperForTest(icebergConfig);
+  public LoadTableResponse createTable(
+      String catalogName, Namespace namespace, CreateTableRequest createTableRequest) {
+    return icebergCatalogWrapperManager
+        .getCatalogWrapper(catalogName)
+        .createTable(namespace, createTableRequest);
   }
 }
