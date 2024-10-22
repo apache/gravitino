@@ -21,25 +21,11 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
-import org.apache.iceberg.rest.requests.CreateTableRequest;
 
-/** Represent a failure event when creating Iceberg table failed. */
+/** Represent a pre event before loading Iceberg table. */
 @DeveloperApi
-public class IcebergCreateTableFailureEvent extends IcebergTableFailureEvent {
-  private CreateTableRequest createTableRequest;
-
-  public IcebergCreateTableFailureEvent(
-      String user,
-      NameIdentifier nameIdentifier,
-      CreateTableRequest createTableRequest,
-      Exception e) {
-    super(user, nameIdentifier, e);
-    this.createTableRequest =
-        IcebergRestUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
-  }
-
-  public CreateTableRequest createTableRequest() {
-    return createTableRequest;
+public class IcebergLoadTablePreEvent extends IcebergTablePreEvent {
+  public IcebergLoadTablePreEvent(String user, NameIdentifier tableIdentifier) {
+    super(user, tableIdentifier);
   }
 }

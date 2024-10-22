@@ -21,25 +21,19 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.iceberg.service.IcebergRestUtils;
-import org.apache.iceberg.rest.requests.CreateTableRequest;
 
-/** Represent a failure event when creating Iceberg table failed. */
+/** Represent an event after dropping Iceberg table successfully. */
 @DeveloperApi
-public class IcebergCreateTableFailureEvent extends IcebergTableFailureEvent {
-  private CreateTableRequest createTableRequest;
+public class IcebergDropTableEvent extends IcebergTableEvent {
+  private boolean purgeRequested;
 
-  public IcebergCreateTableFailureEvent(
-      String user,
-      NameIdentifier nameIdentifier,
-      CreateTableRequest createTableRequest,
-      Exception e) {
-    super(user, nameIdentifier, e);
-    this.createTableRequest =
-        IcebergRestUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
+  public IcebergDropTableEvent(
+      String user, NameIdentifier resourceIdentifier, boolean purgeRequested) {
+    super(user, resourceIdentifier);
+    this.purgeRequested = purgeRequested;
   }
 
-  public CreateTableRequest createTableRequest() {
-    return createTableRequest;
+  public boolean purgeRequested() {
+    return purgeRequested;
   }
 }

@@ -60,6 +60,7 @@ import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,8 +102,12 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "list-table", absolute = true)
   public Response listTable(
       @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
-    return IcebergRestUtils.ok(
-        icebergCatalogWrapperManager.getOps(prefix).listTable(RESTUtil.decodeNamespace(namespace)));
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
+    ListTablesResponse listTablesResponse =
+        tableOperationDispatcher.listTable(catalogName, icebergNS);
+    return IcebergRestUtils.ok(listTablesResponse);
   }
 
   @POST
@@ -128,7 +133,7 @@ public class IcebergTableOperations {
     LoadTableResponse loadTableResponse =
         tableOperationDispatcher.createTable(catalogName, icebergNS, createTableRequest);
     if (isCredentialVending) {
-      return IcebergRestUtils.ok(injectCredentialConfig(prefix, loadTableResponse));
+      return IcebergRestUtils.ok(injectCredentialConfig(catalogName, loadTableResponse));
     } else {
       return IcebergRestUtils.ok(loadTableResponse);
     }
@@ -144,19 +149,20 @@ public class IcebergTableOperations {
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       UpdateTableRequest updateTableRequest) {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     if (LOG.isInfoEnabled()) {
       LOG.info(
-          "Update Iceberg table, namespace: {}, table: {}, updateTableRequest: {}",
-          namespace,
+          "Update Iceberg table, catalog: {}, namespace: {}, table: {}, updateTableRequest: {}",
+          catalogName,
+          icebergNS,
           table,
           SerializeUpdateTableRequest(updateTableRequest));
     }
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    return IcebergRestUtils.ok(
-        icebergCatalogWrapperManager
-            .getOps(prefix)
-            .updateTable(tableIdentifier, updateTableRequest));
+    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+    LoadTableResponse loadTableResponse =
+        tableOperationDispatcher.updateTable(catalogName, tableIdentifier, updateTableRequest);
+    return IcebergRestUtils.ok(loadTableResponse);
   }
 
   @DELETE
@@ -169,18 +175,16 @@ public class IcebergTableOperations {
       @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested) {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Drop Iceberg table, namespace: {}, table: {}, purgeRequested: {}",
-        namespace,
+        "Drop Iceberg table, catalog: {}, namespace: {}, table: {}, purgeRequested: {}",
+        catalogName,
+        icebergNS,
         table,
         purgeRequested);
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    if (purgeRequested) {
-      icebergCatalogWrapperManager.getOps(prefix).purgeTable(tableIdentifier);
-    } else {
-      icebergCatalogWrapperManager.getOps(prefix).dropTable(tableIdentifier);
-    }
+    TableIdentifier tableIdentifier = TableIdentifier.of(namespace, table);
+    tableOperationDispatcher.dropTable(catalogName, tableIdentifier, purgeRequested);
     return IcebergRestUtils.noContent();
   }
 
@@ -195,21 +199,23 @@ public class IcebergTableOperations {
       @PathParam("table") String table,
       @DefaultValue("all") @QueryParam("snapshots") String snapshots,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     LOG.info(
-        "Load iceberg table, namespace: {}, table: {}, access delegation: {}, "
+        "Load Iceberg table, catalog: {}, namespace: {}, table: {}, access delegation: {}, "
             + "credential vending: {}",
-        namespace,
+        catalogName,
+        icebergNS,
         table,
         accessDelegation,
         isCredentialVending);
     // todo support snapshots
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
+    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
     LoadTableResponse loadTableResponse =
-        icebergCatalogWrapperManager.getOps(prefix).loadTable(tableIdentifier);
+        tableOperationDispatcher.loadTable(catalogName, tableIdentifier);
     if (isCredentialVending) {
-      return IcebergRestUtils.ok(injectCredentialConfig(prefix, loadTableResponse));
+      return IcebergRestUtils.ok(injectCredentialConfig(catalogName, loadTableResponse));
     } else {
       return IcebergRestUtils.ok(loadTableResponse);
     }
@@ -224,9 +230,16 @@ public class IcebergTableOperations {
       @PathParam("prefix") String prefix,
       @PathParam("namespace") String namespace,
       @PathParam("table") String table) {
-    TableIdentifier tableIdentifier =
-        TableIdentifier.of(RESTUtil.decodeNamespace(namespace), table);
-    if (icebergCatalogWrapperManager.getOps(prefix).tableExists(tableIdentifier)) {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    LOG.info(
+        "Check Iceberg table exists, catalog: {}, namespace: {}, table: {}",
+        catalogName,
+        icebergNS,
+        table);
+    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+    boolean exists = tableOperationDispatcher.tableExists(catalogName, tableIdentifier);
+    if (exists) {
       return IcebergRestUtils.okWithoutContent();
     } else {
       return IcebergRestUtils.notExists();
@@ -257,9 +270,9 @@ public class IcebergTableOperations {
   }
 
   private LoadTableResponse injectCredentialConfig(
-      String prefix, LoadTableResponse loadTableResponse) {
+      String catalogName, LoadTableResponse loadTableResponse) {
     CredentialProvider credentialProvider =
-        icebergCatalogWrapperManager.getCredentialProvider(prefix);
+        icebergCatalogWrapperManager.getCredentialProvider(catalogName);
     if (credentialProvider == null) {
       throw new NotSupportedException(
           "Doesn't support credential vending, please add "
@@ -296,7 +309,7 @@ public class IcebergTableOperations {
           X_ICEBERG_ACCESS_DELEGATION
               + ": "
               + accessDelegation
-              + " is illegal, Iceberg REST spec supports:[vended-credentials,remote-signing], "
+              + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
               + "Gravitino Iceberg REST server supports: vended-credentials");
     }
   }

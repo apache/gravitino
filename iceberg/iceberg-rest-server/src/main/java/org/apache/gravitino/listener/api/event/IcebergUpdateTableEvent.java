@@ -22,24 +22,33 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
-import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 
-/** Represent a failure event when creating Iceberg table failed. */
+/** Represent an event after updating Iceberg table successfully. */
 @DeveloperApi
-public class IcebergCreateTableFailureEvent extends IcebergTableFailureEvent {
-  private CreateTableRequest createTableRequest;
+public class IcebergUpdateTableEvent extends IcebergTableEvent {
 
-  public IcebergCreateTableFailureEvent(
+  private UpdateTableRequest updateTableRequest;
+  private LoadTableResponse loadTableResponse;
+
+  public IcebergUpdateTableEvent(
       String user,
-      NameIdentifier nameIdentifier,
-      CreateTableRequest createTableRequest,
-      Exception e) {
-    super(user, nameIdentifier, e);
-    this.createTableRequest =
-        IcebergRestUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
+      NameIdentifier resourceIdentifier,
+      UpdateTableRequest updateTableRequest,
+      LoadTableResponse loadTableResponse) {
+    super(user, resourceIdentifier);
+    this.updateTableRequest =
+        IcebergRestUtils.cloneIcebergRESTObject(updateTableRequest, UpdateTableRequest.class);
+    this.loadTableResponse =
+        IcebergRestUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
   }
 
-  public CreateTableRequest createTableRequest() {
-    return createTableRequest;
+  public UpdateTableRequest createTableRequest() {
+    return updateTableRequest;
+  }
+
+  public LoadTableResponse loadTableResponse() {
+    return loadTableResponse;
   }
 }
