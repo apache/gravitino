@@ -34,6 +34,9 @@ import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
+import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsPreEvent;
@@ -44,6 +47,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -84,7 +88,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergCreateTableFailureEvent(
-              PrincipalUtils.getCurrentUserName(), nameIdentifier, e));
+              PrincipalUtils.getCurrentUserName(), nameIdentifier, createTableRequest, e));
       throw e;
     }
     eventBus.dispatchEvent(
@@ -112,7 +116,7 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergUpdateTableFailureEvent(
-              PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier, e));
+              PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier, updateTableRequest, e));
       throw e;
     }
     eventBus.dispatchEvent(
@@ -206,5 +210,26 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
         new IcebergTableExistsEvent(
             PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier, isExists));
     return isExists;
+  }
+
+  @Override
+  public void renameTable(String catalogName, RenameTableRequest renameTableRequest) {
+    TableIdentifier sourceTable = renameTableRequest.source();
+    NameIdentifier gravitinoNameIdentifier =
+        IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, catalogName, sourceTable);
+    eventBus.dispatchEvent(
+        new IcebergRenameTablePreEvent(
+            PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier, renameTableRequest));
+    try {
+      icebergTableOperationDispatcher.renameTable(catalogName, renameTableRequest);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergRenameTableFailureEvent(
+              PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier, renameTableRequest, e));
+      throw e;
+    }
+    eventBus.dispatchEvent(
+        new IcebergRenameTableEvent(
+            PrincipalUtils.getCurrentUserName(), gravitinoNameIdentifier, renameTableRequest));
   }
 }

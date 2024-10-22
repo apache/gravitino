@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -89,4 +90,12 @@ public interface IcebergTableOperationDispatcher {
    * @return Whether table exists.
    */
   boolean tableExists(String catalogName, TableIdentifier tableIdentifier);
+
+  /**
+   * Rename an Iceberg table.
+   *
+   * @param catalogName The catalog name when dropping the table.
+   * @param renameTableRequest Rename table request information.
+   */
+  void renameTable(String catalogName, RenameTableRequest renameTableRequest);
 }

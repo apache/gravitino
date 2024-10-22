@@ -21,11 +21,25 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
 
 /** Represent a failure event when updating Iceberg table failed. */
 @DeveloperApi
-public class IcebergUpdateTableFailureEvent extends IcebergFailureEvent {
-  public IcebergUpdateTableFailureEvent(String user, NameIdentifier nameIdentifier, Exception e) {
+public class IcebergUpdateTableFailureEvent extends IcebergTableFailureEvent {
+  private UpdateTableRequest updateTableRequest;
+
+  public IcebergUpdateTableFailureEvent(
+      String user,
+      NameIdentifier nameIdentifier,
+      UpdateTableRequest updateTableRequest,
+      Exception e) {
     super(user, nameIdentifier, e);
+    this.updateTableRequest =
+        IcebergRestUtils.cloneIcebergRESTObject(updateTableRequest, UpdateTableRequest.class);
+  }
+
+  public UpdateTableRequest updateTableRequest() {
+    return updateTableRequest;
   }
 }

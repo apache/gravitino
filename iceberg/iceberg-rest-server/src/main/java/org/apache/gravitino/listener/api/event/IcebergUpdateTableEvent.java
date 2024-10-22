@@ -39,7 +39,7 @@ public class IcebergUpdateTableEvent extends IcebergTableEvent {
       LoadTableResponse loadTableResponse) {
     super(user, resourceIdentifier);
     this.updateTableRequest =
-        IcebergRestUtils.cloneIcebergRESTObject(this.updateTableRequest, UpdateTableRequest.class);
+        IcebergRestUtils.cloneIcebergRESTObject(updateTableRequest, UpdateTableRequest.class);
     this.loadTableResponse =
         IcebergRestUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
   }

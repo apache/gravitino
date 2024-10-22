@@ -23,6 +23,7 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -74,5 +75,10 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public boolean tableExists(String catalogName, TableIdentifier tableIdentifier) {
     return icebergCatalogWrapperManager.getCatalogWrapper(catalogName).tableExists(tableIdentifier);
+  }
+
+  @Override
+  public void renameTable(String catalogName, RenameTableRequest renameTableRequest) {
+    icebergCatalogWrapperManager.getCatalogWrapper(catalogName).renameTable(renameTableRequest);
   }
 }
