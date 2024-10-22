@@ -27,8 +27,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** List all schema names in a schema. */
 public class ListSchema extends Command {
 
-  protected String metalake;
-  protected String catalog;
+  protected final String metalake;
+  protected final String catalog;
 
   /**
    * Lists all schemas in a catalog.

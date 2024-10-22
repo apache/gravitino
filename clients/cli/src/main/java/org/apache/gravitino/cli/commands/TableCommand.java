@@ -30,8 +30,8 @@ import org.apache.gravitino.rel.TableCatalog;
 /* Common code for all table commands. */
 public class TableCommand extends Command {
 
-  protected String metalake;
-  protected String catalog;
+  protected final String metalake;
+  protected final String catalog;
 
   /**
    * Common code for all table commands.

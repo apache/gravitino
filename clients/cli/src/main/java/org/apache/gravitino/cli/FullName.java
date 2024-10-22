@@ -26,8 +26,9 @@ import org.apache.commons.cli.CommandLine;
  * metalake, catalog, schema, and table names.
  */
 public class FullName {
-  private CommandLine line;
+  private final CommandLine line;
   private String metalakeEnv;
+  private boolean matalakeSet = false;
 
   /**
    * Constructor for the {@code FullName} class.
@@ -51,8 +52,9 @@ public class FullName {
     }
 
     // Cache the metalake environment variable
-    if (metalakeEnv == null) {
+    if (metalakeEnv == null && !matalakeSet) {
       metalakeEnv = System.getenv("GRAVITINO_METALAKE");
+      matalakeSet = true;
     }
 
     // Check if the metalake name is set as an environment variable

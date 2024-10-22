@@ -29,9 +29,9 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 /** Displays the details of schema. */
 public class SchemaDetails extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String schema;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String schema;
 
   /**
    * Displays the details of a schema.

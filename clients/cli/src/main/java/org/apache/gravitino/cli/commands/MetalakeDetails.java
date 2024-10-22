@@ -25,7 +25,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /** Displays the details of a metalake. */
 public class MetalakeDetails extends Command {
-  protected String metalake;
+  protected final String metalake;
 
   /**
    * Displays metalake details.

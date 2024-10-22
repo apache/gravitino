@@ -25,7 +25,7 @@ import org.apache.gravitino.Namespace;
 /** List the names of all tables in a schema. */
 public class ListTables extends TableCommand {
 
-  protected String schema;
+  protected final String schema;
 
   /**
    * List the names of all tables in a schema.

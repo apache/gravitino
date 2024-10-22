@@ -26,7 +26,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /* Lists all catalogs in a metalake. */
 public class ListCatalogs extends Command {
 
-  protected String metalake;
+  protected final String metalake;
 
   /**
    * Lists all catalogs in a metalake.

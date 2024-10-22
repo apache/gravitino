@@ -38,11 +38,12 @@ import org.apache.gravitino.cli.commands.TableDetails;
 /* Gravitino Command line */
 public class GravitinoCommandLine {
 
-  private CommandLine line;
-  private Options options;
-  private String entity;
-  private String command;
+  private final CommandLine line;
+  private final Options options;
+  private final String entity;
+  private final String command;
   private String urlEnv;
+  private boolean urlSet = false;
 
   public static final String CMD = "gcli"; // recommended name
   public static final String DEFAULT_URL = "http://localhost:8090";
@@ -195,8 +196,9 @@ public class GravitinoCommandLine {
     }
 
     // Cache the Gravitino URL environment variable
-    if (urlEnv == null) {
+    if (urlEnv == null && !urlSet) {
       urlEnv = System.getenv("GRAVITINO_URL");
+      urlSet = true;
     }
 
     // If set return the Gravitino URL environment variable

@@ -27,8 +27,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 public class CatalogDetails extends Command {
 
-  protected String metalake;
-  protected String catalog;
+  protected final String metalake;
+  protected final String catalog;
 
   /**
    * Displays the name and comment of a catalog.
