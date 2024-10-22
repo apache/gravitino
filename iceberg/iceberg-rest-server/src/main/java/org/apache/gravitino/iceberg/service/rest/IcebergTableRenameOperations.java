@@ -62,7 +62,7 @@ public class IcebergTableRenameOperations {
       @PathParam("prefix") String prefix, RenameTableRequest renameTableRequest) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     LOG.info(
-        "List Iceberg tables, catalog:{}, source: {}, destination: {}.",
+        "Rename Iceberg tables, catalog: {}, source: {}, destination: {}.",
         catalogName,
         renameTableRequest.source(),
         renameTableRequest.destination());

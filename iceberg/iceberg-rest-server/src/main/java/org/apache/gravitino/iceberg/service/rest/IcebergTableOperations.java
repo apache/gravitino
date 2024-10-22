@@ -153,7 +153,7 @@ public class IcebergTableOperations {
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     if (LOG.isInfoEnabled()) {
       LOG.info(
-          "Update Iceberg table, catalog:{}, namespace: {}, table: {}, updateTableRequest: {}",
+          "Update Iceberg table, catalog: {}, namespace: {}, table: {}, updateTableRequest: {}",
           catalogName,
           icebergNS,
           table,
@@ -178,7 +178,7 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Drop Iceberg table, catalog:{}, namespace: {}, table: {}, purgeRequested: {}",
+        "Drop Iceberg table, catalog: {}, namespace: {}, table: {}, purgeRequested: {}",
         catalogName,
         icebergNS,
         table,
