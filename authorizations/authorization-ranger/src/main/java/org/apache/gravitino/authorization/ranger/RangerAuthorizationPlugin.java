@@ -660,7 +660,7 @@ public abstract class RangerAuthorizationPlugin
   @Override
   public void close() throws IOException {}
 
-  boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
+  public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()
         .allMatch(
             securableObject -> {

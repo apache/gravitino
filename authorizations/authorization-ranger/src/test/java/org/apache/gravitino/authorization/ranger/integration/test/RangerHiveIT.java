@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.authorization.ranger.integration.test;
 
-import static org.apache.gravitino.authorization.SecurableObjects.DOT_SPLITTER;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.verifyRoleInRanger;
 
@@ -43,6 +42,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
+import org.apache.gravitino.authorization.ranger.RangerMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.RangerSecurableObject;
 import org.apache.gravitino.authorization.ranger.RangerSecurableObjects;
@@ -515,7 +515,11 @@ public class RangerHiveIT {
     String userName = "user1";
     rangerAuthHivePlugin.onOwnerSet(
         oldMetadataObject, null, new MockOwner(userName, Owner.Type.USER));
-    verifyOwnerInRanger(oldMetadataObject, Lists.newArrayList(userName));
+    rangerAuthHivePlugin.translateOwner(oldMetadataObject).stream()
+        .forEach(
+            rangerSecurableObject -> {
+              verifyOwnerInRanger(rangerSecurableObject, Lists.newArrayList(userName));
+            });
 
     SecurableObject oldSecurableObject =
         SecurableObjects.parse(
@@ -552,13 +556,21 @@ public class RangerHiveIT {
             .withSecurableObjects(Lists.newArrayList(newSecurableObject))
             .build();
     verifyRoleInRanger(rangerAuthHivePlugin, verifyRole);
-    verifyOwnerInRanger(oldMetadataObject, Lists.newArrayList(userName));
+    rangerAuthHivePlugin.translateOwner(oldMetadataObject).stream()
+        .forEach(
+            rangerSecurableObject -> {
+              verifyOwnerInRanger(rangerSecurableObject, Lists.newArrayList(userName));
+            });
 
     // Delete the role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(verifyRole));
     // Because these metaobjects have an owner, so the policy will not be deleted.
     assertFindManagedPolicy(role, true);
-    verifyOwnerInRanger(oldMetadataObject, Lists.newArrayList(userName));
+    rangerAuthHivePlugin.translateOwner(oldMetadataObject).stream()
+        .forEach(
+            rangerSecurableObject -> {
+              verifyOwnerInRanger(rangerSecurableObject, Lists.newArrayList(userName));
+            });
   }
 
   @Test
@@ -899,7 +911,12 @@ public class RangerHiveIT {
     String ownerName = "owner1";
     rangerAuthHivePlugin.onOwnerSet(
         securableObject1, null, new MockOwner(ownerName, Owner.Type.USER));
-    verifyOwnerInRanger(securableObject1, Lists.newArrayList(ownerName), null, null, null);
+    rangerAuthHivePlugin.translateOwner(securableObject1).stream()
+        .forEach(
+            rangerSecurableObject -> {
+              verifyOwnerInRanger(
+                  rangerSecurableObject, Lists.newArrayList(ownerName), null, null, null);
+            });
 
     RoleEntity role1 =
         RoleEntity.builder()
@@ -1277,23 +1294,13 @@ public class RangerHiveIT {
     assertFindManagedPolicy(role3, true);
   }
 
-  private static String generatePolicyName(MetadataObject metadataObject) {
-    List<String> nsMetadataObject =
-        Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
-    if (!(metadataObject instanceof RangerSecurableObject)
-        && metadataObject.type() != MetadataObject.Type.METALAKE) {
-      nsMetadataObject.remove(0); // remove `catalog`
-    }
-    return String.join(".", nsMetadataObject);
-  }
-
   /**
    * Verify the Gravitino role in Ranger service
    *
    * <p>metadataObject: the Gravitino securable object to be verified
    */
   private void verifyOwnerInRanger(
-      MetadataObject metadataObject,
+      RangerMetadataObject metadataObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups,
@@ -1301,7 +1308,7 @@ public class RangerHiveIT {
       List<String> includeRoles,
       List<String> excludeRoles) {
     // Find policy by each metadata Object
-    String policyName = generatePolicyName(metadataObject);
+    String policyName = metadataObject.fullName();
     RangerPolicy policy;
     try {
       policy = RangerITEnv.rangerClient.getPolicy(RangerITEnv.RANGER_HIVE_REPO_NAME, policyName);
@@ -1315,13 +1322,7 @@ public class RangerHiveIT {
     Assertions.assertTrue(policy.getPolicyLabels().contains(RangerHelper.MANAGED_BY_GRAVITINO));
 
     // verify namespace
-    List<String> metaObjNamespaces =
-        Lists.newArrayList(DOT_SPLITTER.splitToList(metadataObject.fullName()));
-    if (!(metadataObject instanceof RangerSecurableObject)
-        && metadataObject.type() != MetadataObject.Type.METALAKE) {
-      metaObjNamespaces.remove(0); // skip catalog
-    }
-
+    List<String> metaObjNamespaces = metadataObject.names();
     List<String> rolePolicies = new ArrayList<>();
     for (int i = 0; i < metaObjNamespaces.size(); i++) {
       rolePolicies.add(
@@ -1402,21 +1403,21 @@ public class RangerHiveIT {
             });
   }
 
-  private void verifyOwnerInRanger(MetadataObject metadataObject) {
+  private void verifyOwnerInRanger(RangerMetadataObject metadataObject) {
     verifyOwnerInRanger(metadataObject, null, null, null, null, null, null);
   }
 
-  private void verifyOwnerInRanger(MetadataObject metadataObject, List<String> includeUsers) {
+  private void verifyOwnerInRanger(RangerMetadataObject metadataObject, List<String> includeUsers) {
     verifyOwnerInRanger(metadataObject, includeUsers, null, null, null, null, null);
   }
 
   private void verifyOwnerInRanger(
-      MetadataObject metadataObject, List<String> includeUsers, List<String> excludeUsers) {
+      RangerMetadataObject metadataObject, List<String> includeUsers, List<String> excludeUsers) {
     verifyOwnerInRanger(metadataObject, includeUsers, excludeUsers, null, null, null, null);
   }
 
   private void verifyOwnerInRanger(
-      MetadataObject metadataObject,
+      RangerMetadataObject metadataObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups) {
@@ -1425,7 +1426,7 @@ public class RangerHiveIT {
   }
 
   private void verifyOwnerInRanger(
-      MetadataObject metadataObject,
+      RangerMetadataObject metadataObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups,
@@ -1435,7 +1436,7 @@ public class RangerHiveIT {
   }
 
   private void verifyOwnerInRanger(
-      MetadataObject metadataObject,
+      RangerMetadataObject metadataObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups,
