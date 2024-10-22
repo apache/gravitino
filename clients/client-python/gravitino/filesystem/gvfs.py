@@ -320,7 +320,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             StorageType.HDFS,
             StorageType.GCS,
             StorageType.S3,
-            StorageType.S3,
+            StorageType.S3A,
         ]:
             src_context_pair.filesystem().mv(
                 self._strip_storage_protocol(storage_type, src_actual_path),
@@ -856,7 +856,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             )
 
         # get 'aws_secret_access_key' from s3_options, if the key is not found, throw an exception
-        aws_secret_access_key = s3_options.get(GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY)
+        aws_secret_access_key = s3_options.get(GVFSConfig.GVFS_FILESYSTEM_S3_SECRET_KEY)
         if aws_secret_access_key is None:
             raise GravitinoRuntimeException(
                 "AWS secret access key is not found in the options."

@@ -157,22 +157,10 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         self.assertTrue(self.fs.exists(modified_actual_dir))
         self.assertTrue(fs.exists(modified_dir))
 
-        self.assertIsNotNone(fs.modified(modified_dir))
+        self.assertIsNone(fs.modified(modified_dir))
 
         # create a file under the dir 'modified_dir'.
         file_path = modified_dir + "/test.txt"
         fs.touch(file_path)
         self.assertTrue(fs.exists(file_path))
         self.assertIsNotNone(fs.modified(file_path))
-
-    # @unittest.skip(
-    #     "This test will fail for https://github.com/apache/arrow/issues/44438"
-    # )
-    # def test_pandas(self):
-    #     pass
-    #
-    # @unittest.skip(
-    #     "This test will fail for https://github.com/apache/arrow/issues/44438"
-    # )
-    # def test_pyarrow(self):
-    #     pass
