@@ -278,7 +278,11 @@ const CreateCatalogDialog = props => {
           ...others
         } = prevProperties
 
-        if (catalogBackend && catalogBackend === 'hive' && ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)) {
+        if (
+          catalogBackend &&
+          catalogBackend === 'hive' &&
+          ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
+        ) {
           properties = {
             'catalog-backend': catalogBackend,
             uri: uri,
