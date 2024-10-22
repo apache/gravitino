@@ -18,11 +18,17 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
+import static org.apache.gravitino.authorization.ranger.RangerMetadataObjects.DOT_JOINER;
+import static org.apache.gravitino.authorization.ranger.RangerMetadataObjects.DOT_SPLITTER;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -33,6 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
@@ -184,34 +191,34 @@ public abstract class RangerAuthorizationPlugin
                 });
       } else if (change instanceof RoleChange.UpdateSecurableObject) {
         SecurableObject oldSecurableObject =
-            ((RoleChange.UpdateSecurableObject) change).getSecurableObject();
+                ((RoleChange.UpdateSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(oldSecurableObject))) {
           return false;
         }
         SecurableObject newSecurableObject =
-            ((RoleChange.UpdateSecurableObject) change).getNewSecurableObject();
+                ((RoleChange.UpdateSecurableObject) change).getNewSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(newSecurableObject))) {
           return false;
         }
 
         Preconditions.checkArgument(
-            (oldSecurableObject.fullName().equals(newSecurableObject.fullName())
-                && oldSecurableObject.type().equals(newSecurableObject.type())),
-            "The old and new securable objects metadata must be equal!");
+                (oldSecurableObject.fullName().equals(newSecurableObject.fullName())
+                        && oldSecurableObject.type().equals(newSecurableObject.type())),
+                "The old and new securable objects metadata must be equal!");
         List<RangerSecurableObject> rangerOldSecurableObjects =
-            translatePrivilege(oldSecurableObject);
+                translatePrivilege(oldSecurableObject);
         List<RangerSecurableObject> rangerNewSecurableObjects =
-            translatePrivilege(newSecurableObject);
+                translatePrivilege(newSecurableObject);
         rangerOldSecurableObjects.stream()
-            .forEach(
-                rangerSecurableObject -> {
-                  doRemoveSecurableObject(role.name(), rangerSecurableObject);
-                });
+                .forEach(
+                        rangerSecurableObject -> {
+                          doRemoveSecurableObject(role.name(), rangerSecurableObject);
+                        });
         rangerNewSecurableObjects.stream()
-            .forEach(
-                rangerSecurableObject -> {
-                  doAddSecurableObject(role.name(), rangerSecurableObject);
-                });
+                .forEach(
+                        rangerSecurableObject -> {
+                          doAddSecurableObject(role.name(), rangerSecurableObject);
+                        });
       } else {
         throw new IllegalArgumentException(
             "Unsupported role change type: "
@@ -219,6 +226,27 @@ public abstract class RangerAuthorizationPlugin
       }
     }
 
+    return Boolean.TRUE;
+  }
+
+  @Override
+  public Boolean onMetadataUpdated(MetadataObjectChange... changes) throws RuntimeException {
+    for (MetadataObjectChange change : changes) {
+      if (change instanceof MetadataObjectChange.RenameMetadataObject) {
+        MetadataObject metadataObject =
+            ((MetadataObjectChange.RenameMetadataObject) change).getMetadataObject();
+        MetadataObject newMetadataObject =
+            ((MetadataObjectChange.RenameMetadataObject) change).getNewMetadataObject();
+        RangerMetadataObject rangerMetadataObject = translateMetadataObject(metadataObject);
+        RangerMetadataObject newRangerMetadataObject = translateMetadataObject(newMetadataObject);
+
+        doRenameMetadataObject(rangerMetadataObject, newRangerMetadataObject);
+      } else {
+        throw new IllegalArgumentException(
+            "Unsupported metadata object change type: "
+                + (change == null ? "null" : change.getClass().getSimpleName()));
+      }
+    }
     return Boolean.TRUE;
   }
 
@@ -657,6 +685,242 @@ public abstract class RangerAuthorizationPlugin
     return true;
   }
 
+  /**
+   * IF rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
+   * `{schema}.*.*` <br>
+   * IF rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
+   * <br>
+   * IF rename the COLUMN, Only need to rename `{schema}.*.*` <br>
+   */
+  private void doRenameMetadataObject(
+      RangerMetadataObject rangerMetadataObject, RangerMetadataObject newRangerMetadataObject) {
+    switch (rangerMetadataObject.type()) {
+      case SCHEMA:
+        doRenameSchemaMetadataObject(rangerMetadataObject, newRangerMetadataObject);
+        break;
+      case TABLE:
+        doRenameTableMetadataObject(rangerMetadataObject, newRangerMetadataObject);
+        break;
+      case COLUMN:
+        doRenameColumnMetadataObject(rangerMetadataObject, newRangerMetadataObject);
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported metadata object type: " + rangerMetadataObject.type());
+    }
+  }
+
+  /**
+   * Rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
+   * `{schema}.*.*` <br>
+   */
+  private void doRenameSchemaMetadataObject(
+      RangerMetadataObject rangerMetadataObject, RangerMetadataObject newRangerMetadataObject) {
+    List<String> oldMetadataNames = new ArrayList<>();
+    List<String> newMetadataNames = new ArrayList<>();
+    List<Map<String, MetadataObject.Type>> loop =
+        ImmutableList.of(
+            ImmutableMap.of(rangerMetadataObject.names().get(0), MetadataObject.Type.SCHEMA),
+            ImmutableMap.of(RangerHelper.RESOURCE_ALL, MetadataObject.Type.TABLE),
+            ImmutableMap.of(RangerHelper.RESOURCE_ALL, MetadataObject.Type.COLUMN));
+    for (Map<String, MetadataObject.Type> nameAndType : loop) {
+      oldMetadataNames.add(nameAndType.keySet().stream().findFirst().get());
+      if (nameAndType.containsValue(MetadataObject.Type.SCHEMA)) {
+        newMetadataNames.add(newRangerMetadataObject.names().get(0));
+      } else {
+        newMetadataNames.add(RangerHelper.RESOURCE_ALL);
+      }
+      updatePolicyByMetadataObject(
+          MetadataObject.Type.SCHEMA,
+          oldMetadataNames,
+          newMetadataNames,
+          nameAndType.values().stream().findFirst().get());
+    }
+  }
+
+  /**
+   * Rename the TABLE, Need to rename these the relevant policies, `*.{table}`, `*.{table}.{column}`
+   * <br>
+   */
+  private void doRenameTableMetadataObject(
+      RangerMetadataObject rangerMetadataObject, RangerMetadataObject newRangerMetadataObject) {
+    List<String> oldMetadataNames = new ArrayList<>();
+    List<String> newMetadataNames = new ArrayList<>();
+    List<Map<String, MetadataObject.Type>> loop =
+        ImmutableList.of(
+            ImmutableMap.of(rangerMetadataObject.names().get(0), MetadataObject.Type.SCHEMA),
+            ImmutableMap.of(rangerMetadataObject.names().get(1), MetadataObject.Type.TABLE),
+            ImmutableMap.of(RangerHelper.RESOURCE_ALL, MetadataObject.Type.COLUMN));
+    for (Map<String, MetadataObject.Type> nameAndType : loop) {
+      oldMetadataNames.add(nameAndType.keySet().stream().findFirst().get());
+
+      if (nameAndType.containsValue(MetadataObject.Type.SCHEMA)) {
+        newMetadataNames.add(newRangerMetadataObject.names().get(0));
+        // Skip update the schema name operation
+        continue;
+      } else if (nameAndType.containsValue(MetadataObject.Type.TABLE)) {
+        newMetadataNames.add(newRangerMetadataObject.names().get(1));
+      } else if (nameAndType.containsValue(MetadataObject.Type.COLUMN)) {
+        newMetadataNames.add(RangerHelper.RESOURCE_ALL);
+      }
+      updatePolicyByMetadataObject(
+          MetadataObject.Type.TABLE,
+          oldMetadataNames,
+          newMetadataNames,
+          nameAndType.values().stream().findFirst().get());
+    }
+  }
+
+  /** rename the COLUMN, Only need to rename `*.*.{column}` <br> */
+  private void doRenameColumnMetadataObject(
+      RangerMetadataObject rangerMetadataObject, RangerMetadataObject newRangerMetadataObject) {
+    List<String> oldMetadataNames = new ArrayList<>();
+    List<String> newMetadataNames = new ArrayList<>();
+    List<Map<String, MetadataObject.Type>> loop =
+        ImmutableList.of(
+            ImmutableMap.of(RangerHelper.RESOURCE_ALL, MetadataObject.Type.SCHEMA),
+            ImmutableMap.of(RangerHelper.RESOURCE_ALL, MetadataObject.Type.TABLE),
+            ImmutableMap.of(rangerMetadataObject.names().get(2), MetadataObject.Type.COLUMN));
+    for (Map<String, MetadataObject.Type> nameAndType : loop) {
+      oldMetadataNames.add(nameAndType.keySet().stream().findFirst().get());
+
+      if (nameAndType.containsValue(MetadataObject.Type.SCHEMA)) {
+        newMetadataNames.add(newRangerMetadataObject.names().get(0));
+        // Skip update the schema name operation
+        continue;
+      } else if (nameAndType.containsValue(MetadataObject.Type.TABLE)) {
+        newMetadataNames.add(newRangerMetadataObject.names().get(1));
+        // Skip update the table name operation
+        continue;
+      } else if (nameAndType.containsValue(MetadataObject.Type.COLUMN)) {
+        newMetadataNames.add(newRangerMetadataObject.names().get(2));
+      }
+      updatePolicyByMetadataObject(
+          MetadataObject.Type.COLUMN,
+          oldMetadataNames,
+          newMetadataNames,
+          nameAndType.values().stream().findFirst().get());
+    }
+  }
+
+  private void updatePolicyByMetadataObject(
+      MetadataObject.Type operationType,
+      List<String> oldMetadataNames,
+      List<String> newMetadataNames,
+      MetadataObject.Type type) {
+
+    RangerMetadataObject oldMetadataObject =
+        new RangerMetadataObjects.RangerMetadataObjectImpl(
+            RangerMetadataObjects.getParentFullName(oldMetadataNames),
+            RangerMetadataObjects.getLastName(oldMetadataNames),
+            RangerMetadataObject.Type.fromMetadataType(type));
+    RangerMetadataObject newMetadataObject =
+        new RangerMetadataObjects.RangerMetadataObjectImpl(
+            RangerMetadataObjects.getParentFullName(newMetadataNames),
+            RangerMetadataObjects.getLastName(newMetadataNames),
+            RangerMetadataObject.Type.fromMetadataType(type));
+    List<RangerPolicy> oldPolicies = rangerHelper.findManagedPolicies(oldMetadataObject);
+    List<RangerPolicy> newPolicies = rangerHelper.findManagedPolicies(newMetadataObject);
+
+    if (oldPolicies.isEmpty()) {
+      LOG.warn(
+          "Cannot find the Ranger policy for the metadata object({})!",
+          oldMetadataObject.fullName());
+    }
+    if (!newPolicies.isEmpty()) {
+      LOG.warn(
+          "The Ranger policy for the metadata object({}) already exists!",
+          newMetadataObject.fullName());
+    }
+    oldPolicies.stream()
+        .forEach(
+            policy -> {
+              try {
+                // Update the policy name
+                String policyName = policy.getName();
+                List<String> policyNames = Lists.newArrayList(DOT_SPLITTER.splitToList(policyName));
+                Preconditions.checkArgument(
+                    policyNames.size() >= oldMetadataNames.size(),
+                    String.format("The policy name(%s) is invalid!", policyName));
+
+                if (operationType == MetadataObject.Type.SCHEMA) {
+                  policyNames.set(0, newMetadataNames.get(0));
+                  // Update the policy resource
+                  RangerPolicy.RangerPolicyResource policyResource =
+                      new RangerPolicy.RangerPolicyResource(newMetadataNames.get(0));
+                  policy
+                      .getResources()
+                      .put(rangerHelper.policyResourceDefines.get(0), policyResource);
+                } else if (operationType == MetadataObject.Type.TABLE) {
+                  for (int i = 0; i < 2; i++) {
+                    String metadataName = newMetadataNames.get(i);
+                    policyNames.set(i, metadataName);
+                    // Update the policy resource
+                    RangerPolicy.RangerPolicyResource policyResource =
+                        new RangerPolicy.RangerPolicyResource(metadataName);
+                    policy
+                        .getResources()
+                        .put(rangerHelper.policyResourceDefines.get(i), policyResource);
+                  }
+                } else if (operationType == MetadataObject.Type.COLUMN) {
+                  for (int i = 0; i < 3; i++) {
+                    String metadataName = newMetadataNames.get(i);
+                    policyNames.set(i, metadataName);
+                    // Update the policy resource
+                    RangerPolicy.RangerPolicyResource policyResource =
+                        new RangerPolicy.RangerPolicyResource(metadataName);
+                    policy
+                        .getResources()
+                        .put(rangerHelper.policyResourceDefines.get(i), policyResource);
+                  }
+                }
+                policy.setName(DOT_JOINER.join(policyNames));
+                // Update the policy
+                rangerClient.updatePolicy(policy.getId(), policy);
+              } catch (RangerServiceException e) {
+                LOG.error("Failed to rename the policy {}!", policy);
+                throw new RuntimeException(e);
+              }
+            });
+  }
+
+  /** rename the COLUMN, Only need to rename `{schema}.*.*` <br> */
+  private boolean doRenameColumnMetadataObject2(
+      RangerMetadataObject rangerMetadataObject, RangerMetadataObject newRangerMetadataObject) {
+    RangerPolicy policy = rangerHelper.findManagedPolicy(rangerMetadataObject);
+    RangerPolicy newPolicy = rangerHelper.findManagedPolicy(newRangerMetadataObject);
+    if (policy != null && newPolicy == null) {
+      try {
+        policy.setName(newRangerMetadataObject.fullName());
+        policy.getResources().clear();
+        List<String> nsMetadataObject = newRangerMetadataObject.names();
+        for (int i = 0; i < nsMetadataObject.size(); i++) {
+          RangerPolicy.RangerPolicyResource policyResource =
+              new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));
+          policy.getResources().put(rangerHelper.policyResourceDefines.get(i), policyResource);
+        }
+        rangerClient.updatePolicy(policy.getId(), policy);
+      } catch (RangerServiceException e) {
+        LOG.error("Failed to rename the policy {}!", policy);
+        throw new RuntimeException(e);
+      }
+    } else {
+      if (policy == null) {
+        LOG.warn(
+            "Cannot find the Ranger policy for the metadata object({})!",
+            rangerMetadataObject.fullName());
+      }
+      if (newPolicy != null) {
+        LOG.warn(
+            "The Ranger policy for the metadata object({}) already exists!",
+            newRangerMetadataObject.fullName());
+      }
+      // Don't throw exception or return false, because need support immutable operation.
+      return true;
+    }
+    return true;
+  }
+
   @Override
   public void close() throws IOException {}
 
@@ -664,13 +928,16 @@ public abstract class RangerAuthorizationPlugin
   public RangerSecurableObject generateRangerSecurableObject(
       List<String> names, RangerMetadataObject.Type type, Set<RangerPrivilege> privileges) {
     validateRangerMetadataObject(names, type);
-    RangerMetadataObject metadataObject =
+    RangerMetadataObject rangerMetadataObject =
         new RangerMetadataObjects.RangerMetadataObjectImpl(
             RangerMetadataObjects.getParentFullName(names),
             RangerMetadataObjects.getLastName(names),
             type);
     return new RangerSecurableObjects.RangerSecurableObjectImpl(
-        metadataObject.parent(), metadataObject.name(), metadataObject.type(), privileges);
+        rangerMetadataObject.parent(),
+        rangerMetadataObject.name(),
+        rangerMetadataObject.type(),
+        privileges);
   }
 
   public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {

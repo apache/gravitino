@@ -141,6 +141,7 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
   }
 
   /** Translate the Gravitino securable object to the Ranger owner securable object. */
+  @Override
   public List<RangerSecurableObject> translateOwner(MetadataObject gravitinoMetadataObject) {
     List<RangerSecurableObject> rangerSecurableObjects = new ArrayList<>();
 
@@ -197,14 +198,14 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
         // Add `{schema}.{table}` for the TABLE permission
         rangerSecurableObjects.add(
             generateRangerSecurableObject(
-                convertToRangerMetadataObject(gravitinoMetadataObject),
+                translateMetadataObject(gravitinoMetadataObject).names(),
                 RangerMetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `{schema}.{table}.*` for the COLUMN permission
         rangerSecurableObjects.add(
             generateRangerSecurableObject(
                 Stream.concat(
-                        convertToRangerMetadataObject(gravitinoMetadataObject).stream(),
+                        translateMetadataObject(gravitinoMetadataObject).names().stream(),
                         Stream.of(RangerHelper.RESOURCE_ALL))
                     .collect(Collectors.toList()),
                 RangerMetadataObject.Type.COLUMN,
@@ -220,6 +221,7 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
   }
 
   /** Translate the Gravitino securable object to the Ranger securable object. */
+  @Override
   public List<RangerSecurableObject> translatePrivilege(SecurableObject securableObject) {
     List<RangerSecurableObject> rangerSecurableObjects = new ArrayList<>();
 
@@ -350,14 +352,14 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                         // Add `{schema}.{table}` for the TABLE permission
                         rangerSecurableObjects.add(
                             generateRangerSecurableObject(
-                                convertToRangerMetadataObject(securableObject),
+                                translateMetadataObject(securableObject).names(),
                                 RangerMetadataObject.Type.TABLE,
                                 rangerPrivileges));
                         // Add `{schema}.{table}.*` for the COLUMN permission
                         rangerSecurableObjects.add(
                             generateRangerSecurableObject(
                                 Stream.concat(
-                                        convertToRangerMetadataObject(securableObject).stream(),
+                                        translateMetadataObject(securableObject).names().stream(),
                                         Stream.of(RangerHelper.RESOURCE_ALL))
                                     .collect(Collectors.toList()),
                                 RangerMetadataObject.Type.COLUMN,
@@ -383,16 +385,26 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
   }
 
   /**
-   * Because the Ranger securable object is different from the Gravitino securable object, we need
-   * to convert the Gravitino securable object to the Ranger securable object.
+   * Because the Ranger metadata object is different from the Gravitino metadata object, we need to
+   * convert the Gravitino metadata object to the Ranger metadata object.
    */
-  List<String> convertToRangerMetadataObject(MetadataObject metadataObject) {
+  @Override
+  public RangerMetadataObject translateMetadataObject(MetadataObject metadataObject) {
     Preconditions.checkArgument(
         !(metadataObject instanceof RangerPrivileges),
         "The metadata object must be not a RangerPrivileges object.");
     List<String> nsMetadataObject =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
+    Preconditions.checkArgument(
+        nsMetadataObject.size() > 0, "The metadata object must have at least one name.");
     nsMetadataObject.remove(0); // remove the catalog name
-    return nsMetadataObject;
+
+    RangerMetadataObject.Type type =
+        RangerMetadataObject.Type.fromMetadataType(metadataObject.type());
+    validateRangerMetadataObject(nsMetadataObject, type);
+    return new RangerMetadataObjects.RangerMetadataObjectImpl(
+        RangerMetadataObjects.getParentFullName(nsMetadataObject),
+        RangerMetadataObjects.getLastName(nsMetadataObject),
+        type);
   }
 }

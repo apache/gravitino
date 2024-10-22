@@ -18,15 +18,20 @@
  */
 package org.apache.gravitino.connector.authorization;
 
-import java.io.Closeable;
+import org.apache.gravitino.authorization.MetadataObjectChange;
 
 /**
- * Authorization operations plugin interfaces. <br>
- * Notice: Because each interface function needs to perform multiple steps in the underlying
- * permission system, the implementation method of these function interface must be idempotent.
+ * Interface for authorization User and Group plugin operation of the underlying access control
+ * system.
  */
-public interface AuthorizationPlugin
-    extends UserGroupAuthorizationPlugin,
-        RoleAuthorizationPlugin,
-        MetadataAuthorizationPlugin,
-        Closeable {}
+interface MetadataAuthorizationPlugin {
+  /**
+   * After updating a metadata object in Gravitino, this method is called to update the role in the
+   * underlying system. <br>
+   *
+   * @param changes metadata object changes apply to the role.
+   * @return True if the update operation is successful; False if the update operation fails.
+   * @throws RuntimeException If update role encounters storage issues.
+   */
+  Boolean onMetadataUpdated(MetadataObjectChange... changes) throws RuntimeException;
+}

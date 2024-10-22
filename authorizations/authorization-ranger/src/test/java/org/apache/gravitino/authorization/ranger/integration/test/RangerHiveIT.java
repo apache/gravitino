@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
@@ -505,6 +506,92 @@ public class RangerHiveIT {
                 mockCatalogRole.securableObjects().get(0),
                 newSecurableObject)));
     assertFindManagedPolicy(mockCatalogRole, false);
+  }
+
+  @Test
+  public void testMetadataObjectChangeRenameSchema() {
+    String currentFunName = currentFunName();
+    MetadataObject oldMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog.old-%s", currentFunName), MetadataObject.Type.SCHEMA);
+    SecurableObject oldSecurableObject1 =
+        SecurableObjects.parse(
+            oldMetadataObject.fullName(),
+            oldMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    assertFindManagedPolicy(role, true);
+
+    MetadataObject newMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog.new-%s", currentFunName), oldMetadataObject.type());
+    Assertions.assertTrue(
+        rangerAuthHivePlugin.onMetadataUpdated(
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+    assertFindManagedPolicy(role, false);
+    SecurableObject newSecurableObject1 =
+        SecurableObjects.parse(
+            newMetadataObject.fullName(),
+            newMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity newRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
+            .build();
+    assertFindManagedPolicy(newRole, true);
+  }
+
+  @Test
+  public void testMetadataObjectChangeRenameTable() {
+    String currentFunName = currentFunName();
+    MetadataObject oldMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog.schema1.old-%s", currentFunName), MetadataObject.Type.TABLE);
+    SecurableObject oldSecurableObject1 =
+        SecurableObjects.parse(
+            oldMetadataObject.fullName(),
+            oldMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    assertFindManagedPolicy(role, true);
+
+    MetadataObject newMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog.schema1.new-%s", currentFunName), oldMetadataObject.type());
+    Assertions.assertTrue(
+        rangerAuthHivePlugin.onMetadataUpdated(
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+    assertFindManagedPolicy(role, false);
+    SecurableObject newSecurableObject1 =
+        SecurableObjects.parse(
+            newMetadataObject.fullName(),
+            newMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity newRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
+            .build();
+    assertFindManagedPolicy(newRole, true);
   }
 
   public void testRoleChangeCombinedOperation() {

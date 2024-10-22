@@ -74,4 +74,12 @@ public interface RangerPrivilegesMappingProvider {
    * @return The Ranger owner securable object list.
    */
   List<RangerSecurableObject> translateOwner(MetadataObject metadataObject);
+
+  /**
+   * Translate the Gravitino metadata object to the Ranger metadata object.
+   *
+   * @param metadataObject The Gravitino metadata object.
+   * @return The Ranger metadata object.
+   */
+  RangerMetadataObject translateMetadataObject(MetadataObject metadataObject);
 }
