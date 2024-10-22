@@ -31,7 +31,6 @@ import static org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConv
 import static org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter.DOUBLE;
 import static org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter.FLOAT;
 import static org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter.INT;
-import static org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter.JSON;
 import static org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter.TINYINT;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -63,7 +62,6 @@ public class TestOceanBaseTypeConverter {
     checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, "20", null);
     checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), CHAR, "20", null);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null);
-    checkJdbcTypeToGravitinoType(Types.StringType.get(), JSON, null, null);
     checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BINARY, null, null);
     checkJdbcTypeToGravitinoType(
         Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);

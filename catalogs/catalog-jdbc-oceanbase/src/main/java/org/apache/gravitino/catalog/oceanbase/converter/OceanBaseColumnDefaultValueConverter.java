@@ -103,7 +103,6 @@ public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValue
       case OceanBaseTypeConverter.CHAR:
         return Literals.of(
             columnDefaultValue, Types.FixedCharType.of(Integer.parseInt(type.getColumnSize())));
-      case OceanBaseTypeConverter.JSON:
       case JdbcTypeConverter.TEXT:
         return Literals.stringLiteral(columnDefaultValue);
       default:

@@ -41,7 +41,6 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
   static final String CHAR = "char";
   static final String BINARY = "binary";
   static final String DATETIME = "datetime";
-  static final String JSON = "json";
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
@@ -83,7 +82,6 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
         return Types.VarCharType.of(Integer.parseInt(typeBean.getColumnSize()));
       case CHAR:
         return Types.FixedCharType.of(Integer.parseInt(typeBean.getColumnSize()));
-      case JSON:
       case TEXT:
         return Types.StringType.get();
       case BINARY:
