@@ -24,7 +24,7 @@ class GravitinoArrowFSWrapper(ArrowFSWrapper):
     def _strip_protocol(cls, path):
         ops = infer_storage_options(path)
         path = ops["path"]
-        if path.startswith("//") or (path.startswith("/") and path[0] == "oss"):
+        if path.startswith("//") or (path.startswith("/") and ops["protocol"] == "oss"):
             # special case for "hdfs://path" (without the triple slash)
             # special case for "oss://path" (without the double slash)
             path = path[1:]
