@@ -50,6 +50,7 @@ class StorageType(Enum):
     LOCAL = "file"
     GCS = "gs"
     S3A = "s3a"
+    OSS = "oss"
 
 
 class FilesetContextPair:
@@ -319,6 +320,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             StorageType.HDFS,
             StorageType.GCS,
             StorageType.S3A,
+            StorageType.OSS,
         ]:
             src_context_pair.filesystem().mv(
                 self._strip_storage_protocol(storage_type, src_actual_path),
@@ -556,6 +558,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             storage_location.startswith(f"{StorageType.HDFS.value}://")
             or storage_location.startswith(f"{StorageType.GCS.value}://")
             or storage_location.startswith(f"{StorageType.S3A.value}://")
+            or storage_location.startswith(f"{StorageType.OSS.value}://")
         ):
             actual_prefix = infer_storage_options(storage_location)["path"]
         elif storage_location.startswith(f"{StorageType.LOCAL.value}:/"):
@@ -701,6 +704,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             return StorageType.GCS
         if path.startswith(f"{StorageType.S3A.value}://"):
             return StorageType.S3A
+        if path.startswith(f"{StorageType.OSS.value}://"):
+            return StorageType.OSS
         raise GravitinoRuntimeException(
             f"Storage type doesn't support now. Path:{path}"
         )
@@ -725,7 +730,12 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param path: The path
         :return: The stripped path
         """
-        if storage_type in (StorageType.HDFS, StorageType.GCS, StorageType.S3A):
+        if storage_type in (
+            StorageType.HDFS,
+            StorageType.GCS,
+            StorageType.S3A,
+            StorageType.OSS,
+        ):
             return path
         if storage_type == StorageType.LOCAL:
             return path[len(f"{StorageType.LOCAL.value}:") :]
@@ -803,6 +813,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 fs = ArrowFSWrapper(self._get_gcs_filesystem())
             elif storage_type == StorageType.S3A:
                 fs = ArrowFSWrapper(self._get_s3_filesystem())
+            elif storage_type == StorageType.OSS:
+                fs = ArrowFSWrapper(self._get_oss_filesystem())
             else:
                 raise GravitinoRuntimeException(
                     f"Storage type: `{storage_type}` doesn't support now."
@@ -853,6 +865,38 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             access_key=aws_access_key_id,
             secret_key=aws_secret_access_key,
             endpoint_override=aws_endpoint_url,
+        )
+
+    def _get_oss_filesystem(self):
+        # get 'oss_access_key_id' from oss options, if the key is not found, throw an exception
+        oss_access_key_id = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ACCESS_KEY)
+        if oss_access_key_id is None:
+            raise GravitinoRuntimeException(
+                "OSS access key id is not found in the options."
+            )
+
+        # get 'oss_secret_access_key' from oss options, if the key is not found, throw an exception
+        oss_secret_access_key = self._options.get(
+            GVFSConfig.GVFS_FILESYSTEM_OSS_SECRET_KEY
+        )
+        if oss_secret_access_key is None:
+            raise GravitinoRuntimeException(
+                "OSS secret access key is not found in the options."
+            )
+
+        # get 'oss_endpoint_url' from oss options, if the key is not found, throw an exception
+        oss_endpoint_url = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT)
+        if oss_endpoint_url is None:
+            raise GravitinoRuntimeException(
+                "OSS endpoint url is not found in the options."
+            )
+
+        # We can use S3FileSystem to access OSS
+        return importlib.import_module("pyarrow.fs").S3FileSystem(
+            access_key=oss_access_key_id,
+            secret_key=oss_secret_access_key,
+            endpoint_override=oss_endpoint_url,
+            force_virtual_addressing=True,
         )
 
 
