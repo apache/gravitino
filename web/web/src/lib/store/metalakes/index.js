@@ -47,7 +47,13 @@ import {
   deleteSchemaApi
 } from '@/lib/api/schemas'
 import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
-import { getFilesetsApi, getFilesetDetailsApi } from '@/lib/api/filesets'
+import {
+  getFilesetsApi,
+  getFilesetDetailsApi,
+  createFilesetApi,
+  updateFilesetApi,
+  deleteFilesetApi
+} from '@/lib/api/filesets'
 import { getTopicsApi, getTopicDetailsApi } from '@/lib/api/topics'
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
@@ -882,6 +888,67 @@ export const getFilesetDetails = createAsyncThunk(
     )
 
     return resFileset
+  }
+)
+
+export const createFileset = createAsyncThunk(
+  'appMetalakes/createFileset',
+  async ({ data, metalake, catalog, type, schema }, { dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(createFilesetApi({ data, metalake, catalog, schema }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      return { err: true }
+    }
+
+    const { fileset: filesetItem } = res
+
+    const filesetData = {
+      ...filesetItem,
+      node: 'fileset',
+      id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
+      key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
+      path: `?${new URLSearchParams({ metalake, catalog, type, schema, fileset: filesetItem.name }).toString()}`,
+      name: filesetItem.name,
+      title: filesetItem.name,
+      tables: [],
+      children: []
+    }
+
+    dispatch(fetchFilesets({ metalake, catalog, schema, type, init: true }))
+
+    return filesetData
+  }
+)
+
+export const updateFileset = createAsyncThunk(
+  'appMetalakes/updateFileset',
+  async ({ metalake, catalog, type, schema, fileset, data }, { dispatch }) => {
+    const [err, res] = await to(updateFilesetApi({ metalake, catalog, schema, fileset, data }))
+    if (err || !res) {
+      return { err: true }
+    }
+    dispatch(fetchFilesets({ metalake, catalog, type, schema, init: true }))
+
+    return res.catalog
+  }
+)
+
+export const deleteFileset = createAsyncThunk(
+  'appMetalakes/deleteFileset',
+  async ({ metalake, catalog, type, schema, fileset }, { dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(deleteFilesetApi({ metalake, catalog, schema, fileset }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    dispatch(fetchFilesets({ metalake, catalog, type, schema, page: 'schemas', init: true }))
+
+    return res
   }
 )
 
