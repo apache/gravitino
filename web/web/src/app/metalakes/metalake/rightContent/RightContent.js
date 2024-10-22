@@ -25,23 +25,38 @@ import { Box, Button, IconButton } from '@mui/material'
 import Icon from '@/components/Icon'
 import MetalakePath from './MetalakePath'
 import CreateCatalogDialog from './CreateCatalogDialog'
+import CreateSchemaDialog from './CreateSchemaDialog'
 import TabsContent from './tabsContent/TabsContent'
 import { useSearchParams } from 'next/navigation'
+import { useAppSelector } from '@/lib/hooks/useStore'
 
 const RightContent = () => {
   const [open, setOpen] = useState(false)
+  const [openSchema, setOpenSchema] = useState(false)
   const searchParams = useSearchParams()
-  const [isShowBtn, setBtnVisiable] = useState(true)
+  const [isShowBtn, setBtnVisible] = useState(true)
+  const [isShowSchemaBtn, setSchemaBtnVisible] = useState(false)
+  const store = useAppSelector(state => state.metalakes)
 
   const handleCreateCatalog = () => {
     setOpen(true)
   }
 
+  const handleCreateSchema = () => {
+    setOpenSchema(true)
+  }
+
   useEffect(() => {
     const paramsSize = [...searchParams.keys()].length
-    const isMetalakePage = paramsSize == 1 && searchParams.get('metalake')
-    setBtnVisiable(isMetalakePage)
-  }, [searchParams])
+    const isCatalogList = paramsSize == 1 && searchParams.get('metalake')
+    setBtnVisible(isCatalogList)
+
+    if (store.catalogs.length) {
+      const currentCatalog = store.catalogs.filter(ca => ca.name === searchParams.get('catalog'))[0]
+      const isHideSchemaAction = ['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3
+      setSchemaBtnVisible(!isHideSchemaAction && !isCatalogList)
+    }
+  }, [searchParams, store.catalogs, store.catalogs.length])
 
   return (
     <Box className={`twc-w-0 twc-grow twc-h-full twc-bg-customs-white twc-overflow-hidden`}>
@@ -74,6 +89,20 @@ const RightContent = () => {
               Create Catalog
             </Button>
             <CreateCatalogDialog open={open} setOpen={setOpen} />
+          </Box>
+        )}
+        {isShowSchemaBtn && (
+          <Box className={`twc-flex twc-items-center`}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleCreateSchema}
+              sx={{ width: 200 }}
+              data-refer='create-schema-btn'
+            >
+              Create Schema
+            </Button>
+            <CreateSchemaDialog open={openSchema} setOpen={setOpenSchema} />
           </Box>
         )}
       </Box>

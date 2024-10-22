@@ -186,7 +186,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public void clickViewCatalogBtn(String name) {
     try {
-      String xpath = "//button[@data-refer='view-catalog-" + name + "']";
+      String xpath = "//button[@data-refer='view-entity-" + name + "']";
       WebElement btn = driver.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
@@ -198,7 +198,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public void clickEditCatalogBtn(String name) {
     try {
-      String xpath = "//button[@data-refer='edit-catalog-" + name + "']";
+      String xpath = "//button[@data-refer='edit-entity-" + name + "']";
       WebElement btn = driver.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
@@ -210,7 +210,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public void clickDeleteCatalogBtn(String name) {
     try {
-      String xpath = "//button[@data-refer='delete-catalog-" + name + "']";
+      String xpath = "//button[@data-refer='delete-entity-" + name + "']";
       WebElement btn = driver.findElement(By.xpath(xpath));
       WebDriverWait wait = new WebDriverWait(driver, MAX_TIMEOUT);
       wait.until(ExpectedConditions.elementToBeClickable(By.xpath(xpath)));
