@@ -179,7 +179,7 @@ const CreateCatalogDialog = props => {
     const parentField = innerProps.find(i => i.key === field.parentField)
 
     const check =
-      (parentField && parentField.value === field.hide) ||
+      (parentField && field.hide.includes(parentField.value)) ||
       (field.parentField === 'authentication.type' && parentField === undefined)
 
     return check
@@ -232,7 +232,7 @@ const CreateCatalogDialog = props => {
     if (
       propItems[0]?.key === 'catalog-backend' &&
       propItems[0]?.value === 'hive' &&
-      providerSelect === 'lakehouse-iceberg'
+      ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
     ) {
       nextProps = propItems.filter(item => !['jdbc-driver', 'jdbc-user', 'jdbc-password'].includes(item.key))
     } else if (
@@ -278,7 +278,11 @@ const CreateCatalogDialog = props => {
           ...others
         } = prevProperties
 
-        if (catalogBackend && catalogBackend === 'hive' && providerSelect === 'lakehouse-iceberg') {
+        if (
+          catalogBackend &&
+          catalogBackend === 'hive' &&
+          ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
+        ) {
           properties = {
             'catalog-backend': catalogBackend,
             uri: uri,
