@@ -42,6 +42,7 @@ public class GravitinoCommandLine {
   private Options options;
   private String entity;
   private String command;
+  private String urlEnv;
 
   public static final String CMD = "gcli"; // recommended name
   public static final String DEFAULT_URL = "http://localhost:8090";
@@ -182,13 +183,28 @@ public class GravitinoCommandLine {
   }
 
   /**
-   * Gets the Gravitino URL from the command line options, or returns the default URL.
+   * Retrieves the Gravitinno URL from the command line options or the GRAVITINO_URL environment
+   * variable.
    *
-   * @return The Gravitino URL to be used.
+   * @return The Gravitinno URL, or null if not found.
    */
-  protected String getUrl() {
-    return line.hasOption(GravitinoOptions.URL)
-        ? line.getOptionValue(GravitinoOptions.URL)
-        : DEFAULT_URL;
+  public String getUrl() {
+    // If specified on the command line use that
+    if (line.hasOption(GravitinoOptions.URL)) {
+      return line.getOptionValue(GravitinoOptions.URL);
+    }
+
+    // Cache the Gravitino URL environment variable
+    if (urlEnv == null) {
+      urlEnv = System.getenv("GRAVITINO_URL");
+    }
+
+    // If set return the Gravitino URL environment variable
+    if (urlEnv != null) {
+      return urlEnv;
+    }
+
+    // Return the default localhost URL
+    return DEFAULT_URL;
   }
 }
