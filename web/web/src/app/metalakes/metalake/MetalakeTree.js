@@ -70,6 +70,8 @@ const MetalakeTree = props => {
             return 'custom-icons-doris'
           case 'lakehouse-paimon':
             return 'custom-icons-paimon'
+          case 'lakehouse-hudi':
+            return 'custom-icons-hudi'
           default:
             return 'bx:book'
         }

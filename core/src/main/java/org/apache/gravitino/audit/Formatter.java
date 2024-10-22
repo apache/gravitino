@@ -16,25 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.ops;
 
-import java.util.Map;
+package org.apache.gravitino.audit;
 
-/**
- * IcebergCatalogWrapperProvider is an interface defining how Iceberg REST catalog server gets
- * Iceberg catalogs.
- */
-public interface IcebergCatalogWrapperProvider {
+import org.apache.gravitino.listener.api.event.Event;
+
+/** The interface defined the conversions of metadata change event to unified log format. */
+public interface Formatter {
 
   /**
-   * @param properties The parameters for creating Provider which from configurations whose prefix
-   *     is 'gravitino.iceberg-rest.'
+   * Format the event, returning the unified audit log format.
+   *
+   * @param event The event to format.
+   * @return The formatted AuditLog.
    */
-  void initialize(Map<String, String> properties);
-
-  /**
-   * @param catalogName a param send by clients.
-   * @return the instance of IcebergCatalogWrapper.
-   */
-  IcebergCatalogWrapper getIcebergTableOps(String catalogName);
+  AuditLog format(Event event);
 }

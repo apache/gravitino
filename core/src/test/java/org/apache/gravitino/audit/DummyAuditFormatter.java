@@ -16,15 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.service.rest;
 
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.provider.ConfigBasedIcebergCatalogWrapperProvider;
+package org.apache.gravitino.audit;
 
-public class ConfigBasedIcebergCatalogWrapperProviderForTest
-    extends ConfigBasedIcebergCatalogWrapperProvider {
+import static org.apache.gravitino.audit.AuditLog.Status;
+
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.FailureEvent;
+
+public class DummyAuditFormatter implements Formatter {
   @Override
-  public IcebergCatalogWrapper getIcebergTableOps(String prefix) {
-    return new IcebergCatalogWrapperForTest();
+  public DummyAuditLog format(Event event) {
+    return DummyAuditLog.builder()
+        .user(event.user())
+        .operation(AuditLog.Operation.fromEvent(event))
+        .identifier(event.identifier() != null ? event.identifier().toString() : null)
+        .timestamp(event.eventTime())
+        .status(event instanceof FailureEvent ? Status.FAILURE : Status.SUCCESS)
+        .build();
   }
 }
