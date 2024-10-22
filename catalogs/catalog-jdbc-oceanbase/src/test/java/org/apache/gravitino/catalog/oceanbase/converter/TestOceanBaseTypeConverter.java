@@ -44,7 +44,8 @@ import org.junit.jupiter.api.Test;
  */
 public class TestOceanBaseTypeConverter {
 
-  private static final OceanBaseTypeConverter MYSQL_TYPE_CONVERTER = new OceanBaseTypeConverter();
+  private static final OceanBaseTypeConverter OCEANBASE_TYPE_CONVERTER =
+      new OceanBaseTypeConverter();
   private static final String USER_DEFINED_TYPE = "user-defined";
 
   @Test
@@ -86,17 +87,17 @@ public class TestOceanBaseTypeConverter {
     checkGravitinoTypeToJdbcType(USER_DEFINED_TYPE, Types.ExternalType.of(USER_DEFINED_TYPE));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> MYSQL_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
+        () -> OCEANBASE_TYPE_CONVERTER.fromGravitino(Types.UnparsedType.of(USER_DEFINED_TYPE)));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {
-    Assertions.assertEquals(jdbcTypeName, MYSQL_TYPE_CONVERTER.fromGravitino(gravitinoType));
+    Assertions.assertEquals(jdbcTypeName, OCEANBASE_TYPE_CONVERTER.fromGravitino(gravitinoType));
   }
 
   protected void checkJdbcTypeToGravitinoType(
       Type gravitinoType, String jdbcTypeName, String columnSize, String scale) {
     JdbcTypeConverter.JdbcTypeBean typeBean = createTypeBean(jdbcTypeName, columnSize, scale);
-    Assertions.assertEquals(gravitinoType, MYSQL_TYPE_CONVERTER.toGravitino(typeBean));
+    Assertions.assertEquals(gravitinoType, OCEANBASE_TYPE_CONVERTER.toGravitino(typeBean));
   }
 
   protected static JdbcTypeConverter.JdbcTypeBean createTypeBean(
