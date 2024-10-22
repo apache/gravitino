@@ -58,7 +58,7 @@ public class TestMain {
   public void withTwoArgsOnly() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
-    String[] args = {"metalake", "--details"};
+    String[] args = {"metalake", "details"};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);

@@ -39,12 +39,17 @@ public class FullName {
   }
 
   /**
-   * Retrieves the metalake name from the command line options, environment variables, or the first
-   * part of the full name.
+   * Retrieves the metalake name from the command line options, the GRAVITINO_METALAKE environment
+   * variable.
    *
    * @return The metalake name, or null if not found.
    */
   public String getMetalakeName() {
+    // If specified on the command line use that
+    if (line.hasOption(GravitinoOptions.METALAKE)) {
+      return line.getOptionValue(GravitinoOptions.METALAKE);
+    }
+
     // Cache the metalake environment variable
     if (metalakeEnv == null) {
       metalakeEnv = System.getenv("GRAVITINO_METALAKE");
@@ -53,9 +58,6 @@ public class FullName {
     // Check if the metalake name is set as an environment variable
     if (metalakeEnv != null) {
       return metalakeEnv;
-      // Extract the metalake name from the full name option
-    } else if (line.hasOption(GravitinoOptions.NAME)) {
-      return line.getOptionValue(GravitinoOptions.NAME).split("\\.")[0];
     }
 
     return null;
@@ -67,7 +69,7 @@ public class FullName {
    * @return The catalog name, or null if not found.
    */
   public String getCatalogName() {
-    return getNamePart(1);
+    return getNamePart(0);
   }
 
   /**
@@ -76,7 +78,7 @@ public class FullName {
    * @return The schema name, or null if not found.
    */
   public String getSchemaName() {
-    return getNamePart(2);
+    return getNamePart(1);
   }
 
   /**
@@ -85,7 +87,7 @@ public class FullName {
    * @return The table name, or null if not found.
    */
   public String getTableName() {
-    return getNamePart(3);
+    return getNamePart(2);
   }
 
   /**
@@ -100,13 +102,7 @@ public class FullName {
     if (line.hasOption(GravitinoOptions.NAME)) {
       String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
 
-      /* Adjust position if metalake is part of the full name. */
-      String metalakeEnv = System.getenv("GRAVITINO_METALAKE");
-      if (metalakeEnv != null) {
-        position = position - 1;
-      }
-
-      if (names.length < position) {
+      if (names.length <= position) {
         System.err.println(ErrorMessages.MALFORMED_NAME);
         return null;
       }

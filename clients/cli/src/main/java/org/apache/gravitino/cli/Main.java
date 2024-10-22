@@ -51,17 +51,15 @@ public class Main {
    * @return The command, one of 'details', 'list', 'create', 'delete' or 'update'.
    */
   protected static String resolveCommand(CommandLine line) {
-    /* Passed as --list, --details --create --delete or --update. */
-    if (line.hasOption(GravitinoOptions.LIST)) {
-      return CommandActions.LIST;
-    } else if (line.hasOption(GravitinoOptions.DETAILS)) {
-      return CommandActions.DETAILS;
-    } else if (line.hasOption(GravitinoOptions.CREATE)) {
-      return CommandActions.CREATE;
-    } else if (line.hasOption(GravitinoOptions.DELETE)) {
-      return CommandActions.DELETE;
-    } else if (line.hasOption(GravitinoOptions.UPDATE)) {
-      return CommandActions.UPDATE;
+
+    /* As the bare second argument. */
+    String[] args = line.getArgs();
+
+    if (args.length >= 2) {
+      String action = args[1];
+      if (CommandActions.isValidCommand(action)) {
+        return action;
+      }
     }
 
     return CommandActions.DETAILS; /* Default to 'details' command. */
@@ -77,7 +75,7 @@ public class Main {
     /* As the bare first argument. */
     String[] args = line.getArgs();
 
-    if (args.length > 0) {
+    if (args.length >= 1) {
       String entity = args[0];
       if (CommandEntities.isValidEntity(entity)) {
         return entity;
