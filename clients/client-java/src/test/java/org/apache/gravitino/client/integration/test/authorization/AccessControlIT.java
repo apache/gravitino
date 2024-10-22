@@ -42,31 +42,32 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
-import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class AccessControlIT extends AbstractIT {
+public class AccessControlIT extends BaseIT {
 
   private static String metalakeName = RandomNameUtils.genRandomName("metalake");
   private static GravitinoMetalake metalake;
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), String.valueOf(true));
     configs.put(Configs.SERVICE_ADMINS.getKey(), AuthConstants.ANONYMOUS_USER);
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
 
     Catalog filesetCatalog =
@@ -214,7 +215,7 @@ public class AccessControlIT extends AbstractIT {
             "not-existed", Lists.newArrayList(Privileges.UseCatalog.allow()));
 
     Assertions.assertThrows(
-        NoSuchMetadataObjectException.class,
+        IllegalMetadataObjectException.class,
         () -> metalake.createRole("not-existed", properties, Lists.newArrayList(catalogObject)));
 
     // Create a role with duplicated securable objects
@@ -359,12 +360,12 @@ public class AccessControlIT extends AbstractIT {
 
     // Grant a not-existed role
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () -> metalake.grantRolesToUser(Lists.newArrayList("not-existed"), username));
 
     // Revoke a not-existed role
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () -> metalake.revokeRolesFromUser(Lists.newArrayList("not-existed"), username));
 
     // Grant to a not-existed user
@@ -414,12 +415,12 @@ public class AccessControlIT extends AbstractIT {
 
     // Grant a not-existed role
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () -> metalake.grantRolesToGroup(Lists.newArrayList("not-existed"), groupName));
 
     // Revoke a not-existed role
     Assertions.assertThrows(
-        NoSuchRoleException.class,
+        IllegalRoleException.class,
         () -> metalake.revokeRolesFromGroup(Lists.newArrayList("not-existed"), groupName));
 
     // Grant to a not-existed group

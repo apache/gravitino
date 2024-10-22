@@ -282,6 +282,8 @@
    ApacheDS I18n
    ApacheDS Protocol Kerberos Codec
    Apache Hadoop
+   Apache Hadoop Aliyun connector
+   Apache Hadoop GCS connector
    Apache Hadoop Annotatations
    Apache Hadoop Auth
    Apache Hadoop Client Aggregator

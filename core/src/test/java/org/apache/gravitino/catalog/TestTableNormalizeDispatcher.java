@@ -22,6 +22,8 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -73,8 +75,16 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "tableNAME");
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("colNAME2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("colNAME1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("colNAME2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
     RangePartition assignedPartition =
         Partitions.range(
@@ -141,8 +151,16 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         NameIdentifier.of(tableNs, MetadataObjects.METADATA_OBJECT_RESERVED_NAME);
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("colNAME1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("colNAME2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("colNAME1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("colNAME2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
     Exception exception =
         Assertions.assertThrows(
@@ -164,6 +182,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
         new Column[] {
           TestColumn.builder()
               .withName(MetadataObjects.METADATA_OBJECT_RESERVED_NAME)
+              .withPosition(0)
               .withType(Types.StringType.get())
               .build()
         };
@@ -178,8 +197,11 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
   private void assertTableCaseInsensitive(
       NameIdentifier tableIdent, Column[] expectedColumns, Table table) {
     Assertions.assertEquals(tableIdent.name().toLowerCase(), table.name());
-    Assertions.assertEquals(expectedColumns[0].name().toLowerCase(), table.columns()[0].name());
-    Assertions.assertEquals(expectedColumns[1].name().toLowerCase(), table.columns()[1].name());
+    Set<String> expectedColumnNames =
+        Arrays.stream(expectedColumns).map(c -> c.name().toLowerCase()).collect(Collectors.toSet());
+    Set<String> actualColumnNames =
+        Arrays.stream(table.columns()).map(Column::name).collect(Collectors.toSet());
+    Assertions.assertEquals(expectedColumnNames, actualColumnNames);
     Assertions.assertEquals(
         expectedColumns[0].name().toLowerCase(),
         table.partitioning()[0].references()[0].fieldName()[0]);

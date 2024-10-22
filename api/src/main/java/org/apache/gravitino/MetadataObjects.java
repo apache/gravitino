@@ -153,7 +153,13 @@ public class MetadataObjects {
     return MetadataObjects.of(parts, type);
   }
 
-  private static String getParentFullName(List<String> names) {
+  /**
+   * Get the parent full name of the given full name.
+   *
+   * @param names The names of the metadata object
+   * @return The parent full name if it exists, otherwise null
+   */
+  public static String getParentFullName(List<String> names) {
     if (names.size() <= 1) {
       return null;
     }

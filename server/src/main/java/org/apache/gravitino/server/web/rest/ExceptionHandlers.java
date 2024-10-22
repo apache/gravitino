@@ -24,8 +24,11 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -177,6 +180,9 @@ public class ExceptionHandlers {
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
 
+      } else if (e instanceof CatalogNotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
       } else {
         return super.handle(op, partition, table, e);
       }
@@ -211,6 +217,12 @@ public class ExceptionHandlers {
 
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof CatalogNotInUseException) {
+        return Utils.notInUse(errorMsg, e);
 
       } else {
         return super.handle(op, table, schema, e);
@@ -250,6 +262,12 @@ public class ExceptionHandlers {
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof CatalogNotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
       } else {
         return super.handle(op, schema, catalog, e);
       }
@@ -282,8 +300,17 @@ public class ExceptionHandlers {
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else if (e instanceof CatalogAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof CatalogNotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else if (e instanceof CatalogInUseException) {
+        return Utils.inUse(errorMsg, e);
 
       } else {
         return super.handle(op, catalog, metalake, e);
@@ -346,6 +373,12 @@ public class ExceptionHandlers {
 
       } else if (e instanceof FilesetAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof CatalogNotInUseException) {
+        return Utils.notInUse(errorMsg, e);
 
       } else {
         return super.handle(op, fileset, schema, e);
@@ -449,6 +482,9 @@ public class ExceptionHandlers {
       } else if (e instanceof RoleAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
       } else {
         return super.handle(op, role, metalake, e);
       }
@@ -480,6 +516,8 @@ public class ExceptionHandlers {
       } else if (e instanceof TopicAlreadyExistsException) {
         return Utils.alreadyExists(errorMsg, e);
 
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
       } else {
         return super.handle(op, topic, schema, e);
       }

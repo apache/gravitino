@@ -28,10 +28,16 @@ import org.apache.gravitino.dto.responses.OAuth2ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -47,6 +53,7 @@ import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
@@ -270,6 +277,14 @@ public class ErrorHandlers {
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
 
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
+
         default:
           super.accept(errorResponse);
       }
@@ -303,8 +318,20 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);
@@ -343,6 +370,17 @@ public class ErrorHandlers {
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
 
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
 
@@ -380,8 +418,27 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new CatalogAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogInUseException.class.getSimpleName())) {
+            throw new CatalogInUseException(errorMessage);
+
+          } else {
+            throw new InUseException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);
@@ -495,8 +552,19 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new FilesetAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);
@@ -530,8 +598,19 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new TopicAlreadyExistsException(errorMessage);
 
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
 
         default:
           super.accept(errorResponse);
@@ -629,6 +708,10 @@ public class ErrorHandlers {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
           if (errorResponse.getType().equals(IllegalPrivilegeException.class.getSimpleName())) {
             throw new IllegalPrivilegeException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(IllegalMetadataObjectException.class.getSimpleName())) {
+            throw new IllegalMetadataObjectException(errorMessage);
           } else {
             throw new IllegalArgumentException(errorMessage);
           }
@@ -651,6 +734,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
@@ -676,6 +762,8 @@ public class ErrorHandlers {
         case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
           if (errorResponse.getType().equals(IllegalPrivilegeException.class.getSimpleName())) {
             throw new IllegalPrivilegeException(errorMessage);
+          } else if (errorResponse.getType().equals(IllegalRoleException.class.getSimpleName())) {
+            throw new IllegalRoleException(errorMessage);
           } else {
             throw new IllegalArgumentException(errorMessage);
           }

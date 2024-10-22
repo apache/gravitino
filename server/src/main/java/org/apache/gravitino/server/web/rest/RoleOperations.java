@@ -50,11 +50,14 @@ import org.apache.gravitino.dto.responses.DeleteResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,7 +145,11 @@ public class RoleOperations {
               for (Privilege privilege : object.privileges()) {
                 AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
               }
-              AuthorizationUtils.checkSecurableObject(metalake, object);
+              try {
+                MetadataObjectUtil.checkMetadataObject(metalake, object);
+              } catch (NoSuchMetadataObjectException nsm) {
+                throw new IllegalMetadataObjectException(nsm);
+              }
             }
 
             List<SecurableObject> securableObjects =

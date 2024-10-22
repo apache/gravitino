@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon;
 
+import static org.apache.gravitino.connector.PropertyEntry.stringImmutablePropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringReservedPropertyEntry;
 
 import com.google.common.collect.ImmutableList;
@@ -51,9 +52,12 @@ public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
             stringReservedPropertyEntry(COMMENT, "The table comment", true),
             stringReservedPropertyEntry(OWNER, "The table owner", false),
             stringReservedPropertyEntry(BUCKET_KEY, "The table bucket key", false),
-            stringReservedPropertyEntry(MERGE_ENGINE, "The table merge engine", false),
-            stringReservedPropertyEntry(SEQUENCE_FIELD, "The table sequence field", false),
-            stringReservedPropertyEntry(ROWKIND_FIELD, "The table rowkind field", false),
+            stringImmutablePropertyEntry(
+                MERGE_ENGINE, "The table merge engine", false, null, false, false),
+            stringImmutablePropertyEntry(
+                SEQUENCE_FIELD, "The table sequence field", false, null, false, false),
+            stringImmutablePropertyEntry(
+                ROWKIND_FIELD, "The table rowkind field", false, null, false, false),
             stringReservedPropertyEntry(PRIMARY_KEY, "The table primary key", false),
             stringReservedPropertyEntry(PARTITION, "The table partition", false));
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
