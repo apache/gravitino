@@ -20,12 +20,18 @@ package org.apache.gravitino.catalog.jdbc.converter;
 
 import java.sql.SQLException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 
 /** Interface for converter JDBC exceptions to Gravitino exceptions. */
-public abstract class JdbcExceptionConverter {
+public class JdbcExceptionConverter {
 
   /**
-   * Convert JDBC exception to GravitinoException.
+   * Convert JDBC exception to GravitinoException. The default implementation of this method is
+   * based on MySQL exception code, and if the catalog does not compatible with MySQL exception
+   * code, this method needs to be rewritten.
    *
    * @param sqlException The sql exception to map
    * @return The best attempt at a corresponding connector exception or generic with the
@@ -33,8 +39,19 @@ public abstract class JdbcExceptionConverter {
    */
   @SuppressWarnings("FormatStringAnnotation")
   public GravitinoRuntimeException toGravitinoException(final SQLException sqlException) {
-    // TODO we need to transform specific SQL exceptions into our own exceptions, such as
-    // SchemaAlreadyExistsException
-    return new GravitinoRuntimeException(sqlException, sqlException.getMessage());
+    switch (sqlException.getErrorCode()) {
+      case 1007:
+        return new SchemaAlreadyExistsException(sqlException, sqlException.getMessage());
+      case 1050:
+        return new TableAlreadyExistsException(sqlException, sqlException.getMessage());
+      case 1008:
+      case 1049:
+        return new NoSuchSchemaException(sqlException, sqlException.getMessage());
+      case 1146:
+      case 1051:
+        return new NoSuchTableException(sqlException, sqlException.getMessage());
+      default:
+        return new GravitinoRuntimeException(sqlException, sqlException.getMessage());
+    }
   }
 }
