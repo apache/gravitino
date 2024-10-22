@@ -22,7 +22,7 @@ import { Box, Button, Typography, Dialog, DialogContent, DialogActions } from '@
 import Icon from '@/components/Icon'
 
 const ConfirmDeleteDialog = props => {
-  const { open, setOpen, handleConfirmDeleteSubmit } = props
+  const { open, setOpen, confirmCacheData, handleConfirmDeleteSubmit } = props
 
   const handleClose = () => setOpen(false)
 
@@ -34,10 +34,25 @@ const ConfirmDeleteDialog = props => {
           sx={{ '& svg': { mb: 8, color: 'warning.main' } }}
         >
           <Icon icon='tabler:alert-circle' fontSize='6rem' />
-          <Typography variant='h4' className={'twc-mb-5 '} sx={{ color: 'text.secondary' }}>
-            Confirm Delete?
+          <Typography variant='h4' className={'twc-mb-5'} sx={{ color: 'text.secondary' }}>
+            Confirm {['metalake', 'catalog'].includes(confirmCacheData?.type) && <span>Force</span>} Drop?
           </Typography>
-          <Typography>This action can not be reversed!</Typography>
+          {['metalake', 'catalog'].includes(confirmCacheData?.type) ? (
+            <div className='twc-text-left'>
+              <Typography>This irreversible action will:</Typography>
+              <Typography>
+                · Delete all sub-entities{' '}
+                {confirmCacheData?.type === 'metalake'
+                  ? '(tags, catalogs, schemas, tables, etc.)'
+                  : '(schemas, tables)'}{' '}
+                in Gravitino
+              </Typography>
+              <Typography>· Remove the {confirmCacheData?.type} even if in use</Typography>
+              <Typography>· Keep external resources unless managed</Typography>
+            </div>
+          ) : (
+            <Typography>This action can not be reversed!</Typography>
+          )}
         </Box>
       </DialogContent>
       <DialogActions className={'twc-justify-center twc-px-5 twc-pb-8'}>
@@ -47,7 +62,7 @@ const ConfirmDeleteDialog = props => {
           className={'twc-mr-2'}
           onClick={() => handleConfirmDeleteSubmit()}
         >
-          Delete
+          Drop
         </Button>
         <Button variant='outlined' color='secondary' onClick={() => handleClose()}>
           Cancel
