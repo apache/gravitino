@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -53,13 +54,7 @@ public class ListCatalogs extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < catalogs.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(catalogs[i]);
-    }
+    String all = Joiner.on(",").join(catalogs);
 
     System.out.println(all.toString());
   }

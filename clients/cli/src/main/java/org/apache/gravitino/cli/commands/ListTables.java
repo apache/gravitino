@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 
@@ -51,13 +54,12 @@ public class ListTables extends TableCommand {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
+    List<String> tableNames = new ArrayList<>();
     for (int i = 0; i < tables.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(tables[i].name());
+      tableNames.add(tables[i].name());
     }
+
+    String all = Joiner.on(System.lineSeparator()).join(tableNames);
 
     System.out.println(all.toString());
   }

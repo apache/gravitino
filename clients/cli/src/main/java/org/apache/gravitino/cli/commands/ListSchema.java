@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -60,13 +61,7 @@ public class ListSchema extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < schemas.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(schemas[i]);
-    }
+    String all = Joiner.on(",").join(schemas);
 
     System.out.println(all.toString());
   }

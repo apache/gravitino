@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.client.GravitinoAdminClient;
 
@@ -45,13 +48,12 @@ public class ListMetalakes extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
+    List<String> metalakeNames = new ArrayList<>();
     for (int i = 0; i < metalakes.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(metalakes[i].name());
+      metalakeNames.add(metalakes[i].name());
     }
+
+    String all = Joiner.on(System.lineSeparator()).join(metalakeNames);
 
     System.out.println(all.toString());
   }

@@ -24,6 +24,7 @@ plugins {
 
 dependencies {
   implementation(libs.commons.cli.new)
+  implementation(libs.guava)
   implementation(libs.slf4j.api)
   implementation(libs.slf4j.simple)
   implementation(project(":api"))
