@@ -19,40 +19,36 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
-import com.google.common.base.Preconditions;
+import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.GCSProperties;
+import org.junit.jupiter.api.Disabled;
 
-// @Disabled
-// export
 // GOOGLE_APPLICATION_CREDENTIALS=/Users/fanng/deploy/gcs/tonal-land-426304-d3-a75b6878b6ce.json
+@Disabled(
+    "You should export GRAVITINO_GCS_BUCKET and GOOGLE_APPLICATION_CREDENTIALS to run the test")
 public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
-  private String gcsWarehouse = "gs://strato-iceberg/test";
-  private String gcsCredentialPath =
-      "/Users/fanng/deploy/gcs/tonal-land-426304-d3-a75b6878b6ce.json";
-  private String gcsBundleUrl =
-      "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-gcp-bundle/1.5.2/iceberg-gcp-bundle-1.5.2.jar";
+  private String gcsWarehouse;
+  private String gcsCredentialPath;
 
   @Override
   void initEnv() {
+    this.gcsWarehouse =
+        String.format("gs://%s/test", getFromEnvOrDefault("GRAVITINO_GCS_BUCKET", "bucketName"));
+    this.gcsCredentialPath =
+        getFromEnvOrDefault("GOOGLE_APPLICATION_CREDENTIALS", "credentialPath");
     if (ITUtils.isEmbedded()) {
       return;
     }
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    Preconditions.checkArgument(gravitinoHome != null, "GRAVITINO_HOME should not be null");
-    String targetDir = gravitinoHome + "/iceberg-rest-server/libs/";
-    try {
-      DownloaderUtils.downloadFile(gcsBundleUrl, targetDir);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    copyGCSBundleJar();
   }
 
   @Override
@@ -81,5 +77,32 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
         "org.apache.iceberg.gcp.gcs.GCSFileIO");
     configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.WAREHOUSE, gcsWarehouse);
     return configMap;
+  }
+
+  private void copyGCSBundleJar() {
+    String gravitinoVersion = System.getenv("PROJECT_VERSION");
+    String gcsBundleFile = String.format("gravitino-gcp-bundle-%s.jar", gravitinoVersion);
+
+    String rootDir = System.getenv("GRAVITINO_ROOT_DIR");
+    String sourceFile =
+        String.format("%s/bundles/gcp-bundle/build/libs/%s", rootDir, gcsBundleFile);
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
+    String targetFile = String.format("%s/%s", targetDir, gcsBundleFile);
+    LOG.info("Source file: {}, target directory: {}", sourceFile, targetDir);
+    try {
+      File target = new File(targetFile);
+      if (!target.exists()) {
+        LOG.info("Copy source file: {} to target directory: {}", sourceFile, targetDir);
+        FileUtils.copyFileToDirectory(new File(sourceFile), new File(targetDir));
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private String getFromEnvOrDefault(String envVar, String defaultValue) {
+    String envValue = System.getenv(envVar);
+    return Optional.ofNullable(envValue).orElse(defaultValue);
   }
 }
