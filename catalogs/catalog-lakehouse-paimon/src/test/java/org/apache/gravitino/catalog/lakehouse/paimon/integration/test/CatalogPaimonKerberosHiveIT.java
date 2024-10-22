@@ -40,15 +40,14 @@ public class CatalogPaimonKerberosHiveIT extends CatalogPaimonKerberosBaseIT {
     String uri =
         String.format(
             "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
+            kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, type);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, warehouse);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.URI, uri);
   }
 
   @Test
-  void testIcebergWithKerberosAndUserImpersonation() throws IOException {
+  void testPaimonWithKerberosAndUserImpersonation() throws IOException {
     KerberosTokenProvider provider =
         KerberosTokenProvider.builder()
             .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
@@ -72,11 +71,10 @@ public class CatalogPaimonKerberosHiveIT extends CatalogPaimonKerberosBaseIT {
             .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
     properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
     properties.putAll(catalogProperties);
-    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-iceberg");
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
-            CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", properties);
+            CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-paimon", "comment", properties);
 
     // Test create schema
     Exception exception =
@@ -91,9 +89,9 @@ public class CatalogPaimonKerberosHiveIT extends CatalogPaimonKerberosBaseIT {
 
     // Now try to permit the user to create the schema again
     kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hive/warehouse-catalog-iceberg");
+        "hadoop", "fs", "-mkdir", "/user/hive/warehouse-catalog-paimon");
     kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-iceberg");
+        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-paimon");
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
@@ -127,6 +125,7 @@ public class CatalogPaimonKerberosHiveIT extends CatalogPaimonKerberosBaseIT {
     Assertions.assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
 
     // Drop catalog
+    Assertions.assertDoesNotThrow(() -> gravitinoMetalake.disableCatalog(CATALOG_NAME));
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
   }
 }

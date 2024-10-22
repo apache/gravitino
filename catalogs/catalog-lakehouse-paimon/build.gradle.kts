@@ -104,15 +104,6 @@ dependencies {
   }
   implementation(libs.bundles.log4j)
   implementation(libs.commons.lang3)
-  implementation(libs.hive2.common) {
-    exclude("*")
-  }
-  implementation(libs.hive2.exec) {
-    exclude("*")
-  }
-  implementation(libs.hive2.metastore) {
-    exclude("*")
-  }
   implementation(libs.guava)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
@@ -168,13 +159,26 @@ dependencies {
   testImplementation(libs.paimon.oss)
   testImplementation(libs.paimon.s3)
   testImplementation(libs.paimon.spark)
-  testImplementation(libs.testcontainers) {
-    exclude("*")
-  }
+  testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+configurations {
+  implementation {
+    exclude("org.eclipse.jetty.aggregate")
+  }
+  runtimeClasspath {
+    exclude("org.eclipse.jetty.aggregate")
+  }
+  testCompileClasspath {
+    exclude("org.eclipse.jetty.aggregate")
+  }
+  testRuntimeClasspath {
+    exclude("org.eclipse.jetty.aggregate")
+  }
 }
 
 tasks {

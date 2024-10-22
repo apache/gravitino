@@ -40,7 +40,7 @@ import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
@@ -59,7 +59,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class CatalogPaimonKerberosBaseIT extends AbstractIT {
+public abstract class CatalogPaimonKerberosBaseIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogPaimonKerberosBaseIT.class);
 
@@ -93,27 +93,11 @@ public abstract class CatalogPaimonKerberosBaseIT extends AbstractIT {
   protected abstract void initCatalogProperties();
 
   @BeforeAll
-  public void startup() {
-    startIntegrationTest();
-    initCatalogProperties();
-  }
-
-  @AfterAll
-  public static void stop() {
-    // Reset the UGI
-    UserGroupInformation.reset();
-
-    LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
-    // Clean up the kerberos configuration
-    System.clearProperty("java.security.krb5.conf");
-    System.clearProperty("sun.security.krb5.debug");
-
-    AbstractIT.client = null;
-  }
-
-  public static void startIntegrationTest() {
+  public void startIntegrationTest() {
     containerSuite.startKerberosHiveContainer();
     kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
+
+    initCatalogProperties();
 
     try {
       File baseDir = new File(System.getProperty("java.io.tmpdir"));
@@ -128,10 +112,23 @@ public abstract class CatalogPaimonKerberosBaseIT extends AbstractIT {
       addKerberosConfig();
 
       // Start Gravitino server
-      AbstractIT.startIntegrationTest();
+      super.startIntegrationTest();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @AfterAll
+  public void stop() {
+    // Reset the UGI
+    UserGroupInformation.reset();
+
+    LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
+    // Clean up the kerberos configuration
+    System.clearProperty("java.security.krb5.conf");
+    System.clearProperty("sun.security.krb5.debug");
+
+    client = null;
   }
 
   private static void prepareKerberosConfig() throws Exception {
@@ -187,14 +184,12 @@ public abstract class CatalogPaimonKerberosBaseIT extends AbstractIT {
     }
   }
 
-  private static void addKerberosConfig() {
-    AbstractIT.customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
+  private void addKerberosConfig() {
+    customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
+    customConfigs.put("gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
+    customConfigs.put("gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
   }
 
   @Test
@@ -266,6 +261,7 @@ public abstract class CatalogPaimonKerberosBaseIT extends AbstractIT {
     Assertions.assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
 
     // Drop catalog
+    Assertions.assertDoesNotThrow(() -> gravitinoMetalake.disableCatalog(CATALOG_NAME));
     Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
 
     // Drop warehouse path
