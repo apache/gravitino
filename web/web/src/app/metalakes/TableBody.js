@@ -51,7 +51,7 @@ const TableBody = props => {
 
   const handleConfirmDeleteSubmit = () => {
     if (confirmCacheData) {
-      dispatch(deleteMetalake(confirmCacheData))
+      dispatch(deleteMetalake(confirmCacheData.name))
       setOpenConfirmDelete(false)
     }
   }
