@@ -362,6 +362,25 @@ components:
                 type: boolean
                 description: Whether the set operation was successful
 
+    BaseResponse:
+      description: Represents a response for a base operation
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            required:
+              - code
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+          example: {
+            "code": 0
+          }
+
   parameters:
     metalake:
       name: metalake
@@ -465,6 +484,15 @@ components:
       required: true
       schema:
         type: string
+
+    force:
+      name: force
+      in: query
+      description: Force the operation to be executed
+      required: false
+      schema:
+        type: boolean
+        default: false
 
   securitySchemes:
 
