@@ -1,22 +1,22 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
-package org.apache.gravitino.iceberg.provider;
+package org.apache.gravitino.iceberg.service.provider;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
@@ -32,13 +32,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-public class TestStaticIcebergCatalogWrapperProvider {
+public class TestStaticIcebergConfigProvider {
 
   @Test
   public void testValidIcebergTableOps() {
     String hiveCatalogName = "hive_backend";
     String jdbcCatalogName = "jdbc_backend";
-    String defaultCatalogName = IcebergConstants.GRAVITINO_DEFAULT_CATALOG;
+    String defaultCatalogName = IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG;
 
     Map<String, String> config = Maps.newHashMap();
     // hive backend catalog
@@ -60,7 +60,7 @@ public class TestStaticIcebergCatalogWrapperProvider {
     config.put("catalog-backend", "memory");
     config.put("warehouse", "/tmp/");
 
-    StaticIcebergCatalogConfigProvider provider = new StaticIcebergCatalogConfigProvider();
+    StaticIcebergConfigProvider provider = new StaticIcebergConfigProvider();
     provider.initialize(config);
 
     IcebergConfig hiveIcebergConfig = provider.catalogConfigs.get(hiveCatalogName);
@@ -106,7 +106,7 @@ public class TestStaticIcebergCatalogWrapperProvider {
   @ParameterizedTest
   @ValueSource(strings = {"", "not_match"})
   public void testInvalidIcebergTableOps(String catalogName) {
-    StaticIcebergCatalogConfigProvider provider = new StaticIcebergCatalogConfigProvider();
+    StaticIcebergConfigProvider provider = new StaticIcebergConfigProvider();
     provider.initialize(Maps.newHashMap());
 
     Optional<IcebergConfig> config = provider.getIcebergCatalogConfig(catalogName);
