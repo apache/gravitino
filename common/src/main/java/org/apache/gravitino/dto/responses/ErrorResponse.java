@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.RESTException;
 
 /** Represents an error response. */
@@ -234,6 +235,31 @@ public class ErrorResponse extends BaseResponse {
   }
 
   /**
+   * Create a new entity in use error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse notInUse(String type, String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.NOT_IN_USE_CODE, type, message, getStackTrace(throwable));
+  }
+
+  /**
+   * Create a new entity in use error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse inUse(String type, String message, Throwable throwable) {
+    return new ErrorResponse(ErrorConstants.IN_USE_CODE, type, message, getStackTrace(throwable));
+  }
+
+  /**
    * Create a new non-empty error instance of {@link ErrorResponse}.
    *
    * @param type The type of the error.
@@ -301,6 +327,21 @@ public class ErrorResponse extends BaseResponse {
     return new ErrorResponse(
         ErrorConstants.UNSUPPORTED_OPERATION_CODE,
         UnsupportedOperationException.class.getSimpleName(),
+        message,
+        getStackTrace(throwable));
+  }
+
+  /**
+   * Create a new forbidden operation error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse forbidden(String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.FORBIDDEN_CODE,
+        ForbiddenException.class.getSimpleName(),
         message,
         getStackTrace(throwable));
   }

@@ -41,7 +41,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
@@ -72,7 +72,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class CatalogKafkaIT extends AbstractIT {
+public class CatalogKafkaIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogKafkaIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
   private static final String METALAKE_NAME =
@@ -87,7 +87,7 @@ public class CatalogKafkaIT extends AbstractIT {
   private static AdminClient adminClient;
 
   @BeforeAll
-  public static void startUp() throws ExecutionException, InterruptedException {
+  public void startUp() throws ExecutionException, InterruptedException {
     CONTAINER_SUITE.startKafkaContainer();
     kafkaBootstrapServers =
         String.format(
@@ -112,7 +112,7 @@ public class CatalogKafkaIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void shutdown() {
+  public void shutdown() {
     Catalog catalog = metalake.loadCatalog(CATALOG_NAME);
     Arrays.stream(catalog.asSchemas().listSchemas())
         .filter(ident -> !ident.equals("default"))
@@ -123,8 +123,10 @@ public class CatalogKafkaIT extends AbstractIT {
     Arrays.stream(metalake.listCatalogs())
         .forEach(
             (catalogName -> {
+              metalake.disableCatalog(catalogName);
               metalake.dropCatalog(catalogName);
             }));
+    client.disableMetalake(METALAKE_NAME);
     client.dropMetalake(METALAKE_NAME);
     if (adminClient != null) {
       adminClient.close();
@@ -171,7 +173,7 @@ public class CatalogKafkaIT extends AbstractIT {
     Assertions.assertFalse(alteredCatalog.properties().containsKey("key1"));
 
     // test drop catalog
-    boolean dropped = metalake.dropCatalog(catalogName);
+    boolean dropped = metalake.dropCatalog(catalogName, true);
     Assertions.assertTrue(dropped);
     Exception exception =
         Assertions.assertThrows(
@@ -552,11 +554,10 @@ public class CatalogKafkaIT extends AbstractIT {
         .get();
   }
 
-  private static void createMetalake() {
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
+  private void createMetalake() {
+    client.createMetalake(METALAKE_NAME, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(METALAKE_NAME);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(METALAKE_NAME, loadMetalake.name());
 
     metalake = loadMetalake;
   }

@@ -81,9 +81,13 @@ Please see [How to build Gravitino](https://gravitino.apache.org/docs/latest/how
 
 ## Quick start
 
-### Configure and start the Apache Gravitino server
+### Use Gravitino playground
 
-If you already have a binary distribution package, go to the decompressed package directory.
+This is the most recommended way: Gravitino provides a docker-compose based playground to quickly experience the whole system together with other components. Clone or download the [Gravitino playground repository](https://github.com/apache/gravitino-playground) and then follow the [README](https://github.com/apache/gravitino-playground/blob/main/README.md), you will have all then.
+
+### Configure and start Gravitino server in local
+
+If you want to start Gravitino in your machine, download a binary package from the [download page](https://gravitino.apache.org/downloads), and then decompressed the package.
 
 Before starting the Gravitino server, please configure the Gravitino server configuration file. The
 configuration file, `gravitino.conf`, is in the `conf` directory and follows the standard property file format. You can modify the configuration within this file.

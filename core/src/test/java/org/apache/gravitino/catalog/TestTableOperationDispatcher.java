@@ -27,6 +27,7 @@ import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -38,10 +39,14 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -52,10 +57,12 @@ import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -91,7 +98,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, "table1");
     Column[] columns =
         new Column[] {
-          Column.of("col1", Types.StringType.get()), Column.of("col2", Types.StringType.get())
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
 
     Table table1 =
@@ -170,8 +186,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent1 = NameIdentifier.of(tableNs, "table11");
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
 
     Table table1 =
@@ -190,7 +214,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     reset(entityStore);
     entityStore.delete(tableIdent1, TABLE);
     entityStore.delete(NameIdentifier.of(tableNs.levels()), SCHEMA);
-    doThrow(new NoSuchEntityException("")).when(entityStore).get(any(), any(), any());
+    doThrow(new NoSuchEntityException(""))
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.TABLE), any());
     Table loadedTable2 = tableOperationDispatcher.loadTable(tableIdent1);
     // Succeed to import the topic entity
     Assertions.assertTrue(entityStore.exists(NameIdentifier.of(tableNs.levels()), SCHEMA));
@@ -202,7 +228,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     reset(entityStore);
     entityStore.delete(tableIdent1, TABLE);
     entityStore.delete(NameIdentifier.of(tableNs.levels()), SCHEMA);
-    doThrow(new IOException()).when(entityStore).get(any(), any(), any());
+    doThrow(new IOException()).when(entityStore).get(any(), eq(Entity.EntityType.TABLE), any());
     Table loadedTable3 = tableOperationDispatcher.loadTable(tableIdent1);
     // Succeed to import the topic entity
     Assertions.assertTrue(entityStore.exists(NameIdentifier.of(tableNs.levels()), SCHEMA));
@@ -220,7 +246,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             .withAuditInfo(
                 AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
-    doReturn(tableEntity).when(entityStore).get(any(), any(), any());
+    doReturn(tableEntity).when(entityStore).get(any(), eq(Entity.EntityType.TABLE), any());
     Table loadedTable4 = tableOperationDispatcher.loadTable(tableIdent1);
     // Succeed to import the topic entity
     reset(entityStore);
@@ -239,8 +265,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table21");
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
 
     Table table =
@@ -305,8 +339,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
 
     schemaOperationDispatcher.createSchema(
@@ -338,11 +380,499 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         NameIdentifier.of(tableNs.levels()), "", Collections.emptyMap());
     Column[] columns =
         new Column[] {
-          TestColumn.builder().withName("col1").withType(Types.StringType.get()).build(),
-          TestColumn.builder().withName("col2").withType(Types.StringType.get()).build()
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build()
         };
     tableOperationDispatcher.createTable(tableIdent, columns, "comment", props);
     Assertions.assertTrue(entityStore.exists(NameIdentifier.of(tableNs.levels()), SCHEMA));
     Assertions.assertTrue(entityStore.exists(tableIdent, TABLE));
+  }
+
+  @Test
+  public void testCreateAndLoadTableWithColumn() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema91");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table41");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .withComment("comment1")
+              .withNullable(true)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("1"))
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .withComment("comment2")
+              .withNullable(false)
+              .withAutoIncrement(false)
+              .withDefaultValue(Literals.stringLiteral("2"))
+              .build()
+        };
+
+    Table table1 =
+        tableOperationDispatcher.createTable(
+            tableIdent, columns, "comment", props, new Transform[0]);
+
+    Table loadedTable1 = tableOperationDispatcher.loadTable(tableIdent);
+    Assertions.assertEquals(table1.name(), loadedTable1.name());
+    Assertions.assertEquals(table1.comment(), loadedTable1.comment());
+    testProperties(table1.properties(), loadedTable1.properties());
+    testColumns(columns, loadedTable1.columns());
+
+    // The columns from table and table entity should be the same after creating.
+    TableEntity tableEntity = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    Assertions.assertNotNull(tableEntity);
+    Assertions.assertEquals("table41", tableEntity.name());
+    testColumnAndColumnEntities(columns, tableEntity.columns());
+
+    // Test if the column from table is not matched with the column from table entity
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+
+    // 1. Update the existing column
+    Table alteredTable2 =
+        testCatalogOperations.alterTable(
+            tableIdent, TableChange.renameColumn(new String[] {"col1"}, "col3"));
+    Table loadedTable2 = tableOperationDispatcher.loadTable(tableIdent);
+    testColumns(alteredTable2.columns(), loadedTable2.columns());
+
+    // columns in table entity should be updated to match the columns in table
+    TableEntity tableEntity2 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(alteredTable2.columns(), tableEntity2.columns());
+
+    // 2. Add a new column
+    Table alteredTable3 =
+        testCatalogOperations.alterTable(
+            tableIdent,
+            TableChange.addColumn(
+                new String[] {"col4"},
+                Types.StringType.get(),
+                "comment4",
+                TableChange.ColumnPosition.first(),
+                true,
+                true,
+                Literals.stringLiteral("4")));
+
+    Table loadedTable3 = tableOperationDispatcher.loadTable(tableIdent);
+    testColumns(alteredTable3.columns(), loadedTable3.columns());
+
+    TableEntity tableEntity3 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(alteredTable3.columns(), tableEntity3.columns());
+
+    // 3. Drop a column
+    Table alteredTable4 =
+        testCatalogOperations.alterTable(
+            tableIdent, TableChange.deleteColumn(new String[] {"col2"}, true));
+    Table loadedTable4 = tableOperationDispatcher.loadTable(tableIdent);
+    testColumns(alteredTable4.columns(), loadedTable4.columns());
+
+    TableEntity tableEntity4 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(alteredTable4.columns(), tableEntity4.columns());
+
+    // No column for the table
+    Table alteredTable5 =
+        testCatalogOperations.alterTable(
+            tableIdent,
+            TableChange.deleteColumn(new String[] {"col3"}, true),
+            TableChange.deleteColumn(new String[] {"col4"}, true));
+    Table loadedTable5 = tableOperationDispatcher.loadTable(tableIdent);
+    Assertions.assertEquals(0, alteredTable5.columns().length);
+    Assertions.assertEquals(0, loadedTable5.columns().length);
+
+    TableEntity tableEntity5 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    Assertions.assertEquals(0, tableEntity5.columns().size());
+
+    // Re-add columns to the table
+    Table alteredTable6 =
+        testCatalogOperations.alterTable(
+            tableIdent,
+            TableChange.addColumn(
+                new String[] {"col5"},
+                Types.StringType.get(),
+                "comment5",
+                TableChange.ColumnPosition.first(),
+                true,
+                true,
+                Literals.stringLiteral("5")),
+            TableChange.addColumn(
+                new String[] {"col6"},
+                Types.StringType.get(),
+                "comment6",
+                TableChange.ColumnPosition.first(),
+                false,
+                false,
+                Literals.stringLiteral("2")));
+    Table loadedTable6 = tableOperationDispatcher.loadTable(tableIdent);
+    testColumns(alteredTable6.columns(), loadedTable6.columns());
+
+    TableEntity tableEntity6 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(alteredTable6.columns(), tableEntity6.columns());
+  }
+
+  @Test
+  public void testCreateAndAlterTableWithColumn() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema101");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table51");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .withComment("comment1")
+              .withNullable(true)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("1"))
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .withComment("comment2")
+              .withNullable(false)
+              .withAutoIncrement(false)
+              .withDefaultValue(Literals.stringLiteral("2"))
+              .build()
+        };
+
+    Table table1 =
+        tableOperationDispatcher.createTable(
+            tableIdent, columns, "comment", props, new Transform[0]);
+    testColumns(columns, table1.columns());
+
+    // 1. Rename the column
+    Table alteredTable1 =
+        tableOperationDispatcher.alterTable(
+            tableIdent, TableChange.renameColumn(new String[] {"col1"}, "col3"));
+    Column[] expectedColumns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col3")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .withComment("comment1")
+              .withNullable(true)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("1"))
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .withComment("comment2")
+              .withNullable(false)
+              .withAutoIncrement(false)
+              .withDefaultValue(Literals.stringLiteral("2"))
+              .build()
+        };
+    testColumns(expectedColumns, alteredTable1.columns());
+
+    TableEntity tableEntity1 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(expectedColumns, tableEntity1.columns());
+
+    // 2. Add a new column
+    Table alteredTable2 =
+        tableOperationDispatcher.alterTable(
+            tableIdent,
+            TableChange.addColumn(
+                new String[] {"col4"},
+                Types.StringType.get(),
+                "comment4",
+                TableChange.ColumnPosition.first(),
+                true,
+                true,
+                Literals.stringLiteral("4")));
+    Column[] expectedColumns2 =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col4")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .withComment("comment4")
+              .withNullable(true)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("4"))
+              .build(),
+          TestColumn.builder()
+              .withName("col3")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .withComment("comment1")
+              .withNullable(true)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("1"))
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(2)
+              .withType(Types.StringType.get())
+              .withComment("comment2")
+              .withNullable(false)
+              .withAutoIncrement(false)
+              .withDefaultValue(Literals.stringLiteral("2"))
+              .build()
+        };
+
+    testColumns(expectedColumns2, alteredTable2.columns());
+
+    TableEntity tableEntity2 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(expectedColumns2, tableEntity2.columns());
+
+    // 3. Drop a column
+    Table alteredTable3 =
+        tableOperationDispatcher.alterTable(
+            tableIdent,
+            TableChange.deleteColumn(new String[] {"col2"}, true),
+            TableChange.deleteColumn(new String[] {"col3"}, true));
+    Column[] expectedColumns3 =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col4")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .withComment("comment4")
+              .withNullable(true)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("4"))
+              .build()
+        };
+    testColumns(expectedColumns3, alteredTable3.columns());
+
+    TableEntity tableEntity3 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(expectedColumns3, tableEntity3.columns());
+
+    // 4. Update column default value
+    Table alteredTable4 =
+        tableOperationDispatcher.alterTable(
+            tableIdent,
+            TableChange.updateColumnDefaultValue(
+                new String[] {"col4"}, Literals.stringLiteral("5")));
+
+    Column[] expectedColumns4 =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col4")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .withComment("comment4")
+              .withNullable(true)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("5"))
+              .build()
+        };
+    testColumns(expectedColumns4, alteredTable4.columns());
+
+    TableEntity tableEntity4 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(expectedColumns4, tableEntity4.columns());
+
+    // 5. Update column type
+    Table alteredTable5 =
+        tableOperationDispatcher.alterTable(
+            tableIdent,
+            TableChange.updateColumnType(new String[] {"col4"}, Types.IntegerType.get()));
+
+    Column[] expectedColumns5 =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col4")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .withComment("comment4")
+              .withNullable(true)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("5"))
+              .build()
+        };
+
+    testColumns(expectedColumns5, alteredTable5.columns());
+
+    TableEntity tableEntity5 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(expectedColumns5, tableEntity5.columns());
+
+    // 6. Update column comment
+    Table alteredTable6 =
+        tableOperationDispatcher.alterTable(
+            tableIdent, TableChange.updateColumnComment(new String[] {"col4"}, "new comment"));
+
+    Column[] expectedColumns6 =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col4")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .withComment("new comment")
+              .withNullable(true)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("5"))
+              .build()
+        };
+
+    testColumns(expectedColumns6, alteredTable6.columns());
+
+    TableEntity tableEntity6 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(expectedColumns6, tableEntity6.columns());
+
+    // 7. Update column nullable
+    Table alteredTable7 =
+        tableOperationDispatcher.alterTable(
+            tableIdent, TableChange.updateColumnNullability(new String[] {"col4"}, false));
+
+    Column[] expectedColumns7 =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col4")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .withComment("new comment")
+              .withNullable(false)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("5"))
+              .build()
+        };
+
+    testColumns(expectedColumns7, alteredTable7.columns());
+
+    TableEntity tableEntity7 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(expectedColumns7, tableEntity7.columns());
+
+    // 8. Update column auto increment
+    Table alteredTable8 =
+        tableOperationDispatcher.alterTable(
+            tableIdent, TableChange.updateColumnAutoIncrement(new String[] {"col4"}, false));
+
+    Column[] expectedColumns8 =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col4")
+              .withPosition(0)
+              .withType(Types.IntegerType.get())
+              .withComment("new comment")
+              .withNullable(false)
+              .withAutoIncrement(false)
+              .withDefaultValue(Literals.stringLiteral("5"))
+              .build()
+        };
+
+    testColumns(expectedColumns8, alteredTable8.columns());
+
+    TableEntity tableEntity8 = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    testColumnAndColumnEntities(expectedColumns8, tableEntity8.columns());
+  }
+
+  @Test
+  public void testCreateAndDropTableWithColumn() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema111");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table61");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .withComment("comment1")
+              .withNullable(true)
+              .withAutoIncrement(true)
+              .withDefaultValue(Literals.stringLiteral("1"))
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .withComment("comment2")
+              .withNullable(false)
+              .withAutoIncrement(false)
+              .withDefaultValue(Literals.stringLiteral("2"))
+              .build()
+        };
+
+    Table table1 =
+        tableOperationDispatcher.createTable(
+            tableIdent, columns, "comment", props, new Transform[0]);
+    testColumns(columns, table1.columns());
+
+    // Delete table
+    boolean dropped = tableOperationDispatcher.dropTable(tableIdent);
+    Assertions.assertTrue(dropped);
+    Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+  }
+
+  private static void testColumns(Column[] expectedColumns, Column[] actualColumns) {
+    Map<String, Column> expectedColumnMap =
+        expectedColumns == null
+            ? Collections.emptyMap()
+            : Arrays.stream(expectedColumns)
+                .collect(Collectors.toMap(c -> c.name().toLowerCase(), Function.identity()));
+    Map<String, Column> actualColumnMap =
+        actualColumns == null
+            ? Collections.emptyMap()
+            : Arrays.stream(actualColumns)
+                .collect(Collectors.toMap(Column::name, Function.identity()));
+
+    Assertions.assertEquals(expectedColumnMap.size(), actualColumnMap.size());
+    expectedColumnMap.forEach(
+        (name, expectedColumn) -> {
+          TestColumn actualColumn = (TestColumn) actualColumnMap.get(name);
+          TestColumn e = (TestColumn) expectedColumn;
+          Assertions.assertNotNull(actualColumn);
+          Assertions.assertEquals(e.name().toLowerCase(), actualColumn.name());
+          Assertions.assertEquals(e.position(), actualColumn.position());
+          Assertions.assertEquals(e.dataType(), actualColumn.dataType());
+          Assertions.assertEquals(e.comment(), actualColumn.comment());
+          Assertions.assertEquals(e.nullable(), actualColumn.nullable());
+          Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
+          Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
+        });
+  }
+
+  private static void testColumnAndColumnEntities(
+      Column[] expectedColumns, List<ColumnEntity> ColumnEntities) {
+    Map<String, Column> expectedColumnMap =
+        expectedColumns == null
+            ? Collections.emptyMap()
+            : Arrays.stream(expectedColumns)
+                .collect(Collectors.toMap(Column::name, Function.identity()));
+    Map<String, ColumnEntity> actualColumnMap =
+        ColumnEntities == null
+            ? Collections.emptyMap()
+            : ColumnEntities.stream()
+                .collect(Collectors.toMap(ColumnEntity::name, Function.identity()));
+
+    Assertions.assertEquals(expectedColumnMap.size(), actualColumnMap.size());
+    expectedColumnMap.forEach(
+        (name, expectedColumn) -> {
+          ColumnEntity actualColumn = actualColumnMap.get(name);
+          TestColumn e = (TestColumn) expectedColumn;
+          Assertions.assertNotNull(actualColumn);
+          Assertions.assertEquals(e.name(), actualColumn.name());
+          Assertions.assertEquals(e.position(), actualColumn.position());
+          Assertions.assertEquals(e.dataType(), actualColumn.dataType());
+          Assertions.assertEquals(e.comment(), actualColumn.comment());
+          Assertions.assertEquals(e.nullable(), actualColumn.nullable());
+          Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
+          Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
+        });
   }
 }

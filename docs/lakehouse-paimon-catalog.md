@@ -22,17 +22,16 @@ Builds with Apache Paimon `0.8.0`.
 
 ### Catalog capabilities
 
-- Works as a catalog proxy, supporting `FilesystemCatalog`.
+- Works as a catalog proxy, supporting `FilesystemCatalog`, `JdbcCatalog` and `HiveCatalog`.
 - Supports DDL operations for Paimon schemas and tables.
 
-- Doesn't support `JdbcCatalog` and `HiveCatalog` catalog backend now.
 - Doesn't support alterSchema.
 
 ### Catalog properties
 
 | Property name                                      | Description                                                                                                                                                                                                 | Default value          | Required                                                        | Since Version     |
 |----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-----------------------------------------------------------------|-------------------|
-| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Only supports `filesystem` now.                                                                                                                                | (none)                 | Yes                                                             | 0.6.0-incubating  |
+| `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`, `jdbc` and `hive`.                                                                                                                      | (none)                 | Yes                                                             | 0.6.0-incubating  |
 | `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                 | required if the value of `catalog-backend` is not `filesystem`. | 0.6.0-incubating  |
 | `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS  | (none)                 | Yes                                                             | 0.6.0-incubating  |
 | `authentication.type`                              | The type of authentication for Paimon catalog backend, currently Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`               | No                                                              | 0.6.0-incubating  |
@@ -51,8 +50,24 @@ Builds with Apache Paimon `0.8.0`.
 If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/master/filesystems/s3/). 
 :::
 
+:::note
+The hive backend does not support the kerberos authentication now.
+:::
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
+
+#### JDBC backend
+
+If you are using JDBC backend, you must specify the properties like `jdbc-user` and `jdbc-password`.
+
+| Property name   | Description                                                                                                                                                                                                 | Default value          | Required                                                        | Since Version      |
+|-----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|-----------------------------------------------------------------|--------------------|
+| `jdbc-user`     | Jdbc user of Gravitino Paimon catalog for `jdbc` backend.                                                                                                                                                   | (none)                 | required if the value of `catalog-backend` is `jdbc`.           | 0.7.0-incubating   |
+| `jdbc-password` | Jdbc password of Gravitino Paimon catalog for `jdbc` backend.                                                                                                                                               | (none)                 | required if the value of `catalog-backend` is `jdbc`.           | 0.7.0-incubating   |
+
+:::caution
+You must download the corresponding JDBC driver and place it to the `catalogs/lakehouse-paimon/libs` directory If you are using JDBC backend.
+:::
 
 ### Catalog operations
 

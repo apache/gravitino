@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client.integration.test;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,7 +34,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -43,7 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class MetalakeIT extends AbstractIT {
+public class MetalakeIT extends BaseIT {
   public static String metalakeNameA = RandomNameUtils.genRandomName("metalakeA");
   public static String metalakeNameB = RandomNameUtils.genRandomName("metalakeB");
 
@@ -182,6 +183,7 @@ public class MetalakeIT extends AbstractIT {
   public void testDropMetalakes() {
     GravitinoMetalake metalakeA =
         client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
+    assertDoesNotThrow(() -> client.disableMetalake(metalakeA.name()));
     assertTrue(client.dropMetalake(metalakeA.name()), "metaLake should be dropped");
     NameIdentifier id = NameIdentifier.of(metalakeNameA);
     assertThrows(
@@ -205,12 +207,13 @@ public class MetalakeIT extends AbstractIT {
         new MetalakeChange[] {MetalakeChange.updateComment("new metalake comment")};
     GravitinoMetalake updatedMetalake = client.alterMetalake(metalakeNameA, changes);
     assertEquals("new metalake comment", updatedMetalake.comment());
-    client.dropMetalake(metalakeNameA);
+    assertTrue(client.dropMetalake(metalakeNameA, true));
   }
 
   public void dropMetalakes() {
     GravitinoMetalake[] metaLakes = client.listMetalakes();
     for (GravitinoMetalake metalake : metaLakes) {
+      assertDoesNotThrow(() -> client.disableMetalake(metalake.name()));
       assertTrue(client.dropMetalake(metalake.name()));
     }
 

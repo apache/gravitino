@@ -22,19 +22,24 @@ package org.apache.gravitino.client;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.SupportsMetalakes;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
+import org.apache.gravitino.dto.requests.MetalakeSetRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeListResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 
 /**
  * Apache Gravitino Client for the administrator to interact with the Gravitino API, allowing the
@@ -145,22 +150,78 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
   }
 
   /**
-   * Drops a specific Metalake using the Gravitino API.
+   * Drop a metalake with specified name. If the force flag is true, it will:
    *
-   * @param name The name of the Metalake to be dropped.
-   * @return True if the Metalake was successfully dropped, false if the Metalake does not exist.
+   * <ul>
+   *   <li>Cascade drop all sub-entities (tags, catalogs, schemas, tables, etc.) of the metalake in
+   *       Gravitino store.
+   *   <li>Drop the metalake even if it is in use.
+   *   <li>External resources (e.g. database, table, etc.) associated with sub-entities will not be
+   *       deleted unless it is managed (such as managed fileset).
+   * </ul>
+   *
+   * If the force flag is false, it is equivalent to calling {@link #dropMetalake(String)}.
+   *
+   * @param name The name of the metalake.
+   * @param force Whether to force the drop.
+   * @return True if the metalake was dropped, false if the metalake does not exist.
+   * @throws NonEmptyEntityException If the metalake is not empty and force is false.
+   * @throws MetalakeInUseException If the metalake is in use and force is false.
    */
   @Override
-  public boolean dropMetalake(String name) {
+  public boolean dropMetalake(String name, boolean force)
+      throws NonEmptyEntityException, MetalakeInUseException {
     checkMetalakeName(name);
+    Map<String, String> params = new HashMap<>();
+    params.put("force", String.valueOf(force));
+
     DropResponse resp =
         restClient.delete(
             API_METALAKES_IDENTIFIER_PATH + name,
+            params,
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.metalakeErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  @Override
+  public void enableMetalake(String name) throws NoSuchMetalakeException {
+    MetalakeSetRequest req = new MetalakeSetRequest(true);
+
+    ErrorResponse resp =
+        restClient.patch(
+            API_METALAKES_IDENTIFIER_PATH + name,
+            req,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.metalakeErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.metalakeErrorHandler().accept(resp);
+  }
+
+  @Override
+  public void disableMetalake(String name) throws NoSuchMetalakeException {
+    MetalakeSetRequest req = new MetalakeSetRequest(false);
+
+    ErrorResponse resp =
+        restClient.patch(
+            API_METALAKES_IDENTIFIER_PATH + name,
+            req,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.metalakeErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.metalakeErrorHandler().accept(resp);
   }
 
   /**

@@ -35,7 +35,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.TrinoITContainers;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.rel.TableCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
@@ -68,14 +68,17 @@ public class TrinoQueryITBase {
   protected static final String metalakeName = "test";
   protected static GravitinoMetalake metalake;
 
-  private static void setEnv() throws Exception {
+  private static BaseIT baseIT;
+
+  private void setEnv() throws Exception {
+    baseIT = new BaseIT();
     if (autoStart) {
-      AbstractIT.startIntegrationTest();
-      gravitinoClient = AbstractIT.getGravitinoClient();
-      gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+      baseIT.startIntegrationTest();
+      gravitinoClient = baseIT.getGravitinoClient();
+      gravitinoUri = String.format("http://127.0.0.1:%d", baseIT.getGravitinoServerPort());
 
       trinoITContainers = ContainerSuite.getTrinoITContainers();
-      trinoITContainers.launch(AbstractIT.getGravitinoServerPort());
+      trinoITContainers.launch(baseIT.getGravitinoServerPort());
 
       trinoUri = trinoITContainers.getTrinoUri();
       hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
@@ -84,16 +87,16 @@ public class TrinoQueryITBase {
       postgresqlUri = trinoITContainers.getPostgresqlUri();
 
     } else if (autoStartGravitino) {
-      AbstractIT.startIntegrationTest();
-      gravitinoClient = AbstractIT.getGravitinoClient();
-      gravitinoUri = String.format("http://127.0.0.1:%d", AbstractIT.getGravitinoServerPort());
+      baseIT.startIntegrationTest();
+      gravitinoClient = baseIT.getGravitinoClient();
+      gravitinoUri = String.format("http://127.0.0.1:%d", baseIT.getGravitinoServerPort());
 
     } else {
       gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
     }
   }
 
-  public static void setup() throws Exception {
+  public void setup() throws Exception {
     if (started) {
       return;
     }
@@ -113,7 +116,7 @@ public class TrinoQueryITBase {
     try {
       if (autoStart) {
         if (trinoITContainers != null) trinoITContainers.shutdown();
-        AbstractIT.stopIntegrationTest();
+        baseIT.stopIntegrationTest();
       }
     } catch (Exception e) {
       LOG.error("Error in cleanup", e);
@@ -153,7 +156,7 @@ public class TrinoQueryITBase {
     if (!exists) {
       return;
     }
-    gravitinoClient.dropMetalake(metalakeName);
+    gravitinoClient.dropMetalake(metalakeName, true);
   }
 
   private static void createCatalog(
@@ -229,6 +232,7 @@ public class TrinoQueryITBase {
               LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema);
             });
 
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
     LOG.info("Drop catalog \"{}.{}\"", metalakeName, catalogName);
   }
