@@ -16,27 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.ops;
 
-import java.util.Map;
-import java.util.Optional;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
+package org.apache.gravitino.audit;
 
-/**
- * {@code IcebergCatalogConfigProvider} is an interface defining how Iceberg REST catalog server
- * gets Iceberg catalog configurations.
- */
-public interface IcebergCatalogConfigProvider {
+import static org.apache.gravitino.audit.AuditLog.Status;
 
-  /**
-   * @param properties The parameters for creating Provider which from configurations whose prefix
-   *     is 'gravitino.iceberg-rest.'
-   */
-  void initialize(Map<String, String> properties);
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.FailureEvent;
 
-  /**
-   * @param catalogName Iceberg catalog name.
-   * @return the configuration of Iceberg catalog.
-   */
-  Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName);
+public class DummyAuditFormatter implements Formatter {
+  @Override
+  public DummyAuditLog format(Event event) {
+    return DummyAuditLog.builder()
+        .user(event.user())
+        .operation(AuditLog.Operation.fromEvent(event))
+        .identifier(event.identifier() != null ? event.identifier().toString() : null)
+        .timestamp(event.eventTime())
+        .status(event instanceof FailureEvent ? Status.FAILURE : Status.SUCCESS)
+        .build();
+  }
 }

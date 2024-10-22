@@ -73,6 +73,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(project(":bundles:aws-bundle"))
   testImplementation(project(":bundles:gcp-bundle"))
   testImplementation(project(":bundles:aliyun-bundle"))
 
@@ -161,6 +162,11 @@ tasks.test {
   } else {
     dependsOn(tasks.jar)
   }
+
+  // this task depends on :bundles:aws-bundle:jar
+  dependsOn(":bundles:aws-bundle:jar")
+  dependsOn(":bundles:aliyun-bundle:jar")
+  dependsOn(":bundles:gcp-bundle:jar")
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {

@@ -16,5 +16,6 @@ Apache Gravitino Trino connector index:
     - [Iceberg](catalog-iceberg.md)
     - [MySQL](catalog-mysql.md)
     - [PostgreSQL](catalog-postgresql.md)
+  - [Trino cascading query](trino-cascading-query.md)
   - [Supported SQL](sql-support.md)
   - [Development](development.md)

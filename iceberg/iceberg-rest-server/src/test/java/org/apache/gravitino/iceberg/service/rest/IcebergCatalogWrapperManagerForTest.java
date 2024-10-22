@@ -23,11 +23,13 @@ import java.util.Map;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 
 // Provide a custom catalogWrapper to do test like `registerTable`
 public class IcebergCatalogWrapperManagerForTest extends IcebergCatalogWrapperManager {
-  public IcebergCatalogWrapperManagerForTest(Map<String, String> properties) {
-    super(properties);
+  public IcebergCatalogWrapperManagerForTest(
+      Map<String, String> properties, IcebergConfigProvider configProvider) {
+    super(properties, configProvider);
   }
 
   @Override
