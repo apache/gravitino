@@ -62,7 +62,7 @@ Before you can build and run this project, it is suggested you have the followin
 3. Create an alias:
 
     ```bash
-    alias gcli='java -jar clients/cli/build/libs/gravitino-cli-0.7.0-incubating-SNAPSHOT.jar'
+    alias gcli='java -jar clients/cli/build/libs/gravitino-cli-*-incubating-SNAPSHOT.jar'
     ```
 3. Test the command:
     ```bash
