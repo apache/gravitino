@@ -63,7 +63,7 @@ dependencies {
 
   compileOnly(libs.lombok)
 
-  testImplementation(project(":bundles:gcp-bundle"))
+  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
@@ -175,8 +175,4 @@ tasks.clean {
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {
   dependsOn("copyDepends")
-}
-
-tasks.test {
-    jvmArgs("-verbose:class")
 }

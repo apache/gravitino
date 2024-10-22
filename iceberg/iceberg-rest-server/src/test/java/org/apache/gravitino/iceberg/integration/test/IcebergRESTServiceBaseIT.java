@@ -107,25 +107,23 @@ public abstract class IcebergRESTServiceBaseIT {
     int port = getServerPort();
     LOG.info("Iceberg REST server port:{}", port);
     String icebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
-    SparkConf sparkConf = new SparkConf()
-        .set("spark.sql.extensions",
-            "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-        .set("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
-        .set("spark.sql.catalog.rest.type", "rest")
-        .set("spark.sql.catalog.rest.uri", icebergRESTUri)
-        // drop Iceberg table purge may hang in spark local mode
-        .set("spark.locality.wait.node", "0");
+    SparkConf sparkConf =
+        new SparkConf()
+            .set(
+                "spark.sql.extensions",
+                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+            .set("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
+            .set("spark.sql.catalog.rest.type", "rest")
+            .set("spark.sql.catalog.rest.uri", icebergRESTUri)
+            // drop Iceberg table purge may hang in spark local mode
+            .set("spark.locality.wait.node", "0");
 
     if (supportsCredentialVending()) {
-      sparkConf.set("spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation",
-          "vended-credentials");
+      sparkConf.set(
+          "spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation", "vended-credentials");
     }
 
-    sparkSession =
-        SparkSession.builder()
-            .master("local[1]")
-            .config(sparkConf)
-            .getOrCreate();
+    sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }
 
   private void stopSparkEnv() {
@@ -168,9 +166,7 @@ public abstract class IcebergRESTServiceBaseIT {
         .toArray(Object[]::new);
   }
 
-  /**
-   * check whether all child map content is in parent map
-   */
+  /** check whether all child map content is in parent map */
   protected void checkMapContains(Map<String, String> child, Map<String, String> parent) {
     child.forEach(
         (k, v) -> {
@@ -179,9 +175,7 @@ public abstract class IcebergRESTServiceBaseIT {
         });
   }
 
-  /**
-   * mainly used to debug
-   */
+  /** mainly used to debug */
   protected void printObjects(List<Object[]> objects) {
     objects.stream()
         .forEach(

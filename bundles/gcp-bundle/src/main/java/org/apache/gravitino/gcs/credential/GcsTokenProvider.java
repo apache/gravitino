@@ -77,7 +77,9 @@ public class GcsTokenProvider implements CredentialProvider {
     PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
     try {
       AccessToken accessToken =
-          getToken(pathBasedCredentialContext.getReadPaths(), pathBasedCredentialContext.getWritePaths());
+          getToken(
+              pathBasedCredentialContext.getReadPaths(),
+              pathBasedCredentialContext.getWritePaths());
       String tokenValue = accessToken.getTokenValue();
       long expireTime = accessToken.getExpirationTime().toInstant().toEpochMilli();
       return new GcsTokenCredential(tokenValue, expireTime);
