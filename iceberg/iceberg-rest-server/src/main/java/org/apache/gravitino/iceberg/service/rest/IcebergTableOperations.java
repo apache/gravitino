@@ -104,7 +104,7 @@ public class IcebergTableOperations {
       @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
-    LOG.info("List Iceberg tables, catalog:{}, namespace: {}", catalogName, icebergNS);
+    LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
     ListTablesResponse listTablesResponse =
         tableOperationDispatcher.listTable(catalogName, icebergNS);
     return IcebergRestUtils.ok(listTablesResponse);
@@ -203,7 +203,7 @@ public class IcebergTableOperations {
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     LOG.info(
-        "Load iceberg table, catalog: {}, namespace: {}, table: {}, access delegation: {}, "
+        "Load Iceberg table, catalog: {}, namespace: {}, table: {}, access delegation: {}, "
             + "credential vending: {}",
         catalogName,
         icebergNS,
@@ -233,7 +233,7 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Check iceberg table exists, catalog: {}, namespace: {}, table: {}",
+        "Check Iceberg table exists, catalog: {}, namespace: {}, table: {}",
         catalogName,
         icebergNS,
         table);
@@ -309,7 +309,7 @@ public class IcebergTableOperations {
           X_ICEBERG_ACCESS_DELEGATION
               + ": "
               + accessDelegation
-              + " is illegal, Iceberg REST spec supports:[vended-credentials,remote-signing], "
+              + " is illegal, Iceberg REST spec supports: [vended-credentials,remote-signing], "
               + "Gravitino Iceberg REST server supports: vended-credentials");
     }
   }
