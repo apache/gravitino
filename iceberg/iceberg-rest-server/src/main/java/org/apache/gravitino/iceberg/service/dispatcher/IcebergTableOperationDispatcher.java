@@ -44,7 +44,7 @@ public interface IcebergTableOperationDispatcher {
       String catalogName, Namespace namespace, CreateTableRequest createTableRequest);
 
   /**
-   * Updates a new Iceberg table.
+   * Updates an Iceberg table.
    *
    * @param catalogName The catalog name when updating the table.
    * @param tableIdentifier The Iceberg table identifier.
@@ -55,7 +55,7 @@ public interface IcebergTableOperationDispatcher {
       String catalogName, TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest);
 
   /**
-   * Drops a new Iceberg table.
+   * Drops an Iceberg table.
    *
    * @param catalogName The catalog name when dropping the table.
    * @param tableIdentifier The Iceberg table identifier.
@@ -64,7 +64,7 @@ public interface IcebergTableOperationDispatcher {
   void dropTable(String catalogName, TableIdentifier tableIdentifier, boolean purgeRequested);
 
   /**
-   * Loads a new Iceberg table.
+   * Loads an Iceberg table.
    *
    * @param catalogName The catalog name when dropping the table.
    * @param tableIdentifier The Iceberg table identifier.
@@ -82,7 +82,7 @@ public interface IcebergTableOperationDispatcher {
   ListTablesResponse listTable(String catalogName, Namespace namespace);
 
   /**
-   * Check whether Iceberg table exists.
+   * Check whether an Iceberg table exists.
    *
    * @param catalogName The catalog name when dropping the table.
    * @param tableIdentifier The Iceberg table identifier.
