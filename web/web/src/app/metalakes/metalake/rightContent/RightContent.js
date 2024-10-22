@@ -34,8 +34,8 @@ const RightContent = () => {
   const [open, setOpen] = useState(false)
   const [openSchema, setOpenSchema] = useState(false)
   const searchParams = useSearchParams()
-  const [isShowBtn, setBtnVisiable] = useState(true)
-  const [isShowSchemaBtn, setSchemaBtnVisiable] = useState(false)
+  const [isShowBtn, setBtnVisible] = useState(true)
+  const [isShowSchemaBtn, setSchemaBtnVisible] = useState(false)
   const store = useAppSelector(state => state.metalakes)
 
   const handleCreateCatalog = () => {
@@ -49,12 +49,12 @@ const RightContent = () => {
   useEffect(() => {
     const paramsSize = [...searchParams.keys()].length
     const isCatalogList = paramsSize == 1 && searchParams.get('metalake')
-    setBtnVisiable(isCatalogList)
+    setBtnVisible(isCatalogList)
 
     if (store.catalogs.length) {
       const currentCatalog = store.catalogs.filter(ca => ca.name === searchParams.get('catalog'))[0]
       const isHideSchemaAction = ['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3
-      setSchemaBtnVisiable(!isHideSchemaAction && !isCatalogList)
+      setSchemaBtnVisible(!isHideSchemaAction && !isCatalogList)
     }
   }, [searchParams, store.catalogs, store.catalogs.length])
 
