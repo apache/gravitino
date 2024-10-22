@@ -45,7 +45,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("r", SERVER, "Gravitino server version"));
     options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
     options.addOption(createArgOption("f", NAME, "full entity name (dot separated)"));
-    options.addOption(createArgOption("m", METALAKE, "Metalake"));
+    options.addOption(createArgOption("m", METALAKE, "Metalake name"));
 
     return options;
   }
