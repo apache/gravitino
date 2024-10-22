@@ -93,8 +93,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     return catalogWrapper;
   }
 
-  public CredentialProvider getCredentialProvider(String prefix) {
-    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+  public CredentialProvider getCredentialProvider(String catalogName) {
     return credentialProviderManager.getCredentialProvider(catalogName);
   }
 

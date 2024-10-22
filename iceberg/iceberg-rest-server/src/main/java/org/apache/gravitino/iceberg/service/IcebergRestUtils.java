@@ -115,20 +115,11 @@ public class IcebergRestUtils {
     }
   }
 
-  public static NameIdentifier getGravitinoNameIdentifier(String catalogName, Namespace namespace) {
-    Stream<String> catalogNS =
-        Stream.concat(Stream.of(catalogName), Arrays.stream(namespace.levels()));
-    return NameIdentifier.of(catalogNS.toArray(String[]::new));
-  }
-
   public static NameIdentifier getGravitinoNameIdentifier(
-      String catalogName, TableIdentifier icebergIdentifier) {
+      String metalakeName, String catalogName, Namespace namespace) {
     Stream<String> catalogNS =
-        Stream.concat(
-            Stream.of(catalogName), Arrays.stream(icebergIdentifier.namespace().levels()));
-    String[] catalogNSTable =
-        Stream.concat(catalogNS, Stream.of(icebergIdentifier.name())).toArray(String[]::new);
-    return NameIdentifier.of(catalogNSTable);
+        Stream.concat(Stream.of(metalakeName, catalogName), Arrays.stream(namespace.levels()));
+    return NameIdentifier.of(catalogNS.toArray(String[]::new));
   }
 
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
