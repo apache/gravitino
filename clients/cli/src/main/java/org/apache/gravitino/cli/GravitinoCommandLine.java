@@ -109,7 +109,7 @@ public class GravitinoCommandLine {
   /**
    * Handles the command execution for Metalakes based on command type and the command line options.
    */
-  protected void handleMetalakeCommand() {
+  private void handleMetalakeCommand() {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
@@ -124,7 +124,7 @@ public class GravitinoCommandLine {
   /**
    * Handles the command execution for Catalogs based on command type and the command line options.
    */
-  protected void handleCatalogCommand() {
+  private void handleCatalogCommand() {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
@@ -140,7 +140,7 @@ public class GravitinoCommandLine {
   /**
    * Handles the command execution for Schemas based on command type and the command line options.
    */
-  protected void handleSchemaCommand() {
+  private void handleSchemaCommand() {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
@@ -157,7 +157,7 @@ public class GravitinoCommandLine {
   /**
    * Handles the command execution for Tables based on command type and the command line options.
    */
-  protected void handleTableCommand() {
+  private void handleTableCommand() {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
@@ -173,7 +173,7 @@ public class GravitinoCommandLine {
   }
 
   /** Handles the command execution based on command type and the command line options. */
-  protected void handleGeneralCommand() {
+  private void handleGeneralCommand() {
     String url = getUrl();
 
     if (CommandActions.DETAILS.equals(command)) {
