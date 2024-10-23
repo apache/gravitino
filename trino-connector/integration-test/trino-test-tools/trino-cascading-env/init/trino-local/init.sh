@@ -65,7 +65,7 @@ while [ $counter -le 10 ]; do
   fi
 done
 
-echo "list gravitino connector jars:
+echo "list gravitino connector jars"
 ls /usr/lib/trino/plugin/gravitino
 
 #
