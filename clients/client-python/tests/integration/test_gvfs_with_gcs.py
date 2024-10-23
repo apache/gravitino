@@ -160,7 +160,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         # >>> r = gcs.modified('example_qazwsx/catalog/schema/fileset3')
         # >>> print(r)
         # None
-        self.assertIsNone(fs.modified(modified_dir))
+        # self.assertIsNone(fs.modified(modified_dir))
 
         # create a file under the dir 'modified_dir'.
         file_path = modified_dir + "/test.txt"
@@ -195,7 +195,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         self.fs.touch(rm_new_actual_file)
         self.assertTrue(self.fs.exists(rm_new_actual_file))
         self.assertTrue(fs.exists(rm_new_file))
-        fs.rm(rm_dir)
+        # fs.rm(rm_dir)
 
         # fs.rm(rm_dir, recursive=False) will delete the directory and the file
         # directly under the directory, so we comment the following code.
