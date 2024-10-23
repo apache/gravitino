@@ -14,7 +14,6 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import os
 from enum import Enum
 from pathlib import PurePosixPath
 from typing import Dict, Tuple
@@ -821,9 +820,9 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             raise GravitinoRuntimeException(
                 "Service account key is not found in the options."
             )
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
-
-        return importlib.import_module("pyarrow.fs").GcsFileSystem()
+        return importlib.import_module("gcsfs").GCSFileSystem(
+            token=service_account_key_path
+        )
 
     def _get_s3_filesystem(self):
         # get 'aws_access_key_id' from s3_options, if the key is not found, throw an exception

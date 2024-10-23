@@ -20,8 +20,7 @@ import os
 from random import randint
 import unittest
 
-from fsspec.implementations.arrow import ArrowFSWrapper
-from pyarrow.fs import GcsFileSystem
+from gcsfs import GCSFileSystem
 
 
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
@@ -132,9 +131,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             properties=cls.fileset_properties,
         )
 
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = cls.key_file
-        arrow_gcs_fs = GcsFileSystem()
-        cls.fs = ArrowFSWrapper(arrow_gcs_fs)
+        cls.fs = GCSFileSystem(token=cls.key_file)
 
     def test_modified(self):
         modified_dir = self.fileset_gvfs_location + "/test_modified"
@@ -163,14 +160,14 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         self.assertTrue(fs.exists(file_path))
         self.assertIsNotNone(fs.modified(file_path))
 
-    @unittest.skip(
-        "This test will fail for https://github.com/apache/arrow/issues/44438"
-    )
-    def test_pandas(self):
-        pass
-
-    @unittest.skip(
-        "This test will fail for https://github.com/apache/arrow/issues/44438"
-    )
-    def test_pyarrow(self):
-        pass
+    # @unittest.skip(
+    #     "This test will fail for https://github.com/apache/arrow/issues/44438"
+    # )
+    # def test_pandas(self):
+    #     pass
+    #
+    # @unittest.skip(
+    #     "This test will fail for https://github.com/apache/arrow/issues/44438"
+    # )
+    # def test_pyarrow(self):
+    #     pass
