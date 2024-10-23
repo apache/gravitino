@@ -65,9 +65,7 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
   public void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
       throws IllegalArgumentException {
     Preconditions.checkArgument(
-        names != null, "Cannot create a Ranger metadata object with null names");
-    Preconditions.checkArgument(
-        !names.isEmpty(), "Cannot create a Ranger metadata object with no names");
+        names != null && !names.isEmpty(), "Cannot create a Ranger metadata object with no names");
     Preconditions.checkArgument(
         names.size() <= 3,
         "Cannot create a Ranger metadata object with the name length which is greater than 3");

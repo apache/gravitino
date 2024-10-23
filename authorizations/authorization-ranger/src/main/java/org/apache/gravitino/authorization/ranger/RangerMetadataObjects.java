@@ -48,6 +48,7 @@ public class RangerMetadataObjects {
   }
 
   static String getLastName(List<String> names) {
+    Preconditions.checkArgument(names.size() > 0, "Cannot get the last name of an empty list");
     return names.get(names.size() - 1);
   }
 

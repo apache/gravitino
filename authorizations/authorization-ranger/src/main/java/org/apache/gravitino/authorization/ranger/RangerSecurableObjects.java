@@ -48,16 +48,6 @@ public class RangerSecurableObjects {
     }
 
     @Override
-    public String fullName() {
-      return super.fullName();
-    }
-
-    @Override
-    public RangerMetadataObject.Type type() {
-      return super.type();
-    }
-
-    @Override
     public List<RangerPrivilege> privileges() {
       return privileges;
     }
