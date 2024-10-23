@@ -22,7 +22,6 @@ package org.apache.gravitino.cli;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
-import org.apache.gravitino.cli.commands.AllMetalakeDetails;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.ClientVersion;
 import org.apache.gravitino.cli.commands.ListCatalogs;
@@ -96,18 +95,16 @@ public class GravitinoCommandLine {
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand() {
-    if (entity != null) {
-      if (entity.equals(CommandEntities.TABLE)) {
-        handleTableCommand();
-      } else if (entity.equals(CommandEntities.SCHEMA)) {
-        handleSchemaCommand();
-      } else if (entity.equals(CommandEntities.CATALOG)) {
-        handleCatalogCommand();
-      } else if (entity.equals(CommandEntities.METALAKE)) {
-        handleMetalakeCommand();
-      }
-    } else {
-      handleGeneralCommand();
+    if (entity.equals(CommandEntities.COLUMN)) {
+      handleColumnCommand();
+    } else if (entity.equals(CommandEntities.TABLE)) {
+      handleTableCommand();
+    } else if (entity.equals(CommandEntities.SCHEMA)) {
+      handleSchemaCommand();
+    } else if (entity.equals(CommandEntities.CATALOG)) {
+      handleCatalogCommand();
+    } else if (entity.equals(CommandEntities.METALAKE)) {
+      handleMetalakeCommand();
     }
   }
 
@@ -122,7 +119,7 @@ public class GravitinoCommandLine {
     if (CommandActions.DETAILS.equals(command)) {
       new MetalakeDetails(url, ignore, metalake).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListCatalogs(url, ignore, metalake).handle();
+      new ListMetalakes(url, ignore).handle();
     }
   }
 
@@ -138,7 +135,7 @@ public class GravitinoCommandLine {
     if (CommandActions.DETAILS.equals(command)) {
       new CatalogDetails(url, ignore, metalake, catalog).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListSchema(url, ignore, metalake, catalog).handle();
+      new ListCatalogs(url, ignore, metalake).handle();
     }
   }
 
@@ -155,7 +152,7 @@ public class GravitinoCommandLine {
     if (CommandActions.DETAILS.equals(command)) {
       new SchemaDetails(url, ignore, metalake, catalog, schema).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListTables(url, ignore, metalake, catalog, schema).handle();
+      new ListSchema(url, ignore, metalake, catalog).handle();
     }
   }
 
@@ -173,18 +170,23 @@ public class GravitinoCommandLine {
     if (CommandActions.DETAILS.equals(command)) {
       new TableDetails(url, ignore, metalake, catalog, schema, table).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListColumns(url, ignore, metalake, catalog, schema, table).handle();
+      new ListTables(url, ignore, metalake, catalog, schema).handle();
     }
   }
 
-  /** Handles the command execution based on command type and the command line options. */
-  private void handleGeneralCommand() {
+  /**
+   * Handles the command execution for Columns based on command type and the command line options.
+   */
+  private void handleColumnCommand() {
     String url = getUrl();
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+    String schema = name.getSchemaName();
+    String table = name.getTableName();
 
-    if (CommandActions.DETAILS.equals(command)) {
-      new AllMetalakeDetails(url, ignore).handle();
-    } else if (CommandActions.LIST.equals(command)) {
-      new ListMetalakes(url, ignore).handle();
+    if (CommandActions.LIST.equals(command)) {
+      new ListColumns(url, ignore, metalake, catalog, schema, table).handle();
     }
   }
 
