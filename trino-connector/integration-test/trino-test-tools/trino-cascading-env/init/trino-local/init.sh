@@ -65,6 +65,9 @@ while [ $counter -le 10 ]; do
   fi
 done
 
+echo "list gravitino connector jars:
+ls /usr/lib/trino/plugin/gravitino
+
 #
 # Update `gravitino.uri = http://GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT` in the `conf/catalog/gravitino.properties`
 sed -i "s/GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_HOST_PORT}/g" /etc/trino/catalog/gravitino.properties
