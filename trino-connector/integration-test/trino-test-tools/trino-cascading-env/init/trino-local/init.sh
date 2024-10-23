@@ -35,7 +35,7 @@ rm -fr $gravitino_server_dir/logs
 rm -fr $gravitino_server_dir/data
 
 web_path=$gravitino_server_dir/web
-if [ ! -f $web_path ]; then
+if [ ! -d $web_path ]; then
    mkdir -p $web_path
    touch $web_path/gravitino-web-1.0.war
 fi
