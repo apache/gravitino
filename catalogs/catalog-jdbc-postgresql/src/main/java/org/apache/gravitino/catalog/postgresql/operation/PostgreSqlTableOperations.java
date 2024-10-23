@@ -593,15 +593,6 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
         + ";";
   }
 
-  @Override
-  public JdbcTable getOrCreateTable(
-      String databaseName, String tableName, JdbcTable lazyLoadTable) {
-    if (null == lazyLoadTable) {
-      return load(databaseName, tableName);
-    }
-    return lazyLoadTable;
-  }
-
   private List<String> addColumnFieldDefinition(
       TableChange.AddColumn addColumn, JdbcTable lazyLoadTable) {
     if (addColumn.fieldName().length > 1) {

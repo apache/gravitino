@@ -277,16 +277,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return String.format("RENAME TABLE `%s` TO `%s`", oldTableName, newTableName);
-  }
-
-  @Override
-  protected String generateDropTableSql(String tableName) {
-    return "DROP TABLE " + BACK_QUOTE + tableName + BACK_QUOTE;
-  }
-
-  @Override
   protected String generatePurgeTableSql(String tableName) {
     throw new UnsupportedOperationException(
         "MySQL does not support purge table in Gravitino, please use drop table");
@@ -490,12 +480,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
             setProperty ->
                 String.format("%s = %s", setProperty.getProperty(), setProperty.getValue()))
         .collect(Collectors.joining(",\n"));
-  }
-
-  @Override
-  protected JdbcTable getOrCreateTable(
-      String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-    return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
   }
 
   private String updateColumnCommentFieldDefinition(

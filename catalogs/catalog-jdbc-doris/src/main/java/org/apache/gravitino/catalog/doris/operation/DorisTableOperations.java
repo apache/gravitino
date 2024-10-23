@@ -498,11 +498,6 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  protected String generateDropTableSql(String tableName) {
-    return String.format("DROP TABLE `%s`", tableName);
-  }
-
-  @Override
   protected String generatePurgeTableSql(String tableName) {
     throw new UnsupportedOperationException(
         "Doris does not support purge table in Gravitino, please use drop table");
@@ -633,12 +628,6 @@ public class DorisTableOperations extends JdbcTableOperations {
             setProperty ->
                 String.format("\"%s\" = \"%s\"", setProperty.getProperty(), setProperty.getValue()))
         .collect(Collectors.joining(",\n"));
-  }
-
-  @Override
-  protected JdbcTable getOrCreateTable(
-      String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-    return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
   }
 
   private String updateColumnCommentFieldDefinition(

@@ -454,17 +454,35 @@ public abstract class JdbcTableOperations implements TableOperation {
       Distribution distribution,
       Index[] indexes);
 
-  protected abstract String generateRenameTableSql(String oldTableName, String newTableName);
+  /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   */
+  protected String generateRenameTableSql(String oldTableName, String newTableName) {
+    return String.format("RENAME TABLE `%s` TO `%s`", oldTableName, newTableName);
+  }
 
-  protected abstract String generateDropTableSql(String tableName);
+  /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   */
+  protected String generateDropTableSql(String tableName) {
+    return String.format("DROP TABLE `%s`", tableName);
+  }
 
   protected abstract String generatePurgeTableSql(String tableName);
 
   protected abstract String generateAlterTableSql(
       String databaseName, String tableName, TableChange... changes);
 
-  protected abstract JdbcTable getOrCreateTable(
-      String databaseName, String tableName, JdbcTable lazyLoadCreateTable);
+  /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   */
+  protected JdbcTable getOrCreateTable(
+      String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+    return null != lazyLoadCreateTable ? lazyLoadCreateTable : load(databaseName, tableName);
+  }
 
   protected void validateUpdateColumnNullable(
       TableChange.UpdateColumnNullability change, JdbcTable table) {
