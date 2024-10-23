@@ -72,7 +72,7 @@ public class GravitinoCommandLine {
 
     /* Display command usage. */
     if (line.hasOption(GravitinoOptions.HELP)) {
-      GravitinoCommandLine.displayHelp(options);
+      displayHelp(options);
     }
     /* Display Gravitino version. */
     else if (line.hasOption(GravitinoOptions.VERSION)) {
