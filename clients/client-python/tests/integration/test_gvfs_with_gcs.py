@@ -152,10 +152,8 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(modified_actual_dir)
-        self.assertTrue(self.fs.exists(modified_actual_dir))
-        self.assertTrue(fs.exists(modified_dir))
 
+        self.check_mkdir(modified_dir, modified_actual_dir, fs)
         # GCP only supports getting the `object` modify time, so the modified time will be None
         # if it's a directory.
         # >>> gcs.mkdir('example_qazwsx/catalog/schema/fileset3')
@@ -170,14 +168,65 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         self.assertTrue(fs.exists(file_path))
         self.assertIsNotNone(fs.modified(file_path))
 
-    # @unittest.skip(
-    #     "This test will fail for https://github.com/apache/arrow/issues/44438"
-    # )
-    # def test_pandas(self):
-    #     pass
-    #
-    # @unittest.skip(
-    #     "This test will fail for https://github.com/apache/arrow/issues/44438"
-    # )
-    # def test_pyarrow(self):
-    #     pass
+    def test_rm(self):
+        rm_dir = self.fileset_gvfs_location + "/test_rm"
+        rm_actual_dir = self.fileset_storage_location + "/test_rm"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+        self.check_mkdir(rm_dir, rm_actual_dir, fs)
+
+        rm_file = self.fileset_gvfs_location + "/test_rm/test.file"
+        rm_actual_file = self.fileset_storage_location + "/test_rm/test.file"
+        fs.touch(rm_file)
+        self.assertTrue(self.fs.exists(rm_actual_file))
+        self.assertTrue(fs.exists(rm_file))
+
+        # test delete file
+        fs.rm(rm_file)
+        self.assertFalse(fs.exists(rm_file))
+
+        # test delete dir with recursive = false
+        rm_new_file = self.fileset_gvfs_location + "/test_rm/test_new.file"
+        rm_new_actual_file = self.fileset_storage_location + "/test_rm/test_new.file"
+        self.fs.touch(rm_new_actual_file)
+        self.assertTrue(self.fs.exists(rm_new_actual_file))
+        self.assertTrue(fs.exists(rm_new_file))
+        fs.rm(rm_dir)
+
+        # fs.rm(rm_dir, recursive=False) will delete the directory and the file
+        # directly under the directory, so we comment the following code.
+        # test delete dir with recursive = true
+        # fs.rm(rm_dir, recursive=True)
+        # self.assertFalse(fs.exists(rm_dir))
+
+    def test_rmdir(self):
+        rmdir_dir = self.fileset_gvfs_location + "/test_rmdir"
+        rmdir_actual_dir = self.fileset_storage_location + "/test_rmdir"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+        self.check_mkdir(rmdir_dir, rmdir_actual_dir, fs)
+
+        rmdir_file = self.fileset_gvfs_location + "/test_rmdir/test.file"
+        rmdir_actual_file = self.fileset_storage_location + "/test_rmdir/test.file"
+        self.fs.touch(rmdir_actual_file)
+        self.assertTrue(self.fs.exists(rmdir_actual_file))
+        self.assertTrue(fs.exists(rmdir_file))
+
+        # test delete file, GCS will remove the file directly.
+        fs.rmdir(rmdir_file)
+
+    @unittest.skip("GCS does not support making directory")
+    def test_mkdir(self):
+        pass
+
+    @unittest.skip("GCS does not support making directory")
+    def test_makedirs(self):
+        pass

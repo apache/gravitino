@@ -596,7 +596,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             "name": path,
             "size": entry["size"],
             "type": entry["type"],
-            "mtime": entry["mtime"],
+            # Some file systems may not support the `mtime` field.
+            "mtime": entry.get("mtime", None),
         }
 
     def _get_fileset_context(self, virtual_path: str, operation: FilesetDataOperation):
