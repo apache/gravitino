@@ -2,6 +2,7 @@ name: Trino Integration Test
 
 # Controls when the workflow will run
 on:
+  workflow_dispatch:
   push:
     branches: [ "main", "branch-*" ]
   pull_request:
@@ -81,6 +82,10 @@ jobs:
       - name: Free up disk space
         run: |
           dev/ci/util_free_space.sh
+
+      - name: Debug with tmate
+        uses: mxschmitt/action-tmate@v3
+        continue-on-error: true
 
       - name: Trino Integration Test
         id: integrationTest
