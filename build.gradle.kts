@@ -146,7 +146,7 @@ allprojects {
           "$1"
         )
 
-        targetExclude("**/build/**")
+        targetExclude("**/build/**", "**/.pnpm/***")
       }
 
       kotlinGradle {

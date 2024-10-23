@@ -115,7 +115,6 @@ public class RangerITEnv {
         createRangerHdfsRepository("", true);
         createRangerHiveRepository("", true);
         allowAnyoneAccessHDFS();
-        allowAnyoneAccessInformationSchema();
         initRangerService = true;
       }
     }

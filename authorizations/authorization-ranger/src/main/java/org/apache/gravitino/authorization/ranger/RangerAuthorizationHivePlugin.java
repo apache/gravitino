@@ -60,6 +60,37 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
     return instance;
   }
 
+  /** Validate different Ranger metadata object */
+  @Override
+  public void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
+      throws IllegalArgumentException {
+    Preconditions.checkArgument(
+        names != null, "Cannot create a Ranger metadata object with null names");
+    Preconditions.checkArgument(
+        !names.isEmpty(), "Cannot create a Ranger metadata object with no names");
+    Preconditions.checkArgument(
+        names.size() <= 3,
+        "Cannot create a Ranger metadata object with the name length which is greater than 3");
+    Preconditions.checkArgument(
+        type != null, "Cannot create a Ranger metadata object with no type");
+
+    Preconditions.checkArgument(
+        names.size() != 1 || type == RangerMetadataObject.Type.SCHEMA,
+        "If the length of names is 1, it must be the SCHEMA type");
+
+    Preconditions.checkArgument(
+        names.size() != 2 || type == RangerMetadataObject.Type.TABLE,
+        "If the length of names is 2, it must be the TABLE type");
+
+    Preconditions.checkArgument(
+        names.size() != 3 || type == RangerMetadataObject.Type.COLUMN,
+        "If the length of names is 3, it must be COLUMN");
+
+    for (String name : names) {
+      RangerMetadataObjects.checkName(name);
+    }
+  }
+
   @Override
   /** Set the default mapping Gravitino privilege name to the Ranger rule */
   public Map<Privilege.Name, Set<RangerPrivilege>> privilegesMappingRule() {
@@ -109,85 +140,103 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
         Privilege.Name.SELECT_TABLE);
   }
 
+  /**
+   * Allow Gravitino MetadataObject type defines rule.
+   *
+   * @return The allow Gravitino MetadataObject type defines rule.
+   */
+  @Override
+  public Set<MetadataObject.Type> allowMetadataObjectTypesRule() {
+    return ImmutableSet.of(
+        MetadataObject.Type.METALAKE,
+        MetadataObject.Type.CATALOG,
+        MetadataObject.Type.SCHEMA,
+        MetadataObject.Type.TABLE,
+        MetadataObject.Type.COLUMN);
+  }
+
   /** Translate the Gravitino securable object to the Ranger owner securable object. */
-  public List<RangerSecurableObject> translateOwner(MetadataObject metadataObject) {
+  @Override
+  public List<RangerSecurableObject> translateOwner(MetadataObject gravitinoMetadataObject) {
     List<RangerSecurableObject> rangerSecurableObjects = new ArrayList<>();
 
-    switch (metadataObject.type()) {
+    switch (gravitinoMetadataObject.type()) {
       case METALAKE:
       case CATALOG:
         // Add `*` for the SCHEMA permission
         rangerSecurableObjects.add(
-            RangerSecurableObjects.of(
+            generateRangerSecurableObject(
                 ImmutableList.of(RangerHelper.RESOURCE_ALL),
-                MetadataObject.Type.SCHEMA,
+                RangerMetadataObject.Type.SCHEMA,
                 ownerMappingRule()));
         // Add `*.*` for the TABLE permission
         rangerSecurableObjects.add(
-            RangerSecurableObjects.of(
+            generateRangerSecurableObject(
                 ImmutableList.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
-                MetadataObject.Type.TABLE,
+                RangerMetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `*.*.*` for the COLUMN permission
         rangerSecurableObjects.add(
-            RangerSecurableObjects.of(
+            generateRangerSecurableObject(
                 ImmutableList.of(
                     RangerHelper.RESOURCE_ALL,
                     RangerHelper.RESOURCE_ALL,
                     RangerHelper.RESOURCE_ALL),
-                MetadataObject.Type.COLUMN,
+                RangerMetadataObject.Type.COLUMN,
                 ownerMappingRule()));
         break;
       case SCHEMA:
         // Add `{schema}` for the SCHEMA permission
         rangerSecurableObjects.add(
-            RangerSecurableObjects.of(
-                ImmutableList.of(metadataObject.name() /*Schema name*/),
-                MetadataObject.Type.SCHEMA,
+            generateRangerSecurableObject(
+                ImmutableList.of(gravitinoMetadataObject.name() /*Schema name*/),
+                RangerMetadataObject.Type.SCHEMA,
                 ownerMappingRule()));
         // Add `{schema}.*` for the TABLE permission
         rangerSecurableObjects.add(
-            RangerSecurableObjects.of(
-                ImmutableList.of(metadataObject.name() /*Schema name*/, RangerHelper.RESOURCE_ALL),
-                MetadataObject.Type.TABLE,
+            generateRangerSecurableObject(
+                ImmutableList.of(
+                    gravitinoMetadataObject.name() /*Schema name*/, RangerHelper.RESOURCE_ALL),
+                RangerMetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `{schema}.*.*` for the COLUMN permission
         rangerSecurableObjects.add(
-            RangerSecurableObjects.of(
+            generateRangerSecurableObject(
                 ImmutableList.of(
-                    metadataObject.name() /*Schema name*/,
+                    gravitinoMetadataObject.name() /*Schema name*/,
                     RangerHelper.RESOURCE_ALL,
                     RangerHelper.RESOURCE_ALL),
-                MetadataObject.Type.COLUMN,
+                RangerMetadataObject.Type.COLUMN,
                 ownerMappingRule()));
         break;
       case TABLE:
         // Add `{schema}.{table}` for the TABLE permission
         rangerSecurableObjects.add(
-            RangerSecurableObjects.of(
-                convertToRangerMetadataObject(metadataObject),
-                MetadataObject.Type.TABLE,
+            generateRangerSecurableObject(
+                translateMetadataObject(gravitinoMetadataObject).names(),
+                RangerMetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `{schema}.{table}.*` for the COLUMN permission
         rangerSecurableObjects.add(
-            RangerSecurableObjects.of(
+            generateRangerSecurableObject(
                 Stream.concat(
-                        convertToRangerMetadataObject(metadataObject).stream(),
+                        translateMetadataObject(gravitinoMetadataObject).names().stream(),
                         Stream.of(RangerHelper.RESOURCE_ALL))
                     .collect(Collectors.toList()),
-                MetadataObject.Type.COLUMN,
+                RangerMetadataObject.Type.COLUMN,
                 ownerMappingRule()));
         break;
       default:
         throw new AuthorizationPluginException(
             "The owner privilege is not supported for the securable object: %s",
-            metadataObject.type());
+            gravitinoMetadataObject.type());
     }
 
     return rangerSecurableObjects;
   }
 
   /** Translate the Gravitino securable object to the Ranger securable object. */
+  @Override
   public List<RangerSecurableObject> translatePrivilege(SecurableObject securableObject) {
     List<RangerSecurableObject> rangerSecurableObjects = new ArrayList<>();
 
@@ -214,9 +263,9 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                     case CATALOG:
                       // Add Ranger privilege(`SELECT`) to SCHEMA(`*`)
                       rangerSecurableObjects.add(
-                          RangerSecurableObjects.of(
+                          generateRangerSecurableObject(
                               ImmutableList.of(RangerHelper.RESOURCE_ALL),
-                              MetadataObject.Type.SCHEMA,
+                              RangerMetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
                     default:
@@ -231,9 +280,9 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                     case CATALOG:
                       // Add Ranger privilege(`CREATE`) to SCHEMA(`*`)
                       rangerSecurableObjects.add(
-                          RangerSecurableObjects.of(
+                          generateRangerSecurableObject(
                               ImmutableList.of(RangerHelper.RESOURCE_ALL),
-                              MetadataObject.Type.SCHEMA,
+                              RangerMetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
                     default:
@@ -248,17 +297,17 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                     case CATALOG:
                       // Add Ranger privilege(`SELECT`) to SCHEMA(`*`)
                       rangerSecurableObjects.add(
-                          RangerSecurableObjects.of(
+                          generateRangerSecurableObject(
                               ImmutableList.of(RangerHelper.RESOURCE_ALL),
-                              MetadataObject.Type.SCHEMA,
+                              RangerMetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
                     case SCHEMA:
                       // Add Ranger privilege(`SELECT`) to SCHEMA(`{schema}`)
                       rangerSecurableObjects.add(
-                          RangerSecurableObjects.of(
+                          generateRangerSecurableObject(
                               ImmutableList.of(securableObject.name() /*Schema name*/),
-                              MetadataObject.Type.SCHEMA,
+                              RangerMetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
                     default:
@@ -275,38 +324,38 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                     case CATALOG:
                       // Add `*.*` for the TABLE permission
                       rangerSecurableObjects.add(
-                          RangerSecurableObjects.of(
+                          generateRangerSecurableObject(
                               ImmutableList.of(
                                   RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
-                              MetadataObject.Type.TABLE,
+                              RangerMetadataObject.Type.TABLE,
                               rangerPrivileges));
                       // Add `*.*.*` for the COLUMN permission
                       rangerSecurableObjects.add(
-                          RangerSecurableObjects.of(
+                          generateRangerSecurableObject(
                               ImmutableList.of(
                                   RangerHelper.RESOURCE_ALL,
                                   RangerHelper.RESOURCE_ALL,
                                   RangerHelper.RESOURCE_ALL),
-                              MetadataObject.Type.COLUMN,
+                              RangerMetadataObject.Type.COLUMN,
                               rangerPrivileges));
                       break;
                     case SCHEMA:
                       // Add `{schema}.*` for the TABLE permission
                       rangerSecurableObjects.add(
-                          RangerSecurableObjects.of(
+                          generateRangerSecurableObject(
                               ImmutableList.of(
                                   securableObject.name() /*Schema name*/,
                                   RangerHelper.RESOURCE_ALL),
-                              MetadataObject.Type.TABLE,
+                              RangerMetadataObject.Type.TABLE,
                               rangerPrivileges));
                       // Add `{schema}.*.*` for the COLUMN permission
                       rangerSecurableObjects.add(
-                          RangerSecurableObjects.of(
+                          generateRangerSecurableObject(
                               ImmutableList.of(
                                   securableObject.name() /*Schema name*/,
                                   RangerHelper.RESOURCE_ALL,
                                   RangerHelper.RESOURCE_ALL),
-                              MetadataObject.Type.COLUMN,
+                              RangerMetadataObject.Type.COLUMN,
                               rangerPrivileges));
                       break;
                     case TABLE:
@@ -317,18 +366,18 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
                       } else {
                         // Add `{schema}.{table}` for the TABLE permission
                         rangerSecurableObjects.add(
-                            RangerSecurableObjects.of(
-                                convertToRangerMetadataObject(securableObject),
-                                MetadataObject.Type.TABLE,
+                            generateRangerSecurableObject(
+                                translateMetadataObject(securableObject).names(),
+                                RangerMetadataObject.Type.TABLE,
                                 rangerPrivileges));
                         // Add `{schema}.{table}.*` for the COLUMN permission
                         rangerSecurableObjects.add(
-                            RangerSecurableObjects.of(
+                            generateRangerSecurableObject(
                                 Stream.concat(
-                                        convertToRangerMetadataObject(securableObject).stream(),
+                                        translateMetadataObject(securableObject).names().stream(),
                                         Stream.of(RangerHelper.RESOURCE_ALL))
                                     .collect(Collectors.toList()),
-                                MetadataObject.Type.COLUMN,
+                                RangerMetadataObject.Type.COLUMN,
                                 rangerPrivileges));
                       }
                       break;
@@ -351,16 +400,39 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
   }
 
   /**
-   * Because the Ranger securable object is different from the Gravitino securable object, we need
-   * to convert the Gravitino securable object to the Ranger securable object.
+   * Because the Ranger metadata object is different from the Gravitino metadata object, we need to
+   * convert the Gravitino metadata object to the Ranger metadata object.
    */
-  List<String> convertToRangerMetadataObject(MetadataObject metadataObject) {
+  @Override
+  public RangerMetadataObject translateMetadataObject(MetadataObject metadataObject) {
+    Preconditions.checkArgument(
+        allowMetadataObjectTypesRule().contains(metadataObject.type()),
+        String.format(
+            "The metadata object type %s is not supported in the RangerAuthorizationHivePlugin",
+            metadataObject.type()));
     Preconditions.checkArgument(
         !(metadataObject instanceof RangerPrivileges),
         "The metadata object must be not a RangerPrivileges object.");
     List<String> nsMetadataObject =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
-    nsMetadataObject.remove(0); // remove the catalog name
-    return nsMetadataObject;
+    Preconditions.checkArgument(
+        nsMetadataObject.size() > 0, "The metadata object must have at least one name.");
+
+    RangerMetadataObject.Type type = null;
+    if (metadataObject.type() == MetadataObject.Type.METALAKE
+        || metadataObject.type() == MetadataObject.Type.CATALOG) {
+      nsMetadataObject.clear();
+      nsMetadataObject.add(RangerHelper.RESOURCE_ALL);
+      type = RangerMetadataObject.Type.SCHEMA;
+    } else {
+      nsMetadataObject.remove(0); // Remove the catalog name
+      type = RangerMetadataObject.Type.fromMetadataType(metadataObject.type());
+    }
+
+    validateRangerMetadataObject(nsMetadataObject, type);
+    return new RangerMetadataObjects.RangerMetadataObjectImpl(
+        RangerMetadataObjects.getParentFullName(nsMetadataObject),
+        RangerMetadataObjects.getLastName(nsMetadataObject),
+        type);
   }
 }

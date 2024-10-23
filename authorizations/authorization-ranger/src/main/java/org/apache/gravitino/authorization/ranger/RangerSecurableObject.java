@@ -19,7 +19,6 @@
 package org.apache.gravitino.authorization.ranger;
 
 import java.util.List;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Unstable;
 
 /**
@@ -32,7 +31,7 @@ import org.apache.gravitino.annotation.Unstable;
  * specifically.
  */
 @Unstable
-public interface RangerSecurableObject extends MetadataObject {
+public interface RangerSecurableObject extends RangerMetadataObject {
   /**
    * The privileges of the Ranger securable object.
    *

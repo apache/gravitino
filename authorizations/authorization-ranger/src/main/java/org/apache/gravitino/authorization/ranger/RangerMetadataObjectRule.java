@@ -16,17 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization;
+package org.apache.gravitino.authorization.ranger;
 
-import java.io.Closeable;
+import java.util.List;
 
-/**
- * Authorization operations plugin interfaces. <br>
- * Notice: Because each interface function needs to perform multiple steps in the underlying
- * permission system, the implementation method of these function interface must be idempotent.
- */
-public interface AuthorizationPlugin
-    extends UserGroupAuthorizationPlugin,
-        RoleAuthorizationPlugin,
-        MetadataAuthorizationPlugin,
-        Closeable {}
+/** Different underlying datasource have different Ranger metadata object rules */
+interface RangerMetadataObjectRule {
+  /** Validate different underlying datasource Ranger metadata object */
+  void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
+      throws IllegalArgumentException;
+}
