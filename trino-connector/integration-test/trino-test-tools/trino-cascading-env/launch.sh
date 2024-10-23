@@ -68,7 +68,7 @@ LOG_FILE=$(realpath $LOG_DIR)/docker-compose.log
 echo "The docker compose log is: $LOG_FILE"
 
 docker compose up -d
-nohup docker compose logs -f  -t > $LOG_FILE &
+nohup docker compose logs -f  -t > $LOG_FILE 2>&1 &
 
 max_attempts=120
 attempts=1

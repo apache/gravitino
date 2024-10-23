@@ -52,7 +52,7 @@ while [ $counter -le 10 ]; do
     break
   fi
 
-  if [ "$counter" -eq 30 ]; then
+  if [ "$counter" -eq 10 ]; then
     echo "Failed to create test metalake, the gravitino server is not running"
     jps
     cat $gravitino_server_dir/logs/gravitino-server.*
