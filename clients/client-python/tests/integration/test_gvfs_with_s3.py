@@ -145,9 +145,6 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
     def check_mkdir(self, gvfs_dir, actual_dir, gvfs_instance):
         pass
 
-        # Object storage like S3 does not support making directory and can only create
-        # objects under the bucket. So we need to skip the test for GCS.
-
     def check_makedirs(self, gvfs_dir, actual_dir, gvfs_instance):
         pass
 
