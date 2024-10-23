@@ -35,13 +35,20 @@ public class CreateSchema extends Command {
    * Create a new schema.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param comment The schema's comment.
    */
-  public CreateSchema(String url, String metalake, String catalog, String schema, String comment) {
-    super(url);
+  public CreateSchema(
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String schema,
+      String comment) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;

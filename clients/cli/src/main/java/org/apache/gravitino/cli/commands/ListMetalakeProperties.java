@@ -34,10 +34,11 @@ public class ListMetalakeProperties extends ListProperties {
    * List the properties of a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    */
-  public ListMetalakeProperties(String url, String metalake) {
-    super(url);
+  public ListMetalakeProperties(String url, boolean ignoreVersions, String metalake) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
   }
 

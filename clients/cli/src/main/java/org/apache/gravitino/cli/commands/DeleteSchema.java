@@ -35,12 +35,14 @@ public class DeleteSchema extends Command {
    * Delete a schema.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    */
-  public DeleteSchema(String url, String metalake, String catalog, String schema) {
-    super(url);
+  public DeleteSchema(
+      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;

@@ -36,12 +36,14 @@ public class UpdateCatalogComment extends Command {
    * Update the comment of a catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param comment New metalake comment.
    */
-  public UpdateCatalogComment(String url, String metalake, String catalog, String comment) {
-    super(url);
+  public UpdateCatalogComment(
+      String url, boolean ignoreVersions, String metalake, String catalog, String comment) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.comment = comment;

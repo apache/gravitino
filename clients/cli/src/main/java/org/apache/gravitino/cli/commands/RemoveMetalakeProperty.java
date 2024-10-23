@@ -34,11 +34,13 @@ public class RemoveMetalakeProperty extends Command {
    * Remove a property of a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param property The name of the property.
    */
-  public RemoveMetalakeProperty(String url, String metalake, String property) {
-    super(url);
+  public RemoveMetalakeProperty(
+      String url, boolean ignoreVersions, String metalake, String property) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.property = property;
   }

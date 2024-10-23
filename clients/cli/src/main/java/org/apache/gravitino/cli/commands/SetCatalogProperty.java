@@ -37,14 +37,20 @@ public class SetCatalogProperty extends Command {
    * Set a property of a catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param property The name of the property.
    * @param value The value of the property.
    */
   public SetCatalogProperty(
-      String url, String metalake, String catalog, String property, String value) {
-    super(url);
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String property,
+      String value) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.property = property;

@@ -38,14 +38,20 @@ public class CreateCatalog extends Command {
    * Create a new catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param provider The provider/type of catalog.
    * @param comment The catalog's comment.
    */
   public CreateCatalog(
-      String url, String metalake, String catalog, String provider, String comment) {
-    super(url);
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String provider,
+      String comment) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.provider = provider;

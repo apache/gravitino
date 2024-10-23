@@ -31,11 +31,12 @@ public class CreateMetalake extends Command {
    * Create a new metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param comment The metalake's comment.
    */
-  public CreateMetalake(String url, String metalake, String comment) {
-    super(url);
+  public CreateMetalake(String url, boolean ignoreVersions, String metalake, String comment) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.comment = comment;
   }

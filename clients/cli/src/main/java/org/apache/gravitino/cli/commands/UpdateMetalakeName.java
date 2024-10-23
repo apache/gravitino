@@ -34,11 +34,12 @@ public class UpdateMetalakeName extends Command {
    * Update the name of a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param name The new metalake name.
    */
-  public UpdateMetalakeName(String url, String metalake, String name) {
-    super(url);
+  public UpdateMetalakeName(String url, boolean ignoreVersions, String metalake, String name) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.name = name;
   }
