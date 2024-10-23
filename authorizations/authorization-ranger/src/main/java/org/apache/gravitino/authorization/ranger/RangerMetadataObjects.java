@@ -34,46 +34,6 @@ public class RangerMetadataObjects {
   private RangerMetadataObjects() {}
 
   /**
-   * Create the Ranger metadata object with the given names and Gravitino type.
-   *
-   * @param names The names of the Gravitino metadata object
-   * @param type The type of the Gravitino metadata object
-   * @return The created Ranger metadata object
-   */
-  public static RangerMetadataObject of(List<String> names, MetadataObject.Type type) {
-    Preconditions.checkArgument(
-        names != null, "Cannot create a Ranger metadata object with null names");
-    Preconditions.checkArgument(
-        !names.isEmpty(), "Cannot create a Ranger metadata object with no names");
-    Preconditions.checkArgument(
-        names.size() <= 3,
-        "Cannot create a Ranger metadata object with the name length which is greater than 3");
-    Preconditions.checkArgument(
-        type != null, "Cannot create a Ranger metadata object with no type");
-
-    Preconditions.checkArgument(
-        names.size() != 1 || type == MetadataObject.Type.SCHEMA,
-        "If the length of names is 1, it must be the SCHEMA type");
-
-    Preconditions.checkArgument(
-        names.size() != 2 || type == MetadataObject.Type.TABLE,
-        "If the length of names is 2, it must be the TABLE type");
-
-    Preconditions.checkArgument(
-        names.size() != 3 || type == MetadataObject.Type.COLUMN,
-        "If the length of names is 3, it must be COLUMN");
-
-    for (String name : names) {
-      checkName(name);
-    }
-
-    return new RangerMetadataObjectImpl(
-        getParentFullName(names),
-        getLastName(names),
-        RangerMetadataObject.Type.fromMetadataType(type));
-  }
-
-  /**
    * Get the parent full name of the given full name.
    *
    * @param names The names of the metadata object
@@ -87,11 +47,11 @@ public class RangerMetadataObjects {
     return DOT_JOINER.join(names.subList(0, names.size() - 1));
   }
 
-  private static String getLastName(List<String> names) {
+  static String getLastName(List<String> names) {
     return names.get(names.size() - 1);
   }
 
-  private static void checkName(String name) {
+  static void checkName(String name) {
     Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
   }
 

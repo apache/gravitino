@@ -22,19 +22,17 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import java.util.List;
 import java.util.Set;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerMetadataObjects.RangerMetadataObjectImpl;
 
 /** The helper class for {@link RangerSecurableObject}. */
 public class RangerSecurableObjects {
-  public static RangerSecurableObject of(
-      List<String> names, MetadataObject.Type type, Set<RangerPrivilege> privileges) {
-    RangerMetadataObject metadataObject = RangerMetadataObjects.of(names, type);
-    return new RangerSecurableObjectImpl(
-        metadataObject.parent(), metadataObject.name(), metadataObject.type(), privileges);
+  /** Different underlying datasource have different Ranger securable object implement */
+  interface RangerSecurableObjectImplementor {
+    RangerSecurableObject generateRangerSecurableObject(
+        List<String> names, RangerMetadataObject.Type type, Set<RangerPrivilege> privileges);
   }
 
-  private static class RangerSecurableObjectImpl extends RangerMetadataObjectImpl
+  public static class RangerSecurableObjectImpl extends RangerMetadataObjectImpl
       implements RangerSecurableObject {
 
     private final List<RangerPrivilege> privileges;

@@ -45,7 +45,6 @@ import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.RangerSecurableObject;
-import org.apache.gravitino.authorization.ranger.RangerSecurableObjects;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -249,9 +248,9 @@ public class RangerHiveIT {
         GravitinoITUtils.genRandomName(currentFunName()));
     // findManagedPolicy function use precise search, so return null
     RangerSecurableObject rangerSecurableObject =
-        RangerSecurableObjects.of(
+        rangerAuthHivePlugin.generateRangerSecurableObject(
             ImmutableList.of(String.format("%s3", dbName), "tab1"),
-            MetadataObject.Type.TABLE,
+            RangerMetadataObject.Type.TABLE,
             ImmutableSet.of(
                 new RangerPrivileges.RangerHivePrivilegeImpl(
                     RangerPrivileges.RangerHivePrivilege.ALL, Privilege.Condition.ALLOW)));

@@ -38,6 +38,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.ranger.RangerSecurableObjects.RangerSecurableObjectImplementor;
 import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
@@ -67,7 +68,9 @@ import org.slf4j.LoggerFactory;
  * implement Gravitino Owner concept. <br>
  */
 public abstract class RangerAuthorizationPlugin
-    implements AuthorizationPlugin, RangerPrivilegesMappingProvider {
+    implements AuthorizationPlugin,
+        RangerPrivilegesMappingProvider,
+        RangerSecurableObjectImplementor {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
 
   protected final String rangerServiceName;
