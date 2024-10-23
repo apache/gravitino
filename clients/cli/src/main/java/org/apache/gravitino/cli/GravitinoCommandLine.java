@@ -65,6 +65,7 @@ public class GravitinoCommandLine {
 
   /** Handles the parsed command line arguments and executes the corresponding actions. */
   public void handleCommandLine() {
+     /* Check if you should ignore client/version versions */
     if (line.hasOption(GravitinoOptions.IGNORE)) {
       ignore = true;
     }
