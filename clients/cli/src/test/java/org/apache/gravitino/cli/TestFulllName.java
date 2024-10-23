@@ -19,9 +19,11 @@
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.MissingArgumentException;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.FullName;
 import org.apache.gravitino.cli.GravitinoOptions;
@@ -65,7 +67,7 @@ public class TestFulllName {
 
   @Test
   public void malformedName() throws Exception {
-    String[] args = {"--name", "metalake.catalog"};
+    String[] args = {"--name", "catalog.schema"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
     String tableName = fullName.getTableName();
@@ -73,16 +75,13 @@ public class TestFulllName {
   }
 
   @Test
-  public void malformedMissingdName() throws Exception {
-    String[] args = {"catalog", "--name", "metalake"};
-    CommandLine commandLine = new DefaultParser().parse(options, args);
-    FullName fullName = new FullName(commandLine);
-    String catalogName = fullName.getCatalogName();
-    assertNull(catalogName);
+  public void missingName() throws Exception {
+    String[] args = {"catalog", "--name"};
+    assertThrows(MissingArgumentException.class, () -> new DefaultParser().parse(options, args));
   }
 
   @Test
-  public void missingName() throws Exception {
+  public void missingArgs() throws Exception {
     String[] args = {}; // No name provided
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);

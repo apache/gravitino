@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -54,7 +55,7 @@ public class TestMain {
   }
 
   @Test
-  public void withTwoArgsOnly() throws ParseException {
+  public void withTwoArgs() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
     String[] args = {"metalake", "details"};
@@ -83,13 +84,26 @@ public class TestMain {
   public void withNoArgs() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
-    String[] args = {"metalake", "--name", "metalake_demo"};
+    String[] args = {};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);
     assertNull(command);
     String entity = Main.resolveEntity(line);
-    assertEquals(CommandEntities.METALAKE, entity);
+    assertNull(entity);
+  }
+
+  @Test
+  public void withNoArgsAndOptions() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"--name", "metalake_demo"};
+    CommandLine line = parser.parse(options, args);
+
+    String command = Main.resolveCommand(line);
+    assertNull(command);
+    String entity = Main.resolveEntity(line);
+    assertNull(entity);
   }
 
   @Test
@@ -121,7 +135,7 @@ public class TestMain {
   public void catalogWithOneArg() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
-    String[] args = {"catalog", "--details", "--name", "metalake_demo.catalog_postgres"};
+    String[] args = {"catalog", "--name", "catalog_postgres"};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);
