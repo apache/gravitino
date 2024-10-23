@@ -60,6 +60,13 @@ public interface RangerPrivilegesMappingProvider {
   Set<Privilege.Name> allowPrivilegesRule();
 
   /**
+   * Allow Gravitino MetadataObject type defines rule.
+   *
+   * @return The allow Gravitino MetadataObject type defines rule.
+   */
+  Set<MetadataObject.Type> allowMetadataObjectTypesRule();
+
+  /**
    * Translate the Gravitino securable object to the Ranger securable object.
    *
    * @param securableObject The Gravitino securable object.

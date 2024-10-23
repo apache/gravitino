@@ -191,34 +191,34 @@ public abstract class RangerAuthorizationPlugin
                 });
       } else if (change instanceof RoleChange.UpdateSecurableObject) {
         SecurableObject oldSecurableObject =
-                ((RoleChange.UpdateSecurableObject) change).getSecurableObject();
+            ((RoleChange.UpdateSecurableObject) change).getSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(oldSecurableObject))) {
           return false;
         }
         SecurableObject newSecurableObject =
-                ((RoleChange.UpdateSecurableObject) change).getNewSecurableObject();
+            ((RoleChange.UpdateSecurableObject) change).getNewSecurableObject();
         if (!validAuthorizationOperation(Arrays.asList(newSecurableObject))) {
           return false;
         }
 
         Preconditions.checkArgument(
-                (oldSecurableObject.fullName().equals(newSecurableObject.fullName())
-                        && oldSecurableObject.type().equals(newSecurableObject.type())),
-                "The old and new securable objects metadata must be equal!");
+            (oldSecurableObject.fullName().equals(newSecurableObject.fullName())
+                && oldSecurableObject.type().equals(newSecurableObject.type())),
+            "The old and new securable objects metadata must be equal!");
         List<RangerSecurableObject> rangerOldSecurableObjects =
-                translatePrivilege(oldSecurableObject);
+            translatePrivilege(oldSecurableObject);
         List<RangerSecurableObject> rangerNewSecurableObjects =
-                translatePrivilege(newSecurableObject);
+            translatePrivilege(newSecurableObject);
         rangerOldSecurableObjects.stream()
-                .forEach(
-                        rangerSecurableObject -> {
-                          doRemoveSecurableObject(role.name(), rangerSecurableObject);
-                        });
+            .forEach(
+                rangerSecurableObject -> {
+                  doRemoveSecurableObject(role.name(), rangerSecurableObject);
+                });
         rangerNewSecurableObjects.stream()
-                .forEach(
-                        rangerSecurableObject -> {
-                          doAddSecurableObject(role.name(), rangerSecurableObject);
-                        });
+            .forEach(
+                rangerSecurableObject -> {
+                  doAddSecurableObject(role.name(), rangerSecurableObject);
+                });
       } else {
         throw new IllegalArgumentException(
             "Unsupported role change type: "
@@ -239,8 +239,19 @@ public abstract class RangerAuthorizationPlugin
             ((MetadataObjectChange.RenameMetadataObject) change).getNewMetadataObject();
         RangerMetadataObject rangerMetadataObject = translateMetadataObject(metadataObject);
         RangerMetadataObject newRangerMetadataObject = translateMetadataObject(newMetadataObject);
-
+        if (rangerMetadataObject.equals(newRangerMetadataObject)) {
+          LOG.info(
+              "The metadata object({}) and new metadata object({}) are equal, so ignore rename!",
+              rangerMetadataObject.fullName(),
+              newRangerMetadataObject.fullName());
+          continue;
+        }
         doRenameMetadataObject(rangerMetadataObject, newRangerMetadataObject);
+      } else if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
+        MetadataObject metadataObject =
+            ((MetadataObjectChange.RemoveMetadataObject) change).getMetadataObject();
+        RangerMetadataObject rangerMetadataObject = translateMetadataObject(metadataObject);
+        doRemoveMetadataObject(rangerMetadataObject);
       } else {
         throw new IllegalArgumentException(
             "Unsupported metadata object change type: "
@@ -686,6 +697,83 @@ public abstract class RangerAuthorizationPlugin
   }
 
   /**
+   * IF remove the SCHEMA, Need to remove these the relevant policies, `{schema}`, `{schema}.*`,
+   * `{schema}.*.*` <br>
+   * IF remove the TABLE, Need to remove these the relevant policies, `{schema}.*`, `{schema}.*.*`
+   * <br>
+   * IF remove the COLUMN, Only need to remove `{schema}.*.*` <br>
+   */
+  private void doRemoveMetadataObject(RangerMetadataObject rangerMetadataObject) {
+    switch (rangerMetadataObject.type()) {
+      case SCHEMA:
+        doRemoveSchemaMetadataObject(rangerMetadataObject);
+        break;
+      case TABLE:
+        doRemoveTableMetadataObject(rangerMetadataObject);
+        break;
+      case COLUMN:
+        doRemoveColumnMetadataObject(rangerMetadataObject);
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported metadata object type: " + rangerMetadataObject.type());
+    }
+  }
+
+  /**
+   * Remove the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
+   * `{schema}.*.*` <br>
+   */
+  private void doRemoveSchemaMetadataObject(RangerMetadataObject rangerMetadataObject) {
+    List<String> metadataNames = new ArrayList<>();
+    List<Map<String, MetadataObject.Type>> loop =
+        ImmutableList.of(
+            ImmutableMap.of(rangerMetadataObject.names().get(0), MetadataObject.Type.SCHEMA),
+            ImmutableMap.of(RangerHelper.RESOURCE_ALL, MetadataObject.Type.TABLE),
+            ImmutableMap.of(RangerHelper.RESOURCE_ALL, MetadataObject.Type.COLUMN));
+    for (Map<String, MetadataObject.Type> nameAndType : loop) {
+      metadataNames.add(nameAndType.keySet().stream().findFirst().get());
+      removePolicyByMetadataObject(metadataNames, nameAndType.values().stream().findFirst().get());
+    }
+  }
+
+  /**
+   * Remove the TABLE, Need to rename these the relevant policies, `*.{table}`, `*.{table}.{column}`
+   * <br>
+   */
+  private void doRemoveTableMetadataObject(RangerMetadataObject rangerMetadataObject) {
+    List<String> metadataNames = new ArrayList<>();
+    List<Map<String, MetadataObject.Type>> loop =
+        ImmutableList.of(
+            ImmutableMap.of(rangerMetadataObject.names().get(0), MetadataObject.Type.SCHEMA),
+            ImmutableMap.of(rangerMetadataObject.names().get(1), MetadataObject.Type.TABLE),
+            ImmutableMap.of(RangerHelper.RESOURCE_ALL, MetadataObject.Type.COLUMN));
+    for (Map<String, MetadataObject.Type> nameAndType : loop) {
+      metadataNames.add(nameAndType.keySet().stream().findFirst().get());
+
+      if (nameAndType.containsValue(MetadataObject.Type.SCHEMA)) {
+        // Skip remove the schema name operation
+        continue;
+      }
+      removePolicyByMetadataObject(metadataNames, nameAndType.values().stream().findFirst().get());
+    }
+  }
+
+  /** Remove the COLUMN, Only need to rename `*.*.{column}` <br> */
+  private void doRemoveColumnMetadataObject(RangerMetadataObject rangerMetadataObject) {
+    List<String> metadataNames = new ArrayList<>();
+    List<Map<String, MetadataObject.Type>> loop =
+        ImmutableList.of(
+            ImmutableMap.of(RangerHelper.RESOURCE_ALL, MetadataObject.Type.SCHEMA),
+            ImmutableMap.of(RangerHelper.RESOURCE_ALL, MetadataObject.Type.TABLE),
+            ImmutableMap.of(rangerMetadataObject.names().get(2), MetadataObject.Type.COLUMN));
+    for (Map<String, MetadataObject.Type> nameAndType : loop) {
+      metadataNames.add(nameAndType.keySet().stream().findFirst().get());
+      removePolicyByMetadataObject(metadataNames, nameAndType.values().stream().findFirst().get());
+    }
+  }
+
+  /**
    * IF rename the SCHEMA, Need to rename these the relevant policies, `{schema}`, `{schema}.*`,
    * `{schema}.*.*` <br>
    * IF rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
@@ -801,6 +889,30 @@ public abstract class RangerAuthorizationPlugin
           newMetadataNames,
           nameAndType.values().stream().findFirst().get());
     }
+  }
+
+  private void removePolicyByMetadataObject(List<String> metadataNames, MetadataObject.Type type) {
+    RangerMetadataObject metadataObject =
+        new RangerMetadataObjects.RangerMetadataObjectImpl(
+            RangerMetadataObjects.getParentFullName(metadataNames),
+            RangerMetadataObjects.getLastName(metadataNames),
+            RangerMetadataObject.Type.fromMetadataType(type));
+    List<RangerPolicy> policies = rangerHelper.findManagedPolicies(metadataObject);
+
+    if (policies.isEmpty()) {
+      LOG.warn(
+          "Cannot find the Ranger policy for the metadata object({})!", metadataObject.fullName());
+    }
+    policies.stream()
+        .forEach(
+            policy -> {
+              try {
+                rangerClient.deletePolicy(policy.getId());
+              } catch (RangerServiceException e) {
+                LOG.error("Failed to rename the policy {}!", policy);
+                throw new RuntimeException(e);
+              }
+            });
   }
 
   private void updatePolicyByMetadataObject(

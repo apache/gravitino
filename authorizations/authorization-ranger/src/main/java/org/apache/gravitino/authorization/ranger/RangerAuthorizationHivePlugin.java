@@ -140,6 +140,21 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
         Privilege.Name.SELECT_TABLE);
   }
 
+  /**
+   * Allow Gravitino MetadataObject type defines rule.
+   *
+   * @return The allow Gravitino MetadataObject type defines rule.
+   */
+  @Override
+  public Set<MetadataObject.Type> allowMetadataObjectTypesRule() {
+    return ImmutableSet.of(
+        MetadataObject.Type.METALAKE,
+        MetadataObject.Type.CATALOG,
+        MetadataObject.Type.SCHEMA,
+        MetadataObject.Type.TABLE,
+        MetadataObject.Type.COLUMN);
+  }
+
   /** Translate the Gravitino securable object to the Ranger owner securable object. */
   @Override
   public List<RangerSecurableObject> translateOwner(MetadataObject gravitinoMetadataObject) {
@@ -391,16 +406,29 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
   @Override
   public RangerMetadataObject translateMetadataObject(MetadataObject metadataObject) {
     Preconditions.checkArgument(
+        allowMetadataObjectTypesRule().contains(metadataObject.type()),
+        String.format(
+            "The metadata object type %s is not supported in the RangerAuthorizationHivePlugin",
+            metadataObject.type()));
+    Preconditions.checkArgument(
         !(metadataObject instanceof RangerPrivileges),
         "The metadata object must be not a RangerPrivileges object.");
     List<String> nsMetadataObject =
         Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
     Preconditions.checkArgument(
         nsMetadataObject.size() > 0, "The metadata object must have at least one name.");
-    nsMetadataObject.remove(0); // remove the catalog name
 
-    RangerMetadataObject.Type type =
-        RangerMetadataObject.Type.fromMetadataType(metadataObject.type());
+    RangerMetadataObject.Type type = null;
+    if (metadataObject.type() == MetadataObject.Type.METALAKE
+        || metadataObject.type() == MetadataObject.Type.CATALOG) {
+      nsMetadataObject.clear();
+      nsMetadataObject.add(RangerHelper.RESOURCE_ALL);
+      type = RangerMetadataObject.Type.SCHEMA;
+    } else {
+      nsMetadataObject.remove(0); // Remove the catalog name
+      type = RangerMetadataObject.Type.fromMetadataType(metadataObject.type());
+    }
+
     validateRangerMetadataObject(nsMetadataObject, type);
     return new RangerMetadataObjects.RangerMetadataObjectImpl(
         RangerMetadataObjects.getParentFullName(nsMetadataObject),

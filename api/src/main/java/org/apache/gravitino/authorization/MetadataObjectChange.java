@@ -38,6 +38,16 @@ public interface MetadataObjectChange {
     return new RenameMetadataObject(metadataObject, newMetadataObject);
   }
 
+  /**
+   * Remove a metadata entity MetadataObjectChange.
+   *
+   * @param metadataObject The metadata object.
+   * @return return a MetadataObjectChange for the remove metadata object.
+   */
+  static MetadataObjectChange remove(MetadataObject metadataObject) {
+    return new RemoveMetadataObject(metadataObject);
+  }
+
   /** A RenameMetadataObject is to rename securable object's metadata entity. */
   final class RenameMetadataObject implements MetadataObjectChange {
     private final MetadataObject metadataObject;
@@ -109,6 +119,61 @@ public interface MetadataObjectChange {
     @Override
     public String toString() {
       return "RENAMEMETADATAOBJECT " + metadataObject + " " + newMetadataObject;
+    }
+  }
+
+  /** A RemoveMetadataObject is to remove securable object's metadata entity. */
+  final class RemoveMetadataObject implements MetadataObjectChange {
+    private final MetadataObject metadataObject;
+
+    private RemoveMetadataObject(MetadataObject metadataObject) {
+      this.metadataObject = metadataObject;
+    }
+
+    /**
+     * Returns the metadataObject to be renamed.
+     *
+     * @return return a metadataObject.
+     */
+    public MetadataObject getMetadataObject() {
+      return this.metadataObject;
+    }
+
+    /**
+     * Compares this RemoveMetadataObject instance with another object for equality. The comparison
+     * is based on the old metadata entity.
+     *
+     * @param o The object to compare with this instance.
+     * @return true if the given object represents the same rename metadata entity; false otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      RenameMetadataObject that = (RenameMetadataObject) o;
+      return metadataObject.equals(that.metadataObject);
+    }
+
+    /**
+     * Generates a hash code for this RemoveMetadataObject instance. The hash code is based on the
+     * old metadata entity.
+     *
+     * @return A hash code value for this update metadata entity operation.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(metadataObject);
+    }
+
+    /**
+     * Returns a string representation of the RemoveMetadataObject instance. This string format
+     * includes the class name followed by the remove metadata entity object operation.
+     *
+     * @return A string representation of the RemoveMetadataObject instance.
+     */
+    @Override
+    public String toString() {
+      return "REMOVEMETADATAOBJECT " + metadataObject;
     }
   }
 }
