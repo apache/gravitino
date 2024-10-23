@@ -340,6 +340,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             "Deprecated method, use `rm_file` method instead."
         )
 
+    def lazy_load_class(self, module_name, class_name):
+        module = importlib.import_module(module_name)
+        return getattr(module, class_name)
+
     def rm(self, path, recursive=False, maxdepth=None):
         """Remove a file or directory.
         :param path: Virtual fileset path
@@ -352,11 +356,17 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         )
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
-        context_pair.filesystem().rm(
-            self._strip_storage_protocol(storage_type, actual_path),
-            recursive,
-            maxdepth,
-        )
+        fs = context_pair.filesystem()
+
+        # S3FileSystem doesn't support maxdepth
+        if isinstance(fs, self.lazy_load_class("s3fs", "S3FileSystem")):
+            fs.rm(self._strip_storage_protocol(storage_type, actual_path), recursive)
+        else:
+            fs.rm(
+                self._strip_storage_protocol(storage_type, actual_path),
+                recursive,
+                maxdepth,
+            )
 
     def rm_file(self, path):
         """Remove a file.

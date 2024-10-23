@@ -218,9 +218,7 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         self.assertTrue(self.fs.exists(rmdir_actual_file))
         self.assertTrue(fs.exists(rmdir_file))
 
-        # test delete file, S3 will remove the file directly.
-        with self.assertRaises(FileExistsError):
-            fs.rm_file(rmdir_file)
+        fs.rm_file(rmdir_file)
 
     @unittest.skip("S3 does not support making directory")
     def test_mkdir(self):
