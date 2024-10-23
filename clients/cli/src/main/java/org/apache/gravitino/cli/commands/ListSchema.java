@@ -35,11 +35,12 @@ public class ListSchema extends Command {
    * Lists all schemas in a catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    */
-  public ListSchema(String url, String metalake, String catalog) {
-    super(url);
+  public ListSchema(String url, boolean ignoreVersions, String metalake, String catalog) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
   }

@@ -30,6 +30,7 @@ public class GravitinoOptions {
   public static final String URL = "url";
   public static final String NAME = "name";
   public static final String METALAKE = "metalake";
+  public static final String IGNORE = "ignore";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -46,6 +47,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
     options.addOption(createArgOption("f", NAME, "full entity name (dot separated)"));
     options.addOption(createArgOption("m", METALAKE, "Metalake name"));
+    options.addOption(createSimpleOption("i", IGNORE, "Ignore client/sever version check"));
 
     return options;
   }

@@ -32,9 +32,10 @@ public class ListMetalakes extends Command {
    * List all metalakes.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    */
-  public ListMetalakes(String url) {
-    super(url);
+  public ListMetalakes(String url, boolean ignoreVersions) {
+    super(url, ignoreVersions);
   }
 
   /** Lists all metalakes. */
