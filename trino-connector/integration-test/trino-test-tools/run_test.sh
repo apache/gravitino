@@ -52,6 +52,7 @@ TRINO_TEST_SETS_DIR=`realpath $TRINO_TEST_SETS_DIR`
 GRAVITINO_SERVER_DIR=`realpath $GRAVITINO_SERVER_DIR`
 GRAVITINO_TRINO_CONNECTOR_DIR=`realpath $GRAVITINO_TRINO_CONNECTOR_DIR`
 
+set +e
 # start test dockers
 $TRINO_TEST_DOCKER_HOME/launch.sh $GRAVITINO_SERVER_DIR $GRAVITINO_TRINO_CONNECTOR_DIR
 
@@ -68,19 +69,18 @@ if [[ -n $TRINO_TEST_PARAMS ]]; then
     fi
 fi
 
-
 # execute test
 echo "The args: $args"
 
 sleep 5
 $GRAVITINO_HOME_DIR/trino-connector/integration-test/trino-test-tools/trino_test.sh $args
 
-  if [ $? -ne 0 ]; then
-      echo "Test failed"
-      # clean up
-      $TRINO_TEST_DOCKER_HOME/shutdown.sh
-      exit 1
-  fi
+if [ $? -ne 0 ]; then
+    echo "Test failed"
+    # clean up
+    $TRINO_TEST_DOCKER_HOME/shutdown.sh
+    exit 1
+fi
 
 echo "Test success"
 # clean up
