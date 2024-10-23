@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
  * implement Gravitino Owner concept. <br>
  */
 public abstract class RangerAuthorizationPlugin
-    implements AuthorizationPlugin, RangerPrivilegesMappingProvider {
+    implements AuthorizationPlugin, RangerPrivilegesMappingProvider, RangerMetadataObjectRule {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
 
   protected final String rangerServiceName;
@@ -660,7 +660,20 @@ public abstract class RangerAuthorizationPlugin
   @Override
   public void close() throws IOException {}
 
-  boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
+  /** Generate different Ranger securable object */
+  public RangerSecurableObject generateRangerSecurableObject(
+      List<String> names, RangerMetadataObject.Type type, Set<RangerPrivilege> privileges) {
+    validateRangerMetadataObject(names, type);
+    RangerMetadataObject metadataObject =
+        new RangerMetadataObjects.RangerMetadataObjectImpl(
+            RangerMetadataObjects.getParentFullName(names),
+            RangerMetadataObjects.getLastName(names),
+            type);
+    return new RangerSecurableObjects.RangerSecurableObjectImpl(
+        metadataObject.parent(), metadataObject.name(), metadataObject.type(), privileges);
+  }
+
+  public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()
         .allMatch(
             securableObject -> {
