@@ -38,7 +38,6 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.authorization.ranger.RangerMetadataObjects.RangerMetadataObjectRule;
 import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;

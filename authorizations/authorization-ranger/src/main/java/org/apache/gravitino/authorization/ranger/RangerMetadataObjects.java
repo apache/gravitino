@@ -55,13 +55,6 @@ public class RangerMetadataObjects {
     Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
   }
 
-  /** Different underlying datasource have different Ranger securable object rules */
-  interface RangerMetadataObjectRule {
-    /** Validate different underlying datasource Ranger metadata object */
-    void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
-        throws IllegalArgumentException;
-  }
-
   /** The implementation of the {@link MetadataObject}. */
   public static class RangerMetadataObjectImpl implements RangerMetadataObject {
     private final String name;
