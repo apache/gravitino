@@ -248,9 +248,13 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
         mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
         fs.mkdir(mkdir_dir, create_parents=True)
 
-        self.assertFalse(self.fs.exists(mkdir_actual_dir))
+        with self.assertRaises(FileNotFoundError):
+            self.fs.exists(mkdir_actual_dir)
+
         self.assertFalse(fs.exists(mkdir_dir))
-        self.assertFalse(self.fs.exists("s3://" + new_bucket))
+
+        with self.assertRaises(FileNotFoundError):
+            self.fs.exists("oss://" + new_bucket)
 
     def test_makedirs(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
@@ -274,9 +278,12 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
         # it takes no effect.
         fs.makedirs(mkdir_dir)
 
-        self.assertFalse(self.fs.exists(mkdir_actual_dir))
+        with self.assertRaises(FileNotFoundError):
+            self.fs.exists(mkdir_actual_dir)
+
         self.assertFalse(fs.exists(mkdir_dir))
-        self.assertFalse(fs.exists("s3://" + new_bucket))
+        with self.assertRaises(FileNotFoundError):
+            self.fs.exists("oss://" + new_bucket)
 
     def test_rm_file(self):
         rm_file_dir = self.fileset_gvfs_location + "/test_rm_file"
