@@ -36,7 +36,7 @@ Apache Gravitino CLI is a command-line tool that interacts with the Gravitino se
 - Retrieve server version
 - Provide help on usage
 - Manage Gravitino entities such as Metalakes, Catalogs, Schemas, and Tables
-- List details about Graviotino entities
+- List details about Gravitino entities
 
 ## Installation
 
@@ -44,7 +44,7 @@ Apache Gravitino CLI is a command-line tool that interacts with the Gravitino se
 
 Before you can build and run this project, it is suggested you have the following installed:
 
-- Java 11 or higher
+- Java 8 or higher
 
 ### Build the Project
 
@@ -69,61 +69,23 @@ Before you can build and run this project, it is suggested you have the followin
     gcli --help
     ```
 
-## Usage
-
-To run the Gravitino CLI, use the following command structure:
-
-```bash
-usage: gcli [metalake|catalog|schema|table] [list|details|create|delete|update] [options]
-Options
- -b,--bootstrap <arg>   Kafka bootstrap servers
- -C,--create            create an entity
- -c,--comment <arg>     entity comment
- -D,--details           list details about an entity
- -d,--database <arg>    database name
- -h,--help              command help information
- -j,--jdbcurl <arg>     JDBC URL
- -L,--list              list entity children
- -l,--user <arg>        database username
- -m,--metastore <arg>   Hive metastore URI
- -n,--name <arg>        full entity name (dot separated)
- -P,--properties        show an entities properties
- -p,--provider <arg>    provider one of hadoop, hive, mysql, postgres, iceberg, kafka
- -r,--rename <arg>      new entity name
- -R,--delete            delete an entity
- -u,--url <arg>         Gravitino URL (default: http://localhost:8090)
- -U,--update            update an entity
- -v,--value <arg>       property value
- -w,--warehouse <arg>   warehouse name
- -z,--password <arg>    database password
-```
-
-## Commands
-The following commands are available for entity management:
-
-list: List available entities
-details: Show detailed information about an entity
-create: Create a new entity
-delete: Delete an existing entity
-update: Update an existing entity
-
 ### Examples
 List All Metalakes
 
 ```bash
-gcli list
+gcli --list
 ```
 
 Get Details of a Specific Metalake
 
 ```bash
-gcli metalake details -name my-metalake
+gcli metalake --details -name my-metalake
 ```
 
 List Tables in a Catalog
 
 ```bash
-gcli metalake list -name my-metalake.my-catalog
+gcli metalake --list -name my-metalake
 ```
 
 ## Running Tests

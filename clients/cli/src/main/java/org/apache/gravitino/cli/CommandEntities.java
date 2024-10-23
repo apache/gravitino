@@ -30,6 +30,7 @@ public class CommandEntities {
   public static final String CATALOG = "catalog";
   public static final String SCHEMA = "schema";
   public static final String TABLE = "table";
+  public static final String COLUMN = "column";
 
   private static final HashSet<String> VALID_ENTITIES = new HashSet<>();
 
@@ -38,6 +39,7 @@ public class CommandEntities {
     VALID_ENTITIES.add(CATALOG);
     VALID_ENTITIES.add(SCHEMA);
     VALID_ENTITIES.add(TABLE);
+    VALID_ENTITIES.add(COLUMN);
   }
 
   /**

@@ -49,6 +49,10 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String PAIMON_METASTORE = "metastore";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
+  public static final String GRAVITINO_JDBC_USER = "jdbc-user";
+  public static final String PAIMON_JDBC_USER = "jdbc.user";
+  public static final String GRAVITINO_JDBC_PASSWORD = "jdbc-password";
+  public static final String PAIMON_JDBC_PASSWORD = "jdbc.password";
 
   // S3 properties needed by Paimon
   public static final String S3_ENDPOINT = "s3.endpoint";
@@ -56,7 +60,17 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String S3_SECRET_KEY = "s3.secret-key";
 
   public static final Map<String, String> GRAVITINO_CONFIG_TO_PAIMON =
-      ImmutableMap.of(GRAVITINO_CATALOG_BACKEND, PAIMON_METASTORE, WAREHOUSE, WAREHOUSE, URI, URI);
+      ImmutableMap.of(
+          GRAVITINO_CATALOG_BACKEND,
+          PAIMON_METASTORE,
+          WAREHOUSE,
+          WAREHOUSE,
+          URI,
+          URI,
+          GRAVITINO_JDBC_USER,
+          PAIMON_JDBC_USER,
+          GRAVITINO_JDBC_PASSWORD,
+          PAIMON_JDBC_PASSWORD);
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
   public static final Map<String, String> KERBEROS_CONFIGURATION =
       ImmutableMap.of(
@@ -105,7 +119,19 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 "Paimon catalog uri config",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */));
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                GRAVITINO_JDBC_USER,
+                "Gravitino Paimon catalog jdbc user",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                GRAVITINO_JDBC_PASSWORD,
+                "Gravitino Paimon catalog jdbc password",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);

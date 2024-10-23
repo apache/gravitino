@@ -36,14 +36,14 @@ import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class FlinkEnvIT extends AbstractIT {
+public abstract class FlinkEnvIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
   protected static final String GRAVITINO_METALAKE = "flink";
@@ -61,7 +61,7 @@ public abstract class FlinkEnvIT extends AbstractIT {
   private static String gravitinoUri = "http://127.0.0.1:8090";
 
   @BeforeAll
-  static void startUp() {
+  void startUp() {
     // Start Gravitino server
     initGravitinoEnv();
     initMetalake();
@@ -82,13 +82,13 @@ public abstract class FlinkEnvIT extends AbstractIT {
     return PropertiesConverter.FLINK_PROPERTY_PREFIX + key;
   }
 
-  private static void initGravitinoEnv() {
+  private void initGravitinoEnv() {
     // Gravitino server is already started by AbstractIT, just construct gravitinoUrl
     int gravitinoPort = getGravitinoServerPort();
     gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
   }
 
-  private static void initMetalake() {
+  private void initMetalake() {
     metalake = client.createMetalake(GRAVITINO_METALAKE, "", Collections.emptyMap());
   }
 

@@ -25,6 +25,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
@@ -71,6 +72,10 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    // Check whether the current user exists or not
+    AuthorizationUtils.checkCurrentUser(
+        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
+
     Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
 
     // Set the creator as the owner of the catalog.

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -26,16 +27,17 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /* Lists all catalogs in a metalake. */
 public class ListCatalogs extends Command {
 
-  protected String metalake;
+  protected final String metalake;
 
   /**
    * Lists all catalogs in a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    */
-  public ListCatalogs(String url, String metalake) {
-    super(url);
+  public ListCatalogs(String url, boolean ignoreVersions, String metalake) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
   }
 
@@ -53,13 +55,7 @@ public class ListCatalogs extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < catalogs.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(catalogs[i]);
-    }
+    String all = Joiner.on(",").join(catalogs);
 
     System.out.println(all.toString());
   }

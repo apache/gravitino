@@ -29,11 +29,8 @@ public class GravitinoOptions {
   public static final String SERVER = "server";
   public static final String URL = "url";
   public static final String NAME = "name";
-  public static final String LIST = "list";
-  public static final String DETAILS = "details";
-  public static final String CREATE = "create";
-  public static final String UPDATE = "update";
-  public static final String DELETE = "delete";
+  public static final String METALAKE = "metalake";
+  public static final String IGNORE = "ignore";
   public static final String COMMENT = "comment";
   public static final String RENAME = "rename";
   public static final String PROPERTY = "property";
@@ -62,14 +59,8 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("r", SERVER, "Gravitino server version"));
     options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
     options.addOption(createArgOption("n", NAME, "full entity name (dot separated)"));
-
-    //  specifying the command
-    options.addOption(createSimpleOption("L", LIST, "list entity children"));
-    options.addOption(createSimpleOption("D", DETAILS, "list details about an entity"));
-    options.addOption(createSimpleOption("C", CREATE, "create an entity"));
-    options.addOption(createSimpleOption("U", UPDATE, "update an entity"));
-    options.addOption(createSimpleOption("R", DELETE, "delete an entity"));
-    options.addOption(createSimpleOption("P", PROPERTIES, "show an entities properties"));
+    options.addOption(createArgOption("m", METALAKE, "Metalake name"));
+    options.addOption(createSimpleOption("i", IGNORE, "Ignore client/sever version check"));
 
     // Create/update options
     options.addOption(createArgOption("r", RENAME, "new entity name"));

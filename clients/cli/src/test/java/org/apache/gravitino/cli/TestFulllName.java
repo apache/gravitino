@@ -39,7 +39,7 @@ public class TestFulllName {
 
   @Test
   public void entityFromFullNameOption() throws Exception {
-    String[] args = {"--name", "metalakeA.catalogB.schemaC.tableD"};
+    String[] args = {"--metalake", "metalakeA", "--name", "catalogB.schemaC.tableD"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
 

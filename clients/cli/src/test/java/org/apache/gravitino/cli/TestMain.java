@@ -57,7 +57,7 @@ public class TestMain {
   public void withTwoArgsOnly() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
-    String[] args = {"metalake", "--details"};
+    String[] args = {"metalake", "details"};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);
@@ -67,14 +67,27 @@ public class TestMain {
   }
 
   @Test
-  public void defaultToDetails() throws ParseException {
+  public void defaultToDetailsOneArg() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"metalake"};
+    CommandLine line = parser.parse(options, args);
+
+    String command = Main.resolveCommand(line);
+    assertEquals(CommandActions.DETAILS, command);
+    String entity = Main.resolveEntity(line);
+    assertEquals(CommandEntities.METALAKE, entity);
+  }
+
+  @Test
+  public void withNoArgs() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
     String[] args = {"metalake", "--name", "metalake_demo"};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);
-    assertEquals(CommandActions.DETAILS, command);
+    assertNull(command);
     String entity = Main.resolveEntity(line);
     assertEquals(CommandEntities.METALAKE, entity);
   }
@@ -88,7 +101,7 @@ public class TestMain {
     CommandLine line = parser.parse(options, args);
 
     GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, null, "help");
-    commandLine.handleCommandLine();
+    commandLine.handleSimpleLine();
 
     assertTrue(outContent.toString().contains("usage:")); // Expected help output
   }

@@ -109,6 +109,17 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
   }
 
   @Override
+  protected JdbcColumn.Builder getColumnBuilder(
+      ResultSet columnsResult, String databaseName, String tableName) throws SQLException {
+    JdbcColumn.Builder builder = null;
+    if (Objects.equals(columnsResult.getString("TABLE_NAME"), tableName)
+        && Objects.equals(columnsResult.getString("TABLE_SCHEM"), databaseName)) {
+      builder = getBasicJdbcColumnInfo(columnsResult);
+    }
+    return builder;
+  }
+
+  @Override
   protected String generateCreateTableSql(
       String tableName,
       JdbcColumn[] columns,
