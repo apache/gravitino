@@ -243,12 +243,12 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         new_bucket = self.bucket_name + "1"
         mkdir_dir = mkdir_dir.replace(self.bucket_name, new_bucket)
         mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
-        with self.assertRaise(GravitinoRuntimeException):
+        with self.assertRaises(GravitinoRuntimeException):
             fs.mkdir(mkdir_dir, create_parents=True)
 
         self.assertFalse(self.fs.exists(mkdir_actual_dir))
         self.assertFalse(fs.exists(mkdir_dir))
-        self.assertFalse(fs.exists("gcs://" + new_bucket))
+        self.assertFalse(self.fs.exists("s3://" + new_bucket))
 
     def test_makedirs(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
@@ -270,7 +270,7 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
 
         # it takes no effect.
-        with self.assertRaise(GravitinoRuntimeException):
+        with self.assertRaises(GravitinoRuntimeException):
             fs.makedirs(mkdir_dir)
 
         self.assertFalse(self.fs.exists(mkdir_actual_dir))
