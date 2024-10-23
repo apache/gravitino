@@ -52,6 +52,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
@@ -95,6 +96,10 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
     if (ArrayUtils.isNotEmpty(partitioning)) {
       throw new UnsupportedOperationException(
           "Currently we do not support Partitioning in oceanbase");
+    }
+
+    if (!Distributions.NONE.equals(distribution)) {
+      throw new UnsupportedOperationException("OceanBase does not support distribution");
     }
 
     validateIncrementCol(columns, indexes);
