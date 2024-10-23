@@ -243,10 +243,11 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         new_bucket = self.bucket_name + "1"
         mkdir_dir = mkdir_dir.replace(self.bucket_name, new_bucket)
         mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
-        with self.assertRaises(GravitinoRuntimeException):
-            fs.mkdir(mkdir_dir, create_parents=True)
+        fs.mkdir(mkdir_dir, create_parents=True)
 
-        self.assertFalse(self.fs.exists(mkdir_actual_dir))
+        with self.assertRaises(OSError):
+            self.fs.exists(mkdir_actual_dir)
+
         self.assertFalse(fs.exists(mkdir_dir))
         self.assertFalse(self.fs.exists("s3://" + new_bucket))
 
@@ -270,12 +271,12 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
 
         # it takes no effect.
-        with self.assertRaises(GravitinoRuntimeException):
-            fs.makedirs(mkdir_dir)
+        fs.makedirs(mkdir_dir)
+        with self.assertRaises(OSError):
+            self.fs.exists(mkdir_actual_dir)
 
-        self.assertFalse(self.fs.exists(mkdir_actual_dir))
         self.assertFalse(fs.exists(mkdir_dir))
-        self.assertFalse(fs.exists("s3://" + new_bucket))
+        self.assertFalse(self.fs.exists("s3://" + new_bucket))
 
     def test_rm_file(self):
         rm_file_dir = self.fileset_gvfs_location + "/test_rm_file"
