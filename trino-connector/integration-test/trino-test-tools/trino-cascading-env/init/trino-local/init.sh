@@ -29,21 +29,22 @@ cp "$trino_conf_dir/config/catalog/gravitino.properties" /etc/trino/catalog/grav
 cp "$trino_conf_dir/config/catalog/trino.properties" /etc/trino/catalog/trino.properties
 
 #start the gravitino server
-cp -r /opt/gravitino-server /tmp/gravitino-server
-rm -fr /tmp/gravitino-server/logs
-rm -fr /tmp/gravitino-server/data
+gravitino_server_dir=/tmp/gravitino-server
+cp -r /opt/gravitino-server $gravitino_server_dir
+rm -fr $gravitino_server_dir/logs
+rm -fr $gravitino_server_dir/data
 
-web_path=/tmp/gravitino-server/web
+web_path=$gravitino_server_dir/web
 if [ ! -f $web_path ]; then
    mkdir -p $web_path
    touch $web_path/gravitino-web-1.0.war
 fi
 
-/tmp/gravitino-server/bin/gravitino.sh start
+$gravitino_server_dir/bin/gravitino.sh start
 
 #create test metalake
 counter=0
-while [ $counter -le 30 ]; do
+while [ $counter -le 10 ]; do
   sleep 1
   counter=$((counter + 1))
   response=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Content-Type: application/json" -d '{"name":"test","comment":"comment","properties":{}}' http://localhost:8090/api/metalakes) || true
@@ -54,7 +55,7 @@ while [ $counter -le 30 ]; do
   if [ "$counter" -eq 30 ]; then
     echo "Failed to create test metalake, the gravitino server is not running"
     jps
-    cat /usr/local/gravitino-server/logs/gravitino-server.*
+    cat $gravitino_server_dir/logs/gravitino-server.*
     exit 1
   fi
 done
