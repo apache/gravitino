@@ -254,3 +254,46 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
 
         # test delete dir
         fs.rm_file(rm_file_dir)
+
+    def test_info(self):
+        info_dir = self.fileset_gvfs_location + "/test_info"
+        info_actual_dir = self.fileset_storage_location + "/test_info"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+
+        self.check_mkdir(info_dir, info_actual_dir, fs)
+
+        info_file = self.fileset_gvfs_location + "/test_info/test.file"
+        info_actual_file = self.fileset_storage_location + "/test_info/test.file"
+        self.fs.touch(info_actual_file)
+        self.assertTrue(self.fs.exists(info_actual_file))
+
+        ## OSS info has different behavior than S3 info. For OSS info, the name of the
+        ## directory will have a trailing slash if it's a directory and the path
+        # does not end with a slash, while S3 info will not have a trailing
+        # slash if it's a directory.
+
+        # >> > oss.info('bucket-xiaoyu/lisi')
+        # {'name': 'bucket-xiaoyu/lisi/', 'type': 'directory',
+        # 'size': 0, 'Size': 0, 'Key': 'bucket-xiaoyu/lisi/'}
+        # >> > oss.info('bucket-xiaoyu/lisi/')
+        # {'name': 'bucket-xiaoyu/lisi', 'size': 0,
+        # 'type': 'directory', 'Size': 0,
+        # 'Key': 'bucket-xiaoyu/lisi'
+
+        # >> > s3.info('paimon-bucket/lisi');
+        # {'name': 'paimon-bucket/lisi', 'type': 'directory', 'size': 0,
+        # 'StorageClass': 'DIRECTORY'}
+        # >> > s3.info('paimon-bucket/lisi/');
+        # {'name': 'paimon-bucket/lisi', 'type': 'directory', 'size': 0,
+        # 'StorageClass': 'DIRECTORY'}
+
+        dir_info = fs.info(info_dir)
+        self.assertEqual(dir_info["name"][:-1], info_dir[len("gvfs://") :])
+
+        file_info = fs.info(info_file)
+        self.assertEqual(file_info["name"], info_file[len("gvfs://") :])
