@@ -26,12 +26,6 @@ import org.apache.gravitino.authorization.ranger.RangerMetadataObjects.RangerMet
 
 /** The helper class for {@link RangerSecurableObject}. */
 public class RangerSecurableObjects {
-  /** Different underlying datasource have different Ranger securable object implement */
-  interface RangerSecurableObjectImplementor {
-    RangerSecurableObject generateRangerSecurableObject(
-        List<String> names, RangerMetadataObject.Type type, Set<RangerPrivilege> privileges);
-  }
-
   public static class RangerSecurableObjectImpl extends RangerMetadataObjectImpl
       implements RangerSecurableObject {
 

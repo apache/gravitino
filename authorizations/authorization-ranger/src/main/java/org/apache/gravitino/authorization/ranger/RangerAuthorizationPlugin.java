@@ -38,7 +38,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.authorization.ranger.RangerSecurableObjects.RangerSecurableObjectImplementor;
+import org.apache.gravitino.authorization.ranger.RangerMetadataObjects.RangerMetadataObjectRule;
 import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
@@ -68,9 +68,7 @@ import org.slf4j.LoggerFactory;
  * implement Gravitino Owner concept. <br>
  */
 public abstract class RangerAuthorizationPlugin
-    implements AuthorizationPlugin,
-        RangerPrivilegesMappingProvider,
-        RangerSecurableObjectImplementor {
+    implements AuthorizationPlugin, RangerPrivilegesMappingProvider, RangerMetadataObjectRule {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
 
   protected final String rangerServiceName;
@@ -662,6 +660,19 @@ public abstract class RangerAuthorizationPlugin
 
   @Override
   public void close() throws IOException {}
+
+  /** Generate different Ranger securable object */
+  public RangerSecurableObject generateRangerSecurableObject(
+      List<String> names, RangerMetadataObject.Type type, Set<RangerPrivilege> privileges) {
+    validateRangerMetadataObject(names, type);
+    RangerMetadataObject metadataObject =
+        new RangerMetadataObjects.RangerMetadataObjectImpl(
+            RangerMetadataObjects.getParentFullName(names),
+            RangerMetadataObjects.getLastName(names),
+            type);
+    return new RangerSecurableObjects.RangerSecurableObjectImpl(
+        metadataObject.parent(), metadataObject.name(), metadataObject.type(), privileges);
+  }
 
   public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()

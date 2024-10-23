@@ -60,9 +60,10 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
     return instance;
   }
 
+  /** Validate different Ranger metadata object */
   @Override
-  public RangerSecurableObject generateRangerSecurableObject(
-      List<String> names, RangerMetadataObject.Type type, Set<RangerPrivilege> privileges) {
+  public void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
+      throws IllegalArgumentException {
     Preconditions.checkArgument(
         names != null, "Cannot create a Ranger metadata object with null names");
     Preconditions.checkArgument(
@@ -88,15 +89,6 @@ public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
     for (String name : names) {
       RangerMetadataObjects.checkName(name);
     }
-
-    RangerMetadataObject metadataObject =
-        new RangerMetadataObjects.RangerMetadataObjectImpl(
-            RangerMetadataObjects.getParentFullName(names),
-            RangerMetadataObjects.getLastName(names),
-            type);
-
-    return new RangerSecurableObjects.RangerSecurableObjectImpl(
-        metadataObject.parent(), metadataObject.name(), metadataObject.type(), privileges);
   }
 
   @Override
