@@ -200,13 +200,6 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         self.fs.touch(rm_new_actual_file)
         self.assertTrue(self.fs.exists(rm_new_actual_file))
         self.assertTrue(fs.exists(rm_new_file))
-        # fs.rm(rm_dir)
-
-        # fs.rm(rm_dir, recursive=False) will delete the directory and the file
-        # directly under the directory, so we comment the following code.
-        # test delete dir with recursive = true
-        # fs.rm(rm_dir, recursive=True)
-        # self.assertFalse(fs.exists(rm_dir))
 
     def test_rmdir(self):
         rmdir_dir = self.fileset_gvfs_location + "/test_rmdir"
@@ -225,13 +218,38 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         self.assertTrue(self.fs.exists(rmdir_actual_file))
         self.assertTrue(fs.exists(rmdir_file))
 
-        # test delete file, GCS will remove the file directly.
-        fs.rmdir(rmdir_file)
+        # test delete file, S3 will remove the file directly.
+        with self.assertRaises(FileExistsError):
+            fs.rm_file(rmdir_file)
 
-    @unittest.skip("GCS does not support making directory")
+    @unittest.skip("S3 does not support making directory")
     def test_mkdir(self):
         pass
 
-    @unittest.skip("GCS does not support making directory")
+    @unittest.skip("S3 does not support making directory")
     def test_makedirs(self):
         pass
+
+    def test_rm_file(self):
+        rm_file_dir = self.fileset_gvfs_location + "/test_rm_file"
+        rm_file_actual_dir = self.fileset_storage_location + "/test_rm_file"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+        self.check_mkdir(rm_file_dir, rm_file_actual_dir, fs)
+
+        rm_file_file = self.fileset_gvfs_location + "/test_rm_file/test.file"
+        rm_file_actual_file = self.fileset_storage_location + "/test_rm_file/test.file"
+        self.fs.touch(rm_file_actual_file)
+        self.assertTrue(self.fs.exists(rm_file_actual_file))
+        self.assertTrue(fs.exists(rm_file_file))
+
+        # test delete file
+        fs.rm_file(rm_file_file)
+        self.assertFalse(fs.exists(rm_file_file))
+
+        # test delete dir
+        fs.rm_file(rm_file_dir)
