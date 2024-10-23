@@ -36,16 +36,10 @@ public class S3SecretKeyCredential implements Credential {
    * Constructs an instance of {@link S3SecretKeyCredential} with the specified AWS S3 access key ID
    * and secret access key.
    *
-   * <p>This constructor validates that both the access key ID and the secret access key are not
-   * null. If either of these parameters is null, it will throw a {@link NullPointerException} with
-   * an appropriate error message.
-   *
    * <p>The provided credentials are used to authenticate requests made to AWS S3 services.
    *
-   * @param accessKeyId the AWS S3 access key ID used for authentication. Must not be null.
-   * @param secretAccessKey the AWS S3 secret access key used for authentication. Must not be null.
-   * @throws NullPointerException if either {@code accessKeyId} or {@code secretAccessKey} is null.
-   * @since [Your Library Version]
+   * @param accessKeyId the AWS S3 access key ID used for authentication.
+   * @param secretAccessKey the AWS S3 secret access key used for authentication.
    */
   public S3SecretKeyCredential(String accessKeyId, String secretAccessKey) {
     Preconditions.checkNotNull(accessKeyId, "S3 access key Id should not null");

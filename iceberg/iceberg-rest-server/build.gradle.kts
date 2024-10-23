@@ -40,8 +40,6 @@ dependencies {
   implementation(project(":common")) {
     exclude("*")
   }
-  // todo remove
-  implementation(project(":bundles:aws-bundle"))
   implementation(project(":iceberg:iceberg-common"))
   implementation(project(":server-common")) {
     exclude("*")
@@ -65,6 +63,7 @@ dependencies {
 
   compileOnly(libs.lombok)
 
+  testImplementation(project(":bundles:aws-bundle"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")

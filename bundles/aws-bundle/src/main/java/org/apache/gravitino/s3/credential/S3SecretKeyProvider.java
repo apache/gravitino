@@ -26,6 +26,7 @@ import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.config.S3CredentialConfig;
 
+/** Generate S3 access key and secret key to access S3 data. */
 public class S3SecretKeyProvider implements CredentialProvider {
 
   private String accessKey;

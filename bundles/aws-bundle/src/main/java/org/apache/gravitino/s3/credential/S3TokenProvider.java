@@ -46,7 +46,7 @@ import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 import software.amazon.awssdk.services.sts.model.AssumeRoleResponse;
 import software.amazon.awssdk.services.sts.model.Credentials;
 
-/** Generates s3 token to access S3 data. */
+/** Generates S3 token to access S3 data. */
 public class S3TokenProvider implements CredentialProvider {
   private StsClient stsClient;
   private String roleArn;
