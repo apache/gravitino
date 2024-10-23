@@ -55,7 +55,12 @@ while [ $counter -le 10 ]; do
   if [ "$counter" -eq 10 ]; then
     echo "Failed to create test metalake, the gravitino server is not running"
     jps
-    cat $gravitino_server_dir/logs/gravitino-server.*
+    for file in $gravitino_server_dir/logs/gravitino-server.*; do
+        echo "====== Start of $file ======"
+        cat "$file"
+        echo "====== End of $file ======"
+        echo ""
+    done
     exit 1
   fi
 done
