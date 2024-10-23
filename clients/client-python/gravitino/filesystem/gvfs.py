@@ -799,7 +799,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             elif storage_type == StorageType.LOCAL:
                 fs = LocalFileSystem()
             elif storage_type == StorageType.GCS:
-                fs = ArrowFSWrapper(self._get_gcs_filesystem())
+                fs = self._get_gcs_filesystem()
             elif storage_type == StorageType.S3A:
                 fs = ArrowFSWrapper(self._get_s3_filesystem())
             else:
