@@ -32,8 +32,6 @@ public class S3Properties {
   public static final String GRAVITINO_S3_REGION = "s3-region";
   // S3 role arn
   public static final String GRAVITINO_S3_ROLE_ARN = "s3-role-arn";
-  // S3 token
-  public static final String GRAVITINO_S3_TOKEN = "s3-session-token";
   // S3 external id
   public static final String GRAVITINO_S3_EXTERNAL_ID = "s3-external-id";
 

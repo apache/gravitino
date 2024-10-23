@@ -25,6 +25,10 @@ import java.util.Map;
 
 /** S3 secret key credential. */
 public class S3SecretKeyCredential implements Credential {
+
+  /** S3 secret key */
+  public static final String S3_SECRET_KEY_CREDENTIAL_TYPE = "s3-secret-key";
+
   private String accessKeyId;
   private String secretAccessKey;
 
@@ -64,8 +68,8 @@ public class S3SecretKeyCredential implements Credential {
   @Override
   public Map<String, String> credentialInfo() {
     return (new ImmutableMap.Builder<String, String>())
-        .put(GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId)
-        .put(GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
+        .put(S3TokenCredential.GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId)
+        .put(S3TokenCredential.GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
         .build();
   }
 }

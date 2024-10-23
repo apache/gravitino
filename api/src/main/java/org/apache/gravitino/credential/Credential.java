@@ -29,21 +29,6 @@ public interface Credential {
   /** Credential expire time in ms since the epoch. */
   String EXPIRE_TIME_IN_MS = "expire-time-in-ms";
 
-  /** S3 token credential type. */
-  String S3_TOKEN_CREDENTIAL_TYPE = "s3-token";
-  /** S3 secret key */
-  String S3_SECRET_KEY_CREDENTIAL_TYPE = "s3-secret-key";
-  /** The static access key ID used to access S3 data. */
-  String GRAVITINO_S3_ACCESS_KEY_ID = "s3-access-key-id";
-  /** The static secret access key used to access S3 data. */
-  String GRAVITINO_S3_SECRET_ACCESS_KEY = "s3-secret-access-key";
-  /** S3 role arn. */
-  String GRAVITINO_S3_ROLE_ARN = "s3-role-arn";
-  /** S3 session token. */
-  String GRAVITINO_S3_TOKEN = "s3-session-token";
-  /** S3 external id. */
-  String GRAVITINO_S3_EXTERNAL_ID = "s3-external-id";
-
   /**
    * Returns the type of the credential. It should be the same as the credential type of the
    * credential provider.

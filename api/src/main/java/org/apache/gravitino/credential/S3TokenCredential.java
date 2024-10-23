@@ -26,6 +26,16 @@ import org.apache.commons.lang3.StringUtils;
 
 /** S3 token credential. */
 public class S3TokenCredential implements Credential {
+
+  /** S3 token credential type. */
+  public static final String S3_TOKEN_CREDENTIAL_TYPE = "s3-token";
+  /** The static access key ID used to access S3 data. */
+  public static final String GRAVITINO_S3_ACCESS_KEY_ID = "s3-access-key-id";
+  /** The static secret access key used to access S3 data. */
+  public static final String GRAVITINO_S3_SECRET_ACCESS_KEY = "s3-secret-access-key";
+  /** S3 session token. */
+  public static final String GRAVITINO_S3_TOKEN = "s3-session-token";
+
   private String accessKeyId;
   private String secretAccessKey;
   private String sessionToken;

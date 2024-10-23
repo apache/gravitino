@@ -34,6 +34,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 @TestInstance(Lifecycle.PER_CLASS)
 public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private boolean hiveStarted = false;
 
   public IcebergRESTJdbcCatalogIT() {
     catalogType = IcebergCatalogBackend.JDBC;
@@ -42,9 +43,14 @@ public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
   @Override
   void initEnv() {
     containerSuite.startHiveContainer();
+    hiveStarted = true;
   }
 
   public Map<String, String> getCatalogConfig() {
+    return getCatalogJdbcConfig();
+  }
+
+  protected Map<String, String> getCatalogJdbcConfig() {
     Map<String, String> configMap = new HashMap<>();
 
     configMap.put(
@@ -70,13 +76,15 @@ public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
 
     configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + "jdbc.schema-version", "V1");
 
-    configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        GravitinoITUtils.genRandomName(
-            String.format(
-                "hdfs://%s:%d/user/hive/warehouse-jdbc-sqlite",
-                containerSuite.getHiveContainer().getContainerIpAddress(),
-                HiveContainer.HDFS_DEFAULTFS_PORT)));
+    if (hiveStarted) {
+      configMap.put(
+          IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
+          GravitinoITUtils.genRandomName(
+              String.format(
+                  "hdfs://%s:%d/user/hive/warehouse-jdbc-sqlite",
+                  containerSuite.getHiveContainer().getContainerIpAddress(),
+                  HiveContainer.HDFS_DEFAULTFS_PORT)));
+    }
     return configMap;
   }
 }

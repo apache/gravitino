@@ -32,9 +32,9 @@ public class CredentialPropertyUtils {
   private static final String ICEBERG_S3_TOKEN = "s3.session-token";
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.of(
-          Credential.GRAVITINO_S3_ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID,
-          Credential.GRAVITINO_S3_SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY,
-          Credential.GRAVITINO_S3_TOKEN, ICEBERG_S3_TOKEN);
+          S3TokenCredential.GRAVITINO_S3_ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID,
+          S3TokenCredential.GRAVITINO_S3_SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY,
+          S3TokenCredential.GRAVITINO_S3_TOKEN, ICEBERG_S3_TOKEN);
 
   /**
    * Transforms a specific credential into a map of Iceberg properties.

@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.credential.aws;
+package org.apache.gravitino.s3.credential;
 
 import java.util.Map;
 import org.apache.gravitino.credential.Credential;
@@ -43,7 +43,7 @@ public class S3SecretKeyProvider implements CredentialProvider {
 
   @Override
   public String credentialType() {
-    return Credential.S3_SECRET_KEY_CREDENTIAL_TYPE;
+    return S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE;
   }
 
   @Override

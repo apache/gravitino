@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.credential.aws;
+package org.apache.gravitino.s3.credential;
 
 import java.net.URI;
 import java.util.HashMap;
@@ -46,7 +46,7 @@ import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 import software.amazon.awssdk.services.sts.model.AssumeRoleResponse;
 import software.amazon.awssdk.services.sts.model.Credentials;
 
-// io/polaris/core/storage/aws/AwsCredentialsStorageIntegration
+/** Generates s3 token to access S3 data. */
 public class S3TokenProvider implements CredentialProvider {
   private StsClient stsClient;
   private String roleArn;
@@ -71,7 +71,7 @@ public class S3TokenProvider implements CredentialProvider {
 
   @Override
   public String credentialType() {
-    return Credential.S3_TOKEN_CREDENTIAL_TYPE;
+    return S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE;
   }
 
   @Override
@@ -120,7 +120,7 @@ public class S3TokenProvider implements CredentialProvider {
     Map<String, IamStatement.Builder> bucketListStatmentBuilder = new HashMap<>();
     Map<String, IamStatement.Builder> bucketGetLocationStatmentBuilder = new HashMap<>();
 
-    String arnPrefix = getArnPrefixFor(roleArn);
+    String arnPrefix = getArnPrefix(roleArn);
     Stream.concat(readLocations.stream(), writeLocations.stream())
         .distinct()
         .forEach(
@@ -128,10 +128,10 @@ public class S3TokenProvider implements CredentialProvider {
               URI uri = URI.create(location);
               allowGetObjectStatementBuilder.addResource(
                   IamResource.create(getS3UriWithArn(arnPrefix, uri)));
-              String bucket = arnPrefix + getBucket(uri);
+              String bucketArn = arnPrefix + getBucketName(uri);
               bucketListStatmentBuilder
                   .computeIfAbsent(
-                      bucket,
+                      bucketArn,
                       (String key) ->
                           IamStatement.builder()
                               .effect(IamEffect.ALLOW)
@@ -140,9 +140,9 @@ public class S3TokenProvider implements CredentialProvider {
                   .addCondition(
                       IamConditionOperator.STRING_LIKE,
                       "s3:prefix",
-                      concatFilePrefixes(trimLeadingSlash(uri.getPath()), "*", "/"));
+                      concatPathWithSep(trimLeadingSlash(uri.getPath()), "*", "/"));
               bucketGetLocationStatmentBuilder.computeIfAbsent(
-                  bucket,
+                  bucketArn,
                   key ->
                       IamStatement.builder()
                           .effect(IamEffect.ALLOW)
@@ -181,10 +181,10 @@ public class S3TokenProvider implements CredentialProvider {
   }
 
   private String getS3UriWithArn(String arnPrefix, URI uri) {
-    return arnPrefix + concatFilePrefixes(parseS3Path(uri), "*", "/");
+    return arnPrefix + concatPathWithSep(removeSchemaFromS3Uri(uri), "*", "/");
   }
 
-  private String getArnPrefixFor(String roleArn) {
+  private String getArnPrefix(String roleArn) {
     if (roleArn.contains("aws-cn")) {
       return "arn:aws-cn:s3:::";
     } else if (roleArn.contains("aws-us-gov")) {
@@ -194,7 +194,7 @@ public class S3TokenProvider implements CredentialProvider {
     }
   }
 
-  public static String concatFilePrefixes(String leftPath, String rightPath, String fileSep) {
+  private static String concatPathWithSep(String leftPath, String rightPath, String fileSep) {
     if (leftPath.endsWith(fileSep) && rightPath.startsWith(fileSep)) {
       return leftPath + rightPath.substring(1);
     } else if (!leftPath.endsWith(fileSep) && !rightPath.startsWith(fileSep)) {
@@ -204,7 +204,8 @@ public class S3TokenProvider implements CredentialProvider {
     }
   }
 
-  private static String parseS3Path(URI uri) {
+  // Transform 's3://bucket/path' to /bucket/path
+  private static String removeSchemaFromS3Uri(URI uri) {
     String bucket = uri.getHost();
     String path = trimLeadingSlash(uri.getPath());
     return String.join(
@@ -218,7 +219,7 @@ public class S3TokenProvider implements CredentialProvider {
     return path;
   }
 
-  private static String getBucket(URI uri) {
+  private static String getBucketName(URI uri) {
     return uri.getHost();
   }
 
