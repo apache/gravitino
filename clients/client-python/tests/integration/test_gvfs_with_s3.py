@@ -20,8 +20,7 @@ import os
 from random import randint
 import unittest
 
-from fsspec.implementations.arrow import ArrowFSWrapper
-from pyarrow.fs import S3FileSystem
+from s3fs import S3FileSystem
 
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
 from gravitino import (
@@ -137,12 +136,17 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
             properties=cls.fileset_properties,
         )
 
-        arrow_s3_fs = S3FileSystem(
-            access_key=cls.s3_access_key,
-            secret_key=cls.s3_secret_key,
-            endpoint_override=cls.s3_endpoint,
+        cls.fs = S3FileSystem(
+            key=cls.s3_access_key,
+            secret=cls.s3_secret_key,
+            endpoint_url=cls.s3_endpoint,
         )
-        cls.fs = ArrowFSWrapper(arrow_s3_fs)
+
+    def check_mkdir(self, gvfs_dir, actual_dir, gvfs_instance):
+        pass
+
+    def check_makedirs(self, gvfs_dir, actual_dir, gvfs_instance):
+        pass
 
     def test_modified(self):
         modified_dir = self.fileset_gvfs_location + "/test_modified"
@@ -153,14 +157,97 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(modified_actual_dir)
-        self.assertTrue(self.fs.exists(modified_actual_dir))
-        self.assertTrue(fs.exists(modified_dir))
 
-        self.assertIsNone(fs.modified(modified_dir))
+        self.check_mkdir(modified_dir, modified_actual_dir, fs)
+        # S3 only supports getting the `object` modify time, so the modified time will be None
+        # if it's a directory.
+        # >>> gcs.mkdir('example_qazwsx/catalog/schema/fileset3')
+        # >>> r = gcs.modified('example_qazwsx/catalog/schema/fileset3')
+        # >>> print(r)
+        # None
+        # self.assertIsNone(fs.modified(modified_dir))
 
         # create a file under the dir 'modified_dir'.
         file_path = modified_dir + "/test.txt"
         fs.touch(file_path)
         self.assertTrue(fs.exists(file_path))
         self.assertIsNotNone(fs.modified(file_path))
+
+    def test_rm(self):
+        rm_dir = self.fileset_gvfs_location + "/test_rm"
+        rm_actual_dir = self.fileset_storage_location + "/test_rm"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+        self.check_mkdir(rm_dir, rm_actual_dir, fs)
+
+        rm_file = self.fileset_gvfs_location + "/test_rm/test.file"
+        rm_actual_file = self.fileset_storage_location + "/test_rm/test.file"
+        fs.touch(rm_file)
+        self.assertTrue(self.fs.exists(rm_actual_file))
+        self.assertTrue(fs.exists(rm_file))
+
+        # test delete file
+        fs.rm(rm_file)
+        self.assertFalse(fs.exists(rm_file))
+
+        # test delete dir with recursive = false
+        rm_new_file = self.fileset_gvfs_location + "/test_rm/test_new.file"
+        rm_new_actual_file = self.fileset_storage_location + "/test_rm/test_new.file"
+        self.fs.touch(rm_new_actual_file)
+        self.assertTrue(self.fs.exists(rm_new_actual_file))
+        self.assertTrue(fs.exists(rm_new_file))
+
+    def test_rmdir(self):
+        rmdir_dir = self.fileset_gvfs_location + "/test_rmdir"
+        rmdir_actual_dir = self.fileset_storage_location + "/test_rmdir"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+        self.check_mkdir(rmdir_dir, rmdir_actual_dir, fs)
+
+        rmdir_file = self.fileset_gvfs_location + "/test_rmdir/test.file"
+        rmdir_actual_file = self.fileset_storage_location + "/test_rmdir/test.file"
+        self.fs.touch(rmdir_actual_file)
+        self.assertTrue(self.fs.exists(rmdir_actual_file))
+        self.assertTrue(fs.exists(rmdir_file))
+
+        fs.rm_file(rmdir_file)
+
+    @unittest.skip("S3 does not support making directory")
+    def test_mkdir(self):
+        pass
+
+    @unittest.skip("S3 does not support making directory")
+    def test_makedirs(self):
+        pass
+
+    def test_rm_file(self):
+        rm_file_dir = self.fileset_gvfs_location + "/test_rm_file"
+        rm_file_actual_dir = self.fileset_storage_location + "/test_rm_file"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+        self.check_mkdir(rm_file_dir, rm_file_actual_dir, fs)
+
+        rm_file_file = self.fileset_gvfs_location + "/test_rm_file/test.file"
+        rm_file_actual_file = self.fileset_storage_location + "/test_rm_file/test.file"
+        self.fs.touch(rm_file_actual_file)
+        self.assertTrue(self.fs.exists(rm_file_actual_file))
+        self.assertTrue(fs.exists(rm_file_file))
+
+        # test delete file
+        fs.rm_file(rm_file_file)
+        self.assertFalse(fs.exists(rm_file_file))
+
+        # test delete dir
+        fs.rm_file(rm_file_dir)

@@ -14,7 +14,6 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import os
 from enum import Enum
 from pathlib import PurePosixPath
 from typing import Dict, Tuple
@@ -39,7 +38,6 @@ from gravitino.auth.simple_auth_provider import SimpleAuthProvider
 from gravitino.catalog.fileset_catalog import FilesetCatalog
 from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.exceptions.base import GravitinoRuntimeException
-from gravitino.filesystem.gravitino_fs_wrapper import GravitinoArrowFSWrapper
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.name_identifier import NameIdentifier
 
@@ -344,6 +342,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             "Deprecated method, use `rm_file` method instead."
         )
 
+    def lazy_load_class(self, module_name, class_name):
+        module = importlib.import_module(module_name)
+        return getattr(module, class_name)
+
     def rm(self, path, recursive=False, maxdepth=None):
         """Remove a file or directory.
         :param path: Virtual fileset path
@@ -356,11 +358,17 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         )
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
-        context_pair.filesystem().rm(
-            self._strip_storage_protocol(storage_type, actual_path),
-            recursive,
-            maxdepth,
-        )
+        fs = context_pair.filesystem()
+
+        # S3FileSystem doesn't support maxdepth
+        if isinstance(fs, self.lazy_load_class("s3fs", "S3FileSystem")):
+            fs.rm(self._strip_storage_protocol(storage_type, actual_path), recursive)
+        else:
+            fs.rm(
+                self._strip_storage_protocol(storage_type, actual_path),
+                recursive,
+                maxdepth,
+            )
 
     def rm_file(self, path):
         """Remove a file.
@@ -603,7 +611,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             "name": path,
             "size": entry["size"],
             "type": entry["type"],
-            "mtime": entry["mtime"],
+            # Some file systems may not support the `mtime` field.
+            "mtime": entry.get("mtime", None),
         }
 
     def _get_fileset_context(self, virtual_path: str, operation: FilesetDataOperation):
@@ -813,11 +822,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             elif storage_type == StorageType.LOCAL:
                 fs = LocalFileSystem()
             elif storage_type == StorageType.GCS:
-                fs = ArrowFSWrapper(self._get_gcs_filesystem())
+                fs = self._get_gcs_filesystem()
             elif storage_type == StorageType.S3A:
-                fs = ArrowFSWrapper(self._get_s3_filesystem())
+                fs = self._get_s3_filesystem()
             elif storage_type == StorageType.OSS:
-                fs = GravitinoArrowFSWrapper(self._get_oss_filesystem())
+                fs = self._get_oss_filesystem()
             else:
                 raise GravitinoRuntimeException(
                     f"Storage type: `{storage_type}` doesn't support now."
@@ -836,9 +845,9 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             raise GravitinoRuntimeException(
                 "Service account key is not found in the options."
             )
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
-
-        return importlib.import_module("pyarrow.fs").GcsFileSystem()
+        return importlib.import_module("gcsfs").GCSFileSystem(
+            token=service_account_key_path
+        )
 
     def _get_s3_filesystem(self):
         # get 'aws_access_key_id' from s3_options, if the key is not found, throw an exception
@@ -864,10 +873,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 "AWS endpoint url is not found in the options."
             )
 
-        return importlib.import_module("pyarrow.fs").S3FileSystem(
-            access_key=aws_access_key_id,
-            secret_key=aws_secret_access_key,
-            endpoint_override=aws_endpoint_url,
+        return importlib.import_module("s3fs").S3FileSystem(
+            key=aws_access_key_id,
+            secret=aws_secret_access_key,
+            endpoint_url=aws_endpoint_url,
         )
 
     def _get_oss_filesystem(self):
@@ -895,11 +904,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             )
 
         # We can use S3FileSystem to access OSS
-        return importlib.import_module("pyarrow.fs").S3FileSystem(
-            access_key=oss_access_key_id,
-            secret_key=oss_secret_access_key,
-            endpoint_override=oss_endpoint_url,
-            force_virtual_addressing=True,
+        return importlib.import_module("ossfs").OSSFileSystem(
+            key=oss_access_key_id,
+            secret=oss_secret_access_key,
+            endpoint=oss_endpoint_url,
         )
 
 
