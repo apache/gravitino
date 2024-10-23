@@ -102,7 +102,7 @@ public class TestMain {
     CommandLine line = parser.parse(options, args);
 
     GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, null, "help");
-    commandLine.handleCommandLine();
+    commandLine.handleSimpleLine();
 
     assertTrue(outContent.toString().contains("usage:")); // Expected help output
   }

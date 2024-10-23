@@ -65,22 +65,27 @@ public class GravitinoCommandLine {
 
   /** Handles the parsed command line arguments and executes the corresponding actions. */
   public void handleCommandLine() {
-     /* Check if you should ignore client/version versions */
+    /* Check if you should ignore client/version versions */
     if (line.hasOption(GravitinoOptions.IGNORE)) {
       ignore = true;
     }
 
+    executeCommand();
+  }
+
+  /** Handles the parsed command line arguments and executes the corresponding actions. */
+  public void handleSimpleLine() {
     /* Display command usage. */
     if (line.hasOption(GravitinoOptions.HELP)) {
       displayHelp(options);
     }
-    /* Display Gravitino version. */
+    /* Display Gravitino client version. */
     else if (line.hasOption(GravitinoOptions.VERSION)) {
       new ClientVersion(getUrl(), ignore).handle();
-    } else if (line.hasOption(GravitinoOptions.SERVER)) {
+    }
+    /* Display Gravitino server version. */
+    else if (line.hasOption(GravitinoOptions.SERVER)) {
       new ServerVersion(getUrl(), ignore).handle();
-    } else {
-      executeCommand();
     }
   }
 
@@ -131,9 +136,9 @@ public class GravitinoCommandLine {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
-    String catalog = name.getCatalogName();
 
     if (CommandActions.DETAILS.equals(command)) {
+      String catalog = name.getCatalogName();
       new CatalogDetails(url, ignore, metalake, catalog).handle();
     } else if (CommandActions.LIST.equals(command)) {
       new ListCatalogs(url, ignore, metalake).handle();
@@ -148,9 +153,9 @@ public class GravitinoCommandLine {
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
-    String schema = name.getSchemaName();
 
     if (CommandActions.DETAILS.equals(command)) {
+      String schema = name.getSchemaName();
       new SchemaDetails(url, ignore, metalake, catalog, schema).handle();
     } else if (CommandActions.LIST.equals(command)) {
       new ListSchema(url, ignore, metalake, catalog).handle();
@@ -166,9 +171,9 @@ public class GravitinoCommandLine {
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
-    String table = name.getTableName();
 
     if (CommandActions.DETAILS.equals(command)) {
+      String table = name.getTableName();
       new TableDetails(url, ignore, metalake, catalog, schema, table).handle();
     } else if (CommandActions.LIST.equals(command)) {
       new ListTables(url, ignore, metalake, catalog, schema).handle();
@@ -184,9 +189,9 @@ public class GravitinoCommandLine {
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
-    String table = name.getTableName();
 
     if (CommandActions.LIST.equals(command)) {
+      String table = name.getTableName();
       new ListColumns(url, ignore, metalake, catalog, schema, table).handle();
     }
   }
