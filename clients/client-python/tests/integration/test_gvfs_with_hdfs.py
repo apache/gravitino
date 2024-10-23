@@ -581,11 +581,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        logger.info(
-            "before cat_dir: %s, fs: %s, path: %s", cat_dir, self.fs, cat_actual_dir
-        )
         self.fs.mkdir(cat_actual_dir)
-        logger.info("end cat_actual_dir: %s", cat_actual_dir)
         self.assertTrue(self.fs.exists(cat_actual_dir))
         self.assertTrue(fs.exists(cat_dir))
 
