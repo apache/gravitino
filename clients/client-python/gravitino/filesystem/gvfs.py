@@ -849,10 +849,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 "AWS endpoint url is not found in the options."
             )
 
-        return importlib.import_module("pyarrow.fs").S3FileSystem(
-            access_key=aws_access_key_id,
-            secret_key=aws_secret_access_key,
-            endpoint_override=aws_endpoint_url,
+        return importlib.import_module("s3fs").S3FileSystem(
+            key=aws_access_key_id,
+            secret=aws_secret_access_key,
+            endpoint_url=aws_endpoint_url,
         )
 
 

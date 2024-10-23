@@ -20,8 +20,7 @@ import os
 from random import randint
 import unittest
 
-from fsspec.implementations.arrow import ArrowFSWrapper
-from pyarrow.fs import S3FileSystem
+from s3fs import S3FileSystem
 
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
 from gravitino import (
@@ -137,12 +136,11 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
             properties=cls.fileset_properties,
         )
 
-        arrow_s3_fs = S3FileSystem(
-            access_key=cls.s3_access_key,
-            secret_key=cls.s3_secret_key,
-            endpoint_override=cls.s3_endpoint,
+        cls.fs = S3FileSystem(
+            key=cls.s3_access_key,
+            secret=cls.s3_secret_key,
+            endpoint_url=cls.s3_endpoint,
         )
-        cls.fs = ArrowFSWrapper(arrow_s3_fs)
 
     def test_modified(self):
         modified_dir = self.fileset_gvfs_location + "/test_modified"
