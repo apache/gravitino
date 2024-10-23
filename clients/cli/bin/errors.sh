@@ -40,10 +40,10 @@ gcli unknown list
 gcli metalake details
 
 # Unknown metalake name
-gcli metalake details --name unknown
+gcli metalake details --metalake unknown
 
 # Unknown catalog name
-gcli catalog details --name metalake_demo.unknown
+gcli catalog details --metalake metalake_demo --name unknown
 
 # Missing catalog name
-gcli catalog details --name metalake_demo
+gcli catalog details --metalake metalake_demo
