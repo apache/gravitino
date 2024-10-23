@@ -23,20 +23,10 @@ Apache Gravitino CLI is a command-line tool that interacts with the Gravitino se
 
 ## Table of Contents
 
-- [Features](#features)
 - [Installation](#installation)
-- [Usage](#usage)
-- [Commands](#commands)
 - [Running Tests](#running-tests)
 - [Contributing](#contributing)
 - [License](#license)
-
-## Features
-
-- Retrieve server version
-- Provide help on usage
-- Manage Gravitino entities such as Metalakes, Catalogs, Schemas, and Tables
-- List details about Gravitino entities
 
 ## Installation
 
@@ -68,25 +58,6 @@ Before you can build and run this project, it is suggested you have the followin
     ```bash
     gcli --help
     ```
-
-### Examples
-List All Metalakes
-
-```bash
-gcli --list
-```
-
-Get Details of a Specific Metalake
-
-```bash
-gcli metalake --details -name my-metalake
-```
-
-List Tables in a Catalog
-
-```bash
-gcli metalake --list -name my-metalake
-```
 
 ## Running Tests
 
