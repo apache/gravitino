@@ -68,14 +68,27 @@ public class TestMain {
   }
 
   @Test
-  public void defaultToDetails() throws ParseException {
+  public void defaultToDetailsOneArg() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"metalake"};
+    CommandLine line = parser.parse(options, args);
+
+    String command = Main.resolveCommand(line);
+    assertEquals(CommandActions.DETAILS, command);
+    String entity = Main.resolveEntity(line);
+    assertEquals(CommandEntities.METALAKE, entity);
+  }
+
+  @Test
+  public void withNoArgs() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
     String[] args = {};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);
-    assertEquals(CommandActions.DETAILS, command);
+    assertNull(command);
     String entity = Main.resolveEntity(line);
     assertNull(entity);
   }

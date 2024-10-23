@@ -34,10 +34,12 @@ public class Main {
 
     try {
       CommandLine line = parser.parse(options, args);
-      String command = resolveCommand(line);
       String entity = resolveEntity(line);
-      GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, entity, command);
-      commandLine.handleCommandLine();
+      String command = resolveCommand(line);
+      if (entity != null && command != null) {
+        GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, entity, command);
+        commandLine.handleCommandLine();
+      }
     } catch (ParseException exp) {
       System.err.println("Error parsing command line: " + exp.getMessage());
       GravitinoCommandLine.displayHelp(options);
@@ -62,7 +64,12 @@ public class Main {
       }
     }
 
-    return CommandActions.DETAILS; /* Default to 'details' command. */
+    if (args.length == 1) {
+      return CommandActions.DETAILS; /* Default to 'details' command. */
+    }
+
+    System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
+    return null;
   }
 
   /**
