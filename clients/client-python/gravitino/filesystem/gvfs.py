@@ -607,12 +607,34 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         path = self._convert_actual_path(
             entry["name"], storage_location, virtual_location
         )
+
+        # if entry contains 'mtime', then return the entry with 'mtime' else
+        # if entry contains 'LastModified', then return the entry with 'LastModified'
+
+        if "mtime" in entry:
+            # HDFS and GCS
+            return {
+                "name": path,
+                "size": entry["size"],
+                "type": entry["type"],
+                "mtime": entry["mtime"],
+            }
+
+        if "LastModified" in entry:
+            # S3 and OSS
+            return {
+                "name": path,
+                "size": entry["size"],
+                "type": entry["type"],
+                "mtime": entry["LastModified"],
+            }
+
+        # Unknown
         return {
             "name": path,
             "size": entry["size"],
             "type": entry["type"],
-            # Some file systems may not support the `mtime` field.
-            "mtime": entry.get("mtime", None),
+            "mtime": None,
         }
 
     def _get_fileset_context(self, virtual_path: str, operation: FilesetDataOperation):
