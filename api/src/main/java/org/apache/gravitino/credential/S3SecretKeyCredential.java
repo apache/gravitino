@@ -26,8 +26,12 @@ import java.util.Map;
 /** S3 secret key credential. */
 public class S3SecretKeyCredential implements Credential {
 
-  /** S3 secret key */
+  /** S3 secret key credential type. */
   public static final String S3_SECRET_KEY_CREDENTIAL_TYPE = "s3-secret-key";
+  /** The static access key ID used to access S3 data. */
+  public static final String GRAVITINO_S3_ACCESS_KEY_ID = "s3-access-key-id";
+  /** The static secret access key used to access S3 data. */
+  public static final String GRAVITINO_S3_SECRET_ACCESS_KEY = "s3-secret-access-key";
 
   private String accessKeyId;
   private String secretAccessKey;
@@ -35,8 +39,6 @@ public class S3SecretKeyCredential implements Credential {
   /**
    * Constructs an instance of {@link S3SecretKeyCredential} with the specified AWS S3 access key ID
    * and secret access key.
-   *
-   * <p>The provided credentials are used to authenticate requests made to AWS S3 services.
    *
    * @param accessKeyId the AWS S3 access key ID used for authentication.
    * @param secretAccessKey the AWS S3 secret access key used for authentication.
@@ -62,8 +64,8 @@ public class S3SecretKeyCredential implements Credential {
   @Override
   public Map<String, String> credentialInfo() {
     return (new ImmutableMap.Builder<String, String>())
-        .put(S3TokenCredential.GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId)
-        .put(S3TokenCredential.GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
+        .put(GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId)
+        .put(GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
         .build();
   }
 }
