@@ -29,10 +29,10 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 
 public class DeleteTable extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String schema;
-  protected String table;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String schema;
+  protected final String table;
 
   /**
    * Delete a table.

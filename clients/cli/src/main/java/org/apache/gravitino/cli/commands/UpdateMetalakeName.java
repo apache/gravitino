@@ -27,8 +27,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Update the name of a metalake. */
 public class UpdateMetalakeName extends Command {
 
-  protected String metalake;
-  protected String name;
+  protected final String metalake;
+  protected final String name;
 
   /**
    * Update the name of a metalake.

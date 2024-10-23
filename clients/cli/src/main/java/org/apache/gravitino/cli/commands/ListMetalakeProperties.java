@@ -28,7 +28,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** List the properties of a metalake. */
 public class ListMetalakeProperties extends ListProperties {
 
-  protected String metalake;
+  protected final String metalake;
 
   /**
    * List the properties of a metalake.

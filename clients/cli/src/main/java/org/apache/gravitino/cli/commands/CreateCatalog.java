@@ -28,11 +28,11 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 public class CreateCatalog extends Command {
-  protected String metalake;
-  protected String catalog;
-  protected String provider;
-  protected String comment;
-  Map<String, String> properties;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String provider;
+  protected final String comment;
+  protected final Map<String, String> properties;
 
   /**
    * Create a new catalog.

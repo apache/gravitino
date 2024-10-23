@@ -26,10 +26,10 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 
 public class CreateSchema extends Command {
-  protected String metalake;
-  protected String catalog;
-  protected String schema;
-  protected String comment;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String schema;
+  protected final String comment;
 
   /**
    * Create a new schema.

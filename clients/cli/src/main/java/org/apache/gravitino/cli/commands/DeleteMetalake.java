@@ -24,7 +24,7 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 public class DeleteMetalake extends Command {
-  protected String metalake;
+  protected final String metalake;
 
   /**
    * Delete a metalake.

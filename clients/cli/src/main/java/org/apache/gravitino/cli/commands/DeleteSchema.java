@@ -27,9 +27,9 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
 public class DeleteSchema extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String schema;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String schema;
 
   /**
    * Delete a schema.

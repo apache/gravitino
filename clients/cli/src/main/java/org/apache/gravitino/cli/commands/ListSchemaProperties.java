@@ -30,9 +30,9 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 /** List the properties of a catalog. */
 public class ListSchemaProperties extends ListProperties {
 
-  protected String metalake;
-  protected String catalog;
-  protected String schema;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String schema;
 
   /**
    * List the properties of a catalog.

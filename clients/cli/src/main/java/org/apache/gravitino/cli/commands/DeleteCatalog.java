@@ -26,8 +26,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 public class DeleteCatalog extends Command {
 
-  protected String metalake;
-  protected String catalog;
+  protected final String metalake;
+  protected final String catalog;
 
   /**
    * Delete a catalog.

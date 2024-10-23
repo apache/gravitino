@@ -28,9 +28,9 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Remove a property of a catalog. */
 public class RemoveCatalogProperty extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String property;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String property;
 
   /**
    * Remove a property of a catalog.

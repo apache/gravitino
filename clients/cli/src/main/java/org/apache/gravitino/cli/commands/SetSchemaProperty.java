@@ -29,11 +29,11 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 /** Set a property of a schema. */
 public class SetSchemaProperty extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String schema;
-  protected String property;
-  protected String value;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String schema;
+  protected final String property;
+  protected final String value;
 
   /**
    * Set a property of a schema.

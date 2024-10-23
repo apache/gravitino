@@ -28,10 +28,10 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Set a property of a catalog. */
 public class SetCatalogProperty extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String property;
-  protected String value;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String property;
+  protected final String value;
 
   /**
    * Set a property of a catalog.

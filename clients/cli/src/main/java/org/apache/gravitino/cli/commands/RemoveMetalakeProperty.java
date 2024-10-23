@@ -27,8 +27,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Remove a property of a metalake. */
 public class RemoveMetalakeProperty extends Command {
 
-  protected String metalake;
-  protected String property;
+  protected final String metalake;
+  protected final String property;
 
   /**
    * Remove a property of a metalake.
