@@ -146,10 +146,15 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
         )
 
     def check_mkdir(self, gvfs_dir, actual_dir, gvfs_instance):
-        pass
+        # OSS will not create a directory, so the directory will not exist.
+        self.fs.mkdir(actual_dir)
+        self.assertFalse(self.fs.exists(actual_dir))
+        self.assertFalse(gvfs_instance.exists(gvfs_dir))
 
     def check_makedirs(self, gvfs_dir, actual_dir, gvfs_instance):
-        pass
+        self.fs.makedirs(actual_dir)
+        self.assertFalse(self.fs.exists(actual_dir))
+        self.assertFalse(gvfs_instance.exists(gvfs_dir))
 
     def test_modified(self):
         modified_dir = self.fileset_gvfs_location + "/test_modified"
@@ -223,13 +228,55 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
 
         fs.rm_file(rmdir_file)
 
-    @unittest.skip("OSS does not support making directory")
     def test_mkdir(self):
-        pass
+        mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
+        mkdir_actual_dir = self.fileset_storage_location + "/test_mkdir"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
 
-    @unittest.skip("OSS does not support making directory")
+        # it actually takes no effect.
+        self.check_mkdir(mkdir_dir, mkdir_actual_dir, fs)
+
+        # check whether it will automatically create the bucket if 'create_parents'
+        # is set to True.
+        new_bucket = self.bucket_name + "1"
+        mkdir_dir = mkdir_dir.replace(self.bucket_name, new_bucket)
+        mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
+        fs.mkdir(mkdir_dir, create_parents=True)
+
+        self.assertFalse(self.fs.exists(mkdir_actual_dir))
+        self.assertFalse(fs.exists(mkdir_dir))
+        self.assertFalse(self.fs.exists("s3://" + new_bucket))
+
     def test_makedirs(self):
-        pass
+        mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
+        mkdir_actual_dir = self.fileset_storage_location + "/test_mkdir"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+
+        # it actually takes no effect.
+        self.check_mkdir(mkdir_dir, mkdir_actual_dir, fs)
+
+        # check whether it will automatically create the bucket if 'create_parents'
+        # is set to True.
+        new_bucket = self.bucket_name + "1"
+        mkdir_dir = mkdir_dir.replace(self.bucket_name, new_bucket)
+        mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
+
+        # it takes no effect.
+        fs.makedirs(mkdir_dir)
+
+        self.assertFalse(self.fs.exists(mkdir_actual_dir))
+        self.assertFalse(fs.exists(mkdir_dir))
+        self.assertFalse(fs.exists("s3://" + new_bucket))
 
     def test_rm_file(self):
         rm_file_dir = self.fileset_gvfs_location + "/test_rm_file"
