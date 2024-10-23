@@ -23,20 +23,10 @@ Apache Gravitino CLI is a command-line tool that interacts with the Gravitino se
 
 ## Table of Contents
 
-- [Features](#features)
 - [Installation](#installation)
-- [Usage](#usage)
-- [Commands](#commands)
 - [Running Tests](#running-tests)
 - [Contributing](#contributing)
 - [License](#license)
-
-## Features
-
-- Retrieve server version
-- Provide help on usage
-- Manage Gravitino entities such as Metalakes, Catalogs, Schemas, and Tables
-- List details about Gravitino entities
 
 ## Installation
 
@@ -68,67 +58,6 @@ Before you can build and run this project, it is suggested you have the followin
     ```bash
     gcli --help
     ```
-
-## Usage
-
-To run the Gravitino CLI, use the following command structure:
-
-```bash
-usage: gcli [metalake|catalog|schema|table] [list|details|create|delete|update] [options]
-Options
- -f,--name <arg>       full entity name (dot separated)
- -h,--help             command help information
- -m,--metalake <arg>   Metalake name
- -r,--server           Gravitino server version
- -u,--url <arg>        Gravitino URL (default: http://localhost:8090)
- -v,--version          Gravitino client version
-```
-
-## Commands
-The following commands are available for entity management:
-
-- list: List available entities
-- details: Show detailed information about an entity
-- create: Create a new entity
-- delete: Delete an existing entity
-- update: Update an existing entity
-
-### Examples
-List All Metalakes
-
-```bash
-gcli list
-```
-
-Get Details of a Specific Metalake
-
-```bash
-gcli metalake details --metalake my-metalake
-```
-
-List Tables in a Catalog
-
-```bash
-gcli metalake list --metalake my-metalake
-```
-
-### Setting the Metalake name
-
-As dealing with one Metalake is a typical scenario, you can set the Metalake name in several ways.
-
-1. Passed in on the command line via the `--metalake` parameter.
-2. Set via the 'GRAVITINO_METALAKE' environment variable.
-
-The command line option overrides the environment variable.
-
-### Setting the Gravitino URL
-
-As you need to set the Gravitino URL for every command, you can set the URL in several ways.
-
-1. Passed in on the command line via the `--url` parameter.
-2. Set via the 'GRAVITINO_URL' environment variable.
-
-The command line option overrides the environment variable.
 
 ## Running Tests
 
