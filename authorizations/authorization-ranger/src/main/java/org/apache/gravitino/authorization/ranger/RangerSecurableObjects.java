@@ -22,23 +22,13 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import java.util.List;
 import java.util.Set;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.MetadataObjects.MetadataObjectImpl;
+import org.apache.gravitino.authorization.ranger.RangerMetadataObjects.RangerMetadataObjectImpl;
 
 /** The helper class for {@link RangerSecurableObject}. */
 public class RangerSecurableObjects {
-  public static RangerSecurableObject of(
-      List<String> names, MetadataObject.Type type, Set<RangerPrivilege> privileges) {
-    MetadataObject metadataObject =
-        MetadataObjects.of(
-            MetadataObjects.getParentFullName(names), names.get(names.size() - 1), type);
-    return new RangerSecurableObjectImpl(
-        metadataObject.parent(), metadataObject.name(), type, privileges);
-  }
-
-  private static class RangerSecurableObjectImpl extends MetadataObjectImpl
+  public static class RangerSecurableObjectImpl extends RangerMetadataObjectImpl
       implements RangerSecurableObject {
+
     private final List<RangerPrivilege> privileges;
 
     /**
@@ -49,7 +39,10 @@ public class RangerSecurableObjects {
      * @param type The type of the metadata object
      */
     public RangerSecurableObjectImpl(
-        String parent, String name, Type type, Set<RangerPrivilege> privileges) {
+        String parent,
+        String name,
+        RangerMetadataObject.Type type,
+        Set<RangerPrivilege> privileges) {
       super(parent, name, type);
       this.privileges = ImmutableList.copyOf(Sets.newHashSet(privileges));
     }
