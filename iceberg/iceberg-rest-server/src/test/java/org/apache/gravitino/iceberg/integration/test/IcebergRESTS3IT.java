@@ -31,11 +31,10 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.platform.commons.util.StringUtils;
 
-@Disabled(
-    "You should set S3 related environment variable to run the test")
+@EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
 public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
 
   private String s3Warehouse;

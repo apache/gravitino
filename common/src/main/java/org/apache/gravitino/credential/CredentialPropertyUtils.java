@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
@@ -27,9 +28,10 @@ import java.util.Map;
  * Helper class to generate specific credential properties for different table format and engine.
  */
 public class CredentialPropertyUtils {
-  private static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
-  private static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
-  private static final String ICEBERG_S3_TOKEN = "s3.session-token";
+  @VisibleForTesting static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
+  @VisibleForTesting static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
+  @VisibleForTesting static final String ICEBERG_S3_TOKEN = "s3.session-token";
+
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.of(
           S3TokenCredential.GRAVITINO_S3_ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID,

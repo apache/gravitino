@@ -21,33 +21,33 @@ package org.apache.gravitino.credential;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestCredentialUtils {
+public class TestCredentialPropertiesUtils {
 
   @Test
   void testToIcebergProperties() {
     S3TokenCredential s3TokenCredential = new S3TokenCredential("key", "secret", "token", 0);
-    Map<String, String> icebergProperties = CredentialUtils.toIcebergProperties(s3TokenCredential);
+    Map<String, String> icebergProperties =
+        CredentialPropertyUtils.toIcebergProperties(s3TokenCredential);
     Map<String, String> expectedProperties =
         ImmutableMap.of(
-            IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID,
+            CredentialPropertyUtils.ICEBERG_S3_ACCESS_KEY_ID,
             "key",
-            IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY,
+            CredentialPropertyUtils.ICEBERG_S3_SECRET_ACCESS_KEY,
             "secret",
-            IcebergConstants.ICEBERG_S3_TOKEN,
+            CredentialPropertyUtils.ICEBERG_S3_TOKEN,
             "token");
     Assertions.assertEquals(expectedProperties, icebergProperties);
 
     S3SecretKeyCredential secretKeyCredential = new S3SecretKeyCredential("key", "secret");
-    icebergProperties = CredentialUtils.toIcebergProperties(secretKeyCredential);
+    icebergProperties = CredentialPropertyUtils.toIcebergProperties(secretKeyCredential);
     expectedProperties =
         ImmutableMap.of(
-            IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID,
+            CredentialPropertyUtils.ICEBERG_S3_ACCESS_KEY_ID,
             "key",
-            IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY,
+            CredentialPropertyUtils.ICEBERG_S3_SECRET_ACCESS_KEY,
             "secret");
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }
