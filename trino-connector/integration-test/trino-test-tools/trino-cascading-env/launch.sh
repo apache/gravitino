@@ -72,16 +72,15 @@ nohup docker compose logs -f  -t > $LOG_FILE &
 
 max_attempts=120
 attempts=1
-
-docker_name="trino-local"
+container_name="trino-local"
 
 while true; do
-    if [ "$(docker inspect -f '{{.State.Running}}' $docker_name)" != "true" ]; then
-        echo "ERROR: Docker container trino-local has stopped."
+    if [ -z "$(docker compose ps -q "$container_name")" ]; then
+        echo "ERROR: Docker container $container_name has stopped."
         exit 1
     fi
 
-    docker compose exec -T $docker_name trino --execute "SELECT 1" >/dev/null 2>&1 && {
+    docker compose exec -T $container_name trino --execute "SELECT 1" >/dev/null 2>&1 && {
         break;
     }
 
