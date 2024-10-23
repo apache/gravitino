@@ -133,6 +133,16 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
 
         cls.fs = GCSFileSystem(token=cls.key_file)
 
+    # Object storage like GCS does not support making directory and can only create
+    # objects under the bucket. So we need to skip the test for GCS.
+    def check_mkdir(self, gvfs_dir, actual_dir, gvfs_instance):
+        pass
+
+    # Object storage like GCS does not support making directory and can only create
+    # objects under the bucket. So we need to skip the test for GCS.
+    def check_makedirs(self, gvfs_dir, actual_dir, gvfs_instance):
+        pass
+
     def test_modified(self):
         modified_dir = self.fileset_gvfs_location + "/test_modified"
         modified_actual_dir = self.fileset_storage_location + "/test_modified"
