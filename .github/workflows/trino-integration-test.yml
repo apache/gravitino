@@ -2,7 +2,6 @@ name: Trino Integration Test
 
 # Controls when the workflow will run
 on:
-  workflow_dispatch:
   push:
     branches: [ "main", "branch-*" ]
   pull_request:
@@ -77,15 +76,11 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew compileDistribution compileTrinoConnector -x test -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew build compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
       - name: Free up disk space
         run: |
           dev/ci/util_free_space.sh
-
-      - name: Debug with tmate
-        uses: mxschmitt/action-tmate@v3
-        continue-on-error: true
 
       - name: Trino Integration Test
         id: integrationTest
