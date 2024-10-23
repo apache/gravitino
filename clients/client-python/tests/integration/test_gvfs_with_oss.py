@@ -20,7 +20,6 @@ import os
 from random import randint
 import unittest
 
-from fsspec.implementations.arrow import ArrowFSWrapper
 from pyarrow.fs import S3FileSystem
 
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
@@ -32,6 +31,8 @@ from gravitino import (
 )
 from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.filesystem.gvfs_config import GVFSConfig
+from gravitino.filesystem.gravitino_fs_wrapper import GravitinoArrowFSWrapper
+
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +145,7 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
             endpoint_override=cls.oss_endpoint,
             force_virtual_addressing=True,
         )
-        cls.fs = ArrowFSWrapper(arrow_oss_fs)
+        cls.fs = GravitinoArrowFSWrapper(arrow_oss_fs)
 
     def test_modified(self):
         modified_dir = self.fileset_gvfs_location + "/test_modified"

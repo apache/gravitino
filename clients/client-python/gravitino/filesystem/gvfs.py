@@ -559,9 +559,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             storage_location.startswith(f"{StorageType.HDFS.value}://")
             or storage_location.startswith(f"{StorageType.GCS.value}://")
             or storage_location.startswith(f"{StorageType.S3A.value}://")
-            or storage_location.startswith(f"{StorageType.OSS.value}://")
         ):
             actual_prefix = infer_storage_options(storage_location)["path"]
+        elif storage_location.startswith(f"{StorageType.OSS.value}:/"):
+            ops = infer_storage_options(storage_location)
+            actual_prefix = ops["host"] + ops["path"]
         elif storage_location.startswith(f"{StorageType.LOCAL.value}:/"):
             actual_prefix = storage_location[len(f"{StorageType.LOCAL.value}:") :]
         else:
