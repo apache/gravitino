@@ -571,6 +571,11 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             actual_prefix = infer_storage_options(storage_location)["path"]
         elif storage_location.startswith(f"{StorageType.OSS.value}:/"):
             ops = infer_storage_options(storage_location)
+            if "host" not in ops or "path" not in ops:
+                raise GravitinoRuntimeException(
+                    f"Storage location:{storage_location} doesn't support now."
+                )
+
             actual_prefix = ops["host"] + ops["path"]
         elif storage_location.startswith(f"{StorageType.LOCAL.value}:/"):
             actual_prefix = storage_location[len(f"{StorageType.LOCAL.value}:") :]
@@ -763,6 +768,22 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param storage_type: The storage type
         :param path: The path
         :return: The stripped path
+
+        We will handle OSS differently from S3 and GCS, because OSS has different behavior than S3 and GCS.
+        Please see the following example:
+
+        ```
+        >> oss = context_pair.filesystem()
+        >> oss.ls('oss://bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls')
+            DEBUG:ossfs:Get directory listing page for bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset
+            DEBUG:ossfs:CALL: ObjectIterator - () - {'prefix': 'test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/', 'delimiter': '/'}
+            []
+        >> oss.ls('bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls')
+            DEBUG:ossfs:Get directory listing page for bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls
+            DEBUG:ossfs:CALL: ObjectIterator - () - {'prefix': 'test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls/', 'delimiter': '/'}
+            [{'name': 'bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls/test.file', 'type': 'file', 'size': 0, 'LastModified': 1729754793, 'Size': 0, 'Key': 'bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls/test.file'}]
+
+        ```
         """
         if storage_type in (StorageType.HDFS, StorageType.GCS, StorageType.S3A):
             return path
