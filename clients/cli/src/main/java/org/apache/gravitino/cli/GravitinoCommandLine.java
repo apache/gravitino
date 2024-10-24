@@ -184,12 +184,16 @@ public class GravitinoCommandLine {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
+
+    if (CommandActions.LIST.equals(command)) {
+      new ListCatalogs(url, ignore, metalake).handle();
+      return;
+    }
+
     String catalog = name.getCatalogName();
 
     if (CommandActions.DETAILS.equals(command)) {
       new CatalogDetails(url, ignore, metalake, catalog).handle();
-    } else if (CommandActions.LIST.equals(command)) {
-      new ListCatalogs(url, ignore, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       String provider = line.getOptionValue(GravitinoOptions.PROVIDER);
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
@@ -257,12 +261,16 @@ public class GravitinoCommandLine {
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
+
+    if (CommandActions.LIST.equals(command)) {
+      new ListSchema(url, ignore, metalake, catalog).handle();
+      return;
+    }
+
     String schema = name.getSchemaName();
 
     if (CommandActions.DETAILS.equals(command)) {
       new SchemaDetails(url, ignore, metalake, catalog, schema).handle();
-    } else if (CommandActions.LIST.equals(command)) {
-      new ListSchema(url, ignore, metalake, catalog).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       new CreateSchema(url, ignore, metalake, catalog, schema, comment).handle();
@@ -289,12 +297,16 @@ public class GravitinoCommandLine {
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
+
+    if (CommandActions.LIST.equals(command)) {
+      new ListTables(url, ignore, metalake, catalog, schema).handle();
+      return;
+    }
+
     String table = name.getTableName();
 
     if (CommandActions.DETAILS.equals(command)) {
       new TableDetails(url, ignore, metalake, catalog, schema, table).handle();
-    } else if (CommandActions.LIST.equals(command)) {
-      new ListTables(url, ignore, metalake, catalog, schema).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       // TODO
     } else if (CommandActions.DELETE.equals(command)) {
