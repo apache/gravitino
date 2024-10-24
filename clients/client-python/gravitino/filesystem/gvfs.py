@@ -791,6 +791,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             test_gvfs_fileset/test_ls/test.file'}]
 
         ```
+
+        Please take a look at the above example: if we do not remove the protocol (starts with oss://),
+        it will always return an empty array when we call `oss.ls`, however, if we remove the protocol,
+        it will produce the correct result as expected.
         """
         if storage_type in (StorageType.HDFS, StorageType.GCS, StorageType.S3A):
             return path
