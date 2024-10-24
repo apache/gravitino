@@ -45,6 +45,7 @@ class TestCatalog(IntegrationTestEnv):
     catalog_location_prop: str = "location"  # Fileset Catalog must set `location`
     catalog_provider: str = "hadoop"
     catalog_in_use_prop: str = "in-use"
+    catalog_read_only_prop: str = "read-only"
 
     catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
 
@@ -117,6 +118,7 @@ class TestCatalog(IntegrationTestEnv):
             {
                 self.catalog_location_prop: "/tmp/test_schema",
                 self.catalog_in_use_prop: "true",
+                self.catalog_read_only_prop: "false",
             },
         )
 
@@ -171,6 +173,7 @@ class TestCatalog(IntegrationTestEnv):
             {
                 self.catalog_location_prop: "/tmp/test_schema",
                 self.catalog_in_use_prop: "true",
+                self.catalog_read_only_prop: "false",
             },
         )
         self.assertEqual(catalog.audit_info().creator(), "anonymous")

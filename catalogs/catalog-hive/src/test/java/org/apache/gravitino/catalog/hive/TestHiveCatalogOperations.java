@@ -23,6 +23,7 @@ import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
 import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
+import static org.apache.gravitino.Catalog.PROPERTY_READ_ONLY;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CHECK_INTERVAL_SEC;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_CACHE_EVICTION_INTERVAL_MS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.CLIENT_POOL_SIZE;
@@ -74,11 +75,12 @@ class TestHiveCatalogOperations {
     Map<String, PropertyEntry<?>> propertyEntryMap =
         HIVE_PROPERTIES_METADATA.catalogPropertiesMetadata().propertyEntries();
 
-    Assertions.assertEquals(21, propertyEntryMap.size());
+    Assertions.assertEquals(22, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(METASTORE_URIS));
     Assertions.assertTrue(propertyEntryMap.containsKey(Catalog.PROPERTY_PACKAGE));
     Assertions.assertTrue(propertyEntryMap.containsKey(BaseCatalog.CATALOG_OPERATION_IMPL));
     Assertions.assertTrue(propertyEntryMap.containsKey(PROPERTY_IN_USE));
+    Assertions.assertTrue(propertyEntryMap.containsKey(PROPERTY_READ_ONLY));
     Assertions.assertTrue(propertyEntryMap.containsKey(AUTHORIZATION_PROVIDER));
     Assertions.assertTrue(propertyEntryMap.containsKey(CLIENT_POOL_SIZE));
     Assertions.assertTrue(propertyEntryMap.containsKey(IMPERSONATION_ENABLE));

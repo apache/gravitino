@@ -79,6 +79,7 @@ import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
@@ -300,7 +301,7 @@ public class GravitinoMetalake extends MetalakeDTO
 
   @Override
   public void enableCatalog(String catalogName) throws NoSuchCatalogException {
-    CatalogSetRequest req = new CatalogSetRequest(true);
+    CatalogSetRequest req = CatalogSetRequest.setInUse(true);
 
     ErrorResponse resp =
         restClient.patch(
@@ -319,7 +320,27 @@ public class GravitinoMetalake extends MetalakeDTO
 
   @Override
   public void disableCatalog(String catalogName) throws NoSuchCatalogException {
-    CatalogSetRequest req = new CatalogSetRequest(false);
+    CatalogSetRequest req = CatalogSetRequest.setInUse(false);
+
+    ErrorResponse resp =
+        restClient.patch(
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            req,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
+  @Override
+  public void setCatalogReadOnly(String catalogName, boolean readOnly)
+      throws NoSuchCatalogException, CatalogNotInUseException {
+    CatalogSetRequest req = CatalogSetRequest.setReadOnly(readOnly);
 
     ErrorResponse resp =
         restClient.patch(
@@ -383,7 +404,7 @@ public class GravitinoMetalake extends MetalakeDTO
     return this;
   }
 
-  /*
+  /**
    * List all the tag names under a metalake.
    *
    * @return A list of the tag names under the current metalake.

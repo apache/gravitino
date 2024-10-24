@@ -35,6 +35,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
@@ -144,6 +145,12 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public void disableCatalog(String catalogName) throws NoSuchCatalogException {
     getMetalake().disableCatalog(catalogName);
+  }
+
+  @Override
+  public void setCatalogReadOnly(String catalogName, boolean readOnly)
+      throws NoSuchCatalogException, CatalogNotInUseException {
+    getMetalake().setCatalogReadOnly(catalogName, readOnly);
   }
 
   /**

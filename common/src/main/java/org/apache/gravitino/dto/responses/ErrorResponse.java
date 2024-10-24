@@ -260,6 +260,19 @@ public class ErrorResponse extends BaseResponse {
   }
 
   /**
+   * Create a new read-only error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse catalogReadOnly(String type, String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.READ_ONLY_CODE, type, message, getStackTrace(throwable));
+  }
+
+  /**
    * Create a new non-empty error instance of {@link ErrorResponse}.
    *
    * @param type The type of the error.

@@ -82,6 +82,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.CatalogReadOnlyException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -109,6 +110,21 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private static final String CATALOG_DOES_NOT_EXIST_MSG = "Catalog %s does not exist";
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
+
+  /**
+   * Check if the catalog can be written to, if it is read-only, throw an exception.
+   *
+   * @param store the entity store
+   * @param ident the catalog identifier
+   * @throws NoSuchCatalogException if the catalog does not exist
+   * @throws CatalogReadOnlyException if the catalog is read-only
+   */
+  public static void checkCatalogCanWrite(EntityStore store, NameIdentifier ident)
+      throws NoSuchCatalogException, CatalogReadOnlyException {
+    if (catalogReadOnly(store, ident)) {
+      throw new CatalogReadOnlyException("Catalog %s is read-only", ident);
+    }
+  }
 
   public static void checkCatalogInUse(EntityStore store, NameIdentifier ident)
       throws NoSuchMetalakeException, NoSuchCatalogException, CatalogNotInUseException,
@@ -490,6 +506,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       throws NoSuchCatalogException, CatalogNotInUseException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
     checkMetalake(metalakeIdent, store);
+    checkCatalogCanWrite(store, ident);
 
     try {
       if (catalogInUse(store, ident)) {
@@ -521,6 +538,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
     checkMetalake(metalakeIdent, store);
+    checkCatalogCanWrite(store, ident);
 
     try {
       if (!catalogInUse(store, ident)) {
@@ -538,6 +556,38 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     ? new HashMap<>()
                     : new HashMap<>(catalog.getProperties());
             newProps.put(PROPERTY_IN_USE, "false");
+            newCatalogBuilder.withProperties(newProps);
+
+            return newCatalogBuilder.build();
+          });
+      catalogCache.invalidate(ident);
+
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void setCatalogReadOnly(NameIdentifier ident, boolean readOnly)
+      throws NoSuchCatalogException, CatalogNotInUseException {
+    checkCatalogInUse(store, ident);
+    if (catalogReadOnly(store, ident) == readOnly) {
+      return;
+    }
+
+    try {
+      store.update(
+          ident,
+          CatalogEntity.class,
+          EntityType.CATALOG,
+          catalog -> {
+            CatalogEntity.Builder newCatalogBuilder = newCatalogBuilder(ident.namespace(), catalog);
+
+            Map<String, String> newProps =
+                catalog.getProperties() == null
+                    ? new HashMap<>()
+                    : new HashMap<>(catalog.getProperties());
+            newProps.put(Catalog.PROPERTY_READ_ONLY, Boolean.toString(readOnly));
             newCatalogBuilder.withProperties(newProps);
 
             return newCatalogBuilder.build();
@@ -629,6 +679,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    checkMetalake(metalakeIdent, store);
+
     try {
       boolean catalogInUse = catalogInUse(store, ident);
       if (catalogInUse && !force) {
@@ -691,6 +744,23 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } catch (NoSuchEntityException e) {
       LOG.warn("Catalog {} does not exist", catalogIdent, e);
       throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, catalogIdent);
+
+    } catch (IOException e) {
+      LOG.error("Failed to do store operation", e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static boolean catalogReadOnly(EntityStore store, NameIdentifier ident) {
+    try {
+      CatalogEntity catalogEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      return (boolean)
+          BASIC_CATALOG_PROPERTIES_METADATA.getOrDefault(
+              catalogEntity.getProperties(), Catalog.PROPERTY_READ_ONLY);
+
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Catalog {} does not exist", ident, e);
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
 
     } catch (IOException e) {
       LOG.error("Failed to do store operation", e);

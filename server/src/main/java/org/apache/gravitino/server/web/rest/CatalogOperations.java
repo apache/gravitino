@@ -54,6 +54,7 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -194,6 +195,7 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "set-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-catalog", absolute = true)
+  // Not use @NameBindings.CatalogReadOnlyCheck here because setCatalogReadOnly does not require
   public Response setCatalog(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalogName,
@@ -208,30 +210,23 @@ public class CatalogOperations {
                 NameIdentifierUtil.ofMetalake(metalake),
                 LockType.WRITE,
                 () -> {
-                  if (request.isInUse()) {
-                    catalogDispatcher.enableCatalog(ident);
-                  } else {
-                    catalogDispatcher.disableCatalog(ident);
+                  if (request.getInUse() != null) {
+                    setCatalogInUse(ident, request.getInUse());
+
+                  } else if (request.getReadOnly() != null) {
+                    catalogDispatcher.setCatalogReadOnly(ident, request.getReadOnly());
                   }
                   return null;
                 });
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
-                "Successfully {} catalog: {}.{}",
-                request.isInUse() ? "enable" : "disable",
-                metalake,
-                catalogName);
+                "Set catalog {}.{} successfully: {}", metalake, catalogName, request.toString());
             return response;
           });
 
     } catch (Exception e) {
-      LOG.info(
-          "Failed to {} catalog: {}.{}",
-          request.isInUse() ? "enable" : "disable",
-          metalake,
-          catalogName);
-      return ExceptionHandlers.handleCatalogException(
-          OperationType.ENABLE, catalogName, metalake, e);
+      LOG.info("Failed to set catalog {}.{}: {}", metalake, catalogName, request.toString());
+      return ExceptionHandlers.handleCatalogException(OperationType.SET, catalogName, metalake, e);
     }
   }
 
@@ -261,6 +256,7 @@ public class CatalogOperations {
   @PUT
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "alter-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-catalog", absolute = true)
   public Response alterCatalog(
@@ -297,6 +293,7 @@ public class CatalogOperations {
   @DELETE
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "drop-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-catalog", absolute = true)
   public Response dropCatalog(
@@ -325,6 +322,14 @@ public class CatalogOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
           OperationType.DROP, catalogName, metalakeName, e);
+    }
+  }
+
+  private void setCatalogInUse(NameIdentifier ident, boolean inUse) {
+    if (inUse) {
+      catalogDispatcher.enableCatalog(ident);
+    } else {
+      catalogDispatcher.disableCatalog(ident);
     }
   }
 }

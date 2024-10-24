@@ -16,25 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.server.authorization;
+package org.apache.gravitino.exceptions;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import javax.ws.rs.NameBinding;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 
-/* This class is used for Jersey filters to bind operations with the filters which need. */
-public class NameBindings {
+/** An exception thrown when attempting to modify a read-only catalog or its sub-entity. */
+public class CatalogReadOnlyException extends GravitinoRuntimeException {
 
-  /* This annotation will bind all access control related operations */
-  @NameBinding
-  @Target({ElementType.TYPE, ElementType.METHOD})
-  @Retention(RetentionPolicy.RUNTIME)
-  public @interface AccessControlInterfaces {}
-
-  @NameBinding
-  @Target({ElementType.TYPE, ElementType.METHOD})
-  @Retention(RetentionPolicy.RUNTIME)
-  public @interface CatalogReadOnlyCheck {}
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public CatalogReadOnlyException(@FormatString String message, Object... args) {
+    super(message, args);
+  }
 }

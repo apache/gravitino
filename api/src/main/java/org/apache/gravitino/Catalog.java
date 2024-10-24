@@ -101,6 +101,9 @@ public interface Catalog extends Auditable {
   /** The property indicates the catalog is in use. */
   String PROPERTY_IN_USE = "in-use";
 
+  /** The property indicates the catalog is in read-only mode. */
+  String PROPERTY_READ_ONLY = "read-only";
+
   /**
    * The property to specify the cloud that the catalog is running on. The value should be one of
    * the {@link CloudName}.

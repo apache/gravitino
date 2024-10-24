@@ -53,6 +53,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -109,6 +110,7 @@ public class FilesetOperations {
 
   @POST
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "create-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-fileset", absolute = true)
   public Response createFileset(
@@ -183,6 +185,7 @@ public class FilesetOperations {
   @PUT
   @Path("{fileset}")
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "alter-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-fileset", absolute = true)
   public Response alterFileset(
@@ -220,6 +223,7 @@ public class FilesetOperations {
   @DELETE
   @Path("{fileset}")
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "drop-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-fileset", absolute = true)
   public Response dropFileset(

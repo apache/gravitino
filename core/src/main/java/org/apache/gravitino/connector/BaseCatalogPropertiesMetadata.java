@@ -23,6 +23,7 @@ import static org.apache.gravitino.Catalog.CLOUD_NAME;
 import static org.apache.gravitino.Catalog.CLOUD_REGION_CODE;
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.Catalog.PROPERTY_PACKAGE;
+import static org.apache.gravitino.Catalog.PROPERTY_READ_ONLY;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -86,8 +87,13 @@ public abstract class BaseCatalogPropertiesMetadata extends BasePropertiesMetada
                   false /* hidden */),
               PropertyEntry.booleanReservedPropertyEntry(
                   PROPERTY_IN_USE,
-                  "The property indicating the catalog is in use",
+                  "The property indicates the catalog is in use or not",
                   true /* default value */,
+                  false /* hidden */),
+              PropertyEntry.booleanReservedPropertyEntry(
+                  PROPERTY_READ_ONLY,
+                  "The property indicates the catalog is read-only or not",
+                  false /* default value */,
                   false /* hidden */)),
           PropertyEntry::getName);
 

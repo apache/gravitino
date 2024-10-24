@@ -144,6 +144,17 @@ public class Utils {
         .build();
   }
 
+  public static Response catalogReadOnly(String message, Throwable throwable) {
+    return catalogReadOnly(throwable.getClass().getSimpleName(), message, throwable);
+  }
+
+  public static Response catalogReadOnly(String type, String message, Throwable throwable) {
+    return Response.status(Response.Status.CONFLICT)
+        .entity(ErrorResponse.catalogReadOnly(type, message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
   public static Response nonEmpty(String type, String message) {
     return nonEmpty(type, message, null);
   }

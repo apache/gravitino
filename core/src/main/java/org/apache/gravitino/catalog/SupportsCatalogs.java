@@ -200,4 +200,16 @@ public interface SupportsCatalogs {
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
   void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException;
+
+  /**
+   * Set the catalog to read-only mode or not. If the catalog is in read-only mode, only read
+   * operations (e.g. list, load) are allowed.
+   *
+   * @param ident The identifier of the catalog.
+   * @param readOnly Whether to set the catalog to read-only mode.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws CatalogNotInUseException If the catalog is disabled.
+   */
+  void setCatalogReadOnly(NameIdentifier ident, boolean readOnly)
+      throws NoSuchCatalogException, CatalogNotInUseException;
 }

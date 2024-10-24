@@ -51,6 +51,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -103,6 +104,7 @@ public class TableOperations {
 
   @POST
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
   public Response createTable(
@@ -171,6 +173,7 @@ public class TableOperations {
   @PUT
   @Path("{table}")
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "alter-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-table", absolute = true)
   public Response alterTable(
@@ -208,6 +211,7 @@ public class TableOperations {
   @DELETE
   @Path("{table}")
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
   public Response dropTable(

@@ -42,6 +42,7 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
+import org.apache.gravitino.server.web.filter.CatalogReadOnlyFilter;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
@@ -120,6 +121,7 @@ public class GravitinoServer extends ResourceConfig {
     register(JsonParseExceptionMapper.class);
     register(JsonMappingExceptionMapper.class);
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
+    register(CatalogReadOnlyFilter.class);
     property(CommonProperties.JSON_JACKSON_DISABLED_MODULES, "DefaultScalaModule");
 
     if (!enableAuthorization) {
