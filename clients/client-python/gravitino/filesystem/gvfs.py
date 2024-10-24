@@ -775,13 +775,20 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         ```
         >> oss = context_pair.filesystem()
         >> oss.ls('oss://bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls')
-            DEBUG:ossfs:Get directory listing page for bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset
-            DEBUG:ossfs:CALL: ObjectIterator - () - {'prefix': 'test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/', 'delimiter': '/'}
+            DEBUG:ossfs:Get directory listing page for bucket-xiaoyu/test_gvfs_catalog678/
+            test_gvfs_schema/test_gvfs_fileset
+            DEBUG:ossfs:CALL: ObjectIterator - () - {'prefix': 'test_gvfs_catalog678/test_gvfs_schema
+            /test_gvfs_fileset/', 'delimiter': '/'}
             []
         >> oss.ls('bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls')
-            DEBUG:ossfs:Get directory listing page for bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls
-            DEBUG:ossfs:CALL: ObjectIterator - () - {'prefix': 'test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls/', 'delimiter': '/'}
-            [{'name': 'bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls/test.file', 'type': 'file', 'size': 0, 'LastModified': 1729754793, 'Size': 0, 'Key': 'bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls/test.file'}]
+            DEBUG:ossfs:Get directory listing page for bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema
+            /test_gvfs_fileset/test_ls
+            DEBUG:ossfs:CALL: ObjectIterator - () - {'prefix': 'test_gvfs_catalog678/test_gvfs_schema
+            /test_gvfs_fileset/test_ls/', 'delimiter': '/'}
+            [{'name': 'bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls
+            /test.file', 'type': 'file', 'size': 0, 'LastModified': 1729754793,
+            'Size': 0, 'Key': 'bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/
+            test_gvfs_fileset/test_ls/test.file'}]
 
         ```
         """
