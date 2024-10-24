@@ -34,6 +34,21 @@ cd distribution
 tar xfz gravitino-iceberg-rest-server-*.tar.gz
 cp -r gravitino-iceberg-rest-server*-bin ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server
 
+# prepare bundle jar
+cd {iceberg_rest_server_dir}
+mkdir -p bundles
+cp {gravitino_home}/bundles/gcp-bundle/build/libs/gravitino-gcp-bundle-*.jar bundles/
+cp {gravitino_home}/bundles/aws-bundle/build/libs/gravitino-aws-bundle-*.jar bundles/
+
+iceberg_gcp_bundle="iceberg-gcp-bundle-1.5.2.jar"
+if [ ! -f "bundles/$iceberg_gcp_bundle" ]; then
+  wget -O bundles https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-gcp-bundle/1.5.2/$iceberg_gcp_bundle
+fi
+
+# download jdbc driver
+
+cp bundles/*jar ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/libs/
+
 # Keeping the container running at all times
 cat <<EOF >> "${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/bin/gravitino-iceberg-rest-server.sh"
 
