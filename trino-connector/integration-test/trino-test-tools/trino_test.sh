@@ -28,4 +28,4 @@ cd $GRAVITINO_ROOT_DIR
 
 args="\"$@\""
 
-./gradlew :trino-connector:integration-test:TrinoTest -PappArgs="$args" -PjdkVersion=17
+./gradlew :trino-connector:integration-test:TrinoTest -PappArgs="$args"
