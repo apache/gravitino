@@ -330,13 +330,13 @@ public class GravitinoCommandLine {
     String user = line.getOptionValue(GravitinoOptions.USER);
 
     if (CommandActions.DETAILS.equals(command)) {
-      new UserDetails(url, metalake, user).handle();
+      new UserDetails(url, ignore, metalake, user).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListUsers(url, metalake).handle();
+      new ListUsers(url, ignore, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
-      new CreateUser(url, metalake, user).handle();
+      new CreateUser(url, ignore, metalake, user).handle();
     } else if (CommandActions.DELETE.equals(command)) {
-      new DeleteUser(url, metalake, user).handle();
+      new DeleteUser(url, ignore, metalake, user).handle();
     }
   }
 
@@ -348,13 +348,13 @@ public class GravitinoCommandLine {
     String group = line.getOptionValue(GravitinoOptions.GROUP);
 
     if (CommandActions.DETAILS.equals(command)) {
-      new GroupDetails(url, metalake, group).handle();
+      new GroupDetails(url, ignore, metalake, group).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListGroups(url, metalake).handle();
+      new ListGroups(url, ignore, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
-      new CreateGroup(url, metalake, group).handle();
+      new CreateGroup(url, ignore, metalake, group).handle();
     } else if (CommandActions.DELETE.equals(command)) {
-      new DeleteGroup(url, metalake, group).handle();
+      new DeleteGroup(url, ignore, metalake, group).handle();
     }
   }
 

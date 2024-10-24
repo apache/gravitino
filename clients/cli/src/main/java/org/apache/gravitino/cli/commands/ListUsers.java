@@ -32,10 +32,11 @@ public class ListUsers extends Command {
    * Lists all users in a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    */
-  public ListUsers(String url, String metalake) {
-    super(url);
+  public ListUsers(String url, boolean ignoreVersions, String metalake) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
   }
 

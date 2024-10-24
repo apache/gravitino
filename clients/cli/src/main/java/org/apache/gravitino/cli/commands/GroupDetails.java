@@ -34,11 +34,12 @@ public class GroupDetails extends Command {
    * Displays the users in a group.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param group The name of the group.
    */
-  public GroupDetails(String url, String metalake, String group) {
-    super(url);
+  public GroupDetails(String url, boolean ignoreVersions, String metalake, String group) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.group = group;
   }

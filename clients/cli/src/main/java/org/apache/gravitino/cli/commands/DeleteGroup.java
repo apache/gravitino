@@ -33,11 +33,12 @@ public class DeleteGroup extends Command {
    * Delete a group.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param group The name of the group.
    */
-  public DeleteGroup(String url, String metalake, String group) {
-    super(url);
+  public DeleteGroup(String url, boolean ignoreVersions, String metalake, String group) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.group = group;
   }

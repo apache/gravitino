@@ -33,11 +33,12 @@ public class DeleteUser extends Command {
    * Delete a user.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    */
-  public DeleteUser(String url, String metalake, String user) {
-    super(url);
+  public DeleteUser(String url, boolean ignoreVersions, String metalake, String user) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.user = user;
   }

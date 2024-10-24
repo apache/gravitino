@@ -32,11 +32,12 @@ public class CreateUser extends Command {
    * Create a new User.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    */
-  public CreateUser(String url, String metalake, String user) {
-    super(url);
+  public CreateUser(String url, boolean ignoreVersions, String metalake, String user) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.user = user;
   }
