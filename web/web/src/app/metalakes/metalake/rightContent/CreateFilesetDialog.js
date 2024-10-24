@@ -326,6 +326,7 @@ const CreateFilesetDialog = props => {
                       label='Type'
                       defaultValue='managed'
                       onChange={onChange}
+                      disabled={type === 'update'}
                       error={Boolean(errors.type)}
                       labelId='select-fileset-type'
                       data-refer='fileset-type-selector'
@@ -350,6 +351,7 @@ const CreateFilesetDialog = props => {
                       value={value}
                       label='Storage Location'
                       onChange={onChange}
+                      disabled={type === 'update'}
                       placeholder=''
                       error={Boolean(errors.storageLocation)}
                       data-refer='fileset-storageLocation-field'
@@ -387,7 +389,6 @@ const CreateFilesetDialog = props => {
                       rows={2}
                       onChange={onChange}
                       placeholder=''
-                      disabled={type === 'update'}
                       error={Boolean(errors.comment)}
                       data-refer='fileset-comment-field'
                     />

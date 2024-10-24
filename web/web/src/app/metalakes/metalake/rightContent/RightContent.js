@@ -60,15 +60,16 @@ const RightContent = () => {
 
     const isFilesetList =
       paramsSize == 4 &&
-      searchParams.get('metalake') &&
-      searchParams.get('catalog') &&
+      searchParams.has('metalake') &&
+      searchParams.has('catalog') &&
       searchParams.get('type') === 'fileset'
+      searchParams.has('schema')
     setFilesetBtnVisible(isFilesetList)
 
     if (store.catalogs.length) {
       const currentCatalog = store.catalogs.filter(ca => ca.name === searchParams.get('catalog'))[0]
-      const isHideSchemaAction = ['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3
-      setSchemaBtnVisible(!isHideSchemaAction && !isCatalogList && !isFilesetList)
+      const isSchemaList =  paramsSize == 3 && searchParams.has('metalake') && searchParams.has('catalog') && searchParams.has('type') && !['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider)
+      setSchemaBtnVisible(isSchemaList)
     }
   }, [searchParams, store.catalogs, store.catalogs.length])
 
