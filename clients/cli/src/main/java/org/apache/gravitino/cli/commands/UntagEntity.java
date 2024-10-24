@@ -102,13 +102,7 @@ public class UntagEntity extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < tags.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(tags[i]);
-    }
+    String all = String.join(",", tags);
 
     System.out.println(entity + " untagged, tagged with " + all);
   }
