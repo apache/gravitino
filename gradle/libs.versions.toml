@@ -93,6 +93,7 @@ shadow-plugin = "8.1.1"
 kerby = "2.0.3"
 node-plugin = "7.0.1"
 commons-cli = "1.2"
+commons-cli-new = "1.9.0"
 sun-activation-version = "1.2.0"
 error-prone = "3.1.0"
 woodstox-core = "5.3.0"
@@ -122,6 +123,7 @@ junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", v
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit" }
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine"}
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
+slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
 slf4j-jdk14 = { group = "org.slf4j", name = "slf4j-jdk14", version = "1.7.30" }
 log4j-slf4j2-impl = { group = "org.apache.logging.log4j", name = "log4j-slf4j2-impl", version.ref = "log4j" }
 log4j-api = { group = "org.apache.logging.log4j", name = "log4j-api", version.ref = "log4j" }
@@ -217,6 +219,7 @@ postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref
 minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop-minikdc"}
 immutables-value = { module = "org.immutables:value", version.ref = "immutables-value" }
 commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
+commons-cli-new = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli-new" }
 sun-activation = { group = "com.sun.activation", name = "javax.activation", version.ref = "sun-activation-version" }
 kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.ref = "kafka" }
 kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }

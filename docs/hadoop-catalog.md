@@ -47,7 +47,7 @@ The Hadoop catalog supports multi-level authentication to control access, allowi
 - **Schema**: Inherits the authentication setting from the catalog if not explicitly set. For more information about schema settings, please refer to [Schema properties](#schema-properties).
 - **Fileset**: Inherits the authentication setting from the schema if not explicitly set. For more information about fileset settings, please refer to [Fileset properties](#fileset-properties).
 
-The default value of `authentication.impersonation-enable` is false, and the default value for catalogs about this configuration is false, for 
+The default value of `authentication.impersonation-enable` is false, and the default value for catalogs about this configuration is false, for
 schemas and filesets, the default value is inherited from the parent. Value set by the user will override the parent value, and the priority mechanism is the same as authentication.
 
 ### Catalog operations
@@ -82,12 +82,12 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 
 ### Fileset properties
 
-| Property name                                      | Description                                                                                            | Default value            | Required | Since Version   |
-|----------------------------------------------------|--------------------------------------------------------------------------------------------------------|--------------------------|----------|-----------------|
-| `authentication.impersonation-enable`              | Whether to enable impersonation for the Hadoop catalog fileset.                                        | The parent(schema) value | No       | 0.6.0           |
-| `authentication.type`                              | The type of authentication for Hadoop catalog fileset, currently we only support `kerberos`, `simple`. | The parent(schema) value | No       | 0.6.0           |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication for the fileset.                                          | The parent(schema) value | No       | 0.6.0           |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication for the fileset.                                 | The parent(schema) value | No       | 0.6.0           |
+| Property name                         | Description                                                                                            | Default value            | Required | Since Version    |
+|---------------------------------------|--------------------------------------------------------------------------------------------------------|--------------------------|----------|------------------|
+| `authentication.impersonation-enable` | Whether to enable impersonation for the Hadoop catalog fileset.                                        | The parent(schema) value | No       | 0.6.0-incubating |
+| `authentication.type`                 | The type of authentication for Hadoop catalog fileset, currently we only support `kerberos`, `simple`. | The parent(schema) value | No       | 0.6.0-incubating |
+| `authentication.kerberos.principal`   | The principal of the Kerberos authentication for the fileset.                                          | The parent(schema) value | No       | 0.6.0-incubating |
+| `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for the fileset.                                 | The parent(schema) value | No       | 0.6.0-incubating |
 
 ### Fileset operations
 

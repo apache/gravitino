@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public class TestFetchFileUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestFetchFileUtils.class);
-  private static final int MAX_RETRIES = 3;
+  private static final int MAX_RETRIES = 8;
   private static final long INITIAL_RETRY_DELAY_MS = 1000;
 
   @Test
