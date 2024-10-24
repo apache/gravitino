@@ -764,15 +764,17 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param path: The path
         :return: The stripped path
         """
-        if storage_type in (
-            StorageType.HDFS,
-            StorageType.GCS,
-            StorageType.S3A,
-            StorageType.OSS,
-        ):
+        if storage_type in (StorageType.HDFS, StorageType.GCS, StorageType.S3A):
             return path
         if storage_type == StorageType.LOCAL:
             return path[len(f"{StorageType.LOCAL.value}:") :]
+
+        # OSS has different behavior than S3 and GCS, if we do not remove the
+        # protocol, it will always return an empty array.
+        if storage_type == StorageType.OSS:
+            if path.startswith(f"{StorageType.OSS.value}://"):
+                return path[len(f"{StorageType.OSS.value}://") :]
+            return path
 
         raise GravitinoRuntimeException(
             f"Storage type:{storage_type} doesn't support now."
