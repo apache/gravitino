@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -170,11 +171,11 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put("gravitino.bypass.fs.s3a.access.key", accessKey);
-    map.put("gravitino.bypass.fs.s3a.secret.key", secretKey);
-    map.put("gravitino.bypass.fs.s3a.endpoint", s3Endpoint);
+    map.put(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
+    map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
+    map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
     map.put(
-        "gravitino.bypass.fs.s3a.aws.credentials.provider",
+        S3Properties.GRAVITINO_S3_CREDS_PROVIDER,
         "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
     map.put(FILESYSTEM_PROVIDERS, "s3");
 
