@@ -68,7 +68,7 @@ const RightContent = () => {
 
     if (store.catalogs.length) {
       const currentCatalog = store.catalogs.filter(ca => ca.name === searchParams.get('catalog'))[0]
-      
+
       const isSchemaList =
         paramsSize == 3 &&
         searchParams.has('metalake') &&
