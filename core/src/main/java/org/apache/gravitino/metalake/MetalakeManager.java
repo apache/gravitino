@@ -217,7 +217,6 @@ public class MetalakeManager implements MetalakeDispatcher {
           EntityType.METALAKE,
           metalake -> {
             BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
-
             Map<String, String> newProps =
                 metalake.properties() == null
                     ? Maps.newHashMap()
@@ -335,7 +334,7 @@ public class MetalakeManager implements MetalakeDispatcher {
         AuditInfo.builder()
             .withCreator(metalake.auditInfo().creator())
             .withCreateTime(metalake.auditInfo().createTime())
-            .withLastModifier(metalake.auditInfo().creator()) /*TODO: Use real user later on.  */
+            .withLastModifier(PrincipalUtils.getCurrentUserName())
             .withLastModifiedTime(Instant.now())
             .build();
     return builder.withAuditInfo(newInfo);

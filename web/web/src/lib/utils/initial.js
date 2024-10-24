@@ -89,7 +89,7 @@ export const providers = [
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: 'hive',
+        hide: ['hive'],
         description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`
       },
       {
@@ -97,14 +97,14 @@ export const providers = [
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: 'hive'
+        hide: ['hive']
       },
       {
         key: 'jdbc-password',
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: 'hive'
+        hide: ['hive']
       },
       {
         key: 'authentication.type',
@@ -121,7 +121,7 @@ export const providers = [
         required: true,
         description: 'The principal of the Kerberos authentication.',
         parentField: 'authentication.type',
-        hide: 'simple'
+        hide: ['simple']
       },
       {
         key: 'authentication.kerberos.keytab-uri',
@@ -129,7 +129,7 @@ export const providers = [
         required: true,
         description: 'The URI of The keytab for the Kerberos authentication.',
         parentField: 'authentication.type',
-        hide: 'simple'
+        hide: ['simple']
       }
     ]
   },
@@ -231,7 +231,8 @@ export const providers = [
         value: 'filesystem',
         defaultValue: 'filesystem',
         required: true,
-        description: 'Only supports "filesystem" now.'
+        description: 'Only supports "filesystem" now.',
+        select: ['filesystem', 'hive', 'jdbc']
       },
       {
         key: 'uri',
@@ -240,13 +241,27 @@ export const providers = [
         description:
           'e.g. thrift://127.0.0.1:9083 or jdbc:postgresql://127.0.0.1:5432/db_name or jdbc:mysql://127.0.0.1:3306/metastore_db',
         parentField: 'catalog-backend',
-        hide: 'filesystem'
+        hide: ['filesystem']
       },
       {
         key: 'warehouse',
         value: '',
         required: true,
         description: 'e.g. file:///user/hive/warehouse-paimon/ or hdfs://namespace/hdfs/path'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true,
+        parentField: 'catalog-backend',
+        hide: ['hive', 'filesystem']
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true,
+        parentField: 'catalog-backend',
+        hide: ['hive', 'filesystem']
       },
       {
         key: 'authentication.type',
@@ -263,7 +278,7 @@ export const providers = [
         required: true,
         description: 'The principal of the Kerberos authentication.',
         parentField: 'authentication.type',
-        hide: 'simple'
+        hide: ['simple']
       },
       {
         key: 'authentication.kerberos.keytab-uri',
@@ -271,7 +286,7 @@ export const providers = [
         required: true,
         description: 'The URI of The keytab for the Kerberos authentication.',
         parentField: 'authentication.type',
-        hide: 'simple'
+        hide: ['simple']
       }
     ]
   },
