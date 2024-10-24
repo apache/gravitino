@@ -14,7 +14,7 @@ To use `fileset` managed by Gravitino, Gravitino provides a virtual file system 
 the Gravitino Virtual File System (GVFS):
 * In Java, it's built on top of the Hadoop Compatible File System(HCFS) interface.
 * In Python, it's built on top of the [fsspec](https://filesystem-spec.readthedocs.io/en/stable/index.html)
-interface.
+  interface.
 
 GVFS is a virtual layer that manages the files and directories in the fileset through a virtual
 path, without needing to understand the specific storage details of the fileset. You can access
@@ -164,18 +164,18 @@ fs.getFileStatus(filesetPath);
 
 1. Add the GVFS runtime jar to the Spark environment.
 
-    You can use `--packages` or `--jars` in the Spark submit shell to include the Gravitino Virtual
-    File System runtime jar, like so:
+   You can use `--packages` or `--jars` in the Spark submit shell to include the Gravitino Virtual
+   File System runtime jar, like so:
 
     ```shell
     ./${SPARK_HOME}/bin/spark-submit --packages org.apache.gravitino:filesystem-hadoop3-runtime:${version}
     ```
 
-    If you want to include the Gravitino Virtual File System runtime jar in your Spark installation, add it to the `${SPARK_HOME}/jars/` folder.
+   If you want to include the Gravitino Virtual File System runtime jar in your Spark installation, add it to the `${SPARK_HOME}/jars/` folder.
 
 2. Configure the Hadoop configuration when submitting the job.
 
-    You can configure in the shell command in this way:
+   You can configure in the shell command in this way:
 
     ```shell
     --conf spark.hadoop.fs.AbstractFileSystem.gvfs.impl=org.apache.gravitino.filesystem.hadoop.Gvfs
@@ -186,7 +186,7 @@ fs.getFileStatus(filesetPath);
 
 3. Perform operations on the fileset storage in your code.
 
-    Finally, you can access the fileset storage in your Spark program:
+   Finally, you can access the fileset storage in your Spark program:
 
     ```scala
     // Scala code
@@ -206,9 +206,9 @@ For Tensorflow to support GVFS, you need to recompile the [tensorflow-io](https:
 
 1. First, add a patch and recompile tensorflow-io.
 
-    You need to add a [patch](https://github.com/tensorflow/io/pull/1970) to support GVFS on
-    tensorflow-io. Then you can follow the [tutorial](https://github.com/tensorflow/io/blob/master/docs/development.md)
-    to recompile your code and release the tensorflow-io module.
+   You need to add a [patch](https://github.com/tensorflow/io/pull/1970) to support GVFS on
+   tensorflow-io. Then you can follow the [tutorial](https://github.com/tensorflow/io/blob/master/docs/development.md)
+   to recompile your code and release the tensorflow-io module.
 
 2. Then you need to configure the Hadoop configuration.
 
@@ -335,18 +335,17 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 
 ### Configuration
 
-| Configuration item   | Description                                                                                                                                              | Default value | Required                          | Since version |
-|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------------------------------|---------------|
-| `server_uri`         | The Gravitino server uri, e.g. `http://localhost:8090`.                                                                                                  | (none)        | Yes                               | 0.6.0         |
-| `metalake_name`      | The metalake name which the fileset belongs to.                                                                                                          | (none)        | Yes                               | 0.6.0         |
-| `cache_size`         | The cache capacity of the Gravitino Virtual File System.                                                                                                 | `20`          | No                                | 0.6.0         |
-| `cache_expired_time` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `seconds`.                                | `3600`        | No                                | 0.6.0         |
-| `auth_type`          | The auth type to initialize the Gravitino client to use with the Gravitino Virtual File System. Currently supports `simple` and `oauth2` auth types.     | `simple`      | No                                | 0.6.0         |
-| `oauth2_server_uri`  | The auth server URI for the Gravitino client when using `oauth2` auth type.                                                                              | (none)        | Yes if you use `oauth2` auth type | 0.7.0         |
-| `oauth2_credential`  | The auth credential for the Gravitino client when using `oauth2` auth type.                                                                              | (none)        | Yes if you use `oauth2` auth type | 0.7.0         |
-| `oauth2_path`        | The auth server path for the Gravitino client when using `oauth2` auth type. Please remove the first slash `/` from the path, for example `oauth/token`. | (none)        | Yes if you use `oauth2` auth type | 0.7.0         |
-| `oauth2_scope`       | The auth scope for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                            | (none)        | Yes if you use `oauth2` auth type | 0.7.0         |
-
+| Configuration item   | Description                                                                                                                                              | Default value | Required                          | Since version    |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------------------------------|------------------|
+| `server_uri`         | The Gravitino server uri, e.g. `http://localhost:8090`.                                                                                                  | (none)        | Yes                               | 0.6.0-incubating |
+| `metalake_name`      | The metalake name which the fileset belongs to.                                                                                                          | (none)        | Yes                               | 0.6.0-incubating |
+| `cache_size`         | The cache capacity of the Gravitino Virtual File System.                                                                                                 | `20`          | No                                | 0.6.0-incubating |                                                                                                                      
+| `cache_expired_time` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `seconds`.                                | `3600`        | No                                | 0.6.0-incubating |
+| `auth_type`          | The auth type to initialize the Gravitino client to use with the Gravitino Virtual File System. Currently supports `simple` and `oauth2` auth types.     | `simple`      | No                                | 0.6.0-incubating |
+| `oauth2_server_uri`  | The auth server URI for the Gravitino client when using `oauth2` auth type.                                                                              | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
+| `oauth2_credential`  | The auth credential for the Gravitino client when using `oauth2` auth type.                                                                              | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
+| `oauth2_path`        | The auth server path for the Gravitino client when using `oauth2` auth type. Please remove the first slash `/` from the path, for example `oauth/token`. | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
+| `oauth2_scope`       | The auth scope for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                            | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
 
 You can configure these properties when obtaining the `Gravitino Virtual FileSystem` in Python like this:
 
