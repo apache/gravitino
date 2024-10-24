@@ -20,6 +20,7 @@ package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.GVFS_CONFIG_PREFIX;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -410,6 +411,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
           String key = entry.getKey();
           if (key.startsWith(GRAVITINO_BYPASS_PREFIX)) {
             maps.put(key.substring(GRAVITINO_BYPASS_PREFIX.length()), entry.getValue());
+          } else if (GVFS_KEY_TO_HADOOP_KEY.containsKey(key)) {
+            maps.put(GVFS_KEY_TO_HADOOP_KEY.get(key), entry.getValue());
           } else if (!key.startsWith(GVFS_CONFIG_PREFIX)) {
             maps.put(key, entry.getValue());
           }

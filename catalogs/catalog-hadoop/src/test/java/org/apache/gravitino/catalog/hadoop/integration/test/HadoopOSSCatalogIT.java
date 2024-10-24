@@ -27,6 +27,7 @@ import java.net.URI;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -38,7 +39,8 @@ import org.slf4j.LoggerFactory;
 
 @Disabled(
     "Disabled due to we don't have a real OSS account to test. If you have a GCP account,"
-        + "please change the configuration(BUCKET_NAME, OSS_ACCESS_KEY, OSS_SECRET_KEY, OSS_ENDPOINT) and enable this test.")
+        + "please change the configuration(BUCKET_NAME, OSS_ACCESS_KEY, OSS_SECRET_KEY, "
+        + "OSS_ENDPOINT) and enable this test.")
 public class HadoopOSSCatalogIT extends HadoopCatalogIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopOSSCatalogIT.class);
   public static final String BUCKET_NAME = "YOUR_BUCKET";
@@ -81,8 +83,8 @@ public class HadoopOSSCatalogIT extends HadoopCatalogIT {
   public void stop() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
 
     try {
       closer.close();
@@ -114,10 +116,9 @@ public class HadoopOSSCatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put("gravitino.bypass.fs.oss.accessKeyId", OSS_ACCESS_KEY);
-    map.put("gravitino.bypass.fs.oss.accessKeySecret", OSS_SECRET_KEY);
-    map.put("gravitino.bypass.fs.oss.endpoint", OSS_ENDPOINT);
-    map.put("gravitino.bypass.fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
+    map.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY);
+    map.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, OSS_SECRET_KEY);
+    map.put(OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
     map.put(FILESYSTEM_PROVIDERS, "oss");
 
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);

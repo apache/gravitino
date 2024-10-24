@@ -31,5 +31,8 @@ public class S3Properties {
   // The region of the S3 service.
   public static final String GRAVITINO_S3_REGION = "s3-region";
 
+  // The S3 credentials provider class name.
+  public static final String GRAVITINO_S3_CREDS_PROVIDER = "s3-creds-provider";
+
   private S3Properties() {}
 }

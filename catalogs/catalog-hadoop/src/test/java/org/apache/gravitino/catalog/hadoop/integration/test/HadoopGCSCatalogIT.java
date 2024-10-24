@@ -26,6 +26,7 @@ import java.net.URI;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -95,10 +96,8 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put("gravitino.bypass.fs.gs.auth.service.account.enable", "true");
-    map.put("gravitino.bypass.fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
+    map.put(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
     map.put(FILESYSTEM_PROVIDERS, "gcs");
-
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
 
     catalog = metalake.loadCatalog(catalogName);

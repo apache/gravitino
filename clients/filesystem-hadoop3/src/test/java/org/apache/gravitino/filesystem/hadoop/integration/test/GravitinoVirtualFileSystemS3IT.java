@@ -29,8 +29,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -151,11 +153,13 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set("fs.s3a.access.key", accessKey);
-    conf.set("fs.s3a.secret.key", secretKey);
-    conf.set("fs.s3a.endpoint", s3Endpoint);
+    conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY.replace("-", "."), accessKey);
+    conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID.replace("-", "."), secretKey);
+    conf.set(S3Properties.GRAVITINO_S3_ENDPOINT.replace("-", "."), s3Endpoint);
     conf.set(
-        "fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
+        S3Properties.GRAVITINO_S3_CREDS_PROVIDER.replace("-", "."),
+        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
+
     conf.set(FS_FILESYSTEM_PROVIDERS, "s3");
   }
 
@@ -184,13 +188,22 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
    * .GravitinoVirtualFileSystem#getConfigMap(Configuration) in the original code.
    */
   protected Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
-    Configuration gcsConf = new Configuration();
+    Configuration s3Conf = new Configuration();
     gvfsConf.forEach(
         entry -> {
-          gcsConf.set(entry.getKey().replace("gravitino.bypass.", ""), entry.getValue());
+          if (entry.getKey().startsWith("gravitino.bypass.")) {
+            s3Conf.set(entry.getKey().replace("gravitino.bypass.", ""), entry.getValue());
+          } else if (GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY.containsKey(
+              entry.getKey())) {
+            s3Conf.set(
+                GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY.get(entry.getKey()),
+                entry.getValue());
+          } else {
+            s3Conf.set(entry.getKey(), entry.getValue());
+          }
         });
 
-    return gcsConf;
+    return s3Conf;
   }
 
   protected String genStorageLocation(String fileset) {

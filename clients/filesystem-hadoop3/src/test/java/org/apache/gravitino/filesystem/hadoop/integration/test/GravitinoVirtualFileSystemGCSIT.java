@@ -27,7 +27,9 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -88,8 +90,7 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set("gravitino.bypass.fs.gs.auth.service.account.enable", "true");
-    conf.set("gravitino.bypass.fs.gs.auth.service.account.json.keyfile", SERVICE_ACCOUNT_FILE);
+    conf.set(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH.replace("-", "."), SERVICE_ACCOUNT_FILE);
     conf.set(FS_FILESYSTEM_PROVIDERS, "gcs");
   }
 
@@ -121,7 +122,16 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     Configuration gcsConf = new Configuration();
     gvfsConf.forEach(
         entry -> {
-          gcsConf.set(entry.getKey().replace("gravitino.bypass.", ""), entry.getValue());
+          if (entry.getKey().startsWith("gravitino.bypass.")) {
+            gcsConf.set(entry.getKey().replace("gravitino.bypass.", ""), entry.getValue());
+          } else if (GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY.containsKey(
+              entry.getKey())) {
+            gcsConf.set(
+                GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY.get(entry.getKey()),
+                entry.getValue());
+          } else {
+            gcsConf.set(entry.getKey(), entry.getValue());
+          }
         });
 
     return gcsConf;

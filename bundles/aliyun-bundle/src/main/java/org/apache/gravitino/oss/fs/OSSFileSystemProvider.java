@@ -27,6 +27,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem;
 
 public class OSSFileSystemProvider implements FileSystemProvider {
+
+  private static final String OSS_FILESYSTEM_IMPL = "fs.oss.impl";
+
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
@@ -35,6 +38,9 @@ public class OSSFileSystemProvider implements FileSystemProvider {
           configuration.set(k.replace("gravitino.bypass.", ""), v);
         });
 
+    if (!config.containsKey(OSS_FILESYSTEM_IMPL)) {
+      configuration.set(OSS_FILESYSTEM_IMPL, AliyunOSSFileSystem.class.getCanonicalName());
+    }
     return AliyunOSSFileSystem.newInstance(path.toUri(), configuration);
   }
 
