@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 @unittest.skip("This test require oss service account")
 class TestGvfsWithOSS(TestGvfsWithHDFS):
-    # Before running this test, please set the make sure aws-bundle-x.jar has been
+    # Before running this test, please set the make sure aliyun-bundle-x.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
     oss_access_key = "your_access_key"
     oss_secret_key = "your_secret_key"
@@ -117,7 +117,7 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
                 "filesystem-providers": "oss",
                 "oss-access-key-id": cls.oss_access_key,
                 "oss-access-key-secret": cls.oss_secret_key,
-                "oss-endpoint": cls.oss_endpoint,
+                "oss-endpoint": cls.oss_endpoint
             },
         )
         catalog.as_schemas().create_schema(
