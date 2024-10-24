@@ -927,7 +927,6 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 "OSS endpoint url is not found in the options."
             )
 
-        # We can use S3FileSystem to access OSS
         return importlib.import_module("ossfs").OSSFileSystem(
             key=oss_access_key_id,
             secret=oss_secret_access_key,
