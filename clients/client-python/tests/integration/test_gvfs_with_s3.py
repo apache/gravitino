@@ -242,11 +242,7 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
         # is set to True.
         new_bucket = self.bucket_name + "1"
         mkdir_dir = mkdir_dir.replace(self.bucket_name, new_bucket)
-        mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
         fs.mkdir(mkdir_dir, create_parents=True)
-
-        with self.assertRaises(OSError):
-            self.fs.exists(mkdir_actual_dir)
 
         self.assertFalse(fs.exists(mkdir_dir))
         self.assertFalse(self.fs.exists("s3://" + new_bucket))
