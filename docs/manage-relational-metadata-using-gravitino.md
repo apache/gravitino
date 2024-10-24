@@ -29,7 +29,7 @@ For more details, please refer to the related doc.
 Assuming:
 
  - Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
- - Metalake has been created.
+ - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
 
 ## Catalog operations
 
@@ -180,7 +180,87 @@ Therefore, do not change the catalog's URI unless you fully understand the conse
 
 :::
 
+### Enable a catalog
+
+Catalog has a reserved property - `in-use`, which indicates whether the catalog is available for use. By default, the `in-use` property is set to `true`.
+To enable a disabled catalog, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client.
+
+The following is an example of enabling a catalog:
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{"in-use": true}' \
+http://localhost:8090/api/metalakes/metalake/catalogs\catalog
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+// Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+gravitinoClient.enableCatalog("catalog");
+// ...
+```
+
+</TabItem>
+</Tabs>
+
+:::info
+If the catalog is already enabled, the operation will do nothing.
+:::
+
+### Disable a catalog
+
+Once a catalog is disabled:
+- It can only be [listed](#list-all-catalogs-in-a-metalake), [loaded](#load-a-catalog), [dropped](#drop-a-catalog), or [enabled](#enable-a-catalog).
+- Any other operation on the catalog or its sub-entities will result in an error.
+
+To disable a catalog, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client.
+
+The following is an example of disabling a catalog:
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{"in-use": false}' \
+http://localhost:8090/api/metalakes/metalake/catalogs\catalog
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+// Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+gravitinoClient.disableCatalog("catalog");
+// ...
+```
+
+</TabItem>
+</Tabs>
+
+:::info
+If the catalog is already disabled, the operation will do nothing.
+:::
+
 ### Drop a catalog
+
+Deleting catalog doesn't use forced deletion by default, so please make sure:
+
+- There are no schemas under the catalog. Otherwise, you will get an error.
+- The catalog is [disabled](#disable-a-catalog). Otherwise, you will get an error.
+
+If you are using forced deletion, it will:
+
+- Delete all sub-entities (schemas, tables, etc.) under the catalog.
+- Delete the catalog itself even if it is enabled.
+- Not delete the external resources (such as database, table, etc.) associated with sub-entities unless they are managed (such as managed fileset).
 
 You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
 
@@ -190,7 +270,7 @@ You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{m
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog?force=false
 ```
 
 </TabItem>
@@ -199,17 +279,14 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```java
 // ...
 // Assuming you have created a metalake named `metalake` and a catalog named `catalog`
-gravitinoClient.dropCatalog("catalog");
+// force can be true or false
+gravitinoClient.dropCatalog("catalog", false);
 // ...
 
 ```
 
 </TabItem>
 </Tabs>
-
-:::note
-Dropping a catalog only removes metadata about the catalog, schemas, and tables under the catalog in Gravitino, It doesn't remove the real data (table and schema) in Apache Hive.
-:::
 
 ### List all catalogs in a metalake
 
@@ -268,7 +345,7 @@ Catalog[] catalogsInfos = gravitinoMetaLake.listCatalogsInfo();
 ## Schema operations
 
 :::tip
-Users should create a metalake and a catalog before creating a schema.
+Users should create a metalake and a catalog, then ensure that the metalake and catalog are enabled before performing schema operations.
 :::
 
 ### Create a schema
@@ -518,7 +595,7 @@ schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas()
 ## Table operations
 
 :::tip
-Users should create a metalake, a catalog and a schema before creating a table.
+Users should create a metalake, a catalog and a schema, then ensure that the metalake and catalog are enabled before performing table operations.
 :::
 
 ### Create a table
