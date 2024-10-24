@@ -1,0 +1,107 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+#
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: trino-ci-mysql
+    networks:
+      - trino-net
+    volumes:
+      - ./init/mysql:/docker-entrypoint-initdb.d/
+    environment:
+      MYSQL_ROOT_PASSWORD: ds123
+      MYSQL_USER: trino
+      MYSQL_PASSWORD: ds123
+      MYSQL_DATABASE: gt_db
+    command:
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --explicit_defaults_for_timestamp=true
+      --lower_case_table_names=1
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping"]
+      interval: 10s
+      timeout: 60s
+      retries: 5
+
+  trino-remote:
+    image: trinodb/trino:435
+    networks:
+      - trino-net
+    container_name: trino-ci-trino-remote
+    environment:
+      - HADOOP_USER_NAME=root
+      - GRAVITINO_HOST_IP=trino-local
+      - GRAVITINO_HOST_PORT=${GRAVITINO_SERVER_PORT:-8090}
+      - GRAVITINO_METALAKE_NAME=test
+      - HIVE_HOST_IP=hive
+    entrypoint:  /bin/bash /tmp/trino/init.sh
+    volumes:
+      - ./init/trino-remote:/tmp/trino
+      - ${GRAVITINO_TRINO_CONNECTOR_DIR:-/null}:/usr/lib/trino/plugin/gravitino
+      - ${GRAVITINO_TRINO_CASCADING_CONNECTOR_DIR:-/null}:/usr/lib/trino/plugin/trino
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "trino", "--execute", "SELECT 1"]
+      interval: 10s
+      timeout: 60s
+      retries: 5
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  trino-local:
+    image: trinodb/trino:435
+    networks:
+      - trino-net
+    container_name: trino-ci-trino-local
+    environment:
+      - HADOOP_USER_NAME=root
+      - GRAVITINO_HOST_IP=trino-local
+      - GRAVITINO_HOST_PORT=${GRAVITINO_SERVER_PORT:-8090}
+      - GRAVITINO_METALAKE_NAME=test
+      - HIVE_HOST_IP=hive
+    entrypoint:  /bin/bash /tmp/trino/init.sh
+    volumes:
+      - ./init/trino-local:/tmp/trino
+      - ${GRAVITINO_TRINO_CONNECTOR_DIR:-/null}:/usr/lib/trino/plugin/gravitino
+      - ${GRAVITINO_TRINO_CASCADING_CONNECTOR_DIR:-/null}:/usr/lib/trino/plugin/trino
+      - ${GRAVITINO_SERVER_DIR:-/null}:/opt/gravitino-server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "trino", "--execute", "SELECT 1"]
+      interval: 10s
+      timeout: 60s
+      retries: 5
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+networks:
+  trino-net:
+    driver: bridge
+    name: trino-net
+    ipam:
+      config:
+        - subnet: 10.20.31.16/28

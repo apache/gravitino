@@ -120,7 +120,6 @@ tasks.test {
 }
 
 tasks.register<JavaExec>("TrinoTest") {
-  dependsOn("build")
   classpath = sourceSets["test"].runtimeClasspath
   mainClass.set("org.apache.gravitino.trino.connector.integration.test.TrinoQueryTestTool")
 
