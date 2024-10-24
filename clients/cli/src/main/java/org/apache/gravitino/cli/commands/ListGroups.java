@@ -54,13 +54,7 @@ public class ListGroups extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < groups.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(groups[i]);
-    }
+    String all = String.join(",", groups);
 
     System.out.println(all.toString());
   }

@@ -62,13 +62,7 @@ public class UserDetails extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < roles.size(); i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(roles.get(i));
-    }
+    String all = String.join(",", roles);
 
     System.out.println(all.toString());
   }

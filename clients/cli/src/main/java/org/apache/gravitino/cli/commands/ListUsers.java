@@ -54,13 +54,7 @@ public class ListUsers extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < users.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(users[i]);
-    }
+    String all = String.join(",", users);
 
     System.out.println(all.toString());
   }
