@@ -18,14 +18,18 @@
  */
 package org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -40,11 +44,16 @@ public class KerberosClient implements Closeable {
   private final ScheduledThreadPoolExecutor checkTgtExecutor;
   private final Map<String, String> conf;
   private final Configuration hadoopConf;
+  private String realm;
 
   public KerberosClient(Map<String, String> conf, Configuration hadoopConf) {
     this.conf = conf;
     this.hadoopConf = hadoopConf;
     this.checkTgtExecutor = new ScheduledThreadPoolExecutor(1, getThreadFactory("check-tgt"));
+  }
+
+  public String getRealm() {
+    return realm;
   }
 
   /**
@@ -58,6 +67,12 @@ public class KerberosClient implements Closeable {
 
     // Check the principal and keytab file
     String catalogPrincipal = kerberosConfig.getPrincipalName();
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(catalogPrincipal), "The principal can't be blank");
+    @SuppressWarnings("null")
+    List<String> principalComponents = Splitter.on('@').splitToList(catalogPrincipal);
+    Preconditions.checkArgument(
+        principalComponents.size() == 2, "The principal has the wrong format");
 
     // Login
     UserGroupInformation.setConfiguration(hadoopConf);
@@ -77,6 +92,8 @@ public class KerberosClient implements Closeable {
         checkInterval,
         checkInterval,
         TimeUnit.SECONDS);
+
+    this.realm = principalComponents.get(1);
   }
 
   public File saveKeyTabFileFromUri(String catalogId) throws IOException {
