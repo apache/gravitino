@@ -75,6 +75,7 @@ import org.testcontainers.shaded.org.awaitility.Awaitility;
 @ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class BaseIT {
+
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static final Logger LOG = LoggerFactory.getLogger(BaseIT.class);
@@ -127,7 +128,9 @@ public class BaseIT {
       originConfig = FileUtils.readFileToString(configPath.toFile(), StandardCharsets.UTF_8);
     }
 
-    if (customConfigs.isEmpty()) return;
+    if (customConfigs.isEmpty()) {
+      return;
+    }
 
     String tmpFileName = GravitinoServer.CONF_FILE + ".tmp";
     Path tmpPath = Paths.get(gravitinoHome, "conf", tmpFileName);
@@ -397,26 +400,26 @@ public class BaseIT {
     return Objects.equals(mode, ITUtils.DEPLOY_TEST_MODE);
   }
 
-  protected void copyBundleJarsToHadoop(String bundleName) {
+  public static void copyBundleJarsToDirectory(String bundleName, String directory) {
+    String bundleJarSourceFile = ITUtils.getBundleJarSourceFile(bundleName);
+    try {
+      DownloaderUtils.downloadFile(bundleJarSourceFile, directory);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to copy the %s dependency jars: %s to %s",
+              bundleName, bundleJarSourceFile, directory),
+          e);
+    }
+  }
+
+  protected static void copyBundleJarsToHadoop(String bundleName) {
     if (!isDeploy()) {
       return;
     }
 
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String jarName =
-        String.format("gravitino-%s-%s.jar", bundleName, System.getenv("PROJECT_VERSION"));
-    String gcsJars =
-        ITUtils.joinPath(
-            gravitinoHome, "..", "..", "bundles", bundleName, "build", "libs", jarName);
-    gcsJars = "file://" + gcsJars;
-    try {
-      if (!ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
-        String hadoopLibDirs = ITUtils.joinPath(gravitinoHome, "catalogs", "hadoop", "libs");
-        DownloaderUtils.downloadFile(gcsJars, hadoopLibDirs);
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Failed to copy the %s dependency jars: %s", bundleName, gcsJars), e);
-    }
+    String hadoopLibDirs = ITUtils.joinPath(gravitinoHome, "catalogs", "hadoop", "libs");
+    copyBundleJarsToDirectory(bundleName, hadoopLibDirs);
   }
 }

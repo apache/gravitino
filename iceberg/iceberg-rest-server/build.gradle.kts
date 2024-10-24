@@ -63,6 +63,7 @@ dependencies {
 
   compileOnly(libs.lombok)
 
+  testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
@@ -75,6 +76,7 @@ dependencies {
     exclude("org.rocksdb")
   }
 
+  testImplementation(libs.iceberg.gcp.bundle)
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
