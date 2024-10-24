@@ -388,10 +388,25 @@ SELECT * FROM dml.test;
 You could run Gravitino Iceberg REST server though docker container:
 
 ```shell
-docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.6.0
+docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
-Or build it manually to add custom logics:
+Gravitino Iceberg REST server in docker image could access local fs by default, you could change the configuration by environment variables to access S3 and GCS storage.
+
+| Environment variables                | Configuration items                               | Since version     |
+|--------------------------------------|---------------------------------------------------|-------------------|
+| `GRAVITINO_IO_IMPL`                  | `gravitino.iceberg-rest.io-impl`                  | 0.7.0-incubating  |
+| `GRAVITINO_URI`                      | `gravitino.iceberg-rest.uri`                      | 0.7.0-incubating  |
+| `GRAVITINO_WAREHOUSE`                | `gravitino.iceberg-rest.warehouse`                | 0.7.0-incubating  |
+| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE` | `gravitino.iceberg-rest.credential-provider-type` | 0.7.0-incubating  |
+| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH` | `gravitino.iceberg-rest.gcs-credential-file-path` | 0.7.0-incubating  |
+| `GRAVITINO_S3_ACCESS_KEY`            | `gravitino.iceberg-rest.s3-access-key-id`         | 0.7.0-incubating  |
+| `GRAVITINO_S3_SECRET_KEY`            | `gravitino.iceberg-rest.s3-secret-access-key`     | 0.7.0-incubating  |
+| `GRAVITINO_S3_REGION`                | `gravitino.iceberg-rest.s3-region`                | 0.7.0-incubating  |
+| `GRAVITINO_S3_ROLE_ARN`              | `gravitino.iceberg-rest.s3-role-arn`              | 0.7.0-incubating  |
+| `GRAVITINO_S3_EXTERNAL_ID`           | `gravitino.iceberg-rest.s3-external-id`           | 0.7.0-incubating  |
+
+Or build it manually to add custom configuration or logics:
 
 ```shell
 sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image apache/gravitino-iceberg-rest --tag 0.6.0
