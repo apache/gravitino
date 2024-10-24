@@ -27,8 +27,8 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 
 public class UserDetails extends Command {
 
-  protected String metalake;
-  protected String user;
+  protected final String metalake;
+  protected final String user;
 
   /**
    * Displays the roles of a user.

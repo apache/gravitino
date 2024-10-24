@@ -25,8 +25,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 
 public class CreateUser extends Command {
-  protected String metalake;
-  protected String user;
+  protected final String metalake;
+  protected final String user;
 
   /**
    * Create a new User.

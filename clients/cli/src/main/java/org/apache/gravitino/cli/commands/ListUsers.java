@@ -26,7 +26,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /* Lists all users in a metalake. */
 public class ListUsers extends Command {
 
-  protected String metalake;
+  protected final String metalake;
 
   /**
    * Lists all users in a metalake.

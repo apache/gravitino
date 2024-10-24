@@ -27,8 +27,8 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 
 public class GroupDetails extends Command {
 
-  protected String metalake;
-  protected String group;
+  protected final String metalake;
+  protected final String group;
 
   /**
    * Displays the users in a group.

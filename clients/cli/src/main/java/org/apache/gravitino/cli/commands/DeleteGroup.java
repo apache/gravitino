@@ -26,8 +26,8 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 public class DeleteGroup extends Command {
 
-  protected String metalake;
-  protected String group;
+  protected final String metalake;
+  protected final String group;
 
   /**
    * Delete a group.

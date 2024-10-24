@@ -26,8 +26,8 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 
 public class DeleteUser extends Command {
 
-  protected String metalake;
-  protected String user;
+  protected final String metalake;
+  protected final String user;
 
   /**
    * Delete a user.

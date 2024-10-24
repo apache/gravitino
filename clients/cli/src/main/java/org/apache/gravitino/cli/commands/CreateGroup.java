@@ -25,8 +25,8 @@ import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 public class CreateGroup extends Command {
-  protected String metalake;
-  protected String group;
+  protected final String metalake;
+  protected final String group;
 
   /**
    * Create a new group.

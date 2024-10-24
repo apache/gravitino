@@ -26,7 +26,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /* Lists all groups in a metalake. */
 public class ListGroups extends Command {
 
-  protected String metalake;
+  protected final String metalake;
 
   /**
    * Lists all groups in a metalake.
