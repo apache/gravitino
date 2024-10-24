@@ -28,10 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.ranger.RangerClient;
 import org.apache.ranger.RangerServiceException;
@@ -192,12 +190,12 @@ public class RangerHelper {
   /**
    * Find the managed policy for the ranger securable object.
    *
-   * @param rangerSecurableObject The ranger securable object to find the managed policy.
+   * @param rangerMetadataObject The ranger securable object to find the managed policy.
    * @return The managed policy for the metadata object.
    */
-  public RangerPolicy findManagedPolicy(RangerSecurableObject rangerSecurableObject)
+  public RangerPolicy findManagedPolicy(RangerMetadataObject rangerMetadataObject)
       throws AuthorizationPluginException {
-    List<String> nsMetadataObj = getMetadataObjectNames(rangerSecurableObject);
+    List<String> nsMetadataObj = rangerMetadataObject.names();
 
     Map<String, String> searchFilters = new HashMap<>();
     Map<String, String> preciseFilters = new HashMap<>();
@@ -395,23 +393,13 @@ public class RangerHelper {
             });
   }
 
-  private static List<String> getMetadataObjectNames(MetadataObject metadataObject) {
-    List<String> nsMetadataObject =
-        Lists.newArrayList(SecurableObjects.DOT_SPLITTER.splitToList(metadataObject.fullName()));
-    if (nsMetadataObject.size() > 4) {
-      // The max level of the securable object is `catalog.db.table.column`
-      throw new RuntimeException("The length of the securable object should not be greater than 4");
-    }
-    return nsMetadataObject;
-  }
-
-  protected RangerPolicy createPolicyAddResources(MetadataObject metadataObject) {
+  protected RangerPolicy createPolicyAddResources(RangerMetadataObject metadataObject) {
     RangerPolicy policy = new RangerPolicy();
     policy.setService(rangerServiceName);
     policy.setName(metadataObject.fullName());
     policy.setPolicyLabels(Lists.newArrayList(RangerHelper.MANAGED_BY_GRAVITINO));
 
-    List<String> nsMetadataObject = getMetadataObjectNames(metadataObject);
+    List<String> nsMetadataObject = metadataObject.names();
 
     for (int i = 0; i < nsMetadataObject.size(); i++) {
       RangerPolicy.RangerPolicyResource policyResource =
@@ -421,7 +409,7 @@ public class RangerHelper {
     return policy;
   }
 
-  protected RangerPolicy addOwnerToNewPolicy(MetadataObject metadataObject, Owner newOwner) {
+  protected RangerPolicy addOwnerToNewPolicy(RangerMetadataObject metadataObject, Owner newOwner) {
     RangerPolicy policy = createPolicyAddResources(metadataObject);
 
     ownerPrivileges.forEach(
@@ -444,7 +432,7 @@ public class RangerHelper {
   }
 
   protected RangerPolicy addOwnerRoleToNewPolicy(
-      MetadataObject metadataObject, String ownerRoleName) {
+      RangerMetadataObject metadataObject, String ownerRoleName) {
     RangerPolicy policy = createPolicyAddResources(metadataObject);
 
     ownerPrivileges.forEach(

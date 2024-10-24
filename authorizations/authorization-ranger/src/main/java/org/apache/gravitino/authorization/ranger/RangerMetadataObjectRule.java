@@ -16,18 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.oceanbase.converter;
+package org.apache.gravitino.authorization.ranger;
 
-import java.sql.SQLException;
-import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import java.util.List;
 
-/** Exception converter to Apache Gravitino exception for OceanBase. */
-public class OceanBaseExceptionConverter extends JdbcExceptionConverter {
-
-  @SuppressWarnings("FormatStringAnnotation")
-  @Override
-  public GravitinoRuntimeException toGravitinoException(SQLException se) {
-    return new GravitinoRuntimeException("Not implemented yet.");
-  }
+/** Different underlying datasource have different Ranger metadata object rules */
+interface RangerMetadataObjectRule {
+  /** Validate different underlying datasource Ranger metadata object */
+  void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
+      throws IllegalArgumentException;
 }

@@ -32,6 +32,8 @@ class GVFSConfig:
     OAUTH2_PATH = "oauth2_path"
     OAUTH2_SCOPE = "oauth2_scope"
 
-    GVFS_FILESYSTEM_BY_PASS = "gravitino.bypass"
-    GVFS_FILESYSTEM_BY_PASS_GCS = "gravitino.bypass.gcs."
-    GVFS_FILESYSTEM_KEY_FILE = "service-account-key-path"
+    GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE = "gcs_service_account_key_path"
+
+    GVFS_FILESYSTEM_S3_ACCESS_KEY = "s3_access_key"
+    GVFS_FILESYSTEM_S3_SECRET_KEY = "s3_secret_key"
+    GVFS_FILESYSTEM_S3_ENDPOINT = "s3_endpoint"
