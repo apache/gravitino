@@ -21,9 +21,7 @@ package org.apache.gravitino.catalog.hive;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.LIST_ALL_TABLES;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.METASTORE_URIS;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMeta.PRINCIPAL;
-import static org.apache.gravitino.catalog.hive.HiveTable.ICEBERG_TABLE_TYPE_VALUE;
 import static org.apache.gravitino.catalog.hive.HiveTable.SUPPORT_TABLE_TYPES;
-import static org.apache.gravitino.catalog.hive.HiveTable.TABLE_TYPE_PROP;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.COMMENT;
 import static org.apache.gravitino.catalog.hive.HiveTablePropertiesMetadata.TABLE_TYPE;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
@@ -93,6 +91,7 @@ import org.apache.hadoop.hive.metastore.api.InvalidOperationException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.thrift.TException;
@@ -539,23 +538,25 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // then based on
       // those names we can obtain metadata for each individual table and get the type we needed.
       List<String> allTables = clientPool.run(c -> c.getAllTables(schemaIdent.name()));
-      return clientPool.run(
-          c ->
-              c.getTableObjectsByName(schemaIdent.name(), allTables).stream()
-                  .filter(
-                      tb -> {
-                        boolean isSupportTable = SUPPORT_TABLE_TYPES.contains(tb.getTableType());
-                        if (!isSupportTable) {
-                          return false;
-                        }
-                        if (!listAllTables) {
-                          Map<String, String> parameters = tb.getParameters();
-                          return isHiveTable(parameters);
-                        }
-                        return true;
-                      })
-                  .map(tb -> NameIdentifier.of(namespace, tb.getTableName()))
-                  .toArray(NameIdentifier[]::new));
+      if (!listAllTables) {
+        // The reason for using the listTableNamesByFilter function is that the
+        // getTableObjectiesByName
+        // function has poor performance. Currently, we only focus on the iceberg table. In the
+        // future,
+        // if necessary, we will need to filter out other tables such as hudi. In addition, the
+        // current
+        // return also includes tables of type VIRTUAL-VIEW.
+        String filter =
+            String.format(
+                "%stable_type = \"ICEBERG\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+        List<String> allTables_iceberg =
+            clientPool.run(c -> c.listTableNamesByFilter(schemaIdent.name(), filter, (short) -1));
+        allTables.removeAll(allTables_iceberg);
+      }
+      return allTables.stream()
+          .map(tbName -> NameIdentifier.of(namespace, tbName))
+          .toArray(NameIdentifier[]::new);
+
     } catch (UnknownDBException e) {
       throw new NoSuchSchemaException(
           "Schema (database) does not exist %s in Hive Metastore", namespace);
@@ -567,22 +568,6 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  boolean isHiveTable(Map<String, String> tableParameters) {
-    if (isIcebergTable(tableParameters)) return false;
-    return true;
-  }
-
-  boolean isIcebergTable(Map<String, String> tableParameters) {
-    if (tableParameters != null) {
-      boolean isIcebergTable =
-          ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(tableParameters.get(TABLE_TYPE_PROP));
-      if (isIcebergTable) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /**
