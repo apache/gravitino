@@ -212,7 +212,8 @@ paths:
     post:
       tags:
         - tag
-      summary: Associate tags with metadata object, the supported metadata objects are CATALOG, SCHEMA, TABLE, FILESET, TOPIC, COLUMN
+      summary: Associate tags with metadata object
+      description: Associate and disassociate tags with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, FILESET, TOPIC, COLUMN
       operationId: associateTags
       requestBody:
         content:
