@@ -76,7 +76,7 @@ jobs:
 
       - name: Package Gravitino
         run: |
-          ./gradlew build compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
+          ./gradlew build compileDistribution -x test
 
       - name: Free up disk space
         run: |
