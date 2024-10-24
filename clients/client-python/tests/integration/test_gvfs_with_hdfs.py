@@ -239,8 +239,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(ls_actual_dir)
-        self.assertTrue(self.fs.exists(ls_actual_dir))
+
+        self.check_mkdir(ls_dir, ls_actual_dir, fs)
 
         ls_file = self.fileset_gvfs_location + "/test_ls/test.file"
         ls_actual_file = self.fileset_storage_location + "/test_ls/test.file"
@@ -266,8 +266,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(info_actual_dir)
-        self.assertTrue(self.fs.exists(info_actual_dir))
+
+        self.check_mkdir(info_dir, info_actual_dir, fs)
 
         info_file = self.fileset_gvfs_location + "/test_info/test.file"
         info_actual_file = self.fileset_storage_location + "/test_info/test.file"
@@ -289,9 +289,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(exist_actual_dir)
-        self.assertTrue(self.fs.exists(exist_actual_dir))
-        self.assertTrue(fs.exists(exist_dir))
+        self.check_mkdir(exist_dir, exist_actual_dir, fs)
 
         exist_file = self.fileset_gvfs_location + "/test_exist/test.file"
         exist_actual_file = self.fileset_storage_location + "/test_exist/test.file"
@@ -308,9 +306,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(cp_file_actual_dir)
-        self.assertTrue(self.fs.exists(cp_file_actual_dir))
-        self.assertTrue(fs.exists(cp_file_dir))
+
+        self.check_mkdir(cp_file_dir, cp_file_actual_dir, fs)
 
         cp_file_file = self.fileset_gvfs_location + "/test_cp_file/test.file"
         cp_file_actual_file = self.fileset_storage_location + "/test_cp_file/test.file"
@@ -341,9 +338,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(mv_actual_dir)
-        self.assertTrue(self.fs.exists(mv_actual_dir))
-        self.assertTrue(fs.exists(mv_dir))
+        self.check_mkdir(mv_dir, mv_actual_dir, fs)
 
         mv_new_dir = self.fileset_gvfs_location + "/test_mv_new"
         mv_new_actual_dir = self.fileset_storage_location + "/test_mv_new"
@@ -353,9 +348,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(mv_new_actual_dir)
-        self.assertTrue(self.fs.exists(mv_new_actual_dir))
-        self.assertTrue(fs.exists(mv_new_dir))
+
+        self.check_mkdir(mv_new_dir, mv_new_actual_dir, fs)
 
         mv_file = self.fileset_gvfs_location + "/test_mv/test.file"
         mv_actual_file = self.fileset_storage_location + "/test_mv/test.file"
@@ -385,9 +379,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(rm_actual_dir)
-        self.assertTrue(self.fs.exists(rm_actual_dir))
-        self.assertTrue(fs.exists(rm_dir))
+        self.check_mkdir(rm_dir, rm_actual_dir, fs)
 
         rm_file = self.fileset_gvfs_location + "/test_rm/test.file"
         rm_actual_file = self.fileset_storage_location + "/test_rm/test.file"
@@ -421,9 +413,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(rm_file_actual_dir)
-        self.assertTrue(self.fs.exists(rm_file_actual_dir))
-        self.assertTrue(fs.exists(rm_file_dir))
+        self.check_mkdir(rm_file_dir, rm_file_actual_dir, fs)
 
         rm_file_file = self.fileset_gvfs_location + "/test_rm_file/test.file"
         rm_file_actual_file = self.fileset_storage_location + "/test_rm_file/test.file"
@@ -448,9 +438,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(rmdir_actual_dir)
-        self.assertTrue(self.fs.exists(rmdir_actual_dir))
-        self.assertTrue(fs.exists(rmdir_dir))
+        self.check_mkdir(rmdir_dir, rmdir_actual_dir, fs)
 
         rmdir_file = self.fileset_gvfs_location + "/test_rmdir/test.file"
         rmdir_actual_file = self.fileset_storage_location + "/test_rmdir/test.file"
@@ -475,9 +463,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(open_actual_dir)
-        self.assertTrue(self.fs.exists(open_actual_dir))
-        self.assertTrue(fs.exists(open_dir))
+        self.check_mkdir(open_dir, open_actual_dir, fs)
 
         open_file = self.fileset_gvfs_location + "/test_open/test.file"
         open_actual_file = self.fileset_storage_location + "/test_open/test.file"
@@ -503,9 +489,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        fs.mkdir(mkdir_dir)
-        self.assertTrue(fs.exists(mkdir_dir))
-        self.assertTrue(self.fs.exists(mkdir_actual_dir))
+        self.check_mkdir(mkdir_dir, mkdir_actual_dir, fs)
 
         # test mkdir dir with create_parents = false
         parent_not_exist_virtual_path = mkdir_dir + "/not_exist/sub_dir"
@@ -530,9 +514,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        fs.makedirs(makedirs_dir)
-        self.assertTrue(fs.exists(makedirs_dir))
-        self.assertTrue(self.fs.exists(makedirs_actual_dir))
+        self.check_makedirs(makedirs_dir, makedirs_actual_dir, fs)
 
         # test mkdir dir not exist
         parent_not_exist_virtual_path = makedirs_dir + "/not_exist/sub_dir"
@@ -549,9 +531,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(created_actual_dir)
-        self.assertTrue(self.fs.exists(created_actual_dir))
-        self.assertTrue(fs.exists(created_dir))
+
+        self.check_mkdir(created_dir, created_actual_dir, fs)
 
         with self.assertRaises(GravitinoRuntimeException):
             fs.created(created_dir)
@@ -565,12 +546,21 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(modified_actual_dir)
-        self.assertTrue(self.fs.exists(modified_actual_dir))
-        self.assertTrue(fs.exists(modified_dir))
+
+        self.check_mkdir(modified_dir, modified_actual_dir, fs)
 
         # test mkdir dir which exists
         self.assertIsNotNone(fs.modified(modified_dir))
+
+    def check_mkdir(self, gvfs_dir, actual_dir, gvfs_instance):
+        self.fs.mkdir(actual_dir)
+        self.assertTrue(self.fs.exists(actual_dir))
+        self.assertTrue(gvfs_instance.exists(gvfs_dir))
+
+    def check_makedirs(self, gvfs_dir, actual_dir, gvfs_instance):
+        self.fs.makedirs(actual_dir)
+        self.assertTrue(self.fs.exists(actual_dir))
+        self.assertTrue(gvfs_instance.exists(gvfs_dir))
 
     def test_cat_file(self):
         cat_dir = self.fileset_gvfs_location + "/test_cat"
@@ -581,9 +571,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(cat_actual_dir)
-        self.assertTrue(self.fs.exists(cat_actual_dir))
-        self.assertTrue(fs.exists(cat_dir))
+
+        self.check_mkdir(cat_dir, cat_actual_dir, fs)
 
         cat_file = self.fileset_gvfs_location + "/test_cat/test.file"
         cat_actual_file = self.fileset_storage_location + "/test_cat/test.file"
@@ -609,9 +598,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(get_actual_dir)
-        self.assertTrue(self.fs.exists(get_actual_dir))
-        self.assertTrue(fs.exists(get_dir))
+
+        self.check_mkdir(get_dir, get_actual_dir, fs)
 
         get_file = self.fileset_gvfs_location + "/test_get/test.file"
         get_actual_file = self.fileset_storage_location + "/test_get/test.file"
@@ -649,9 +637,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(pands_actual_dir)
-        self.assertTrue(self.fs.exists(pands_actual_dir))
-        self.assertTrue(fs.exists(pands_dir))
+
+        self.check_mkdir(pands_dir, pands_actual_dir, fs)
 
         data = pandas.DataFrame({"Name": ["A", "B", "C", "D"], "ID": [20, 21, 19, 18]})
         # to parquet
@@ -695,9 +682,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(pyarrow_actual_dir)
-        self.assertTrue(self.fs.exists(pyarrow_actual_dir))
-        self.assertTrue(fs.exists(pyarrow_dir))
+
+        self.check_mkdir(pyarrow_dir, pyarrow_actual_dir, fs)
 
         data = pandas.DataFrame({"Name": ["A", "B", "C", "D"], "ID": [20, 21, 19, 18]})
         # to parquet
@@ -725,9 +711,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             options=self.options,
             **self.conf,
         )
-        self.fs.mkdir(llama_actual_dir)
-        self.assertTrue(self.fs.exists(llama_actual_dir))
-        self.assertTrue(fs.exists(llama_dir))
+        self.check_mkdir(llama_dir, llama_actual_dir, fs)
+
         data = pandas.DataFrame({"Name": ["A", "B", "C", "D"], "ID": [20, 21, 19, 18]})
 
         storage_options = {

@@ -20,8 +20,7 @@ import os
 from random import randint
 import unittest
 
-from gcsfs import GCSFileSystem
-
+from s3fs import S3FileSystem
 
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
 from gravitino import (
@@ -36,17 +35,22 @@ from gravitino.filesystem.gvfs_config import GVFSConfig
 logger = logging.getLogger(__name__)
 
 
-@unittest.skip("This test require GCS service account key file")
-class TestGvfsWithGCS(TestGvfsWithHDFS):
-    # Before running this test, please set the make sure gcp-bundle-x.jar has been
+@unittest.skip("This test require S3 service account")
+class TestGvfsWithS3(TestGvfsWithHDFS):
+    # Before running this test, please set the make sure aws-bundle-x.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
-    key_file = "your_key_file.json"
+    s3_access_key = "your_access_key"
+    s3_secret_key = "your_secret_key"
+    s3_endpoint = "your_endpoint"
     bucket_name = "your_bucket_name"
-    metalake_name: str = "TestGvfsWithGCS_metalake" + str(randint(1, 10000))
+
+    metalake_name: str = "TestGvfsWithS3_metalake" + str(randint(1, 10000))
 
     def setUp(self):
         self.options = {
-            f"{GVFSConfig.GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE}": self.key_file
+            f"{GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY}": self.s3_access_key,
+            f"{GVFSConfig.GVFS_FILESYSTEM_S3_SECRET_KEY}": self.s3_secret_key,
+            f"{GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT}": self.s3_endpoint,
         }
 
     def tearDown(self):
@@ -108,9 +112,10 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             provider=cls.catalog_provider,
             comment="",
             properties={
-                "filesystem-providers": "gcs",
-                "gravitino.bypass.fs.gs.auth.service.account.enable": "true",
-                "gravitino.bypass.fs.gs.auth.service.account.json.keyfile": cls.key_file,
+                "filesystem-providers": "s3",
+                "gravitino.bypass.fs.s3a.access.key": cls.s3_access_key,
+                "gravitino.bypass.fs.s3a.secret.key": cls.s3_secret_key,
+                "gravitino.bypass.fs.s3a.endpoint": cls.s3_endpoint,
             },
         )
         catalog.as_schemas().create_schema(
@@ -118,7 +123,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         )
 
         cls.fileset_storage_location: str = (
-            f"gs://{cls.bucket_name}/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
+            f"s3a://{cls.bucket_name}/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
         )
         cls.fileset_gvfs_location = (
             f"gvfs://fileset/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
@@ -131,18 +136,18 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             properties=cls.fileset_properties,
         )
 
-        cls.fs = GCSFileSystem(token=cls.key_file)
+        cls.fs = S3FileSystem(
+            key=cls.s3_access_key,
+            secret=cls.s3_secret_key,
+            endpoint_url=cls.s3_endpoint,
+        )
 
-    # Object storage like GCS does not support making directory and can only create
-    # objects under the bucket. So we need to skip the test for GCS.
     def check_mkdir(self, gvfs_dir, actual_dir, gvfs_instance):
-        # GCS will not create a directory, so the directory will not exist.
+        # S3 will not create a directory, so the directory will not exist.
         self.fs.mkdir(actual_dir)
         self.assertFalse(self.fs.exists(actual_dir))
         self.assertFalse(gvfs_instance.exists(gvfs_dir))
 
-    # Object storage like GCS does not support making directory and can only create
-    # objects under the bucket. So we need to skip the test for GCS.
     def check_makedirs(self, gvfs_dir, actual_dir, gvfs_instance):
         self.fs.makedirs(actual_dir)
         self.assertFalse(self.fs.exists(actual_dir))
@@ -159,7 +164,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         )
 
         self.check_mkdir(modified_dir, modified_actual_dir, fs)
-        # GCP only supports getting the `object` modify time, so the modified time will be None
+        # S3 only supports getting the `object` modify time, so the modified time will be None
         # if it's a directory.
         # >>> gcs.mkdir('example_qazwsx/catalog/schema/fileset3')
         # >>> r = gcs.modified('example_qazwsx/catalog/schema/fileset3')
@@ -200,13 +205,6 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         self.fs.touch(rm_new_actual_file)
         self.assertTrue(self.fs.exists(rm_new_actual_file))
         self.assertTrue(fs.exists(rm_new_file))
-        # fs.rm(rm_dir)
-
-        # fs.rm(rm_dir, recursive=False) will delete the directory and the file
-        # directly under the directory, so we comment the following code.
-        # test delete dir with recursive = true
-        # fs.rm(rm_dir, recursive=True)
-        # self.assertFalse(fs.exists(rm_dir))
 
     def test_rmdir(self):
         rmdir_dir = self.fileset_gvfs_location + "/test_rmdir"
@@ -225,8 +223,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         self.assertTrue(self.fs.exists(rmdir_actual_file))
         self.assertTrue(fs.exists(rmdir_file))
 
-        # test delete file, GCS will remove the file directly.
-        fs.rmdir(rmdir_file)
+        fs.rm_file(rmdir_file)
 
     def test_mkdir(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
@@ -245,12 +242,10 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
         # is set to True.
         new_bucket = self.bucket_name + "1"
         mkdir_dir = mkdir_dir.replace(self.bucket_name, new_bucket)
-        mkdir_actual_dir = mkdir_actual_dir.replace(self.bucket_name, new_bucket)
         fs.mkdir(mkdir_dir, create_parents=True)
 
-        self.assertFalse(self.fs.exists(mkdir_actual_dir))
         self.assertFalse(fs.exists(mkdir_dir))
-        self.assertFalse(self.fs.exists("gs://" + new_bucket))
+        self.assertFalse(self.fs.exists("s3://" + new_bucket))
 
     def test_makedirs(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
@@ -273,7 +268,32 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
 
         # it takes no effect.
         fs.makedirs(mkdir_dir)
+        with self.assertRaises(OSError):
+            self.fs.exists(mkdir_actual_dir)
 
-        self.assertFalse(self.fs.exists(mkdir_actual_dir))
         self.assertFalse(fs.exists(mkdir_dir))
-        self.assertFalse(self.fs.exists("gs://" + new_bucket))
+        self.assertFalse(self.fs.exists("s3://" + new_bucket))
+
+    def test_rm_file(self):
+        rm_file_dir = self.fileset_gvfs_location + "/test_rm_file"
+        rm_file_actual_dir = self.fileset_storage_location + "/test_rm_file"
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options=self.options,
+            **self.conf,
+        )
+        self.check_mkdir(rm_file_dir, rm_file_actual_dir, fs)
+
+        rm_file_file = self.fileset_gvfs_location + "/test_rm_file/test.file"
+        rm_file_actual_file = self.fileset_storage_location + "/test_rm_file/test.file"
+        self.fs.touch(rm_file_actual_file)
+        self.assertTrue(self.fs.exists(rm_file_actual_file))
+        self.assertTrue(fs.exists(rm_file_file))
+
+        # test delete file
+        fs.rm_file(rm_file_file)
+        self.assertFalse(fs.exists(rm_file_file))
+
+        # test delete dir
+        fs.rm_file(rm_file_dir)
