@@ -25,14 +25,23 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Properties;
 
+/**
+ * GravitinoConfig is a configuration class used to read and manage Gravitino settings. It supports
+ * setting a configuration file, reading properties like 'metalake' and 'URL', and verifying if the
+ * config file exists.
+ */
 public class GravitinoConfig {
-
   private static String defaultFile = ".gravitino";
-
   private String configFile;
   private String metalake;
   private String url;
 
+  /**
+   * Creates a GravitinoConfig object with a specified config file. If no file is provided, it
+   * defaults to `.gravitino` the user's home directory.
+   *
+   * @param file The path to the config file or null to use the default.
+   */
   public GravitinoConfig(String file) {
     if (file == null) {
       configFile = System.getProperty("user.home") + "/" + defaultFile;
@@ -41,11 +50,20 @@ public class GravitinoConfig {
     }
   }
 
+  /**
+   * Checks if the configuration file exists.
+   *
+   * @return true if the config file exists, false otherwise.
+   */
   public boolean fileExists() {
     File file = new File(configFile);
     return file.exists();
   }
 
+  /**
+   * Reads the configuration file and loads the 'metalake' and 'URL' properties. If the file is not
+   * found, it is ignored as the config file is optional.
+   */
   public void read() {
     String metalakeKey = "metalake";
     String urlKey = "URL";
@@ -68,14 +86,29 @@ public class GravitinoConfig {
     }
   }
 
+  /**
+   * Retrieves the metalake name stored in the configuration.
+   *
+   * @return The metalake name or null if not set.
+   */
   public String getMetalakeName() {
     return metalake;
   }
 
+  /**
+   * Retrieves the Gravitino URL stored in the configuration.
+   *
+   * @return The Gravitino URL or null if not set.
+   */
   public String getGravitinoURL() {
     return url;
   }
 
+  /**
+   * Retrieves the path to the configuration file being used.
+   *
+   * @return The config file path.
+   */
   public String getConfigFile() {
     return configFile;
   }
