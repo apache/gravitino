@@ -61,7 +61,10 @@ Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
 Java SDK definition in [Gravitino Java doc](pathname:///docs/0.7.0-incubating-SNAPSHOT/api/java/index.html).
 
-Gravitino provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`. See [Gravitino web UI](./webui.md) for details.
+Gravitino also provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`.
+See [Gravitino web UI](./webui.md) for details.
+
+Gravitino also provides a Command Line Interface (CLI) to manage the metadata. See [Gravitino CLI](./cli.md) for details.
 
 Gravitino currently supports the following catalogs:
 
