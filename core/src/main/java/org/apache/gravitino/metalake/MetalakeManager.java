@@ -38,6 +38,7 @@ import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -120,9 +121,9 @@ public class MetalakeManager implements MetalakeDispatcher {
   @Override
   public BaseMetalake[] listMetalakes() {
     try {
-      return store
-          .list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE)
-          .toArray(new BaseMetalake[0]);
+      return store.list(Namespace.empty(), BaseMetalake.class, EntityType.METALAKE).stream()
+          .map(this::newMetalakeWithResolvedProperties)
+          .toArray(BaseMetalake[]::new);
     } catch (IOException ioe) {
       LOG.error("Listing Metalakes failed due to storage issues.", ioe);
       throw new RuntimeException(ioe);
@@ -140,7 +141,8 @@ public class MetalakeManager implements MetalakeDispatcher {
   @Override
   public BaseMetalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     try {
-      return store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+      return newMetalakeWithResolvedProperties(
+          store.get(ident, EntityType.METALAKE, BaseMetalake.class));
     } catch (NoSuchEntityException e) {
       LOG.warn("Metalake {} does not exist", ident, e);
       throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
@@ -148,6 +150,25 @@ public class MetalakeManager implements MetalakeDispatcher {
       LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
       throw new RuntimeException(ioe);
     }
+  }
+
+  private BaseMetalake newMetalakeWithResolvedProperties(BaseMetalake metalakeEntity) {
+    Map<String, String> newProps = Maps.newHashMap(metalakeEntity.properties());
+    newProps
+        .entrySet()
+        .removeIf(e -> metalakeEntity.propertiesMetadata().isHiddenProperty(e.getKey()));
+    newProps.putIfAbsent(
+        PROPERTY_IN_USE,
+        metalakeEntity.propertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
+
+    return BaseMetalake.builder()
+        .withId(metalakeEntity.id())
+        .withName(metalakeEntity.name())
+        .withComment(metalakeEntity.comment())
+        .withProperties(newProps)
+        .withVersion(metalakeEntity.getVersion())
+        .withAuditInfo(metalakeEntity.auditInfo())
+        .build();
   }
 
   /**
@@ -253,7 +274,7 @@ public class MetalakeManager implements MetalakeDispatcher {
       List<CatalogEntity> catalogEntities =
           store.list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG);
       if (!catalogEntities.isEmpty() && !force) {
-        throw new NonEmptyEntityException(
+        throw new NonEmptyMetalakeException(
             "Metalake %s has catalogs, please drop them first or use force option", ident);
       }
 
