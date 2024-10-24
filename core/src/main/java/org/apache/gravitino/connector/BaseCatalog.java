@@ -345,6 +345,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
+          tempProperties.putIfAbsent(
+              PROPERTY_READ_ONLY,
+              catalogPropertiesMetadata().getDefaultValue(PROPERTY_READ_ONLY).toString());
           properties = tempProperties;
         }
       }

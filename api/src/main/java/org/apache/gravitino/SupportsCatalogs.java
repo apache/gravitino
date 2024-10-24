@@ -144,7 +144,7 @@ public interface SupportsCatalogs {
    *
    * If the force flag is false, it is equivalent to calling {@link #dropCatalog(String)}.
    *
-   * @param catalogName The identifier of the catalog.
+   * @param catalogName The name of the catalog.
    * @param force Whether to force the drop.
    * @return True if the catalog was dropped, false if the catalog does not exist.
    * @throws NonEmptyEntityException If the catalog is not empty and force is false.
@@ -156,7 +156,7 @@ public interface SupportsCatalogs {
   /**
    * Enable a catalog. If the catalog is already enabled, this method does nothing.
    *
-   * @param catalogName The identifier of the catalog.
+   * @param catalogName The name of the catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
   void enableCatalog(String catalogName) throws NoSuchCatalogException;
@@ -172,10 +172,22 @@ public interface SupportsCatalogs {
    *       CatalogNotInUseException}.
    * </ul>
    *
-   * @param catalogName The identifier of the catalog.
+   * @param catalogName The name of the catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
   void disableCatalog(String catalogName) throws NoSuchCatalogException;
+
+  /**
+   * Set the catalog to read-only mode or not. If the catalog is in read-only mode, only read
+   * operations (e.g. list, load) are allowed.
+   *
+   * @param catalogName The name of the catalog.
+   * @param readOnly Whether to set the catalog to read-only mode.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws CatalogNotInUseException If the catalog is disabled.
+   */
+  void setCatalogReadOnly(String catalogName, boolean readOnly)
+      throws NoSuchCatalogException, CatalogNotInUseException;
 
   /**
    * Test whether the catalog with specified parameters can be connected to before creating it.

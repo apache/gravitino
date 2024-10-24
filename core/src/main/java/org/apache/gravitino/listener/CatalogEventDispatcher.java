@@ -186,4 +186,11 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
     // todo: support disable catalog event
     dispatcher.disableCatalog(ident);
   }
+
+  @Override
+  public void setCatalogReadOnly(NameIdentifier ident, boolean readOnly)
+      throws NoSuchCatalogException, CatalogNotInUseException {
+    // todo: support set catalog read only event
+    dispatcher.setCatalogReadOnly(ident, readOnly);
+  }
 }

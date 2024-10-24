@@ -54,6 +54,9 @@ public class ErrorConstants {
   /** Error codes for drop an in use entity. */
   public static final int IN_USE_CODE = 1010;
 
+  /** Error codes for write operation on a read-only entity. */
+  public static final int READ_ONLY_CODE = 1011;
+
   /** Error codes for invalid state. */
   public static final int UNKNOWN_ERROR_CODE = 1100;
 

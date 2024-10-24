@@ -50,6 +50,7 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -100,6 +101,7 @@ public class SchemaOperations {
 
   @POST
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "create-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-schema", absolute = true)
   public Response createSchema(
@@ -161,6 +163,7 @@ public class SchemaOperations {
   @PUT
   @Path("/{schema}")
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "alter-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-schema", absolute = true)
   public Response alterSchema(
@@ -197,6 +200,7 @@ public class SchemaOperations {
   @DELETE
   @Path("/{schema}")
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "drop-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-schema", absolute = true)
   public Response dropSchema(

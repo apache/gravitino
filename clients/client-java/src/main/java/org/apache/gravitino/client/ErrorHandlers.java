@@ -30,6 +30,7 @@ import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.CatalogReadOnlyException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -53,6 +54,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
@@ -292,6 +294,9 @@ public class ErrorHandlers {
             throw new NotInUseException(errorMessage);
           }
 
+        case ErrorConstants.READ_ONLY_CODE:
+          throw new CatalogReadOnlyException(errorMessage);
+
         default:
           super.accept(errorResponse);
       }
@@ -344,6 +349,9 @@ public class ErrorHandlers {
           } else {
             throw new NotInUseException(errorMessage);
           }
+
+        case ErrorConstants.READ_ONLY_CODE:
+          throw new CatalogReadOnlyException(errorMessage);
 
         default:
           super.accept(errorResponse);
@@ -400,6 +408,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.READ_ONLY_CODE:
+          throw new CatalogReadOnlyException(errorMessage);
 
         default:
           super.accept(errorResponse);
@@ -465,6 +476,12 @@ public class ErrorHandlers {
             throw new NotInUseException(errorMessage);
           }
 
+        case ErrorConstants.READ_ONLY_CODE:
+          throw new CatalogReadOnlyException(errorMessage);
+
+        case ErrorConstants.NON_EMPTY_CODE:
+          throw new NonEmptyEntityException(errorMessage);
+
         default:
           super.accept(errorResponse);
       }
@@ -495,6 +512,12 @@ public class ErrorHandlers {
 
         case ErrorConstants.IN_USE_CODE:
           throw new MetalakeInUseException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.NON_EMPTY_CODE:
+          throw new NonEmptyEntityException(errorMessage);
 
         default:
           super.accept(errorResponse);
@@ -599,6 +622,9 @@ public class ErrorHandlers {
             throw new NotInUseException(errorMessage);
           }
 
+        case ErrorConstants.READ_ONLY_CODE:
+          throw new CatalogReadOnlyException(errorMessage);
+
         default:
           super.accept(errorResponse);
       }
@@ -649,6 +675,9 @@ public class ErrorHandlers {
           } else {
             throw new NotInUseException(errorMessage);
           }
+
+        case ErrorConstants.READ_ONLY_CODE:
+          throw new CatalogReadOnlyException(errorMessage);
 
         default:
           super.accept(errorResponse);

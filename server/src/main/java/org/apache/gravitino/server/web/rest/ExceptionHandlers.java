@@ -24,6 +24,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogReadOnlyException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -33,6 +34,7 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
@@ -317,6 +319,9 @@ public class ExceptionHandlers {
       } else if (e instanceof InUseException) {
         return Utils.inUse(errorMsg, e);
 
+      } else if (e instanceof CatalogReadOnlyException) {
+        return Utils.catalogReadOnly(errorMsg, e);
+
       } else {
         return super.handle(op, catalog, metalake, e);
       }
@@ -347,6 +352,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof NoSuchMetalakeException) {
         return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof NonEmptyEntityException) {
+        return Utils.nonEmpty(errorMsg, e);
 
       } else if (e instanceof MetalakeNotInUseException) {
         return Utils.notInUse(errorMsg, e);

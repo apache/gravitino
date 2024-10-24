@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -30,30 +31,58 @@ import org.apache.gravitino.rest.RESTRequest;
 @ToString
 public class CatalogSetRequest implements RESTRequest {
 
+  /**
+   * Creates a CatalogSetRequest to set a catalog in use or not in use.
+   *
+   * @param inUse The in use status to set.
+   * @return The CatalogSetRequest.
+   */
+  public static CatalogSetRequest setInUse(Boolean inUse) {
+    return new CatalogSetRequest(inUse, null);
+  }
+
+  /**
+   * Creates a CatalogSetRequest to set a catalog read-only or not.
+   *
+   * @param readOnly The read-only status to set.
+   * @return The CatalogSetRequest.
+   */
+  public static CatalogSetRequest setReadOnly(Boolean readOnly) {
+    return new CatalogSetRequest(null, readOnly);
+  }
+
   @JsonProperty("inUse")
-  private final boolean inUse;
+  private final Boolean inUse;
+
+  @JsonProperty("readOnly")
+  private final Boolean readOnly;
 
   /** Default constructor for CatalogSetRequest. */
   public CatalogSetRequest() {
-    this(false);
+    this(null, null);
   }
 
   /**
    * Constructor for CatalogSetRequest.
    *
    * @param inUse The in use status to set.
+   * @param readOnly The read-only status to set.
    */
-  public CatalogSetRequest(boolean inUse) {
+  private CatalogSetRequest(Boolean inUse, Boolean readOnly) {
     this.inUse = inUse;
+    this.readOnly = readOnly;
   }
 
   /**
-   * Validates the request. No validation needed.
+   * Validates the request.
    *
    * @throws IllegalArgumentException If the request is invalid.
    */
   @Override
   public void validate() throws IllegalArgumentException {
-    // No validation needed
+    Preconditions.checkArgument(
+        inUse != null || readOnly != null, "Either inUse or readOnly must be set.");
+    Preconditions.checkArgument(
+        inUse == null || readOnly == null, "Only one of inUse or readOnly can be set.");
   }
 }

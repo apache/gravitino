@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.hudi.integration.test;
 
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
+import static org.apache.gravitino.Catalog.PROPERTY_READ_ONLY;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.CATALOG_BACKEND;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.URI;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiSchemaPropertiesMetadata.LOCATION;
@@ -150,6 +151,7 @@ public class HudiCatalogHMSIT extends BaseIT {
     Assertions.assertEquals(comment, catalog.comment());
     Map<String, String> expectedProperties = new HashMap<>(properties);
     expectedProperties.put(PROPERTY_IN_USE, "true");
+    expectedProperties.put(PROPERTY_READ_ONLY, "false");
     Assertions.assertEquals(expectedProperties, catalog.properties());
 
     // test list

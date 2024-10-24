@@ -46,6 +46,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -96,6 +97,7 @@ public class TopicOperations {
 
   @POST
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "create-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-topic", absolute = true)
   public Response createTopic(
@@ -165,6 +167,7 @@ public class TopicOperations {
   @PUT
   @Path("/{topic}")
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "alter-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-topic", absolute = true)
   public Response alterTopic(
@@ -203,6 +206,7 @@ public class TopicOperations {
   @DELETE
   @Path("/{topic}")
   @Produces("application/vnd.gravitino.v1+json")
+  @NameBindings.CatalogReadOnlyCheck
   @Timed(name = "drop-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-topic", absolute = true)
   public Response dropTopic(

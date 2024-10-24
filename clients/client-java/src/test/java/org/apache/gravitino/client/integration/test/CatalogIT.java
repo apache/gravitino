@@ -20,6 +20,7 @@
 package org.apache.gravitino.client.integration.test;
 
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
+import static org.apache.gravitino.Catalog.PROPERTY_READ_ONLY;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -37,6 +38,9 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.CatalogReadOnlyException;
+import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -218,6 +222,54 @@ public class CatalogIT extends BaseIT {
 
     Assertions.assertTrue(metalake.dropCatalog(catalogName), "catalog should be dropped");
     Assertions.assertFalse(metalake.dropCatalog(catalogName), "catalog should be non-existent");
+  }
+
+  @Test
+  public void testCatalogReadOnly() {
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog");
+    Catalog catalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", ImmutableMap.of());
+    Assertions.assertEquals("false", catalog.properties().get(PROPERTY_READ_ONLY));
+
+    metalake.setCatalogReadOnly(catalogName, true);
+    catalog = metalake.loadCatalog(catalogName);
+    Assertions.assertEquals("true", catalog.properties().get(PROPERTY_READ_ONLY));
+
+    // test schema operations under read-only catalog
+    SupportsSchemas schemaOps = catalog.asSchemas();
+    Assertions.assertDoesNotThrow(schemaOps::listSchemas);
+    Assertions.assertThrows(
+        CatalogReadOnlyException.class, () -> schemaOps.createSchema("dummy", null, null));
+    Assertions.assertThrows(NoSuchSchemaException.class, () -> schemaOps.loadSchema("dummy"));
+    Assertions.assertThrows(
+        CatalogReadOnlyException.class,
+        () -> schemaOps.alterSchema("dummy", SchemaChange.removeProperty("dummy")));
+    Assertions.assertThrows(
+        CatalogReadOnlyException.class, () -> schemaOps.dropSchema("dummy", false));
+
+    // test fileset operations under read-only catalog
+    FilesetCatalog filesetOps = catalog.asFilesetCatalog();
+    Assertions.assertThrows(
+        NoSuchSchemaException.class, () -> filesetOps.listFilesets(Namespace.of("dummy")));
+    Assertions.assertThrows(
+        NoSuchFilesetException.class,
+        () -> filesetOps.loadFileset(NameIdentifier.of("dummy", "dummy")));
+    Assertions.assertThrows(
+        CatalogReadOnlyException.class,
+        () ->
+            filesetOps.createFileset(NameIdentifier.of("dummy", "dummy"), null, null, null, null));
+    Assertions.assertThrows(
+        CatalogReadOnlyException.class,
+        () -> filesetOps.dropFileset(NameIdentifier.of("dummy", "dummy")));
+    Assertions.assertThrows(
+        NoSuchFilesetException.class,
+        () -> filesetOps.getFileLocation(NameIdentifier.of("dummy", "dummy"), "dummy"));
+    Assertions.assertThrows(
+        CatalogReadOnlyException.class,
+        () ->
+            filesetOps.alterFileset(
+                NameIdentifier.of("dummy", "dummy"), FilesetChange.removeComment()));
   }
 
   @Test

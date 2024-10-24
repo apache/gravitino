@@ -31,6 +31,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
@@ -132,6 +133,12 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   @Override
   public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     dispatcher.disableCatalog(ident);
+  }
+
+  @Override
+  public void setCatalogReadOnly(NameIdentifier ident, boolean readOnly)
+      throws NoSuchCatalogException, CatalogNotInUseException {
+    dispatcher.setCatalogReadOnly(ident, readOnly);
   }
 
   private void validateCatalogName(String name) throws IllegalArgumentException {

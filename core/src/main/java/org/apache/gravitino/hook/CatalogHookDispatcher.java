@@ -141,6 +141,12 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public void setCatalogReadOnly(NameIdentifier ident, boolean readOnly)
+      throws NoSuchCatalogException, CatalogNotInUseException {
+    dispatcher.setCatalogReadOnly(ident, readOnly);
+  }
+
+  @Override
   public boolean catalogExists(NameIdentifier ident) {
     return dispatcher.catalogExists(ident);
   }
