@@ -25,11 +25,11 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.config.GCSCredentialConfig;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.gravitino.storage.GCSProperties;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 // You should export GRAVITINO_GCS_BUCKET and GOOGLE_APPLICATION_CREDENTIALS to run the test
@@ -75,7 +75,8 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
         IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
         CredentialConstants.GCS_TOKEN_CREDENTIAL_PROVIDER_TYPE);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + GCSProperties.GRAVITINO_GCS_CREDENTIAL_FILE_PATH,
+        IcebergConfig.ICEBERG_CONFIG_PREFIX
+            + GCSCredentialConfig.GRAVITINO_GCS_CREDENTIAL_FILE_PATH,
         gcsCredentialPath);
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.IO_IMPL,

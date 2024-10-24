@@ -19,17 +19,21 @@
 
 package org.apache.gravitino.credential.config;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
-import org.apache.gravitino.storage.GCSProperties;
 
 public class GCSCredentialConfig extends Config {
+
+  @VisibleForTesting
+  public static final String GRAVITINO_GCS_CREDENTIAL_FILE_PATH = "gcs-credential-file-path";
+
   public static final ConfigEntry<String> GCS_CREDENTIAL_FILE_PATH =
-      new ConfigBuilder(GCSProperties.GRAVITINO_GCS_CREDENTIAL_FILE_PATH)
+      new ConfigBuilder(GRAVITINO_GCS_CREDENTIAL_FILE_PATH)
           .doc("The path of GCS credential file")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()

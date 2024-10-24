@@ -133,6 +133,7 @@ public class GCSTokenProvider implements CredentialProvider {
                 writeBuckets.add(bucketName);
                 resourceExpressions =
                     writeExpressions.computeIfAbsent(bucketName, key -> new ArrayList<>());
+                // add write privilege
                 resourceExpressions.add(
                     String.format(
                         "resource.name.startsWith('projects/_/buckets/%s/objects/%s')",
