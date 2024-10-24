@@ -40,12 +40,13 @@ public class TagEntity extends Command {
    * Tag an entity with an existing tag.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    * @param tag The name of the tag.
    */
-  public TagEntity(String url, String metalake, FullName name, String tag) {
-    super(url);
+  public TagEntity(String url, boolean ignoreVersions, String metalake, FullName name, String tag) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.name = name;
     this.tag = tag;

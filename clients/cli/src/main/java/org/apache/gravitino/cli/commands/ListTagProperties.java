@@ -36,11 +36,12 @@ public class ListTagProperties extends ListProperties {
    * List the properties of a tag.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    */
-  public ListTagProperties(String url, String metalake, String tag) {
-    super(url);
+  public ListTagProperties(String url, boolean ignoreVersions, String metalake, String tag) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;
   }

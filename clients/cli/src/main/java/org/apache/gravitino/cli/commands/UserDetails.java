@@ -27,18 +27,19 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 
 public class UserDetails extends Command {
 
-  protected String metalake;
-  protected String user;
+  protected final String metalake;
+  protected final String user;
 
   /**
    * Displays the roles of a user.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    */
-  public UserDetails(String url, String metalake, String user) {
-    super(url);
+  public UserDetails(String url, boolean ignoreVersions, String metalake, String user) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.user = user;
   }
@@ -61,13 +62,7 @@ public class UserDetails extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < roles.size(); i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(roles.get(i));
-    }
+    String all = String.join(",", roles);
 
     System.out.println(all.toString());
   }

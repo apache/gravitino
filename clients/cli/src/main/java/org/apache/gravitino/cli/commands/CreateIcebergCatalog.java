@@ -25,6 +25,7 @@ public class CreateIcebergCatalog extends CreateCatalog {
    * Create a new Iceberg catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param provider The provider/type of catalog.
@@ -34,13 +35,14 @@ public class CreateIcebergCatalog extends CreateCatalog {
    */
   public CreateIcebergCatalog(
       String url,
+      boolean ignoreVersions,
       String metalake,
       String catalog,
       String provider,
       String comment,
       String metastore,
       String warehouse) {
-    super(url, metalake, catalog, provider, comment);
+    super(url, ignoreVersions, metalake, catalog, provider, comment);
     properties.put("uri", metastore);
     properties.put("catalog-backend", "hive");
     properties.put("warehouse", warehouse);

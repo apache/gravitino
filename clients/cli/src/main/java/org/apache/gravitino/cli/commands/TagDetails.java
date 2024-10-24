@@ -34,11 +34,12 @@ public class TagDetails extends Command {
    * Displays the name and comment of a catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    */
-  public TagDetails(String url, String metalake, String tag) {
-    super(url);
+  public TagDetails(String url, boolean ignoreVersions, String metalake, String tag) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;
   }

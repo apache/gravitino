@@ -25,6 +25,7 @@ public class CreateMySQLCatalog extends CreateCatalog {
    * Create a new MySQL catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param provider The provider/type of catalog.
@@ -35,6 +36,7 @@ public class CreateMySQLCatalog extends CreateCatalog {
    */
   public CreateMySQLCatalog(
       String url,
+      boolean ignoreVersions,
       String metalake,
       String catalog,
       String provider,
@@ -42,7 +44,7 @@ public class CreateMySQLCatalog extends CreateCatalog {
       String jdbcurl,
       String user,
       String password) {
-    super(url, metalake, catalog, provider, comment);
+    super(url, ignoreVersions, metalake, catalog, provider, comment);
     properties.put("jdbc-url", jdbcurl);
     properties.put("jdbc-user", user);
     properties.put("jdbc-password", password);

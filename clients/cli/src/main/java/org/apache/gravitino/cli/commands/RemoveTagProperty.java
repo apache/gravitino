@@ -36,12 +36,14 @@ public class RemoveTagProperty extends Command {
    * Remove a property of a tag.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    * @param property The name of the property.
    */
-  public RemoveTagProperty(String url, String metalake, String tag, String property) {
-    super(url);
+  public RemoveTagProperty(
+      String url, boolean ignoreVersions, String metalake, String tag, String property) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;
     this.property = property;

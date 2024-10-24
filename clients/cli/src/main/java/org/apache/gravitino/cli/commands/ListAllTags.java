@@ -32,10 +32,11 @@ public class ListAllTags extends Command {
    * Lists all tags in a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    */
-  public ListAllTags(String url, String metalake) {
-    super(url);
+  public ListAllTags(String url, boolean ignoreVersions, String metalake) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
   }
 

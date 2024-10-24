@@ -37,6 +37,7 @@ import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -110,6 +111,7 @@ public class SqlSessionFactoryHelper {
     configuration.addMapper(CatalogMetaMapper.class);
     configuration.addMapper(SchemaMetaMapper.class);
     configuration.addMapper(TableMetaMapper.class);
+    configuration.addMapper(TableColumnMapper.class);
     configuration.addMapper(FilesetMetaMapper.class);
     configuration.addMapper(FilesetVersionMapper.class);
     configuration.addMapper(TopicMetaMapper.class);

@@ -27,20 +27,22 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Set a property of a metalake. */
 public class SetMetalakeProperty extends Command {
 
-  protected String metalake;
-  protected String property;
-  protected String value;
+  protected final String metalake;
+  protected final String property;
+  protected final String value;
 
   /**
    * Set a property of a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param property The name of the property.
    * @param value The value of the property.
    */
-  public SetMetalakeProperty(String url, String metalake, String property, String value) {
-    super(url);
+  public SetMetalakeProperty(
+      String url, boolean ignoreVersions, String metalake, String property, String value) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.property = property;
     this.value = value;

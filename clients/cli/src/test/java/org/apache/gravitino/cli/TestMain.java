@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -54,10 +55,10 @@ public class TestMain {
   }
 
   @Test
-  public void withTwoArgsOnly() throws ParseException {
+  public void withTwoArgs() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
-    String[] args = {"metalake", "--details"};
+    String[] args = {"metalake", "details"};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);
@@ -67,16 +68,42 @@ public class TestMain {
   }
 
   @Test
-  public void defaultToDetails() throws ParseException {
+  public void defaultToDetailsOneArg() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
-    String[] args = {"metalake", "--name", "metalake_demo"};
+    String[] args = {"metalake"};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);
     assertEquals(CommandActions.DETAILS, command);
     String entity = Main.resolveEntity(line);
     assertEquals(CommandEntities.METALAKE, entity);
+  }
+
+  @Test
+  public void withNoArgs() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {};
+    CommandLine line = parser.parse(options, args);
+
+    String command = Main.resolveCommand(line);
+    assertNull(command);
+    String entity = Main.resolveEntity(line);
+    assertNull(entity);
+  }
+
+  @Test
+  public void withNoArgsAndOptions() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"--name", "metalake_demo"};
+    CommandLine line = parser.parse(options, args);
+
+    String command = Main.resolveCommand(line);
+    assertNull(command);
+    String entity = Main.resolveEntity(line);
+    assertNull(entity);
   }
 
   @Test
@@ -88,7 +115,7 @@ public class TestMain {
     CommandLine line = parser.parse(options, args);
 
     GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, null, "help");
-    commandLine.handleCommandLine();
+    commandLine.handleSimpleLine();
 
     assertTrue(outContent.toString().contains("usage:")); // Expected help output
   }
@@ -108,7 +135,7 @@ public class TestMain {
   public void catalogWithOneArg() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
-    String[] args = {"catalog", "--details", "--name", "metalake_demo.catalog_postgres"};
+    String[] args = {"catalog", "--name", "catalog_postgres"};
     CommandLine line = parser.parse(options, args);
 
     String command = Main.resolveCommand(line);

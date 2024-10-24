@@ -33,11 +33,12 @@ public class DeleteTag extends Command {
    * Delete a tag.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    */
-  public DeleteTag(String url, String metalake, String tag) {
-    super(url);
+  public DeleteTag(String url, boolean ignoreVersions, String metalake, String tag) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;
   }

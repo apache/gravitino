@@ -29,16 +29,17 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 /** Set a property of a schema. */
 public class SetSchemaProperty extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String schema;
-  protected String property;
-  protected String value;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String schema;
+  protected final String property;
+  protected final String value;
 
   /**
    * Set a property of a schema.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
@@ -46,8 +47,14 @@ public class SetSchemaProperty extends Command {
    * @param value The value of the property.
    */
   public SetSchemaProperty(
-      String url, String metalake, String catalog, String schema, String property, String value) {
-    super(url);
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String schema,
+      String property,
+      String value) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;

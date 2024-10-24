@@ -33,12 +33,14 @@ public class CreateTag extends Command {
    * Create a new tag.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    * @param comment The comment of the tag.
    */
-  public CreateTag(String url, String metalake, String tag, String comment) {
-    super(url);
+  public CreateTag(
+      String url, boolean ignoreVersions, String metalake, String tag, String comment) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;
     this.comment = comment;
