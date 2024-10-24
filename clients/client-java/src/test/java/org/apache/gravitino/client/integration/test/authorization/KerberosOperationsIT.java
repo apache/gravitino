@@ -34,7 +34,7 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoVersion;
 import org.apache.gravitino.client.KerberosTokenProvider;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.hadoop.minikdc.KerberosSecurityTestcase;
 import org.junit.jupiter.api.AfterAll;
@@ -43,7 +43,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.util.concurrent.Uninterruptibles;
 
-public class KerberosOperationsIT extends AbstractIT {
+public class KerberosOperationsIT extends BaseIT {
 
   private static final KerberosSecurityTestcase kdc =
       new KerberosSecurityTestcase() {
@@ -64,8 +64,12 @@ public class KerberosOperationsIT extends AbstractIT {
 
   private static final String clientPrincipal = "client@EXAMPLE.COM";
 
+  public void setGravitinoAdminClient(GravitinoAdminClient client) {
+    this.client = client;
+  }
+
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     kdc.startMiniKdc();
     initKeyTab();
 
@@ -78,7 +82,7 @@ public class KerberosOperationsIT extends AbstractIT {
 
     registerCustomConfigs(configs);
 
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
 
     client =
         GravitinoAdminClient.builder(serverUri)
@@ -91,8 +95,8 @@ public class KerberosOperationsIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void stopIntegrationTest() throws IOException, InterruptedException {
-    AbstractIT.stopIntegrationTest();
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    super.stopIntegrationTest();
     kdc.stopMiniKdc();
   }
 

@@ -25,17 +25,17 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /** Displays the details of a metalake. */
 public class MetalakeDetails extends Command {
-
-  protected String metalake;
+  protected final String metalake;
 
   /**
    * Displays metalake details.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    */
-  public MetalakeDetails(String url, String metalake) {
-    super(url);
+  public MetalakeDetails(String url, boolean ignoreVersions, String metalake) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
   }
 

@@ -22,6 +22,8 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -178,8 +180,11 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
   private void assertTableCaseInsensitive(
       NameIdentifier tableIdent, Column[] expectedColumns, Table table) {
     Assertions.assertEquals(tableIdent.name().toLowerCase(), table.name());
-    Assertions.assertEquals(expectedColumns[0].name().toLowerCase(), table.columns()[0].name());
-    Assertions.assertEquals(expectedColumns[1].name().toLowerCase(), table.columns()[1].name());
+    Set<String> expectedColumnNames =
+        Arrays.stream(expectedColumns).map(c -> c.name().toLowerCase()).collect(Collectors.toSet());
+    Set<String> actualColumnNames =
+        Arrays.stream(table.columns()).map(Column::name).collect(Collectors.toSet());
+    Assertions.assertEquals(expectedColumnNames, actualColumnNames);
     Assertions.assertEquals(
         expectedColumns[0].name().toLowerCase(),
         table.partitioning()[0].references()[0].fieldName()[0]);

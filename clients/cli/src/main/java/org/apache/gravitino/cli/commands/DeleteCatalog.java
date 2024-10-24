@@ -26,18 +26,19 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 public class DeleteCatalog extends Command {
 
-  protected String metalake;
-  protected String catalog;
+  protected final String metalake;
+  protected final String catalog;
 
   /**
    * Delete a catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    */
-  public DeleteCatalog(String url, String metalake, String catalog) {
-    super(url);
+  public DeleteCatalog(String url, boolean ignoreVersions, String metalake, String catalog) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
   }

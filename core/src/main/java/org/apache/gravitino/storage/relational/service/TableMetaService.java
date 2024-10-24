@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
@@ -32,6 +34,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -48,21 +51,6 @@ public class TableMetaService {
   }
 
   private TableMetaService() {}
-
-  public TablePO getTablePOBySchemaIdAndName(Long schemaId, String tableName) {
-    TablePO tablePO =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, tableName));
-
-    if (tablePO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.TABLE.name().toLowerCase(),
-          tableName);
-    }
-    return tablePO;
-  }
 
   // Table may be deleted, so the TablePO may be null.
   public TablePO getTablePOById(Long tableId) {
@@ -94,8 +82,11 @@ public class TableMetaService {
         CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     TablePO tablePO = getTablePOBySchemaIdAndName(schemaId, identifier.name());
+    List<ColumnPO> columnPOs =
+        TableColumnMetaService.getInstance()
+            .getColumnsByTableIdAndVersion(tablePO.getTableId(), tablePO.getCurrentVersion());
 
-    return POConverters.fromTablePO(tablePO, identifier.namespace());
+    return POConverters.fromTableAndColumnPOs(tablePO, columnPOs, identifier.namespace());
   }
 
   public List<TableEntity> listTablesByNamespace(Namespace namespace) {
@@ -117,16 +108,34 @@ public class TableMetaService {
       TablePO.Builder builder = TablePO.builder();
       fillTablePOBuilderParentEntityId(builder, tableEntity.namespace());
 
-      SessionUtils.doWithCommit(
-          TableMetaMapper.class,
-          mapper -> {
-            TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
+      AtomicReference<TablePO> tablePORef = new AtomicReference<>();
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TableMetaMapper.class,
+                  mapper -> {
+                    TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
+                    tablePORef.set(po);
+                    if (overwrite) {
+                      mapper.insertTableMetaOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertTableMeta(po);
+                    }
+                  }),
+          () -> {
+            // We need to delete the columns first if we want to overwrite the table.
             if (overwrite) {
-              mapper.insertTableMetaOnDuplicateKeyUpdate(po);
-            } else {
-              mapper.insertTableMeta(po);
+              TableColumnMetaService.getInstance()
+                  .deleteColumnsByTableId(tablePORef.get().getTableId());
+            }
+          },
+          () -> {
+            if (tableEntity.columns() != null && !tableEntity.columns().isEmpty()) {
+              TableColumnMetaService.getInstance()
+                  .insertColumnPOs(tablePORef.get(), tableEntity.columns());
             }
           });
+
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TABLE, tableEntity.nameIdentifier().toString());
@@ -144,30 +153,47 @@ public class TableMetaService {
         CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
     TablePO oldTablePO = getTablePOBySchemaIdAndName(schemaId, tableName);
-    TableEntity oldTableEntity = POConverters.fromTablePO(oldTablePO, identifier.namespace());
-    TableEntity newEntity = (TableEntity) updater.apply((E) oldTableEntity);
+    List<ColumnPO> oldTableColumns =
+        TableColumnMetaService.getInstance()
+            .getColumnsByTableIdAndVersion(oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
+    TableEntity oldTableEntity =
+        POConverters.fromTableAndColumnPOs(oldTablePO, oldTableColumns, identifier.namespace());
+
+    TableEntity newTableEntity = (TableEntity) updater.apply((E) oldTableEntity);
     Preconditions.checkArgument(
-        Objects.equals(oldTableEntity.id(), newEntity.id()),
+        Objects.equals(oldTableEntity.id(), newTableEntity.id()),
         "The updated table entity id: %s should be same with the table entity id before: %s",
-        newEntity.id(),
+        newTableEntity.id(),
         oldTableEntity.id());
 
-    Integer updateResult;
+    boolean isColumnChanged =
+        TableColumnMetaService.getInstance().isColumnUpdated(oldTableEntity, newTableEntity);
+    TablePO newTablePO =
+        POConverters.updateTablePOWithVersion(oldTablePO, newTableEntity, isColumnChanged);
+
+    final AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              TableMetaMapper.class,
-              mapper ->
-                  mapper.updateTableMeta(
-                      POConverters.updateTablePOWithVersion(oldTablePO, newEntity), oldTablePO));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              updateResult.set(
+                  SessionUtils.doWithoutCommitAndFetchResult(
+                      TableMetaMapper.class,
+                      mapper -> mapper.updateTableMeta(newTablePO, oldTablePO))),
+          () -> {
+            if (updateResult.get() > 0 && isColumnChanged) {
+              TableColumnMetaService.getInstance()
+                  .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
+            }
+          });
+
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
-          re, Entity.EntityType.TABLE, newEntity.nameIdentifier().toString());
+          re, Entity.EntityType.TABLE, newTableEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult > 0) {
-      return newEntity;
+    if (updateResult.get() > 0) {
+      return newTableEntity;
     } else {
       throw new IOException("Failed to update the entity: " + identifier);
     }
@@ -183,26 +209,35 @@ public class TableMetaService {
 
     Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
 
+    AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
-            SessionUtils.doWithoutCommit(
-                TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasByTableId(tableId)),
-        () ->
+            deleteResult.set(
+                SessionUtils.doWithCommitAndFetchResult(
+                    TableMetaMapper.class,
+                    mapper -> mapper.softDeleteTableMetasByTableId(tableId))),
+        () -> {
+          if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        tableId, MetadataObject.Type.TABLE.name())));
+                        tableId, MetadataObject.Type.TABLE.name()));
+          }
+        },
+        () -> {
+          if (deleteResult.get() > 0) {
+            TableColumnMetaService.getInstance().deleteColumnsByTableId(tableId);
+          }
+        });
 
-    return true;
+    return deleteResult.get() > 0;
   }
 
   public int deleteTableMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         TableMetaMapper.class,
-        mapper -> {
-          return mapper.deleteTableMetasByLegacyTimeline(legacyTimeline, limit);
-        });
+        mapper -> mapper.deleteTableMetasByLegacyTimeline(legacyTimeline, limit));
   }
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
@@ -228,5 +263,20 @@ public class TableMetaService {
           break;
       }
     }
+  }
+
+  private TablePO getTablePOBySchemaIdAndName(Long schemaId, String tableName) {
+    TablePO tablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class,
+            mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, tableName));
+
+    if (tablePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.TABLE.name().toLowerCase(),
+          tableName);
+    }
+    return tablePO;
   }
 }

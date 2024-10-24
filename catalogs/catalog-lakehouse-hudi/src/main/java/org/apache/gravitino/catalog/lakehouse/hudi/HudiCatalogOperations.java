@@ -92,7 +92,8 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
       Map<String, String> properties)
       throws Exception {
     try {
-      hudiCatalogBackendOps.listSchemas(null);
+      hudiCatalogBackendOps.listSchemas(
+          Namespace.of(catalogIdent.namespace().level(0), catalogIdent.name()));
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run listSchemas on Hudi catalog: %s", e.getMessage());

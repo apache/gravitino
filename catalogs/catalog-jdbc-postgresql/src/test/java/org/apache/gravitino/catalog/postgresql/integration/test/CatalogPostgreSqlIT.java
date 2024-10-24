@@ -49,7 +49,7 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.PGImageName;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -82,7 +82,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-public class CatalogPostgreSqlIT extends AbstractIT {
+public class CatalogPostgreSqlIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   public static final PGImageName DEFAULT_POSTGRES_IMAGE = PGImageName.VERSION_13;
 

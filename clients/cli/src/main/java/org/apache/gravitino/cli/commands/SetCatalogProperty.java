@@ -28,23 +28,29 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Set a property of a catalog. */
 public class SetCatalogProperty extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String property;
-  protected String value;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String property;
+  protected final String value;
 
   /**
    * Set a property of a catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param property The name of the property.
    * @param value The value of the property.
    */
   public SetCatalogProperty(
-      String url, String metalake, String catalog, String property, String value) {
-    super(url);
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String property,
+      String value) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.property = property;

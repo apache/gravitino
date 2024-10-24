@@ -30,6 +30,7 @@ public class CommandEntities {
   public static final String CATALOG = "catalog";
   public static final String SCHEMA = "schema";
   public static final String TABLE = "table";
+  public static final String COLUMN = "column";
   public static final String USER = "user";
   public static final String GROUP = "group";
 
@@ -40,6 +41,7 @@ public class CommandEntities {
     VALID_ENTITIES.add(CATALOG);
     VALID_ENTITIES.add(SCHEMA);
     VALID_ENTITIES.add(TABLE);
+    VALID_ENTITIES.add(COLUMN);
     VALID_ENTITIES.add(USER);
     VALID_ENTITIES.add(GROUP);
   }
