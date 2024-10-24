@@ -32,9 +32,10 @@ import java.util.Properties;
  */
 public class GravitinoConfig {
   private static String defaultFile = ".gravitino";
-  private String configFile;
+  private final String configFile;
   private String metalake;
   private String url;
+  private boolean ignore;
 
   /**
    * Creates a GravitinoConfig object with a specified config file. If no file is provided, it
@@ -67,6 +68,7 @@ public class GravitinoConfig {
   public void read() {
     String metalakeKey = "metalake";
     String urlKey = "URL";
+    String ignoreKey = "ignore";
     Properties prop = new Properties();
 
     try (FileInputStream stream = new FileInputStream(configFile)) {
@@ -83,6 +85,9 @@ public class GravitinoConfig {
     }
     if (prop.containsKey(urlKey)) {
       url = prop.getProperty(urlKey);
+    }
+    if (prop.containsKey(ignoreKey)) {
+      ignore = prop.getProperty(ignoreKey).equals("true");
     }
   }
 
@@ -102,6 +107,15 @@ public class GravitinoConfig {
    */
   public String getGravitinoURL() {
     return url;
+  }
+
+  /**
+   * Retrieves the ignore options stored in the configuration.
+   *
+   * @return The config file path.
+   */
+  public boolean getIgnore() {
+    return ignore;
   }
 
   /**
