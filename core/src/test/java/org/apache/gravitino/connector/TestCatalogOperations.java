@@ -405,6 +405,7 @@ public class TestCatalogOperations
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
     if (!filesets.containsKey(ident)) {

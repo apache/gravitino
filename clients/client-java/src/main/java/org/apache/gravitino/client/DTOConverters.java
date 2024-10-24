@@ -205,6 +205,7 @@ class DTOConverters {
     }
   }
 
+  @SuppressWarnings("deprecation")
   static FilesetUpdateRequest toFilesetUpdateRequest(FilesetChange change) {
     if (change instanceof FilesetChange.RenameFileset) {
       return new FilesetUpdateRequest.RenameFilesetRequest(

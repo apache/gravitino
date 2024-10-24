@@ -761,6 +761,7 @@ public class TestHadoopCatalogOperations {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testRemoveFilesetComment() throws IOException {
     String schemaName = "schema27";
     String comment = "comment27";

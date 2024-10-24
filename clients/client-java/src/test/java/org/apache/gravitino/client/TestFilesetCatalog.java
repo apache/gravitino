@@ -313,6 +313,7 @@ public class TestFilesetCatalog extends TestBase {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testAlterFileset() throws JsonProcessingException {
     NameIdentifier fileset = NameIdentifier.of("schema1", "fileset1");
     String filesetPath =

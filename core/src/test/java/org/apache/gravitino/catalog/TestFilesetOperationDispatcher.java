@@ -111,6 +111,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testCreateAndAlterFileset() {
     Namespace filesetNs = Namespace.of(metalake, catalog, "schema101");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");

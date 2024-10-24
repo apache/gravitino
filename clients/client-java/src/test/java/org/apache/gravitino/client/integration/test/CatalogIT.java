@@ -156,6 +156,7 @@ public class CatalogIT extends BaseIT {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testCatalogAvailable() {
     String catalogName = GravitinoITUtils.genRandomName("test_catalog");
     Catalog catalog =
