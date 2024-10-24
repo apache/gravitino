@@ -21,5 +21,6 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 /** The type of Apache Paimon catalog backend. */
 public enum PaimonCatalogBackend {
   FILESYSTEM,
-  JDBC
+  JDBC,
+  HIVE
 }

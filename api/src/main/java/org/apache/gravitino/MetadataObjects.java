@@ -49,7 +49,8 @@ public class MetadataObjects {
     Preconditions.checkArgument(name != null, "Cannot create a metadata object with null name");
     Preconditions.checkArgument(type != null, "Cannot create a metadata object with no type");
 
-    return new MetadataObjectImpl(parent, name, type);
+    String fullName = parent == null ? name : DOT_JOINER.join(parent, name);
+    return parse(fullName, type);
   }
 
   /**
@@ -153,6 +154,12 @@ public class MetadataObjects {
     return MetadataObjects.of(parts, type);
   }
 
+  /**
+   * Get the parent full name of the given full name.
+   *
+   * @param names The names of the metadata object
+   * @return The parent full name if it exists, otherwise null
+   */
   private static String getParentFullName(List<String> names) {
     if (names.size() <= 1) {
       return null;

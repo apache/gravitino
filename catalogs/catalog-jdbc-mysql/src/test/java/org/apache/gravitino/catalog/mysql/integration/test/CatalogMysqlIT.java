@@ -142,7 +142,9 @@ public class CatalogMysqlIT extends BaseIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
+    client.disableMetalake(metalakeName);
     client.dropMetalake(metalakeName);
     mysqlService.close();
   }
@@ -166,10 +168,9 @@ public class CatalogMysqlIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
@@ -1987,6 +1988,6 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertDoesNotThrow(() -> loadCatalog.asSchemas().createSchema("test", "", null));
 
     loadCatalog.asSchemas().dropSchema("test", true);
-    metalake.dropCatalog(testCatalogName);
+    metalake.dropCatalog(testCatalogName, true);
   }
 }

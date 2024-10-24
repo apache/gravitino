@@ -138,7 +138,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   public void stop() throws Exception {
     try {
       clearTableAndSchema();
+      metalake.disableCatalog(catalogName);
       metalake.dropCatalog(catalogName);
+      client.disableMetalake(metalakeName);
       client.dropMetalake(metalakeName);
     } finally {
       if (spark != null) {
@@ -196,10 +198,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }

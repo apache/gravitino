@@ -17,7 +17,7 @@
   under the License.
 -->
 
-# Apache Gravitino CLI
+# Apache Gravitino Command Line Interface
 
 Apache Gravitino CLI is a command-line tool that interacts with the Gravitino server to manage and query entities like metalakes, catalogs, schemas, and tables. The tool provides options for listing information about Gravitino entities and in future versions support creating, deleting, and updating these entities.
 
@@ -52,7 +52,7 @@ Before you can build and run this project, it is suggested you have the followin
 3. Create an alias:
 
     ```bash
-    alias gcli='java -jar clients/cli/build/libs/gravitino-cli-0.7.0-incubating-SNAPSHOT.jar'
+    alias gcli='java -jar clients/cli/build/libs/gravitino-cli-*-incubating-SNAPSHOT.jar'
     ```
 3. Test the command:
     ```bash
