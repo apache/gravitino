@@ -31,6 +31,7 @@ public class GravitinoConfig {
 
   private String configFile;
   private String metalake;
+  private String url;
 
   public GravitinoConfig(String file) {
     if (file == null) {
@@ -46,7 +47,8 @@ public class GravitinoConfig {
   }
 
   public void read() {
-    String key = "metalake";
+    String metalakeKey = "metalake";
+    String urlKey = "URL";
     Properties prop = new Properties();
 
     try (FileInputStream stream = new FileInputStream(configFile)) {
@@ -58,13 +60,20 @@ public class GravitinoConfig {
       System.err.println(exp.getMessage());
     }
 
-    if (prop.containsKey(key)) {
-      metalake = prop.getProperty(key);
+    if (prop.containsKey(metalakeKey)) {
+      metalake = prop.getProperty(metalakeKey);
+    }
+    if (prop.containsKey(urlKey)) {
+      url = prop.getProperty(urlKey);
     }
   }
 
   public String getMetalakeName() {
     return metalake;
+  }
+
+  public String getGravitinoURL() {
+    return url;
   }
 
   public String getConfigFile() {

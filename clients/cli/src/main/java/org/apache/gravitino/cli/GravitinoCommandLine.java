@@ -320,11 +320,13 @@ public class GravitinoCommandLine {
 
   /**
    * Retrieves the Gravitinno URL from the command line options or the GRAVITINO_URL environment
-   * variable.
+   * variable or the Gravitio config file.
    *
    * @return The Gravitinno URL, or null if not found.
    */
   public String getUrl() {
+    GravitinoConfig config = new GravitinoConfig(null);
+
     // If specified on the command line use that
     if (line.hasOption(GravitinoOptions.URL)) {
       return line.getOptionValue(GravitinoOptions.URL);
@@ -334,6 +336,13 @@ public class GravitinoCommandLine {
     if (urlEnv == null && !urlSet) {
       urlEnv = System.getenv("GRAVITINO_URL");
       urlSet = true;
+      // Check if the metalake name is specified in the configuration file
+    } else if (config.fileExists()) {
+      config.read();
+      String configURL = config.getGravitinoURL();
+      if (configURL != null) {
+        return configURL;
+      }
     }
 
     // If set return the Gravitino URL environment variable

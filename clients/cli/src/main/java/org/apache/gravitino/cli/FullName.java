@@ -41,7 +41,7 @@ public class FullName {
 
   /**
    * Retrieves the metalake name from the command line options, the GRAVITINO_METALAKE environment
-   * variable.
+   * variable or the Gravitino config file.
    *
    * @return The metalake name, or null if not found.
    */
@@ -67,7 +67,7 @@ public class FullName {
       config.read();
       String configName = config.getMetalakeName();
       if (configName != null) {
-        return config.getMetalakeName();
+        return configName;
       }
     }
 
