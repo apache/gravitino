@@ -32,9 +32,9 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Table;
 
 public class UntagEntity extends Command {
-  protected String metalake;
-  protected FullName name;
-  protected String tag;
+  protected final String metalake;
+  protected final FullName name;
+  protected final String tag;
 
   /**
    * Untag an entity with an existing tag.

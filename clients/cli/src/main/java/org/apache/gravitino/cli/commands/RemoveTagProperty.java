@@ -28,9 +28,9 @@ import org.apache.gravitino.tag.TagChange;
 /** Remove a property of a tag. */
 public class RemoveTagProperty extends Command {
 
-  protected String metalake;
-  protected String tag;
-  protected String property;
+  protected final String metalake;
+  protected final String tag;
+  protected final String property;
 
   /**
    * Remove a property of a tag.

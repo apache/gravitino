@@ -26,8 +26,8 @@ import org.apache.gravitino.exceptions.NoSuchTagException;
 
 public class DeleteTag extends Command {
 
-  protected String metalake;
-  protected String tag;
+  protected final String metalake;
+  protected final String tag;
 
   /**
    * Delete a tag.

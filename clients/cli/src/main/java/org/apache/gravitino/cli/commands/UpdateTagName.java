@@ -28,9 +28,9 @@ import org.apache.gravitino.tag.TagChange;
 /** Update the name of a tag. */
 public class UpdateTagName extends Command {
 
-  protected String metalake;
-  protected String tag;
-  protected String name;
+  protected final String metalake;
+  protected final String tag;
+  protected final String name;
 
   /**
    * Update the name of a tag.

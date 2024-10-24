@@ -26,7 +26,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /* Lists all tags in a metalake. */
 public class ListAllTags extends Command {
 
-  protected String metalake;
+  protected final String metalake;
 
   /**
    * Lists all tags in a metalake.

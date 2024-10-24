@@ -25,9 +25,9 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 
 public class CreateTag extends Command {
-  protected String metalake;
-  protected String tag;
-  protected String comment;
+  protected final String metalake;
+  protected final String tag;
+  protected final String comment;
 
   /**
    * Create a new tag.

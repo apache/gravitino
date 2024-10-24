@@ -28,10 +28,10 @@ import org.apache.gravitino.tag.TagChange;
 /** Set a property of a tag. */
 public class SetTagProperty extends Command {
 
-  protected String metalake;
-  protected String tag;
-  protected String property;
-  protected String value;
+  protected final String metalake;
+  protected final String tag;
+  protected final String property;
+  protected final String value;
 
   /**
    * Set a property of a tag.

@@ -27,8 +27,8 @@ import org.apache.gravitino.tag.Tag;
 
 public class TagDetails extends Command {
 
-  protected String metalake;
-  protected String tag;
+  protected final String metalake;
+  protected final String tag;
 
   /**
    * Displays the name and comment of a catalog.
