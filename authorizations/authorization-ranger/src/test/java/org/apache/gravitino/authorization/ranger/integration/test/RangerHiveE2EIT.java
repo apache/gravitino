@@ -201,7 +201,6 @@ public class RangerHiveE2EIT extends BaseIT {
 
   @AfterAll
   public void stop() {
-    RangerITEnv.cleanup();
     if (client != null) {
       Arrays.stream(catalog.asSchemas().listSchemas())
           .filter(schema -> !schema.equals("default"))
@@ -222,8 +221,8 @@ public class RangerHiveE2EIT extends BaseIT {
     } catch (Exception e) {
       LOG.error("Failed to close CloseableGroup", e);
     }
-
     client = null;
+    RangerITEnv.cleanup();
   }
 
   @Test
