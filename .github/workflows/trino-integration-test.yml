@@ -85,9 +85,9 @@ jobs:
       - name: Trino Integration Test
         id: integrationTest
         run: |
+          trino-connector/integration-test/trino-test-tools/run_test.sh
           ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false :trino-connector:integration-test:test
           ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :trino-connector:integration-test:test
-          trino-connector/integration-test/trino-test-tools/run_test.sh
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3
