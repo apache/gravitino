@@ -133,25 +133,25 @@ Since 0.6.0-incubating, the data types other than listed above are mapped to Gra
 Table properties supply or set metadata for the underlying Hive tables.
 The following table lists predefined table properties for a Hive table. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
 
-| Property Name      | Description                                                                                                                             | Default Value                                                                                                                                       | Required | Since version |
-|--------------------|-----------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
-| `location`         | The location for table storage, such as `/user/hive/warehouse/test_table`.                                                              | HMS uses the database location as the parent directory by default.                                                                                  | No       | 0.2.0         |
-| `table-type`       | Type of the table. Valid values include `MANAGED_TABLE` and `EXTERNAL_TABLE`.                                                           | `MANAGED_TABLE`                                                                                                                                     | No       | 0.2.0         |
-| `format`           | The table file format. Valid values include `TEXTFILE`, `SEQUENCEFILE`, `RCFILE`, `ORC`, `PARQUET`, `AVRO`, `JSON`, `CSV`, and `REGEX`. | `TEXTFILE`                                                                                                                                          | No       | 0.2.0         |
-| `input-format`     | The input format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcInputFormat`.                                        | The property `format` sets the default value `org.apache.hadoop.mapred.TextInputFormat` and can change it to a different default.                   | No       | 0.2.0         |
-| `output-format`    | The output format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat`.                                      | The property `format` sets the default value `org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat` and can change it to a different default. | No       | 0.2.0         |
-| `serde-lib`        | The serde library class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcSerde`.                                             | The property `format` sets the default value `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe` and can change it to a different default.         | No       | 0.2.0         |
+| Property Name      | Description                                                                                                                                | Default Value                                                                                                                                       | Required | Since version |
+|--------------------|--------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
+| `location`         | The location for table storage, such as `/user/hive/warehouse/test_table`.                                                                 | HMS uses the database location as the parent directory by default.                                                                                  | No       | 0.2.0         |
+| `table-type`       | Type of the table. Valid values include `MANAGED_TABLE` and `EXTERNAL_TABLE`.                                                              | `MANAGED_TABLE`                                                                                                                                     | No       | 0.2.0         |
+| `format`           | The table file format. Valid values include `TEXTFILE`, `SEQUENCEFILE`, `RCFILE`, `ORC`, `PARQUET`, `AVRO`, `JSON`, `CSV`, and `REGEX`.    | `TEXTFILE`                                                                                                                                          | No       | 0.2.0         |
+| `input-format`     | The input format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcInputFormat`.                                           | The property `format` sets the default value `org.apache.hadoop.mapred.TextInputFormat` and can change it to a different default.                   | No       | 0.2.0         |
+| `output-format`    | The output format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat`.                                         | The property `format` sets the default value `org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat` and can change it to a different default. | No       | 0.2.0         |
+| `serde-lib`        | The serde library class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcSerde`.                                                | The property `format` sets the default value `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe` and can change it to a different default.         | No       | 0.2.0         |
 | `serde.parameter.` | The prefix of the serde parameter, such as `"serde.parameter.orc.create.index" = "true"`, indicating `ORC` serde lib to create row indexes | (none)                                                                                                                                              | No       | 0.2.0         |
 
 Hive automatically adds and manages some reserved properties. Users aren't allowed to set these properties.
 
-| Property Name           | Description                                       | Since Version |
-|-------------------------|---------------------------------------------------|---------------|
+| Property Name           | Description                                     | Since Version |
+|-------------------------|-------------------------------------------------|---------------|
 | `comment`               | Used to store a table comment.                  | 0.2.0         |
-| `numFiles`              | Used to store the number of files in the table.   | 0.2.0         |
-| `totalSize`             | Used to store the total size of the table.        | 0.2.0         |
-| `EXTERNAL`              | Indicates whether the table is external.          | 0.2.0         |
-| `transient_lastDdlTime` | Used to store the last DDL time of the table.     | 0.2.0         |
+| `numFiles`              | Used to store the number of files in the table. | 0.2.0         |
+| `totalSize`             | Used to store the total size of the table.      | 0.2.0         |
+| `EXTERNAL`              | Indicates whether the table is external.        | 0.2.0         |
+| `transient_lastDdlTime` | Used to store the last DDL time of the table.   | 0.2.0         |
 
 ### Table indexes
 
