@@ -53,6 +53,8 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
@@ -465,6 +467,9 @@ public class ErrorHandlers {
             throw new NotInUseException(errorMessage);
           }
 
+        case ErrorConstants.NON_EMPTY_CODE:
+          throw new NonEmptyCatalogException(errorMessage);
+
         default:
           super.accept(errorResponse);
       }
@@ -495,6 +500,12 @@ public class ErrorHandlers {
 
         case ErrorConstants.IN_USE_CODE:
           throw new MetalakeInUseException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.NON_EMPTY_CODE:
+          throw new NonEmptyMetalakeException(errorMessage);
 
         default:
           super.accept(errorResponse);
