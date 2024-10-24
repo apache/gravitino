@@ -19,7 +19,6 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
-import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
 import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_PASSWORD;
@@ -33,7 +32,6 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -42,8 +40,10 @@ import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.Schema;
+import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -54,9 +54,6 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.UserEntity;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -79,19 +76,39 @@ public class RangerHiveE2EIT extends BaseIT {
   public static final String schemaName =
       GravitinoITUtils.genRandomName("RangerHiveE2EIT_schema").toLowerCase();
 
+  public static final String tableName =
+      GravitinoITUtils.genRandomName("RangerHiveE2EIT_table").toLowerCase();
+
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
   private static final String provider = "hive";
   private static String HIVE_METASTORE_URIS;
 
   private static SparkSession sparkSession = null;
-  private final AuditInfo auditInfo =
-      AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
   private static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
   private static final String TEST_USER_NAME = "e2e_it_user";
 
   private static final String SQL_SHOW_DATABASES =
       String.format("SHOW DATABASES like '%s'", schemaName);
+
+  private static final String SQL_USE_CATALOG = String.format("USE CATALOG %s", catalogName);
+
+  private static final String SQL_CREATE_SCHEMA = String.format("CREATE DATABASE %s", schemaName);
+
+  private static final String SQL_DROP_SCHEMA = String.format("DROP DATABASE %s", schemaName);
+
+  private static final String SQL_USE_SCHEMA = String.format("USE SCHEMA %s", schemaName);
+
+  private static final String SQL_CREATE_TABLE =
+      String.format("CREATE TABLE %s (a int, b string, c string)", tableName);
+
+  private static final String SQL_RENAME_TABLE =
+      String.format("ALTER TABLE %s RENAME TO new_table", tableName);
+
+  private static final String SQL_RENAME_BACK_TABLE =
+      String.format("ALTER TABLE new_table RENAME TO %s", tableName);
+
+  private static final String SQL_DROP_TABLE = String.format("DROP TABLE %s", tableName);
 
   private static String RANGER_ADMIN_URL = null;
 
@@ -204,9 +221,262 @@ public class RangerHiveE2EIT extends BaseIT {
   }
 
   @Test
+  void testCreateSchema() throws InterruptedException {
+    // First,  give USE_CATALOG privilege and fail to create the schema
+    String useCatalogRole = "useCatalogRole";
+    SecurableObject securableObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.UseCatalog.allow()));
+    metalake.createRole(
+        useCatalogRole, Collections.emptyMap(), Lists.newArrayList(securableObject));
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(useCatalogRole), userName1);
+    waitForUpdatingPolicies();
+    sparkSession.sql(SQL_USE_CATALOG);
+    sparkSession.sql(SQL_CREATE_SCHEMA);
+
+    // Second, grant the `CREATE_SCHEMA` role
+    String roleName = "createSchemaRole";
+    securableObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.CreateSchema.allow()));
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+    waitForUpdatingPolicies();
+
+    // Third, succeed to create the schema
+    sparkSession.sql(SQL_CREATE_SCHEMA);
+
+    // Clean up
+    metalake.deleteRole(roleName);
+    metalake.deleteRole(useCatalogRole);
+  }
+
+  @Test
+  void testCreateTable() throws InterruptedException {
+    // First, create a schema and change the owner to avoid the influence of the owner
+    String createSchemaRole = "createSchemaRole";
+    SecurableObject securableObject =
+        SecurableObjects.ofMetalake(
+            metalakeName,
+            Lists.newArrayList(
+                Privileges.UseCatalog.allow(),
+                Privileges.UseSchema.allow(),
+                Privileges.CreateSchema.allow()));
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.createRole(
+        createSchemaRole, Collections.emptyMap(), Lists.newArrayList(securableObject));
+    metalake.grantRolesToUser(Lists.newArrayList(createSchemaRole), userName1);
+    MetadataObject schemaObject =
+        MetadataObjects.of(Lists.newArrayList(catalogName, schemaName), MetadataObject.Type.SCHEMA);
+    metalake.setOwner(schemaObject, AuthConstants.ANONYMOUS_USER, Owner.Type.USER);
+    waitForUpdatingPolicies();
+
+    // Second, fail to create a table
+    sparkSession.sql(SQL_USE_SCHEMA);
+    sparkSession.sql(SQL_CREATE_TABLE);
+
+    // Third, create a role and grant to the user
+    String createTableRole = "createTableRole";
+    securableObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.CreateTable.allow()));
+    metalake.createRole(
+        createTableRole, Collections.emptyMap(), Lists.newArrayList(securableObject));
+    metalake.grantRolesToUser(Lists.newArrayList(createSchemaRole), userName1);
+    waitForUpdatingPolicies();
+
+    // Fourth, succeed to create a table
+    sparkSession.sql(SQL_CREATE_TABLE);
+
+    // Clean up
+    sparkSession.sql(SQL_DROP_TABLE);
+    metalake.deleteRole(createTableRole);
+    metalake.deleteRole(createSchemaRole);
+  }
+
+  @Test
+  void testReadWriteTable() {
+    // case 1: Succeed to insert data into table
+    // case 2: Succeed to select data from the table
+    // case 3: Succeed to alter data in the table
+    // case 4: Succeed to delete data from the table
+    // case 5: Succeed to alter the table
+    // case 6: Fail to drop the table
+  }
+
+  @Test
+  void testReadOnlyTable() {
+    // case 1: Fail to insert data into table
+    // case 2: Succeed to select data from the table
+    // case 3: Fail to alter data in the table
+    // case 4: Fail to delete data from the table
+    // case 5: Fail to alter the table
+    // case 6: Fail to drop the table
+  }
+
+  @Test
+  void testWriteOnlyTable() {
+    // case 1: Succeed to insert data into the table
+    // case 2: Fail to select data from the table
+    // case 3: Succeed to alter data in the table
+    // case 4: Succeed to delete data from the table
+    // case 5: Succeed to alter the table
+    // case 6: Fail to drop the table
+  }
+
+  @Test
+  void testCreateAllPrivilegesRole() throws InterruptedException {
+    String roleName = "allPrivilegesRole";
+    SecurableObject securableObject =
+        SecurableObjects.ofMetalake(
+            metalakeName,
+            Lists.newArrayList(
+                Privileges.CreateCatalog.allow(),
+                Privileges.UseCatalog.allow(),
+                Privileges.UseSchema.allow(),
+                Privileges.CreateSchema.allow(),
+                Privileges.ReadFileset.allow(),
+                Privileges.WriteFileset.allow(),
+                Privileges.ConsumeTopic.allow(),
+                Privileges.ProduceTopic.allow(),
+                Privileges.SelectTable.allow(),
+                Privileges.ModifyTable.allow(),
+                Privileges.ManageUsers.allow(),
+                Privileges.ManageGroups.allow(),
+                Privileges.CreateRole.allow()));
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
+
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+
+    waitForUpdatingPolicies();
+
+    // Test to use the catalog
+    sparkSession.sql(SQL_USE_CATALOG);
+
+    // Clean up
+    metalake.deleteRole(roleName);
+  }
+
+  @Test
+  void testDeleteAndRecreateRole() {
+    // Create a role with CREATE_SCHEMA privilege
+    String roleName = "createSchemaRole";
+    SecurableObject securableObject =
+        SecurableObjects.parse(
+            String.format("%s", catalogName),
+            MetadataObject.Type.CATALOG,
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.allow()));
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
+
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+
+    // Delete the role
+    metalake.deleteRole(roleName);
+
+    // Grant the role again
+    userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+
+    // Clean up
+    metalake.deleteRole(roleName);
+  }
+
+  @Test
+  void testDeleteAndRecreateMetadataObject() throws InterruptedException {
+    // Create a role with CREATE_SCHEMA privilege
+    String roleName = "createSchemaRole";
+    SecurableObject securableObject =
+        SecurableObjects.parse(
+            String.format("%s", catalogName),
+            MetadataObject.Type.CATALOG,
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.allow()));
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
+
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+
+    waitForUpdatingPolicies();
+
+    // Create a schema
+    sparkSession.sql(SQL_USE_CATALOG);
+    sparkSession.sql(SQL_CREATE_SCHEMA);
+
+    // Delete a schema
+    sparkSession.sql(SQL_DROP_SCHEMA);
+
+    // Recreate a schema
+    sparkSession.sql(SQL_CREATE_SCHEMA);
+
+    // Cleanup
+    sparkSession.sql(SQL_DROP_SCHEMA);
+  }
+
+  @Test
+  void testRenameMetadataObject() throws InterruptedException {
+    // Create a role with CREATE_SCHEMA and CREATE_TABLE privilege
+    String roleName = "createRole";
+    SecurableObject securableObject =
+        SecurableObjects.parse(
+            String.format("%s", catalogName),
+            MetadataObject.Type.CATALOG,
+            Lists.newArrayList(
+                Privileges.UseCatalog.allow(),
+                Privileges.CreateSchema.allow(),
+                Privileges.CreateTable.allow()));
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+
+    waitForUpdatingPolicies();
+
+    // Create a schema and a table
+    sparkSession.sql(SQL_CREATE_SCHEMA);
+    sparkSession.sql(SQL_CREATE_TABLE);
+
+    // Rename a table and rename back
+    sparkSession.sql(SQL_RENAME_TABLE);
+    sparkSession.sql(SQL_RENAME_BACK_TABLE);
+    sparkSession.sql(SQL_DROP_TABLE);
+  }
+
+  @Test
+  void testChangeOwner() {
+    // Create a schema and a table
+
+    // case 1: change table owner
+
+    // case 2: change schema owner
+
+    // case 3: change catalog owner
+  }
+
+  @Test
   void testAllowUseSchemaPrivilege() throws InterruptedException {
+    // Create a role with CREATE_SCHEMA privilege
+    String roleName = "useSchemaRole";
+    SecurableObject securableObject1 =
+        SecurableObjects.parse(
+            String.format("%s", catalogName),
+            MetadataObject.Type.CATALOG,
+            Lists.newArrayList(Privileges.UseCatalog.allow(), Privileges.CreateSchema.allow()));
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject1));
+
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+
+    waitForUpdatingPolicies();
+
     // First, create a schema use Gravitino client
-    createSchema();
+    sparkSession.sql(SQL_USE_CATALOG);
+    sparkSession.sql(SQL_CREATE_SCHEMA);
 
     // Use Spark to show this databases(schema)
     Dataset dataset1 = sparkSession.sql(SQL_SHOW_DATABASES);
@@ -215,41 +485,6 @@ public class RangerHiveE2EIT extends BaseIT {
     // The schema should not be shown, because the user does not have the permission
     Assertions.assertEquals(
         0, rows1.stream().filter(row -> row.getString(0).equals(schemaName)).count());
-
-    // Create a role with CREATE_SCHEMA privilege
-    SecurableObject securableObject1 =
-        SecurableObjects.parse(
-            String.format("%s", catalogName),
-            MetadataObject.Type.CATALOG,
-            Lists.newArrayList(Privileges.CreateSchema.allow()));
-    RoleEntity role =
-        RoleEntity.builder()
-            .withId(1L)
-            .withName(currentFunName())
-            .withAuditInfo(auditInfo)
-            .withSecurableObjects(Lists.newArrayList(securableObject1))
-            .build();
-    RangerITEnv.rangerAuthHivePlugin.onRoleCreated(role);
-
-    // Granted this role to the spark execution user `HADOOP_USER_NAME`
-    String userName1 = System.getenv(HADOOP_USER_NAME);
-    UserEntity userEntity1 =
-        UserEntity.builder()
-            .withId(1L)
-            .withName(userName1)
-            .withRoleNames(Collections.emptyList())
-            .withRoleIds(Collections.emptyList())
-            .withAuditInfo(auditInfo)
-            .build();
-    Assertions.assertTrue(
-        RangerITEnv.rangerAuthHivePlugin.onGrantedRolesToUser(
-            Lists.newArrayList(role), userEntity1));
-
-    // After Ranger Authorization, Must wait a period of time for the Ranger Spark plugin to update
-    // the policy Sleep time must be greater than the policy update interval
-    // (ranger.plugin.spark.policy.pollIntervalMs) in the
-    // `resources/ranger-spark-security.xml.template`
-    Thread.sleep(1000L);
 
     // Use Spark to show this databases(schema) again
     Dataset dataset2 = sparkSession.sql(SQL_SHOW_DATABASES);
@@ -262,6 +497,11 @@ public class RangerHiveE2EIT extends BaseIT {
     // The schema should be shown, because the user has the permission
     Assertions.assertEquals(
         1, rows2.stream().filter(row -> row.getString(0).equals(schemaName)).count());
+
+    // Clean up
+    sparkSession.sql(SQL_DROP_SCHEMA);
+    metalake.revokeRolesFromUser(Lists.newArrayList(roleName), userName1);
+    metalake.deleteRole(roleName);
   }
 
   private void createMetalake() {
@@ -300,21 +540,11 @@ public class RangerHiveE2EIT extends BaseIT {
     LOG.info("Catalog created: {}", catalog);
   }
 
-  private static void createSchema() {
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("key1", "val1");
-    properties.put("key2", "val2");
-    properties.put(
-        "location",
-        String.format(
-            "hdfs://%s:%d/user/hive/warehouse/%s.db",
-            containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT,
-            schemaName.toLowerCase()));
-    String comment = "comment";
-
-    catalog.asSchemas().createSchema(schemaName, comment, properties);
-    Schema loadSchema = catalog.asSchemas().loadSchema(schemaName);
-    Assertions.assertEquals(schemaName.toLowerCase(), loadSchema.name());
+  private static void waitForUpdatingPolicies() throws InterruptedException {
+    // After Ranger Authorization, Must wait a period of time for the Ranger Spark plugin to update
+    // the policy Sleep time must be greater than the policy update interval
+    // (ranger.plugin.spark.policy.pollIntervalMs) in the
+    // `resources/ranger-spark-security.xml.template`
+    Thread.sleep(1000L);
   }
 }
