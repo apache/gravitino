@@ -32,6 +32,7 @@ import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
@@ -90,6 +91,10 @@ public abstract class IcebergRESTServiceBaseIT {
     LOG.info("Iceberg REST service config registered, {}", StringUtils.join(icebergConfigs));
   }
 
+  protected boolean supportsCredentialVending() {
+    return false;
+  }
+
   private int getServerPort() {
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(
@@ -100,19 +105,24 @@ public abstract class IcebergRESTServiceBaseIT {
   private void initSparkEnv() {
     int port = getServerPort();
     LOG.info("Iceberg REST server port:{}", port);
-    String IcebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
-    sparkSession =
-        SparkSession.builder()
-            .master("local[1]")
-            .config(
+    String icebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
+    SparkConf sparkConf =
+        new SparkConf()
+            .set(
                 "spark.sql.extensions",
                 "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-            .config("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
-            .config("spark.sql.catalog.rest.type", "rest")
-            .config("spark.sql.catalog.rest.uri", IcebergRESTUri)
+            .set("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
+            .set("spark.sql.catalog.rest.type", "rest")
+            .set("spark.sql.catalog.rest.uri", icebergRESTUri)
             // drop Iceberg table purge may hang in spark local mode
-            .config("spark.locality.wait.node", "0")
-            .getOrCreate();
+            .set("spark.locality.wait.node", "0");
+
+    if (supportsCredentialVending()) {
+      sparkConf.set(
+          "spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation", "vended-credentials");
+    }
+
+    sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }
 
   private void stopSparkEnv() {

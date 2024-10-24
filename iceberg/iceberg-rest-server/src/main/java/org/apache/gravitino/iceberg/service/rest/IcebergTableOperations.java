@@ -133,7 +133,11 @@ public class IcebergTableOperations {
     LoadTableResponse loadTableResponse =
         tableOperationDispatcher.createTable(catalogName, icebergNS, createTableRequest);
     if (isCredentialVending) {
-      return IcebergRestUtils.ok(injectCredentialConfig(catalogName, loadTableResponse));
+      return IcebergRestUtils.ok(
+          injectCredentialConfig(
+              catalogName,
+              TableIdentifier.of(icebergNS, createTableRequest.name()),
+              loadTableResponse));
     } else {
       return IcebergRestUtils.ok(loadTableResponse);
     }
@@ -215,7 +219,8 @@ public class IcebergTableOperations {
     LoadTableResponse loadTableResponse =
         tableOperationDispatcher.loadTable(catalogName, tableIdentifier);
     if (isCredentialVending) {
-      return IcebergRestUtils.ok(injectCredentialConfig(catalogName, loadTableResponse));
+      return IcebergRestUtils.ok(
+          injectCredentialConfig(catalogName, tableIdentifier, loadTableResponse));
     } else {
       return IcebergRestUtils.ok(loadTableResponse);
     }
@@ -270,7 +275,7 @@ public class IcebergTableOperations {
   }
 
   private LoadTableResponse injectCredentialConfig(
-      String catalogName, LoadTableResponse loadTableResponse) {
+      String catalogName, TableIdentifier tableIdentifier, LoadTableResponse loadTableResponse) {
     CredentialProvider credentialProvider =
         icebergCatalogWrapperManager.getCredentialProvider(catalogName);
     if (credentialProvider == null) {
@@ -286,6 +291,12 @@ public class IcebergTableOperations {
       throw new ServiceUnavailableException(
           "Couldn't generate credential for %s", credentialProvider.credentialType());
     }
+
+    LOG.info(
+        "Generate credential: {} for Iceberg table: {}",
+        credential.credentialType(),
+        tableIdentifier);
+
     Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
