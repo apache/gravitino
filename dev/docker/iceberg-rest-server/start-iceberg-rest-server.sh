@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -16,14 +17,13 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM openjdk:17-jdk-buster
 
-LABEL maintainer="dev@gravitino.apache.org"
+set -ex
+bin_dir="$(dirname "${BASH_SOURCE-$0}")"
+iceberg_rest_server_dir="$(cd "${bin_dir}/../">/dev/null; pwd)"
 
-WORKDIR /root/gravitino-iceberg-rest-server
+cd ${iceberg_rest_server_dir}
 
-COPY packages/gravitino-iceberg-rest-server /root/gravitino-iceberg-rest-server
+python bin/rewrite_config.py
 
-EXPOSE 9001
-
-ENTRYPOINT ["/bin/bash", "/root/gravitino-iceberg-rest-server/bin/start-iceberg-rest-server.sh"]
+./bin/gravitino-iceberg-rest-server.sh start
