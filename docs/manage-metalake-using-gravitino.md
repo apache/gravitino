@@ -191,13 +191,13 @@ gravitino_admin_client.enable_metalake("metalake")
 </Tabs>
 
 :::info
-If the metalake is already enabled, the operation will do nothing.
+This operation does nothing if the metalake is already enabled.
 :::
 
 ## Disable a metalake
 
 Once a metalake is disabled:
- - It can only be [listed](#list-all-metalakes), [loaded](#load-a-metalake), [dropped](#drop-a-metalake), or [enabled](#enable-a-metalake).
+ - Users can only [list](#list-all-metalakes), [load](#load-a-metalake), [drop](#drop-a-metalake), or [enable](#enable-a-metalake) it.
  - Any other operation on the metalake or its sub-entities will result in an error.
 
 To disable a metalake, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
@@ -237,17 +237,17 @@ gravitino_admin_client.disable_metalake("metalake")
 </Tabs>
 
 :::info
-If the metalake is already disabled, the operation will do nothing.
+This operation does nothing if the metalake is already disabled.
 :::
 
 ## Drop a metalake
 
-Deleting metalake doesn't use forced deletion by default, so please make sure:
+Deleting a metalake by "force" is not a default behavior, so please make sure:
 
 - There are no catalogs under the metalake. Otherwise, you will get an error.
 - The metalake is [disabled](#disable-a-metalake). Otherwise, you will get an error.
 
-If you are using forced deletion, it will:
+Deleting a metalake by "force" will:
 
 - Delete all sub-entities (tags, catalogs, schemas, etc.) under the metalake.
 - Delete the metalake itself even if it is enabled.

@@ -138,7 +138,7 @@ in relational catalog for more details. For a messaging catalog, the list operat
 ## Topic operations
 
 :::tip
-Users should create a metalake, a catalog and a schema, then ensure that the metalake and catalog are enabled before performing topic operations.
+Users should create a metalake, a catalog and a schema, then ensure that the metalake and catalog are enabled before operating topics.
 :::
 
 ### Create a topic

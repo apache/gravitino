@@ -204,7 +204,7 @@ paths:
     patch:
       tags:
         - catalog
-      summary: set caatalog in-use
+      summary: set catalog in-use
       operationId: setCatalog
       description: Set a specific catalog in-use or not in-use
       requestBody:

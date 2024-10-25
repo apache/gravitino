@@ -193,7 +193,7 @@ The following is an example of enabling a catalog:
 ```shell
 curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{"in-use": true}' \
-http://localhost:8090/api/metalakes/metalake/catalogs\catalog
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
 </TabItem>
@@ -210,13 +210,13 @@ gravitinoClient.enableCatalog("catalog");
 </Tabs>
 
 :::info
-If the catalog is already enabled, the operation will do nothing.
+This operation does nothing if the catalog is already enabled.
 :::
 
 ### Disable a catalog
 
 Once a catalog is disabled:
-- It can only be [listed](#list-all-catalogs-in-a-metalake), [loaded](#load-a-catalog), [dropped](#drop-a-catalog), or [enabled](#enable-a-catalog).
+- Users can only [list](#list-all-catalogs-in-a-metalake), [load](#load-a-catalog), [drop](#drop-a-catalog), or [enable](#enable-a-catalog) it.
 - Any other operation on the catalog or its sub-entities will result in an error.
 
 To disable a catalog, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client.
@@ -229,7 +229,7 @@ The following is an example of disabling a catalog:
 ```shell
 curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{"in-use": false}' \
-http://localhost:8090/api/metalakes/metalake/catalogs\catalog
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
 </TabItem>
@@ -246,17 +246,17 @@ gravitinoClient.disableCatalog("catalog");
 </Tabs>
 
 :::info
-If the catalog is already disabled, the operation will do nothing.
+This operation does nothing if the catalog is already disabled.
 :::
 
 ### Drop a catalog
 
-Deleting catalog doesn't use forced deletion by default, so please make sure:
+Deleting a catalog by "force" is not a default behavior, so please make sure:
 
 - There are no schemas under the catalog. Otherwise, you will get an error.
 - The catalog is [disabled](#disable-a-catalog). Otherwise, you will get an error.
 
-If you are using forced deletion, it will:
+Deleting a catalog by "force" will:
 
 - Delete all sub-entities (schemas, tables, etc.) under the catalog.
 - Delete the catalog itself even if it is enabled.
