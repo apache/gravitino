@@ -25,7 +25,7 @@ import { useState, useEffect, Fragment } from 'react'
 
 import Link from 'next/link'
 
-import { styled, Box, Typography, IconButton, Stack } from '@mui/material'
+import { styled, Box, Typography, IconButton, Stack, Switch } from '@mui/material'
 import Tooltip, { tooltipClasses } from '@mui/material/Tooltip'
 import { DataGrid } from '@mui/x-data-grid'
 import {
@@ -43,10 +43,10 @@ import CreateCatalogDialog from '../../CreateCatalogDialog'
 import CreateSchemaDialog from '../../CreateSchemaDialog'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { deleteCatalog, deleteSchema } from '@/lib/store/metalakes'
+import { deleteCatalog, deleteSchema, setCatalogInUse } from '@/lib/store/metalakes'
 
 import { to } from '@/lib/utils'
-import { getCatalogDetailsApi } from '@/lib/api/catalogs'
+import { getCatalogDetailsApi, switchInUseApi } from '@/lib/api/catalogs'
 import { getSchemaDetailsApi } from '@/lib/api/schemas'
 import { useSearchParams } from 'next/navigation'
 
@@ -247,6 +247,9 @@ const TableView = () => {
                 {name}
               </Typography>
             </Tooltip>
+            {paramsSize == 1 && searchParams.has('metalake') && <Tooltip title={row.inUse === 'true' ? 'In-use' : 'Not In-use'} placement='right'>
+              <Switch checked={row.inUse === 'true'} onChange={(e, value) => handleChangeInUse(name, value)} size='small' />
+            </Tooltip>}
           </Box>
         )
       }
@@ -528,6 +531,14 @@ const TableView = () => {
 
       setOpenConfirmDelete(false)
     }
+  }
+
+  const handleChangeInUse = async (name, isInUse) => {
+    const [err, res] = await to(switchInUseApi({ metalake, catalog: name, isInUse }))
+    if (err || !res) {
+      throw new Error(err)
+    }
+    dispatch(setCatalogInUse({ name, isInUse }))
   }
 
   const checkColumns = () => {

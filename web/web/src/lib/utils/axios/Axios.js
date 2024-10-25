@@ -269,6 +269,16 @@ class NextAxios {
    * @param {RequestOptions} [options]
    * @returns {Promise<T>}
    */
+  patch(config, options) {
+    return this.request({ ...config, method: 'PATCH' }, options)
+  }
+
+  /**
+   * @template T
+   * @param {AxiosRequestConfig} config
+   * @param {RequestOptions} [options]
+   * @returns {Promise<T>}
+   */
   delete(config, options) {
     return this.request({ ...config, method: 'DELETE' }, options)
   }

@@ -21,7 +21,7 @@ import { useState, useEffect, Fragment } from 'react'
 
 import Link from 'next/link'
 
-import { Box, Typography, Portal, Tooltip, IconButton } from '@mui/material'
+import { Box, Typography, Portal, Tooltip, IconButton, Switch } from '@mui/material'
 import { DataGrid, GridToolbar } from '@mui/x-data-grid'
 import {
   VisibilityOutlined as ViewIcon,
@@ -31,7 +31,9 @@ import {
 
 import { formatToDateTime } from '@/lib/utils/date'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, resetTree } from '@/lib/store/metalakes'
+import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, resetTree, setMetalakeInUse } from '@/lib/store/metalakes'
+import { switchInUseApi } from '@/lib/api/metalakes'
+import { to } from '@/lib/utils'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 
 const TableBody = props => {
@@ -46,12 +48,12 @@ const TableBody = props => {
 
   const handleDeleteMetalake = name => () => {
     setOpenConfirmDelete(true)
-    setConfirmCacheData(name)
+    setConfirmCacheData({name, type: 'metalake'})
   }
 
   const handleConfirmDeleteSubmit = () => {
     if (confirmCacheData) {
-      dispatch(deleteMetalake(confirmCacheData))
+      dispatch(deleteMetalake(confirmCacheData.name))
       setOpenConfirmDelete(false)
     }
   }
@@ -74,6 +76,14 @@ const TableBody = props => {
 
   const handleClickLink = () => {
     dispatch(resetTree())
+  }
+
+  const handleChangeInUse = async (name, isInUse) => {
+    const [err, res] = await to(switchInUseApi({ name, isInUse }))
+    if (err || !res) {
+      throw new Error(err)
+    }
+    dispatch(setMetalakeInUse({ name, isInUse }))
   }
 
   useEffect(() => {
@@ -127,6 +137,9 @@ const TableBody = props => {
               >
                 {name}
               </Typography>
+            </Tooltip>
+            <Tooltip title={row.properties['in-use'] === 'true' ? 'In-use' : 'Not In-use'} placement='right'>
+              <Switch checked={row.properties['in-use'] === 'true'} onChange={(e, value) => handleChangeInUse(name, value)} size='small' />
             </Tooltip>
           </Box>
         )

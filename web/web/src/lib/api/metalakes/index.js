@@ -23,7 +23,8 @@ const Apis = {
   GET: '/api/metalakes',
   CREATE: '/api/metalakes',
   DELETE: '/api/metalakes',
-  UPDATE: '/api/metalakes'
+  UPDATE: '/api/metalakes',
+  UPDATEINUSE: '/api/metalakes'
 }
 
 export const getMetalakesApi = () => {
@@ -61,5 +62,12 @@ export const updateMetalakeApi = ({ name, data }) => {
 export const getMetalakeDataApi = url => {
   return defHttp.get({
     url: `/api${url}`
+  })
+}
+
+export const switchInUseApi = ({ name, isInUse }) => {
+  return defHttp.patch({
+    url: `${Apis.UPDATEINUSE}/${name}`,
+    data: {inUse: isInUse}
   })
 }

@@ -289,6 +289,7 @@ export const fetchCatalogs = createAsyncThunk(
         path: `?${new URLSearchParams({ metalake, catalog: catalog.name, type: catalog.type }).toString()}`,
         type: catalog.type,
         provider: catalog.provider,
+        inUse: catalog.properties['in-use'],
         name: catalog.name,
         title: catalog.name,
         namespace: [metalake],
@@ -1064,6 +1065,23 @@ export const appMetalakesSlice = createSlice({
     removeCatalogFromTree(state, action) {
       state.metalakeTree = state.metalakeTree.filter(i => i.key !== action.payload)
     },
+    setCatalogInUse(state, action) {
+      for(let i = 0; i < state.catalogs.length; i++) {
+        if (state.catalogs[i].name === action.payload.name) {
+          state.catalogs[i].inUse = action.payload.isInUse + ''
+          state.tableData[i].inUse = action.payload.isInUse + ''
+          break
+        }
+      }
+    },
+    setMetalakeInUse(state, action) {
+      for(let i = 0; i < state.metalakes.length; i++) {
+        if (state.metalakes[i].name === action.payload.name) {
+          state.metalakes[i].properties['in-use'] = action.payload.isInUse + ''
+          break
+        }
+      }
+    },
     setTableProps(state, action) {
       state.tableProps = action.payload
     },
@@ -1248,6 +1266,8 @@ export const {
   setExpanded,
   setExpandedNodes,
   addCatalogToTree,
+  setCatalogInUse,
+  setMetalakeInUse,
   removeCatalogFromTree,
   setTableProps
 } = appMetalakesSlice.actions
