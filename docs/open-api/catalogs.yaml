@@ -201,11 +201,47 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    patch:
+      tags:
+        - catalog
+      summary: set catalog in-use
+      operationId: setCatalog
+      description: Set a specific catalog in-use or not in-use
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogSetRequest"
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/BaseResponse"
+        "404":
+          description: Not Found - The metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "#/components/examples/NoSuchCatalogException"
+        "500":
+          description:
+            Internal server error. It is possible that the server
+            encountered a storage issue.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+
+
+
     delete:
       tags:
         - catalog
       summary: Drop catalog
       operationId: dropCatalog
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/force"
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/DropResponse"
@@ -338,6 +374,18 @@ components:
           default: { }
           additionalProperties:
             type: string
+
+    CatalogSetRequest:
+      type: object
+      required:
+        - inUse
+      properties:
+        inUse:
+          type: boolean
+          description: The in-use status of the catalog to set
+      example: {
+        "inUse": true
+      }
 
     CatalogUpdatesRequest:
       type: object
