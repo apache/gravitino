@@ -17,7 +17,6 @@
  * under the License.
  */
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import com.github.jengelman.gradle.plugins.shadow.transformers.ServiceResourceTransformer
 
 plugins {
   `maven-publish`
@@ -43,11 +42,6 @@ tasks.withType(ShadowJar::class.java) {
   isZip64 = true
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
-
-  transform(ServiceResourceTransformer) {
-     resources = ['META-INF/services/*']
-     mergeStrategy = ServiceResourceTransformer.MergeStrategy.FIRST
-  }
 
   // Relocate dependencies to avoid conflicts
   relocate("org.apache.httpcomponents", "org.apache.gravitino.shaded.org.apache.httpcomponents")
