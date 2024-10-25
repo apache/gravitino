@@ -36,9 +36,11 @@ import org.apache.paimon.catalog.FileSystemCatalog;
 import org.apache.paimon.factories.FactoryException;
 import org.apache.paimon.hive.HiveCatalog;
 import org.apache.paimon.jdbc.JdbcCatalog;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** Tests for {@link org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils}. */
+@Tag("gravitino-docker-test")
 public class TestCatalogUtils {
 
   @Test

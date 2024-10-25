@@ -24,6 +24,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
@@ -69,8 +70,17 @@ public class MetadataObjectService {
       return FilesetMetaService.getInstance().getFilesetIdBySchemaIdAndName(schemaId, names.get(2));
     } else if (type == MetadataObject.Type.TOPIC) {
       return TopicMetaService.getInstance().getTopicIdBySchemaIdAndName(schemaId, names.get(2));
-    } else if (type == MetadataObject.Type.TABLE) {
-      return TableMetaService.getInstance().getTableIdBySchemaIdAndName(schemaId, names.get(2));
+    }
+
+    long tableId =
+        TableMetaService.getInstance().getTableIdBySchemaIdAndName(schemaId, names.get(2));
+    if (type == MetadataObject.Type.TABLE) {
+      return tableId;
+    }
+
+    if (type == MetadataObject.Type.COLUMN) {
+      return TableColumnMetaService.getInstance()
+          .getColumnIdByTableIdAndName(tableId, names.get(3));
     }
 
     throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));
@@ -79,91 +89,111 @@ public class MetadataObjectService {
   // Metadata object may be null because the metadata object can be deleted asynchronously.
   @Nullable
   public static String getMetadataObjectFullName(String type, long metadataObjectId) {
-    MetadataObject.Type metadatatype = MetadataObject.Type.valueOf(type);
-    if (metadatatype == MetadataObject.Type.METALAKE) {
-      MetalakePO metalakePO = MetalakeMetaService.getInstance().getMetalakePOById(metadataObjectId);
-      if (metalakePO == null) {
-        return null;
+    MetadataObject.Type metadataType = MetadataObject.Type.valueOf(type);
+    String fullName = null;
+    long objectId = metadataObjectId;
+
+    do {
+      switch (metadataType) {
+        case METALAKE:
+          MetalakePO metalakePO = MetalakeMetaService.getInstance().getMetalakePOById(objectId);
+          if (metalakePO != null) {
+            fullName = metalakePO.getMetalakeName();
+            metadataType = null;
+          } else {
+            return null;
+          }
+          break;
+
+        case CATALOG:
+          CatalogPO catalogPO = CatalogMetaService.getInstance().getCatalogPOById(objectId);
+          if (catalogPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(catalogPO.getCatalogName(), fullName)
+                    : catalogPO.getCatalogName();
+            metadataType = null;
+          } else {
+            return null;
+          }
+          break;
+
+        case SCHEMA:
+          SchemaPO schemaPO = SchemaMetaService.getInstance().getSchemaPOById(objectId);
+          if (schemaPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(schemaPO.getSchemaName(), fullName)
+                    : schemaPO.getSchemaName();
+            objectId = schemaPO.getCatalogId();
+            metadataType = MetadataObject.Type.CATALOG;
+          } else {
+            return null;
+          }
+          break;
+
+        case TABLE:
+          TablePO tablePO = TableMetaService.getInstance().getTablePOById(objectId);
+          if (tablePO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(tablePO.getTableName(), fullName)
+                    : tablePO.getTableName();
+            objectId = tablePO.getSchemaId();
+            metadataType = MetadataObject.Type.SCHEMA;
+          } else {
+            return null;
+          }
+          break;
+
+        case TOPIC:
+          TopicPO topicPO = TopicMetaService.getInstance().getTopicPOById(objectId);
+          if (topicPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(topicPO.getTopicName(), fullName)
+                    : topicPO.getTopicName();
+            objectId = topicPO.getSchemaId();
+            metadataType = MetadataObject.Type.SCHEMA;
+          } else {
+            return null;
+          }
+          break;
+
+        case FILESET:
+          FilesetPO filesetPO = FilesetMetaService.getInstance().getFilesetPOById(objectId);
+          if (filesetPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(filesetPO.getFilesetName(), fullName)
+                    : filesetPO.getFilesetName();
+            objectId = filesetPO.getSchemaId();
+            metadataType = MetadataObject.Type.SCHEMA;
+          } else {
+            return null;
+          }
+          break;
+
+        case COLUMN:
+          ColumnPO columnPO = TableColumnMetaService.getInstance().getColumnPOById(objectId);
+          if (columnPO != null) {
+            fullName =
+                fullName != null
+                    ? DOT_JOINER.join(columnPO.getColumnName(), fullName)
+                    : columnPO.getColumnName();
+            objectId = columnPO.getTableId();
+            metadataType = MetadataObject.Type.TABLE;
+          } else {
+            return null;
+          }
+          break;
+
+        default:
+          throw new IllegalArgumentException(
+              String.format("Doesn't support the type %s", metadataType));
       }
+    } while (metadataType != null);
 
-      return metalakePO.getMetalakeName();
-    }
-
-    if (metadatatype == MetadataObject.Type.CATALOG) {
-      return getCatalogFullName(metadataObjectId);
-    }
-
-    if (metadatatype == MetadataObject.Type.SCHEMA) {
-      return getSchemaFullName(metadataObjectId);
-    }
-
-    if (metadatatype == MetadataObject.Type.TABLE) {
-      TablePO tablePO = TableMetaService.getInstance().getTablePOById(metadataObjectId);
-      if (tablePO == null) {
-        return null;
-      }
-
-      String schemaName = getSchemaFullName(tablePO.getSchemaId());
-      if (schemaName == null) {
-        return null;
-      }
-
-      return DOT_JOINER.join(schemaName, tablePO.getTableName());
-    }
-
-    if (metadatatype == MetadataObject.Type.TOPIC) {
-      TopicPO topicPO = TopicMetaService.getInstance().getTopicPOById(metadataObjectId);
-      if (topicPO == null) {
-        return null;
-      }
-
-      String schemaName = getSchemaFullName(topicPO.getSchemaId());
-      if (schemaName == null) {
-        return null;
-      }
-
-      return DOT_JOINER.join(schemaName, topicPO.getTopicName());
-    }
-
-    if (metadatatype == MetadataObject.Type.FILESET) {
-      FilesetPO filesetPO = FilesetMetaService.getInstance().getFilesetPOById(metadataObjectId);
-      if (filesetPO == null) {
-        return null;
-      }
-
-      String schemaName = getSchemaFullName(filesetPO.getSchemaId());
-      if (schemaName == null) {
-        return null;
-      }
-
-      return DOT_JOINER.join(schemaName, filesetPO.getFilesetName());
-    }
-
-    throw new IllegalArgumentException(String.format("Doesn't support the type %s", metadatatype));
-  }
-
-  @Nullable
-  private static String getCatalogFullName(Long entityId) {
-    CatalogPO catalogPO = CatalogMetaService.getInstance().getCatalogPOById(entityId);
-    if (catalogPO == null) {
-      return null;
-    }
-    return catalogPO.getCatalogName();
-  }
-
-  @Nullable
-  private static String getSchemaFullName(Long entityId) {
-    SchemaPO schemaPO = SchemaMetaService.getInstance().getSchemaPOById(entityId);
-
-    if (schemaPO == null) {
-      return null;
-    }
-
-    String catalogName = getCatalogFullName(schemaPO.getCatalogId());
-    if (catalogName == null) {
-      return null;
-    }
-
-    return DOT_JOINER.join(catalogName, schemaPO.getSchemaName());
+    return fullName;
   }
 }

@@ -46,7 +46,6 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.gravitino.catalog.lakehouse.paimon.utils.CatalogUtils;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -256,7 +255,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), createdTable.columns()[i]);
+      assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -269,7 +268,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), loadTable.columns()[i]);
+      assertColumn(columns[i], loadTable.columns()[i]);
     }
 
     // catalog load check
@@ -346,7 +345,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), createdTable.columns()[i]);
+      assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -374,7 +373,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     Assertions.assertArrayEquals(partitionKeys, loadedPartitionKeys);
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), loadTable.columns()[i]);
+      assertColumn(columns[i], loadTable.columns()[i]);
     }
 
     // catalog load check
@@ -459,7 +458,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     }
     Assertions.assertEquals(createdTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), createdTable.columns()[i]);
+      assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
@@ -488,7 +487,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), loadTable.columns()[i]);
+      assertColumn(columns[i], loadTable.columns()[i]);
     }
 
     // catalog load check
@@ -968,5 +967,14 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
                 "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
             .enableHiveSupport()
             .getOrCreate();
+  }
+
+  protected void assertColumn(Column expectedColumn, Column actualColumn) {
+    Assertions.assertEquals(expectedColumn.name(), actualColumn.name());
+    Assertions.assertEquals(expectedColumn.dataType(), actualColumn.dataType());
+    Assertions.assertEquals(expectedColumn.comment(), actualColumn.comment());
+    Assertions.assertEquals(expectedColumn.nullable(), actualColumn.nullable());
+    Assertions.assertEquals(expectedColumn.autoIncrement(), actualColumn.autoIncrement());
+    Assertions.assertEquals(expectedColumn.defaultValue(), actualColumn.defaultValue());
   }
 }
