@@ -26,9 +26,9 @@ the future versions.
    `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, etc. A metadata object is combined by a `type` and a
    comma-separated `name`. For example, a `CATAGLOG` object has a name "catalog1" with type
    "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
-   object has a name "catalog1.schema1.table1" with type "TABLE".
-2. Currently, only `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC` objects can be tagged, tagging
-   on `COLUMN` will be supported in the future.
+   object has a name "catalog1.schema1.table1" with type "TABLE", a `COLUMN` object has a name 
+   "catalog1.schema1.table1.column1" with type "COLUMN".
+2. Currently, `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `COLUMN` objects can be tagged.
 3. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
    tags of its parent metadata objects. For example, listing tags of a `Table` will also list
    the tags of its parent `Schema` and `Catalog`.
