@@ -33,6 +33,7 @@ dependencies {
   compileOnly(libs.hadoop3.common)
 
   implementation(libs.commons.lang3)
+  // runtime used
   implementation(libs.commons.logging)
   implementation(libs.hadoop3.gcs)
   implementation(libs.google.auth.http)
@@ -45,8 +46,8 @@ tasks.withType(ShadowJar::class.java) {
   archiveClassifier.set("")
 
   // Relocate dependencies to avoid conflicts
-  relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
-  relocate("org.apache.commons", "org.apache.gravitino.gcp.shaded.org.apache.commons")
+  relocate("org.apache.httpcomponents", "org.apache.gravitino.shaded.org.apache.httpcomponents")
+  relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")
   relocate("com.google", "org.apache.gravitino.shaded.com.google")
 }
 
