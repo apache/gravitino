@@ -127,6 +127,8 @@ public class ColumnPO {
 
   private String columnName;
 
+  private Integer columnPosition;
+
   private Long metalakeId;
 
   private Long catalogId;
@@ -174,6 +176,11 @@ public class ColumnPO {
 
     public Builder withColumnName(String columnName) {
       columnPO.columnName = columnName;
+      return this;
+    }
+
+    public Builder withColumnPosition(Integer columnPosition) {
+      columnPO.columnPosition = columnPosition;
       return this;
     }
 
@@ -247,6 +254,7 @@ public class ColumnPO {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(columnPO.columnName),
           "Column name is required and cannot be blank");
+      Preconditions.checkArgument(columnPO.columnPosition != null, "Column position is required");
       Preconditions.checkArgument(columnPO.metalakeId != null, "Metalake id is required");
       Preconditions.checkArgument(columnPO.catalogId != null, "Catalog id is required");
       Preconditions.checkArgument(columnPO.schemaId != null, "Schema id is required");

@@ -24,10 +24,12 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -136,13 +138,29 @@ public class TestCatalogOperations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
+    TestColumn[] sortedColumns =
+        IntStream.range(0, columns.length)
+            .mapToObj(
+                i ->
+                    TestColumn.builder()
+                        .withName(columns[i].name())
+                        .withPosition(i)
+                        .withComment(columns[i].comment())
+                        .withType(columns[i].dataType())
+                        .withNullable(columns[i].nullable())
+                        .withAutoIncrement(columns[i].autoIncrement())
+                        .withDefaultValue(columns[i].defaultValue())
+                        .build())
+            .sorted(Comparator.comparingInt(TestColumn::position))
+            .toArray(TestColumn[]::new);
+
     TestTable table =
         TestTable.builder()
             .withName(ident.name())
             .withComment(comment)
             .withProperties(new HashMap<>(properties))
             .withAuditInfo(auditInfo)
-            .withColumns(columns)
+            .withColumns(sortedColumns)
             .withDistribution(distribution)
             .withSortOrders(sortOrders)
             .withPartitioning(partitions)
@@ -160,7 +178,7 @@ public class TestCatalogOperations
         .withComment(comment)
         .withProperties(new HashMap<>(properties))
         .withAuditInfo(auditInfo)
-        .withColumns(columns)
+        .withColumns(sortedColumns)
         .withDistribution(distribution)
         .withSortOrders(sortOrders)
         .withPartitioning(partitions)
@@ -646,6 +664,39 @@ public class TestCatalogOperations
     }
   }
 
+  private Map<String, Column> updateColumnPositionsAfterColumnUpdate(
+      String updatedColumnName,
+      TableChange.ColumnPosition newColumnPosition,
+      Map<String, Column> allColumns) {
+    TestColumn updatedColumn = (TestColumn) allColumns.get(updatedColumnName);
+    int newPosition;
+    if (newColumnPosition instanceof TableChange.First) {
+      newPosition = 0;
+    } else if (newColumnPosition instanceof TableChange.Default) {
+      newPosition = allColumns.size() - 1;
+    } else if (newColumnPosition instanceof TableChange.After) {
+      String afterColumnName = ((TableChange.After) newColumnPosition).getColumn();
+      Column afterColumn = allColumns.get(afterColumnName);
+      newPosition = ((TestColumn) afterColumn).position() + 1;
+    } else {
+      throw new IllegalArgumentException("Unsupported column position: " + newColumnPosition);
+    }
+    updatedColumn.setPosition(newPosition);
+
+    allColumns.forEach(
+        (columnName, column) -> {
+          if (columnName.equals(updatedColumnName)) {
+            return;
+          }
+          TestColumn testColumn = (TestColumn) column;
+          if (testColumn.position() >= newPosition) {
+            testColumn.setPosition(testColumn.position() + 1);
+          }
+        });
+
+    return allColumns;
+  }
+
   private Column[] updateColumns(Column[] columns, TableChange.ColumnChange[] columnChanges) {
     Map<String, Column> columnMap =
         Arrays.stream(columns).collect(Collectors.toMap(Column::name, Function.identity()));
@@ -656,6 +707,7 @@ public class TestCatalogOperations
         TestColumn column =
             TestColumn.builder()
                 .withName(String.join(".", addColumn.fieldName()))
+                .withPosition(columnMap.size())
                 .withComment(addColumn.getComment())
                 .withType(addColumn.getDataType())
                 .withNullable(addColumn.isNullable())
@@ -663,9 +715,18 @@ public class TestCatalogOperations
                 .withDefaultValue(addColumn.getDefaultValue())
                 .build();
         columnMap.put(column.name(), column);
+        updateColumnPositionsAfterColumnUpdate(column.name(), addColumn.getPosition(), columnMap);
 
       } else if (columnChange instanceof TableChange.DeleteColumn) {
-        columnMap.remove(String.join(".", columnChange.fieldName()));
+        TestColumn removedColumn =
+            (TestColumn) columnMap.remove(String.join(".", columnChange.fieldName()));
+        columnMap.forEach(
+            (columnName, column) -> {
+              TestColumn testColumn = (TestColumn) column;
+              if (testColumn.position() > removedColumn.position()) {
+                testColumn.setPosition(testColumn.position() - 1);
+              }
+            });
 
       } else if (columnChange instanceof TableChange.RenameColumn) {
         String oldName = String.join(".", columnChange.fieldName());
@@ -674,6 +735,7 @@ public class TestCatalogOperations
         TestColumn newColumn =
             TestColumn.builder()
                 .withName(newName)
+                .withPosition(((TestColumn) column).position())
                 .withComment(column.comment())
                 .withType(column.dataType())
                 .withNullable(column.nullable())
@@ -690,6 +752,7 @@ public class TestCatalogOperations
         TestColumn newColumn =
             TestColumn.builder()
                 .withName(columnName)
+                .withPosition(((TestColumn) oldColumn).position())
                 .withComment(oldColumn.comment())
                 .withType(oldColumn.dataType())
                 .withNullable(oldColumn.nullable())
@@ -705,6 +768,7 @@ public class TestCatalogOperations
         TestColumn newColumn =
             TestColumn.builder()
                 .withName(columnName)
+                .withPosition(((TestColumn) oldColumn).position())
                 .withComment(oldColumn.comment())
                 .withType(updateColumnType.getNewDataType())
                 .withNullable(oldColumn.nullable())
@@ -721,6 +785,7 @@ public class TestCatalogOperations
         TestColumn newColumn =
             TestColumn.builder()
                 .withName(columnName)
+                .withPosition(((TestColumn) oldColumn).position())
                 .withComment(updateColumnComment.getNewComment())
                 .withType(oldColumn.dataType())
                 .withNullable(oldColumn.nullable())
@@ -737,6 +802,7 @@ public class TestCatalogOperations
         TestColumn newColumn =
             TestColumn.builder()
                 .withName(columnName)
+                .withPosition(((TestColumn) oldColumn).position())
                 .withComment(oldColumn.comment())
                 .withType(oldColumn.dataType())
                 .withNullable(updateColumnNullable.nullable())
@@ -753,6 +819,7 @@ public class TestCatalogOperations
         TestColumn newColumn =
             TestColumn.builder()
                 .withName(columnName)
+                .withPosition(((TestColumn) oldColumn).position())
                 .withComment(oldColumn.comment())
                 .withType(oldColumn.dataType())
                 .withNullable(oldColumn.nullable())
@@ -761,10 +828,22 @@ public class TestCatalogOperations
                 .build();
         columnMap.put(columnName, newColumn);
 
+      } else if (columnChange instanceof TableChange.UpdateColumnPosition) {
+        String columnName = String.join(".", columnChange.fieldName());
+        TableChange.UpdateColumnPosition updateColumnPosition =
+            (TableChange.UpdateColumnPosition) columnChange;
+        columnMap =
+            updateColumnPositionsAfterColumnUpdate(
+                columnName, updateColumnPosition.getPosition(), columnMap);
+
       } else {
-        // do nothing
+        throw new IllegalArgumentException("Unsupported column change: " + columnChange);
       }
     }
-    return columnMap.values().toArray(new Column[0]);
+
+    return columnMap.values().stream()
+        .map(TestColumn.class::cast)
+        .sorted(Comparator.comparingInt(TestColumn::position))
+        .toArray(TestColumn[]::new);
   }
 }

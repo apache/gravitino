@@ -26,8 +26,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.listener.api.event.AlterCatalogEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogEvent;
@@ -145,9 +148,10 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   }
 
   @Override
-  public boolean dropCatalog(NameIdentifier ident) {
+  public boolean dropCatalog(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, CatalogInUseException {
     try {
-      boolean isExists = dispatcher.dropCatalog(ident);
+      boolean isExists = dispatcher.dropCatalog(ident, force);
       eventBus.dispatchEvent(
           new DropCatalogEvent(PrincipalUtils.getCurrentUserName(), ident, isExists));
       return isExists;
@@ -168,5 +172,18 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       throws Exception {
     // TODO: Support event dispatching for testConnection
     dispatcher.testConnection(ident, type, provider, comment, properties);
+  }
+
+  @Override
+  public void enableCatalog(NameIdentifier ident)
+      throws NoSuchCatalogException, CatalogNotInUseException {
+    // todo: support enable catalog event
+    dispatcher.enableCatalog(ident);
+  }
+
+  @Override
+  public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    // todo: support disable catalog event
+    dispatcher.disableCatalog(ident);
   }
 }

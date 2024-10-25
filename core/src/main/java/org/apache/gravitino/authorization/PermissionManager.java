@@ -33,6 +33,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -129,6 +130,8 @@ class PermissionManager {
     } catch (NoSuchEntityException nse) {
       LOG.warn("Failed to grant, user {} does not exist in the metalake {}", user, metalake, nse);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
+    } catch (NoSuchRoleException nsr) {
+      throw new IllegalRoleException(nsr);
     } catch (IOException ioe) {
       LOG.error(
           "Failed to grant role {} to user {} in the metalake {} due to storage issues",
@@ -208,6 +211,8 @@ class PermissionManager {
     } catch (NoSuchEntityException nse) {
       LOG.warn("Failed to grant, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
+    } catch (NoSuchRoleException nsr) {
+      throw new IllegalRoleException(nsr);
     } catch (IOException ioe) {
       LOG.error(
           "Failed to grant role {} to group {} in the metalake {} due to storage issues",
@@ -288,6 +293,8 @@ class PermissionManager {
       LOG.warn(
           "Failed to revoke, group {} does not exist in the metalake {}", group, metalake, nse);
       throw new NoSuchGroupException(GROUP_DOES_NOT_EXIST_MSG, group, metalake);
+    } catch (NoSuchRoleException nsr) {
+      throw new IllegalRoleException(nsr);
     } catch (IOException ioe) {
       LOG.error(
           "Failed to revoke role {} from  group {} in the metalake {} due to storage issues",
@@ -366,6 +373,8 @@ class PermissionManager {
     } catch (NoSuchEntityException nse) {
       LOG.warn("Failed to revoke, user {} does not exist in the metalake {}", user, metalake, nse);
       throw new NoSuchUserException(USER_DOES_NOT_EXIST_MSG, user, metalake);
+    } catch (NoSuchRoleException nsr) {
+      throw new IllegalRoleException(nsr);
     } catch (IOException ioe) {
       LOG.error(
           "Failed to revoke role {} from  user {} in the metalake {} due to storage issues",

@@ -77,6 +77,8 @@ public class GravitinoCommandLine {
   private String urlEnv;
   private boolean urlSet = false;
   private boolean ignore = false;
+  private String ignoreEnv;
+  private boolean ignoreSet = false;
 
   public static final String CMD = "gcli"; // recommended name
   public static final String DEFAULT_URL = "http://localhost:8090";
@@ -98,9 +100,26 @@ public class GravitinoCommandLine {
 
   /** Handles the parsed command line arguments and executes the corresponding actions. */
   public void handleCommandLine() {
+    GravitinoConfig config = new GravitinoConfig(null);
+
     /* Check if you should ignore client/version versions */
     if (line.hasOption(GravitinoOptions.IGNORE)) {
       ignore = true;
+    } else {
+      // Cache the ignore environment variable
+      if (ignoreEnv == null && !ignoreSet) {
+        ignoreEnv = System.getenv("GRAVITINO_IGNORE");
+        ignore = ignoreEnv != null && ignoreEnv.equals("true");
+        ignoreSet = true;
+      }
+
+      // Check if the ignore name is specified in the configuration file
+      if (ignoreEnv == null) {
+        if (config.fileExists()) {
+          config.read();
+          ignore = config.getIgnore();
+        }
+      }
     }
 
     executeCommand();
@@ -392,18 +411,20 @@ public class GravitinoCommandLine {
     if (urlEnv == null && !urlSet) {
       urlEnv = System.getenv("GRAVITINO_URL");
       urlSet = true;
-      // Check if the metalake name is specified in the configuration file
-    } else if (config.fileExists()) {
-      config.read();
-      String configURL = config.getGravitinoURL();
-      if (configURL != null) {
-        return configURL;
-      }
     }
 
     // If set return the Gravitino URL environment variable
     if (urlEnv != null) {
       return urlEnv;
+    }
+
+    // Check if the metalake name is specified in the configuration file
+    if (config.fileExists()) {
+      config.read();
+      String configURL = config.getGravitinoURL();
+      if (configURL != null) {
+        return configURL;
+      }
     }
 
     // Return the default localhost URL

@@ -98,7 +98,7 @@ public class CheckCurrentUserIT extends BaseIT {
   @AfterAll
   public void tearDown() {
     if (client != null) {
-      client.dropMetalake(metalakeName);
+      client.dropMetalake(metalakeName, true);
       client.close();
       client = null;
     }
@@ -146,7 +146,7 @@ public class CheckCurrentUserIT extends BaseIT {
                 .createTopic(topicIdent, "comment", null, Collections.emptyMap()));
     catalog.asTopicCatalog().dropTopic(topicIdent);
 
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 
   @Test
@@ -191,7 +191,7 @@ public class CheckCurrentUserIT extends BaseIT {
     // Clean up
     catalog.asFilesetCatalog().dropFileset(fileIdent);
     catalog.asSchemas().dropSchema("schema", true);
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 
   @Test
@@ -268,6 +268,6 @@ public class CheckCurrentUserIT extends BaseIT {
     // Clean up
     catalog.asTableCatalog().dropTable(tableIdent);
     catalog.asSchemas().dropSchema("schema", true);
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 }

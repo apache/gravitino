@@ -30,8 +30,10 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 
 public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   private static final Set<String> RESERVED_WORDS =
@@ -105,6 +107,12 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public boolean dropCatalog(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, CatalogInUseException {
+    return dispatcher.dropCatalog(ident, force);
+  }
+
+  @Override
   public void testConnection(
       NameIdentifier ident,
       Catalog.Type type,
@@ -114,6 +122,16 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
       throws Exception {
     validateCatalogName(ident.name());
     dispatcher.testConnection(ident, type, provider, comment, properties);
+  }
+
+  @Override
+  public void enableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    dispatcher.enableCatalog(ident);
+  }
+
+  @Override
+  public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    dispatcher.disableCatalog(ident);
   }
 
   private void validateCatalogName(String name) throws IllegalArgumentException {
