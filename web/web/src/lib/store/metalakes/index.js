@@ -1133,12 +1133,23 @@ export const appMetalakesSlice = createSlice({
       state.metalakeTree = state.metalakeTree.filter(i => i.key !== action.payload)
     },
     setCatalogInUse(state, action) {
+      const { name, catalogType, metalake, isInUse } = action.payload
       for (let i = 0; i < state.catalogs.length; i++) {
-        if (state.catalogs[i].name === action.payload.name) {
-          state.catalogs[i].inUse = action.payload.isInUse + ''
-          state.tableData[i].inUse = action.payload.isInUse + ''
+        if (state.catalogs[i].name === name) {
+          state.catalogs[i].inUse = isInUse + ''
+          state.tableData[i].inUse = isInUse + ''
+          const catalogItem = state.metalakeTree[i]
+          catalogItem.inUse = isInUse + ''
+          state.metalakeTree.splice(i, 1, catalogItem)
           break
         }
+      }
+      if (!isInUse) {
+        state.expandedNodes = state.expandedNodes.filter(key => !key.includes(name))
+        state.loadedNodes = state.loadedNodes.filter(key => !key.includes(name))
+        state.metalakeTree = updateTreeData(state.metalakeTree, `{{${metalake}}}{{${name}}}{{${catalogType}}}`, [])
+      } else {
+        state.metalakeTree = updateTreeData(state.metalakeTree, `{{${metalake}}}{{${name}}}{{${catalogType}}}`, null)
       }
     },
     setMetalakeInUse(state, action) {

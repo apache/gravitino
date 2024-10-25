@@ -125,24 +125,28 @@ const TableBody = props => {
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Tooltip title={row.comment} placement='right'>
-              <Typography
-                noWrap
-                component={Link}
-                href={`/metalakes?metalake=${name}`}
-                onClick={() => handleClickLink()}
-                sx={{
-                  fontWeight: 500,
-                  color: 'primary.main',
-                  textDecoration: 'none',
-                  maxWidth: 240,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  '&:hover': { color: 'primary.main', textDecoration: 'underline' }
-                }}
-                data-refer={`metalake-link-${name}`}
-              >
-                {name}
-              </Typography>
+              {row.properties['in-use'] === 'true' ? (
+                <Typography
+                  noWrap
+                  component={Link}
+                  href={`/metalakes?metalake=${name}`}
+                  onClick={() => handleClickLink()}
+                  sx={{
+                    fontWeight: 500,
+                    color: 'primary.main',
+                    textDecoration: 'none',
+                    maxWidth: 240,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    '&:hover': { color: 'primary.main', textDecoration: 'underline' }
+                  }}
+                  data-refer={`metalake-link-${name}`}
+                >
+                  {name}
+                </Typography>
+              ) : (
+                <Typography>{name}</Typography>
+              )}
             </Tooltip>
             <Tooltip title={row.properties['in-use'] === 'true' ? 'In-use' : 'Not In-use'} placement='right'>
               <Switch

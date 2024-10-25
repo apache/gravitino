@@ -44,7 +44,14 @@ import CreateSchemaDialog from '../../CreateSchemaDialog'
 import CreateFilesetDialog from '../../CreateFilesetDialog'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { deleteCatalog, deleteFileset, deleteSchema, setCatalogInUse } from '@/lib/store/metalakes'
+import {
+  deleteCatalog,
+  deleteFileset,
+  deleteSchema,
+  resetExpandNode,
+  setCatalogInUse,
+  setIntoTreeNodes
+} from '@/lib/store/metalakes'
 
 import { to } from '@/lib/utils'
 import { getCatalogDetailsApi, switchInUseApi } from '@/lib/api/catalogs'
@@ -79,6 +86,8 @@ const TableView = () => {
   const catalog = searchParams.get('catalog') || ''
   const type = searchParams.get('type') || ''
   const schema = searchParams.get('schema') || ''
+
+  const isCatalogList = paramsSize == 1 && searchParams.has('metalake')
 
   const isKafkaSchema =
     paramsSize == 3 &&
@@ -237,32 +246,36 @@ const TableView = () => {
 
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Tooltip title={row.comment} placement='right'>
-              <Typography
-                noWrap
-                {...(path
-                  ? {
-                      component: Link,
-                      href: path
-                    }
-                  : {})}
-                onClick={() => handleClickUrl(path)}
-                sx={{
-                  fontWeight: 400,
-                  color: 'primary.main',
-                  textDecoration: 'none',
-                  '&:hover': { color: 'primary.main', textDecoration: 'underline' }
-                }}
-              >
-                {name}
-              </Typography>
+            <Tooltip title={row.comment} placement='left'>
+              {(isCatalogList && row.inUse === 'true') || !isCatalogList ? (
+                <Typography
+                  noWrap
+                  {...(path
+                    ? {
+                        component: Link,
+                        href: path
+                      }
+                    : {})}
+                  onClick={() => handleClickUrl(path)}
+                  sx={{
+                    fontWeight: 400,
+                    color: 'primary.main',
+                    textDecoration: 'none',
+                    '&:hover': { color: 'primary.main', textDecoration: 'underline' }
+                  }}
+                >
+                  {name}
+                </Typography>
+              ) : (
+                <Typography>{name}</Typography>
+              )}
             </Tooltip>
-            {paramsSize == 1 && searchParams.has('metalake') && (
+            {isCatalogList && (
               <Tooltip title={row.inUse === 'true' ? 'In-use' : 'Not In-use'} placement='right'>
                 <Switch
                   data-refer={`catalog-in-use-${name}`}
                   checked={row.inUse === 'true'}
-                  onChange={(e, value) => handleChangeInUse(name, value)}
+                  onChange={(e, value) => handleChangeInUse(name, row.type, value)}
                   size='small'
                 />
               </Tooltip>
@@ -574,12 +587,12 @@ const TableView = () => {
     }
   }
 
-  const handleChangeInUse = async (name, isInUse) => {
+  const handleChangeInUse = async (name, catalogType, isInUse) => {
     const [err, res] = await to(switchInUseApi({ metalake, catalog: name, isInUse }))
     if (err || !res) {
       throw new Error(err)
     }
-    dispatch(setCatalogInUse({ name, isInUse }))
+    dispatch(setCatalogInUse({ name, catalogType, metalake, isInUse }))
   }
 
   const checkColumns = () => {
