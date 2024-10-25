@@ -234,8 +234,6 @@
    Error Prone Annotations
    Failure Access
    Guava
-   Google Auth http
-   Google Auth Credentials
    Google Guice
    Google Guice Servlet
    J2ObjC Annotations
@@ -401,6 +399,8 @@
    RE2/J
    ZSTD JNI
    fsspec
+   Google auth HTTP
+   Google auth Credentials
 
    This product bundles various third-party components also under the
    MIT license
