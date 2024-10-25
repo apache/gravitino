@@ -156,7 +156,7 @@ public class TrinoQueryITBase {
     if (!exists) {
       return;
     }
-    gravitinoClient.dropMetalake(metalakeName);
+    gravitinoClient.dropMetalake(metalakeName, true);
   }
 
   private static void createCatalog(
@@ -232,6 +232,7 @@ public class TrinoQueryITBase {
               LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema);
             });
 
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
     LOG.info("Drop catalog \"{}.{}\"", metalakeName, catalogName);
   }

@@ -18,64 +18,13 @@
  */
 package org.apache.gravitino.authorization.ranger;
 
+import org.apache.gravitino.authorization.Privilege;
+
 /** RangerPrivilege interface is used to define the Ranger privileges. */
 public interface RangerPrivilege {
   String getName();
 
+  Privilege.Condition condition();
+
   boolean equalsTo(String value);
-
-  /** Ranger Hive privileges enumeration. */
-  enum RangerHivePrivilege implements RangerPrivilege {
-    ALL("all"),
-    SELECT("select"),
-    UPDATE("update"),
-    CREATE("create"),
-    DROP("drop"),
-    ALTER("alter"),
-    INDEX("index"),
-    LOCK("lock"),
-    READ("read"),
-    WRITE("write"),
-    REPLADMIN("repladmin"),
-    SERVICEADMIN("serviceadmin");
-
-    private final String name; // Access a type in the Ranger policy item
-
-    RangerHivePrivilege(String name) {
-      this.name = name;
-    }
-
-    @Override
-    public String getName() {
-      return name;
-    }
-
-    @Override
-    public boolean equalsTo(String value) {
-      return name.equalsIgnoreCase(value);
-    }
-  }
-
-  /** Ranger HDFS privileges enumeration. */
-  enum RangerHdfsPrivilege implements RangerPrivilege {
-    READ("read"),
-    WRITE("write"),
-    EXECUTE("execute");
-
-    private final String name; // Access a type in the Ranger policy item
-
-    RangerHdfsPrivilege(String name) {
-      this.name = name;
-    }
-
-    @Override
-    public String getName() {
-      return name;
-    }
-
-    @Override
-    public boolean equalsTo(String value) {
-      return name.equalsIgnoreCase(value);
-    }
-  }
 }

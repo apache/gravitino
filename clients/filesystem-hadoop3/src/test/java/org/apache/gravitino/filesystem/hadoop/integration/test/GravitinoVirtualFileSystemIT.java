@@ -56,13 +56,14 @@ import org.slf4j.LoggerFactory;
 @Tag("gravitino-docker-test")
 public class GravitinoVirtualFileSystemIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemIT.class);
-  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected String metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
   protected String catalogName = GravitinoITUtils.genRandomName("catalog");
   protected String schemaName = GravitinoITUtils.genRandomName("schema");
   protected GravitinoMetalake metalake;
   protected Configuration conf = new Configuration();
   protected int defaultBockSize = 128 * 1024 * 1024;
+  protected int defaultReplication = 3;
 
   @BeforeAll
   public void startUp() throws Exception {
@@ -91,8 +92,8 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
   public void tearDown() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
 
     if (client != null) {
       client.close();
@@ -459,7 +460,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(filesetIdent));
     Path gvfsPath = genGvfsPath(filesetName);
     try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-      assertEquals(3, gvfs.getDefaultReplication(gvfsPath));
+      assertEquals(defaultReplication, gvfs.getDefaultReplication(gvfsPath));
     }
 
     catalog.asFilesetCatalog().dropFileset(filesetIdent);

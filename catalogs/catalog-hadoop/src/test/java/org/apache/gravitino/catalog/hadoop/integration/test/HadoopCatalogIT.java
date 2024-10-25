@@ -61,19 +61,24 @@ public class HadoopCatalogIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogIT.class);
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  public String metalakeName = GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
-  public String catalogName = GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
-  public static final String SCHEMA_PREFIX = "CatalogFilesetIT_schema";
-  public String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
+  protected String metalakeName = GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
+  protected String catalogName = GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
+  public final String SCHEMA_PREFIX = "CatalogFilesetIT_schema";
+  protected String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
   protected static final String provider = "hadoop";
-  protected static GravitinoMetalake metalake;
-  protected static Catalog catalog;
-  protected static FileSystem fileSystem;
-  protected static String defaultBaseLocation;
+  protected GravitinoMetalake metalake;
+  protected Catalog catalog;
+  protected FileSystem fileSystem;
+  protected String defaultBaseLocation;
+
+  protected void startNecessaryContainer() {
+    containerSuite.startHiveContainer();
+  }
 
   @BeforeAll
   public void setup() throws IOException {
-    containerSuite.startHiveContainer();
+    startNecessaryContainer();
+
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", defaultBaseLocation());
     fileSystem = FileSystem.get(conf);
@@ -87,8 +92,8 @@ public class HadoopCatalogIT extends BaseIT {
   public void stop() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
     if (fileSystem != null) {
       fileSystem.close();
     }
@@ -104,10 +109,9 @@ public class HadoopCatalogIT extends BaseIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
@@ -160,7 +164,7 @@ public class HadoopCatalogIT extends BaseIT {
 
     Assertions.assertEquals(newLocation, modifiedCatalog.properties().get("location"));
 
-    metalake.dropCatalog(catalogName);
+    metalake.dropCatalog(catalogName, true);
   }
 
   @Test
@@ -606,7 +610,7 @@ public class HadoopCatalogIT extends BaseIT {
         filesetCatalog.asSchemas().schemaExists(schemaName), "schema should not be exists");
 
     // Drop the catalog.
-    dropped = metalake.dropCatalog(catalogName);
+    dropped = metalake.dropCatalog(catalogName, true);
     Assertions.assertTrue(dropped, "catalog should be dropped");
     Assertions.assertFalse(metalake.catalogExists(catalogName), "catalog should not be exists");
   }

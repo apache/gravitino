@@ -22,12 +22,10 @@ import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalog;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
-import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseColumnDefaultValueConverter;
-import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseExceptionConverter;
 import org.apache.gravitino.catalog.oceanbase.converter.OceanBaseTypeConverter;
 import org.apache.gravitino.catalog.oceanbase.operation.OceanBaseDatabaseOperations;
 import org.apache.gravitino.catalog.oceanbase.operation.OceanBaseTableOperations;
@@ -55,11 +53,6 @@ public class OceanBaseCatalog extends JdbcCatalog {
   @Override
   public Capability newCapability() {
     return new OceanBaseCatalogCapability();
-  }
-
-  @Override
-  protected JdbcExceptionConverter createExceptionConverter() {
-    return new OceanBaseExceptionConverter();
   }
 
   @Override

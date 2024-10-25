@@ -18,12 +18,14 @@
  */
 package org.apache.gravitino.catalog.lakehouse.hudi.integration.test;
 
+import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.CATALOG_BACKEND;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata.URI;
 import static org.apache.gravitino.catalog.lakehouse.hudi.HudiSchemaPropertiesMetadata.LOCATION;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -146,7 +148,9 @@ public class HudiCatalogHMSIT extends BaseIT {
     Assertions.assertEquals(Catalog.Type.RELATIONAL, catalog.type());
     Assertions.assertEquals("lakehouse-hudi", catalog.provider());
     Assertions.assertEquals(comment, catalog.comment());
-    Assertions.assertEquals(properties, catalog.properties());
+    Map<String, String> expectedProperties = new HashMap<>(properties);
+    expectedProperties.put(PROPERTY_IN_USE, "true");
+    Assertions.assertEquals(expectedProperties, catalog.properties());
 
     // test list
     String[] catalogs = metalake.listCatalogs();

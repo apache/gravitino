@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS table_column_version_info (
     table_version INT NOT NULL,
     column_id BIGINT NOT NULL,
     column_name VARCHAR(128) NOT NULL,
+    column_position INT NOT NULL,
     column_type TEXT NOT NULL,
     column_comment VARCHAR(256) DEFAULT '',
     column_nullable SMALLINT NOT NULL DEFAULT 1,
@@ -173,6 +174,7 @@ COMMENT ON COLUMN table_column_version_info.table_id IS 'table id';
 COMMENT ON COLUMN table_column_version_info.table_version IS 'table version';
 COMMENT ON COLUMN table_column_version_info.column_id IS 'column id';
 COMMENT ON COLUMN table_column_version_info.column_name IS 'column name';
+COMMENT ON COLUMN table_column_version_info.column_position IS 'column position, starting from 0';
 COMMENT ON COLUMN table_column_version_info.column_type IS 'column type';
 COMMENT ON COLUMN table_column_version_info.column_comment IS 'column comment';
 COMMENT ON COLUMN table_column_version_info.column_nullable IS 'column nullable, 0 is not nullable, 1 is nullable';

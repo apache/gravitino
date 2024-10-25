@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.integration.test.authorization;
+package org.apache.gravitino.client.integration.test.authorization;
 
 import com.google.common.collect.Lists;
 import java.util.Collections;
@@ -148,6 +148,7 @@ public class AccessControlNotAllowIT extends BaseIT {
     Assertions.assertTrue(
         e.getMessage().contains("You should set 'gravitino.authorization.enable'"));
 
+    client.disableMetalake(metalakeTestName);
     client.dropMetalake(metalakeTestName);
   }
 }

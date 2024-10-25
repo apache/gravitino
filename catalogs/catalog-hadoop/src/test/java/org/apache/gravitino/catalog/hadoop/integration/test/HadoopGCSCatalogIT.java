@@ -42,8 +42,21 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
   public static final String BUCKET_NAME = "YOUR_BUCKET";
   public static final String SERVICE_ACCOUNT_FILE = "YOUR_KEY_FILE";
 
+  @Override
+  public void startIntegrationTest() throws Exception {
+    // Just overwrite super, do nothing.
+  }
+
   @BeforeAll
   public void setup() throws IOException {
+    copyBundleJarsToHadoop("gcp-bundle");
+
+    try {
+      super.startIntegrationTest();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
     metalakeName = GravitinoITUtils.genRandomName("CatalogFilesetIT_metalake");
     catalogName = GravitinoITUtils.genRandomName("CatalogFilesetIT_catalog");
     schemaName = GravitinoITUtils.genRandomName("CatalogFilesetIT_schema");

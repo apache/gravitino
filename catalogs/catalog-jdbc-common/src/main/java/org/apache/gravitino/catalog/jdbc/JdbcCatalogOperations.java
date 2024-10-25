@@ -74,6 +74,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.MapUtils;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -570,9 +571,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         .toArray(TableChange[]::new);
   }
 
-  // TODO. We should figure out a better way to get the current user from servlet container.
   private static String currentUser() {
-    return System.getProperty("user.name");
+    return PrincipalUtils.getCurrentUserName();
   }
 
   public void deregisterDriver(Driver driver) throws SQLException {
