@@ -30,7 +30,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -44,6 +43,8 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -71,11 +72,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HadoopCatalogOperations implements CatalogOperations, SupportsSchemas, FilesetCatalog {
-
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
-
   private static final Logger LOG = LoggerFactory.getLogger(HadoopCatalogOperations.class);
 
   private final EntityStore store;
@@ -89,6 +88,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private Map<String, String> conf;
 
   private CatalogInfo catalogInfo;
+
+  private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
+
+  private FileSystemProvider defaultFileSystemProvider;
 
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
@@ -107,7 +110,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   public Configuration getHadoopConf() {
-    return hadoopConf;
+    Configuration configuration = new Configuration();
+    conf.forEach((k, v) -> configuration.set(k.replace(CATALOG_BYPASS_PREFIX, ""), v));
+    return configuration;
   }
 
   public Map<String, String> getConf() {
@@ -119,26 +124,31 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     this.propertiesMetadata = propertiesMetadata;
-    // Initialize Hadoop Configuration.
-    this.conf = config;
-    this.hadoopConf = new Configuration();
     this.catalogInfo = info;
-    Map<String, String> bypassConfigs =
-        config.entrySet().stream()
-            .filter(e -> e.getKey().startsWith(CATALOG_BYPASS_PREFIX))
-            .collect(
-                Collectors.toMap(
-                    e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
-                    Map.Entry::getValue));
-    bypassConfigs.forEach(hadoopConf::set);
+
+    this.conf = config;
+
+    String fileSystemProviders =
+        (String)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
+    this.fileSystemProvidersMap.putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders));
+
+    String defaultFileSystemProviderName =
+        (String)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER);
+    this.defaultFileSystemProvider =
+        FileSystemUtils.getFileSystemProviderByName(
+            fileSystemProvidersMap, defaultFileSystemProviderName);
 
     String catalogLocation =
         (String)
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.LOCATION);
-    conf.forEach(hadoopConf::set);
-
     this.catalogStorageLocation =
         StringUtils.isNotBlank(catalogLocation)
             ? Optional.of(catalogLocation).map(Path::new)
@@ -235,8 +245,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
     try {
       // formalize the path to avoid path without scheme, uri, authority, etc.
-      filesetPath = formalizePath(filesetPath, hadoopConf);
-      FileSystem fs = filesetPath.getFileSystem(hadoopConf);
+      filesetPath = formalizePath(filesetPath, conf);
+
+      FileSystem fs = getFileSystem(filesetPath, conf);
       if (!fs.exists(filesetPath)) {
         if (!fs.mkdirs(filesetPath)) {
           throw new RuntimeException(
@@ -339,7 +350,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
       // For managed fileset, we should delete the related files.
       if (filesetEntity.filesetType() == Fileset.Type.MANAGED) {
-        FileSystem fs = filesetPath.getFileSystem(hadoopConf);
+        FileSystem fs = getFileSystem(filesetPath, conf);
         if (fs.exists(filesetPath)) {
           if (!fs.delete(filesetPath, true)) {
             LOG.warn("Failed to delete fileset {} location {}", ident, filesetPath);
@@ -459,7 +470,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
     Path schemaPath = getSchemaPath(ident.name(), properties);
     if (schemaPath != null) {
       try {
-        FileSystem fs = schemaPath.getFileSystem(hadoopConf);
+        FileSystem fs = getFileSystem(schemaPath, conf);
         if (!fs.exists(schemaPath)) {
           if (!fs.mkdirs(schemaPath)) {
             // Fail the operation when failed to create the schema path.
@@ -577,8 +588,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       if (schemaPath == null) {
         return false;
       }
-
-      FileSystem fs = schemaPath.getFileSystem(hadoopConf);
+      FileSystem fs = getFileSystem(schemaPath, conf);
       // Nothing to delete if the schema path does not exist.
       if (!fs.exists(schemaPath)) {
         return false;
@@ -717,8 +727,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   }
 
   @VisibleForTesting
-  static Path formalizePath(Path path, Configuration configuration) throws IOException {
-    FileSystem defaultFs = FileSystem.get(configuration);
+  Path formalizePath(Path path, Map<String, String> configuration) throws IOException {
+    FileSystem defaultFs = getFileSystem(path, configuration);
     return path.makeQualified(defaultFs.getUri(), defaultFs.getWorkingDirectory());
   }
 
@@ -731,7 +741,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   private boolean checkSingleFile(Fileset fileset) {
     try {
       Path locationPath = new Path(fileset.storageLocation());
-      return locationPath.getFileSystem(hadoopConf).getFileStatus(locationPath).isFile();
+      return getFileSystem(locationPath, conf).getFileStatus(locationPath).isFile();
     } catch (FileNotFoundException e) {
       // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
       return false;
@@ -741,5 +751,26 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
           "Exception occurs when checking whether fileset: %s mounts a single file",
           fileset.name());
     }
+  }
+
+  FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
+    if (path == null) {
+      throw new IllegalArgumentException("Path should not be null");
+    }
+
+    String scheme =
+        path.toUri().getScheme() != null
+            ? path.toUri().getScheme()
+            : defaultFileSystemProvider.scheme();
+
+    FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
+    if (provider == null) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Unsupported scheme: %s, path: %s, all supported schemes: %s and providers: %s",
+              scheme, path, fileSystemProvidersMap.keySet(), fileSystemProvidersMap.values()));
+    }
+
+    return provider.getFileSystem(path, config);
   }
 }

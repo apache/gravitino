@@ -24,6 +24,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
@@ -51,8 +52,10 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
       ImmutableMap.<Class<? extends Exception>, Integer>builder()
           .put(IllegalArgumentException.class, 400)
           .put(ValidationException.class, 400)
+          .put(IllegalNameIdentifierException.class, 400)
           .put(NamespaceNotEmptyException.class, 400)
           .put(NotAuthorizedException.class, 401)
+          .put(org.apache.gravitino.exceptions.ForbiddenException.class, 403)
           .put(ForbiddenException.class, 403)
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)

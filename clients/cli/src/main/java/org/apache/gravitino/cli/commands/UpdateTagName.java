@@ -28,20 +28,22 @@ import org.apache.gravitino.tag.TagChange;
 /** Update the name of a tag. */
 public class UpdateTagName extends Command {
 
-  protected String metalake;
-  protected String tag;
-  protected String name;
+  protected final String metalake;
+  protected final String tag;
+  protected final String name;
 
   /**
    * Update the name of a tag.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the tag.
    * @param tag The name of the catalog.
    * @param name The new metalake name.
    */
-  public UpdateTagName(String url, String metalake, String tag, String name) {
-    super(url);
+  public UpdateTagName(
+      String url, boolean ignoreVersions, String metalake, String tag, String name) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;
     this.name = name;

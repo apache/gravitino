@@ -59,7 +59,7 @@ import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -94,7 +94,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public abstract class CatalogIcebergBaseIT extends AbstractIT {
+public abstract class CatalogIcebergBaseIT extends BaseIT {
 
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected String WAREHOUSE;
@@ -125,7 +125,7 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   @BeforeAll
   public void startup() throws Exception {
     ignoreIcebergRestService = false;
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
     containerSuite.startHiveContainer();
     initIcebergCatalogProperties();
     createMetalake();
@@ -138,18 +138,20 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   public void stop() throws Exception {
     try {
       clearTableAndSchema();
+      metalake.disableCatalog(catalogName);
       metalake.dropCatalog(catalogName);
+      client.disableMetalake(metalakeName);
       client.dropMetalake(metalakeName);
     } finally {
       if (spark != null) {
         spark.close();
       }
-      AbstractIT.stopIntegrationTest();
+      super.stopIntegrationTest();
     }
   }
 
   @AfterEach
-  private void resetSchema() {
+  public void resetSchema() {
     clearTableAndSchema();
     createSchema();
   }
@@ -158,10 +160,10 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
   // if startIntegrationTest() is auto invoked by Junit. So here we override
   // startIntegrationTest() to disable the auto invoke by junit.
   @BeforeAll
-  public static void startIntegrationTest() {}
+  public void startIntegrationTest() {}
 
   @AfterAll
-  public static void stopIntegrationTest() {}
+  public void stopIntegrationTest() {}
 
   protected abstract void initIcebergCatalogProperties();
 
@@ -196,10 +198,9 @@ public abstract class CatalogIcebergBaseIT extends AbstractIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }

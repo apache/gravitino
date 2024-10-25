@@ -46,6 +46,7 @@ import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
+import org.apache.gravitino.dto.requests.CatalogSetRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
@@ -77,8 +78,11 @@ import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -86,6 +90,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -261,21 +266,74 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
-   * Drop the catalog with specified identifier.
+   * Drop a catalog with specified name. If the force flag is true, it will:
    *
-   * @param catalogName the name of the catalog.
-   * @return true if the catalog is dropped successfully, false if the catalog does not exist.
+   * <ul>
+   *   <li>Cascade drop all sub-entities (schemas, tables, etc.) of the catalog in Gravitino store.
+   *   <li>Drop the catalog even if it is in use.
+   *   <li>External resources (e.g. database, table, etc.) associated with sub-entities will not be
+   *       dropped unless it is managed (such as managed fileset).
+   * </ul>
+   *
+   * @param catalogName The identifier of the catalog.
+   * @param force Whether to force the drop.
+   * @return True if the catalog was dropped, false if the catalog does not exist.
+   * @throws NonEmptyEntityException If the catalog is not empty and force is false.
+   * @throws CatalogInUseException If the catalog is in use and force is false.
    */
   @Override
-  public boolean dropCatalog(String catalogName) {
+  public boolean dropCatalog(String catalogName, boolean force)
+      throws NonEmptyEntityException, CatalogInUseException {
+    Map<String, String> params = new HashMap<>();
+    params.put("force", String.valueOf(force));
+
     DropResponse resp =
         restClient.delete(
             String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            params,
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.catalogErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  @Override
+  public void enableCatalog(String catalogName) throws NoSuchCatalogException {
+    CatalogSetRequest req = new CatalogSetRequest(true);
+
+    ErrorResponse resp =
+        restClient.patch(
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            req,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
+  @Override
+  public void disableCatalog(String catalogName) throws NoSuchCatalogException {
+    CatalogSetRequest req = new CatalogSetRequest(false);
+
+    ErrorResponse resp =
+        restClient.patch(
+            String.format(API_METALAKES_CATALOGS_PATH, this.name(), catalogName),
+            req,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
   }
 
   /**
@@ -729,12 +787,12 @@ public class GravitinoMetalake extends MetalakeDTO
    * @return The created Role instance.
    * @throws RoleAlreadyExistsException If a Role with the same name already exists.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws NoSuchMetadataObjectException If the securable object doesn't exist
+   * @throws IllegalMetadataObjectException If the securable object is invalid
    * @throws RuntimeException If creating the Role encounters storage issues.
    */
   public Role createRole(
       String role, Map<String, String> properties, List<SecurableObject> securableObjects)
-      throws RoleAlreadyExistsException, NoSuchMetalakeException, NoSuchMetadataObjectException {
+      throws RoleAlreadyExistsException, NoSuchMetalakeException, IllegalMetadataObjectException {
     RoleCreateRequest req =
         new RoleCreateRequest(
             role,
@@ -781,12 +839,12 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param roles The names of the Role.
    * @return The Group after granted.
    * @throws NoSuchUserException If the User with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws IllegalRoleException If the Role with the given name is invalid.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If granting roles to a user encounters storage issues.
    */
   public User grantRolesToUser(List<String> roles, String user)
-      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     RoleGrantRequest request = new RoleGrantRequest(roles);
     request.validate();
 
@@ -812,7 +870,7 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param roles The names of the Role.
    * @return The Group after granted.
    * @throws NoSuchGroupException If the Group with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws IllegalRoleException If the Role with the given name is invalid.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If granting roles to a group encounters storage issues.
    */
@@ -843,7 +901,7 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param roles The names of the Role.
    * @return The User after revoked.
    * @throws NoSuchUserException If the User with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws IllegalRoleException If the Role with the given name is invalid.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If revoking roles from a user encounters storage issues.
    */
@@ -874,12 +932,12 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param roles The names of the Role.
    * @return The Group after revoked.
    * @throws NoSuchGroupException If the Group with the given name does not exist.
-   * @throws NoSuchRoleException If the Role with the given name does not exist.
+   * @throws IllegalRoleException If the Role with the given name is invalid.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If revoking roles from a group encounters storage issues.
    */
   public Group revokeRolesFromGroup(List<String> roles, String group)
-      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     RoleRevokeRequest request = new RoleRevokeRequest(roles);
     request.validate();
 

@@ -41,6 +41,10 @@ public class TestGravitinoConfig {
       System.getProperty("java.io.tmpdir") + "/non_existent.properties";
   private static final String METALAKE_KEY = "metalake";
   private static final String METALAKE_VALUE = "metalake_demo";
+  private static final String URL_KEY = "URL";
+  private static final String URL_VALUE = "http://10.0.0.1:8090";
+  private static final String IGNORE_KEY = "ignore";
+  private static final String IGNORE_VALUE = "true";
 
   @BeforeEach
   public void setUp() throws IOException {
@@ -52,6 +56,8 @@ public class TestGravitinoConfig {
 
     Properties props = new Properties();
     props.setProperty(METALAKE_KEY, METALAKE_VALUE);
+    props.setProperty(URL_KEY, URL_VALUE);
+    props.setProperty(IGNORE_KEY, IGNORE_VALUE);
 
     try (Writer writer = Files.newBufferedWriter(tempFile.toPath(), StandardCharsets.UTF_8)) {
       props.store(writer, "Test Config");
@@ -88,6 +94,9 @@ public class TestGravitinoConfig {
         METALAKE_VALUE,
         config.getMetalakeName(),
         "Should read the metalake value from the config file");
+    assertEquals(
+        URL_VALUE, config.getGravitinoURL(), "Should read the URL value from the config file");
+    assertTrue(config.getIgnore(), "Should read the ignore value from the config file");
   }
 
   @Test
@@ -117,6 +126,41 @@ public class TestGravitinoConfig {
   }
 
   @Test
+  public void configFileMissingURL() throws IOException {
+    // Create a config file without the "url" key
+    File tempFileWithoutURL = new File(System.getProperty("java.io.tmpdir") + "/no_url.properties");
+    try (Writer writer =
+        Files.newBufferedWriter(tempFileWithoutURL.toPath(), StandardCharsets.UTF_8)) {
+      writer.write("# This config file has no url key\n");
+    }
+
+    GravitinoConfig config = new GravitinoConfig(tempFileWithoutURL.getAbsolutePath());
+    config.read();
+    assertNull(
+        config.getGravitinoURL(), "URL should be null if the key is missing in the config file");
+
+    tempFileWithoutURL.delete();
+  }
+
+  @Test
+  public void configFileMissingIgnore() throws IOException {
+    // Create a config file without the "ignore" key
+    File tempFileWithoutIgnore =
+        new File(System.getProperty("java.io.tmpdir") + "/no_url.properties");
+    try (Writer writer =
+        Files.newBufferedWriter(tempFileWithoutIgnore.toPath(), StandardCharsets.UTF_8)) {
+      writer.write("# This config file has no ignore key\n");
+    }
+
+    GravitinoConfig config = new GravitinoConfig(tempFileWithoutIgnore.getAbsolutePath());
+    config.read();
+    assertFalse(
+        config.getIgnore(), "Ignore should be false if the key is missing in the config file");
+
+    tempFileWithoutIgnore.delete();
+  }
+
+  @Test
   public void invalidConfigFile() throws IOException {
     // Create a corrupt config file
     File corruptConfigFile =
@@ -137,5 +181,7 @@ public class TestGravitinoConfig {
   public void withoutReadingConfig() {
     GravitinoConfig config = new GravitinoConfig(TEMP_FILE_PATH);
     assertNull(config.getMetalakeName(), "Metalake should be null before reading the config file");
+    assertNull(config.getGravitinoURL(), "URL should be null before reading the config file");
+    assertFalse(config.getIgnore(), "Ignore should be null before reading the config file");
   }
 }

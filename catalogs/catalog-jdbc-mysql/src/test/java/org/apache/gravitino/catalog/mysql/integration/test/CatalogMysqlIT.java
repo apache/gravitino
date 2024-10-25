@@ -50,7 +50,7 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -84,7 +84,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-public class CatalogMysqlIT extends AbstractIT {
+public class CatalogMysqlIT extends BaseIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static final String provider = "jdbc-mysql";
 
@@ -142,7 +142,9 @@ public class CatalogMysqlIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
+    client.disableMetalake(metalakeName);
     client.dropMetalake(metalakeName);
     mysqlService.close();
   }
@@ -166,10 +168,9 @@ public class CatalogMysqlIT extends AbstractIT {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
@@ -1987,6 +1988,6 @@ public class CatalogMysqlIT extends AbstractIT {
     Assertions.assertDoesNotThrow(() -> loadCatalog.asSchemas().createSchema("test", "", null));
 
     loadCatalog.asSchemas().dropSchema("test", true);
-    metalake.dropCatalog(testCatalogName);
+    metalake.dropCatalog(testCatalogName, true);
   }
 }

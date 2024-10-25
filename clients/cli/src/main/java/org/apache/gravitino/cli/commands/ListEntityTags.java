@@ -41,11 +41,12 @@ public class ListEntityTags extends Command {
    * Lists all tags in a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    */
-  public ListEntityTags(String url, String metalake, FullName name) {
-    super(url);
+  public ListEntityTags(String url, boolean ignoreVersions, String metalake, FullName name) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.name = name;
   }

@@ -26,8 +26,9 @@ import org.apache.commons.cli.CommandLine;
  * metalake, catalog, schema, and table names.
  */
 public class FullName {
-  private CommandLine line;
+  private final CommandLine line;
   private String metalakeEnv;
+  private boolean matalakeSet = false;
 
   /**
    * Constructor for the {@code FullName} class.
@@ -39,17 +40,23 @@ public class FullName {
   }
 
   /**
-   * Retrieves the metalake name from the command line options, environment variables, or the first
-   * part of the full name.
+   * Retrieves the metalake name from the command line options, the GRAVITINO_METALAKE environment
+   * variable or the Gravitino config file.
    *
    * @return The metalake name, or null if not found.
    */
   public String getMetalakeName() {
     GravitinoConfig config = new GravitinoConfig(null);
 
+    // If specified on the command line use that
+    if (line.hasOption(GravitinoOptions.METALAKE)) {
+      return line.getOptionValue(GravitinoOptions.METALAKE);
+    }
+
     // Cache the metalake environment variable
-    if (metalakeEnv == null) {
+    if (metalakeEnv == null && !matalakeSet) {
       metalakeEnv = System.getenv("GRAVITINO_METALAKE");
+      matalakeSet = true;
     }
 
     // Check if the metalake name is set as an environment variable
@@ -60,7 +67,7 @@ public class FullName {
       config.read();
       String configName = config.getMetalakeName();
       if (configName != null) {
-        return config.getMetalakeName();
+        return configName;
       }
     }
 
@@ -78,7 +85,7 @@ public class FullName {
    * @return The catalog name, or null if not found.
    */
   public String getCatalogName() {
-    return getNamePart(1);
+    return getNamePart(0);
   }
 
   /**
@@ -87,7 +94,7 @@ public class FullName {
    * @return The schema name, or null if not found.
    */
   public String getSchemaName() {
-    return getNamePart(2);
+    return getNamePart(1);
   }
 
   /**
@@ -96,7 +103,7 @@ public class FullName {
    * @return The table name, or null if not found.
    */
   public String getTableName() {
-    return getNamePart(3);
+    return getNamePart(2);
   }
 
   /**
@@ -111,12 +118,7 @@ public class FullName {
     if (line.hasOption(GravitinoOptions.NAME)) {
       String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
 
-      /* Adjust position if metalake is part of the full name. */
-      if (metalakeEnv != null) {
-        position = position - 1;
-      }
-
-      if (position >= names.length) {
+      if (names.length <= position) {
         System.err.println(ErrorMessages.MALFORMED_NAME);
         return null;
       }
@@ -141,10 +143,6 @@ public class FullName {
       int length = names.length;
       int position = partNo;
 
-      /* Adjust position if metalake is part of the full name. */
-      if (metalakeEnv != null) {
-        position = position - 1;
-      }
       return position <= length;
     }
 

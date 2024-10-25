@@ -33,6 +33,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -111,25 +112,25 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
 
   @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)
-      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     return dispatcher.grantRolesToUser(metalake, roles, user);
   }
 
   @Override
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
-      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     return dispatcher.grantRolesToGroup(metalake, roles, group);
   }
 
   @Override
   public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
-      throws NoSuchGroupException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     return dispatcher.revokeRolesFromGroup(metalake, roles, group);
   }
 
   @Override
   public User revokeRolesFromUser(String metalake, List<String> roles, String user)
-      throws NoSuchUserException, NoSuchRoleException, NoSuchMetalakeException {
+      throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     return dispatcher.revokeRolesFromUser(metalake, roles, user);
   }
 
@@ -145,6 +146,9 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
+    // Check whether the current user exists or not
+    AuthorizationUtils.checkCurrentUser(metalake, PrincipalUtils.getCurrentUserName());
+
     Role createdRole = dispatcher.createRole(metalake, role, properties, securableObjects);
 
     // Set the creator as the owner of role.

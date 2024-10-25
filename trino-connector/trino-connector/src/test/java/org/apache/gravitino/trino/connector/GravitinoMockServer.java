@@ -164,7 +164,7 @@ public class GravitinoMockServer implements AutoCloseable {
               }
             });
 
-    when(metaLake.dropCatalog(anyString()))
+    when(metaLake.dropCatalog(anyString(), anyBoolean()))
         .thenAnswer(
             new Answer<Boolean>() {
               @Override

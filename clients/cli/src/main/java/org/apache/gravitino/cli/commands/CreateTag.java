@@ -25,20 +25,22 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 
 public class CreateTag extends Command {
-  protected String metalake;
-  protected String tag;
-  protected String comment;
+  protected final String metalake;
+  protected final String tag;
+  protected final String comment;
 
   /**
    * Create a new tag.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    * @param comment The comment of the tag.
    */
-  public CreateTag(String url, String metalake, String tag, String comment) {
-    super(url);
+  public CreateTag(
+      String url, boolean ignoreVersions, String metalake, String tag, String comment) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;
     this.comment = comment;
