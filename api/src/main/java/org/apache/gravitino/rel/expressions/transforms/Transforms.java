@@ -447,7 +447,7 @@ public class Transforms {
     /** @return The arguments to the transform. */
     @Override
     public Expression[] arguments() {
-      return ObjectArrays.concat(numBuckets, fields);
+      return ObjectArrays.concat(new Expression[] {numBuckets}, fields, Expression.class);
     }
 
     @Override
