@@ -85,7 +85,7 @@ jobs:
       - name: Trino Integration Test
         id: integrationTest
         run: |
-          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false :trino-connector:integration-test:test
+          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :trino-connector:integration-test:test
           ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :trino-connector:integration-test:test
           trino-connector/integration-test/trino-test-tools/run_test.sh
 
