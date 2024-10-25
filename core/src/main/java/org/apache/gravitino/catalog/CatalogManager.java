@@ -513,6 +513,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
             return newCatalogBuilder.build();
           });
+      catalogCache.invalidate(ident);
+
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
