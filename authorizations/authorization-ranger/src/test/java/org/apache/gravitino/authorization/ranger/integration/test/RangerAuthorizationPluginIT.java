@@ -363,8 +363,7 @@ public class RangerAuthorizationPluginIT {
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(readFilesetInCatalog)));
     Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(readFilesetInSchema)));
-    Assertions.assertTrue(
-        rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(readFileset)));
+    Assertions.assertTrue(rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(readFileset)));
 
     // Ignore the Topic operation
     SecurableObject createTopicInMetalake =
