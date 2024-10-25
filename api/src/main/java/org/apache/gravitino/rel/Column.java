@@ -27,6 +27,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing a column of a {@link Table}. It defines basic properties of a column,
@@ -70,6 +71,14 @@ public interface Column {
    * @return The default value of this column, {@link Column#DEFAULT_VALUE_NOT_SET} if not specified
    */
   Expression defaultValue();
+
+  /**
+   * @return the {@link SupportsTags} if the column supports tag operations.
+   * @throws UnsupportedOperationException if the column does not support tag operations.
+   */
+  default SupportsTags supportsTags() {
+    throw new UnsupportedOperationException("Column does not support tag operations.");
+  }
 
   /**
    * Create a {@link Column} instance.
