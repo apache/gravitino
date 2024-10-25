@@ -42,6 +42,7 @@ import software.amazon.awssdk.policybuilder.iam.IamResource;
 import software.amazon.awssdk.policybuilder.iam.IamStatement;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sts.StsClient;
+import software.amazon.awssdk.services.sts.StsClientBuilder;
 import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
 import software.amazon.awssdk.services.sts.model.AssumeRoleResponse;
 import software.amazon.awssdk.services.sts.model.Credentials;
@@ -81,7 +82,7 @@ public class S3TokenProvider implements CredentialProvider {
     }
     PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
     Credentials s3Token =
-        getS3Token(
+        createS3Token(
             roleArn,
             pathBasedCredentialContext.getReadPaths(),
             pathBasedCredentialContext.getWritePaths(),
@@ -98,18 +99,15 @@ public class S3TokenProvider implements CredentialProvider {
         StaticCredentialsProvider.create(
             AwsBasicCredentials.create(
                 s3CredentialConfig.accessKeyID(), s3CredentialConfig.secretAccessKey()));
+    StsClientBuilder builder = StsClient.builder().credentialsProvider(credentialsProvider);
     String region = s3CredentialConfig.region();
     if (StringUtils.isNotBlank(region)) {
-      return StsClient.builder()
-          .credentialsProvider(credentialsProvider)
-          .region(Region.of(region))
-          .build();
-    } else {
-      return StsClient.builder().credentialsProvider(credentialsProvider).build();
+      builder.region(Region.of(region));
     }
+    return builder.build();
   }
 
-  private IamPolicy getPolicy(
+  private IamPolicy createPolicy(
       String roleArn, Set<String> readLocations, Set<String> writeLocations) {
     IamPolicy.Builder policyBuilder = IamPolicy.builder();
     IamStatement.Builder allowGetObjectStatementBuilder =
@@ -223,9 +221,9 @@ public class S3TokenProvider implements CredentialProvider {
     return uri.getHost();
   }
 
-  private Credentials getS3Token(
+  private Credentials createS3Token(
       String roleArn, Set<String> readLocations, Set<String> writeLocations, String userName) {
-    IamPolicy policy = getPolicy(roleArn, readLocations, writeLocations);
+    IamPolicy policy = createPolicy(roleArn, readLocations, writeLocations);
     AssumeRoleRequest.Builder builder =
         AssumeRoleRequest.builder()
             .roleArn(roleArn)
