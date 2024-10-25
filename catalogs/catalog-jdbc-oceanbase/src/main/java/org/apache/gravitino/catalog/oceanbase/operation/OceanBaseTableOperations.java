@@ -22,7 +22,6 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -34,7 +33,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -47,7 +45,6 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
-import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -61,28 +58,10 @@ import org.apache.gravitino.rel.types.Types;
 /** Table operations for OceanBase. */
 public class OceanBaseTableOperations extends JdbcTableOperations {
 
-  public static final String BACK_QUOTE = "`";
-  public static final String OCEANBASE_AUTO_INCREMENT = "AUTO_INCREMENT";
+  private static final String BACK_QUOTE = "`";
+  private static final String OCEANBASE_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String OCEANBASE_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "OceanBase does not support nested column names.";
-
-  @Override
-  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
-    final List<String> names = Lists.newArrayList();
-
-    try (Connection connection = getConnection(databaseName);
-        ResultSet tables = getTables(connection)) {
-      while (tables.next()) {
-        if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
-          names.add(tables.getString("TABLE_NAME"));
-        }
-      }
-      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
-      return names;
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
-    }
-  }
 
   @Override
   protected String generateCreateTableSql(
@@ -147,44 +126,6 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
     return result;
   }
 
-  /**
-   * The auto-increment column will be verified. There can only be one auto-increment column and it
-   * must be the primary key or unique index.
-   *
-   * @param columns jdbc column
-   * @param indexes table indexes
-   */
-  private static void validateIncrementCol(JdbcColumn[] columns, Index[] indexes) {
-    // Check auto increment column
-    List<JdbcColumn> autoIncrementCols =
-        Arrays.stream(columns).filter(Column::autoIncrement).collect(Collectors.toList());
-    String autoIncrementColsStr =
-        autoIncrementCols.stream().map(JdbcColumn::name).collect(Collectors.joining(",", "[", "]"));
-    Preconditions.checkArgument(
-        autoIncrementCols.size() <= 1,
-        "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: "
-            + autoIncrementColsStr);
-    if (!autoIncrementCols.isEmpty()) {
-      Optional<Index> existAutoIncrementColIndexOptional =
-          Arrays.stream(indexes)
-              .filter(
-                  index ->
-                      Arrays.stream(index.fieldNames())
-                          .flatMap(Arrays::stream)
-                          .anyMatch(
-                              s ->
-                                  StringUtils.equalsIgnoreCase(autoIncrementCols.get(0).name(), s)))
-              .filter(
-                  index ->
-                      index.type() == Index.IndexType.PRIMARY_KEY
-                          || index.type() == Index.IndexType.UNIQUE_KEY)
-              .findAny();
-      Preconditions.checkArgument(
-          existAutoIncrementColIndexOptional.isPresent(),
-          "Incorrect table definition; there can be only one auto column and it must be defined as a key");
-    }
-  }
-
   public static void appendIndexesSql(Index[] indexes, StringBuilder sqlBuilder) {
     for (Index index : indexes) {
       String fieldStr = getIndexFieldStr(index.fieldNames());
@@ -209,19 +150,6 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
           throw new IllegalArgumentException("OceanBase doesn't support index : " + index.type());
       }
     }
-  }
-
-  private static String getIndexFieldStr(String[][] fieldNames) {
-    return Arrays.stream(fieldNames)
-        .map(
-            colNames -> {
-              if (colNames.length > 1) {
-                throw new IllegalArgumentException(
-                    "Index does not support complex fields in OceanBase");
-              }
-              return BACK_QUOTE + colNames[0] + BACK_QUOTE;
-            })
-        .collect(Collectors.joining(", "));
   }
 
   @Override
@@ -271,6 +199,14 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
     return String.format("TRUNCATE TABLE `%s`", tableName);
   }
 
+  /**
+   * OceanBase does not support some multiple changes in one statement, So rewrite this method, one
+   * by one to apply TableChange to the table.
+   *
+   * @param databaseName The name of the database.
+   * @param tableName The name of the table.
+   * @param changes The changes to apply to the table.
+   */
   @Override
   public void alterTable(String databaseName, String tableName, TableChange... changes)
       throws NoSuchTableException {

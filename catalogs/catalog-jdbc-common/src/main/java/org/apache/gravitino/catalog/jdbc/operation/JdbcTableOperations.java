@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.jdbc.operation;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -30,6 +31,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
@@ -46,6 +48,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -125,15 +128,20 @@ public abstract class JdbcTableOperations implements TableOperation {
     return true;
   }
 
+  /**
+   * The default implementation of this method is based on MySQL, and if the catalog does not
+   * compatible with MySQL, this method needs to be rewritten.
+   */
   @Override
   public List<String> listTables(String databaseName) throws NoSuchSchemaException {
-    try (Connection connection = getConnection(databaseName)) {
-      final List<String> names = Lists.newArrayList();
-      try (ResultSet tables = getTables(connection)) {
-        while (tables.next()) {
-          if (Objects.equals(tables.getString("TABLE_SCHEM"), databaseName)) {
-            names.add(tables.getString("TABLE_NAME"));
-          }
+
+    final List<String> names = Lists.newArrayList();
+
+    try (Connection connection = getConnection(databaseName);
+        ResultSet tables = getTables(connection)) {
+      while (tables.next()) {
+        if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
+          names.add(tables.getString("TABLE_NAME"));
         }
       }
       LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
@@ -495,6 +503,61 @@ public abstract class JdbcTableOperations implements TableOperation {
       throw new IllegalArgumentException(
           "column " + col + " with null default value cannot be changed to not null");
     }
+  }
+
+  /**
+   * The auto-increment column will be verified. There can only be one auto-increment column and it
+   * must be the primary key or unique index.
+   *
+   * @param columns jdbc column
+   * @param indexes table indexes
+   */
+  protected static void validateIncrementCol(JdbcColumn[] columns, Index[] indexes) {
+    // Check auto increment column
+    List<JdbcColumn> autoIncrementCols =
+        Arrays.stream(columns).filter(Column::autoIncrement).collect(Collectors.toList());
+    String autoIncrementColsStr =
+        autoIncrementCols.stream().map(JdbcColumn::name).collect(Collectors.joining(",", "[", "]"));
+    Preconditions.checkArgument(
+        autoIncrementCols.size() <= 1,
+        "Only one column can be auto-incremented. There are multiple auto-increment columns in your table: "
+            + autoIncrementColsStr);
+    if (!autoIncrementCols.isEmpty()) {
+      Optional<Index> existAutoIncrementColIndexOptional =
+          Arrays.stream(indexes)
+              .filter(
+                  index ->
+                      Arrays.stream(index.fieldNames())
+                          .flatMap(Arrays::stream)
+                          .anyMatch(
+                              s ->
+                                  StringUtils.equalsIgnoreCase(autoIncrementCols.get(0).name(), s)))
+              .filter(
+                  index ->
+                      index.type() == Index.IndexType.PRIMARY_KEY
+                          || index.type() == Index.IndexType.UNIQUE_KEY)
+              .findAny();
+      Preconditions.checkArgument(
+          existAutoIncrementColIndexOptional.isPresent(),
+          "Incorrect table definition; there can be only one auto column and it must be defined as a key");
+    }
+  }
+
+  /**
+   * The default implementation of this method is based on MySQL syntax, and if the catalog does not
+   * support MySQL syntax, this method needs to be rewritten.
+   */
+  protected static String getIndexFieldStr(String[][] fieldNames) {
+    return Arrays.stream(fieldNames)
+        .map(
+            colNames -> {
+              if (colNames.length > 1) {
+                throw new IllegalArgumentException(
+                    "Index does not support complex fields in this Catalog");
+              }
+              return String.format("`%s`", colNames[0]);
+            })
+        .collect(Collectors.joining(", "));
   }
 
   protected JdbcColumn getJdbcColumnFromTable(JdbcTable jdbcTable, String colName) {

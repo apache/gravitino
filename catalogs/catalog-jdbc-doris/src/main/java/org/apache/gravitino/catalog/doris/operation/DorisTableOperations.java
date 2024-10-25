@@ -26,7 +26,6 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -38,7 +37,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -53,7 +51,6 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTablePartitionOperations;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
-import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -72,24 +69,6 @@ public class DorisTableOperations extends JdbcTableOperations {
   private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String NEW_LINE = "\n";
-
-  @Override
-  public List<String> listTables(String databaseName) throws NoSuchSchemaException {
-    final List<String> names = Lists.newArrayList();
-
-    try (Connection connection = getConnection(databaseName);
-        ResultSet tables = getTables(connection)) {
-      while (tables.next()) {
-        if (Objects.equals(tables.getString("TABLE_CAT"), databaseName)) {
-          names.add(tables.getString("TABLE_NAME"));
-        }
-      }
-      LOG.info("Finished listing tables size {} for database name {} ", names.size(), databaseName);
-      return names;
-    } catch (final SQLException se) {
-      throw this.exceptionMapper.toGravitinoException(se);
-    }
-  }
 
   @Override
   public JdbcTablePartitionOperations createJdbcTablePartitionOperations(JdbcTable loadedTable) {

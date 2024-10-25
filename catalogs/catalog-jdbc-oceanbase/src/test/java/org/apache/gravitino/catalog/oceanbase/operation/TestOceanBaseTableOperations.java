@@ -48,8 +48,8 @@ import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
 public class TestOceanBaseTableOperations extends TestOceanBase {
-  private static Type VARCHAR = Types.VarCharType.of(255);
-  private static Type INT = Types.IntegerType.get();
+  private static final Type VARCHAR = Types.VarCharType.of(255);
+  private static final Type INT = Types.IntegerType.get();
 
   @BeforeAll
   public static void setUp() {
