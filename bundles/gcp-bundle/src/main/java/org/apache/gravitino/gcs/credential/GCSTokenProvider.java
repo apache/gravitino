@@ -21,6 +21,7 @@ package org.apache.gravitino.gcs.credential;
 
 import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.CredentialAccessBoundary;
+import com.google.auth.oauth2.CredentialAccessBoundary.AccessBoundaryRule;
 import com.google.auth.oauth2.DownscopedCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import java.io.File;
@@ -147,39 +148,50 @@ public class GCSTokenProvider implements CredentialProvider {
     readBuckets.forEach(
         bucket -> {
           List<String> readConditions = readExpressions.get(bucket);
-          if (readConditions == null || readConditions.isEmpty()) {
+          AccessBoundaryRule rule =
+              getAccessBoundaryRule(
+                  bucket,
+                  readConditions,
+                  Arrays.asList(
+                      "inRole:roles/storage.legacyObjectReader",
+                      "inRole:roles/storage.objectViewer"));
+          if (rule == null) {
             return;
           }
-          CredentialAccessBoundary.AccessBoundaryRule.Builder builder =
-              CredentialAccessBoundary.AccessBoundaryRule.newBuilder();
-          builder.setAvailableResource(toGCSBucketResource(bucket));
-          builder.setAvailabilityCondition(
-              CredentialAccessBoundary.AccessBoundaryRule.AvailabilityCondition.newBuilder()
-                  .setExpression(String.join(" || ", readConditions))
-                  .build());
-          builder.setAvailablePermissions(Arrays.asList("inRole:roles/storage.legacyObjectReader"));
-          builder.addAvailablePermission("inRole:roles/storage.objectViewer");
-          credentialAccessBoundaryBuilder.addRule(builder.build());
+          credentialAccessBoundaryBuilder.addRule(rule);
         });
 
     writeBuckets.forEach(
         bucket -> {
           List<String> writeConditions = writeExpressions.get(bucket);
-          if (writeConditions == null || writeConditions.isEmpty()) {
+          AccessBoundaryRule rule =
+              getAccessBoundaryRule(
+                  bucket,
+                  writeConditions,
+                  Arrays.asList("inRole:roles/storage.legacyBucketWriter"));
+          if (rule == null) {
             return;
           }
-          CredentialAccessBoundary.AccessBoundaryRule.Builder builder =
-              CredentialAccessBoundary.AccessBoundaryRule.newBuilder();
-          builder.setAvailableResource(toGCSBucketResource(bucket));
-          builder.setAvailabilityCondition(
-              CredentialAccessBoundary.AccessBoundaryRule.AvailabilityCondition.newBuilder()
-                  .setExpression(String.join(" || ", writeConditions))
-                  .build());
-          builder.setAvailablePermissions(Arrays.asList("inRole:roles/storage.legacyBucketWriter"));
-          credentialAccessBoundaryBuilder.addRule(builder.build());
+          credentialAccessBoundaryBuilder.addRule(rule);
         });
 
     return credentialAccessBoundaryBuilder.build();
+  }
+
+  private AccessBoundaryRule getAccessBoundaryRule(
+      String bucketName, List<String> resourceExpression, List<String> permissions) {
+    if (resourceExpression == null || resourceExpression.isEmpty()) {
+      return null;
+    }
+    CredentialAccessBoundary.AccessBoundaryRule.Builder builder =
+        CredentialAccessBoundary.AccessBoundaryRule.newBuilder();
+    builder.setAvailableResource(toGCSBucketResource(bucketName));
+    builder.setAvailabilityCondition(
+        CredentialAccessBoundary.AccessBoundaryRule.AvailabilityCondition.newBuilder()
+            .setExpression(String.join(" || ", resourceExpression))
+            .build());
+    builder.setAvailablePermissions(permissions);
+    return builder.build();
   }
 
   private static String toGCSBucketResource(String bucketName) {
