@@ -234,6 +234,8 @@
    Error Prone Annotations
    Failure Access
    Guava
+   Google Auth http
+   Google Auth Credentials
    Google Guice
    Google Guice Servlet
    J2ObjC Annotations
