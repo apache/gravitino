@@ -308,5 +308,33 @@ export const providers = [
         description: 'Apache Hudi catalog uri config'
       }
     ]
-  }
+  },
+  {
+    label: 'OceanBase',
+    value: 'oceanbase',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:mysql://localhost:3306'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
+      }
+    ]
+  },
 ]
