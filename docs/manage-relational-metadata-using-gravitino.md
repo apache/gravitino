@@ -85,6 +85,19 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# Assuming you have just created a metalake named `metalake`
+gravitino_client = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+gravitino_client.create_catalog(name="catalog",
+                                catalog_type=CatalogType.RELATIONAL,
+                                provider="hive",
+                                comment="This is a hive catalog",
+                                properties={"metastore.uris": "thrift://localhost:9083"})
+```
+
+</TabItem>
 </Tabs>
 
 Currently, Gravitino supports the following catalog providers:
@@ -119,6 +132,15 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 // Assuming you have created a metalake named `metalake` and a catalog named `catalog`
 Catalog catalog = gravitinoClient.loadCatalog("catalog");
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+catalog = gravitino_client.load_catalog("catalog")
 ```
 
 </TabItem>
@@ -157,6 +179,17 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 Catalog catalog = gravitinoClient.alterCatalog("catalog",
     CatalogChange.rename("alter_catalog"), CatalogChange.updateComment("new comment"));
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+changes = (CatalogChange.update_comment("new comment"))
+catalog = gravitino_client.alterCatalog("catalog", *changes)
+# ...
 ```
 
 </TabItem>
@@ -207,6 +240,16 @@ gravitinoClient.enableCatalog("catalog");
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+gravitino_client.enable_catalog("catalog")
+# ...
+```
+
+</TabItem>
 </Tabs>
 
 :::info
@@ -240,6 +283,16 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 // Assuming you have created a metalake named `metalake` and a catalog named `catalog`
 gravitinoClient.disableCatalog("catalog");
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+gravitino_client.disable_catalog("catalog")
+# ...
 ```
 
 </TabItem>
@@ -286,6 +339,17 @@ gravitinoClient.dropCatalog("catalog", false);
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+# force can be true or false
+gravitino_client.drop_catalog(name="catalog", force=False)
+# ...
+```
+
+</TabItem>
 </Tabs>
 
 ### List all catalogs in a metalake
@@ -313,6 +377,16 @@ String[] catalogNames = gravitinoClient.listCatalogs();
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+catalog_names = gravitino_client.list_catalogs()
+# ...
+```
+
+</TabItem>
 </Tabs>
 
 ### List all catalogs' information in a metalake
@@ -336,6 +410,16 @@ http://localhost:8090/api/metalakes/metalake/catalogs?details=true
 // Assuming you have just created a metalake named `metalake`
 Catalog[] catalogsInfos = gravitinoMetaLake.listCatalogsInfo();
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+catalogs_info = gravitino_client.list_catalogs_info()
+# ...
 ```
 
 </TabItem>
