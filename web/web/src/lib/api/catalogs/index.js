@@ -28,7 +28,7 @@ const Apis = {
   UPDATE: ({ metalake, catalog }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`,
   DELETE: ({ metalake, catalog }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}?force=true`,
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`,
   UPDATEINUSE: ({ metalake, catalog }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`
 }
