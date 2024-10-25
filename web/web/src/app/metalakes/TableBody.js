@@ -146,6 +146,7 @@ const TableBody = props => {
             </Tooltip>
             <Tooltip title={row.properties['in-use'] === 'true' ? 'In-use' : 'Not In-use'} placement='right'>
               <Switch
+                data-refer={`metalake-in-use-${name}`}
                 checked={row.properties['in-use'] === 'true'}
                 onChange={(e, value) => handleChangeInUse(name, value)}
                 size='small'

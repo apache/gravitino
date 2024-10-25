@@ -260,6 +260,7 @@ const TableView = () => {
             {paramsSize == 1 && searchParams.has('metalake') && (
               <Tooltip title={row.inUse === 'true' ? 'In-use' : 'Not In-use'} placement='right'>
                 <Switch
+                  data-refer={`catalog-in-use-${name}`}
                   checked={row.inUse === 'true'}
                   onChange={(e, value) => handleChangeInUse(name, value)}
                   size='small'
