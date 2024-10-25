@@ -34,7 +34,6 @@ dependencies {
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
-  implementation(libs.aws.kms)
   implementation(libs.hadoop3.aws)
 }
 

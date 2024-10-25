@@ -41,6 +41,7 @@ httpclient5 = "5.2.1"
 mockserver = "5.15.0"
 commons-lang3 = "3.14.0"
 commons-lang = "2.6"
+commons-logging = "1.2"
 commons-io = "2.15.0"
 commons-collections4 = "4.4"
 commons-collections3 = "3.2.2"
@@ -175,6 +176,7 @@ mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", versi
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
 commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
+commons-logging = { group = "commons-logging", name = "commons-logging", version.ref = "commons-logging" }
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
 rocksdbjni = { group = "org.rocksdb", name = "rocksdbjni", version.ref = "rocksdbjni" }
