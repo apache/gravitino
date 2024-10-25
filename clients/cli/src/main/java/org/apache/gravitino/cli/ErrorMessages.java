@@ -23,10 +23,14 @@ package org.apache.gravitino.cli;
 public class ErrorMessages {
   public static final String UNSUPPORTED_COMMAND = "Unsupported or unknown command.";
   public static final String UNKNOWN_ENTITY = "Unknown entity.";
+  public static final String TOO_MANY_ARGUMENTS = "Too many arguments.";
   public static final String UNKNOWN_METALAKE = "Unknown metalake name.";
   public static final String UNKNOWN_CATALOG = "Unknown catalog name.";
   public static final String UNKNOWN_SCHEMA = "Unknown schema name.";
   public static final String UNKNOWN_TABLE = "Unknown table name.";
   public static final String MALFORMED_NAME = "Malformed entity name.";
   public static final String MISSING_NAME = "Missing name.";
+  public static final String METALAKE_EXISTS = "Metalake already exists.";
+  public static final String CATALOG_EXISTS = "Catalog already exists.";
+  public static final String SCHEMA_EXISTS = "Schema already exists.";
 }

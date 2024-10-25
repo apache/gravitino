@@ -41,11 +41,13 @@ public class FullName {
 
   /**
    * Retrieves the metalake name from the command line options, the GRAVITINO_METALAKE environment
-   * variable.
+   * variable or the Gravitino config file.
    *
    * @return The metalake name, or null if not found.
    */
   public String getMetalakeName() {
+    GravitinoConfig config = new GravitinoConfig(null);
+
     // If specified on the command line use that
     if (line.hasOption(GravitinoOptions.METALAKE)) {
       return line.getOptionValue(GravitinoOptions.METALAKE);
@@ -60,6 +62,18 @@ public class FullName {
     // Check if the metalake name is set as an environment variable
     if (metalakeEnv != null) {
       return metalakeEnv;
+      // Check if the metalake name is specified in the configuration file
+    } else if (config.fileExists()) {
+      config.read();
+      String configName = config.getMetalakeName();
+      if (configName != null) {
+        return configName;
+      }
+    }
+
+    // Extract the metalake name from the full name option
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      return line.getOptionValue(GravitinoOptions.NAME).split("\\.")[0];
     }
 
     return null;
