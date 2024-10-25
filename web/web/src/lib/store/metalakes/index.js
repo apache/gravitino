@@ -1133,7 +1133,7 @@ export const appMetalakesSlice = createSlice({
       state.metalakeTree = state.metalakeTree.filter(i => i.key !== action.payload)
     },
     setCatalogInUse(state, action) {
-      for(let i = 0; i < state.catalogs.length; i++) {
+      for (let i = 0; i < state.catalogs.length; i++) {
         if (state.catalogs[i].name === action.payload.name) {
           state.catalogs[i].inUse = action.payload.isInUse + ''
           state.tableData[i].inUse = action.payload.isInUse + ''
@@ -1142,7 +1142,7 @@ export const appMetalakesSlice = createSlice({
       }
     },
     setMetalakeInUse(state, action) {
-      for(let i = 0; i < state.metalakes.length; i++) {
+      for (let i = 0; i < state.metalakes.length; i++) {
         if (state.metalakes[i].name === action.payload.name) {
           state.metalakes[i].properties['in-use'] = action.payload.isInUse + ''
           break

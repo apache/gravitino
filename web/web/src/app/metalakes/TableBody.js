@@ -31,7 +31,13 @@ import {
 
 import { formatToDateTime } from '@/lib/utils/date'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { fetchMetalakes, setFilteredMetalakes, deleteMetalake, resetTree, setMetalakeInUse } from '@/lib/store/metalakes'
+import {
+  fetchMetalakes,
+  setFilteredMetalakes,
+  deleteMetalake,
+  resetTree,
+  setMetalakeInUse
+} from '@/lib/store/metalakes'
 import { switchInUseApi } from '@/lib/api/metalakes'
 import { to } from '@/lib/utils'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
@@ -48,7 +54,7 @@ const TableBody = props => {
 
   const handleDeleteMetalake = name => () => {
     setOpenConfirmDelete(true)
-    setConfirmCacheData({name, type: 'metalake'})
+    setConfirmCacheData({ name, type: 'metalake' })
   }
 
   const handleConfirmDeleteSubmit = () => {
@@ -139,7 +145,11 @@ const TableBody = props => {
               </Typography>
             </Tooltip>
             <Tooltip title={row.properties['in-use'] === 'true' ? 'In-use' : 'Not In-use'} placement='right'>
-              <Switch checked={row.properties['in-use'] === 'true'} onChange={(e, value) => handleChangeInUse(name, value)} size='small' />
+              <Switch
+                checked={row.properties['in-use'] === 'true'}
+                onChange={(e, value) => handleChangeInUse(name, value)}
+                size='small'
+              />
             </Tooltip>
           </Box>
         )

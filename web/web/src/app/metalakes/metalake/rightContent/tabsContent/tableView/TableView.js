@@ -257,9 +257,15 @@ const TableView = () => {
                 {name}
               </Typography>
             </Tooltip>
-            {paramsSize == 1 && searchParams.has('metalake') && <Tooltip title={row.inUse === 'true' ? 'In-use' : 'Not In-use'} placement='right'>
-              <Switch checked={row.inUse === 'true'} onChange={(e, value) => handleChangeInUse(name, value)} size='small' />
-            </Tooltip>}
+            {paramsSize == 1 && searchParams.has('metalake') && (
+              <Tooltip title={row.inUse === 'true' ? 'In-use' : 'Not In-use'} placement='right'>
+                <Switch
+                  checked={row.inUse === 'true'}
+                  onChange={(e, value) => handleChangeInUse(name, value)}
+                  size='small'
+                />
+              </Tooltip>
+            )}
           </Box>
         )
       }

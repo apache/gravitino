@@ -68,6 +68,6 @@ export const deleteCatalogApi = ({ metalake, catalog }) => {
 export const switchInUseApi = ({ metalake, catalog, isInUse }) => {
   return defHttp.patch({
     url: `${Apis.UPDATEINUSE({ metalake, catalog })}`,
-    data: {inUse: isInUse}
+    data: { inUse: isInUse }
   })
 }

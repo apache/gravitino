@@ -37,13 +37,14 @@ const ConfirmDeleteDialog = props => {
           <Typography variant='h4' className={'twc-mb-5 '} sx={{ color: 'text.secondary' }}>
             Confirm Drop?
           </Typography>
-          {
-            ['metalake', 'catalog'].includes(confirmCacheData?.type) ? (
-            <Typography>Make sure the {confirmCacheData.type} is not in-use, and all sub-entities in it are dropped. This action can not be reversed!</Typography>
-            ) : (
-              <Typography>This action can not be reversed!</Typography>
-            )
-          }
+          {['metalake', 'catalog'].includes(confirmCacheData?.type) ? (
+            <Typography>
+              Make sure the {confirmCacheData.type} is not in-use, and all sub-entities in it are dropped. This action
+              can not be reversed!
+            </Typography>
+          ) : (
+            <Typography>This action can not be reversed!</Typography>
+          )}
         </Box>
       </DialogContent>
       <DialogActions className={'twc-justify-center twc-px-5 twc-pb-8'}>

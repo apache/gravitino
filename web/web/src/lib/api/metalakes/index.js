@@ -68,6 +68,6 @@ export const getMetalakeDataApi = url => {
 export const switchInUseApi = ({ name, isInUse }) => {
   return defHttp.patch({
     url: `${Apis.UPDATEINUSE}/${name}`,
-    data: {inUse: isInUse}
+    data: { inUse: isInUse }
   })
 }
