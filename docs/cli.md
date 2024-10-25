@@ -10,7 +10,7 @@ license: 'This software is licensed under the Apache License version 2.'
 
 This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
 
-At present, the CLI allows users to view metadata information for metalakes, catalogs, schemas, and tables. Future updates will expand on these capabilities to include entities such as roles, users and tags.
+Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, and tables. Future updates will expand on these capabilities to include roles, users, and tags.
 
 ## Running the CLI
 
@@ -62,7 +62,7 @@ The following commands are used for entity management:
 
 ### Setting the Metalake name
 
-As dealing with one Metalake is a typical scenario, you can set the Metalake name in several ways so that it doesn't need to passed on the command line.
+As dealing with one Metalake is a typical scenario, you can set the Metalake name in several ways so it doesn't need to be passed on the command line.
 
 1. Passed in on the command line via the `--metalake` parameter.
 2. Set via the `GRAVITINO_METALAKE` environment variable.
@@ -82,7 +82,7 @@ The command line option overrides the environment variable.
 
 ## Gravitino CLI configuration file
 
-The gravitino CLI can read commonly used CLI options from a configuration file. By default the file is `.gravitino` in the users home directory. The metalake, URL and ignore parameters can be set in this file.
+The gravitino CLI can read commonly used CLI options from a configuration file. By default, the file is `.gravitino` in the user's home directory. The metalake, URL and ignore parameters can be set in this file.
 
 ```text
 #
@@ -201,7 +201,7 @@ gcli metalake remove --metalake metalake_demo --property test
 gcli catalog list --metalake metalake_demo
 ```
 
-#### Show a catalogs details
+#### Show a catalog details
 
 ```bash
 gcli catalog details --metalake metalake_demo --name catalog_postgres
@@ -209,7 +209,7 @@ gcli catalog details --metalake metalake_demo --name catalog_postgres
 
 #### Creating a catalog
 
-The type of catalog to be created is specified by the `--provider` option. Different catalogs require different options, for example a Hive catalog requires a metastore URI to be passed in as an option.
+The type of catalog to be created is specified by the `--provider` option. Different catalogs require different options, for example, a Hive catalog requires a metastore URI to be passed in as an option.
 
 ##### Create a Hive catalog
 
@@ -259,7 +259,6 @@ gcli catalog update --metalake metalake_demo --name catalog_mysql --rename mysql
 gcli catalog update --metalake metalake_demo --name catalog_mysql --comment "new comment"
 ```
 
-
 #### Display a catalog's properties
 
 ```bash
@@ -286,7 +285,7 @@ gcli catalog remove --metalake metalake_demo --name catalog_mysql --property tes
 gcli schema list --metalake metalake_demo --name catalog_postgres
 ```
 
-#### Show a schema details
+#### Show schema details
 
 ```bash
 gcli schema details --metalake metalake_demo --name catalog_postgres.hr
@@ -298,14 +297,13 @@ gcli schema details --metalake metalake_demo --name catalog_postgres.hr
 gcli schema create --metalake metalake_demo --name catalog_postgres.new_db
 ```
 
-#### Display a schema properties
+#### Display schema properties
 
 ```bash
 gcli schema properties --metalake metalake_demo --name catalog_postgres.hr -i
 ```
 
 Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
-
 
 ### Table
 
@@ -326,4 +324,3 @@ gcli column list --metalake metalake_demo --name catalog_postgres.hr.departments
 ```bash
 gcli table delete --metalake metalake_demo --name catalog_postgres.hr.salaries
 ```
-
