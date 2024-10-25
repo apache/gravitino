@@ -163,6 +163,7 @@ public class CatalogIT extends BaseIT {
             catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", ImmutableMap.of());
     Assertions.assertEquals("true", catalog.properties().get(PROPERTY_IN_USE));
 
+    // test in-use and can't drop
     Exception exception =
         Assertions.assertThrows(
             CatalogInUseException.class, () -> metalake.dropCatalog(catalogName));
@@ -170,10 +171,16 @@ public class CatalogIT extends BaseIT {
         exception.getMessage().contains("please disable it first or use force option"),
         exception.getMessage());
 
+    // test disable and enable again
     Assertions.assertDoesNotThrow(() -> metalake.disableCatalog(catalogName));
     Catalog loadedCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals("false", loadedCatalog.properties().get(PROPERTY_IN_USE));
 
+    Assertions.assertDoesNotThrow(() -> metalake.enableCatalog(catalogName));
+    loadedCatalog = metalake.loadCatalog(catalogName);
+    Assertions.assertEquals("true", loadedCatalog.properties().get(PROPERTY_IN_USE));
+
+    Assertions.assertDoesNotThrow(() -> metalake.disableCatalog(catalogName));
     exception =
         Assertions.assertThrows(
             CatalogNotInUseException.class,
