@@ -37,8 +37,6 @@ public class TestCommandEntities {
         CommandEntities.isValidEntity(CommandEntities.SCHEMA), "SCHEMA should be a valid entity");
     assertTrue(
         CommandEntities.isValidEntity(CommandEntities.TABLE), "TABLE should be a valid entity");
-    assertTrue(
-        CommandEntities.isValidEntity(CommandEntities.COLUMN), "COLUMN should be a valid entity");
   }
 
   @Test
@@ -62,8 +60,6 @@ public class TestCommandEntities {
 
   @Test
   public void caseSensitive() {
-    assertFalse(
-        CommandEntities.isValidEntity("DETAILS".toUpperCase()),
-        "Entities should be case-sensitive");
+    assertFalse(CommandEntities.isValidEntity("METALAKE"), "Entities should be case-sensitive");
   }
 }

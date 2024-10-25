@@ -35,6 +35,11 @@ public class Main {
     try {
       CommandLine line = parser.parse(options, args);
       String entity = resolveEntity(line);
+      String[] extra = line.getArgs();
+      if (extra.length > 2) {
+        System.err.println(ErrorMessages.TOO_MANY_ARGUMENTS);
+        return;
+      }
       String command = resolveCommand(line);
       GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, entity, command);
 
