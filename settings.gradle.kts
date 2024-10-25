@@ -72,5 +72,4 @@ include("docs")
 include("integration-test-common")
 include(":bundles:aws-bundle")
 include(":bundles:gcp-bundle")
-include("bundles:aliyun-bundle")
-findProject(":bundles:aliyun-bundle")?.name = "aliyun-bundle"
+include(":bundles:aliyun-bundle")
