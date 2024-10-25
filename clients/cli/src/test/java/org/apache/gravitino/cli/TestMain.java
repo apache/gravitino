@@ -55,7 +55,7 @@ public class TestMain {
   }
 
   @Test
-  public void withTwoArgsOnly() throws ParseException {
+  public void withTwoArgs() throws ParseException {
     Options options = new GravitinoOptions().options();
     CommandLineParser parser = new DefaultParser();
     String[] args = {"metalake", "details"};
@@ -94,6 +94,19 @@ public class TestMain {
   }
 
   @Test
+  public void withNoArgsAndOptions() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"--name", "metalake_demo"};
+    CommandLine line = parser.parse(options, args);
+
+    String command = Main.resolveCommand(line);
+    assertNull(command);
+    String entity = Main.resolveEntity(line);
+    assertNull(entity);
+  }
+
+  @Test
   @SuppressWarnings("DefaultCharset")
   public void withHelpOption() throws ParseException, UnsupportedEncodingException {
     Options options = new GravitinoOptions().options();
@@ -116,5 +129,18 @@ public class TestMain {
 
     assertTrue(errContent.toString().contains("Error parsing command line")); // Expect error
     assertTrue(outContent.toString().contains("usage:")); // Expect help output
+  }
+
+  @Test
+  public void catalogWithOneArg() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+    String[] args = {"catalog", "--name", "catalog_postgres"};
+    CommandLine line = parser.parse(options, args);
+
+    String command = Main.resolveCommand(line);
+    assertEquals(CommandActions.DETAILS, command);
+    String entity = Main.resolveEntity(line);
+    assertEquals(CommandEntities.CATALOG, entity);
   }
 }

@@ -41,11 +41,13 @@ public class FullName {
 
   /**
    * Retrieves the metalake name from the command line options, the GRAVITINO_METALAKE environment
-   * variable.
+   * variable or the Gravitino config file.
    *
    * @return The metalake name, or null if not found.
    */
   public String getMetalakeName() {
+    GravitinoConfig config = new GravitinoConfig(null);
+
     // If specified on the command line use that
     if (line.hasOption(GravitinoOptions.METALAKE)) {
       return line.getOptionValue(GravitinoOptions.METALAKE);
@@ -60,6 +62,18 @@ public class FullName {
     // Check if the metalake name is set as an environment variable
     if (metalakeEnv != null) {
       return metalakeEnv;
+      // Check if the metalake name is specified in the configuration file
+    } else if (config.fileExists()) {
+      config.read();
+      String configName = config.getMetalakeName();
+      if (configName != null) {
+        return configName;
+      }
+    }
+
+    // Extract the metalake name from the full name option
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      return line.getOptionValue(GravitinoOptions.NAME).split("\\.")[0];
     }
 
     return null;
@@ -114,5 +128,60 @@ public class FullName {
 
     System.err.println(ErrorMessages.MISSING_NAME);
     return null;
+  }
+
+  /**
+   * Helper method to determine a specific part of the full name exits.
+   *
+   * @param partNo The part of the name to obtain.
+   * @return True if the part exitsts.
+   */
+  public boolean hasNamePart(int partNo) {
+    /* Extract the name part from the full name if available. */
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
+      int length = names.length;
+      int position = partNo;
+
+      return position <= length;
+    }
+
+    return false;
+  }
+
+  /**
+   * Does the metalake name exist?
+   *
+   * @return True if the catalog name exists, or false if it does not.
+   */
+  public boolean hasMetalakeName() {
+    return hasNamePart(1);
+  }
+
+  /**
+   * Does the catalog name exist?
+   *
+   * @return True if the catalog name exists, or false if it does not.
+   */
+  public boolean hasCatalogName() {
+    return hasNamePart(2);
+  }
+
+  /**
+   * Does the schema name exist?
+   *
+   * @return True if the schema name exists, or false if it does not.
+   */
+  public boolean hasSchemaName() {
+    return hasNamePart(3);
+  }
+
+  /**
+   * Does the table name exist?
+   *
+   * @return True if the table name exists, or false if it does not.
+   */
+  public boolean hasTableName() {
+    return hasNamePart(4);
   }
 }

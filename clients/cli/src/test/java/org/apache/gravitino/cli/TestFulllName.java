@@ -17,14 +17,18 @@
  * under the License.
  */
 
+package org.apache.gravitino.cli;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.MissingArgumentException;
 import org.apache.commons.cli.Options;
-import org.apache.gravitino.cli.FullName;
-import org.apache.gravitino.cli.GravitinoOptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -65,7 +69,7 @@ public class TestFulllName {
 
   @Test
   public void malformedName() throws Exception {
-    String[] args = {"--name", "metalake.catalog"};
+    String[] args = {"--name", "catalog.schema"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
     String tableName = fullName.getTableName();
@@ -74,11 +78,61 @@ public class TestFulllName {
 
   @Test
   public void missingName() throws Exception {
+    String[] args = {"catalog", "--name"};
+    assertThrows(MissingArgumentException.class, () -> new DefaultParser().parse(options, args));
+  }
+
+  @Test
+  public void missingArgs() throws Exception {
     String[] args = {}; // No name provided
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
 
     String namePart = fullName.getNamePart(3);
     assertNull(namePart);
+  }
+
+  @Test
+  public void hasPartNameMetalake() throws Exception {
+    String[] args = {"metalake", "details", "--name", "metalake"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertTrue(fullName.hasMetalakeName());
+    assertFalse(fullName.hasCatalogName());
+    assertFalse(fullName.hasSchemaName());
+    assertFalse(fullName.hasTableName());
+  }
+
+  @Test
+  public void hasPartNameCatalog() throws Exception {
+    String[] args = {"catalog", "details", "--name", "metalake.catalog"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertTrue(fullName.hasMetalakeName());
+    assertTrue(fullName.hasCatalogName());
+    assertFalse(fullName.hasSchemaName());
+    assertFalse(fullName.hasTableName());
+  }
+
+  @Test
+  public void hasPartNameSchema() throws Exception {
+    String[] args = {"schema", "details", "--name", "metalake.catalog.schema"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertTrue(fullName.hasMetalakeName());
+    assertTrue(fullName.hasCatalogName());
+    assertTrue(fullName.hasSchemaName());
+    assertFalse(fullName.hasTableName());
+  }
+
+  @Test
+  public void hasPartNameTable() throws Exception {
+    String[] args = {"table", "details", "--name", "metalake.catalog.schema.table"};
+    CommandLine commandLine = new DefaultParser().parse(options, args);
+    FullName fullName = new FullName(commandLine);
+    assertTrue(fullName.hasMetalakeName());
+    assertTrue(fullName.hasCatalogName());
+    assertTrue(fullName.hasSchemaName());
+    assertTrue(fullName.hasTableName());
   }
 }

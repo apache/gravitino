@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 public class TestCommandActions {
 
   @Test
-  public void ValidCommands() {
+  public void validCommands() {
     assertTrue(
         CommandActions.isValidCommand(CommandActions.DETAILS), "DETAILS should be a valid command");
     assertTrue(
@@ -38,6 +38,12 @@ public class TestCommandActions {
         CommandActions.isValidCommand(CommandActions.CREATE), "CREATE should be a valid command");
     assertTrue(
         CommandActions.isValidCommand(CommandActions.DELETE), "DELETE should be a valid command");
+    assertTrue(CommandActions.isValidCommand(CommandActions.SET), "SET should be a valid command");
+    assertTrue(
+        CommandActions.isValidCommand(CommandActions.REMOVE), "REMOVE should be a valid command");
+    assertTrue(
+        CommandActions.isValidCommand(CommandActions.PROPERTIES),
+        "PROPERTIES should be a valid command");
   }
 
   @Test
@@ -62,8 +68,6 @@ public class TestCommandActions {
 
   @Test
   public void caseSensitive() {
-    assertFalse(
-        CommandActions.isValidCommand("DETAILS".toUpperCase()),
-        "Commands should be case-sensitive");
+    assertFalse(CommandActions.isValidCommand("DETAILS"), "Commands should be case-sensitive");
   }
 }
