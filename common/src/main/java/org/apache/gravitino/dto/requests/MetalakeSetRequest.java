@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -29,6 +30,7 @@ import org.apache.gravitino.rest.RESTRequest;
 @ToString
 public class MetalakeSetRequest implements RESTRequest {
 
+  @JsonProperty("inUse")
   private final boolean inUse;
 
   /** Default constructor for MetalakeSetRequest. */

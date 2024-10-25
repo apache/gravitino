@@ -87,6 +87,7 @@ import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
@@ -629,6 +630,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
+    NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
+    checkMetalake(metalakeIdent, store);
+
     try {
       boolean catalogInUse = catalogInUse(store, ident);
       if (catalogInUse && !force) {
@@ -646,7 +650,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       if (!schemas.isEmpty() && !force) {
         // the Kafka catalog is special, it includes a default schema
         if (!catalogEntity.getProvider().equals("kafka") || schemas.size() > 1) {
-          throw new NonEmptyEntityException(
+          throw new NonEmptyCatalogException(
               "Catalog %s has schemas, please drop them first or use force option", ident);
         }
       }

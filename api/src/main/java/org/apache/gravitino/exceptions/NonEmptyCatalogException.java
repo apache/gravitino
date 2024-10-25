@@ -21,8 +21,9 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Exception thrown when a schema is not empty. */
-public class NonEmptySchemaException extends GravitinoRuntimeException {
+/** Exception thrown when a catalog is not empty. */
+public class NonEmptyCatalogException extends GravitinoRuntimeException {
+
   /**
    * Constructs a new exception with the specified detail message.
    *
@@ -30,19 +31,7 @@ public class NonEmptySchemaException extends GravitinoRuntimeException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public NonEmptySchemaException(@FormatString String message, Object... args) {
+  public NonEmptyCatalogException(@FormatString String message, Object... args) {
     super(message, args);
-  }
-
-  /**
-   * Constructs a new exception with the specified detail message and cause.
-   *
-   * @param cause the cause.
-   * @param message the detail message.
-   * @param args the arguments to the message.
-   */
-  @FormatMethod
-  public NonEmptySchemaException(Throwable cause, @FormatString String message, Object... args) {
-    super(cause, message, args);
   }
 }

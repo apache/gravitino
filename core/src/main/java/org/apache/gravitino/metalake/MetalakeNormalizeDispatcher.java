@@ -19,7 +19,6 @@
 package org.apache.gravitino.metalake;
 
 import static org.apache.gravitino.Entity.SYSTEM_METALAKE_RESERVED_NAME;
-import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.meta.BaseMetalake.PROPERTIES_METADATA;
@@ -37,7 +36,6 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.meta.BaseMetalake;
 
 public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
   private static final Set<String> RESERVED_WORDS = ImmutableSet.of(SYSTEM_METALAKE_RESERVED_NAME);
@@ -66,7 +64,7 @@ public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
 
   @Override
   public Metalake loadMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
-    return newMetalakeWithResolvedProperties((BaseMetalake) dispatcher.loadMetalake(ident));
+    return dispatcher.loadMetalake(ident);
   }
 
   @Override
@@ -130,25 +128,6 @@ public class MetalakeNormalizeDispatcher implements MetalakeDispatcher {
     if (!name.matches(METALAKE_NAME_PATTERN)) {
       throw new IllegalArgumentException("The metalake name '" + name + "' is illegal.");
     }
-  }
-
-  private BaseMetalake newMetalakeWithResolvedProperties(BaseMetalake metalakeEntity) {
-    Map<String, String> newProps = Maps.newHashMap(metalakeEntity.properties());
-    newProps
-        .entrySet()
-        .removeIf(e -> metalakeEntity.propertiesMetadata().isHiddenProperty(e.getKey()));
-    newProps.putIfAbsent(
-        PROPERTY_IN_USE,
-        metalakeEntity.propertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
-
-    return BaseMetalake.builder()
-        .withId(metalakeEntity.id())
-        .withName(metalakeEntity.name())
-        .withComment(metalakeEntity.comment())
-        .withProperties(newProps)
-        .withVersion(metalakeEntity.getVersion())
-        .withAuditInfo(metalakeEntity.auditInfo())
-        .build();
   }
 
   private Pair<Map<String, String>, Map<String, String>> getMetalakeAlterProperty(
