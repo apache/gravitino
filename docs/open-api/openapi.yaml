@@ -453,6 +453,7 @@ components:
           - "CATALOG"
           - "SCHEMA"
           - "TABLE"
+          - "COLUMN"
           - "FILESET"
           - "TOPIC"
           - "ROLE"

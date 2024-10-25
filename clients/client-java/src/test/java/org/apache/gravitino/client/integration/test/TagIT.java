@@ -60,6 +60,8 @@ public class TagIT extends BaseIT {
   private static Schema schema;
   private static Table table;
 
+  private static Column column;
+
   @BeforeAll
   public void setUp() {
     containerSuite.startHiveContainer();
@@ -105,6 +107,7 @@ public class TagIT extends BaseIT {
                 },
                 "comment",
                 Collections.emptyMap());
+    column = Arrays.stream(table.columns()).filter(c -> c.name().equals("col1")).findFirst().get();
   }
 
   @AfterAll
@@ -507,5 +510,100 @@ public class TagIT extends BaseIT {
     Assertions.assertEquals(table.name(), tag3.associatedObjects().objects()[0].name());
     Assertions.assertEquals(
         MetadataObject.Type.TABLE, tag3.associatedObjects().objects()[0].type());
+  }
+
+  @Test
+  public void testAssociateTagsToColumn() {
+    Tag tag1 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_column_tag1"),
+            "comment1",
+            Collections.emptyMap());
+    Tag tag2 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_column_tag2"),
+            "comment2",
+            Collections.emptyMap());
+    Tag tag3 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_column_tag3"),
+            "comment3",
+            Collections.emptyMap());
+    Tag tag4 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_column_tag4"),
+            "comment4",
+            Collections.emptyMap());
+
+    // Associate tags to catalog
+    relationalCatalog.supportsTags().associateTags(new String[] {tag1.name()}, null);
+
+    // Associate tags to schema
+    schema.supportsTags().associateTags(new String[] {tag2.name()}, null);
+
+    // Associate tags to table
+    table.supportsTags().associateTags(new String[] {tag3.name()}, null);
+
+    // Associate tags to column
+    String[] tags = column.supportsTags().associateTags(new String[] {tag4.name()}, null);
+
+    Assertions.assertEquals(1, tags.length);
+    Set<String> tagNames = Sets.newHashSet(tags);
+    Assertions.assertTrue(tagNames.contains(tag4.name()));
+
+    // Test list associated tags for column
+    String[] tags1 = column.supportsTags().listTags();
+    Assertions.assertEquals(4, tags1.length);
+    Set<String> tagNames1 = Sets.newHashSet(tags1);
+    Assertions.assertTrue(tagNames1.contains(tag1.name()));
+    Assertions.assertTrue(tagNames1.contains(tag2.name()));
+    Assertions.assertTrue(tagNames1.contains(tag3.name()));
+    Assertions.assertTrue(tagNames1.contains(tag4.name()));
+
+    // Test list associated tags with details for column
+    Tag[] tags2 = column.supportsTags().listTagsInfo();
+    Assertions.assertEquals(4, tags2.length);
+
+    Set<Tag> nonInheritedTags =
+        Arrays.stream(tags2).filter(tag -> !tag.inherited().get()).collect(Collectors.toSet());
+    Set<Tag> inheritedTags =
+        Arrays.stream(tags2).filter(tag -> tag.inherited().get()).collect(Collectors.toSet());
+
+    Assertions.assertEquals(1, nonInheritedTags.size());
+    Assertions.assertEquals(3, inheritedTags.size());
+    Assertions.assertTrue(nonInheritedTags.contains(tag4));
+    Assertions.assertTrue(inheritedTags.contains(tag1));
+    Assertions.assertTrue(inheritedTags.contains(tag2));
+    Assertions.assertTrue(inheritedTags.contains(tag3));
+
+    // Test get associated tag for column
+    Tag resultTag1 = column.supportsTags().getTag(tag1.name());
+    Assertions.assertEquals(tag1, resultTag1);
+    Assertions.assertTrue(resultTag1.inherited().get());
+
+    Tag resultTag2 = column.supportsTags().getTag(tag2.name());
+    Assertions.assertEquals(tag2, resultTag2);
+    Assertions.assertTrue(resultTag2.inherited().get());
+
+    Tag resultTag3 = column.supportsTags().getTag(tag3.name());
+    Assertions.assertEquals(tag3, resultTag3);
+    Assertions.assertTrue(resultTag3.inherited().get());
+
+    Tag resultTag4 = column.supportsTags().getTag(tag4.name());
+    Assertions.assertEquals(tag4, resultTag4);
+    Assertions.assertFalse(resultTag4.inherited().get());
+
+    // Test get objects associated with tag
+    Assertions.assertEquals(1, tag1.associatedObjects().count());
+    Assertions.assertEquals(relationalCatalog.name(), tag1.associatedObjects().objects()[0].name());
+
+    Assertions.assertEquals(1, tag2.associatedObjects().count());
+    Assertions.assertEquals(schema.name(), tag2.associatedObjects().objects()[0].name());
+
+    Assertions.assertEquals(1, tag3.associatedObjects().count());
+    Assertions.assertEquals(table.name(), tag3.associatedObjects().objects()[0].name());
+
+    Assertions.assertEquals(1, tag4.associatedObjects().count());
+    Assertions.assertEquals(column.name(), tag4.associatedObjects().objects()[0].name());
   }
 }

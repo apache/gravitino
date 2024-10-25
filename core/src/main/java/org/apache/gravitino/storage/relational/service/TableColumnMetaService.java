@@ -21,9 +21,12 @@ package org.apache.gravitino.storage.relational.service;
 import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
@@ -52,6 +55,37 @@ public class TableColumnMetaService {
     return columnPOs.stream()
         .filter(c -> c.getColumnOpType() != ColumnPO.ColumnOpType.DELETE.value())
         .collect(Collectors.toList());
+  }
+
+  Long getColumnIdByTableIdAndName(Long tableId, String columnName) {
+    Long columnId =
+        SessionUtils.getWithoutCommit(
+            TableColumnMapper.class,
+            mapper -> mapper.selectColumnIdByTableIdAndName(tableId, columnName));
+
+    if (columnId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.COLUMN.name().toLowerCase(Locale.ROOT),
+          columnName);
+    }
+
+    return columnId;
+  }
+
+  ColumnPO getColumnPOById(Long columnId) {
+    ColumnPO columnPO =
+        SessionUtils.getWithoutCommit(
+            TableColumnMapper.class, mapper -> mapper.selectColumnPOById(columnId));
+
+    if (columnPO == null || columnPO.getColumnOpType() == ColumnPO.ColumnOpType.DELETE.value()) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.COLUMN.name().toLowerCase(Locale.ROOT),
+          columnId.toString());
+    }
+
+    return columnPO;
   }
 
   void insertColumnPOs(TablePO tablePO, List<ColumnEntity> columnEntities) {
