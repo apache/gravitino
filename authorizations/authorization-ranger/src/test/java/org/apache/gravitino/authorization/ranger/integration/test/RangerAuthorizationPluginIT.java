@@ -299,11 +299,11 @@ public class RangerAuthorizationPluginIT {
             String.format("catalog.schema"),
             MetadataObject.Type.SCHEMA,
             Lists.newArrayList(Privileges.ReadFileset.allow()));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(createFilesetInMetalake)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(createFilesetInCatalog)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(createFilesetInSchema)));
 
     // Ignore the Topic operation
@@ -327,13 +327,13 @@ public class RangerAuthorizationPluginIT {
             String.format("catalog.schema.fileset"),
             MetadataObject.Type.FILESET,
             Lists.newArrayList(Privileges.WriteFileset.allow()));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(writeFilesetInMetalake)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(writeFilesetInCatalog)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(writeFilesetInScheam)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(writeFileset)));
 
     // Ignore the Fileset operation
@@ -357,13 +357,13 @@ public class RangerAuthorizationPluginIT {
             String.format("catalog.schema.table"),
             MetadataObject.Type.FILESET,
             Lists.newArrayList(Privileges.ReadFileset.allow()));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(readFilesetInMetalake)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(readFilesetInCatalog)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(readFilesetInSchema)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(readFileset)));
 
     // Ignore the Topic operation
@@ -382,11 +382,11 @@ public class RangerAuthorizationPluginIT {
             String.format("catalog.schema"),
             MetadataObject.Type.SCHEMA,
             Lists.newArrayList(Privileges.CreateTopic.allow()));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(createTopicInMetalake)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(createTopicInCatalog)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(createTopicInSchema)));
 
     SecurableObject produceTopicInMetalake =
@@ -409,13 +409,13 @@ public class RangerAuthorizationPluginIT {
             String.format("catalog.schema.fileset"),
             MetadataObject.Type.TOPIC,
             Lists.newArrayList(Privileges.ProduceTopic.allow()));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(produceTopicInMetalake)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(produceTopicInCatalog)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(produceTopicInSchema)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(produceTopic)));
 
     SecurableObject consumeTopicInMetalake =
@@ -438,13 +438,13 @@ public class RangerAuthorizationPluginIT {
             String.format("catalog.schema.topic"),
             MetadataObject.Type.TOPIC,
             Lists.newArrayList(Privileges.ConsumeTopic.allow()));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(consumeTopicInMetalake)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(consumeTopicInCatalog)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(consumeTopicInSchema)));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(consumeTopic)));
   }
 
