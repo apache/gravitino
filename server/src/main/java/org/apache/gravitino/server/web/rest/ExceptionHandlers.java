@@ -33,6 +33,8 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
@@ -317,6 +319,9 @@ public class ExceptionHandlers {
       } else if (e instanceof InUseException) {
         return Utils.inUse(errorMsg, e);
 
+      } else if (e instanceof NonEmptyCatalogException) {
+        return Utils.nonEmpty(errorMsg, e);
+
       } else {
         return super.handle(op, catalog, metalake, e);
       }
@@ -353,6 +358,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof MetalakeInUseException) {
         return Utils.inUse(errorMsg, e);
+
+      } else if (e instanceof NonEmptyMetalakeException) {
+        return Utils.nonEmpty(errorMsg, e);
 
       } else {
         return super.handle(op, metalake, parent, e);
