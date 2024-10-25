@@ -429,7 +429,7 @@ catalogs_info = gravitino_client.list_catalogs_info()
 ## Schema operations
 
 :::tip
-Users should create a metalake and a catalog, then ensure that the metalake and catalog are enabled before performing schema operations.
+Users should create a metalake and a catalog, then ensure that the metalake and catalog are enabled before operating schemas.
 :::
 
 ### Create a schema
@@ -679,7 +679,7 @@ schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas()
 ## Table operations
 
 :::tip
-Users should create a metalake, a catalog and a schema, then ensure that the metalake and catalog are enabled before performing table operations.
+Users should create a metalake, a catalog and a schema, then ensure that the metalake and catalog are enabled before before operating tables.
 :::
 
 ### Create a table
