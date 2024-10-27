@@ -456,13 +456,13 @@ public class GravitinoCommandLine {
     String role = line.getOptionValue(GravitinoOptions.ROLE);
 
     if (CommandActions.DETAILS.equals(command)) {
-      new RoleDetails(url, metalake, role).handle();
+      new RoleDetails(url, ignore, metalake, role).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      new ListRoles(url, metalake).handle();
+      new ListRoles(url, ignore, metalake).handle();
     } else if (CommandActions.CREATE.equals(command)) {
-      new CreateRole(url, metalake, role).handle();
+      new CreateRole(url, ignore, metalake, role).handle();
     } else if (CommandActions.DELETE.equals(command)) {
-      new DeleteRole(url, metalake, role).handle();
+      new DeleteRole(url, ignore, metalake, role).handle();
     }
   }
 

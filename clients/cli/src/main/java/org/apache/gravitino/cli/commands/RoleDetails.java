@@ -35,11 +35,12 @@ public class RoleDetails extends Command {
    * Displays the securable objects in a role.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param role The name of the role.
    */
-  public RoleDetails(String url, String metalake, String role) {
-    super(url);
+  public RoleDetails(String url, boolean ignoreVersions, String metalake, String role) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.role = role;
   }
