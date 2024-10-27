@@ -26,16 +26,17 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /* Lists all tags in a metalake. */
 public class ListAllTags extends Command {
 
-  protected String metalake;
+  protected final String metalake;
 
   /**
    * Lists all tags in a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    */
-  public ListAllTags(String url, String metalake) {
-    super(url);
+  public ListAllTags(String url, boolean ignoreVersions, String metalake) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
   }
 
@@ -53,13 +54,7 @@ public class ListAllTags extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < tags.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(tags[i]);
-    }
+    String all = String.join(",", tags);
 
     System.out.println(all.toString());
   }

@@ -45,13 +45,14 @@ public class GravitinoIcebergRESTServer {
   }
 
   private void initialize() {
-    gravitinoEnv.initialize(serverConfig, false);
+    gravitinoEnv.initializeBaseComponents(serverConfig);
     icebergRESTService.serviceInit(
         serverConfig.getConfigsWithPrefix(IcebergConfig.ICEBERG_CONFIG_PREFIX));
     ServerAuthenticator.getInstance().initialize(serverConfig);
   }
 
   private void start() {
+    gravitinoEnv.start();
     icebergRESTService.serviceStart();
   }
 

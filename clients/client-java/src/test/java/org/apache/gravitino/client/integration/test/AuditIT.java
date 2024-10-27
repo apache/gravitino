@@ -26,22 +26,22 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-public class AuditIT extends AbstractIT {
+public class AuditIT extends BaseIT {
 
   private static final String expectUser = System.getProperty("user.name");
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     registerCustomConfigs(configs);
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
   }
 
   @Test
@@ -60,6 +60,7 @@ public class AuditIT extends AbstractIT {
     metaLake = client.alterMetalake(metalakeAuditName, changes);
     Assertions.assertEquals(expectUser, metaLake.auditInfo().creator());
     Assertions.assertEquals(expectUser, metaLake.auditInfo().lastModifier());
+    Assertions.assertDoesNotThrow(() -> client.disableMetalake(newName));
     Assertions.assertTrue(client.dropMetalake(newName), "metaLake should be dropped");
     Assertions.assertFalse(client.dropMetalake(newName), "metalake should be non-existent");
   }

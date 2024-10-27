@@ -24,11 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,18 +38,25 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
@@ -143,6 +152,140 @@ public class TestPOConverters {
     assertEquals(expectedTable.name(), convertedTable.name());
     assertEquals(expectedTable.namespace(), convertedTable.namespace());
     assertEquals(expectedTable.auditInfo().creator(), convertedTable.auditInfo().creator());
+  }
+
+  @Test
+  public void testFromColumnPO() throws JsonProcessingException {
+    ColumnPO columnPO =
+        createColumnPO(
+            1L,
+            "test",
+            0,
+            1L,
+            1L,
+            1L,
+            1L,
+            Types.IntegerType.get(),
+            "test",
+            true,
+            true,
+            Literals.integerLiteral(1),
+            ColumnPO.ColumnOpType.CREATE);
+
+    ColumnEntity expectedColumn =
+        createColumn(
+            1L, "test", 0, Types.IntegerType.get(), "test", true, true, Literals.integerLiteral(1));
+
+    ColumnEntity convertedColumn = POConverters.fromColumnPO(columnPO);
+    assertEquals(expectedColumn.id(), convertedColumn.id());
+    assertEquals(expectedColumn.name(), convertedColumn.name());
+    assertEquals(expectedColumn.dataType(), convertedColumn.dataType());
+    assertEquals(expectedColumn.comment(), convertedColumn.comment());
+    assertEquals(expectedColumn.nullable(), convertedColumn.nullable());
+    assertEquals(expectedColumn.autoIncrement(), convertedColumn.autoIncrement());
+    assertEquals(expectedColumn.defaultValue(), convertedColumn.defaultValue());
+
+    // Test column comment is null
+    ColumnPO columnPO1 =
+        createColumnPO(
+            1L,
+            "test",
+            0,
+            1L,
+            1L,
+            1L,
+            1L,
+            Types.IntegerType.get(),
+            null,
+            true,
+            true,
+            Literals.integerLiteral(1),
+            ColumnPO.ColumnOpType.CREATE);
+
+    ColumnEntity expectedColumn1 =
+        createColumn(
+            1L, "test", 0, Types.IntegerType.get(), null, true, true, Literals.integerLiteral(1));
+
+    ColumnEntity convertedColumn1 = POConverters.fromColumnPO(columnPO1);
+    assertEquals(expectedColumn1.comment(), convertedColumn1.comment());
+  }
+
+  @Test
+  public void testFromTableColumnPOs() throws JsonProcessingException {
+    TablePO tablePO = createTablePO(1L, "test", 1L, 1L, 1L);
+    ColumnPO columnPO1 =
+        createColumnPO(
+            1L,
+            "test1",
+            0,
+            1L,
+            1L,
+            1L,
+            1L,
+            Types.IntegerType.get(),
+            "test1",
+            true,
+            true,
+            Literals.integerLiteral(1),
+            ColumnPO.ColumnOpType.CREATE);
+
+    ColumnPO columnPO2 =
+        createColumnPO(
+            2L,
+            "test2",
+            1,
+            1L,
+            1L,
+            1L,
+            1L,
+            Types.StringType.get(),
+            "test2",
+            true,
+            true,
+            Literals.stringLiteral("1"),
+            ColumnPO.ColumnOpType.CREATE);
+
+    ColumnEntity expectedColumn1 =
+        createColumn(
+            1L,
+            "test1",
+            0,
+            Types.IntegerType.get(),
+            "test1",
+            true,
+            true,
+            Literals.integerLiteral(1));
+
+    ColumnEntity expectedColumn2 =
+        createColumn(
+            2L,
+            "test2",
+            1,
+            Types.StringType.get(),
+            "test2",
+            true,
+            true,
+            Literals.stringLiteral("1"));
+
+    TableEntity expectedTable =
+        createTableWithColumns(
+            1L,
+            "test",
+            NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"),
+            Lists.newArrayList(expectedColumn1, expectedColumn2));
+
+    TableEntity convertedTable =
+        POConverters.fromTableAndColumnPOs(
+            tablePO,
+            Lists.newArrayList(columnPO1, columnPO2),
+            NamespaceUtil.ofTable("test_metalake", "test_catalog", "test_schema"));
+
+    assertEquals(expectedTable.id(), convertedTable.id());
+    assertEquals(expectedTable.name(), convertedTable.name());
+    assertEquals(expectedTable.namespace(), convertedTable.namespace());
+    assertEquals(expectedTable.auditInfo().creator(), convertedTable.auditInfo().creator());
+    assertEquals(expectedTable.columns().size(), convertedTable.columns().size());
+    assertEquals(expectedTable.columns(), convertedTable.columns());
   }
 
   @Test
@@ -527,7 +670,7 @@ public class TestPOConverters {
     TablePO.Builder builder =
         TablePO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     TablePO initPO = POConverters.initializeTablePOWithVersion(tableEntity, builder);
-    TablePO updatePO = POConverters.updateTablePOWithVersion(initPO, updatedTable);
+    TablePO updatePO = POConverters.updateTablePOWithVersion(initPO, updatedTable, false);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
@@ -800,26 +943,18 @@ public class TestPOConverters {
   }
 
   private static TableEntity createTable(Long id, String name, Namespace namespace) {
+    return createTableWithColumns(id, name, namespace, Collections.emptyList());
+  }
+
+  private static TableEntity createTableWithColumns(
+      Long id, String name, Namespace namespace, List<ColumnEntity> columns) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     return TableEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withAuditInfo(auditInfo)
-        .build();
-  }
-
-  private static TopicEntity createTopic(
-      Long id, String name, Namespace namespace, String comment, Map<String, String> properties) {
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
-    return TopicEntity.builder()
-        .withId(id)
-        .withName(name)
-        .withNamespace(namespace)
-        .withComment(comment)
-        .withProperties(properties)
+        .withColumns(columns)
         .withAuditInfo(auditInfo)
         .build();
   }
@@ -839,6 +974,83 @@ public class TestPOConverters {
         .withCurrentVersion(1L)
         .withLastVersion(1L)
         .withDeletedAt(0L)
+        .build();
+  }
+
+  private static ColumnPO createColumnPO(
+      Long id,
+      String columnName,
+      Integer columnPosition,
+      Long metalakeId,
+      Long catalogId,
+      Long schemaId,
+      Long tableId,
+      Type columnType,
+      String columnComment,
+      boolean columnNullable,
+      boolean columnAutoIncrement,
+      Expression columnDefaultValue,
+      ColumnPO.ColumnOpType columnOpType)
+      throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return ColumnPO.builder()
+        .withColumnId(id)
+        .withColumnName(columnName)
+        .withColumnPosition(columnPosition)
+        .withMetalakeId(metalakeId)
+        .withCatalogId(catalogId)
+        .withSchemaId(schemaId)
+        .withTableId(tableId)
+        .withTableVersion(1L)
+        .withColumnType(JsonUtils.anyFieldMapper().writeValueAsString(columnType))
+        .withColumnComment(columnComment)
+        .withNullable(ColumnPO.Nullable.fromBoolean(columnNullable).value())
+        .withAutoIncrement(ColumnPO.AutoIncrement.fromBoolean(columnAutoIncrement).value())
+        .withDefaultValue(
+            JsonUtils.anyFieldMapper()
+                .writeValueAsString(DTOConverters.toFunctionArg(columnDefaultValue)))
+        .withColumnOpType(columnOpType.value())
+        .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+        .withDeletedAt(0L)
+        .build();
+  }
+
+  private static ColumnEntity createColumn(
+      Long id,
+      String columnName,
+      Integer columnPosition,
+      Type columnType,
+      String columnComment,
+      boolean columnNullable,
+      boolean columnAutoIncrement,
+      Expression columnDefaultValue) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return ColumnEntity.builder()
+        .withId(id)
+        .withName(columnName)
+        .withPosition(columnPosition)
+        .withDataType(columnType)
+        .withComment(columnComment)
+        .withNullable(columnNullable)
+        .withAutoIncrement(columnAutoIncrement)
+        .withDefaultValue(columnDefaultValue)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private static TopicEntity createTopic(
+      Long id, String name, Namespace namespace, String comment, Map<String, String> properties) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return TopicEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment(comment)
+        .withProperties(properties)
+        .withAuditInfo(auditInfo)
         .build();
   }
 

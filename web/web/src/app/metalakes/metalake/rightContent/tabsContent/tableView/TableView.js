@@ -40,12 +40,14 @@ import ColumnTypeChip from '@/components/ColumnTypeChip'
 import DetailsDrawer from '@/components/DetailsDrawer'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 import CreateCatalogDialog from '../../CreateCatalogDialog'
+import CreateSchemaDialog from '../../CreateSchemaDialog'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { updateCatalog, deleteCatalog } from '@/lib/store/metalakes'
+import { deleteCatalog, deleteSchema } from '@/lib/store/metalakes'
 
 import { to } from '@/lib/utils'
 import { getCatalogDetailsApi } from '@/lib/api/catalogs'
+import { getSchemaDetailsApi } from '@/lib/api/schemas'
 import { useSearchParams } from 'next/navigation'
 
 const fonts = Inconsolata({ subsets: ['latin'] })
@@ -72,6 +74,8 @@ const TableView = () => {
   const searchParams = useSearchParams()
   const paramsSize = [...searchParams.keys()].length
   const metalake = searchParams.get('metalake') || ''
+  const catalog = searchParams.get('catalog') || ''
+  const type = searchParams.get('type') || ''
 
   const defaultPaginationConfig = { pageSize: 10, page: 0 }
   const pageSizeOptions = [10, 25, 50]
@@ -86,8 +90,18 @@ const TableView = () => {
   const [confirmCacheData, setConfirmCacheData] = useState(null)
   const [openConfirmDelete, setOpenConfirmDelete] = useState(false)
   const [openDialog, setOpenDialog] = useState(false)
+  const [openSchemaDialog, setOpenSchemaDialog] = useState(false)
   const [dialogData, setDialogData] = useState({})
   const [dialogType, setDialogType] = useState('create')
+  const [isHideSchemaEdit, setIsHideSchemaEdit] = useState(true)
+
+  useEffect(() => {
+    if (store.catalogs.length) {
+      const currentCatalog = store.catalogs.filter(ca => ca.name === catalog)[0]
+      const isHideSchemaAction = ['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3
+      setIsHideSchemaEdit(isHideSchemaAction)
+    }
+  }, [store.catalogs, store.catalogs.length, paramsSize, catalog])
 
   const handleClickUrl = path => {
     if (!path) {
@@ -200,7 +214,7 @@ const TableView = () => {
     }
   ]
 
-  const catalogsColumns = [
+  const actionsColumns = [
     {
       flex: 0.1,
       minWidth: 60,
@@ -251,31 +265,35 @@ const TableView = () => {
             title='Details'
             size='small'
             sx={{ color: theme => theme.palette.text.secondary }}
-            onClick={() => handleShowDetails({ row, type: 'catalog' })}
-            data-refer={`view-catalog-${row.name}`}
+            onClick={() => handleShowDetails({ row, type: row.node })}
+            data-refer={`view-entity-${row.name}`}
           >
             <ViewIcon viewBox='0 0 24 22' />
           </IconButton>
 
-          <IconButton
-            title='Edit'
-            size='small'
-            sx={{ color: theme => theme.palette.text.secondary }}
-            onClick={() => handleShowEditDialog({ row, type: 'catalog' })}
-            data-refer={`edit-catalog-${row.name}`}
-          >
-            <EditIcon />
-          </IconButton>
+          {!isHideSchemaEdit && (
+            <IconButton
+              title='Edit'
+              size='small'
+              sx={{ color: theme => theme.palette.text.secondary }}
+              onClick={() => handleShowEditDialog({ row, type: row.node })}
+              data-refer={`edit-entity-${row.name}`}
+            >
+              <EditIcon />
+            </IconButton>
+          )}
 
-          <IconButton
-            title='Delete'
-            size='small'
-            sx={{ color: theme => theme.palette.error.light }}
-            onClick={() => handleDelete({ name: row.name, type: 'catalog', catalogType: row.type })}
-            data-refer={`delete-catalog-${row.name}`}
-          >
-            <DeleteIcon />
-          </IconButton>
+          {!isHideSchemaEdit && (
+            <IconButton
+              title='Delete'
+              size='small'
+              sx={{ color: theme => theme.palette.error.light }}
+              onClick={() => handleDelete({ name: row.name, type: row.node, catalogType: row.type })}
+              data-refer={`delete-entity-${row.name}`}
+            >
+              <DeleteIcon />
+            </IconButton>
+          )}
         </>
       )
     }
@@ -422,34 +440,66 @@ const TableView = () => {
   ]
 
   const handleShowDetails = async ({ row, type }) => {
-    if (type === 'catalog') {
-      const [err, res] = await to(getCatalogDetailsApi({ metalake, catalog: row.name }))
+    switch (type) {
+      case 'catalog': {
+        const [err, res] = await to(getCatalogDetailsApi({ metalake, catalog: row.name }))
 
-      if (err || !res) {
-        throw new Error(err)
+        if (err || !res) {
+          throw new Error(err)
+        }
+
+        setDrawerData(res.catalog)
+        setOpenDrawer(true)
+        break
       }
+      case 'schema': {
+        const [err, res] = await to(getSchemaDetailsApi({ metalake, catalog, schema: row.name }))
 
-      setDrawerData(res.catalog)
-      setOpenDrawer(true)
+        if (err || !res) {
+          throw new Error(err)
+        }
+
+        setDrawerData(res.schema)
+        setOpenDrawer(true)
+        break
+      }
+      default:
+        return
     }
   }
 
   const handleShowEditDialog = async data => {
-    const metalake = data.row.namespace[0] || null
-    const catalog = data.row.name || null
+    switch (data.type) {
+      case 'catalog': {
+        const [err, res] = await to(getCatalogDetailsApi({ metalake, catalog: data.row?.name }))
 
-    if (metalake && catalog) {
-      const [err, res] = await to(getCatalogDetailsApi({ metalake, catalog }))
+        if (err || !res) {
+          throw new Error(err)
+        }
 
-      if (err || !res) {
-        throw new Error(err)
+        const { catalog: resCatalog } = res
+
+        setDialogType('update')
+        setDialogData(resCatalog)
+        setOpenDialog(true)
+        break
       }
+      case 'schema': {
+        if (metalake && catalog) {
+          const [err, res] = await to(getSchemaDetailsApi({ metalake, catalog, schema: data.row?.name }))
 
-      const { catalog: resCatalog } = res
+          if (err || !res) {
+            throw new Error(err)
+          }
 
-      setDialogType('update')
-      setDialogData(resCatalog)
-      setOpenDialog(true)
+          setDialogType('update')
+          setDialogData(res.schema)
+          setOpenSchemaDialog(true)
+        }
+        break
+      }
+      default:
+        return
     }
   }
 
@@ -465,8 +515,15 @@ const TableView = () => {
 
   const handleConfirmDeleteSubmit = () => {
     if (confirmCacheData) {
-      if (confirmCacheData.type === 'catalog') {
-        dispatch(deleteCatalog({ metalake, catalog: confirmCacheData.name, type: confirmCacheData.catalogType }))
+      switch (confirmCacheData.type) {
+        case 'catalog':
+          dispatch(deleteCatalog({ metalake, catalog: confirmCacheData.name, type: confirmCacheData.catalogType }))
+          break
+        case 'schema':
+          dispatch(deleteSchema({ metalake, catalog, type, schema: confirmCacheData.name }))
+          break
+        default:
+          break
       }
 
       setOpenConfirmDelete(false)
@@ -474,8 +531,11 @@ const TableView = () => {
   }
 
   const checkColumns = () => {
-    if (paramsSize == 1 && searchParams.has('metalake')) {
-      return catalogsColumns
+    if (
+      (paramsSize == 1 && searchParams.has('metalake')) ||
+      (paramsSize == 3 && searchParams.has('metalake') && searchParams.has('catalog') && searchParams.has('type'))
+    ) {
+      return actionsColumns
     } else if (paramsSize == 5 && searchParams.has('table')) {
       return tableColumns
     } else {
@@ -508,12 +568,7 @@ const TableView = () => {
         paginationModel={paginationModel}
         onPaginationModelChange={setPaginationModel}
       />
-      <DetailsDrawer
-        openDrawer={openDrawer}
-        setOpenDrawer={setOpenDrawer}
-        drawerData={drawerData}
-        isMetalakePage={paramsSize == 1 && searchParams.hasOwnProperty('metalake')}
-      />
+      <DetailsDrawer openDrawer={openDrawer} setOpenDrawer={setOpenDrawer} drawerData={drawerData} />
       <ConfirmDeleteDialog
         open={openConfirmDelete}
         setOpen={setOpenConfirmDelete}
@@ -522,13 +577,9 @@ const TableView = () => {
         handleConfirmDeleteSubmit={handleConfirmDeleteSubmit}
       />
 
-      <CreateCatalogDialog
-        open={openDialog}
-        setOpen={setOpenDialog}
-        updateCatalog={updateCatalog}
-        data={dialogData}
-        type={dialogType}
-      />
+      <CreateCatalogDialog open={openDialog} setOpen={setOpenDialog} data={dialogData} type={dialogType} />
+
+      <CreateSchemaDialog open={openSchemaDialog} setOpen={setOpenSchemaDialog} data={dialogData} type={dialogType} />
     </Box>
   )
 }

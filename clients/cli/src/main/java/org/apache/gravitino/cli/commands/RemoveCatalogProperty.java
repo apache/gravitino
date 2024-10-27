@@ -28,20 +28,22 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Remove a property of a catalog. */
 public class RemoveCatalogProperty extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String property;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String property;
 
   /**
    * Remove a property of a catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param property The name of the property.
    */
-  public RemoveCatalogProperty(String url, String metalake, String catalog, String property) {
-    super(url);
+  public RemoveCatalogProperty(
+      String url, boolean ignoreVersions, String metalake, String catalog, String property) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.property = property;

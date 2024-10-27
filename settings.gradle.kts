@@ -71,3 +71,7 @@ project(":spark-connector:spark-runtime-3.5").projectDir = file("spark-connector
 include("web:web", "web:integration-test")
 include("docs")
 include("integration-test-common")
+include(":bundles:aws-bundle")
+include(":bundles:gcp-bundle")
+include("bundles:aliyun-bundle")
+findProject(":bundles:aliyun-bundle")?.name = "aliyun-bundle"

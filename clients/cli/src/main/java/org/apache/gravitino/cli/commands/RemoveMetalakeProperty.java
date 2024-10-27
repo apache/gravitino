@@ -27,18 +27,20 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Remove a property of a metalake. */
 public class RemoveMetalakeProperty extends Command {
 
-  protected String metalake;
-  protected String property;
+  protected final String metalake;
+  protected final String property;
 
   /**
    * Remove a property of a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param property The name of the property.
    */
-  public RemoveMetalakeProperty(String url, String metalake, String property) {
-    super(url);
+  public RemoveMetalakeProperty(
+      String url, boolean ignoreVersions, String metalake, String property) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.property = property;
   }

@@ -18,7 +18,8 @@
  */
 package org.apache.gravitino.server.web.rest;
 
-import com.google.common.collect.ImmutableMap;
+import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
+
 import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -29,7 +30,6 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 
 public class TestCatalog extends BaseCatalog<TestCatalog> {
-  private static final PropertiesMetadata PROPERTIES_METADATA = ImmutableMap::of;
 
   @Override
   public String shortName() {
@@ -61,6 +61,6 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
 
   @Override
   public PropertiesMetadata catalogPropertiesMetadata() throws UnsupportedOperationException {
-    return PROPERTIES_METADATA;
+    return BASIC_CATALOG_PROPERTIES_METADATA;
   }
 }

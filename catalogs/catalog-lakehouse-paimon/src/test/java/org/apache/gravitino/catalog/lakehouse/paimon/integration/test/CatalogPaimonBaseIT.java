@@ -51,8 +51,10 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -84,15 +86,27 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.commons.util.StringUtils;
 
-public abstract class CatalogPaimonBaseIT extends AbstractIT {
+public abstract class CatalogPaimonBaseIT extends BaseIT {
 
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  protected static final TestDatabaseName TEST_DB_NAME =
+      TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD;
+  protected static MySQLContainer mySQLContainer;
   protected String WAREHOUSE;
   protected String TYPE;
+  protected String URI;
+  protected String jdbcUser;
+  protected String jdbcPassword;
+  protected Catalog catalog;
+  protected org.apache.paimon.catalog.Catalog paimonCatalog;
+  protected SparkSession spark;
+  protected String metalakeName = GravitinoITUtils.genRandomName("paimon_it_metalake");
+  protected String catalogName = GravitinoITUtils.genRandomName("paimon_it_catalog");
+  protected String schemaName = GravitinoITUtils.genRandomName("paimon_it_schema");
+  protected static final String schema_comment = "schema_comment";
 
   private static final String provider = "lakehouse-paimon";
   private static final String catalog_comment = "catalog_comment";
-  private static final String schema_comment = "schema_comment";
   private static final String table_comment = "table_comment";
   private static final String PAIMON_COL_NAME1 = "paimon_col_name1";
   private static final String PAIMON_COL_NAME2 = "paimon_col_name2";
@@ -100,16 +114,10 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   private static final String PAIMON_COL_NAME4 = "paimon_col_name4";
   private static final String PAIMON_COL_NAME5 = "paimon_col_name5";
   private static final String alertTableName = "alert_table_name";
-  private String metalakeName = GravitinoITUtils.genRandomName("paimon_it_metalake");
-  private String catalogName = GravitinoITUtils.genRandomName("paimon_it_catalog");
-  private String schemaName = GravitinoITUtils.genRandomName("paimon_it_schema");
-  private String tableName = GravitinoITUtils.genRandomName("paimon_it_table");
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO paimon.%s VALUES %s";
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM paimon.%s";
+  private static final String DEFAULT_DB = "default";
   private GravitinoMetalake metalake;
-  private Catalog catalog;
-  private org.apache.paimon.catalog.Catalog paimonCatalog;
-  protected SparkSession spark;
   private Map<String, String> catalogProperties;
 
   @BeforeAll
@@ -129,7 +137,9 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   @AfterAll
   public void stop() {
     clearTableAndSchema();
+    metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);
+    client.disableMetalake(metalakeName);
     client.dropMetalake(metalakeName);
     if (spark != null) {
       spark.close();
@@ -163,9 +173,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
     // load schema check.
     Schema schema = schemas.loadSchema(schemaIdent.name());
-    // database properties is empty for Paimon FilesystemCatalog.
-    Assertions.assertTrue(schema.properties().isEmpty());
-    Assertions.assertTrue(paimonCatalog.loadDatabaseProperties(schemaIdent.name()).isEmpty());
+    Assertions.assertEquals(testSchemaName, schema.name());
 
     Map<String, String> emptyMap = Collections.emptyMap();
     Assertions.assertThrows(
@@ -202,6 +210,7 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
   @Test
   void testCreateTableWithNullComment() {
+    String tableName = GravitinoITUtils.genRandomName("paimon_table_with_null_comment");
     Column[] columns = createColumns();
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
 
@@ -217,6 +226,8 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   @Test
   void testCreateAndLoadPaimonTable()
       throws org.apache.paimon.catalog.Catalog.TableNotExistException {
+    String tableName = GravitinoITUtils.genRandomName("create_and_load_paimon_table");
+
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
@@ -301,6 +312,8 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   @Test
   void testCreateAndLoadPaimonPartitionedTable()
       throws org.apache.paimon.catalog.Catalog.TableNotExistException {
+    String tableName = GravitinoITUtils.genRandomName("create_and_load_paimon_partitioned_table");
+
     // Create table from Gravitino API
     Column[] columns = createColumns();
 
@@ -390,6 +403,8 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   @Test
   void testCreateAndLoadPaimonPrimaryKeyTable()
       throws org.apache.paimon.catalog.Catalog.TableNotExistException {
+    String tableName = GravitinoITUtils.genRandomName("create_and_load_paimon_primary_key_table");
+
     // Create table from Gravitino API
     Column[] columns = createColumns();
     ArrayList<Column> newColumns = new ArrayList<>(Arrays.asList(columns));
@@ -615,6 +630,8 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
 
   @Test
   public void testAlterPaimonTable() {
+    String tableName = GravitinoITUtils.genRandomName("alter_paimon_table");
+
     Column[] columns = createColumns();
     catalog
         .asTableCatalog()
@@ -712,11 +729,11 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     // update column position
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
-    Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
+    Column col3 = Column.of("date_of_birth", Types.StringType.get(), "comment");
 
     Column[] newColumns = new Column[] {col1, col2, col3};
     NameIdentifier tableIdentifier =
-        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("PaimonAlterTableIT"));
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("new_alter_paimon_table"));
     catalog
         .asTableCatalog()
         .createTable(
@@ -857,16 +874,21 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
   }
 
   private void clearTableAndSchema() {
-    if (catalog.asSchemas().schemaExists(schemaName)) {
-      catalog.asSchemas().dropSchema(schemaName, true);
-    }
+    SupportsSchemas supportsSchema = catalog.asSchemas();
+    Arrays.stream(supportsSchema.listSchemas())
+        .forEach(
+            schema -> {
+              // can not drop default database for hive backend.
+              if (!DEFAULT_DB.equalsIgnoreCase(schema)) {
+                supportsSchema.dropSchema(schema, true);
+              }
+            });
   }
 
   private void createMetalake() {
-    GravitinoMetalake createdMetalake =
-        client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
     GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
-    Assertions.assertEquals(createdMetalake, loadMetalake);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
     metalake = loadMetalake;
   }
@@ -903,10 +925,8 @@ public abstract class CatalogPaimonBaseIT extends AbstractIT {
     prop.put("key2", "val2");
 
     Schema createdSchema = catalog.asSchemas().createSchema(ident.name(), schema_comment, prop);
-    // database properties is empty for Paimon FilesystemCatalog.
     Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(createdSchema.name(), loadSchema.name());
-    Assertions.assertTrue(loadSchema.properties().isEmpty());
   }
 
   private Column[] createColumns() {

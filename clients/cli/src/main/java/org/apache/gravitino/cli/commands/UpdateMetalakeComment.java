@@ -27,18 +27,20 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** Update the comment of a metalake. */
 public class UpdateMetalakeComment extends Command {
 
-  protected String metalake;
-  protected String comment;
+  protected final String metalake;
+  protected final String comment;
 
   /**
    * Update the comment of a metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param comment New metalake comment.
    */
-  public UpdateMetalakeComment(String url, String metalake, String comment) {
-    super(url);
+  public UpdateMetalakeComment(
+      String url, boolean ignoreVersions, String metalake, String comment) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.comment = comment;
   }

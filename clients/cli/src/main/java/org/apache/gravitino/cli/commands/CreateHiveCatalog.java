@@ -25,6 +25,7 @@ public class CreateHiveCatalog extends CreateCatalog {
    * Create a new Hive catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param provider The provider/type of catalog.
@@ -33,12 +34,13 @@ public class CreateHiveCatalog extends CreateCatalog {
    */
   public CreateHiveCatalog(
       String url,
+      boolean ignoreVersions,
       String metalake,
       String catalog,
       String provider,
       String comment,
       String metastore) {
-    super(url, metalake, catalog, provider, comment);
+    super(url, ignoreVersions, metalake, catalog, provider, comment);
     properties.put("metastore.uris", metastore);
   }
 }

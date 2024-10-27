@@ -46,7 +46,7 @@ import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
@@ -60,7 +60,7 @@ import org.testcontainers.utility.MountableFile;
 import sun.security.krb5.KrbException;
 
 @Tag("gravitino-docker-test")
-public class HadoopUserAuthenticationIT extends AbstractIT {
+public class HadoopUserAuthenticationIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopUserAuthenticationIT.class);
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -104,7 +104,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
   private static final String TABLE_NAME = "test_table";
 
   @BeforeAll
-  public static void startIntegrationTest() throws Exception {
+  public void startIntegrationTest() throws Exception {
     containerSuite.startKerberosHiveContainer();
     kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
 
@@ -122,7 +122,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
     addKerberosConfig();
 
     // Start Gravitino server
-    AbstractIT.startIntegrationTest();
+    super.startIntegrationTest();
   }
 
   @AfterAll
@@ -222,14 +222,12 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
         .copyFileFromContainer(HADOOP_FILESET_KEYTAB, TMP_DIR + HADOOP_FILESET_KEYTAB);
   }
 
-  private static void addKerberosConfig() {
-    AbstractIT.customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
-    AbstractIT.customConfigs.put(
-        "gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
-    AbstractIT.customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
+  private void addKerberosConfig() {
+    customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
+    customConfigs.put("gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
+    customConfigs.put("gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
+    customConfigs.put(SDK_KERBEROS_PRINCIPAL_KEY, GRAVITINO_CLIENT_PRINCIPAL);
   }
 
   @Test
@@ -655,7 +653,7 @@ public class HadoopUserAuthenticationIT extends AbstractIT {
 
     catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, filesetName));
     catalog.asSchemas().dropSchema(SCHEMA_NAME, true);
-    gravitinoMetalake.dropCatalog(catalogName);
-    adminClient.dropMetalake(metalakeName);
+    gravitinoMetalake.dropCatalog(catalogName, true);
+    adminClient.dropMetalake(metalakeName, true);
   }
 }

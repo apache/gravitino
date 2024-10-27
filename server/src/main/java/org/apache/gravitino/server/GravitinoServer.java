@@ -48,6 +48,7 @@ import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.tag.TagManager;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
+import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
@@ -79,7 +80,7 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void initialize() {
-    gravitinoEnv.initialize(serverConfig, true);
+    gravitinoEnv.initializeFullComponents(serverConfig);
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -119,6 +120,7 @@ public class GravitinoServer extends ResourceConfig {
     register(JsonParseExceptionMapper.class);
     register(JsonMappingExceptionMapper.class);
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
+    property(CommonProperties.JSON_JACKSON_DISABLED_MODULES, "DefaultScalaModule");
 
     if (!enableAuthorization) {
       register(AccessControlNotAllowedFilter.class);

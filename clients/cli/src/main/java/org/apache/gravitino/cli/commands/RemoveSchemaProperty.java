@@ -29,23 +29,29 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 /** Remove a property of a schema. */
 public class RemoveSchemaProperty extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String schema;
-  protected String property;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String schema;
+  protected final String property;
 
   /**
    * Remove a property of a schema.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param property The name of the property.
    */
   public RemoveSchemaProperty(
-      String url, String metalake, String catalog, String schema, String property) {
-    super(url);
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String schema,
+      String property) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;

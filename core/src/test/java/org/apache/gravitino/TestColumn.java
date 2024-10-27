@@ -26,20 +26,44 @@ import org.apache.gravitino.connector.BaseColumn;
 @ToString
 public class TestColumn extends BaseColumn {
 
+  private int position;
+
   private TestColumn() {}
 
+  public int position() {
+    return position;
+  }
+
+  public void setPosition(int position) {
+    this.position = position;
+  }
+
   public static class Builder extends BaseColumn.BaseColumnBuilder<Builder, TestColumn> {
+
+    private Integer position;
+
     /** Creates a new instance of {@link Builder}. */
     private Builder() {}
+
+    public Builder withPosition(int position) {
+      this.position = position;
+      return this;
+    }
 
     @Override
     protected TestColumn internalBuild() {
       TestColumn column = new TestColumn();
 
+      if (position == null) {
+        throw new IllegalArgumentException("Position is required");
+      }
+
       column.name = name;
+      column.position = position;
       column.comment = comment;
       column.dataType = dataType;
       column.nullable = nullable;
+      column.autoIncrement = autoIncrement;
       column.defaultValue = defaultValue;
 
       return column;

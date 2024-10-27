@@ -28,9 +28,10 @@ public class ServerVersion extends Command {
    * Displays the server version.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    */
-  public ServerVersion(String url) {
-    super(url);
+  public ServerVersion(String url, boolean ignoreVersions) {
+    super(url, ignoreVersions);
   }
 
   /** Displays the server version. */

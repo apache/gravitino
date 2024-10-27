@@ -138,6 +138,33 @@ The plugin provides several operational modes for how to process event, supporti
 
 For more details, please refer to the definition of the plugin.
 
+### Audit log configuration
+
+The audit log framework defines how audit logs are formatted and written to various storages. The formatter defines an interface that transforms different `Event` types into a unified `AuditLog`. The writer defines an interface to writing AuditLog to different storages.
+
+Gravitino provides a default implement to log basic audit information to a file, you could extend the audit system by implementation corresponding interfaces.
+
+| Property name                         | Description                            | Default value                               | Required | Since Version              |
+|---------------------------------------|----------------------------------------|---------------------------------------------|----------|----------------------------|
+| `gravitino.audit.enabled`             | The audit log enable flag.             | false                                       | NO       | 0.7.0-incubating           |
+| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter  | NO       | 0.7.0-incubating           | 
+| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.SimpleFormatter  | NO       | 0.7.0-incubating           | 
+
+#### Audit log formatter
+
+The Formatter defines an interface that formats metadata audit logs into a unified format. `SimpleFormatter` is a default implement to format audit information, you don't need to do extra configurations.
+
+#### Audit log writer
+
+The `AuditLogWriter` defines an interface that enables the writing of metadata audit logs to different storage mediums such as files, databases, etc.
+
+Writer configuration begins with `gravitino.audit.writer.${name}`, where ${name} is replaced with the actual writer name defined in method `name()`. `FileAuditWriter` is a default implement to log audit information, whose name is `file`.
+
+| Property name                                       | Description                                                                             | Default value       | Required | Since Version              |
+|-----------------------------------------------------|-----------------------------------------------------------------------------------------|---------------------|----------|----------------------------|
+| `gravitino.audit.writer.file.fileName`              | The audit log file name, the path is ${sys:gravitino.log.path}/${fileName}.             | gravitino_audit.log | NO       | 0.7.0-incubating           |
+| `gravitino.audit.writer.file.append`                | Whether the log will be written to the end or the beginning of the file.                | true                | NO       | 0.7.0-incubating           |
+
 ### Security configuration
 
 Refer to [security](security/security.md) for HTTPS and authentication configurations.

@@ -25,14 +25,18 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -71,6 +75,10 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    // Check whether the current user exists or not
+    AuthorizationUtils.checkCurrentUser(
+        ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
+
     Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
 
     // Set the creator as the owner of the catalog.
@@ -105,6 +113,12 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public boolean dropCatalog(NameIdentifier ident, boolean force)
+      throws NonEmptyEntityException, CatalogInUseException {
+    return dispatcher.dropCatalog(ident, force);
+  }
+
+  @Override
   public void testConnection(
       NameIdentifier ident,
       Catalog.Type type,
@@ -113,6 +127,17 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       Map<String, String> properties)
       throws Exception {
     dispatcher.testConnection(ident, type, provider, comment, properties);
+  }
+
+  @Override
+  public void enableCatalog(NameIdentifier ident)
+      throws NoSuchCatalogException, CatalogNotInUseException {
+    dispatcher.enableCatalog(ident);
+  }
+
+  @Override
+  public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
+    dispatcher.disableCatalog(ident);
   }
 
   @Override
