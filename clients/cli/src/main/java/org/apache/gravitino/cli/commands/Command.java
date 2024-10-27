@@ -26,15 +26,19 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /* The base for all commands. */
 public abstract class Command {
   private final String url;
+  private final boolean ignoreVersions;
 
   /**
    * Command constructor.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    */
-  protected Command(String url) {
+  public Command(String url, boolean ignoreVersions) {
     this.url = url;
+    this.ignoreVersions = ignoreVersions;
   }
+
   /** All commands have a handle method to handle and run the required command. */
   public abstract void handle();
 
@@ -46,7 +50,11 @@ public abstract class Command {
    * @throws NoSuchMetalakeException if the specified metalake does not exist.
    */
   protected GravitinoClient buildClient(String metalake) throws NoSuchMetalakeException {
-    return GravitinoClient.builder(url).withMetalake(metalake).withVersionCheckDisabled().build();
+    if (ignoreVersions) {
+      return GravitinoClient.builder(url).withMetalake(metalake).withVersionCheckDisabled().build();
+    } else {
+      return GravitinoClient.builder(url).withMetalake(metalake).build();
+    }
   }
 
   /**
@@ -55,6 +63,10 @@ public abstract class Command {
    * @return A configured {@link GravitinoAdminClient} instance.
    */
   protected GravitinoAdminClient buildAdminClient() {
-    return GravitinoAdminClient.builder(url).withVersionCheckDisabled().build();
+    if (ignoreVersions) {
+      return GravitinoAdminClient.builder(url).withVersionCheckDisabled().build();
+    } else {
+      return GravitinoAdminClient.builder(url).build();
+    }
   }
 }

@@ -28,24 +28,30 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 public class CreateCatalog extends Command {
-  protected String metalake;
-  protected String catalog;
-  protected String provider;
-  protected String comment;
-  Map<String, String> properties;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String provider;
+  protected final String comment;
+  protected final Map<String, String> properties;
 
   /**
    * Create a new catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param provider The provider/type of catalog.
    * @param comment The catalog's comment.
    */
   public CreateCatalog(
-      String url, String metalake, String catalog, String provider, String comment) {
-    super(url);
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String provider,
+      String comment) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.provider = provider;

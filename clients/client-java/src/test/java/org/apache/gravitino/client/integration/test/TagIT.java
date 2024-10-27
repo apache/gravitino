@@ -35,7 +35,7 @@ import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -49,7 +49,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 @org.junit.jupiter.api.Tag("gravitino-docker-test")
-public class TagIT extends AbstractIT {
+public class TagIT extends BaseIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
@@ -61,7 +61,7 @@ public class TagIT extends AbstractIT {
   private static Table table;
 
   @BeforeAll
-  public static void setUp() {
+  public void setUp() {
     containerSuite.startHiveContainer();
     String hmsUri =
         String.format(
@@ -108,11 +108,11 @@ public class TagIT extends AbstractIT {
   }
 
   @AfterAll
-  public static void tearDown() {
+  public void tearDown() {
     relationalCatalog.asTableCatalog().dropTable(NameIdentifier.of(schema.name(), table.name()));
     relationalCatalog.asSchemas().dropSchema(schema.name(), true);
-    metalake.dropCatalog(relationalCatalog.name());
-    client.dropMetalake(metalakeName);
+    metalake.dropCatalog(relationalCatalog.name(), true);
+    client.dropMetalake(metalakeName, true);
 
     if (client != null) {
       client.close();

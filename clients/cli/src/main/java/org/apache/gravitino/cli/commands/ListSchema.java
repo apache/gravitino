@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import com.google.common.base.Joiner;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -27,18 +28,19 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 /** List all schema names in a schema. */
 public class ListSchema extends Command {
 
-  protected String metalake;
-  protected String catalog;
+  protected final String metalake;
+  protected final String catalog;
 
   /**
    * Lists all schemas in a catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    */
-  public ListSchema(String url, String metalake, String catalog) {
-    super(url);
+  public ListSchema(String url, boolean ignoreVersions, String metalake, String catalog) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
   }
@@ -60,13 +62,7 @@ public class ListSchema extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < schemas.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(schemas[i]);
-    }
+    String all = Joiner.on(",").join(schemas);
 
     System.out.println(all.toString());
   }

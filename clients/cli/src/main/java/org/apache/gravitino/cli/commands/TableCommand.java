@@ -30,18 +30,19 @@ import org.apache.gravitino.rel.TableCatalog;
 /* Common code for all table commands. */
 public class TableCommand extends Command {
 
-  protected String metalake;
-  protected String catalog;
+  protected final String metalake;
+  protected final String catalog;
 
   /**
    * Common code for all table commands.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    */
-  public TableCommand(String url, String metalake, String catalog) {
-    super(url);
+  public TableCommand(String url, boolean ignoreVersions, String metalake, String catalog) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
   }

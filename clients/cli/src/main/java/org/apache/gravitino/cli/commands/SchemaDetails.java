@@ -29,20 +29,22 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 /** Displays the details of schema. */
 public class SchemaDetails extends Command {
 
-  protected String metalake;
-  protected String catalog;
-  protected String schema;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String schema;
 
   /**
    * Displays the details of a schema.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schenma.
    */
-  public SchemaDetails(String url, String metalake, String catalog, String schema) {
-    super(url);
+  public SchemaDetails(
+      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;

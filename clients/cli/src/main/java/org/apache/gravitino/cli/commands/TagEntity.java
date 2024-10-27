@@ -32,20 +32,21 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Table;
 
 public class TagEntity extends Command {
-  protected String metalake;
-  protected FullName name;
-  protected String tag;
+  protected final String metalake;
+  protected final FullName name;
+  protected final String tag;
 
   /**
    * Tag an entity with an existing tag.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
    * @param tag The name of the tag.
    */
-  public TagEntity(String url, String metalake, FullName name, String tag) {
-    super(url);
+  public TagEntity(String url, boolean ignoreVersions, String metalake, FullName name, String tag) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.name = name;
     this.tag = tag;
@@ -100,13 +101,7 @@ public class TagEntity extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < tags.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(tags[i]);
-    }
+    String all = String.join(",", tags);
 
     System.out.println(entity + " tagged with " + all);
   }

@@ -58,7 +58,7 @@ dependencies {
     exclude("com.google.code.findbugs", "sr305")
     exclude("com.tdunning", "json")
     exclude("com.zaxxer", "HikariCP")
-    exclude("io.dropwizard.metricss")
+    exclude("io.dropwizard.metrics")
     exclude("javax.transaction", "transaction-api")
     exclude("org.apache.ant")
     exclude("org.apache.avro")
@@ -128,7 +128,7 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.localstack)
-  testImplementation(libs.hadoop2.s3)
+  testImplementation(libs.hadoop2.aws)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

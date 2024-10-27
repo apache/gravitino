@@ -25,13 +25,13 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Metalake;
-import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.metalake.MetalakePropertiesMetadata;
 
 /** Base implementation of a Metalake entity. */
 @EqualsAndHashCode
@@ -51,6 +51,8 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
   /** The required field for the schema version of the metalake. */
   public static final Field SCHEMA_VERSION =
       Field.required("version", SchemaVersion.class, "The version of the schema for the metalake");
+
+  public static final PropertiesMetadata PROPERTIES_METADATA = new MetalakePropertiesMetadata();
 
   private Long id;
 
@@ -87,10 +89,10 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
   /**
    * The audit information of the metalake.
    *
-   * @return The audit information as an {@link Audit} instance.
+   * @return The audit information as an {@link AuditInfo} instance.
    */
   @Override
-  public Audit auditInfo() {
+  public AuditInfo auditInfo() {
     return auditInfo;
   }
 
@@ -141,7 +143,11 @@ public class BaseMetalake implements Metalake, Entity, Auditable, HasIdentifier 
    */
   @Override
   public Map<String, String> properties() {
-    return StringIdentifier.newPropertiesWithoutId(properties);
+    return properties;
+  }
+
+  public PropertiesMetadata propertiesMetadata() {
+    return PROPERTIES_METADATA;
   }
 
   /** Builder class for creating instances of {@link BaseMetalake}. */

@@ -19,6 +19,7 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
@@ -78,6 +79,8 @@ public class GravitinoEnv {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoEnv.class);
 
   private Config config;
+  // Iceberg REST server use base components while Gravitino Server use full components.
+  private boolean manageFullComponents = true;
 
   private EntityStore entityStore;
 
@@ -109,6 +112,8 @@ public class GravitinoEnv {
 
   private EventListenerManager eventListenerManager;
 
+  private AuditLogManager auditLogManager;
+
   private TagManager tagManager;
   private EventBus eventBus;
   private OwnerManager ownerManager;
@@ -130,21 +135,30 @@ public class GravitinoEnv {
   }
 
   /**
-   * Initialize the Gravitino environment.
+   * Initialize base components, used for Iceberg REST server.
    *
    * @param config The configuration object to initialize the environment.
-   * @param isGravitinoServer A boolean flag indicating whether the initialization is for the
-   *     Gravitino server. If true, server-specific components will be initialized in addition to
-   *     the base components.
    */
-  public void initialize(Config config, boolean isGravitinoServer) {
-    LOG.info("Initializing Gravitino Environment...");
+  public void initializeBaseComponents(Config config) {
+    LOG.info("Initializing Gravitino base environment...");
     this.config = config;
+    this.manageFullComponents = false;
     initBaseComponents();
-    if (isGravitinoServer) {
-      initGravitinoServerComponents();
-    }
-    LOG.info("Gravitino Environment is initialized.");
+    LOG.info("Gravitino base environment is initialized.");
+  }
+
+  /**
+   * Initialize all components, used for Gravitino server.
+   *
+   * @param config The configuration object to initialize the environment.
+   */
+  public void initializeFullComponents(Config config) {
+    LOG.info("Initializing Gravitino full environment...");
+    this.config = config;
+    this.manageFullComponents = true;
+    initBaseComponents();
+    initGravitinoServerComponents();
+    LOG.info("Gravitino full environment is initialized.");
   }
 
   /**
@@ -308,9 +322,11 @@ public class GravitinoEnv {
   }
 
   public void start() {
-    auxServiceManager.serviceStart();
     metricsSystem.start();
     eventListenerManager.start();
+    if (manageFullComponents) {
+      auxServiceManager.serviceStart();
+    }
   }
 
   /** Shutdown the Gravitino environment. */
@@ -356,6 +372,9 @@ public class GravitinoEnv {
     eventListenerManager.init(
         config.getConfigsWithPrefix(EventListenerManager.GRAVITINO_EVENT_LISTENER_PREFIX));
     this.eventBus = eventListenerManager.createEventBus();
+
+    this.auditLogManager = new AuditLogManager();
+    auditLogManager.init(config, eventListenerManager);
   }
 
   private void initGravitinoServerComponents() {
@@ -366,14 +385,18 @@ public class GravitinoEnv {
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
 
-    // Create and initialize metalake related modules
+    // Create and initialize metalake related modules, the operation chain is:
+    // MetalakeEventDispatcher -> MetalakeNormalizeDispatcher -> MetalakeHookDispatcher ->
+    // MetalakeManager
     MetalakeDispatcher metalakeManager = new MetalakeManager(entityStore, idGenerator);
     MetalakeHookDispatcher metalakeHookDispatcher = new MetalakeHookDispatcher(metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
         new MetalakeNormalizeDispatcher(metalakeHookDispatcher);
     this.metalakeDispatcher = new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
 
-    // Create and initialize Catalog related modules
+    // Create and initialize Catalog related modules, the operation chain is:
+    // CatalogEventDispatcher -> CatalogNormalizeDispatcher -> CatalogHookDispatcher ->
+    // CatalogManager
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     CatalogHookDispatcher catalogHookDispatcher = new CatalogHookDispatcher(catalogManager);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =

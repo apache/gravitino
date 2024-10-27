@@ -28,22 +28,29 @@ import org.apache.gravitino.tag.TagChange;
 /** Set a property of a tag. */
 public class SetTagProperty extends Command {
 
-  protected String metalake;
-  protected String tag;
-  protected String property;
-  protected String value;
+  protected final String metalake;
+  protected final String tag;
+  protected final String property;
+  protected final String value;
 
   /**
    * Set a property of a tag.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    * @param property The name of the property.
    * @param value The value of the property.
    */
-  public SetTagProperty(String url, String metalake, String tag, String property, String value) {
-    super(url);
+  public SetTagProperty(
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String tag,
+      String property,
+      String value) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.tag = tag;
     this.property = property;

@@ -25,20 +25,27 @@ import org.apache.gravitino.rel.Table;
 /** Displays the details of a table. */
 public class TableDetails extends TableCommand {
 
-  protected String schema;
-  protected String table;
+  protected final String schema;
+  protected final String table;
 
   /**
    * Displays the details of a table.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schenma.
    * @param table The name of the table.
    */
-  public TableDetails(String url, String metalake, String catalog, String schema, String table) {
-    super(url, metalake, catalog);
+  public TableDetails(
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String schema,
+      String table) {
+    super(url, ignoreVersions, metalake, catalog);
     this.schema = schema;
     this.table = table;
   }

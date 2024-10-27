@@ -19,7 +19,10 @@
 package org.apache.gravitino.meta;
 
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -33,6 +36,7 @@ public class TestColumnEntity {
         ColumnEntity.builder()
             .withId(1L)
             .withName("test")
+            .withPosition(1)
             .withComment("test comment")
             .withDataType(Types.IntegerType.get())
             .withNullable(true)
@@ -44,6 +48,7 @@ public class TestColumnEntity {
 
     Assertions.assertEquals(1L, columnEntity.id());
     Assertions.assertEquals("test", columnEntity.name());
+    Assertions.assertEquals(1, columnEntity.position());
     Assertions.assertEquals("test comment", columnEntity.comment());
     Assertions.assertEquals(Types.IntegerType.get(), columnEntity.dataType());
     Assertions.assertTrue(columnEntity.nullable());
@@ -54,6 +59,7 @@ public class TestColumnEntity {
         ColumnEntity.builder()
             .withId(1L)
             .withName("test")
+            .withPosition(1)
             .withDataType(Types.IntegerType.get())
             .withNullable(true)
             .withAutoIncrement(true)
@@ -67,6 +73,7 @@ public class TestColumnEntity {
         ColumnEntity.builder()
             .withId(1L)
             .withName("test")
+            .withPosition(1)
             .withComment("test comment")
             .withDataType(Types.IntegerType.get())
             .withNullable(true)
@@ -74,7 +81,7 @@ public class TestColumnEntity {
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
-    Assertions.assertNull(columnEntity3.defaultValue());
+    Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, columnEntity3.defaultValue());
   }
 
   @Test
@@ -84,6 +91,7 @@ public class TestColumnEntity {
         () -> {
           ColumnEntity.builder()
               .withId(1L)
+              .withPosition(1)
               .withName("test")
               .withNullable(true)
               .withAutoIncrement(true)
@@ -98,6 +106,7 @@ public class TestColumnEntity {
         () -> {
           ColumnEntity.builder()
               .withId(1L)
+              .withPosition(1)
               .withComment("test comment")
               .withDataType(Types.IntegerType.get())
               .withAutoIncrement(true)
@@ -112,6 +121,7 @@ public class TestColumnEntity {
         () -> {
           ColumnEntity.builder()
               .withId(1L)
+              .withName("test")
               .withComment("test comment")
               .withDataType(Types.IntegerType.get())
               .withNullable(true)
@@ -140,6 +150,7 @@ public class TestColumnEntity {
         ColumnEntity.builder()
             .withId(1L)
             .withName("test")
+            .withPosition(1)
             .withComment("test comment")
             .withDataType(Types.IntegerType.get())
             .withNullable(true)
@@ -153,6 +164,7 @@ public class TestColumnEntity {
         ColumnEntity.builder()
             .withId(2L)
             .withName("test2")
+            .withPosition(2)
             .withComment("test comment2")
             .withDataType(Types.StringType.get())
             .withNullable(true)
@@ -166,6 +178,7 @@ public class TestColumnEntity {
         ColumnEntity.builder()
             .withId(3L)
             .withName("test3")
+            .withPosition(3)
             .withComment("test comment3")
             .withDataType(Types.BooleanType.get())
             .withNullable(true)
@@ -175,7 +188,7 @@ public class TestColumnEntity {
                 AuditInfo.builder().withCreator("test3").withCreateTime(Instant.now()).build())
             .build();
 
-    ColumnEntity[] columns = new ColumnEntity[] {columnEntity1, columnEntity2, columnEntity3};
+    List<ColumnEntity> columns = Arrays.asList(columnEntity1, columnEntity2, columnEntity3);
     TableEntity tableEntity =
         TableEntity.builder()
             .withId(1L)
@@ -189,7 +202,7 @@ public class TestColumnEntity {
     Assertions.assertEquals(1L, tableEntity.id());
     Assertions.assertEquals("test", tableEntity.name());
     Assertions.assertEquals(Namespace.of("catalog", "schema"), tableEntity.namespace());
-    Assertions.assertArrayEquals(columns, tableEntity.columns());
-    Assertions.assertEquals(3, tableEntity.columns().length);
+    Assertions.assertEquals(columns, tableEntity.columns());
+    Assertions.assertEquals(3, tableEntity.columns().size());
   }
 }

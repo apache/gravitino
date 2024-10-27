@@ -24,18 +24,19 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 
 public class CreateMetalake extends Command {
-  protected String metalake;
-  protected String comment;
+  protected final String metalake;
+  protected final String comment;
 
   /**
    * Create a new metalake.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param comment The metalake's comment.
    */
-  public CreateMetalake(String url, String metalake, String comment) {
-    super(url);
+  public CreateMetalake(String url, boolean ignoreVersions, String metalake, String comment) {
+    super(url, ignoreVersions);
     this.metalake = metalake;
     this.comment = comment;
   }

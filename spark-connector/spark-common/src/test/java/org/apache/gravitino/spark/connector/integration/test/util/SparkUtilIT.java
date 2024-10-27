@@ -28,7 +28,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import org.apache.gravitino.integration.test.util.AbstractIT;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Assertions;
  *
  * <p>Referred from spark/v3.4/spark/src/test/java/org/apache/iceberg/spark/SparkTestBase.java
  */
-public abstract class SparkUtilIT extends AbstractIT {
+public abstract class SparkUtilIT extends BaseIT {
   protected static final String NULL_STRING = "NULL";
 
   protected abstract SparkSession getSparkSession();

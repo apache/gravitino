@@ -28,9 +28,10 @@ public class ListProperties extends Command {
    * List the properties of an entity.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    */
-  public ListProperties(String url) {
-    super(url);
+  public ListProperties(String url, boolean ignoreVersions) {
+    super(url, ignoreVersions);
   }
 
   public void handle() {

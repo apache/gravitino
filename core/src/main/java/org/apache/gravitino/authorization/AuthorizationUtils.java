@@ -19,14 +19,12 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.collect.Sets;
-import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -36,14 +34,13 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /* The utilization class of authorization module*/
 public class AuthorizationUtils {
@@ -51,8 +48,6 @@ public class AuthorizationUtils {
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in th metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
-  private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
-  private static final String METALAKE_DOES_NOT_EXIST_MSG = "Metalake %s does not exist";
 
   private static final Set<Privilege.Name> FILESET_PRIVILEGES =
       Sets.immutableEnumSet(
@@ -66,18 +61,17 @@ public class AuthorizationUtils {
 
   private AuthorizationUtils() {}
 
-  static void checkMetalakeExists(String metalake) throws NoSuchMetalakeException {
+  public static void checkCurrentUser(String metalake, String user) {
     try {
-      EntityStore store = GravitinoEnv.getInstance().entityStore();
-
-      NameIdentifier metalakeIdent = NameIdentifier.of(metalake);
-      if (!store.exists(metalakeIdent, Entity.EntityType.METALAKE)) {
-        LOG.warn("Metalake {} does not exist", metalakeIdent);
-        throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalakeIdent);
+      AccessControlDispatcher dispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
+      // Only when we enable authorization, we need to check the current user
+      if (dispatcher != null) {
+        dispatcher.getUser(metalake, user);
       }
-    } catch (IOException e) {
-      LOG.error("Failed to do storage operation", e);
-      throw new RuntimeException(e);
+    } catch (NoSuchUserException nsu) {
+      throw new ForbiddenException(
+          "Current user %s doesn't exist in the metalake %s, you should add the user to the metalake first",
+          user, metalake);
     }
   }
 

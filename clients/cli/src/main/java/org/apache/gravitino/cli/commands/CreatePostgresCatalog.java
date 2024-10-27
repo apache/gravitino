@@ -25,6 +25,7 @@ public class CreatePostgresCatalog extends CreateCatalog {
    * Create a new Postgres catalog.
    *
    * @param url The URL of the Gravitino server.
+   * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param provider The provider/type of catalog.
@@ -36,6 +37,7 @@ public class CreatePostgresCatalog extends CreateCatalog {
    */
   public CreatePostgresCatalog(
       String url,
+      boolean ignoreVersions,
       String metalake,
       String catalog,
       String provider,
@@ -44,7 +46,7 @@ public class CreatePostgresCatalog extends CreateCatalog {
       String user,
       String password,
       String database) {
-    super(url, metalake, catalog, provider, comment);
+    super(url, ignoreVersions, metalake, catalog, provider, comment);
     properties.put("jdbc-url", jdbcurl);
     properties.put("jdbc-user", user);
     properties.put("jdbc-password", password);
