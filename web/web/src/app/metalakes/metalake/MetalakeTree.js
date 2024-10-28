@@ -86,7 +86,7 @@ const MetalakeTree = props => {
 
   const handleClickIcon = (e, nodeProps) => {
     e.stopPropagation()
-    if (nodeProps.data.inUse !== 'true') return
+    if (nodeProps.data.inUse === 'false') return
 
     switch (nodeProps.data.node) {
       case 'table': {
@@ -119,7 +119,7 @@ const MetalakeTree = props => {
   }
 
   const onMouseEnter = (e, nodeProps) => {
-    if (nodeProps.data.inUse !== 'true') return
+    if (nodeProps.data.inUse === 'false') return
     if (nodeProps.data.node === 'table') {
       if (store.selectedNodes.includes(nodeProps.data.key)) {
         setIsHover(nodeProps.data.key)
@@ -130,12 +130,12 @@ const MetalakeTree = props => {
   }
 
   const onMouseLeave = (e, nodeProps) => {
-    if (nodeProps.data.inUse !== 'true') return
+    if (nodeProps.data.inUse === 'false') return
     setIsHover(null)
   }
 
   const onLoadData = node => {
-    if (node.inUse !== 'true') return new Promise(resolve => resolve())
+    if (node.inUse === 'false') return new Promise(resolve => resolve())
     const { key, children } = node
 
     dispatch(setLoadedNodes([...store.loadedNodes, key]))
@@ -154,7 +154,7 @@ const MetalakeTree = props => {
   }
 
   const onExpand = (keys, { expanded, node }) => {
-    if (node.inUse !== 'true') return
+    if (node.inUse === 'false') return
     if (expanded) {
       dispatch(setExpandedNodes(keys))
     } else {
@@ -163,7 +163,7 @@ const MetalakeTree = props => {
   }
 
   const onSelect = (keys, { selected, node }) => {
-    if (node.inUse !== 'true') return
+    if (node.inUse === 'false') return
     if (!selected) {
       dispatch(setSelectedNodes([node.key]))
 
