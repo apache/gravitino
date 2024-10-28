@@ -20,27 +20,32 @@
 
 set -e
 
-if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 <new_version>"
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "Usage: $0 <new_version> [project_dir]"
   exit 1
 fi
 
 NEW_VERSION=$1
-cd "$(cd "$(dirname "$0")" && pwd)/../../docs"
+PROJECT_DIR=${2:-$(cd "$(dirname "$0")" && pwd)/../../}
+cd "${PROJECT_DIR}/docs"
 CURRENT_VERSION=`cat index.md| grep pathname:///docs | head -n 1 | awk -F '///docs' '{print $2}' | awk -F '/' '{print $2}'`
 
 if [[ "${NEW_VERSION}" == "${CURRENT_VERSION}" ]]; then
-  echo "The new version is the same as the current version."
-  exit 1
+  echo "The new version is the same as the current version: ${NEW_VERSION}"
+  exit 0
 fi
 
 # Detect the operating system
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS
     find "$(pwd)" -name "*.md" | xargs sed -i '' "s|/docs/${CURRENT_VERSION}/api|/docs/${NEW_VERSION}/api|g"
+    # modify open-api/openapi.yaml
+    sed -i '' "s|version: ${CURRENT_VERSION}|version: ${NEW_VERSION}|g" open-api/openapi.yaml
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
     # Linux
     find "$(pwd)" -name "*.md" | xargs sed -i "s|/docs/${CURRENT_VERSION}/api|/docs/${NEW_VERSION}/api|g"
+    # modify open-api/openapi.yaml
+    sed -i "s|version: ${CURRENT_VERSION}|version: ${NEW_VERSION}|g" open-api/openapi.yaml
 else
     echo "Unsupported OS"
     exit 1

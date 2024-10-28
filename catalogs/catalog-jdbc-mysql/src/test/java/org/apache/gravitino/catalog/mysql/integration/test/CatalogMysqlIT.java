@@ -934,7 +934,7 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertTrue(
         StringUtils.contains(
             illegalArgumentException.getMessage(),
-            "Index does not support complex fields in MySQL"));
+            "Index does not support complex fields in this Catalog"));
 
     Index[] indexes3 = new Index[] {Indexes.unique("u1_key", new String[][] {{"col_2", "col_3"}})};
     illegalArgumentException =
@@ -954,7 +954,7 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertTrue(
         StringUtils.contains(
             illegalArgumentException.getMessage(),
-            "Index does not support complex fields in MySQL"));
+            "Index does not support complex fields in this Catalog"));
 
     NameIdentifier tableIdent = NameIdentifier.of(schemaName, "test_null_key");
     tableCatalog.createTable(
