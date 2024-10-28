@@ -221,7 +221,7 @@ public class CatalogIT extends BaseIT {
         CatalogNotInUseException.class,
         () ->
             filesetOps.alterFileset(
-                NameIdentifier.of("dummy", "dummy"), FilesetChange.removeComment()));
+                NameIdentifier.of("dummy", "dummy"), FilesetChange.updateComment(null)));
 
     Assertions.assertTrue(metalake.dropCatalog(catalogName), "catalog should be dropped");
     Assertions.assertFalse(metalake.dropCatalog(catalogName), "catalog should be non-existent");
@@ -398,6 +398,10 @@ public class CatalogIT extends BaseIT {
     Catalog updatedCatalog =
         metalake.alterCatalog(catalogName, CatalogChange.updateComment("new catalog comment"));
     Assertions.assertEquals("new catalog comment", updatedCatalog.comment());
+
+    Catalog updateNullComment =
+        metalake.alterCatalog(catalogName, CatalogChange.updateComment(null));
+    Assertions.assertNull(updateNullComment.comment());
 
     metalake.disableCatalog(catalogName);
     metalake.dropCatalog(catalogName);

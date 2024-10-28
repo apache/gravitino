@@ -198,6 +198,14 @@ public class TagIT extends BaseIT {
   }
 
   @Test
+  public void testNullableComment() {
+    String tagName = GravitinoITUtils.genRandomName("tag_it_tag");
+    metalake.createTag(tagName, "comment", Collections.emptyMap());
+    Tag alteredTag6 = metalake.alterTag(tagName, TagChange.updateComment(null));
+    Assertions.assertNull(alteredTag6.comment());
+  }
+
+  @Test
   public void testCreateAndAlterTag() {
     String tagName = GravitinoITUtils.genRandomName("tag_it_tag");
     metalake.createTag(tagName, "comment", Collections.emptyMap());
