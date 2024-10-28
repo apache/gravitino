@@ -240,10 +240,10 @@ const CreateCatalogDialog = props => {
       propItems[0]?.value === 'filesystem' &&
       providerSelect === 'lakehouse-paimon'
     ) {
-      nextProps = propItems.filter(item => item.key !== 'uri')
+      nextProps = propItems.filter(item => !['jdbc-driver', 'jdbc-user', 'jdbc-password', 'uri'].includes(item.key))
     }
     const parentField = nextProps.find(i => i.key === 'authentication.type')
-    if (parentField && parentField.value === 'simple') {
+    if (!parentField || parentField?.value === 'simple') {
       nextProps = nextProps.filter(
         item => item.key !== 'authentication.kerberos.principal' && item.key !== 'authentication.kerberos.keytab-uri'
       )
@@ -288,16 +288,8 @@ const CreateCatalogDialog = props => {
             uri: uri,
             ...others
           }
+          authType && (properties['authType'] = authType)
         } else if (catalogBackend && catalogBackend === 'filesystem' && providerSelect === 'lakehouse-paimon') {
-          properties = {
-            'catalog-backend': catalogBackend,
-            ...others
-          }
-          uri && (properties['uri'] = uri)
-        } else if (
-          (!authType || authType === 'simple') &&
-          ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
-        ) {
           properties = {
             'catalog-backend': catalogBackend,
             ...others
