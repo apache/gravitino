@@ -43,6 +43,8 @@ package org.apache.gravitino.integration.test.util;
  *       postgresql.integration.test.TestMultipleJDBCLoad.
  *   <li>{@link #PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD}: Represents the PostgreSQL database for
  *       lakehouse.iceberg.integration.test.TestMultipleJDBCLoad.
+ *   <li>{@link #PG_TEST_PAIMON_CATALOG_MULTIPLE_JDBC_LOAD}: Represents the PostgreSQL database for
+ *       lakehouse.paimon.integration.test.CatalogPaimonMultipleJDBCLoadIT.
  * </ul>
  */
 public enum TestDatabaseName {
@@ -82,6 +84,18 @@ public enum TestDatabaseName {
    * Represents the PostgreSQL database for lakehouse.iceberg.integration.test.TestMultipleJDBCLoad.
    */
   PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD {
+    /** PostgreSQL only accept lowercase database name */
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  },
+
+  /**
+   * Represents the PostgreSQL database for
+   * lakehouse.paimon.integration.test.CatalogPaimonMultipleJDBCLoadIT.
+   */
+  PG_TEST_PAIMON_CATALOG_MULTIPLE_JDBC_LOAD {
     /** PostgreSQL only accept lowercase database name */
     @Override
     public String toString() {
