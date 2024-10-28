@@ -102,7 +102,7 @@ The detailed configuration items are as follows:
 
 #### S3 configuration
 
-Gravitino Iceberg REST service supports using static S3 secret key or generates temporary token to access S3 data.
+Gravitino Iceberg REST service supports using static S3 secret key or generating temporary token to access S3 data.
 
 | Configuration item                                | Description                                                                                                                                                                                                         | Default value | Required                                           | Since Version    |
 |---------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------|------------------|
@@ -142,7 +142,7 @@ Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_na
 
 #### GCS
 
-Supports generating GCS token file to access GCS data.
+Supports using static GCS credential file or generating GCS token to access GCS data.
 
 | Configuration item                                | Description                                                                                        | Default value | Required | Since Version    |
 |---------------------------------------------------|----------------------------------------------------------------------------------------------------|---------------|----------|------------------|
