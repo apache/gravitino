@@ -125,6 +125,9 @@ tasks {
 }
 
 tasks.test {
+  doFirst {
+    environment("HADOOP_USER_NAME", "test")
+  }
   dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
 
   val skipITs = project.hasProperty("skipITs")
