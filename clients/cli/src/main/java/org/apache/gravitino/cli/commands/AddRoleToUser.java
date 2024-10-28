@@ -54,7 +54,7 @@ public class AddRoleToUser extends Command {
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
-      ArrayList<String> roles = new ArrayList<String>();
+      ArrayList<String> roles = new ArrayList<>();
       roles.add(role);
       client.grantRolesToUser(roles, user);
     } catch (NoSuchMetalakeException err) {
@@ -71,6 +71,6 @@ public class AddRoleToUser extends Command {
       return;
     }
 
-    System.out.println(role + " added to" + user);
+    System.out.println(role + " added to " + user);
   }
 }
