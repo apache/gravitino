@@ -24,7 +24,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 ### Catalog capabilities
 
 - Gravitino catalog corresponds to the OceanBase instance.
-- Supports metadata management of OceanBase (3.x, 4.x).
+- Supports metadata management of OceanBase (4.x).
 - Supports DDL operation for OceanBase databases and tables.
 - Supports table index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
@@ -38,17 +38,18 @@ Check the relevant data source configuration in [data source properties](https:/
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the OceanBase catalog has the following properties:
 
-| Configuration item   | Description                                                                                            | Default value | Required | Since Version |
-|----------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:2881`                    | (none)        | Yes      | 0.3.0         |
-| `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`. | (none)        | Yes      | 0.3.0         |
-| `jdbc-user`          | The JDBC user name.                                                                                    | (none)        | Yes      | 0.3.0         |
-| `jdbc-password`      | The JDBC password.                                                                                     | (none)        | Yes      | 0.3.0         |
-| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                         | `2`           | No       | 0.3.0         |
-| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                        | `10`          | No       | 0.3.0         |
+| Configuration item   | Description                                                                                                                           | Default value | Required | Since Version    |
+|----------------------|---------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:2881`                                                   | (none)        | Yes      | 0.7.0-incubating |
+| `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` or `com.oceanbase.jdbc.Driver`. | (none)        | Yes      | 0.7.0-incubating |
+| `jdbc-user`          | The JDBC user name.                                                                                                                   | (none)        | Yes      | 0.7.0-incubating |
+| `jdbc-password`      | The JDBC password.                                                                                                                    | (none)        | Yes      | 0.7.0-incubating |
+| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                                                        | `2`           | No       | 0.7.0-incubating |
+| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                                       | `10`          | No       | 0.7.0-incubating |
 
 :::caution
-You must download the corresponding JDBC driver to the `catalogs/jdbc-oceanbase/libs` directory.
+Before using the OceanBase Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-oceanbase/libs` directory.
+Gravitino doesn't package the JDBC driver for OceanBase due to licensing issues.
 :::
 
 ### Catalog operations
@@ -100,14 +101,13 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `Time`            | `Time`              |
 | `Timestamp`       | `Timestamp`         |
 | `Decimal`         | `Decimal`           |
-| `Decimal`         | `Numberic`          |
 | `VarChar`         | `VarChar`           |
 | `FixedChar`       | `FixedChar`         |
 | `Binary`          | `Binary`            |
 
 :::info
 OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
 #### Table column auto-increment
@@ -203,7 +203,9 @@ Index[] indexes = new Index[] {
 
 ### Table operations
 
+:::note
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+:::
 
 #### Alter table operations
 
