@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
 import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_PASSWORD;
@@ -233,7 +234,7 @@ public class RangerHiveE2EIT extends BaseIT {
 
     // Second, grant the `CREATE_SCHEMA` role
     String userName1 = System.getenv(HADOOP_USER_NAME);
-    String roleName = "createSchemaRole";
+    String roleName = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.ofMetalake(
             metalakeName, Lists.newArrayList(Privileges.CreateSchema.allow()));
@@ -252,7 +253,7 @@ public class RangerHiveE2EIT extends BaseIT {
   @Test
   void testCreateTable() throws InterruptedException {
     // First, create a role for creating a database and grant role to the user
-    String createSchemaRole = "createSchemaRole";
+    String createSchemaRole = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.ofMetalake(
             metalakeName,
@@ -270,7 +271,7 @@ public class RangerHiveE2EIT extends BaseIT {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
 
     // Fourth, create a role for creating a table and grant to the user
-    String createTableRole = "createTableRole";
+    String createTableRole = currentFunName() + "2";
     securableObject =
         SecurableObjects.ofMetalake(
             metalakeName, Lists.newArrayList(Privileges.CreateTable.allow()));
@@ -282,6 +283,11 @@ public class RangerHiveE2EIT extends BaseIT {
     // Fifth, succeed to create a table
     sparkSession.sql(SQL_CREATE_TABLE);
 
+    // Sixth, fail to read and write a table
+    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
+    Assertions.assertThrows(
+        AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
+
     // Clean up
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, true);
@@ -292,7 +298,7 @@ public class RangerHiveE2EIT extends BaseIT {
   @Test
   void testReadWriteTable() throws InterruptedException {
     // First, create a role for creating a database and grant role to the user
-    String readWriteRole = "readWriteRole";
+    String readWriteRole = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.ofMetalake(
             metalakeName,
@@ -341,7 +347,7 @@ public class RangerHiveE2EIT extends BaseIT {
   @Test
   void testReadOnlyTable() throws InterruptedException {
     // First, create a role for creating a database and grant role to the user
-    String readOnlyRole = "readOnlyRole";
+    String readOnlyRole = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.ofMetalake(
             metalakeName,
@@ -389,7 +395,7 @@ public class RangerHiveE2EIT extends BaseIT {
   @Test
   void testWriteOnlyTable() throws InterruptedException {
     // First, create a role for creating a database and grant role to the user
-    String readOnlyRole = "writeOnlyRole";
+    String readOnlyRole = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.ofMetalake(
             metalakeName,
@@ -437,7 +443,7 @@ public class RangerHiveE2EIT extends BaseIT {
 
   @Test
   void testCreateAllPrivilegesRole() throws InterruptedException {
-    String roleName = "allPrivilegesRole";
+    String roleName = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.ofMetalake(
             metalakeName,
@@ -480,9 +486,9 @@ public class RangerHiveE2EIT extends BaseIT {
   }
 
   @Test
-  void testDeleteAndRecreateRole() {
+  void testDeleteAndRecreateRole() throws InterruptedException {
     // Create a role with CREATE_SCHEMA privilege
-    String roleName = "createSchemaRole";
+    String roleName = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.parse(
             String.format("%s", catalogName),
@@ -493,24 +499,39 @@ public class RangerHiveE2EIT extends BaseIT {
     // Granted this role to the spark execution user `HADOOP_USER_NAME`
     String userName1 = System.getenv(HADOOP_USER_NAME);
     metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+    waitForUpdatingPolicies();
+
+    // Succeed to create the schema
+    sparkSession.sql(SQL_CREATE_SCHEMA);
+    catalog.asSchemas().dropSchema(schemaName, true);
 
     // Delete the role
     metalake.deleteRole(roleName);
+    waitForUpdatingPolicies();
+
+    // Fail to create the schema
+    Assertions.assertThrows(
+        AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
 
     // Create the role again
     metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
 
     // Grant the role again
     metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+    waitForUpdatingPolicies();
+
+    // Succeed to create the schema
+    sparkSession.sql(SQL_CREATE_SCHEMA);
 
     // Clean up
+    catalog.asSchemas().dropSchema(schemaName, true);
     metalake.deleteRole(roleName);
   }
 
   @Test
   void testAllowUseSchemaPrivilege() throws InterruptedException {
     // Create a role with CREATE_SCHEMA privilege
-    String roleName = "createSchemaRole";
+    String roleName = currentFunName();
     SecurableObject securableObject =
         SecurableObjects.parse(
             String.format("%s", catalogName),
