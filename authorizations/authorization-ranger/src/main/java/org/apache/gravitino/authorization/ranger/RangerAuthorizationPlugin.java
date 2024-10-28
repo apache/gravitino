@@ -681,15 +681,6 @@ public abstract class RangerAuthorizationPlugin
               securableObject.privileges().stream()
                   .forEach(
                       privilege -> {
-                        if (!allowPrivilegesRule().contains(privilege.name())) {
-                          LOG.error(
-                              "Authorization to ignore privilege({}) on metadata object({})!",
-                              privilege.name(),
-                              securableObject.fullName());
-                          match.set(false);
-                          return;
-                        }
-
                         if (!privilege.canBindTo(securableObject.type())) {
                           LOG.error(
                               "The privilege({}) is not supported for the metadata object({})!",
