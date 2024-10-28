@@ -17,14 +17,23 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# This script is used to execute tests for the Trino connector. Environment variables allow you to set the Trino connector
+# test set, test environment, and other test parameters. By default, the script uses the test set in the
+# `$GRAVITINO_HOME_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/trino-cascading-testsets` directory.
+# and the trino-cascading-query test environment in the `trino-cascading-env` directory. However, you can also pass in
+# a test set and test environment directory as parameters.
+
 cd "$(dirname "$0")"
 
+# Set the Gravitino server and Trino connector directories
 GRAVITINO_HOME_DIR=../../../
 GRAVITINO_SERVER_DIR=
 GRAVITINO_TRINO_CONNECTOR_DIR=
 
 GRAVITINO_HOME_DIR=`realpath $GRAVITINO_HOME_DIR`
 
+# Set the test set and test environment directories
+# Set the test arguments and parameters for the test TrinoQueryTestTools
 TRINO_TEST_DOCKER_HOME=trino-cascading-env
 TRINO_TEST_SETS_DIR=$GRAVITINO_HOME_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/trino-cascading-testsets
 TRINO_TEST_ARGS=
