@@ -163,9 +163,9 @@ allprojects {
       // Default use MiniGravitino to run integration tests
       param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
       param.environment("IT_PROJECT_DIR", project.buildDir.path)
-      if (project.name == "authorization-ranger") {
-        param.environment("HADOOP_USER_NAME", "test")
-      } else {
+      // If the environment variable `HADOOP_USER_NAME` is not customized in submodule,
+      // then set it to "anonymous"
+      if (param.environment["HADOOP_USER_NAME"] == null) {
         param.environment("HADOOP_USER_NAME", "anonymous")
       }
       param.environment("HADOOP_HOME", "/tmp")
