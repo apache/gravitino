@@ -36,10 +36,10 @@ public class S3TokenCredential implements Credential {
   /** S3 session token. */
   public static final String GRAVITINO_S3_TOKEN = "s3-session-token";
 
-  private String accessKeyId;
-  private String secretAccessKey;
-  private String sessionToken;
-  private long expireTimeInMS;
+  private final String accessKeyId;
+  private final String secretAccessKey;
+  private final String sessionToken;
+  private final long expireTimeInMS;
 
   /**
    * Constructs an instance of {@link S3SecretKeyCredential} with the specified AWS S3 access key ID
