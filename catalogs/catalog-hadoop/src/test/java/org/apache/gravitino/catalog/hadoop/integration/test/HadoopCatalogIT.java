@@ -575,7 +575,7 @@ public class HadoopCatalogIT extends BaseIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(schemaName, filesetName), FilesetChange.removeComment());
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.updateComment(null));
     assertFilesetExists(filesetName);
 
     // verify fileset is updated
