@@ -112,15 +112,28 @@ public class RangerHelper {
         .forEach(
             rangerPrivilege -> {
               // Find the policy item that matches Gravitino privilege
-              List<RangerPolicy.RangerPolicyItem> matchPolicyItems =
-                  policy.getPolicyItems().stream()
-                      .filter(
-                          policyItem -> {
-                            return policyItem.getAccesses().stream()
-                                .anyMatch(
-                                    access -> access.getType().equals(rangerPrivilege.getName()));
-                          })
-                      .collect(Collectors.toList());
+              List<RangerPolicy.RangerPolicyItem> matchPolicyItems;
+              if (rangerPrivilege.condition() == Privilege.Condition.ALLOW) {
+                matchPolicyItems =
+                    policy.getPolicyItems().stream()
+                        .filter(
+                            policyItem -> {
+                              return policyItem.getAccesses().stream()
+                                  .anyMatch(
+                                      access -> access.getType().equals(rangerPrivilege.getName()));
+                            })
+                        .collect(Collectors.toList());
+              } else {
+                matchPolicyItems =
+                    policy.getDenyPolicyItems().stream()
+                        .filter(
+                            policyItem -> {
+                              return policyItem.getAccesses().stream()
+                                  .anyMatch(
+                                      access -> access.getType().equals(rangerPrivilege.getName()));
+                            })
+                        .collect(Collectors.toList());
+              }
 
               if (matchPolicyItems.isEmpty()) {
                 // If the policy item does not exist, then create a new policy item
@@ -146,44 +159,6 @@ public class RangerHelper {
                           }
                         });
               }
-            });
-  }
-
-  /**
-   * Remove policy item base the securable object's privileges and role name. <br>
-   * We cannot directly clean the policy items because one Ranger policy maybe contains multiple
-   * Gravitino privilege objects. <br>
-   */
-  void removePolicyItem(
-      RangerPolicy policy, String roleName, RangerSecurableObject securableObject) {
-    // Delete the policy role base the securable object's privileges
-    policy.getPolicyItems().stream()
-        .forEach(
-            policyItem -> {
-              policyItem
-                  .getAccesses()
-                  .forEach(
-                      access -> {
-                        boolean matchPrivilege =
-                            securableObject.privileges().stream()
-                                .anyMatch(
-                                    privilege -> {
-                                      return access.getType().equals(privilege.getName());
-                                    });
-                        if (matchPrivilege) {
-                          policyItem.getRoles().removeIf(roleName::equals);
-                        }
-                      });
-            });
-
-    // Delete the policy items if the roles are empty and not ownership policy item
-    policy
-        .getPolicyItems()
-        .removeIf(
-            policyItem -> {
-              return policyItem.getRoles().isEmpty()
-                  && policyItem.getUsers().isEmpty()
-                  && policyItem.getGroups().isEmpty();
             });
   }
 
