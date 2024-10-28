@@ -45,9 +45,9 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /* The utilization class of authorization module*/
 public class AuthorizationUtils {
 
-  static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
-  static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in th metalake %s";
-  static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
+  static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in the metalake %s";
+  static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
+  static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
 
   private static final Set<Privilege.Name> FILESET_PRIVILEGES =
       Sets.immutableEnumSet(
