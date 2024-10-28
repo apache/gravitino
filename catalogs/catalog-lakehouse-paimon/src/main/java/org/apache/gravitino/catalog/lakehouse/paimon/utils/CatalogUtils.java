@@ -23,6 +23,8 @@ import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropert
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.OSS_CONFIGURATION;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata.S3_CONFIGURATION;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_BACKEND;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_JDBC_PASSWORD;
+import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_JDBC_USER;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_URI;
 import static org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig.CATALOG_WAREHOUSE;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
@@ -37,12 +39,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.HiveBackendProxy;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.CatalogContext;
 import org.apache.paimon.catalog.CatalogFactory;
+import org.apache.paimon.hive.HiveCatalog;
 import org.apache.paimon.options.Options;
 
 /** Utilities of {@link Catalog} to support catalog management. */
@@ -66,7 +70,9 @@ public class CatalogUtils {
         File keytabFile =
             kerberosClient.saveKeyTabFileFromUri(UUID.randomUUID().toString().replace("-", ""));
         kerberosClient.login(keytabFile.getAbsolutePath());
-        Catalog catalog = loadCatalogBackendWithKerberosAuth(paimonConfig, configuration);
+        Catalog catalog =
+            loadCatalogBackendWithKerberosAuth(
+                paimonConfig, configuration, authenticationConfig, kerberosClient);
         return new PaimonBackendCatalogWrapper(catalog, kerberosClient);
       } catch (Exception e) {
         throw new RuntimeException("Failed to login with kerberos", e);
@@ -84,17 +90,23 @@ public class CatalogUtils {
    * @return The {@link Catalog} instance of catalog backend.
    */
   public static Catalog loadCatalogBackendWithKerberosAuth(
-      PaimonConfig paimonConfig, Configuration configuration) {
+      PaimonConfig paimonConfig,
+      Configuration configuration,
+      AuthenticationConfig authenticationConfig,
+      KerberosClient kerberosClient) {
     checkPaimonConfig(paimonConfig);
-
-    // TODO: Now we only support kerberos auth for Filesystem backend, and will support it for Hive
-    // backend later.
-    Preconditions.checkArgument(
-        PaimonCatalogBackend.FILESYSTEM.name().equalsIgnoreCase(paimonConfig.get(CATALOG_BACKEND)));
 
     CatalogContext catalogContext =
         CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()), configuration);
-    return CatalogFactory.createCatalog(catalogContext);
+    Catalog catalog = CatalogFactory.createCatalog(catalogContext);
+    if (PaimonCatalogBackend.HIVE.name().equalsIgnoreCase(paimonConfig.get(CATALOG_BACKEND))
+        && authenticationConfig.isImpersonationEnabled()) {
+      HiveBackendProxy proxyHiveCatalog =
+          new HiveBackendProxy(
+              catalogContext.options(), (HiveCatalog) catalog, kerberosClient.getRealm());
+      return proxyHiveCatalog.getProxy();
+    }
+    return catalog;
   }
 
   /**
@@ -123,6 +135,17 @@ public class CatalogUtils {
       String uri = paimonConfig.get(CATALOG_URI);
       Preconditions.checkArgument(
           StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");
+    }
+
+    if (PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(metastore)) {
+      String jdbcUser = paimonConfig.get(CATALOG_JDBC_USER);
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(jdbcUser), "Paimon Catalog jdbc user can not be null or empty.");
+
+      String jdbcPassword = paimonConfig.get(CATALOG_JDBC_PASSWORD);
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(jdbcPassword),
+          "Paimon Catalog jdbc password can not be null or empty.");
     }
   }
 

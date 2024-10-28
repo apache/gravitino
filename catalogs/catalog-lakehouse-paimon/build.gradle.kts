@@ -33,6 +33,7 @@ dependencies {
   implementation(project(":api")) {
     exclude("*")
   }
+  implementation(libs.cglib)
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
@@ -163,6 +164,21 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+configurations {
+  implementation {
+    exclude("org.eclipse.jetty.aggregate")
+  }
+  runtimeClasspath {
+    exclude("org.eclipse.jetty.aggregate")
+  }
+  testCompileClasspath {
+    exclude("org.eclipse.jetty.aggregate")
+  }
+  testRuntimeClasspath {
+    exclude("org.eclipse.jetty.aggregate")
+  }
 }
 
 tasks {
