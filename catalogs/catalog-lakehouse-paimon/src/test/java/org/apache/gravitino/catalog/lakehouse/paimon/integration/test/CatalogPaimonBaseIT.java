@@ -89,7 +89,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
 
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   protected static final TestDatabaseName TEST_DB_NAME =
-      TestDatabaseName.PG_TEST_ICEBERG_CATALOG_MULTIPLE_JDBC_LOAD;
+      TestDatabaseName.PG_TEST_PAIMON_CATALOG_MULTIPLE_JDBC_LOAD;
   protected static MySQLContainer mySQLContainer;
   protected String WAREHOUSE;
   protected String TYPE;
