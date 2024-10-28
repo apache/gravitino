@@ -225,7 +225,7 @@ The following is an example of enabling a catalog:
 
 ```shell
 curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{"in-use": true}' \
+-H "Content-Type: application/json" -d '{"inUse": true}' \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
@@ -271,7 +271,7 @@ The following is an example of disabling a catalog:
 
 ```shell
 curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{"in-use": false}' \
+-H "Content-Type: application/json" -d '{"inUse": false}' \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
