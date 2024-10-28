@@ -88,8 +88,8 @@ public interface RangerMetadataObject {
   List<String> names();
 
   /**
-   * The full name of the object. Full name will be separated by "." to represent a string identifier
-   * of the object, like catalog, catalog.table, etc.
+   * The full name of the object. Full name will be separated by "." to represent a string
+   * identifier of the object, like catalog, catalog.table, etc.
    *
    * @return The name of the object.
    */
