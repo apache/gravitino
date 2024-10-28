@@ -131,7 +131,7 @@ call gravitino.system.create_catalog(
     'hive',
     map(
         array['metastore.uris', 'trino.bypass.hive.config.resources'],
-        array['thrift://trino-ci-hive:9083', "/tmp/hive-site.xml,/tmp/core-site.xml"]
+        array['thrift://trino-ci-hive:9083', '/tmp/hive-site.xml,/tmp/core-site.xml']
     )
 );
 ```
