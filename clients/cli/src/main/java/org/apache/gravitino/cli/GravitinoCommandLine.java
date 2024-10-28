@@ -479,7 +479,7 @@ public class GravitinoCommandLine {
       if (owner != null) {
         new SetOwner(url, ignore, metalake, entityName, entity, owner, false).handle();
       } else if (group != null) {
-        new SetOwner(url, ignore, metalake, entityName, entity, owner, true).handle();
+        new SetOwner(url, ignore, metalake, entityName, entity, group, true).handle();
       }
     }
   }
