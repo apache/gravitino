@@ -82,7 +82,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("d", DATABASE, "database name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
     options.addOption(createArgOption("a", TAG, "tag name"));
-    options.addOption(createArgOption("o", OWNER, "owner name or group name"));
+    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
 
     return options;
   }

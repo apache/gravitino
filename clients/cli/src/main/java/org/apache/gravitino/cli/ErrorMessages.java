@@ -39,4 +39,5 @@ public class ErrorMessages {
   public static final String GROUP_EXISTS = "Group already exists.";
   public static final String UNKNOWN_TAG = "Unknown tag.";
   public static final String TAG_EXISTS = "Tag already exists.";
+  public static final String UNKNOWN_ROLE = "Unknown role.";
 }
