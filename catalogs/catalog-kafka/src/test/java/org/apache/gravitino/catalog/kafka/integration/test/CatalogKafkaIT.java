@@ -172,6 +172,10 @@ public class CatalogKafkaIT extends BaseIT {
     Assertions.assertEquals("new comment", alteredCatalog.comment());
     Assertions.assertFalse(alteredCatalog.properties().containsKey("key1"));
 
+    Catalog updateNullComment =
+        metalake.alterCatalog(catalogName, CatalogChange.updateComment(null));
+    Assertions.assertNull(updateNullComment.comment());
+
     // test drop catalog
     boolean dropped = metalake.dropCatalog(catalogName, true);
     Assertions.assertTrue(dropped);

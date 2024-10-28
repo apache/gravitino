@@ -22,6 +22,7 @@ import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -219,6 +220,11 @@ public class MetalakeIT extends BaseIT {
         new MetalakeChange[] {MetalakeChange.updateComment("new metalake comment")};
     GravitinoMetalake updatedMetalake = client.alterMetalake(metalakeNameA, changes);
     assertEquals("new metalake comment", updatedMetalake.comment());
+
+    GravitinoMetalake updateNullComment =
+        client.alterMetalake(metalakeNameA, MetalakeChange.updateComment(null));
+    assertNull(updateNullComment.comment());
+
     assertTrue(client.dropMetalake(metalakeNameA, true));
   }
 
@@ -317,7 +323,7 @@ public class MetalakeIT extends BaseIT {
         MetalakeNotInUseException.class,
         () ->
             filesetOps.alterFileset(
-                NameIdentifier.of("dummy", "dummy"), FilesetChange.removeComment()));
+                NameIdentifier.of("dummy", "dummy"), FilesetChange.updateComment(null)));
 
     Assertions.assertThrows(
         NonEmptyMetalakeException.class, () -> client.dropMetalake(metalakeName));
