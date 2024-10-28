@@ -117,7 +117,7 @@ Gravitino Iceberg REST service supports using static S3 secret key or generates 
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
 
-If you set `credential-provider-type` explicitly, please downloading [Gravitino AWS bundle jar](), and place it in the classpath of Iceberg REST server.
+If you set `credential-provider-type` explicitly, please downloading [Gravitino AWS bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/aws-bundle), and place it to the classpath of Iceberg REST server.
 
 :::info
 To configure the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `gravitino.iceberg-rest.warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
@@ -152,7 +152,7 @@ Supports generating GCS token file to access GCS data.
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.iceberg-rest.gcs.project-id`.
 
-If you set `credential-provider-type` explicitly, please downloading [Gravitino GCP bundle jar](), and place it in the classpath of Iceberg REST server.
+If you set `credential-provider-type` explicitly, please downloading [Gravitino GCP bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gcp-bundle), and place it to the classpath of Iceberg REST server.
 
 Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino Iceberg REST server is started.
 
