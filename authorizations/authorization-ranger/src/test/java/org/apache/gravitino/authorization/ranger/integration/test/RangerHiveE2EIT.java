@@ -31,7 +31,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -142,8 +141,6 @@ public class RangerHiveE2EIT extends BaseIT {
             HiveContainer.HIVE_METASTORE_PORT);
 
     generateRangerSparkSecurityXML();
-
-    setEnv(HADOOP_USER_NAME, "test");
 
     sparkSession =
         SparkSession.builder()
@@ -612,22 +609,5 @@ public class RangerHiveE2EIT extends BaseIT {
     // (ranger.plugin.spark.policy.pollIntervalMs) in the
     // `resources/ranger-spark-security.xml.template`
     Thread.sleep(1000L);
-  }
-
-  private static void setEnv(String key, String value) {
-    try {
-      Map<String, String> env = System.getenv();
-      Class<?> cl = env.getClass();
-      Field field = cl.getDeclaredField("m");
-      field.setAccessible(true);
-      Map<String, String> writableEnv = (Map<String, String>) field.get(env);
-      if (value == null) {
-        writableEnv.remove(key);
-      } else {
-        writableEnv.put(key, value);
-      }
-    } catch (Exception e) {
-      throw new IllegalStateException("Failed to set environment variable", e);
-    }
   }
 }
