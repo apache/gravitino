@@ -13,7 +13,11 @@ Depending on your network and computer, startup time may take 3-5 minutes. Once 
 
 ## Prerequisites
 
-Install Git and Docker Compose.
+Install Git, Docker, Docker Compose.
+
+## System Resource Requirements
+
+2 CPU cores, 8 GB RAM, 25 GB disk storage, MacOS or Linux OS (Verified Ubuntu22.04 Ubuntu24.04 AmazonLinux).
 
 ## TCP ports used
 
@@ -28,25 +32,24 @@ The playground runs several services. The TCP ports used may clash with existing
 | playground-trino      | 18080                  |
 | playground-jupyter    | 18888                  |
 
-## Start playground
+## Playground usage
 
-### Launch all components of the playground
+### Launch playground
 
 ```shell
 git clone git@github.com:apache/gravitino-playground.git
 cd gravitino-playground
-./launch-playground.sh
+./playground.sh start
 ```
 
-
-### Launch special component or components of playground
+### Check status
+```shell 
+./playground.sh status
+```
+### Stop playground
 ```shell
-git clone git@github.com:apache/gravitino-playground.git
-cd gravitino-playground
-./launch-playground.sh hive|gravitino|trino|postgresql|mysql|spark|jupyter
+./playground.sh stop
 ```
-
-Note. Components have dependencies, so not launching all components may prevent you from experiencing the full functionality of the playground.
 
 ## Using Apache Gravitino with Trino SQL
 
