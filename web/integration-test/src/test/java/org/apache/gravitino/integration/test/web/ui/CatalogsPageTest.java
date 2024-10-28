@@ -269,6 +269,7 @@ public class CatalogsPageTest extends BaseWebIT {
     catalogsPage.setCatalogFixedProp("metastore.uris", hiveMetastoreUri);
     clickAndWait(catalogsPage.handleSubmitCatalogBtn);
     // delete catalog
+    catalogsPage.clickInUseSwitch(DEFAULT_CATALOG_NAME);
     catalogsPage.clickDeleteCatalogBtn(DEFAULT_CATALOG_NAME);
     clickAndWait(catalogsPage.confirmDeleteBtn);
     Assertions.assertTrue(catalogsPage.verifyEmptyTableData());
