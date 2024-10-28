@@ -311,7 +311,7 @@ export const providers = [
   },
   {
     label: 'OceanBase',
-    value: 'oceanbase',
+    value: 'jdbc-oceanbase',
     defaultProps: [
       {
         key: 'jdbc-driver',
@@ -336,5 +336,5 @@ export const providers = [
         required: true
       }
     ]
-  },
+  }
 ]
