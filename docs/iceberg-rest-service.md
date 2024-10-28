@@ -18,6 +18,7 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
   - pagination
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
 - Supports different storages like `S3`, `HDFS`, `OSS`, `GCS` and provides the capability to support other storages.
+- Supports event listener.
 - Supports OAuth2 and HTTPS.
 - Provides a pluggable metrics store interface to store and delete Iceberg metrics.
 
@@ -298,6 +299,11 @@ The `clients` property for example:
 :::info
 `catalog-impl` has no effect.
 :::
+
+
+### Event listener
+
+Gravitino generates pre-event and post-event for table operations and provide a pluggable event listener to allow you to inject custom logic. For more details, please refer to [Event listener configuration](gravitino-server-config.md#event-listener-configuration).
 
 ### Apache Iceberg metrics store configuration
 

@@ -143,7 +143,7 @@ The plugin provides several operational modes for how to process event, supporti
  
 - **ASYNC_ISOLATED**: Events are processed asynchronously, with each listener having its own dedicated queue and dispatcher thread. This approach offers better isolation but at the expense of multiple queues and dispatchers.
 
-  For more details, please refer to the definition of the plugin.
+When processing pre-event, you could throw up `ForbiddenException` to skip the execution of subsequent operation. For more details, please refer to the definition of the plugin.
 
 ### Audit log configuration
 
