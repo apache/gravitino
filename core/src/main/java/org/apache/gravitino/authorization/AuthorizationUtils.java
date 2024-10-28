@@ -186,17 +186,6 @@ public class AuthorizationUtils {
     }
   }
 
-  private static void callAuthorizationPluginImpl(
-      Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
-
-    if (catalog instanceof BaseCatalog) {
-      BaseCatalog baseCatalog = (BaseCatalog) catalog;
-      if (baseCatalog.getAuthorizationPlugin() != null) {
-        consumer.accept(baseCatalog.getAuthorizationPlugin());
-      }
-    }
-  }
-
   public static boolean needApplyAuthorizationPluginAllCatalogs(SecurableObject securableObject) {
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();
@@ -270,5 +259,51 @@ public class AuthorizationUtils {
 
   private static boolean needApplyAuthorization(MetadataObject.Type type) {
     return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
+  }
+
+  private static void callAuthorizationPluginImpl(
+      Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
+
+    if (catalog instanceof BaseCatalog) {
+      BaseCatalog baseCatalog = (BaseCatalog) catalog;
+      if (baseCatalog.getAuthorizationPlugin() != null) {
+        consumer.accept(baseCatalog.getAuthorizationPlugin());
+      }
+    }
+  }
+
+  public static void removeAuthorizationPluginPrivileges(
+      NameIdentifier ident, Entity.EntityType type) {
+    // If we enable authorization, we should remove the privileges about the entity in the
+    // authorization plugin.
+    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+      MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
+      MetadataObjectChange removeObject = MetadataObjectChange.remove(metadataObject);
+      callAuthorizationPluginForMetadataObject(
+          ident.namespace().level(0),
+          metadataObject,
+          authorizationPlugin -> {
+            authorizationPlugin.onMetadataUpdated(removeObject);
+          });
+    }
+  }
+
+  public static void renameAuthorizationPluginPrivileges(
+      NameIdentifier ident, Entity.EntityType type, String newName) {
+    // If we enable authorization, we should rename the privileges about the entity in the
+    // authorization plugin.
+    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+      MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
+      MetadataObject newMetadataObject =
+          NameIdentifierUtil.toMetadataObject(NameIdentifier.of(ident.namespace(), newName), type);
+      MetadataObjectChange renameObject =
+          MetadataObjectChange.rename(oldMetadataObject, newMetadataObject);
+      callAuthorizationPluginForMetadataObject(
+          ident.namespace().level(0),
+          oldMetadataObject,
+          authorizationPlugin -> {
+            authorizationPlugin.onMetadataUpdated(renameObject);
+          });
+    }
   }
 }

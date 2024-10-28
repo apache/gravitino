@@ -104,17 +104,24 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException {
+    // For underlying authorization plugins, the privilege information shouldn't
+    // contain catalog information, so catalog rename won't affect the privileges
+    // of the authorization plugin.
     return dispatcher.alterCatalog(ident, changes);
   }
 
   @Override
   public boolean dropCatalog(NameIdentifier ident) {
+    // For catalog, we don't clear all the privileges of catalog authorization plugin.
+    // we just remove catalog.
     return dispatcher.dropCatalog(ident);
   }
 
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
+    // For catalog, we don't clear all the privileges of catalog authorization plugin.
+    // we just remove catalog.
     return dispatcher.dropCatalog(ident, force);
   }
 
