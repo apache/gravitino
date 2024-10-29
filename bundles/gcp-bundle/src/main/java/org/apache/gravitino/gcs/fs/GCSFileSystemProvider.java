@@ -19,6 +19,7 @@
 package org.apache.gravitino.gcs.fs;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
@@ -36,6 +37,7 @@ public class GCSFileSystemProvider implements FileSystemProvider {
   private static final String GCS_SERVICE_ACCOUNT_JSON_FILE =
       "fs.gs.auth.service.account.json.keyfile";
 
+  @VisibleForTesting
   public static final Map<String, String> GRAVITINO_KEY_TO_GCS_HADOOP_KEY =
       ImmutableMap.of(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, GCS_SERVICE_ACCOUNT_JSON_FILE);
 

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.oss.fs;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
@@ -40,6 +41,8 @@ public class OSSFileSystemProvider implements FileSystemProvider {
   // For example, User can use oss-endpoint to set the endpoint of OSS 'fs.oss.endpoint' in
   // Gravitino.
   // GCS and S3 also have similar mapping relationship.
+
+  @VisibleForTesting
   public static final Map<String, String> GRAVITINO_KEY_TO_OSS_HADOOP_KEY =
       ImmutableMap.of(
           OSSProperties.GRAVITINO_OSS_ENDPOINT, Constants.ENDPOINT_KEY,

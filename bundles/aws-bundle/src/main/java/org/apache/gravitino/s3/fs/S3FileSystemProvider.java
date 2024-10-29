@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.s3.fs;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
@@ -33,6 +34,7 @@ import org.apache.hadoop.fs.s3a.S3AFileSystem;
 
 public class S3FileSystemProvider implements FileSystemProvider {
 
+  @VisibleForTesting
   public static final Map<String, String> GRAVITINO_KEY_TO_S3_HADOOP_KEY =
       ImmutableMap.of(
           S3Properties.GRAVITINO_S3_ENDPOINT, Constants.ENDPOINT,
