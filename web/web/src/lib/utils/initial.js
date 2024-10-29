@@ -231,7 +231,6 @@ export const providers = [
         value: 'filesystem',
         defaultValue: 'filesystem',
         required: true,
-        description: 'Only supports "filesystem" now.',
         select: ['filesystem', 'hive', 'jdbc']
       },
       {
