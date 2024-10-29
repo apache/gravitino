@@ -28,63 +28,58 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 | Property Name                                      | Description                                                                                                                                                                                                                                                                                                   | Default Value   | Required                                                    | Since Version    |
 |----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|-------------------------------------------------------------|------------------|
 | `location`                                         | The storage location managed by Hadoop catalog.                                                                                                                                                                                                                                                               | (none)          | No                                                          | 0.5.0            |
-| `filesystem-providers`                             | The names (split by comma) of filesystem providers for the Hadoop catalog. Gravitino already support built-in `builtin-local`(`local file`) and `builtin-hdfs`(`hdfs`). If users want to support more file system and add it to Gravitino, they custom more file system by implementing `FileSystemProvider`. | (none)          | Yes if use s3, gcs or oss.                                  | 0.7.0-incubating |
-| `default-filesystem-provider`                      | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`                                                                                                                                                                  | `builtin-local` | No                                                          | 0.7.0-incubating |
+
+Apart from the above properties, to access fileset like HDFS, S3, GCS, OSS or custom fileset through GVFS, you need to configure the following extra properties.
+
+#### HDFS fileset 
+
+| Property Name                                      | Description                                                                                                                                                                                                                                                                                                   | Default Value   | Required                                                    | Since Version    |
+|----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|-------------------------------------------------------------|------------------|
 | `authentication.impersonation-enable`              | Whether to enable impersonation for the Hadoop catalog.                                                                                                                                                                                                                                                       | `false`         | No                                                          | 0.5.1            |
 | `authentication.type`                              | The type of authentication for Hadoop catalog, currently we only support `kerberos`, `simple`.                                                                                                                                                                                                                | `simple`        | No                                                          | 0.5.1            |
 | `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                                                                                                                  | (none)          | required if the value of `authentication.type` is Kerberos. | 0.5.1            |
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                                                                                                                        | (none)          | required if the value of `authentication.type` is Kerberos. | 0.5.1            |
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Hadoop catalog.                                                                                                                                                                                                                                                 | 60              | No                                                          | 0.5.1            |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                                                                                    | 60              | No                                                          | 0.5.1            |
-| `s3-endpoint`                                      | The endpoint of the AWS s3.                                                                                                                                                                                                                                                                                   | (none)          | Yes if use s3                                               | 0.7.0-incubating |
-| `s3-access-key-id`                                 | The access key of the AWS s3.                                                                                                                                                                                                                                                                                 | (none)          | Yes if use s3                                               | 0.7.0-incubating |
-| `s3-secret-access-key`                             | The secret key of the AWS s3.                                                                                                                                                                                                                                                                                 | (none)          | Yes if use s3                                               | 0.7.0-incubating |
-| `gcs-service-account-file`                         | The path of GCS service account JSON file.                                                                                                                                                                                                                                                                    | (none)          | Yes if use gcs                                              | 0.7.0-incubating |
-| `oss-endpoint`                                     | The endpoint of the Aliyun oss.                                                                                                                                                                                                                                                                               | (none)          | Yes if use oss                                              | 0.7.0-incubating |
-| `oss-access-key-id`                                | The access key of the Aliyun oss.                                                                                                                                                                                                                                                                             | (none)          | Yes if use oss                                              | 0.7.0-incubating |
-| `oss-secret-access-key`                            | The secret key of the Aliyun oss.                                                                                                                                                                                                                                                                             | (none)          | Yes if use oss                                              | 0.7.0-incubating | 
+
+#### S3 fileset
+
+| Configuration item             | Description                                                                                                                                                                                                                  | Default value   | Required                   | Since version    |
+|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|
+| `fs.gvfs.filesystem.providers` | The file system providers. Set it to `s3` if it's a S3 fileset                                                                                                                                                               | (none)          | Yes                        | 0.7.0-incubating |
+| `default-filesystem-provider`  | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 'oss://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
+| `s3.endpoint`                  | The endpoint of the AWS s3.                                                                                                                                                                                                  | (none)          | Yes if it's a s3 fileset.  | 0.7.0-incubating |
+| `s3.access.key.id`             | The access key of the AWS s3.                                                                                                                                                                                                | (none)          | Yes if it's a s3 fileset.  | 0.7.0-incubating |
+| `s3.secret.access.key`         | The secret key of the AWS s3.                                                                                                                                                                                                | (none)          | Yes if it's a s3 fileset.  | 0.7.0-incubating |
+
+At the same time, you need to place the corresponding bundle jar `gravitno-aws-bundle-{version}.jar` in the Hadoop environment.
 
 
-#### Properties required to create a local file system Hadoop Catalog
+#### GCS fileset
 
-No additional properties are required to create a local file system Hadoop catalog. 
+| Configuration item             | Description                                                                                                                                                                                                                  | Default value   | Required                   | Since version    |
+|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|
+| `fs.gvfs.filesystem.providers` | The file system providers. Set it to `gs` if it's a GCS fileset                                                                                                                                                              | (none)          | Yes                        | 0.7.0-incubating |
+| `default-filesystem-provider`  | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
+| `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                                                                   | (none)          | Yes if it's a gcs fileset. | 0.7.0-incubating |
 
-#### Properties required to create an HDFS Hadoop Catalog
+In the meantime, you need to place the corresponding bundle jar `gravitno-gcp-bundle-{version}.jar` in the Hadoop environment.
 
-Similarly, no additional properties are required to create an HDFS Hadoop catalog if the target HDFS cluster is not Kerberos-enabled. If the target HDFS cluster is Kerberos-enabled, the following properties are required:
-- `authentication.type`: The type of authentication for the Hadoop catalog. The value should be `kerberos`.
-- `authentication.kerberos.principal`: The principal of the Kerberos authentication.
-- `authentication.kerberos.keytab-uri`: The URI of the keytab for the Kerberos authentication.
+#### OSS fileset
 
-#### Properties required to create an S3 Hadoop Catalog
-To create an S3 Hadoop catalog, you need to set the following properties:
-- `filesystem-providers`: The value should be `s3` or a comma-separated list of that contains `s3` like `builtin-local,s3`. 
-- `s3-endpoint`: The endpoint of the AWS S3.
-- `s3-access-key-id`: The access key of the AWS S3.
-- `s3-secret-access-key`: The secret key of the AWS S3.
+| Configuration item             | Description                                                                                                                                                                                                                   | Default value   | Required                   | Since version    |
+|--------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------|------------------|
+| `fs.gvfs.filesystem.providers` | The file system providers. Set it to `oss` if it's a OSS fileset                                                                                                                                                              | (none)          | Yes                        | 0.7.0-incubating |
+| `default-filesystem-provider`  | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
+| `oss-endpoint`                 | The endpoint of the Aliyun oss.                                                                                                                                                                                               | (none)          | Yes if it's a oss fileset. | 0.7.0-incubating |
+| `oss-access-key-id`            | The access key of the Aliyun oss.                                                                                                                                                                                             | (none)          | Yes if it's a oss fileset. | 0.7.0-incubating |
+| `oss-secret-access-key`        | The secret key of the Aliyun oss.                                                                                                                                                                                             | (none)          | Yes if it's a oss fileset. | 0.7.0-incubating |
 
-At the same time, you need to put the corresponding bundle jar `gravitino-aws-bundle-{version}.jar` into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory.
-
-#### Properties required to create a GCS Hadoop Catalog
-To create a GCS Hadoop catalog, you need to set the following properties:
-- `filesystem-providers`: The value should be `gcs` or a comma-separated list of that contains `gcs` like `builtin-local,gcs`.
-- `gcs-service-account-file`: The path of the GCS service account JSON file.
-
-At the same time, you need to put the corresponding bundle jar `gravitino-gcs-bundle-{version}.jar` into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory.
-
-#### Properties required to create an OSS Hadoop Catalog
-To create an OSS Hadoop catalog, you need to set the following properties:
-- `filesystem-providers`: The value should be `oss` or a comma-separated list of that contains `oss` like `builtin-local,oss`.
-- `oss-endpoint`: The endpoint of the Aliyun OSS.
-- `oss-access-key-id`: The access key of the Aliyun OSS.
-- `oss-secret-access-key`: The secret key of the Aliyun OSS.
-
-At the same time, you need to put the corresponding bundle jar `gravitino-oss-bundle-{version}.jar` into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory.
-
+In the meantime, you need to place the corresponding bundle jar `gravitno-aliyun-bundle-{version}.jar` in the Hadoop environment.
 
 #### How to custom your own HCFS file system provider?
 
-Developer or user can custom their own HCFS file system provider by implementing the `FileSystemProvider` interface. The `FileSystemProvider` interface is defined as follows:
+Developers and users can custom their own HCFS file system provider by implementing the `FileSystemProvider` interface. The `FileSystemProvider` interface is defined as follows:
 
 ```java
   
