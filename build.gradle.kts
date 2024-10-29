@@ -368,16 +368,12 @@ subprojects {
   }
 
   tasks.withType<Jar> {
-    if (name == "sourcesJar") {
-      into("META-INF") {
-        from(rootDir) {
+    into("META-INF") {
+      from(rootDir) {
+        if (name == "sourcesJar") {
           include("LICENSE")
           include("NOTICE")
-        }
-      }
-    } else {
-      into("META-INF") {
-        from(rootDir) {
+        } else {
           include("LICENSE.bin")
           rename("LICENSE.bin", "LICENSE")
           include("NOTICE.bin")
