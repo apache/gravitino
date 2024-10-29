@@ -33,6 +33,8 @@ dependencies {
   compileOnly(libs.hadoop3.common)
 
   implementation(libs.commons.lang3)
+  // runtime used
+  implementation(libs.commons.logging)
   implementation(libs.hadoop3.gcs)
   implementation(libs.google.auth.http)
   implementation(libs.google.auth.credentials)

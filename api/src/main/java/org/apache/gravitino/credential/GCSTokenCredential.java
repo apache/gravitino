@@ -33,8 +33,8 @@ public class GCSTokenCredential implements Credential {
   /** GCS credential property, token name. */
   public static final String GCS_TOKEN_NAME = "token";
 
-  private String token;
-  private long expireMs;
+  private final String token;
+  private final long expireMs;
 
   /**
    * @param token The GCS token.
