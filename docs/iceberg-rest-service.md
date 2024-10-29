@@ -377,7 +377,7 @@ For example, we can configure Spark catalog options to use Gravitino Iceberg RES
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/
 ```
 
-You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in cloud, you need to download corresponding jars (please refer to the cloud storage part) and place it in the classpath of Spark, no extra config is needed if you enable credential vending in the server side by setting `credential-provider-type` and enable credential vending request in client side by setting `spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation` = `vended-credentials`.
+You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in cloud, you need to download corresponding jars (please refer to the cloud storage part) and place it in the classpath of Spark. If you want to enable credential vending,  please setting `credential-provider-type` to proper value in server side, setting `spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation` = `vended-credentials` in client side.
 
 For other storages not managed by Gravitino, the properties wouldn't transfer from the server to client automatically, if you want to pass custom properties to initialize `FileIO`, you could add it by `spark.sql.catalog.${iceberg_catalog_name}.${configuration_key}` = `{property_value}`.
 
