@@ -110,7 +110,8 @@ public class FileSystemUtils {
    * it will be set to the configuration. Keys with prefixes 'gravitino.bypass' has the lowest
    * priority.
    *
-   * Consider the following example:
+   * <p>Consider the following example:
+   *
    * <pre>
    * config:
    *  k1=v1
