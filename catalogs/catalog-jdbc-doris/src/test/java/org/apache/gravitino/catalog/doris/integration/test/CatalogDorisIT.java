@@ -934,4 +934,36 @@ public class CatalogDorisIT extends BaseIT {
       tableCatalog.dropTable(tableIdentifier);
     }
   }
+
+  @Test
+  void testDorisTableWithUnknownProperties() {
+    // create a table
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+
+    Distribution distribution = createDistribution();
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+        };
+
+    Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2", "k3", "v3");
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        distribution,
+        null,
+        indexes);
+
+    // load table
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+    assertFalse(loadTable.properties().containsKey("k1"));
+    assertFalse(loadTable.properties().containsKey("k2"));
+  }
 }

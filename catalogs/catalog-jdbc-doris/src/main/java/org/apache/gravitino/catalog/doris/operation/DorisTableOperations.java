@@ -26,6 +26,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Sets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -41,6 +42,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.collections4.SetUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -69,6 +72,34 @@ public class DorisTableOperations extends JdbcTableOperations {
   private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String NEW_LINE = "\n";
+
+  // Known table properties for Doris 1.2.x, these value may be changed in the higher version.
+  // for more, please refer to
+  // https://doris.apache.org/docs/1.2/sql-manual/sql-reference/Data-Definition-Statements/Create/CREATE-TABLE/
+  private static final Set<String> KNOWN_TABLE_PROPERTIES =
+      Sets.newHashSet(
+          "replication_num",
+          "replication_allocation",
+          "storage_medium",
+          "storage_cooldown_time",
+          "colocate_with",
+          "bloom_filter_columns",
+          "in_memory",
+          "function_column.sequence_col",
+          "function_column.sequence_type",
+          "compression",
+          "light_schema_change",
+          "disable_auto_compaction",
+          "dynamic_partition.enable",
+          "dynamic_partition.time_unit",
+          "dynamic_partition.start",
+          "dynamic_partition.end",
+          "dynamic_partition.prefix",
+          "dynamic_partition.buckets",
+          "dynamic_partition.create_history_partition",
+          "dynamic_partition.history_retention_time",
+          "dynamic_partition.history_partition_num",
+          "dynamic_partition.reserved_history_periods");
 
   @Override
   public JdbcTablePartitionOperations createJdbcTablePartitionOperations(JdbcTable loadedTable) {
@@ -137,14 +168,33 @@ public class DorisTableOperations extends JdbcTableOperations {
       sqlBuilder.append(" BUCKETS ").append(distribution.number());
     }
 
-    properties = appendNecessaryProperties(properties);
     // Add table properties
+    properties = appendNecessaryProperties(properties);
+
+    // Remove unknown properties
+    properties = removeUnknownProperties(properties);
+
     sqlBuilder.append(NEW_LINE).append(DorisUtils.generatePropertiesSql(properties));
 
     // Return the generated SQL statement
     String result = sqlBuilder.toString();
 
     LOG.info("Generated create table:{} sql: {}", tableName, result);
+    return result;
+  }
+
+  private Map<String, String> removeUnknownProperties(Map<String, String> properties) {
+    if (MapUtils.isEmpty(properties)) {
+      return properties;
+    }
+
+    Map<String, String> result =
+        properties.entrySet().stream()
+            .filter(entry -> KNOWN_TABLE_PROPERTIES.contains(entry.getKey()))
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+    Set<String> unknownProperties = SetUtils.difference(properties.keySet(), result.keySet());
+    LOG.info("Remove unknown properties for Doris table: {}", unknownProperties);
     return result;
   }
 
