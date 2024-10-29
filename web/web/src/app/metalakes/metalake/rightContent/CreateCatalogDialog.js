@@ -288,17 +288,25 @@ const CreateCatalogDialog = props => {
             uri: uri,
             ...others
           }
-          authType && (properties['authType'] = authType)
         } else if (catalogBackend && catalogBackend === 'filesystem' && providerSelect === 'lakehouse-paimon') {
           properties = {
             'catalog-backend': catalogBackend,
             ...others
           }
           uri && (properties['uri'] = uri)
-          authType && (properties['authType'] = authType)
         } else {
-          properties = prevProperties
+          properties = {
+            'catalog-backend': catalogBackend,
+            'jdbc-driver': jdbcDriver,
+            'jdbc-user': jdbcUser,
+            'jdbc-password': jdbcPwd,
+            uri: uri,
+            ...others
+          }
         }
+        authType && (properties['authType'] = authType)
+        kerberosPrincipal && (properties['authentication.kerberos.principal'] = kerberosPrincipal)
+        kerberosKeytabUri && (properties['authentication.kerberos.keytab-uri'] = kerberosKeytabUri)
 
         const catalogData = {
           ...mainData,
