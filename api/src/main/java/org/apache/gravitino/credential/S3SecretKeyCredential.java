@@ -40,8 +40,8 @@ public class S3SecretKeyCredential implements Credential {
    * Constructs an instance of {@link S3SecretKeyCredential} with the specified AWS S3 access key ID
    * and secret access key.
    *
-   * @param accessKeyId the AWS S3 access key ID used for authentication.
-   * @param secretAccessKey the AWS S3 secret access key used for authentication.
+   * @param accessKeyId the AWS S3 static access key ID.
+   * @param secretAccessKey the AWS S3 static secret access key.
    */
   public S3SecretKeyCredential(String accessKeyId, String secretAccessKey) {
     Preconditions.checkNotNull(accessKeyId, "S3 access key Id should not null");
@@ -67,5 +67,23 @@ public class S3SecretKeyCredential implements Credential {
         .put(GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId)
         .put(GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
         .build();
+  }
+
+  /**
+   * Get S3 static access key ID.
+   *
+   * @return The S3 access key ID.
+   */
+  public String accessKeyId() {
+    return accessKeyId;
+  }
+
+  /**
+   * Get S3 static secret access key.
+   *
+   * @return The S3 secret access key.
+   */
+  public String secretAccessKey() {
+    return secretAccessKey;
   }
 }

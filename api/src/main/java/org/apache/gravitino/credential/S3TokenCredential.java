@@ -30,9 +30,9 @@ public class S3TokenCredential implements Credential {
   /** S3 token credential type. */
   public static final String S3_TOKEN_CREDENTIAL_TYPE = "s3-token";
   /** The session access key ID used to access S3 data. */
-  public static final String GRAVITINO_S3_ACCESS_KEY_ID = "s3-session-access-key-id";
+  public static final String GRAVITINO_S3_ACCESS_KEY_ID = "s3-access-key-id";
   /** The session secret access key used to access S3 data. */
-  public static final String GRAVITINO_S3_SECRET_ACCESS_KEY = "s3-session-secret-access-key";
+  public static final String GRAVITINO_S3_SECRET_ACCESS_KEY = "s3-secret-access-key";
   /** S3 session token. */
   public static final String GRAVITINO_S3_TOKEN = "s3-session-token";
 
@@ -42,13 +42,12 @@ public class S3TokenCredential implements Credential {
   private final long expireTimeInMS;
 
   /**
-   * Constructs an instance of {@link S3SecretKeyCredential} with the specified AWS S3 access key ID
-   * and secret access key.
+   * Constructs an instance of {@link S3SecretKeyCredential} with session secret key and token.
    *
-   * @param accessKeyId the AWS S3 access key ID used for authentication.
-   * @param secretAccessKey the AWS S3 secret access key used for authentication.
-   * @param sessionToken AWS S3 access key ID used for authentication.
-   * @param expireTimeInMS AWS S3 access key ID used for authentication.
+   * @param accessKeyId the AWS S3 session access key ID.
+   * @param secretAccessKey the AWS S3 session secret access key.
+   * @param sessionToken AWS S3 session token.
+   * @param expireTimeInMS AWS S3 session token expire time in ms.
    */
   public S3TokenCredential(
       String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMS) {
@@ -82,5 +81,32 @@ public class S3TokenCredential implements Credential {
         .put(GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
         .put(GRAVITINO_S3_TOKEN, sessionToken)
         .build();
+  }
+
+  /**
+   * Get S3 session access key ID.
+   *
+   * @return The S3 access key ID.
+   */
+  public String accessKeyId() {
+    return accessKeyId;
+  }
+
+  /**
+   * Get S3 session secret access key.
+   *
+   * @return The S3 secret access key.
+   */
+  public String secretAccessKey() {
+    return secretAccessKey;
+  }
+
+  /**
+   * Get S3 session token.
+   *
+   * @return The S3 token.
+   */
+  public String sessionToken() {
+    return sessionToken;
   }
 }
