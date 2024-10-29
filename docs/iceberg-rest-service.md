@@ -391,7 +391,7 @@ You could run Gravitino Iceberg REST server though docker container:
 docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
-Gravitino Iceberg REST server in docker image could access local fs by default, you could change the configuration by environment variables to access S3 and GCS storage.
+Gravitino Iceberg REST server in docker image could access local storage, you could change the configuration by environment variables to access S3 or GCS storage, please refer to storage section for more details.
 
 | Environment variables                | Configuration items                               | Since version     |
 |--------------------------------------|---------------------------------------------------|-------------------|
@@ -409,7 +409,7 @@ Gravitino Iceberg REST server in docker image could access local fs by default, 
 Or build it manually to add custom configuration or logics:
 
 ```shell
-sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image apache/gravitino-iceberg-rest --tag 0.6.0
+sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image apache/gravitino-iceberg-rest --tag 0.7.0-incubating
 ```
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-apache-iceberg-rest-service).

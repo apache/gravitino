@@ -64,9 +64,6 @@ for k, v in env_map.items():
     if k in os.environ:
         update_config(config_map, v, os.environ[k])
   
-# for key, value in config_map.items(): 
-#     print(f"{key}: {value}")
-
 if os.path.exists(config_file_path):  
     os.remove(config_file_path)  
 
