@@ -77,9 +77,9 @@ In the meantime, you need to place the corresponding bundle jar `gravitno-gcp-bu
 
 In the meantime, you need to place the corresponding bundle jar `gravitno-aliyun-bundle-{version}.jar` in the Hadoop environment.
 
-#### How to custom your own HCFS file system provider?
+#### How to custom your own HCFS file system fileset?
 
-Developers and users can custom their own HCFS file system provider by implementing the `FileSystemProvider` interface. The `FileSystemProvider` interface is defined as follows:
+Developers and users can custom their own HCFS file system fileset by implementing the `FileSystemProvider` interface. The `FileSystemProvider` interface is defined as follows:
 
 ```java
   
