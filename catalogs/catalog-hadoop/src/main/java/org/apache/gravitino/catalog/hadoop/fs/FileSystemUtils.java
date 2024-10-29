@@ -120,6 +120,7 @@ public class FileSystemUtils {
    *  custom-k1=k1
    * then the result will be:
    *  k1=v3
+   * </pre>
    *
    * @param config Gravitino configuration
    * @return Hadoop configuration Map
