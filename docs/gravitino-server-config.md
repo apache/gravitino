@@ -115,6 +115,8 @@ To leverage the event listener, you must implement the `EventListenerPlugin` int
 
 Gravitino triggers a pre-event before the operation, a post-event after the completion of the operation and a failure event after the operation failed.
 
+##### Post-event
+
 | Operation type                      | Post-event                                                                                                                                                                                                                                                                                                                                                                                                                    | Since Version    |
 |-------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
 | table operation                     | `CreateTableEvent`, `AlterTableEvent`, `DropTableEvent`, `LoadTableEvent`, `ListTableEvent`, `PurgeTableFailureEvent`, `CreateTableFailureEvent`, `AlterTableFailureEvent`, `DropTableFailureEvent`, `LoadTableFailureEvent`, `ListTableFailureEvent`, `PurgeTableFailureEvent`                                                                                                                                               | 0.5.0            |
@@ -124,6 +126,8 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 | catalog operation                   | `CreateCatalogEvent`, `AlterCatalogEvent`, `DropCatalogEvent`, `LoadCatalogEvent`, `ListCatalogEvent`, `CreateCatalogFailureEvent`, `AlterCatalogFailureEvent`, `DropCatalogFailureEvent`, `LoadCatalogFailureEvent`, `ListCatalogFailureEvent`                                                                                                                                                                               | 0.5.0            |
 | metalake operation                  | `CreateMetalakeEvent`, `AlterMetalakeEvent`, `DropMetalakeEvent`, `LoadMetalakeEvent`, `ListMetalakeEvent`, `CreateMetalakeFailureEvent`, `AlterMetalakeFailureEvent`, `DropMetalakeFailureEvent`, `LoadMetalakeFailureEvent`, `ListMetalakeFailureEvent`                                                                                                                                                                     | 0.5.0            |
 | Iceberg REST server table operation | `IcebergCreateTableEvent`, `IcebergUpdateTableEvent`, `IcebergDropTableEvent`, `IcebergLoadTableEvent`, `IcebergListTableEvent`, `IcebergTableExistsEvent`, `IcebergRenameTableEvent`, `IcebergCreateTableFailureEvent`, `IcebergUpdateTableFailureEvent`, `IcebergDropTableFailureEvent`, `IcebergLoadTableFailureEvent`, `IcebergListTableFailureEvent`, `IcebergRenameTableFailureEvent`, `IcebergTableExistsFailureEvent` | 0.7.0-incubating |
+
+##### Pre-event
 
 Pre-event is only generated before Iceberg REST server table operations, the other operation doesn't generate pre-event for now.
 
