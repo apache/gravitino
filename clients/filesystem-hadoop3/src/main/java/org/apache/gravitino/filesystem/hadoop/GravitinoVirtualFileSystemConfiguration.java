@@ -18,12 +18,7 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
-import com.google.common.collect.ImmutableMap;
-import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
-import org.apache.gravitino.storage.GCSProperties;
-import org.apache.gravitino.storage.OSSProperties;
-import org.apache.gravitino.storage.S3Properties;
 
 /** Configuration class for Gravitino Virtual File System. */
 public class GravitinoVirtualFileSystemConfiguration {
@@ -111,38 +106,6 @@ public class GravitinoVirtualFileSystemConfiguration {
    */
   public static final long FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_DEFAULT =
       1000L * 60 * 60;
-
-  // For this part, please refer to the corresponding file system provider.
-  private static final Map<String, String> GVFS_S3_KEY_TO_HADOOP_KEY =
-      ImmutableMap.of(
-          S3Properties.GRAVITINO_S3_ENDPOINT, "fs.s3a.endpoint",
-          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, "fs.s3a.access.key",
-          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "fs.s3a.secret.key",
-          S3Properties.GRAVITINO_S3_CREDS_PROVIDER, "fs.s3a.aws.credentials.provider");
-
-  private static final Map<String, String> GVFS_OSS_KEY_TO_HADOOP_KEY =
-      ImmutableMap.of(
-          OSSProperties.GRAVITINO_OSS_ENDPOINT, "fs.oss.endpoint",
-          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, "fs.oss.accessKeyId",
-          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, "fs.oss.accessKeySecret");
-
-  private static final Map<String, String> GVFS_GCS_KEY_TO_HADOOP_KEY =
-      ImmutableMap.of(
-          GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, "fs.gs.auth.service.account.json.keyfile");
-
-  /**
-   * The mapping from Gravitino Virtual File System key to Hadoop key.
-   *
-   * <p>For example, if users want to set the OSS endpoint, they can use the key "oss.endpoint" in
-   * the Gravitino Virtual File System configuration. The corresponding Hadoop key is
-   * "fs.oss.endpoint".
-   */
-  public static final Map<String, String> GVFS_KEY_TO_HADOOP_KEY =
-      ImmutableMap.<String, String>builder()
-          .putAll(GVFS_S3_KEY_TO_HADOOP_KEY)
-          .putAll(GVFS_OSS_KEY_TO_HADOOP_KEY)
-          .putAll(GVFS_GCS_KEY_TO_HADOOP_KEY)
-          .build();
 
   private GravitinoVirtualFileSystemConfiguration() {}
 }

@@ -33,7 +33,7 @@ import org.apache.hadoop.fs.s3a.S3AFileSystem;
 
 public class S3FileSystemProvider implements FileSystemProvider {
 
-  private static final Map<String, String> GRAVITINO_KEY_TO_S3_HADOOP_KEY =
+  public static final Map<String, String> GRAVITINO_KEY_TO_S3_HADOOP_KEY =
       ImmutableMap.of(
           S3Properties.GRAVITINO_S3_ENDPOINT, Constants.ENDPOINT,
           S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, Constants.ACCESS_KEY,

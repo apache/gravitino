@@ -28,8 +28,8 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.oss.fs.OSSFileSystemProvider;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
@@ -135,7 +135,7 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
 
     Map<String, String> hadoopConfMap =
         FileSystemUtils.toHadoopConfigMap(
-            map, GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY);
+            map, OSSFileSystemProvider.GRAVITINO_KEY_TO_OSS_HADOOP_KEY);
 
     hadoopConfMap.forEach(ossConf::set);
 

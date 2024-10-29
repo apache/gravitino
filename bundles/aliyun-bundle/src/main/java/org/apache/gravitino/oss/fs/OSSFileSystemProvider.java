@@ -34,7 +34,7 @@ public class OSSFileSystemProvider implements FileSystemProvider {
 
   private static final String OSS_FILESYSTEM_IMPL = "fs.oss.impl";
 
-  private static final Map<String, String> GRAVITINO_KEY_TO_OSS_HADOOP_KEY =
+  public static final Map<String, String> GRAVITINO_KEY_TO_OSS_HADOOP_KEY =
       ImmutableMap.of(
           OSSProperties.GRAVITINO_OSS_ENDPOINT, Constants.ENDPOINT_KEY,
           OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, Constants.ACCESS_KEY_ID,

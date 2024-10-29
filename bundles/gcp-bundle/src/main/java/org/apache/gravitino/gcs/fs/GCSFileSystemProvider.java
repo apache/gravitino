@@ -36,7 +36,7 @@ public class GCSFileSystemProvider implements FileSystemProvider {
   private static final String GCS_SERVICE_ACCOUNT_JSON_FILE =
       "fs.gs.auth.service.account.json.keyfile";
 
-  private static final Map<String, String> GRAVITINO_KEY_TO_GCS_HADOOP_KEY =
+  public static final Map<String, String> GRAVITINO_KEY_TO_GCS_HADOOP_KEY =
       ImmutableMap.of(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, GCS_SERVICE_ACCOUNT_JSON_FILE);
 
   @Override

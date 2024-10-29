@@ -30,9 +30,9 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.s3.fs.S3FileSystemProvider;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
@@ -191,8 +191,7 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
     gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
 
     Map<String, String> hadoopConfMap =
-        FileSystemUtils.toHadoopConfigMap(
-            map, GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY);
+        FileSystemUtils.toHadoopConfigMap(map, S3FileSystemProvider.GRAVITINO_KEY_TO_S3_HADOOP_KEY);
 
     hadoopConfMap.forEach(s3Conf::set);
 

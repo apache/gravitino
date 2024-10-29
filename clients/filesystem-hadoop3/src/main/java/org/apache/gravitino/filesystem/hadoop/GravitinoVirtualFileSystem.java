@@ -19,7 +19,6 @@
 package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -384,13 +383,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             scheme,
             str -> {
               try {
-                Map<String, String> maps = getConfigMap(getConf());
                 FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
                 if (provider == null) {
                   throw new GravitinoRuntimeException(
                       "Unsupported file system scheme: %s for %s.",
                       scheme, GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME);
                 }
+
+                Map<String, String> maps = getConfigMap(getConf());
                 return provider.getFileSystem(filePath, maps);
               } catch (IOException ioe) {
                 throw new GravitinoRuntimeException(
@@ -405,7 +405,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private Map<String, String> getConfigMap(Configuration configuration) {
     Map<String, String> maps = Maps.newHashMap();
     configuration.forEach(entry -> maps.put(entry.getKey(), entry.getValue()));
-    return FileSystemUtils.toHadoopConfigMap(maps, GVFS_KEY_TO_HADOOP_KEY);
+    return maps;
   }
 
   private String getSubPathFromVirtualPath(NameIdentifier identifier, String virtualPathString) {

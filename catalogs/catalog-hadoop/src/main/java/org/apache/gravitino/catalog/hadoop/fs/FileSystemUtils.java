@@ -116,28 +116,32 @@ public class FileSystemUtils {
   public static Map<String, String> toHadoopConfigMap(
       Map<String, String> config, Map<String, String> predefinedKeys) {
     Map<String, String> result = Maps.newHashMap();
-    Set<String> highestPriorityKeys = Sets.newHashSet();
+
+    // First, add those keys that start with 'gravitino.bypass' to the result map as it has the
+    // lowest priority.
+    config.forEach(
+        (k, v) -> {
+          if (k.startsWith(GRAVITINO_BYPASS)) {
+            String key = k.replace(GRAVITINO_BYPASS, "");
+            result.put(key, v);
+          }
+        });
+
+    // Then add those keys that are not in the predefined keys and not start with 'gravitino.bypass'
+    // to the result map.
+    config.forEach(
+        (k, v) -> {
+          if (!predefinedKeys.containsKey(k) && !k.startsWith(GRAVITINO_BYPASS)) {
+            result.put(k, v);
+          }
+        });
+
+    // Last, add those keys that are in the predefined keys to the result map.
     config.forEach(
         (k, v) -> {
           if (predefinedKeys.containsKey(k)) {
             String key = predefinedKeys.get(k);
-            highestPriorityKeys.add(key);
             result.put(key, v);
-          }
-
-          if (!k.startsWith(GRAVITINO_BYPASS)) {
-            // If the key does not start with 'gravitino.bypass' and is not in the highest priority
-            // keys, set the value to the configuration.
-            if (!highestPriorityKeys.contains(k)) {
-              result.put(k, v);
-            }
-          } else {
-            // If the key starts with 'gravitino.bypass', remove the prefix and set the value to the
-            // configuration if the key does not exist in the configuration.
-            String key = k.replace(GRAVITINO_BYPASS, "");
-            if (!result.containsKey(key)) {
-              result.put(key, v);
-            }
           }
         });
 
