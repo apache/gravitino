@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -185,19 +186,15 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
    */
   protected Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
     Configuration s3Conf = new Configuration();
-    gvfsConf.forEach(
-        entry -> {
-          if (entry.getKey().startsWith("gravitino.bypass.")) {
-            s3Conf.set(entry.getKey().replace("gravitino.bypass.", ""), entry.getValue());
-          } else if (GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY.containsKey(
-              entry.getKey())) {
-            s3Conf.set(
-                GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY.get(entry.getKey()),
-                entry.getValue());
-          } else {
-            s3Conf.set(entry.getKey(), entry.getValue());
-          }
-        });
+    Map<String, String> map = Maps.newHashMap();
+
+    gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
+
+    Map<String, String> hadoopConfMap =
+        FileSystemUtils.toHadoopConfigMap(
+            map, GravitinoVirtualFileSystemConfiguration.GVFS_KEY_TO_HADOOP_KEY);
+
+    hadoopConfMap.forEach(s3Conf::set);
 
     return s3Conf;
   }
