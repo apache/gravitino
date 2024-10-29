@@ -21,6 +21,8 @@ package org.apache.gravitino.credential;
 
 public class CredentialConstants {
   public static final String CREDENTIAL_PROVIDER_TYPE = "credential-provider-type";
+  public static final String S3_TOKEN_CREDENTIAL_PROVIDER = "s3-token";
+  public static final String TOKEN_EXPIRE_TIME = "token-expire-time";
 
   public static final String GCS_TOKEN_CREDENTIAL_PROVIDER_TYPE = "gcs-token";
 
