@@ -323,7 +323,7 @@ export const providers = [
         key: 'jdbc-url',
         value: '',
         required: true,
-        description: 'e.g. jdbc:mysql://localhost:2881' or jdbc:oceanbase://localhost:2881'
+        description: 'e.g. jdbc:mysql://localhost:2881 or jdbc:oceanbase://localhost:2881'
       },
       {
         key: 'jdbc-user',
