@@ -40,8 +40,8 @@ public class S3SecretKeyCredential implements Credential {
    * Constructs an instance of {@link S3SecretKeyCredential} with the specified AWS S3 access key ID
    * and secret access key.
    *
-   * @param accessKeyId the AWS S3 static access key ID.
-   * @param secretAccessKey the AWS S3 static secret access key.
+   * @param accessKeyId The S3 static access key ID.
+   * @param secretAccessKey The S3 static secret access key.
    */
   public S3SecretKeyCredential(String accessKeyId, String secretAccessKey) {
     Preconditions.checkNotNull(accessKeyId, "S3 access key Id should not null");

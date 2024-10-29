@@ -29,9 +29,9 @@ public class S3TokenCredential implements Credential {
 
   /** S3 token credential type. */
   public static final String S3_TOKEN_CREDENTIAL_TYPE = "s3-token";
-  /** The session access key ID used to access S3 data. */
+  /** S3 session access key ID used to access S3 data. */
   public static final String GRAVITINO_S3_ACCESS_KEY_ID = "s3-access-key-id";
-  /** The session secret access key used to access S3 data. */
+  /** S3 session secret access key used to access S3 data. */
   public static final String GRAVITINO_S3_SECRET_ACCESS_KEY = "s3-secret-access-key";
   /** S3 session token. */
   public static final String GRAVITINO_S3_TOKEN = "s3-session-token";
@@ -44,10 +44,10 @@ public class S3TokenCredential implements Credential {
   /**
    * Constructs an instance of {@link S3SecretKeyCredential} with session secret key and token.
    *
-   * @param accessKeyId the AWS S3 session access key ID.
-   * @param secretAccessKey the AWS S3 session secret access key.
-   * @param sessionToken AWS S3 session token.
-   * @param expireTimeInMS AWS S3 session token expire time in ms.
+   * @param accessKeyId The S3 session access key ID.
+   * @param secretAccessKey The S3 session secret access key.
+   * @param sessionToken The S3 session token.
+   * @param expireTimeInMS The S3 session token expire time in ms.
    */
   public S3TokenCredential(
       String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMS) {
@@ -104,7 +104,7 @@ public class S3TokenCredential implements Credential {
   /**
    * Get S3 session token.
    *
-   * @return The S3 token.
+   * @return The S3 session token.
    */
   public String sessionToken() {
     return sessionToken;
