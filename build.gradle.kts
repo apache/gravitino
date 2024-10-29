@@ -371,6 +371,22 @@ subprojects {
     from(tasks["javadoc"])
   }
 
+  tasks.withType<Jar> {
+    into("META-INF") {
+      from(rootDir) {
+        if (name == "sourcesJar") {
+          include("LICENSE")
+          include("NOTICE")
+        } else {
+          include("LICENSE.bin")
+          rename("LICENSE.bin", "LICENSE")
+          include("NOTICE.bin")
+          rename("NOTICE.bin", "NOTICE")
+        }
+      }
+    }
+  }
+
   if (project.name in listOf("web", "docs")) {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
