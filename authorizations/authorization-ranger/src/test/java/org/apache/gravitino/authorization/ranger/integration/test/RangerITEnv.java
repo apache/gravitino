@@ -19,7 +19,6 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -508,7 +507,6 @@ public class RangerITEnv {
     Map<String, String> resourceFilter = new HashMap<>(); // use to match the precise policy
     Map<String, String> policyFilter = new HashMap<>();
     policyFilter.put(SearchFilter.SERVICE_NAME, serviceName);
-    policyFilter.put(SearchFilter.POLICY_LABELS_PARTIAL, RangerHelper.MANAGED_BY_GRAVITINO);
     final int[] index = {0};
     policyResourceMap.forEach(
         (k, v) -> {
@@ -562,7 +560,6 @@ public class RangerITEnv {
         policy.setServiceType(type);
         policy.setService(serviceName);
         policy.setName(policyName);
-        policy.setPolicyLabels(Lists.newArrayList(RangerHelper.MANAGED_BY_GRAVITINO));
         policy.setResources(policyResourceMap);
         policy.setPolicyItems(policyItems);
         rangerClient.createPolicy(policy);
@@ -594,6 +591,8 @@ public class RangerITEnv {
 
   /** Don't call this function in the Lambda function body, It will return a random function name */
   public static String currentFunName() {
-    return Thread.currentThread().getStackTrace()[2].getMethodName();
+    String name = Thread.currentThread().getStackTrace()[2].getMethodName();
+    Assertions.assertFalse(name.startsWith("lambda$"), "Don't call this function in the Lambda");
+    return name;
   }
 }

@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.verifyRoleInRanger;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -230,6 +231,25 @@ public class RangerHiveIT {
   }
 
   @Test
+  public void testManagedByGravitino() {
+    RoleEntity role = mock3TableRole(currentFunName());
+    role.securableObjects().stream()
+        .forEach(
+            securableObject -> {
+              Joiner DOT_JOINER = Joiner.on('.');
+              List<String> names =
+                  Lists.newArrayList(
+                      SecurableObjects.DOT_SPLITTER.splitToList(securableObject.fullName()));
+              names.remove(0); // remove catalog node
+              // Manual create the Ranger Policy
+              createHivePolicy(Lists.newArrayList(names), DOT_JOINER.join(names));
+            });
+    // Use role to create Ranger Policy
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    verifyRoleInRanger(rangerAuthHivePlugin, role);
+  }
+
+  @Test
   public void testFindManagedPolicy() {
     // Because Ranger support wildcard to match the policy, so we need to test the policy with
     // wildcard
@@ -264,7 +284,7 @@ public class RangerHiveIT {
     Assertions.assertNotNull(rangerHelper.findManagedPolicy(rangerSecurableObject));
   }
 
-  static void createHivePolicy(List<String> metaObjects, String roleName) {
+  static void createHivePolicy(List<String> metaObjects, String policyName) {
     Assertions.assertTrue(metaObjects.size() < 4);
     Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap = new HashMap<>();
     for (int i = 0; i < metaObjects.size(); i++) {
@@ -286,7 +306,7 @@ public class RangerHiveIT {
     RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HIVE,
         RangerITEnv.RANGER_HIVE_REPO_NAME,
-        roleName,
+        policyName,
         policyResourceMap,
         Collections.singletonList(policyItem));
   }
@@ -1318,7 +1338,6 @@ public class RangerHiveIT {
     }
 
     Assertions.assertEquals(policy.getName(), policyName);
-    Assertions.assertTrue(policy.getPolicyLabels().contains(RangerHelper.MANAGED_BY_GRAVITINO));
 
     // verify namespace
     List<String> metaObjNamespaces = metadataObject.names();

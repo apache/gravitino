@@ -196,11 +196,9 @@ public class RangerHelper {
   public RangerPolicy findManagedPolicy(RangerMetadataObject rangerMetadataObject)
       throws AuthorizationPluginException {
     List<String> nsMetadataObj = rangerMetadataObject.names();
-
     Map<String, String> searchFilters = new HashMap<>();
     Map<String, String> preciseFilters = new HashMap<>();
     searchFilters.put(SearchFilter.SERVICE_NAME, rangerServiceName);
-    searchFilters.put(SearchFilter.POLICY_LABELS_PARTIAL, MANAGED_BY_GRAVITINO);
     for (int i = 0; i < nsMetadataObj.size(); i++) {
       searchFilters.put(
           SearchFilter.RESOURCE_PREFIX + policyResourceDefines.get(i), nsMetadataObj.get(i));
@@ -209,7 +207,6 @@ public class RangerHelper {
 
     try {
       List<RangerPolicy> policies = rangerClient.findPolicies(searchFilters);
-
       if (!policies.isEmpty()) {
         /**
          * Because Ranger doesn't support the precise search, Ranger will return the policy meets
@@ -400,7 +397,6 @@ public class RangerHelper {
     policy.setPolicyLabels(Lists.newArrayList(RangerHelper.MANAGED_BY_GRAVITINO));
 
     List<String> nsMetadataObject = metadataObject.names();
-
     for (int i = 0; i < nsMetadataObject.size(); i++) {
       RangerPolicy.RangerPolicyResource policyResource =
           new RangerPolicy.RangerPolicyResource(nsMetadataObject.get(i));

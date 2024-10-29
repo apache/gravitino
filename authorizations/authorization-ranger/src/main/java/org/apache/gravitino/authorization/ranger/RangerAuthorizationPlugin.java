@@ -587,6 +587,9 @@ public abstract class RangerAuthorizationPlugin
       if (policy.getId() == null) {
         rangerClient.createPolicy(policy);
       } else {
+        if (!policy.getPolicyLabels().contains(RangerHelper.MANAGED_BY_GRAVITINO)) {
+          policy.getPolicyLabels().add(RangerHelper.MANAGED_BY_GRAVITINO);
+        }
         rangerClient.updatePolicy(policy.getId(), policy);
       }
     } catch (RangerServiceException e) {
