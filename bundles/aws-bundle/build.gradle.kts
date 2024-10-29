@@ -25,8 +25,15 @@ plugins {
 }
 
 dependencies {
+  compileOnly(project(":api"))
+  compileOnly(project(":core"))
+  compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
   compileOnly(libs.hadoop3.common)
+
+  implementation(libs.aws.iam)
+  implementation(libs.aws.policy)
+  implementation(libs.aws.sts)
   implementation(libs.hadoop3.aws)
 }
 
