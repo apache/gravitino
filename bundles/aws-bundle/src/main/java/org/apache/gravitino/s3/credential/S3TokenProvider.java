@@ -59,7 +59,7 @@ public class S3TokenProvider implements CredentialProvider {
     S3CredentialConfig s3CredentialConfig = new S3CredentialConfig(properties);
     this.roleArn = s3CredentialConfig.s3RoleArn();
     this.externalID = s3CredentialConfig.externalID();
-    this.tokenExpireSecs = s3CredentialConfig.tokenExpireSecs();
+    this.tokenExpireSecs = s3CredentialConfig.tokenExpireInSecs();
     this.stsClient = createStsClient(s3CredentialConfig);
   }
 
