@@ -40,7 +40,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 
 | Configuration item   | Description                                                                                                                           | Default value | Required | Since Version    |
 |----------------------|---------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:2881`                                                   | (none)        | Yes      | 0.7.0-incubating |
+| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:2881` or `jdbc:oceanbase://localhost:2881`              | (none)        | Yes      | 0.7.0-incubating |
 | `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` or `com.oceanbase.jdbc.Driver`. | (none)        | Yes      | 0.7.0-incubating |
 | `jdbc-user`          | The JDBC user name.                                                                                                                   | (none)        | Yes      | 0.7.0-incubating |
 | `jdbc-password`      | The JDBC password.                                                                                                                    | (none)        | Yes      | 0.7.0-incubating |
@@ -204,8 +204,10 @@ Index[] indexes = new Index[] {
 ### Table operations
 
 :::note
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+The OceanBase catalog does not support creating partitioned tables in the current version.
 :::
+
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 
