@@ -77,7 +77,9 @@ public class TestCatalogUtils {
                         PaimonConfig.CATALOG_JDBC_USER.getKey(),
                         "user",
                         PaimonConfig.CATALOG_JDBC_PASSWORD.getKey(),
-                        "password")))
+                        "password",
+                        PaimonConfig.CATALOG_JDBC_DRIVER.getKey(),
+                        "org.h2.Driver")))
             .getCatalog()) {
       consumer.accept(catalog);
     }

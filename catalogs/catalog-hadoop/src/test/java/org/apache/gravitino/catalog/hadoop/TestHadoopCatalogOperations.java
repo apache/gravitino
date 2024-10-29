@@ -770,7 +770,7 @@ public class TestHadoopCatalogOperations {
     String name = "fileset27";
     Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
-    FilesetChange change1 = FilesetChange.removeComment();
+    FilesetChange change1 = FilesetChange.updateComment(null);
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);

@@ -29,7 +29,7 @@ For more details, please refer to the related doc.
 Assuming:
 
  - Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
- - Metalake has been created.
+ - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
 
 ## Catalog operations
 
@@ -85,6 +85,19 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# Assuming you have just created a metalake named `metalake`
+gravitino_client = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
+gravitino_client.create_catalog(name="catalog",
+                                catalog_type=CatalogType.RELATIONAL,
+                                provider="hive",
+                                comment="This is a hive catalog",
+                                properties={"metastore.uris": "thrift://localhost:9083"})
+```
+
+</TabItem>
 </Tabs>
 
 Currently, Gravitino supports the following catalog providers:
@@ -119,6 +132,15 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 // Assuming you have created a metalake named `metalake` and a catalog named `catalog`
 Catalog catalog = gravitinoClient.loadCatalog("catalog");
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+catalog = gravitino_client.load_catalog("catalog")
 ```
 
 </TabItem>
@@ -160,6 +182,17 @@ Catalog catalog = gravitinoClient.alterCatalog("catalog",
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+changes = (CatalogChange.update_comment("new comment"))
+catalog = gravitino_client.alterCatalog("catalog", *changes)
+# ...
+```
+
+</TabItem>
 </Tabs>
 
 Currently, Gravitino supports the following changes to a catalog:
@@ -180,16 +213,19 @@ Therefore, do not change the catalog's URI unless you fully understand the conse
 
 :::
 
-### Drop a catalog
+### Enable a catalog
 
-You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
+Catalog has a reserved property - `in-use`, which indicates whether the catalog is available for use. By default, the `in-use` property is set to `true`.
+To enable a disabled catalog, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client.
 
-<Tabs groupId="language" queryString>
+The following is an example of enabling a catalog:
+
+<Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
+curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{"inUse": true}' \
 http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
@@ -199,17 +235,122 @@ http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```java
 // ...
 // Assuming you have created a metalake named `metalake` and a catalog named `catalog`
-gravitinoClient.dropCatalog("catalog");
+gravitinoClient.enableCatalog("catalog");
 // ...
+```
 
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+gravitino_client.enable_catalog("catalog")
+# ...
 ```
 
 </TabItem>
 </Tabs>
 
-:::note
-Dropping a catalog only removes metadata about the catalog, schemas, and tables under the catalog in Gravitino, It doesn't remove the real data (table and schema) in Apache Hive.
+:::info
+This operation does nothing if the catalog is already enabled.
 :::
+
+### Disable a catalog
+
+Once a catalog is disabled:
+- Users can only [list](#list-all-catalogs-in-a-metalake), [load](#load-a-catalog), [drop](#drop-a-catalog), or [enable](#enable-a-catalog) it.
+- Any other operation on the catalog or its sub-entities will result in an error.
+
+To disable a catalog, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client.
+
+The following is an example of disabling a catalog:
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{"inUse": false}' \
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+// Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+gravitinoClient.disableCatalog("catalog");
+// ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+gravitino_client.disable_catalog("catalog")
+# ...
+```
+
+</TabItem>
+</Tabs>
+
+:::info
+This operation does nothing if the catalog is already disabled.
+:::
+
+### Drop a catalog
+
+Deleting a catalog by "force" is not a default behavior, so please make sure:
+
+- There are no schemas under the catalog. Otherwise, you will get an error.
+- The catalog is [disabled](#disable-a-catalog). Otherwise, you will get an error.
+
+Deleting a catalog by "force" will:
+
+- Delete all sub-entities (schemas, tables, etc.) under the catalog.
+- Delete the catalog itself even if it is enabled.
+- Not delete the external resources (such as database, table, etc.) associated with sub-entities unless they are managed (such as managed fileset).
+
+You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/metalake/catalogs/catalog?force=false
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+// Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+// force can be true or false
+gravitinoClient.dropCatalog("catalog", false);
+// ...
+
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+# force can be true or false
+gravitino_client.drop_catalog(name="catalog", force=False)
+# ...
+```
+
+</TabItem>
+</Tabs>
 
 ### List all catalogs in a metalake
 
@@ -233,6 +374,16 @@ http://localhost:8090/api/metalakes/metalake/catalogs
 // Assuming you have just created a metalake named `metalake`
 String[] catalogNames = gravitinoClient.listCatalogs();
 // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+catalog_names = gravitino_client.list_catalogs()
+# ...
 ```
 
 </TabItem>
@@ -262,13 +413,23 @@ Catalog[] catalogsInfos = gravitinoMetaLake.listCatalogsInfo();
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+# ...
+# Assuming you have created a metalake named `metalake` and a catalog named `catalog`
+catalogs_info = gravitino_client.list_catalogs_info()
+# ...
+```
+
+</TabItem>
 </Tabs>
 
 
 ## Schema operations
 
 :::tip
-Users should create a metalake and a catalog before creating a schema.
+Users should create a metalake and a catalog, then ensure that the metalake and catalog are enabled before operating schemas.
 :::
 
 ### Create a schema
@@ -518,7 +679,7 @@ schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas()
 ## Table operations
 
 :::tip
-Users should create a metalake, a catalog and a schema before creating a table.
+Users should create a metalake, a catalog and a schema, then ensure that the metalake and catalog are enabled before before operating tables.
 :::
 
 ### Create a table

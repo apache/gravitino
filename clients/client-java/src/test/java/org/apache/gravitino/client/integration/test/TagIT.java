@@ -198,6 +198,14 @@ public class TagIT extends BaseIT {
   }
 
   @Test
+  public void testNullableComment() {
+    String tagName = GravitinoITUtils.genRandomName("tag_it_tag");
+    metalake.createTag(tagName, "comment", Collections.emptyMap());
+    Tag alteredTag6 = metalake.alterTag(tagName, TagChange.updateComment(null));
+    Assertions.assertNull(alteredTag6.comment());
+  }
+
+  @Test
   public void testCreateAndAlterTag() {
     String tagName = GravitinoITUtils.genRandomName("tag_it_tag");
     metalake.createTag(tagName, "comment", Collections.emptyMap());
@@ -605,5 +613,44 @@ public class TagIT extends BaseIT {
 
     Assertions.assertEquals(1, tag4.associatedObjects().count());
     Assertions.assertEquals(column.name(), tag4.associatedObjects().objects()[0].name());
+  }
+
+  @Test
+  public void testAssociateAndDeleteTags() {
+    Tag tag1 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_tag1"), "comment1", Collections.emptyMap());
+    Tag tag2 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_tag2"), "comment2", Collections.emptyMap());
+    Tag tag3 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_tag3"), "comment3", Collections.emptyMap());
+
+    String[] associatedTags =
+        relationalCatalog
+            .supportsTags()
+            .associateTags(new String[] {tag1.name(), tag2.name()}, new String[] {tag3.name()});
+
+    Assertions.assertEquals(2, associatedTags.length);
+    Set<String> tagNames = Sets.newHashSet(associatedTags);
+    Assertions.assertTrue(tagNames.contains(tag1.name()));
+    Assertions.assertTrue(tagNames.contains(tag2.name()));
+    Assertions.assertFalse(tagNames.contains(tag3.name()));
+
+    Tag retrivedTag = relationalCatalog.supportsTags().getTag(tag2.name());
+    Assertions.assertEquals(tag2.name(), retrivedTag.name());
+    Assertions.assertEquals(tag2.comment(), retrivedTag.comment());
+
+    boolean deleted = metalake.deleteTag("null");
+    Assertions.assertFalse(deleted);
+
+    deleted = metalake.deleteTag(tag1.name());
+    Assertions.assertTrue(deleted);
+    deleted = metalake.deleteTag(tag1.name());
+    Assertions.assertFalse(deleted);
+
+    String[] associatedTags1 = relationalCatalog.supportsTags().listTags();
+    Assertions.assertArrayEquals(new String[] {tag2.name()}, associatedTags1);
   }
 }

@@ -25,10 +25,18 @@ plugins {
 }
 
 dependencies {
+  compileOnly(project(":api"))
+  compileOnly(project(":core"))
+  compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
+
   compileOnly(libs.hadoop3.common)
+
+  implementation(libs.commons.lang3)
   implementation(libs.hadoop3.gcs)
   implementation(project(":catalogs:catalog-common"))
+  implementation(libs.google.auth.http)
+  implementation(libs.google.auth.credentials)
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -39,8 +47,7 @@ tasks.withType(ShadowJar::class.java) {
   // Relocate dependencies to avoid conflicts
   relocate("org.apache.httpcomponents", "org.apache.gravitino.shaded.org.apache.httpcomponents")
   relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")
-  relocate("com.google.guava", "org.apache.gravitino.shaded.com.google.guava")
-  relocate("com.google.code", "org.apache.gravitino.shaded.com.google.code")
+  relocate("com.google", "org.apache.gravitino.shaded.com.google")
 }
 
 tasks.jar {

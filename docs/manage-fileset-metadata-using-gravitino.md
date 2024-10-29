@@ -25,7 +25,7 @@ control mechanism without needing to set access controls across different storag
 To use fileset, please make sure that:
 
  - Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
- - A metalake has been created.
+ - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake)
 
 ## Catalog operations
 
@@ -389,13 +389,13 @@ fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("sche
 
 Currently, Gravitino supports the following changes to a fileset:
 
-| Supported modification     | JSON                                                         | Java                                          |
-|----------------------------|--------------------------------------------------------------|-----------------------------------------------|
-| Rename a fileset           | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
-| Update a comment           | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
-| Set a fileset property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
-| Remove a fileset property  | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
-| Remove comment             | `{"@type":"removeComment"}`                                  | `FilesetChange.removeComment()`               |
+| Supported modification      | JSON                                                         | Java                                          |
+|-----------------------------|--------------------------------------------------------------|-----------------------------------------------|
+| Rename a fileset            | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
+| Update a comment            | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
+| Set a fileset property      | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
+| Remove a fileset property   | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
+| Remove comment (deprecated) | `{"@type":"removeComment"}`                                  | `FilesetChange.removeComment()`               |
 
 ### Drop a fileset
 

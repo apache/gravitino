@@ -600,7 +600,9 @@ const CreateCatalogDialog = props => {
                                   name='key'
                                   label='Key'
                                   value={item.key}
-                                  disabled={item.required || item.disabled}
+                                  disabled={
+                                    item.required || item.disabled || (item.key === 'in-use' && type === 'update')
+                                  }
                                   onChange={event => handleFormChange({ index, event })}
                                   error={item.hasDuplicateKey || item.invalid || !item.key.trim()}
                                   data-refer={`props-key-${index}`}
@@ -631,7 +633,7 @@ const CreateCatalogDialog = props => {
                                     label='Value'
                                     error={item.required && item.value === ''}
                                     value={item.value}
-                                    disabled={item.disabled}
+                                    disabled={item.disabled || (item.key === 'in-use' && type === 'update')}
                                     onChange={event => handleFormChange({ index, event })}
                                     data-refer={`props-value-${index}`}
                                     data-prev-refer={`props-${item.key}`}
@@ -640,7 +642,7 @@ const CreateCatalogDialog = props => {
                                 )}
                               </Box>
 
-                              {!(item.required || item.disabled) ? (
+                              {!(item.required || item.disabled || (item.key === 'in-use' && type === 'update')) ? (
                                 <Box sx={{ minWidth: 40 }}>
                                   <IconButton onClick={() => removeFields(index)}>
                                     <Icon icon='mdi:minus-circle-outline' />
