@@ -296,13 +296,13 @@ const CreateCatalogDialog = props => {
           uri && (properties['uri'] = uri)
         } else {
           properties = {
-            'catalog-backend': catalogBackend,
-            'jdbc-driver': jdbcDriver,
-            'jdbc-user': jdbcUser,
-            'jdbc-password': jdbcPwd,
             uri: uri,
             ...others
           }
+          catalogBackend && (properties['catalog-backend'] = catalogBackend)
+          jdbcDriver && (properties['jdbc-driver'] = jdbcDriver)
+          jdbcUser && (properties['jdbc-user'] = jdbcUser)
+          jdbcPwd && (properties['jdbc-password'] = jdbcPwd)
         }
         authType && (properties['authType'] = authType)
         kerberosPrincipal && (properties['authentication.kerberos.principal'] = kerberosPrincipal)
