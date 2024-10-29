@@ -317,7 +317,7 @@ export const providers = [
         key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
+        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver or com.oceanbase.jdbc.Driver'
       },
       {
         key: 'jdbc-url',
