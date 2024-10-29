@@ -110,6 +110,17 @@ public class FileSystemUtils {
    * it will be set to the configuration. Keys with prefixes 'gravitino.bypass' has the lowest
    * priority.
    *
+   * Consider the following example:
+   * <pre>
+   * config:
+   *  k1=v1
+   *  gravitino.bypass.k1=v2
+   *  custom-k1=v3
+   * predefinedKeys:
+   *  custom-k1=k1
+   * then the result will be:
+   *  k1=v3
+   *
    * @param config Gravitino configuration
    * @return Hadoop configuration Map
    */

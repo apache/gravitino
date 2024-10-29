@@ -34,6 +34,12 @@ public class OSSFileSystemProvider implements FileSystemProvider {
 
   private static final String OSS_FILESYSTEM_IMPL = "fs.oss.impl";
 
+  // This map maintains the mapping relationship between the OSS properties in Gravitino and
+  // the Hadoop properties. Through this map, users can customize the OSS properties in Gravitino
+  // and map them to the corresponding Hadoop properties.
+  // For example, User can use oss-endpoint to set the endpoint of OSS 'fs.oss.endpoint' in
+  // Gravitino.
+  // GCS and S3 also have similar mapping relationship.
   public static final Map<String, String> GRAVITINO_KEY_TO_OSS_HADOOP_KEY =
       ImmutableMap.of(
           OSSProperties.GRAVITINO_OSS_ENDPOINT, Constants.ENDPOINT_KEY,
