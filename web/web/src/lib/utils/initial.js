@@ -231,7 +231,6 @@ export const providers = [
         value: 'filesystem',
         defaultValue: 'filesystem',
         required: true,
-        description: 'Only supports "filesystem" now.',
         select: ['filesystem', 'hive', 'jdbc']
       },
       {
@@ -248,6 +247,14 @@ export const providers = [
         value: '',
         required: true,
         description: 'e.g. file:///user/hive/warehouse-paimon/ or hdfs://namespace/hdfs/path'
+      },
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        parentField: 'catalog-backend',
+        hide: ['hive', 'filesystem'],
+        description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`
       },
       {
         key: 'jdbc-user',
