@@ -72,6 +72,8 @@ const MetalakeTree = props => {
             return 'custom-icons-paimon'
           case 'lakehouse-hudi':
             return 'custom-icons-hudi'
+          case 'jdbc-oceanbase':
+            return 'custom-icons-oceanbase'
           default:
             return 'bx:book'
         }
