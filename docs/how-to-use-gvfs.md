@@ -66,22 +66,52 @@ the path mapping and convert automatically.
 | `fs.gravitino.fileset.cache.maxCapacity`              | The cache capacity of the Gravitino Virtual File System.                                                                                                                                                | `20`          | No                                                                                                    | 0.5.0            |
 | `fs.gravitino.fileset.cache.evictionMillsAfterAccess` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `milliseconds`.                                                                          | `3600000`     | No                                                                                                    | 0.5.0            |
 | `fs.gravitino.fileset.cache.evictionMillsAfterAccess` | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `milliseconds`.                                                                          | `3600000`     | No                                                                                                    | 0.5.0            |
-| `fs.gvfs.filesystem.providers`                        | The file system providers. If the underlying storage is s3 for this fileset is S3, set it to `s3`, `gcs` for gcs fileset and `oss` for oss fileset.                                                     | (none)        | Yes                                                                                                   | 0.7.0-incubating |
-| `s3.endpoint`                                         | The endpoint of the AWS s3.                                                                                                                                                                             | (none)        | Yes if it's a s3 fileset.                                                                             | 0.7.0-incubating |
-| `s3.access.key.id`                                    | The access key of the AWS s3.                                                                                                                                                                           | (none)        | Yes if it's a s3 fileset.                                                                             | 0.7.0-incubating |
-| `s3.secret.access.key`                                | The secret key of the AWS s3.                                                                                                                                                                           | (none)        | Yes if it's a s3 fileset.                                                                             | 0.7.0-incubating |
-| `gcs-service-account-file`                            | The path of GCS service account JSON file.                                                                                                                                                              | (none)        | Yes if it's a gcs fileset.                                                                            | 0.7.0-incubating |
-| `oss-endpoint`                                        | The endpoint of the Aliyun oss.                                                                                                                                                                         | (none)        | Yes if it's a oss fileset.                                                                            | 0.7.0-incubating |
-| `oss-access-key-id`                                   | The access key of the Aliyun oss.                                                                                                                                                                       | (none)        | Yes if it's a oss fileset.                                                                            | 0.7.0-incubating |
-| `oss-secret-access-key`                               | The secret key of the Aliyun oss.                                                                                                                                                                       | (none)        | Yes if it's a oss fileset.                                                                            | 0.7.0-incubating |
+
+Apart from the above properties, to access fileset like S3, GCS, OSS or custom fileset through GVFS, you need to configure the following extra properties.
+
+#### S3 fileset
+
+| Configuration item                                    | Description                                                    | Default value | Required                                                                                              | Since version    |
+|-------------------------------------------------------|----------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------|------------------|
+| `fs.gvfs.filesystem.providers`                        | The file system providers. Set it to `s3` if it's a S3 fileset | (none)        | Yes                                                                                                   | 0.7.0-incubating |
+| `s3.endpoint`                                         | The endpoint of the AWS s3.                                    | (none)        | Yes if it's a s3 fileset.                                                                             | 0.7.0-incubating |
+| `s3.access.key.id`                                    | The access key of the AWS s3.                                  | (none)        | Yes if it's a s3 fileset.                                                                             | 0.7.0-incubating |
+| `s3.secret.access.key`                                | The secret key of the AWS s3.                                  | (none)        | Yes if it's a s3 fileset.                                                                             | 0.7.0-incubating |
+
+At the same time, you need to place the corresponding bundle jar `gravitno-aws-bundle-{version}.jar` in the Hadoop environment.
 
 
-:::warning
-For S3, GCS, and OSS filesets, you need to place the corresponding bundle jars in the Hadoop environment. The bundle jars are:
-- `gravitno-aws-bundle-{version}.jar` for S3 fileset
-- `gravitno-gcp-bundle-{version}.jar` for GCS fileset
-- `gravitno-aliyun-bundle-{version}.jar` for OSS fileset
-:::
+#### GCS fileset
+
+| Configuration item             | Description                                                     | Default value | Required                                                                                              | Since version    |
+|--------------------------------|-----------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------|------------------|
+| `fs.gvfs.filesystem.providers` | The file system providers. Set it to `gs` if it's a GCS fileset | (none)        | Yes                                                                                                   | 0.7.0-incubating |
+| `gcs-service-account-file`     | The path of GCS service account JSON file.                      | (none)        | Yes if it's a gcs fileset.                                                                            | 0.7.0-incubating |
+
+In the meantime, you need to place the corresponding bundle jar `gravitno-gcp-bundle-{version}.jar` in the Hadoop environment.
+
+
+#### OSS fileset
+
+| Configuration item              | Description                                                      | Default value | Required                                                                                              | Since version    |
+|---------------------------------|------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------|------------------|
+| `fs.gvfs.filesystem.providers`  | The file system providers. Set it to `oss` if it's a OSS fileset | (none)        | Yes                                                                                                   | 0.7.0-incubating |
+| `oss-endpoint`                  | The endpoint of the Aliyun oss.                                  | (none)        | Yes if it's a oss fileset.                                                                            | 0.7.0-incubating |
+| `oss-access-key-id`             | The access key of the Aliyun oss.                                | (none)        | Yes if it's a oss fileset.                                                                            | 0.7.0-incubating |
+| `oss-secret-access-key`         | The secret key of the Aliyun oss.                                | (none)        | Yes if it's a oss fileset.                                                                            | 0.7.0-incubating |
+
+In the meantime, you need to place the corresponding bundle jar `gravitno-aliyun-bundle-{version}.jar` in the Hadoop environment.
+
+#### Custom fileset 
+Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding properties, for more, please refer to [Custom Fileset](./hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-provider).
+So, If you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
+
+| Configuration item             | Description                                                                                  | Default value | Required | Since version    |
+|--------------------------------|----------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `fs.gvfs.filesystem.providers` | The file system providers. please set it to the value of `YourCustomFileSystemProvider#name` | (none)        | Yes      | 0.7.0-incubating |
+| `your-custom-properties`       | The properties will be used to create a FileSystem instance in `CustomFileSystemProvider`    | (none)        | No       | -                |
+
+
 
 You can configure these properties in two ways:
 

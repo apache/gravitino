@@ -44,10 +44,62 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 | `oss-access-key-id`                                | The access key of the Aliyun oss.                                                                                                                                                                                                                                                                             | (none)          | Yes if use oss                                              | 0.7.0-incubating |
 | `oss-secret-access-key`                            | The secret key of the Aliyun oss.                                                                                                                                                                                                                                                                             | (none)          | Yes if use oss                                              | 0.7.0-incubating | 
 
-:::warning
-Since Gravitino 0.7.0-incubating, the Hadoop catalog supports S3, GCS, and OSS. To enable the support for these object storages, you need to put the corresponding bundle jar like `gravitino-aws-bundle-{version}.jar`, `gravitino-gcs-bundle-{version}.jar`, `gravitino-oss-bundle-{version}.jar`
-into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory and set the corresponding configurations.
-:::
+
+#### Properties required to create a local file system Hadoop Catalog
+
+No additional properties are required to create a local file system Hadoop catalog. 
+
+#### Properties required to create an HDFS Hadoop Catalog
+
+Similarly, no additional properties are required to create an HDFS Hadoop catalog if the target HDFS cluster is not Kerberos-enabled. If the target HDFS cluster is Kerberos-enabled, the following properties are required:
+- `authentication.type`: The type of authentication for the Hadoop catalog. The value should be `kerberos`.
+- `authentication.kerberos.principal`: The principal of the Kerberos authentication.
+- `authentication.kerberos.keytab-uri`: The URI of the keytab for the Kerberos authentication.
+
+#### Properties required to create an S3 Hadoop Catalog
+To create an S3 Hadoop catalog, you need to set the following properties:
+- `filesystem-providers`: The value should be `s3` or a comma-separated list of that contains `s3` like `builtin-local,s3`. 
+- `s3-endpoint`: The endpoint of the AWS S3.
+- `s3-access-key-id`: The access key of the AWS S3.
+- `s3-secret-access-key`: The secret key of the AWS S3.
+
+At the same time, you need to put the corresponding bundle jar `gravitino-aws-bundle-{version}.jar` into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory.
+
+#### Properties required to create a GCS Hadoop Catalog
+To create a GCS Hadoop catalog, you need to set the following properties:
+- `filesystem-providers`: The value should be `gcs` or a comma-separated list of that contains `gcs` like `builtin-local,gcs`.
+- `gcs-service-account-file`: The path of the GCS service account JSON file.
+
+At the same time, you need to put the corresponding bundle jar `gravitino-gcs-bundle-{version}.jar` into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory.
+
+#### Properties required to create an OSS Hadoop Catalog
+To create an OSS Hadoop catalog, you need to set the following properties:
+- `filesystem-providers`: The value should be `oss` or a comma-separated list of that contains `oss` like `builtin-local,oss`.
+- `oss-endpoint`: The endpoint of the Aliyun OSS.
+- `oss-access-key-id`: The access key of the Aliyun OSS.
+- `oss-secret-access-key`: The secret key of the Aliyun OSS.
+
+At the same time, you need to put the corresponding bundle jar `gravitino-oss-bundle-{version}.jar` into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory.
+
+
+#### How to custom your own HCFS file system provider?
+
+Developer or user can custom their own HCFS file system provider by implementing the `FileSystemProvider` interface. The `FileSystemProvider` interface is defined as follows:
+
+```java
+  
+  // Create a FileSystem instance by the properties you have set when creating the catalog. 
+  FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
+      throws IOException;
+  
+  // The schema name of the file system provider. 'file' for Local file system, 'hdfs' for HDFS, 's3' for AWS S3, 'gcs' for GCS, 'oss' for Aliyun OSS. 
+  String scheme();
+
+  // Name of the file system provider. You need to set this name in the `filesystem-providers` property of the catalog.
+  String name();
+```
+
+After implementing the `FileSystemProvider` interface, you need to put the jar file into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory. Then you can set the `filesystem-providers` property to use your custom file system provider.
 
 
 ### Authentication for Hadoop Catalog
