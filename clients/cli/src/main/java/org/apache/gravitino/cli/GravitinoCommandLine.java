@@ -34,6 +34,7 @@ import org.apache.gravitino.cli.commands.CreateMySQLCatalog;
 import org.apache.gravitino.cli.commands.CreatePostgresCatalog;
 import org.apache.gravitino.cli.commands.CreateSchema;
 import org.apache.gravitino.cli.commands.CreateTag;
+import org.apache.gravitino.cli.commands.CreateTopic;
 import org.apache.gravitino.cli.commands.CreateUser;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
 import org.apache.gravitino.cli.commands.DeleteGroup;
@@ -41,6 +42,7 @@ import org.apache.gravitino.cli.commands.DeleteMetalake;
 import org.apache.gravitino.cli.commands.DeleteSchema;
 import org.apache.gravitino.cli.commands.DeleteTable;
 import org.apache.gravitino.cli.commands.DeleteTag;
+import org.apache.gravitino.cli.commands.DeleteTopic;
 import org.apache.gravitino.cli.commands.DeleteUser;
 import org.apache.gravitino.cli.commands.GroupDetails;
 import org.apache.gravitino.cli.commands.ListAllTags;
@@ -55,6 +57,7 @@ import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
 import org.apache.gravitino.cli.commands.ListTables;
 import org.apache.gravitino.cli.commands.ListTagProperties;
+import org.apache.gravitino.cli.commands.ListTopics;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
@@ -70,6 +73,7 @@ import org.apache.gravitino.cli.commands.SetTagProperty;
 import org.apache.gravitino.cli.commands.TableDetails;
 import org.apache.gravitino.cli.commands.TagDetails;
 import org.apache.gravitino.cli.commands.TagEntity;
+import org.apache.gravitino.cli.commands.TopicDetails;
 import org.apache.gravitino.cli.commands.UntagEntity;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
@@ -77,6 +81,7 @@ import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
 import org.apache.gravitino.cli.commands.UpdateMetalakeName;
 import org.apache.gravitino.cli.commands.UpdateTagComment;
 import org.apache.gravitino.cli.commands.UpdateTagName;
+import org.apache.gravitino.cli.commands.UpdateTopicComment;
 import org.apache.gravitino.cli.commands.UserDetails;
 
 /* Gravitino Command line */
@@ -175,6 +180,8 @@ public class GravitinoCommandLine {
       handleCatalogCommand();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
+    } else if (entity.equals(CommandEntities.TOPIC)) {
+      handleTopicCommand();
     }
   }
 
@@ -451,6 +458,34 @@ public class GravitinoCommandLine {
 
     if (CommandActions.LIST.equals(command)) {
       new ListColumns(url, ignore, metalake, catalog, schema, table).handle();
+    }
+  }
+
+  /**
+   * Handles the command execution for Topics based on command type and the command line options.
+   */
+  private void handleTopicCommand() {
+    String url = getUrl();
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+    String schema = name.getSchemaName();
+    String topic = line.getOptionValue(GravitinoOptions.TOPIC);
+
+    if (CommandActions.LIST.equals(command)) {
+      new ListTopics(url, ignore, metalake, catalog, schema).handle();
+    } else if (CommandActions.DETAILS.equals(command)) {
+      new TopicDetails(url, ignore, metalake, catalog, schema, topic).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      new CreateTopic(url, ignore, metalake, catalog, schema, topic, comment).handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      new DeleteTopic(url, ignore, metalake, catalog, schema, topic).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        new UpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment).handle();
+      }
     }
   }
 
