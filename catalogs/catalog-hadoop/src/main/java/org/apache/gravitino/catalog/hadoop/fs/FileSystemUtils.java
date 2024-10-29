@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_HDFS_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_LOCAL_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -100,5 +101,46 @@ public class FileSystemUtils {
                     String.format(
                         "File system provider with name '%s' not found in the file system provider list.",
                         fileSystemProviderName)));
+  }
+
+  /**
+   * Convert the Gravitino configuration to Hadoop configuration.
+   *
+   * <p>Predefined keys have the highest priority. If the key does not exist in the predefined keys,
+   * it will be set to the configuration. Keys with prefixes 'gravitino.bypass' has the lowest
+   * priority.
+   *
+   * @param config Gravitino configuration
+   * @return Hadoop configuration Map
+   */
+  public static Map<String, String> toHadoopConfigMap(
+      Map<String, String> config, Map<String, String> predefinedKeys) {
+    Map<String, String> result = Maps.newHashMap();
+    Set<String> highestPriorityKeys = Sets.newHashSet();
+    config.forEach(
+        (k, v) -> {
+          if (predefinedKeys.containsKey(k)) {
+            String key = predefinedKeys.get(k);
+            highestPriorityKeys.add(key);
+            result.put(key, v);
+          }
+
+          if (!k.startsWith(GRAVITINO_BYPASS)) {
+            // If the key does not start with 'gravitino.bypass' and is not in the highest priority
+            // keys, set the value to the configuration.
+            if (!highestPriorityKeys.contains(k)) {
+              result.put(k, v);
+            }
+          } else {
+            // If the key starts with 'gravitino.bypass', remove the prefix and set the value to the
+            // configuration if the key does not exist in the configuration.
+            String key = k.replace(GRAVITINO_BYPASS, "");
+            if (!result.containsKey(key)) {
+              result.put(key, v);
+            }
+          }
+        });
+
+    return result;
   }
 }

@@ -34,7 +34,9 @@ dependencies {
 
   implementation(libs.commons.lang3)
   implementation(libs.hadoop3.gcs)
-  implementation(project(":catalogs:catalog-common"))
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
   implementation(libs.google.auth.http)
   implementation(libs.google.auth.credentials)
 }

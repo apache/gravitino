@@ -32,6 +32,18 @@ import org.apache.hadoop.fs.Path;
  */
 public interface FileSystemProvider {
 
+  /**
+   * The prefix of the configuration key that should be bypassed when setting the configuration to
+   * the FileSystem instance.
+   *
+   * <p>For example, if the configuration key passed to {@link
+   * FileSystemProvider#getFileSystem(Path, Map)} 'gravitino.bypass.fs.s3a.endpoint', the prefix
+   * 'gravitino.bypass.' should be removed when setting the configuration to the FileSystem
+   * instance.
+   *
+   * <p>User can use this prefix to pass the configuration item that has not been defined in
+   * Gravitino.
+   */
   String GRAVITINO_BYPASS = "gravitino.bypass.";
 
   /**

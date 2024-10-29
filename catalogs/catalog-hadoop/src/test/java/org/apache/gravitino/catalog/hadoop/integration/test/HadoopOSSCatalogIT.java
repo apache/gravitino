@@ -21,19 +21,25 @@ package org.apache.gravitino.catalog.hadoop.integration.test;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,5 +134,67 @@ public class HadoopOSSCatalogIT extends HadoopCatalogIT {
 
   protected String generateLocation(String filesetName) {
     return String.format("%s/%s", defaultBaseLocation, filesetName);
+  }
+
+  @Test
+  public void testCreateSchemaAndFilesetWithSpecialLocation() {
+    String localCatalogName = GravitinoITUtils.genRandomName("local_catalog");
+
+    String ossLocation = String.format("oss://%s", BUCKET_NAME);
+    Map<String, String> catalogProps = Maps.newHashMap();
+    catalogProps.put("location", ossLocation);
+    catalogProps.put(OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
+    catalogProps.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY);
+    catalogProps.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, OSS_SECRET_KEY);
+    catalogProps.put(FILESYSTEM_PROVIDERS, "oss");
+
+    Catalog localCatalog =
+        metalake.createCatalog(
+            localCatalogName, Catalog.Type.FILESET, provider, "comment", catalogProps);
+    Assertions.assertEquals(ossLocation, localCatalog.properties().get("location"));
+
+    // Create schema without specifying location.
+    Schema localSchema =
+        localCatalog
+            .asSchemas()
+            .createSchema("local_schema", "comment", ImmutableMap.of("key1", "val1"));
+
+    Fileset localFileset =
+        localCatalog
+            .asFilesetCatalog()
+            .createFileset(
+                NameIdentifier.of(localSchema.name(), "local_fileset"),
+                "fileset comment",
+                Fileset.Type.MANAGED,
+                null,
+                ImmutableMap.of("k1", "v1"));
+    Assertions.assertEquals(
+        ossLocation + "/local_schema/local_fileset", localFileset.storageLocation());
+
+    // Delete schema
+    localCatalog.asSchemas().dropSchema(localSchema.name(), true);
+
+    // Create schema with specifying location.
+    Map<String, String> schemaProps = ImmutableMap.of("location", ossLocation);
+    Schema localSchema2 =
+        localCatalog.asSchemas().createSchema("local_schema2", "comment", schemaProps);
+    Assertions.assertEquals(ossLocation, localSchema2.properties().get("location"));
+
+    Fileset localFileset2 =
+        localCatalog
+            .asFilesetCatalog()
+            .createFileset(
+                NameIdentifier.of(localSchema2.name(), "local_fileset2"),
+                "fileset comment",
+                Fileset.Type.MANAGED,
+                null,
+                ImmutableMap.of("k1", "v1"));
+    Assertions.assertEquals(ossLocation + "/local_fileset2", localFileset2.storageLocation());
+
+    // Delete schema
+    localCatalog.asSchemas().dropSchema(localSchema2.name(), true);
+
+    // Delete catalog
+    metalake.dropCatalog(localCatalogName, true);
   }
 }

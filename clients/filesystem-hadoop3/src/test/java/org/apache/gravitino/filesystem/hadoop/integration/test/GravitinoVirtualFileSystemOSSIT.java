@@ -95,11 +95,10 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID.replace("-", "."), OSS_ACCESS_KEY);
-    conf.set(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET.replace("-", "."), OSS_SECRET_KEY);
-    conf.set(OSSProperties.GRAVITINO_OSS_ENDPOINT.replace("-", "."), OSS_ENDPOINT);
-    conf.set("gravitino.bypass.fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
-
+    conf.set(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY);
+    conf.set(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, OSS_SECRET_KEY);
+    conf.set(OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
+    conf.set("fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
     conf.set(FS_FILESYSTEM_PROVIDERS, "oss");
   }
 

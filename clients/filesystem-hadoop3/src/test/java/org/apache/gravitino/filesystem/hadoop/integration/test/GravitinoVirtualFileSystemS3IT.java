@@ -153,13 +153,9 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY.replace("-", "."), accessKey);
-    conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID.replace("-", "."), secretKey);
-    conf.set(S3Properties.GRAVITINO_S3_ENDPOINT.replace("-", "."), s3Endpoint);
-    conf.set(
-        S3Properties.GRAVITINO_S3_CREDS_PROVIDER.replace("-", "."),
-        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
-
+    conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, accessKey);
+    conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, secretKey);
+    conf.set(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
     conf.set(FS_FILESYSTEM_PROVIDERS, "s3");
   }
 

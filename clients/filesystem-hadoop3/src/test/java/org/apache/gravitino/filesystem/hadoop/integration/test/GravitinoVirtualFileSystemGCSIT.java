@@ -90,7 +90,7 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH.replace("-", "."), SERVICE_ACCOUNT_FILE);
+    conf.set(GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, SERVICE_ACCOUNT_FILE);
     conf.set(FS_FILESYSTEM_PROVIDERS, "gcs");
   }
 
