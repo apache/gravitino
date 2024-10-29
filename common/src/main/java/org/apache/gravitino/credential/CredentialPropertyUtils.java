@@ -42,10 +42,6 @@ public class CredentialPropertyUtils {
           ICEBERG_S3_ACCESS_KEY_ID,
           S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
           ICEBERG_S3_SECRET_ACCESS_KEY,
-          S3TokenCredential.GRAVITINO_S3_SESSION_ACCESS_KEY_ID,
-          ICEBERG_S3_ACCESS_KEY_ID,
-          S3TokenCredential.GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY,
-          ICEBERG_S3_SECRET_ACCESS_KEY,
           S3TokenCredential.GRAVITINO_S3_TOKEN,
           ICEBERG_S3_TOKEN);
 
