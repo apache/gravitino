@@ -69,9 +69,9 @@ public class S3CredentialConfig extends Config {
           .stringConf()
           .create();
 
-  public static final ConfigEntry<Integer> S3_TOKEN_EXPIRE_SECS =
-      new ConfigBuilder(CredentialConstants.TOKEN_EXPIRE_TIME)
-          .doc("S3 token expire seconds")
+  public static final ConfigEntry<Integer> S3_TOKEN_EXPIRE_IN_SECS =
+      new ConfigBuilder(CredentialConstants.S3_TOKEN_EXPIRE_IN_SECS)
+          .doc("S3 token expire in seconds")
           .version(ConfigConstants.VERSION_0_7_0)
           .intConf()
           .createWithDefault(3600);
@@ -104,7 +104,7 @@ public class S3CredentialConfig extends Config {
     return this.get(S3_EXTERNAL_ID);
   }
 
-  public Integer tokenExpireSecs() {
-    return this.get(S3_TOKEN_EXPIRE_SECS);
+  public Integer tokenExpireInSecs() {
+    return this.get(S3_TOKEN_EXPIRE_IN_SECS);
   }
 }
