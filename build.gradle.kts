@@ -371,6 +371,22 @@ subprojects {
     from(tasks["javadoc"])
   }
 
+  tasks.withType<Jar> {
+    into("META-INF") {
+      from(rootDir) {
+        if (name == "sourcesJar") {
+          include("LICENSE")
+          include("NOTICE")
+        } else {
+          include("LICENSE.bin")
+          rename("LICENSE.bin", "LICENSE")
+          include("NOTICE.bin")
+          rename("NOTICE.bin", "NOTICE")
+        }
+      }
+    }
+  }
+
   if (project.name in listOf("web", "docs")) {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
@@ -492,11 +508,9 @@ tasks.rat {
     "dev/docker/kerberos-hive/kadm5.acl",
     "**/*.log",
     "**/*.out",
-    "**/testsets",
+    "**/trino-ci-testset",
     "**/licenses/*.txt",
     "**/licenses/*.md",
-    "integration-test/**/*.sql",
-    "integration-test/**/*.txt",
     "docs/**/*.md",
     "spark-connector/spark-common/src/test/resources/**",
     "web/web/.**",

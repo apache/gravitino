@@ -231,7 +231,6 @@ export const providers = [
         value: 'filesystem',
         defaultValue: 'filesystem',
         required: true,
-        description: 'Only supports "filesystem" now.',
         select: ['filesystem', 'hive', 'jdbc']
       },
       {
@@ -248,6 +247,14 @@ export const providers = [
         value: '',
         required: true,
         description: 'e.g. file:///user/hive/warehouse-paimon/ or hdfs://namespace/hdfs/path'
+      },
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        parentField: 'catalog-backend',
+        hide: ['hive', 'filesystem'],
+        description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`
       },
       {
         key: 'jdbc-user',
@@ -306,6 +313,34 @@ export const providers = [
         value: '',
         required: true,
         description: 'Apache Hudi catalog uri config'
+      }
+    ]
+  },
+  {
+    label: 'OceanBase',
+    value: 'jdbc-oceanbase',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver or com.oceanbase.jdbc.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:mysql://localhost:2881 or jdbc:oceanbase://localhost:2881'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
       }
     ]
   }
