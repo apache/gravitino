@@ -29,26 +29,26 @@ public class S3SecretKeyCredential implements Credential {
   /** S3 secret key credential type. */
   public static final String S3_SECRET_KEY_CREDENTIAL_TYPE = "s3-secret-key";
   /** The static access key ID used to access S3 data. */
-  public static final String GRAVITINO_S3_ACCESS_KEY_ID = "s3-access-key-id";
+  public static final String GRAVITINO_S3_STATIC_ACCESS_KEY_ID = "s3-static-access-key-id";
   /** The static secret access key used to access S3 data. */
-  public static final String GRAVITINO_S3_SECRET_ACCESS_KEY = "s3-secret-access-key";
+  public static final String GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY = "s3-static-secret-access-key";
 
-  private final String accessKeyId;
-  private final String secretAccessKey;
+  private final String staticAccessKeyId;
+  private final String staticSecretAccessKey;
 
   /**
-   * Constructs an instance of {@link S3SecretKeyCredential} with the specified AWS S3 access key ID
-   * and secret access key.
+   * Constructs an instance of {@link S3SecretKeyCredential} with the static S3 access key ID and
+   * secret access key.
    *
-   * @param accessKeyId The S3 static access key ID.
-   * @param secretAccessKey The S3 static secret access key.
+   * @param staticAccessKeyId The S3 static access key ID.
+   * @param staticSecretAccessKey The S3 static secret access key.
    */
-  public S3SecretKeyCredential(String accessKeyId, String secretAccessKey) {
-    Preconditions.checkNotNull(accessKeyId, "S3 access key Id should not null");
-    Preconditions.checkNotNull(secretAccessKey, "S3 secret access key should not null");
+  public S3SecretKeyCredential(String staticAccessKeyId, String staticSecretAccessKey) {
+    Preconditions.checkNotNull(staticAccessKeyId, "S3 access key Id should not null");
+    Preconditions.checkNotNull(staticSecretAccessKey, "S3 secret access key should not null");
 
-    this.accessKeyId = accessKeyId;
-    this.secretAccessKey = secretAccessKey;
+    this.staticAccessKeyId = staticAccessKeyId;
+    this.staticSecretAccessKey = staticSecretAccessKey;
   }
 
   @Override
@@ -64,8 +64,8 @@ public class S3SecretKeyCredential implements Credential {
   @Override
   public Map<String, String> credentialInfo() {
     return (new ImmutableMap.Builder<String, String>())
-        .put(GRAVITINO_S3_ACCESS_KEY_ID, accessKeyId)
-        .put(GRAVITINO_S3_SECRET_ACCESS_KEY, secretAccessKey)
+        .put(GRAVITINO_S3_STATIC_ACCESS_KEY_ID, staticAccessKeyId)
+        .put(GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY, staticSecretAccessKey)
         .build();
   }
 
@@ -74,8 +74,8 @@ public class S3SecretKeyCredential implements Credential {
    *
    * @return The S3 access key ID.
    */
-  public String accessKeyId() {
-    return accessKeyId;
+  public String staticAccessKeyId() {
+    return staticAccessKeyId;
   }
 
   /**
@@ -83,7 +83,7 @@ public class S3SecretKeyCredential implements Credential {
    *
    * @return The S3 secret access key.
    */
-  public String secretAccessKey() {
-    return secretAccessKey;
+  public String staticSecretAccessKey() {
+    return staticSecretAccessKey;
   }
 }

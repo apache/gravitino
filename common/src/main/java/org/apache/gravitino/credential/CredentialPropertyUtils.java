@@ -32,14 +32,19 @@ public class CredentialPropertyUtils {
   @VisibleForTesting static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
   @VisibleForTesting static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
   @VisibleForTesting static final String ICEBERG_S3_TOKEN = "s3.session-token";
+  @VisibleForTesting static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
 
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.of(
           GCSTokenCredential.GCS_TOKEN_NAME,
-          "gcs.oauth2.token",
-          S3TokenCredential.GRAVITINO_S3_ACCESS_KEY_ID,
+          ICEBERG_GCS_TOKEN,
+          S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID,
           ICEBERG_S3_ACCESS_KEY_ID,
-          S3TokenCredential.GRAVITINO_S3_SECRET_ACCESS_KEY,
+          S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
+          ICEBERG_S3_SECRET_ACCESS_KEY,
+          S3TokenCredential.GRAVITINO_S3_SESSION_ACCESS_KEY_ID,
+          ICEBERG_S3_ACCESS_KEY_ID,
+          S3TokenCredential.GRAVITINO_S3_SESSION_SECRET_ACCESS_KEY,
           ICEBERG_S3_SECRET_ACCESS_KEY,
           S3TokenCredential.GRAVITINO_S3_TOKEN,
           ICEBERG_S3_TOKEN);
