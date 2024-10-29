@@ -116,7 +116,7 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
             properties={
                 "filesystem-providers": "oss",
                 "oss-access-key-id": cls.oss_access_key,
-                "oss-access-key-secret": cls.oss_secret_key,
+                "oss-secret-access-key": cls.oss_secret_key,
                 "oss-endpoint": cls.oss_endpoint,
             },
         )

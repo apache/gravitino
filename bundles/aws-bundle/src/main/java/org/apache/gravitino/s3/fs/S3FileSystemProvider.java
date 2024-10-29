@@ -19,23 +19,37 @@
 
 package org.apache.gravitino.s3.fs;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.s3a.S3AFileSystem;
 
 public class S3FileSystemProvider implements FileSystemProvider {
+
+  public static final Map<String, String> GRAVITINO_KEY_TO_S3_HADOOP_KEY =
+      ImmutableMap.of(
+          S3Properties.GRAVITINO_S3_ENDPOINT, Constants.ENDPOINT,
+          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, Constants.ACCESS_KEY,
+          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, Constants.SECRET_KEY);
+
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
     config.forEach(
         (k, v) -> {
-          configuration.set(k.replace("gravitino.bypass.", ""), v);
+          if (k.startsWith(GRAVITINO_BYPASS)) {
+            configuration.set(k.replace(GRAVITINO_BYPASS, ""), v);
+          } else configuration.set(GRAVITINO_KEY_TO_S3_HADOOP_KEY.getOrDefault(k, k), v);
         });
 
+    configuration.set(
+        Constants.AWS_CREDENTIALS_PROVIDER, Constants.ASSUMED_ROLE_CREDENTIALS_DEFAULT);
     return S3AFileSystem.newInstance(path.toUri(), configuration);
   }
 

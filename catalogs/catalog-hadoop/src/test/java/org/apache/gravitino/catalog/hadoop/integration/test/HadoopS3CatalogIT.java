@@ -174,9 +174,6 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
     map.put(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
     map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
     map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
-    map.put(
-        S3Properties.GRAVITINO_S3_CREDS_PROVIDER,
-        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
     map.put(FILESYSTEM_PROVIDERS, "s3");
 
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);

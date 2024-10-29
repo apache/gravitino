@@ -32,6 +32,8 @@ import org.apache.hadoop.fs.Path;
  */
 public interface FileSystemProvider {
 
+  String GRAVITINO_BYPASS = "gravitino.bypass.";
+
   /**
    * Get the FileSystem instance according to the configuration map and file path.
    *

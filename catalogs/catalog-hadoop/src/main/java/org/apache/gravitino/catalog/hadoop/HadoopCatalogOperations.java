@@ -43,9 +43,6 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
-import org.apache.gravitino.catalog.hadoop.config.HadoopGCSFileSystemConfig;
-import org.apache.gravitino.catalog.hadoop.config.HadoopOSSFileSystemConfig;
-import org.apache.gravitino.catalog.hadoop.config.HadoopS3FileSystemConfig;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.connector.CatalogInfo;
@@ -774,23 +771,6 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
               scheme, path, fileSystemProvidersMap.keySet(), fileSystemProvidersMap.values()));
     }
 
-    return provider.getFileSystem(path, convertGravitinoToHadoopConf(config));
-  }
-
-  private Map<String, String> convertGravitinoToHadoopConf(Map<String, String> gravitinoConf) {
-    Map<String, String> hadoopConf = Maps.newHashMap();
-
-    gravitinoConf.forEach(
-        (k, v) -> {
-          if (HadoopS3FileSystemConfig.GRAVITINO_KEY_TO_S3_HADOOP_KEY.containsKey(k)) {
-            hadoopConf.put(HadoopS3FileSystemConfig.GRAVITINO_KEY_TO_S3_HADOOP_KEY.get(k), v);
-          } else if (HadoopGCSFileSystemConfig.GRAVITINO_KEY_TO_GCS_HADOOP_KEY.containsKey(k)) {
-            hadoopConf.put(HadoopGCSFileSystemConfig.GRAVITINO_KEY_TO_GCS_HADOOP_KEY.get(k), v);
-          } else
-            hadoopConf.put(
-                HadoopOSSFileSystemConfig.GRAVITINO_KEY_TO_OSS_HADOOP_KEY.getOrDefault(k, k), v);
-        });
-
-    return hadoopConf;
+    return provider.getFileSystem(path, config);
   }
 }

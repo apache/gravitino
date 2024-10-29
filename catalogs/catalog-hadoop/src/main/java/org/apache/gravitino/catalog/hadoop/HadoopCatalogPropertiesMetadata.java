@@ -23,9 +23,6 @@ import static org.apache.gravitino.catalog.hadoop.authentication.kerberos.Kerber
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
-import org.apache.gravitino.catalog.hadoop.config.HadoopGCSFileSystemConfig;
-import org.apache.gravitino.catalog.hadoop.config.HadoopOSSFileSystemConfig;
-import org.apache.gravitino.catalog.hadoop.config.HadoopS3FileSystemConfig;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
@@ -87,9 +84,6 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           // The following two are about authentication.
           .putAll(KERBEROS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
-          .putAll(HadoopGCSFileSystemConfig.GCS_FILESYSTEM_PROPERTY_ENTRIES)
-          .putAll(HadoopS3FileSystemConfig.S3_FILESYSTEM_PROPERTY_ENTRIES)
-          .putAll(HadoopOSSFileSystemConfig.OSS_FILESYSTEM_PROPERTY_ENTRIES)
           .build();
 
   @Override

@@ -19,9 +19,11 @@
 package org.apache.gravitino.gcs.fs;
 
 import com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -31,12 +33,18 @@ import org.slf4j.LoggerFactory;
 public class GCSFileSystemProvider implements FileSystemProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(GCSFileSystemProvider.class);
 
+  public static final Map<String, String> GRAVITINO_KEY_TO_GCS_HADOOP_KEY =
+      ImmutableMap.of(
+          GCSProperties.GCS_SERVICE_ACCOUNT_JSON_PATH, "fs.gs.auth.service.account.json.keyfile");
+
   @Override
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
     config.forEach(
         (k, v) -> {
-          configuration.set(k.replace("gravitino.bypass.", ""), v);
+          if (k.startsWith(GRAVITINO_BYPASS)) {
+            configuration.set(k.replace(GRAVITINO_BYPASS, ""), v);
+          } else configuration.set(GRAVITINO_KEY_TO_GCS_HADOOP_KEY.getOrDefault(k, k), v);
         });
 
     LOGGER.info("Creating GCS file system with config: {}", config);
