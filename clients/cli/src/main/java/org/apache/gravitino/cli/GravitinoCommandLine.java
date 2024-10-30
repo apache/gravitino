@@ -57,6 +57,7 @@ import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
 import org.apache.gravitino.cli.commands.ListTables;
 import org.apache.gravitino.cli.commands.ListTagProperties;
+import org.apache.gravitino.cli.commands.ListTopicProperties;
 import org.apache.gravitino.cli.commands.ListTopics;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
@@ -64,12 +65,14 @@ import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
 import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
+import org.apache.gravitino.cli.commands.RemoveTopicProperty;
 import org.apache.gravitino.cli.commands.SchemaDetails;
 import org.apache.gravitino.cli.commands.ServerVersion;
 import org.apache.gravitino.cli.commands.SetCatalogProperty;
 import org.apache.gravitino.cli.commands.SetMetalakeProperty;
 import org.apache.gravitino.cli.commands.SetSchemaProperty;
 import org.apache.gravitino.cli.commands.SetTagProperty;
+import org.apache.gravitino.cli.commands.SetTopicProperty;
 import org.apache.gravitino.cli.commands.TableDetails;
 import org.apache.gravitino.cli.commands.TagDetails;
 import org.apache.gravitino.cli.commands.TagEntity;
@@ -486,6 +489,15 @@ public class GravitinoCommandLine {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
         new UpdateTopicComment(url, ignore, metalake, catalog, schema, topic, comment).handle();
       }
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      new SetTopicProperty(url, ignore, metalake, catalog, schema, topic, property, value).handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      new RemoveTopicProperty(url, ignore, metalake, catalog, schema, topic, property).handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      new ListTopicProperties(url, ignore, metalake, catalog, schema, topic).handle();
     }
   }
 

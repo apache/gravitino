@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -28,8 +29,8 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.messaging.Topic;
 
-/** Displays the details of a topic. */
-public class TopicDetails extends Command {
+/** List the properties of a topic. */
+public class ListTopicProperties extends ListProperties {
 
   protected final String metalake;
   protected final String catalog;
@@ -37,16 +38,16 @@ public class TopicDetails extends Command {
   protected final String topic;
 
   /**
-   * Displays the details of a topic.
+   * List the properties of a topic.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    * @param topic The name of the topic.
    */
-  public TopicDetails(
+  public ListTopicProperties(
       String url,
       boolean ignoreVersions,
       String metalake,
@@ -60,7 +61,7 @@ public class TopicDetails extends Command {
     this.topic = topic;
   }
 
-  /** Displays the details of a topic. */
+  /** List the properties of a catalog. */
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, topic);
     Topic gTopic = null;
@@ -85,6 +86,7 @@ public class TopicDetails extends Command {
       return;
     }
 
-    System.out.println(gTopic.name() + "," + gTopic.comment());
+    Map<String, String> properties = gTopic.properties();
+    printProperties(properties);
   }
 }

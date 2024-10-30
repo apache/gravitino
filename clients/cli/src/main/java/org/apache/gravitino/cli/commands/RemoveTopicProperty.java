@@ -26,48 +26,52 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
-import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.messaging.TopicChange;
 
-/** Displays the details of a topic. */
-public class TopicDetails extends Command {
+/** Remove a property of a topic. */
+public class RemoveTopicProperty extends Command {
 
   protected final String metalake;
   protected final String catalog;
   protected final String schema;
   protected final String topic;
+  protected final String property;
 
   /**
-   * Displays the details of a topic.
+   * Remove a property of a topic.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
-   * @param topic The name of the topic.
+   * @param schema The name of the schema.
+   * @param topic The name of the schema.
+   * @param property The name of the property.
    */
-  public TopicDetails(
+  public RemoveTopicProperty(
       String url,
       boolean ignoreVersions,
       String metalake,
       String catalog,
       String schema,
-      String topic) {
+      String topic,
+      String property) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
     this.topic = topic;
+    this.property = property;
   }
 
-  /** Displays the details of a topic. */
+  /** Remove a property of a schema. */
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, topic);
-    Topic gTopic = null;
 
     try {
       GravitinoClient client = buildClient(metalake);
-      gTopic = client.loadCatalog(catalog).asTopicCatalog().loadTopic(name);
+      TopicChange change = TopicChange.removeProperty(property);
+      client.loadCatalog(catalog).asTopicCatalog().alterTopic(name, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -85,6 +89,6 @@ public class TopicDetails extends Command {
       return;
     }
 
-    System.out.println(gTopic.name() + "," + gTopic.comment());
+    System.out.println(property + " property removed.");
   }
 }
