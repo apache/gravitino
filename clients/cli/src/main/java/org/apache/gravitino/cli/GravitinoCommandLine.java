@@ -77,6 +77,8 @@ import org.apache.gravitino.cli.commands.TagEntity;
 import org.apache.gravitino.cli.commands.UntagEntity;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
+import org.apache.gravitino.cli.commands.UpdateFilesetComment;
+import org.apache.gravitino.cli.commands.UpdateFilesetName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
 import org.apache.gravitino.cli.commands.UpdateMetalakeName;
 import org.apache.gravitino.cli.commands.UpdateTagComment;
@@ -479,11 +481,19 @@ public class GravitinoCommandLine {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       boolean managed = line.hasOption(GravitinoOptions.MANAGED);
       String location = line.getOptionValue(GravitinoOptions.LOCATION);
-
       new CreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, managed, location)
           .handle();
     } else if (CommandActions.DELETE.equals(command)) {
       new DeleteFileset(url, ignore, metalake, catalog, schema, fileset).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        new UpdateFilesetComment(url, ignore, metalake, catalog, schema, fileset, comment).handle();
+      }
+      if (line.hasOption(GravitinoOptions.RENAME)) {
+        String newName = line.getOptionValue(GravitinoOptions.RENAME);
+        new UpdateFilesetName(url, ignore, metalake, catalog, schema, fileset, newName).handle();
+      }
     }
   }
 
