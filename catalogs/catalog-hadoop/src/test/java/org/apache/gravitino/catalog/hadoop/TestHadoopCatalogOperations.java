@@ -41,6 +41,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Map;
@@ -794,6 +795,39 @@ public class TestHadoopCatalogOperations {
                 "hadoop",
                 "comment",
                 ImmutableMap.of()));
+  }
+
+  @Test
+  void testTrailSlash() throws IOException {
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+
+      String location = "hdfs://localhost:9000";
+      Map<String, String> catalogProperties = Maps.newHashMap();
+      catalogProperties.put(HadoopCatalogPropertiesMetadata.LOCATION, location);
+
+      ops.initialize(catalogProperties, randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+
+      String schemaName = "schema1024";
+      NameIdentifier nameIdentifier = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
+
+      Map<String, String> schemaProperties = Maps.newHashMap();
+      schemaProperties.put(HadoopCatalogPropertiesMetadata.LOCATION, "hdfs://localhost:9000/user1");
+      StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+      schemaProperties =
+          Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, schemaProperties));
+
+      Map<String, String> finalSchemaProperties = schemaProperties;
+
+      // If not fixed by #5296, this method will throw java.lang.IllegalArgumentException:
+      // java.net.URISyntaxException: Relative path in absolute URI: hdfs://localhost:9000schema1024
+      // After #5296, this method will throw java.lang.RuntimeException: Failed to create
+      // schema m1.c1.schema1024 location hdfs://localhost:9000/user1
+      Exception exception =
+          Assertions.assertThrows(
+              Exception.class,
+              () -> ops.createSchema(nameIdentifier, "comment", finalSchemaProperties));
+      Assertions.assertTrue(exception.getCause() instanceof ConnectException);
+    }
   }
 
   @Test

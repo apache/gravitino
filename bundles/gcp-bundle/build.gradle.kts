@@ -36,6 +36,9 @@ dependencies {
   // runtime used
   implementation(libs.commons.logging)
   implementation(libs.hadoop3.gcs)
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
   implementation(libs.google.auth.http)
   implementation(libs.google.auth.credentials)
 }
