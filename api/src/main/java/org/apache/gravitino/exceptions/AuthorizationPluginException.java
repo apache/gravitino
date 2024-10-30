@@ -43,7 +43,8 @@ public class AuthorizationPluginException extends GravitinoRuntimeException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public AuthorizationPluginException(Throwable cause, @FormatString String message, Object... args) {
+  public AuthorizationPluginException(
+      Throwable cause, @FormatString String message, Object... args) {
     super(cause, message, args);
   }
 }
