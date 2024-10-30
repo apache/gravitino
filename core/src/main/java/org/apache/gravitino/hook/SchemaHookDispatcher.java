@@ -90,7 +90,7 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     boolean dropped = dispatcher.dropSchema(ident, cascade);
-    AuthorizationUtils.removeAuthorizationPluginPrivileges(ident, Entity.EntityType.SCHEMA);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.SCHEMA);
     return dropped;
   }
 

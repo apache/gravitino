@@ -106,7 +106,7 @@ public class TableHookDispatcher implements TableDispatcher {
     }
 
     if (lastRenameChange != null) {
-      AuthorizationUtils.renameAuthorizationPluginPrivileges(
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
           ident, Entity.EntityType.TABLE, lastRenameChange.getNewName());
     }
 
@@ -116,14 +116,14 @@ public class TableHookDispatcher implements TableDispatcher {
   @Override
   public boolean dropTable(NameIdentifier ident) {
     boolean dropped = dispatcher.dropTable(ident);
-    AuthorizationUtils.removeAuthorizationPluginPrivileges(ident, Entity.EntityType.TABLE);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.TABLE);
     return dropped;
   }
 
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
     boolean purged = dispatcher.purgeTable(ident);
-    AuthorizationUtils.removeAuthorizationPluginPrivileges(ident, Entity.EntityType.TABLE);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.TABLE);
     return purged;
   }
 

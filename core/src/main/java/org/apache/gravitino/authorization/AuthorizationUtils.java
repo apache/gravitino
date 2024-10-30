@@ -272,7 +272,7 @@ public class AuthorizationUtils {
     }
   }
 
-  public static void removeAuthorizationPluginPrivileges(
+  public static void authorizationPluginRemovePrivileges(
       NameIdentifier ident, Entity.EntityType type) {
     // If we enable authorization, we should remove the privileges about the entity in the
     // authorization plugin.
@@ -288,7 +288,7 @@ public class AuthorizationUtils {
     }
   }
 
-  public static void renameAuthorizationPluginPrivileges(
+  public static void authorizationPluginRenamePrivileges(
       NameIdentifier ident, Entity.EntityType type, String newName) {
     // If we enable authorization, we should rename the privileges about the entity in the
     // authorization plugin.

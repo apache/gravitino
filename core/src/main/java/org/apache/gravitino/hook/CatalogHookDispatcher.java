@@ -112,7 +112,7 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       }
     }
     if (lastRenameChange != null) {
-      AuthorizationUtils.renameAuthorizationPluginPrivileges(
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
           ident, Entity.EntityType.CATALOG, lastRenameChange.getNewName());
     }
     return alteredCatalog;
@@ -120,14 +120,14 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
 
   @Override
   public boolean dropCatalog(NameIdentifier ident) {
-    AuthorizationUtils.removeAuthorizationPluginPrivileges(ident, Entity.EntityType.CATALOG);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.CATALOG);
     return dispatcher.dropCatalog(ident);
   }
 
   @Override
   public boolean dropCatalog(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
-    AuthorizationUtils.removeAuthorizationPluginPrivileges(ident, Entity.EntityType.CATALOG);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.CATALOG);
     return dispatcher.dropCatalog(ident, force);
   }
 

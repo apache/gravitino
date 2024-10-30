@@ -94,7 +94,7 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
       }
     }
     if (lastRenameChange != null) {
-      AuthorizationUtils.renameAuthorizationPluginPrivileges(
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
           ident, Entity.EntityType.FILESET, lastRenameChange.getNewName());
     }
 
@@ -104,7 +104,7 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
   @Override
   public boolean dropFileset(NameIdentifier ident) {
     boolean dropped = dispatcher.dropFileset(ident);
-    AuthorizationUtils.removeAuthorizationPluginPrivileges(ident, Entity.EntityType.FILESET);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.FILESET);
     return dropped;
   }
 
