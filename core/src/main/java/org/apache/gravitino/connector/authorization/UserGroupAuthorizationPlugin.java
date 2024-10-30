@@ -58,8 +58,8 @@ interface UserGroupAuthorizationPlugin {
    *
    * @param user The user entity.
    * @return IF exist return true, else return false.
-   * @throws AuthorizationPluginException If getting the User encounters underlying access control system
-   *     issues.
+   * @throws AuthorizationPluginException If getting the User encounters underlying access control
+   *     system issues.
    */
   Boolean onUserAcquired(User user) throws AuthorizationPluginException;
 
@@ -93,8 +93,8 @@ interface UserGroupAuthorizationPlugin {
    *
    * @param group The group entity.
    * @return If exist return true, else return false.
-   * @throws AuthorizationPluginException If getting the Group encounters underlying access control system
-   *     issues.
+   * @throws AuthorizationPluginException If getting the Group encounters underlying access control
+   *     system issues.
    */
   Boolean onGroupAcquired(Group group) throws AuthorizationPluginException;
 

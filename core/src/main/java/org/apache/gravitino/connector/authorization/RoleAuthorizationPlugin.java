@@ -46,8 +46,8 @@ interface RoleAuthorizationPlugin {
    *
    * @param role The entity of the Role.
    * @return IF exist return true, else return false.
-   * @throws AuthorizationPluginException If getting the Role encounters underlying access control system
-   *     issues.
+   * @throws AuthorizationPluginException If getting the Role encounters underlying access control
+   *     system issues.
    */
   Boolean onRoleAcquired(Role role) throws AuthorizationPluginException;
 
@@ -114,5 +114,6 @@ interface RoleAuthorizationPlugin {
    * @return True if the revoke was successfully removed, False if the revoke failed.
    * @throws AuthorizationPluginException If revoking roles from a group encounters storage issues.
    */
-  Boolean onRevokedRolesFromGroup(List<Role> roles, Group group) throws AuthorizationPluginException;
+  Boolean onRevokedRolesFromGroup(List<Role> roles, Group group)
+      throws AuthorizationPluginException;
 }
