@@ -72,7 +72,7 @@ public interface MetadataObjectChange {
      *
      * @return return a metadataObject.
      */
-    public MetadataObject getMetadataObject() {
+    public MetadataObject metadataObject() {
       return this.metadataObject;
     }
 

@@ -746,9 +746,9 @@ public abstract class RangerAuthorizationPlugin
   }
 
   /**
-   * IF remove the SCHEMA, Need to remove these the relevant policies, `{schema}`, `{schema}.*`,
+   * IF remove the SCHEMA, need to remove these the relevant policies, `{schema}`, `{schema}.*`,
    * `{schema}.*.*` <br>
-   * IF remove the TABLE, Need to remove these the relevant policies, `{schema}.*`, `{schema}.*.*`
+   * IF remove the TABLE, need to remove these the relevant policies, `{schema}.*`, `{schema}.*.*`
    * <br>
    * IF remove the COLUMN, Only need to remove `{schema}.*.*` <br>
    */
