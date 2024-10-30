@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization.ranger.integration.test;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Arrays;
@@ -117,24 +118,17 @@ public class RangerITEnv {
         createRangerHdfsRepository("", true);
         createRangerHiveRepository("", true);
         allowAnyoneAccessHDFS();
-        allowAnyoneAccessInformationSchema();
         initRangerService = true;
       }
     }
   }
 
   public static void cleanup() {
-    try {
-      if (rangerClient != null) {
-        if (rangerClient.getService(RANGER_TRINO_REPO_NAME) != null) {
-          rangerClient.deleteService(RANGER_TRINO_REPO_NAME);
-        }
-        if (rangerClient.getService(RANGER_HIVE_REPO_NAME) != null) {
-          rangerClient.deleteService(RANGER_HIVE_REPO_NAME);
-        }
+    if (rangerClient != null) {
+      // Clean up the test Ranger policy
+      for (String repoName : ImmutableList.of(RANGER_HIVE_REPO_NAME, RANGER_HDFS_REPO_NAME)) {
+        cleanAllPolicy(repoName);
       }
-    } catch (RangerServiceException e) {
-      // ignore
     }
   }
 
@@ -598,11 +592,17 @@ public class RangerITEnv {
   /** Clean all policy in the Ranger */
   protected static void cleanAllPolicy(String serviceName) {
     try {
-      List<RangerPolicy> policies =
-          rangerClient.findPolicies(ImmutableMap.of(SearchFilter.SERVICE_NAME, serviceName));
-      for (RangerPolicy policy : policies) {
-        rangerClient.deletePolicy(policy.getId());
-      }
+      List<RangerPolicy> policies = rangerClient.getPoliciesInService(serviceName);
+      policies.stream()
+          .forEach(
+              policy -> {
+                try {
+                  rangerClient.deletePolicy(policy.getId());
+                } catch (RangerServiceException e) {
+                  LOG.error("Failed to rename the policy {}!", policy);
+                  throw new RuntimeException(e);
+                }
+              });
     } catch (RangerServiceException e) {
       throw new RuntimeException(e);
     }
