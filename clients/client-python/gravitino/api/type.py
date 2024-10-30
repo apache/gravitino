@@ -116,38 +116,50 @@ class Name(Enum):
     EXTERNAL = "EXTERNAL"
     """ The external type. An external type represents a type that is not supported. """
 
+
 # Define the Type interface (abstract base class)
 class Type(ABC):
     @abstractmethod
     def name(self) -> Name:
-        """ Returns the generic name of the type. """
+        """Returns the generic name of the type."""
         pass
 
     @abstractmethod
     def simpleString(self) -> str:
-        """ Returns a readable string representation of the type. """
+        """Returns a readable string representation of the type."""
         pass
+
 
 # Define base classes
 class PrimitiveType(Type, ABC):
-    """ Base class for all primitive types. """
+    """Base class for all primitive types."""
+
     pass
+
 
 class NumericType(PrimitiveType, ABC):
-    """ Base class for all numeric types. """
+    """Base class for all numeric types."""
+
     pass
+
 
 class DateTimeType(PrimitiveType, ABC):
-    """ Base class for all date/time types. """
+    """Base class for all date/time types."""
+
     pass
+
 
 class IntervalType(PrimitiveType, ABC):
-    """ Base class for all interval types. """
+    """Base class for all interval types."""
+
     pass
 
+
 class ComplexType(Type, ABC):
-    """ Base class for all complex types, including struct, list, map, and union. """
+    """Base class for all complex types, including struct, list, map, and union."""
+
     pass
+
 
 # Define IntegralType class
 class IntegralType(NumericType, ABC):
@@ -155,11 +167,13 @@ class IntegralType(NumericType, ABC):
         self._signed = signed
 
     def signed(self) -> bool:
-        """ Returns True if the integer type is signed, False otherwise. """
+        """Returns True if the integer type is signed, False otherwise."""
         return self._signed
+
 
 # Define FractionType class
 class FractionType(NumericType, ABC):
-    """ Base class for all fractional types. """
+    """Base class for all fractional types."""
+
     def __init__(self):
         super().__init__()

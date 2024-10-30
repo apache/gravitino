@@ -20,25 +20,33 @@ from gravitino.api.types import Types, Name
 
 
 class TestTypes(unittest.TestCase):
-    
+
     # Test NullType singleton and methods
     def test_null_type(self):
         null_type_1 = Types.NullType.get()
         null_type_2 = Types.NullType.get()
-        
-        self.assertIs(null_type_1, null_type_2, "NullType should return the same singleton instance")
+
+        self.assertIs(
+            null_type_1,
+            null_type_2,
+            "NullType should return the same singleton instance",
+        )
         self.assertEqual(null_type_1.name(), Name.NULL)
         self.assertEqual(null_type_1.simpleString(), "null")
-    
+
     # Test BooleanType singleton and methods
     def test_boolean_type(self):
         boolean_type_1 = Types.BooleanType.get()
         boolean_type_2 = Types.BooleanType.get()
 
-        self.assertIs(boolean_type_1, boolean_type_2, "BooleanType should return the same singleton instance")
+        self.assertIs(
+            boolean_type_1,
+            boolean_type_2,
+            "BooleanType should return the same singleton instance",
+        )
         self.assertEqual(boolean_type_1.name(), Name.BOOLEAN)
         self.assertEqual(boolean_type_1.simpleString(), "boolean")
-    
+
     # Test ByteType for signed and unsigned versions
     def test_byte_type(self):
         signed_byte = Types.ByteType.get()
@@ -56,7 +64,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(signed_short.name(), Name.SHORT)
         self.assertEqual(signed_short.simpleString(), "short")
         self.assertEqual(unsigned_short.simpleString(), "short unsigned")
-    
+
     # Test IntegerType for signed and unsigned versions
     def test_integer_type(self):
         signed_int = Types.IntegerType.get()
@@ -65,7 +73,7 @@ class TestTypes(unittest.TestCase):
         self.assertEqual(signed_int.name(), Name.INTEGER)
         self.assertEqual(signed_int.simpleString(), "integer")
         self.assertEqual(unsigned_int.simpleString(), "integer unsigned")
-    
+
     # Test DecimalType and its methods
     def test_decimal_type(self):
         decimal_type_1 = Types.DecimalType.of(10, 2)
@@ -74,34 +82,58 @@ class TestTypes(unittest.TestCase):
 
         self.assertEqual(decimal_type_1.name(), Name.DECIMAL)
         self.assertEqual(decimal_type_1.simpleString(), "decimal(10,2)")
-        self.assertEqual(decimal_type_1, decimal_type_2, "Decimal types with the same precision and scale should be equal")
-        self.assertNotEqual(decimal_type_1, decimal_type_3, "Decimal types with different precision/scale should not be equal")
-        self.assertNotEqual(hash(decimal_type_1), hash(decimal_type_3), "Different decimal types should have different hash codes")
+        self.assertEqual(
+            decimal_type_1,
+            decimal_type_2,
+            "Decimal types with the same precision and scale should be equal",
+        )
+        self.assertNotEqual(
+            decimal_type_1,
+            decimal_type_3,
+            "Decimal types with different precision/scale should not be equal",
+        )
+        self.assertNotEqual(
+            hash(decimal_type_1),
+            hash(decimal_type_3),
+            "Different decimal types should have different hash codes",
+        )
 
     # Test DateType singleton and methods
     def test_date_type(self):
         date_type_1 = Types.DateType.get()
         date_type_2 = Types.DateType.get()
 
-        self.assertIs(date_type_1, date_type_2, "DateType should return the same singleton instance")
+        self.assertIs(
+            date_type_1,
+            date_type_2,
+            "DateType should return the same singleton instance",
+        )
         self.assertEqual(date_type_1.name(), Name.DATE)
         self.assertEqual(date_type_1.simpleString(), "date")
-    
+
     # Test TimeType singleton and methods
     def test_time_type(self):
         time_type_1 = Types.TimeType.get()
         time_type_2 = Types.TimeType.get()
 
-        self.assertIs(time_type_1, time_type_2, "TimeType should return the same singleton instance")
+        self.assertIs(
+            time_type_1,
+            time_type_2,
+            "TimeType should return the same singleton instance",
+        )
         self.assertEqual(time_type_1.name(), Name.TIME)
         self.assertEqual(time_type_1.simpleString(), "time")
-    
+
     # Test StringType singleton and methods
     def test_string_type(self):
         string_type_1 = Types.StringType.get()
         string_type_2 = Types.StringType.get()
 
-        self.assertIs(string_type_1, string_type_2, "StringType should return the same singleton instance")
+        self.assertIs(
+            string_type_1,
+            string_type_2,
+            "StringType should return the same singleton instance",
+        )
         self.assertEqual(string_type_1.name(), Name.STRING)
         self.assertEqual(string_type_1.simpleString(), "string")
 
@@ -110,7 +142,11 @@ class TestTypes(unittest.TestCase):
         uuid_type_1 = Types.UUIDType.get()
         uuid_type_2 = Types.UUIDType.get()
 
-        self.assertIs(uuid_type_1, uuid_type_2, "UUIDType should return the same singleton instance")
+        self.assertIs(
+            uuid_type_1,
+            uuid_type_2,
+            "UUIDType should return the same singleton instance",
+        )
         self.assertEqual(uuid_type_1.name(), Name.UUID)
         self.assertEqual(uuid_type_1.simpleString(), "uuid")
 

@@ -14,13 +14,24 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from .type import Type, Name, PrimitiveType, IntegralType, FractionType, DateTimeType, IntervalType, ComplexType
+from .type import (
+    Type,
+    Name,
+    PrimitiveType,
+    IntegralType,
+    FractionType,
+    DateTimeType,
+    IntervalType,
+    ComplexType,
+)
 
 
 """ The helper class for Type. """
-class Types:
 
-    """ The data type representing `NULL` values. """
+
+class Types:
+    """The data type representing `NULL` values."""
+
     class NullType(Type):
         _instance = None
 
@@ -46,6 +57,7 @@ class Types:
             return "null"
 
     """ The boolean type in Gravitino. """
+
     class BooleanType(PrimitiveType):
         _instance = None
 
@@ -71,6 +83,7 @@ class Types:
             return "boolean"
 
     """ The byte type in Gravitino. """
+
     class ByteType(IntegralType):
         _instance = None
         _unsigned_instance = None
@@ -112,6 +125,7 @@ class Types:
             return "byte" if self.signed() else "byte unsigned"
 
     """ The short type in Gravitino. """
+
     class ShortType(IntegralType):
         _instance = None
         _unsigned_instance = None
@@ -153,6 +167,7 @@ class Types:
             return "short" if self.signed() else "short unsigned"
 
     """ The integer type in Gravitino. """
+
     class IntegerType(IntegralType):
         _instance = None
         _unsigned_instance = None
@@ -194,6 +209,7 @@ class Types:
             return "integer" if self.signed() else "integer unsigned"
 
     """ The long type in Gravitino. """
+
     class LongType(IntegralType):
         _instance = None
         _unsigned_instance = None
@@ -235,6 +251,7 @@ class Types:
             return "long" if self.signed() else "long unsigned"
 
     """ The float type in Gravitino. """
+
     class FloatType(FractionType):
         _instance = None
 
@@ -260,6 +277,7 @@ class Types:
             return "float"
 
     """ The double type in Gravitino. """
+
     class DoubleType(FractionType):
         _instance = None
 
@@ -285,6 +303,7 @@ class Types:
             return "double"
 
     """ The decimal type in Gravitino. """
+
     class DecimalType(FractionType):
         @classmethod
         def of(cls, precision: int, scale: int):
@@ -312,9 +331,13 @@ class Types:
             @param scale: The scale of the decimal.
             """
             if not (1 <= precision <= 38):
-                raise ValueError(f"Decimal precision must be in range [1, 38]: {precision}")
+                raise ValueError(
+                    f"Decimal precision must be in range [1, 38]: {precision}"
+                )
             if not (0 <= scale <= precision):
-                raise ValueError(f"Decimal scale must be in range [0, precision ({precision})]: {scale}")
+                raise ValueError(
+                    f"Decimal scale must be in range [0, precision ({precision})]: {scale}"
+                )
 
         def name(self) -> Name:
             """
@@ -339,11 +362,11 @@ class Types:
             @return A readable string representation of the Decimal type.
             """
             return f"decimal({self._precision},{self._scale})"
-        
+
         def __eq__(self, other):
             """
             Compares two DecimalType objects for equality.
-            
+
             @param other: The other DecimalType to compare with.
             @return: True if both objects have the same precision and scale, False otherwise.
             """
@@ -358,6 +381,7 @@ class Types:
             return hash((self._precision, self._scale))
 
     """ The date time type in Gravitino. """
+
     class DateType(DateTimeType):
         _instance = None
 
@@ -383,6 +407,7 @@ class Types:
             return "date"
 
     """ The time type in Gravitino. """
+
     class TimeType(DateTimeType):
         _instance = None
 
@@ -408,6 +433,7 @@ class Types:
             return "time"
 
     """ The timestamp type in Gravitino. """
+
     class TimestampType(DateTimeType):
         _instance_with_tz = None
         _instance_without_tz = None
@@ -455,6 +481,7 @@ class Types:
             return "timestamp_tz" if self._with_time_zone else "timestamp"
 
     """ The interval year type in Gravitino. """
+
     class IntervalYearType(IntervalType):
         _instance = None
 
@@ -478,8 +505,9 @@ class Types:
             @return A readable string representation of the IntervalYear type.
             """
             return "interval_year"
-        
+
     """ The interval day type in Gravitino. """
+
     class IntervalDayType(IntervalType):
         _instance = None
 
@@ -505,6 +533,7 @@ class Types:
             return "interval_day"
 
     """ The string type in Gravitino, equivalent to varchar(MAX), where the MAX is determined by the underlying catalog. """
+
     class StringType(PrimitiveType):
         _instance = None
 
@@ -530,6 +559,7 @@ class Types:
             return "string"
 
     """ The UUID type in Gravitino. """
+
     class UUIDType(PrimitiveType):
         _instance = None
 
@@ -555,6 +585,7 @@ class Types:
             return "uuid"
 
     """ Fixed-length byte array type. Use BinaryType for variable-length byte arrays. """
+
     class FixedType(PrimitiveType):
         def __init__(self, length: int):
             """
@@ -608,6 +639,7 @@ class Types:
             return hash(self._length)
 
     """ The varchar type in Gravitino. """
+
     class VarCharType(PrimitiveType):
         def __init__(self, length: int):
             """
@@ -661,6 +693,7 @@ class Types:
             return hash(self._length)
 
     """ The fixed char type in Gravitino. """
+
     class FixedCharType(PrimitiveType):
         def __init__(self, length: int):
             """
@@ -714,6 +747,7 @@ class Types:
             return hash(self._length)
 
     """ The binary type in Gravitino. """
+
     class BinaryType(PrimitiveType):
         _instance = None
 
@@ -739,6 +773,7 @@ class Types:
             return "binary"
 
     """ The struct type in Gravitino. Note, this type is not supported in the current version of Gravitino."""
+
     class StructType(ComplexType):
         def __init__(self, fields):
             """
@@ -774,7 +809,9 @@ class Types:
             """
             @return: A readable string representation of the struct type.
             """
-            return f"struct<{', '.join(field.simpleString() for field in self._fields)}>"
+            return (
+                f"struct<{', '.join(field.simpleString() for field in self._fields)}>"
+            )
 
         def __eq__(self, other):
             """
@@ -794,6 +831,7 @@ class Types:
             return hash(tuple(self._fields))
 
         """ A field of a struct type. """
+
         class Field:
             def __init__(self, name, type, nullable, comment=None):
                 """
@@ -866,8 +904,12 @@ class Types:
                 """
                 if not isinstance(other, Types.StructType.Field):
                     return False
-                return (self._name == other._name and self._type == other._type and
-                        self._nullable == other._nullable and self._comment == other._comment)
+                return (
+                    self._name == other._name
+                    and self._type == other._type
+                    and self._nullable == other._nullable
+                    and self._comment == other._comment
+                )
 
             def __hash__(self):
                 """
@@ -884,6 +926,7 @@ class Types:
                 return f"{self._name}: {self._type.simpleString()} {nullable_str}{comment_str}"
 
     """ A list type. Note, this type is not supported in the current version of Gravitino. """
+
     class ListType(ComplexType):
         def __init__(self, elementType: Type, elementNullable: bool):
             """
@@ -950,7 +993,11 @@ class Types:
             """
             @return: A readable string representation of the list type.
             """
-            return f"list<{self._elementType.simpleString()}>" if self._elementNullable else f"list<{self._elementType.simpleString()}, NOT NULL>"
+            return (
+                f"list<{self._elementType.simpleString()}>"
+                if self._elementNullable
+                else f"list<{self._elementType.simpleString()}, NOT NULL>"
+            )
 
         def __eq__(self, other):
             """
@@ -961,7 +1008,10 @@ class Types:
             """
             if not isinstance(other, Types.ListType):
                 return False
-            return self._elementNullable == other._elementNullable and self._elementType == other._elementType
+            return (
+                self._elementNullable == other._elementNullable
+                and self._elementType == other._elementType
+            )
 
         def __hash__(self):
             """
@@ -970,6 +1020,7 @@ class Types:
             return hash((self._elementType, self._elementNullable))
 
     """ The map type in Gravitino. Note, this type is not supported in the current version of Gravitino. """
+
     class MapType(ComplexType):
         def __init__(self, keyType: Type, valueType: Type, valueNullable: bool):
             """
@@ -1045,7 +1096,9 @@ class Types:
             """
             @return: A readable string representation of the map type.
             """
-            return f"map<{self._keyType.simpleString()}, {self._valueType.simpleString()}>"
+            return (
+                f"map<{self._keyType.simpleString()}, {self._valueType.simpleString()}>"
+            )
 
         def __eq__(self, other):
             """
@@ -1056,7 +1109,11 @@ class Types:
             """
             if not isinstance(other, Types.MapType):
                 return False
-            return self._valueNullable == other._valueNullable and self._keyType == other._keyType and self._valueType == other._valueType
+            return (
+                self._valueNullable == other._valueNullable
+                and self._keyType == other._keyType
+                and self._valueType == other._valueType
+            )
 
         def __hash__(self):
             """
@@ -1065,6 +1122,7 @@ class Types:
             return hash((self._keyType, self._valueType, self._valueNullable))
 
     """ The union type in Gravitino. Note, this type is not supported in the current version of Gravitino. """
+
     class UnionType(ComplexType):
         def __init__(self, types: list):
             """
@@ -1120,6 +1178,7 @@ class Types:
             return hash(tuple(self._types))
 
     """  Represents a type that is not parsed yet. The parsed type is represented by other types of Types. """
+
     class UnparsedType(Type):
         def __init__(self, unparsedType: str):
             """
@@ -1181,6 +1240,7 @@ class Types:
             return self._unparsedType
 
     """ Represents a type that is defined in an external catalog. """
+
     class ExternalType(Type):
         def __init__(self, catalogString: str):
             """
@@ -1250,4 +1310,3 @@ class Types:
         @return: True if the given data type is allowed to be an auto-increment column, False otherwise.
         """
         return isinstance(dataType, (Types.IntegerType, Types.LongType))
-
