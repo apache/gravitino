@@ -32,12 +32,12 @@ class GVFSConfig:
     OAUTH2_PATH = "oauth2_path"
     OAUTH2_SCOPE = "oauth2_scope"
 
-    GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE = "gcs_service_account_key_path"
+    GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE = "gcs_service_account_file"
 
-    GVFS_FILESYSTEM_S3_ACCESS_KEY = "s3_access_key"
-    GVFS_FILESYSTEM_S3_SECRET_KEY = "s3_secret_key"
+    GVFS_FILESYSTEM_S3_ACCESS_KEY = "s3_access_key_id"
+    GVFS_FILESYSTEM_S3_SECRET_KEY = "s3_secret_access_key"
     GVFS_FILESYSTEM_S3_ENDPOINT = "s3_endpoint"
 
-    GVFS_FILESYSTEM_OSS_ACCESS_KEY = "oss_access_key"
-    GVFS_FILESYSTEM_OSS_SECRET_KEY = "oss_secret_key"
+    GVFS_FILESYSTEM_OSS_ACCESS_KEY = "oss_access_key_id"
+    GVFS_FILESYSTEM_OSS_SECRET_KEY = "oss_secret_access_key"
     GVFS_FILESYSTEM_OSS_ENDPOINT = "oss_endpoint"

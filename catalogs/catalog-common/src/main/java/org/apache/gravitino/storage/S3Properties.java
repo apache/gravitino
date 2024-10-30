@@ -35,5 +35,8 @@ public class S3Properties {
   // S3 external id
   public static final String GRAVITINO_S3_EXTERNAL_ID = "s3-external-id";
 
+  // The S3 credentials provider class name.
+  public static final String GRAVITINO_S3_CREDS_PROVIDER = "s3-creds-provider";
+
   private S3Properties() {}
 }
