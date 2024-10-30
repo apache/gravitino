@@ -236,17 +236,17 @@ You could access the view interface if using JDBC backend and enable `jdbc.schem
 
 #### Multi catalog support
 
-The Gravitino Iceberg REST server supports multiple catalogs and offers a configuration-based catalog management system.
+The Gravitino Iceberg REST server supports multiple catalogs, and you could manage the catalog by different ways.
 
-| Configuration item                        | Description                                                                                                                                                                        | Default value           | Required | Since Version    |
-|-------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|------------------|
-| `gravitino.iceberg-rest.catalog-provider` | Catalog provider class name, you can develop a class that implements `IcebergTableOpsProvider` and add the corresponding jar file to the Iceberg REST service classpath directory. | `config-based-provider` | No       | 0.7.0-incubating |
+| Configuration item                               | Description                                                                                                                                                                                                                                                                                                                                      | Default value            | Required | Since Version    |
+|--------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|----------|------------------|
+| `gravitino.iceberg-rest.catalog-config-provider` | The className of catalog configuration provider, Gravitino provides build-in `static-config-provider` and `dynamic-config-provider`, you could also develop a custom class that implements `apache.gravitino.iceberg.service.provider.IcebergConfigProvider` and add the corresponding jar file to the Iceberg REST service classpath directory. | `static-config-provider` | No       | 0.7.0-incubating |
 
-##### Configuration based catalog provider
+##### Static catalog configuration provider
 
-When using a configuration based catalog provider, you can configure the default catalog with `gravitino.iceberg-rest.catalog.<param name>=<value>`. For specific catalogs, use the format `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
+The static catalog configuration provider retrieves the catalog configuration from the configuration file of the Gravitino Iceberg REST server. You could configure the default catalog with `gravitino.iceberg-rest.catalog.<param name>=<value>`. For specific catalogs, use the format `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>`.
 
-For instance, you can configure three different catalogs, the default catalog and the specific `hive_backend` and `jdbc_backend` catalogs separately.
+For instance, you could configure three different catalogs, the default catalog and the specific `hive_backend` and `jdbc_backend` catalogs separately.
 
 ```text
 gravitino.iceberg-rest.catalog-backend = jdbc
@@ -281,19 +281,19 @@ You can access different catalogs by setting the `prefix` to the specific catalo
 ...
 ```
 
-##### Gravitino server based catalog provider
+##### Dynamic catalog configuration provider
 
-When using a Gravitino server based catalog provider, you can leverage Gravitino to support dynamic catalog management for the Iceberg REST server.
+The dynamic catalog configuration provider retrieves the catalog configuration from the Gravitino server. 
 
-| Configuration item                                          | Description                                                                                                                                      | Default value | Required | Since Version    |
-|-------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `gravitino.iceberg-rest.gravitino-uri`                      | The uri of Gravitino server address, only worked if `catalog-provider` is `gravitino-based-provider`.                                            | (none)        | No       | 0.7.0-incubating |
-| `gravitino.iceberg-rest.gravitino-metalake`                 | The metalake name that `gravitino-based-provider` used to request to Gravitino, only worked if `catalog-provider` is `gravitino-based-provider`. | (none)        | No       | 0.7.0-incubating |
-| `gravitino.iceberg-rest.catalog-cache-eviction-interval-ms` | Catalog cache eviction interval.                                                                                                                 | 3600000       | No       | 0.7.0-incubating |
+| Configuration item                                          | Description                                                                                                                                           | Default value | Required | Since Version    |
+|-------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `gravitino.iceberg-rest.gravitino-uri`                      | The uri of Gravitino server address, only worked if `catalog-config-provider` is `dynamic-config-provider`.                                           | (none)        | No       | 0.7.0-incubating |
+| `gravitino.iceberg-rest.gravitino-metalake`                 | The metalake name that `dynamic-config-provider` used to request to Gravitino, only worked if `catalog-config-provider` is `dynamic-config-provider`. | (none)        | No       | 0.7.0-incubating |
+| `gravitino.iceberg-rest.catalog-cache-eviction-interval-ms` | Catalog cache eviction interval.                                                                                                                      | 3600000       | No       | 0.7.0-incubating |
 
 ```text
 gravitino.iceberg-rest.catalog-cache-eviction-interval-ms = 300000
-gravitino.iceberg-rest.catalog-provider = gravitino-based-provider
+gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
 gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
 gravitino.iceberg-rest.gravitino-metalake = test
 ```
