@@ -238,7 +238,7 @@ public abstract class RangerAuthorizationPlugin
         MetadataObject metadataObject =
             ((MetadataObjectChange.RenameMetadataObject) change).metadataObject();
         MetadataObject newMetadataObject =
-            ((MetadataObjectChange.RenameMetadataObject) change).getNewMetadataObject();
+            ((MetadataObjectChange.RenameMetadataObject) change).newMetadataObject();
         RangerMetadataObject rangerMetadataObject = translateMetadataObject(metadataObject);
         RangerMetadataObject newRangerMetadataObject = translateMetadataObject(newMetadataObject);
         if (rangerMetadataObject.equals(newRangerMetadataObject)) {
@@ -251,7 +251,7 @@ public abstract class RangerAuthorizationPlugin
         doRenameMetadataObject(rangerMetadataObject, newRangerMetadataObject);
       } else if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
         MetadataObject metadataObject =
-            ((MetadataObjectChange.RemoveMetadataObject) change).getMetadataObject();
+            ((MetadataObjectChange.RemoveMetadataObject) change).metadataObject();
         RangerMetadataObject rangerMetadataObject = translateMetadataObject(metadataObject);
         doRemoveMetadataObject(rangerMetadataObject);
       } else {
