@@ -33,6 +33,26 @@ public class HiveDataTypeTransformer extends GeneralDataTypeTransformer {
   private static final int HIVE_CHAR_MAX_LENGTH = 255;
 
   @Override
+  public io.trino.spi.type.Type getTrinoType(Type type) {
+    boolean unsupportedType = false;
+    if (Type.Name.TIMESTAMP == type.name()) {
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasTimeZone()) {
+        unsupportedType = true;
+      } else if (Type.Name.TIME == type.name()) {
+        unsupportedType = true;
+      }
+    }
+
+    if (unsupportedType) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE,
+          "Unsupported gravitino datatype: " + type);
+    }
+    return super.getTrinoType(type);
+  }
+
+  @Override
   public Type getGravitinoType(io.trino.spi.type.Type type) {
     Class<? extends io.trino.spi.type.Type> typeClass = type.getClass();
     if (typeClass == VarcharType.class) {
