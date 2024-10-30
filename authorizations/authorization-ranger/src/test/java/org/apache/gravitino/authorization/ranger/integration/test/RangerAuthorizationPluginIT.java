@@ -29,6 +29,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
+import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerSecurableObject;
 import org.junit.jupiter.api.Assertions;
@@ -47,6 +48,38 @@ public class RangerAuthorizationPluginIT {
   }
 
   @Test
+  public void testTranslateMetadataObject() {
+    MetadataObject metalake =
+        MetadataObjects.parse(String.format("metalake1"), MetadataObject.Type.METALAKE);
+    RangerMetadataObject rangerMetalake = rangerAuthPlugin.translateMetadataObject(metalake);
+    Assertions.assertEquals(1, rangerMetalake.names().size());
+    Assertions.assertEquals(RangerHelper.RESOURCE_ALL, rangerMetalake.names().get(0));
+    Assertions.assertEquals(RangerMetadataObject.Type.SCHEMA, rangerMetalake.type());
+
+    MetadataObject catalog =
+        MetadataObjects.parse(String.format("catalog1"), MetadataObject.Type.CATALOG);
+    RangerMetadataObject rangerCatalog = rangerAuthPlugin.translateMetadataObject(catalog);
+    Assertions.assertEquals(1, rangerCatalog.names().size());
+    Assertions.assertEquals(RangerHelper.RESOURCE_ALL, rangerCatalog.names().get(0));
+    Assertions.assertEquals(RangerMetadataObject.Type.SCHEMA, rangerCatalog.type());
+
+    MetadataObject schema =
+        MetadataObjects.parse(String.format("catalog1.schema1"), MetadataObject.Type.SCHEMA);
+    RangerMetadataObject rangerSchema = rangerAuthPlugin.translateMetadataObject(schema);
+    Assertions.assertEquals(1, rangerSchema.names().size());
+    Assertions.assertEquals("schema1", rangerSchema.names().get(0));
+    Assertions.assertEquals(RangerMetadataObject.Type.SCHEMA, rangerSchema.type());
+
+    MetadataObject table =
+        MetadataObjects.parse(String.format("catalog1.schema1.tab1"), MetadataObject.Type.TABLE);
+    RangerMetadataObject rangerTable = rangerAuthPlugin.translateMetadataObject(table);
+    Assertions.assertEquals(2, rangerTable.names().size());
+    Assertions.assertEquals("schema1", rangerTable.names().get(0));
+    Assertions.assertEquals("tab1", rangerTable.names().get(1));
+    Assertions.assertEquals(RangerMetadataObject.Type.TABLE, rangerTable.type());
+  }
+
+  @Test
   public void testTranslatePrivilege() {
     SecurableObject createSchemaInMetalake =
         SecurableObjects.parse(
@@ -56,7 +89,7 @@ public class RangerAuthorizationPluginIT {
     List<RangerSecurableObject> createSchemaInMetalake1 =
         rangerAuthPlugin.translatePrivilege(createSchemaInMetalake);
     Assertions.assertEquals(1, createSchemaInMetalake1.size());
-    Assertions.assertEquals("*", createSchemaInMetalake1.get(0).fullName());
+    Assertions.assertEquals(RangerHelper.RESOURCE_ALL, createSchemaInMetalake1.get(0).fullName());
     Assertions.assertEquals(
         RangerMetadataObject.Type.SCHEMA, createSchemaInMetalake1.get(0).type());
 
@@ -68,7 +101,7 @@ public class RangerAuthorizationPluginIT {
     List<RangerSecurableObject> createSchemaInCatalog1 =
         rangerAuthPlugin.translatePrivilege(createSchemaInCatalog);
     Assertions.assertEquals(1, createSchemaInCatalog1.size());
-    Assertions.assertEquals("*", createSchemaInCatalog1.get(0).fullName());
+    Assertions.assertEquals(RangerHelper.RESOURCE_ALL, createSchemaInCatalog1.get(0).fullName());
     Assertions.assertEquals(RangerMetadataObject.Type.SCHEMA, createSchemaInCatalog1.get(0).type());
 
     for (Privilege privilege :
@@ -136,7 +169,7 @@ public class RangerAuthorizationPluginIT {
       MetadataObject metalake = MetadataObjects.parse("metalake_or_catalog", type);
       List<RangerSecurableObject> metalakeOwner = rangerAuthPlugin.translateOwner(metalake);
       Assertions.assertEquals(3, metalakeOwner.size());
-      Assertions.assertEquals("*", metalakeOwner.get(0).fullName());
+      Assertions.assertEquals(RangerHelper.RESOURCE_ALL, metalakeOwner.get(0).fullName());
       Assertions.assertEquals(RangerMetadataObject.Type.SCHEMA, metalakeOwner.get(0).type());
       Assertions.assertEquals("*.*", metalakeOwner.get(1).fullName());
       Assertions.assertEquals(RangerMetadataObject.Type.TABLE, metalakeOwner.get(1).type());
