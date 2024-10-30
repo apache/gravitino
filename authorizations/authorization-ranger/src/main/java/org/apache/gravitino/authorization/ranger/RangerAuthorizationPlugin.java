@@ -236,7 +236,7 @@ public abstract class RangerAuthorizationPlugin
     for (MetadataObjectChange change : changes) {
       if (change instanceof MetadataObjectChange.RenameMetadataObject) {
         MetadataObject metadataObject =
-            ((MetadataObjectChange.RenameMetadataObject) change).getMetadataObject();
+            ((MetadataObjectChange.RenameMetadataObject) change).metadataObject();
         MetadataObject newMetadataObject =
             ((MetadataObjectChange.RenameMetadataObject) change).getNewMetadataObject();
         RangerMetadataObject rangerMetadataObject = translateMetadataObject(metadataObject);

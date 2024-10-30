@@ -73,7 +73,7 @@ public interface MetadataObjectChange {
      * @return return a metadataObject.
      */
     public MetadataObject metadataObject() {
-      return this.metadataObject;
+      return metadataObject;
     }
 
     /**
@@ -82,7 +82,7 @@ public interface MetadataObjectChange {
      * @return return a metadataObject object.
      */
     public MetadataObject getNewMetadataObject() {
-      return this.newMetadataObject;
+      return newMetadataObject;
     }
 
     /**
@@ -138,7 +138,7 @@ public interface MetadataObjectChange {
      * @return return a metadataObject.
      */
     public MetadataObject getMetadataObject() {
-      return this.metadataObject;
+      return metadataObject;
     }
 
     /**
