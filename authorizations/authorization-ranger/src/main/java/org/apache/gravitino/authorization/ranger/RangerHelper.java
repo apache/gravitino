@@ -182,7 +182,7 @@ public class RangerHelper {
       List<RangerPolicy> policies = rangerClient.findPolicies(searchFilters);
       return policies;
     } catch (RangerServiceException e) {
-      throw new AuthorizationPluginException(e);
+      throw new AuthorizationPluginException(e, "Failed to find the policies in the Ranger");
     }
   }
 
