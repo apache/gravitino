@@ -27,13 +27,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -562,6 +562,15 @@ public abstract class RangerAuthorizationPlugin
 
     if (policy != null) {
       // Check the policy item's accesses and roles equal the Ranger securable object's privilege
+      List<RangerPrivilege> allowPrivilies =
+          securableObject.privileges().stream()
+              .filter(privilege -> privilege.condition() == Privilege.Condition.ALLOW)
+              .collect(Collectors.toList());
+      List<RangerPrivilege> denyPrivilies =
+          securableObject.privileges().stream()
+              .filter(privilege -> privilege.condition() == Privilege.Condition.DENY)
+              .collect(Collectors.toList());
+
       Set<RangerPrivilege> policyPrivileges =
           policy.getPolicyItems().stream()
               .filter(policyItem -> policyItem.getRoles().contains(roleName))
@@ -569,7 +578,17 @@ public abstract class RangerAuthorizationPlugin
               .map(RangerPolicy.RangerPolicyItemAccess::getType)
               .map(RangerPrivileges::valueOf)
               .collect(Collectors.toSet());
-      if (policyPrivileges.containsAll(securableObject.privileges())) {
+
+      Set<RangerPrivilege> policyDenyPrivileges =
+          policy.getDenyPolicyItems().stream()
+              .filter(policyItem -> policyItem.getRoles().contains(roleName))
+              .flatMap(policyItem -> policyItem.getAccesses().stream())
+              .map(RangerPolicy.RangerPolicyItemAccess::getType)
+              .map(RangerPrivileges::valueOf)
+              .collect(Collectors.toSet());
+
+      if (policyPrivileges.containsAll(allowPrivilies)
+          && policyDenyPrivileges.containsAll(denyPrivilies)) {
         LOG.info(
             "The privilege({}) already added to Ranger policy({})!",
             policy.getName(),
@@ -614,24 +633,25 @@ public abstract class RangerAuthorizationPlugin
       return true;
     }
 
-    policy
-        .getPolicyItems()
+    rangerSecurableObject.privileges().stream()
         .forEach(
-            policyItem -> {
-              boolean match =
-                  policyItem.getAccesses().stream()
-                      .allMatch(
-                          // Find the policy item that matches access and role
-                          access -> {
-                            // Use Gravitino privilege to search the Ranger policy item's access
-                            boolean matchPrivilege =
-                                rangerSecurableObject.privileges().stream()
-                                    .filter(Objects::nonNull)
-                                    .anyMatch(privilege -> privilege.equalsTo(access.getType()));
-                            return matchPrivilege;
-                          });
-              if (match) {
-                policyItem.getRoles().removeIf(roleName::equals);
+            rangerPrivilege -> {
+              if (rangerPrivilege.condition() == Privilege.Condition.ALLOW) {
+                policy
+                    .getPolicyItems()
+                    .forEach(
+                        policyItem -> {
+                          removePolicyItemIfEqualRoleName(
+                              policyItem, rangerSecurableObject, roleName);
+                        });
+              } else {
+                policy
+                    .getDenyPolicyItems()
+                    .forEach(
+                        policyItem -> {
+                          removePolicyItemIfEqualRoleName(
+                              policyItem, rangerSecurableObject, roleName);
+                        });
               }
             });
 
@@ -643,9 +663,16 @@ public abstract class RangerAuthorizationPlugin
                 policyItem.getRoles().isEmpty()
                     && policyItem.getUsers().isEmpty()
                     && policyItem.getGroups().isEmpty());
+    policy
+        .getDenyPolicyItems()
+        .removeIf(
+            policyItem ->
+                policyItem.getRoles().isEmpty()
+                    && policyItem.getUsers().isEmpty()
+                    && policyItem.getGroups().isEmpty());
 
     try {
-      if (policy.getPolicyItems().isEmpty()) {
+      if (policy.getPolicyItems().isEmpty() && policy.getDenyPolicyItems().isEmpty()) {
         rangerClient.deletePolicy(policy.getId());
       } else {
         rangerClient.updatePolicy(policy.getId(), policy);
@@ -655,6 +682,26 @@ public abstract class RangerAuthorizationPlugin
       throw new RuntimeException(e);
     }
     return true;
+  }
+
+  private void removePolicyItemIfEqualRoleName(
+      RangerPolicy.RangerPolicyItem policyItem,
+      RangerSecurableObject rangerSecurableObject,
+      String roleName) {
+    boolean match =
+        policyItem.getAccesses().stream()
+            .allMatch(
+                // Find the policy item that matches access and role
+                access -> {
+                  // Use Gravitino privilege to search the Ranger policy item's access
+                  boolean matchPrivilege =
+                      rangerSecurableObject.privileges().stream()
+                          .anyMatch(privilege -> privilege.equalsTo(access.getType()));
+                  return matchPrivilege;
+                });
+    if (match) {
+      policyItem.getRoles().removeIf(roleName::equals);
+    }
   }
 
   @Override
