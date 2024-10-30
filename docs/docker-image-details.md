@@ -51,10 +51,16 @@ You can deploy the standalone Gravitino Iceberg REST server with the Docker imag
 Container startup commands
 
 ```shell
-docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.6.1-incubating
+docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
 Changelog
+
+- apache/gravitino-iceberg-rest:0.7.0-incubating
+  - Using JDBC catalog backend.
+  - Supports S3 and GCS storage.
+  - Supports credential vending.
+  - Supports changing configuration by environment variables.
 
 - apache/gravitino-iceberg-rest:0.6.1-incubating
   - Based on Gravitino 0.6.1-incubating, you can know more information from 0.6.1-incubating release notes.
