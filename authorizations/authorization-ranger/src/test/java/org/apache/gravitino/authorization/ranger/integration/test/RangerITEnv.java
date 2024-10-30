@@ -25,7 +25,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationHivePlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
@@ -443,26 +445,40 @@ public class RangerITEnv {
                       LOG.error("Failed to get policy: " + securableObject.fullName());
                       throw new RuntimeException(e);
                     }
-                    boolean match =
-                        policy.getPolicyItems().stream()
-                            .filter(
-                                policyItem -> {
-                                  // Filter Ranger policy item by Gravitino privilege
-                                  return policyItem.getAccesses().stream()
-                                      .anyMatch(
-                                          access -> {
-                                            return rangerSecurableObject
-                                                .privileges()
-                                                .contains(
-                                                    RangerPrivileges.valueOf(access.getType()));
+
+                    AtomicReference<List<RangerPolicy.RangerPolicyItem>> policyItems =
+                        new AtomicReference<>();
+                    rangerSecurableObject.privileges().stream()
+                        .forEach(
+                            privilege -> {
+                              if (privilege.condition() == Privilege.Condition.ALLOW) {
+                                policyItems.set(policy.getPolicyItems());
+                              } else {
+                                policyItems.set(policy.getDenyPolicyItems());
+                              }
+
+                              boolean match =
+                                  policyItems.get().stream()
+                                      .filter(
+                                          policyItem -> {
+                                            // Filter Ranger policy item by Gravitino privilege
+                                            return policyItem.getAccesses().stream()
+                                                .allMatch(
+                                                    access -> {
+                                                      return rangerSecurableObject
+                                                          .privileges()
+                                                          .contains(
+                                                              RangerPrivileges.valueOf(
+                                                                  access.getType()));
+                                                    });
+                                          })
+                                      .allMatch(
+                                          policyItem -> {
+                                            // Verify role name in Ranger policy item
+                                            return policyItem.getRoles().contains(role.name());
                                           });
-                                })
-                            .allMatch(
-                                policyItem -> {
-                                  // Verify role name in Ranger policy item
-                                  return policyItem.getRoles().contains(role.name());
-                                });
-                    Assertions.assertTrue(match);
+                              Assertions.assertTrue(match);
+                            });
                   });
             });
   }
