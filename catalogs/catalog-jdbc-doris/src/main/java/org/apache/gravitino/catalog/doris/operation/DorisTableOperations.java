@@ -194,7 +194,9 @@ public class DorisTableOperations extends JdbcTableOperations {
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     Set<String> unknownProperties = SetUtils.difference(properties.keySet(), result.keySet());
-    LOG.info("Remove unknown properties for Doris table: {}", unknownProperties);
+    if (!unknownProperties.isEmpty()) {
+      LOG.warn("Remove unknown properties '{}' for Doris table.", unknownProperties);
+    }
     return result;
   }
 
