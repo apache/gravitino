@@ -46,6 +46,9 @@ public class GravitinoOptions {
   public static final String BOOTSTRAP = "bootstrap";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
+  public static final String FILESET = "fileset";
+  public static final String MANAGED = "managed";
+  public static final String LOCATION = "location";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -81,6 +84,9 @@ public class GravitinoOptions {
     options.addOption(createArgOption("d", DATABASE, "database name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
     options.addOption(createArgOption("a", TAG, "tag name"));
+    options.addOption(createArgOption("f", FILESET, "fileset name"));
+    options.addOption(createSimpleOption("m", MANAGED, "a managed fileset"));
+    options.addOption(createArgOption("l", LOCATION, "fieset location"));
 
     return options;
   }

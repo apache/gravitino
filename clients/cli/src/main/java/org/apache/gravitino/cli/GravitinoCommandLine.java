@@ -24,6 +24,7 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.ClientVersion;
+import org.apache.gravitino.cli.commands.CreateFileset;
 import org.apache.gravitino.cli.commands.CreateGroup;
 import org.apache.gravitino.cli.commands.CreateHadoopCatalog;
 import org.apache.gravitino.cli.commands.CreateHiveCatalog;
@@ -36,18 +37,21 @@ import org.apache.gravitino.cli.commands.CreateSchema;
 import org.apache.gravitino.cli.commands.CreateTag;
 import org.apache.gravitino.cli.commands.CreateUser;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
+import org.apache.gravitino.cli.commands.DeleteFileset;
 import org.apache.gravitino.cli.commands.DeleteGroup;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
 import org.apache.gravitino.cli.commands.DeleteSchema;
 import org.apache.gravitino.cli.commands.DeleteTable;
 import org.apache.gravitino.cli.commands.DeleteTag;
 import org.apache.gravitino.cli.commands.DeleteUser;
+import org.apache.gravitino.cli.commands.FilesetDetails;
 import org.apache.gravitino.cli.commands.GroupDetails;
 import org.apache.gravitino.cli.commands.ListAllTags;
 import org.apache.gravitino.cli.commands.ListCatalogProperties;
 import org.apache.gravitino.cli.commands.ListCatalogs;
 import org.apache.gravitino.cli.commands.ListColumns;
 import org.apache.gravitino.cli.commands.ListEntityTags;
+import org.apache.gravitino.cli.commands.ListFilesets;
 import org.apache.gravitino.cli.commands.ListGroups;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
 import org.apache.gravitino.cli.commands.ListMetalakes;
@@ -175,6 +179,8 @@ public class GravitinoCommandLine {
       handleCatalogCommand();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
+    } else if (entity.equals(CommandEntities.FILESET)) {
+      handleFilesetCommand();
     }
   }
 
@@ -451,6 +457,33 @@ public class GravitinoCommandLine {
 
     if (CommandActions.LIST.equals(command)) {
       new ListColumns(url, ignore, metalake, catalog, schema, table).handle();
+    }
+  }
+
+  /**
+   * Handles the command execution for filesets based on command type and the command line options.
+   */
+  private void handleFilesetCommand() {
+    String url = getUrl();
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String catalog = name.getCatalogName();
+    String schema = name.getSchemaName();
+    String fileset = line.getOptionValue(GravitinoOptions.FILESET);
+
+    if (CommandActions.DETAILS.equals(command)) {
+      new FilesetDetails(url, ignore, metalake, catalog, schema, fileset).handle();
+    } else if (CommandActions.LIST.equals(command)) {
+      new ListFilesets(url, ignore, metalake, catalog, schema).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      boolean managed = line.hasOption(GravitinoOptions.MANAGED);
+      String location = line.getOptionValue(GravitinoOptions.LOCATION);
+
+      new CreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, managed, location)
+          .handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      new DeleteFileset(url, ignore, metalake, catalog, schema, fileset).handle();
     }
   }
 
