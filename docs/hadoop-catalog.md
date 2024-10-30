@@ -94,10 +94,14 @@ Developers and users can custom their own HCFS file system fileset by implementi
   FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
       throws IOException;
   
-  // The schema name of the file system provider. 'file' for Local file system, 'hdfs' for HDFS, 's3' for AWS S3, 'gcs' for GCS, 'oss' for Aliyun OSS. 
+  // The schema name of the file system provider. 'file' for Local file system,
+  // 'hdfs' for HDFS, 's3' for AWS S3, 'gs' for GCS, 'oss' for Aliyun OSS. 
   String scheme();
 
-  // Name of the file system provider. You need to set this name in the `filesystem-providers` property of the catalog.
+  // Name of the file system provider. 'builtin-local' for Local file system, 'builtin-hdfs' for HDFS, 
+  // 's3' for AWS s3, 'gcs' for GCS, 'oss' for Aliyun OSS.
+  
+  // You need to set catalog properties `filesystem-providers` to support this file system.
   String name();
 ```
 
