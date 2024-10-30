@@ -115,10 +115,9 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
             comment="",
             properties={
                 "filesystem-providers": "oss",
-                "gravitino.bypass.fs.oss.accessKeyId": cls.oss_access_key,
-                "gravitino.bypass.fs.oss.accessKeySecret": cls.oss_secret_key,
-                "gravitino.bypass.fs.oss.endpoint": cls.oss_endpoint,
-                "gravitino.bypass.fs.oss.impl": "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem",
+                "oss-access-key-id": cls.oss_access_key,
+                "oss-secret-access-key": cls.oss_secret_key,
+                "oss-endpoint": cls.oss_endpoint,
             },
         )
         catalog.as_schemas().create_schema(

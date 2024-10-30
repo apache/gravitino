@@ -35,6 +35,9 @@ dependencies {
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
   implementation(libs.hadoop3.aws)
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
 }
 
 tasks.withType(ShadowJar::class.java) {
