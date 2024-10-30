@@ -283,7 +283,7 @@ You can access different catalogs by setting the `prefix` to the specific catalo
 
 ##### Dynamic catalog configuration provider
 
-The dynamic catalog configuration provider retrieves the catalog configuration from the Gravitino server. 
+The dynamic catalog configuration provider retrieves the catalog configuration from the Gravitino server.
 
 | Configuration item                                          | Description                                                                                                                                           | Default value | Required | Since Version    |
 |-------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
