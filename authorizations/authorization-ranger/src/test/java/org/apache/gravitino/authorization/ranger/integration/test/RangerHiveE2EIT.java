@@ -304,7 +304,7 @@ public class RangerHiveE2EIT extends BaseIT {
   }
 
   @Test
-  void testReadWriteTable() throws InterruptedException {
+  void testReadWriteTableWithMetalakeLevelRole() throws InterruptedException {
     // First, create a role for creating a database and grant role to the user
     String readWriteRole = currentFunName();
     SecurableObject securableObject =
@@ -350,6 +350,64 @@ public class RangerHiveE2EIT extends BaseIT {
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.deleteRole(readWriteRole);
+  }
+
+  @Test
+  void testReadWriteTableWithTableLevelRole() throws InterruptedException {
+    // First, create a role for creating a database and grant role to the user
+    String roleName = currentFunName();
+    SecurableObject securableObject =
+        SecurableObjects.ofMetalake(
+            metalakeName,
+            Lists.newArrayList(
+                Privileges.UseSchema.allow(),
+                Privileges.CreateSchema.allow(),
+                Privileges.CreateTable.allow()));
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+    waitForUpdatingPolicies();
+    // Second, create a schema
+    sparkSession.sql(SQL_CREATE_SCHEMA);
+
+    // Third, create a table
+    sparkSession.sql(SQL_USE_SCHEMA);
+    sparkSession.sql(SQL_CREATE_TABLE);
+
+    // Fourth, revoke and grant a table level role
+    metalake.deleteRole(roleName);
+    securableObject =
+        SecurableObjects.parse(
+            String.format("%s.%s.%s", catalogName, schemaName, tableName),
+            MetadataObject.Type.TABLE,
+            Lists.newArrayList(Privileges.ModifyTable.allow(), Privileges.SelectTable.allow()));
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+    waitForUpdatingPolicies();
+
+    // case 1: Succeed to insert data into table
+    sparkSession.sql(SQL_INSERT_TABLE);
+
+    // case 2: Succeed to select data from the table
+    sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
+
+    // case 3: Fail to update data in the table, Because Hive doesn't support.
+    Assertions.assertThrows(
+        SparkUnsupportedOperationException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
+
+    // case 4: Fail to delete data from the table, Because Hive doesn't support.
+    Assertions.assertThrows(AnalysisException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
+
+    // case 5: Succeed to alter the table
+    sparkSession.sql(SQL_ALTER_TABLE);
+
+    // case 6: Fail to drop the table
+    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+
+    // Clean up
+    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asSchemas().dropSchema(schemaName, true);
+    metalake.deleteRole(roleName);
   }
 
   @Test
