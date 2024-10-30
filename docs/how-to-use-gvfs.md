@@ -106,10 +106,10 @@ In the meantime, you need to place the corresponding bundle jar [gravitino-aliyu
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding properties, for more, please refer to [Custom Fileset](./hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
 So, If you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
 
-| Configuration item             | Description                                                                                  | Default value | Required | Since version    |
-|--------------------------------|----------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `fs.gvfs.filesystem.providers` | The file system providers. please set it to the value of `YourCustomFileSystemProvider#name` | (none)        | Yes      | 0.7.0-incubating |
-| `your-custom-properties`       | The properties will be used to create a FileSystem instance in `CustomFileSystemProvider`    | (none)        | No       | -                |
+| Configuration item             | Description                                                                                             | Default value | Required | Since version    |
+|--------------------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `fs.gvfs.filesystem.providers` | The file system providers. please set it to the value of `YourCustomFileSystemProvider#name`            | (none)        | Yes      | 0.7.0-incubating |
+| `your-custom-properties`       | The properties will be used to create a FileSystem instance in `CustomFileSystemProvider#getFileSystem` | (none)        | No       | -                |
 
 
 
@@ -123,9 +123,21 @@ You can configure these properties in two ways:
     conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
     conf.set("fs.gravitino.server.uri","http://localhost:8090");
     conf.set("fs.gravitino.client.metalake","test_metalake");
+   
+    // Optional. It's only for s3 catalog, for GCs and OSS catalog, you should set the corresponding properties.
+    conf.set("fs.gvfs.filesystem.providers", "s3");
+    conf.set("s3-endpoint", "http://localhost:9000");
+    conf.set("s3-access-key-id", "minio");
+    conf.set("s3-secret-access-key", "minio123"); 
+   
     Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
     FileSystem fs = filesetPath.getFileSystem(conf);
     ```
+   
+:::note
+If you want to access the s3, gcs, oss or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle jar in the Hadoop environment. 
+For example if you want to access the s3 fileset, you need to place the s3 bundle jar [gravitino-aws-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`) or add it to the classpath. 
+:::
 
 2. Configure the properties in the `core-site.xml` file of the Hadoop environment:
 
@@ -148,6 +160,24 @@ You can configure these properties in two ways:
       <property>
         <name>fs.gravitino.client.metalake</name>
         <value>test_metalake</value>
+      </property>
+   
+      <!-- Optional. It's only for s3 catalog, for GCs and OSS catalog, you should set the corresponding properties. -->
+      <property>
+        <name>fs.gvfs.filesystem.providers</name>
+        <value>s3</value>
+      </property>
+      <property>
+        <name>s3-endpoint</name>
+        <value>http://localhost:9000</value>
+      </property>
+      <property>
+        <name>s3-access-key-id</name>
+        <value>minio</value>
+      </property>
+      <property>
+        <name>s3-secret-access-key</name>
+        <value>minio123</value>
       </property>
     ```
 
@@ -393,13 +423,31 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 | `oauth2_credential`        | The auth credential for the Gravitino client when using `oauth2` auth type.                                                                              | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
 | `oauth2_path`              | The auth server path for the Gravitino client when using `oauth2` auth type. Please remove the first slash `/` from the path, for example `oauth/token`. | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
 | `oauth2_scope`             | The auth scope for the Gravitino client when using `oauth2` auth type with the Gravitino Virtual File System.                                            | (none)        | Yes if you use `oauth2` auth type | 0.7.0-incubating |
-| `s3_endpoint`              | The endpoint of the AWS s3.                                                                                                                              | (none)        | Yes if it's a s3 fileset          | 0.7.0-incubating |
-| `s3_access_key_id`         | The access key of the AWS s3.                                                                                                                            | (none)        | Yes if it's a s3 fileset          | 0.7.0-incubating |
-| `s3_secret_access_key`     | The secret key of the AWS s3.                                                                                                                            | (none)        | Yes if it's a s3 fileset          | 0.7.0-incubating |
-| `gcs_service_account_file` | The path of GCS service account JSON file.                                                                                                               | (none)        | Yes if it's a gcs fileset         | 0.7.0-incubating |
-| `oss_endpoint`             | The endpoint of the Aliyun oss.                                                                                                                          | (none)        | Yes if it's a oss fileset         | 0.7.0-incubating |
-| `oss_access_key_id`        | The access key of the Aliyun oss.                                                                                                                        | (none)        | Yes if it's a oss fileset         | 0.7.0-incubating |
-| `oss_secret_access_key`    | The secret key of the Aliyun oss.                                                                                                                        | (none)        | Yes if it's a oss fileset         | 0.7.0-incubating |
+
+
+#### Extra configuration for S3, GCS, OSS fileset
+
+The following properties are required if you want to access the S3 fileset via GVFS python client:
+
+| Configuration item         | Description                   | Default value | Required                  | Since version    |
+|----------------------------|-------------------------------|---------------|---------------------------|------------------|
+| `s3_endpoint`              | The endpoint of the AWS s3.   | (none)        | Yes if it's a s3 fileset  | 0.7.0-incubating |
+| `s3_access_key_id`         | The access key of the AWS s3. | (none)        | Yes if it's a s3 fileset  | 0.7.0-incubating |
+| `s3_secret_access_key`     | The secret key of the AWS s3. | (none)        | Yes if it's a s3 fileset  | 0.7.0-incubating |
+
+The following properties are required if you want to access the GCS fileset via GVFS python client:
+
+| Configuration item         | Description                                | Default value | Required                  | Since version    |
+|----------------------------|--------------------------------------------|---------------|---------------------------|------------------|
+| `gcs_service_account_file` | The path of GCS service account JSON file. | (none)        | Yes if it's a gcs fileset | 0.7.0-incubating |
+
+The following properties are required if you want to access the OSS fileset via GVFS python client:
+
+| Configuration item         | Description                       | Default value | Required                  | Since version    |
+|----------------------------|-----------------------------------|---------------|---------------------------|------------------|
+| `oss_endpoint`             | The endpoint of the Aliyun oss.   | (none)        | Yes if it's a oss fileset | 0.7.0-incubating |
+| `oss_access_key_id`        | The access key of the Aliyun oss. | (none)        | Yes if it's a oss fileset | 0.7.0-incubating |
+| `oss_secret_access_key`    | The secret key of the Aliyun oss. | (none)        | Yes if it's a oss fileset | 0.7.0-incubating |
 
 You can configure these properties when obtaining the `Gravitino Virtual FileSystem` in Python like this:
 
@@ -409,9 +457,20 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple"
+    
+    # Optional, the following properties are required if you want to access the S3 fileset via GVFS python client, for GCS and OSS fileset, you should set the corresponding properties.
+    "s3_endpoint": "http://localhost:9000",
+    "s3_access_key_id": "minio",
+    "s3_secret_access_key": "minio123"
 }
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
 ```
+
+:::note
+
+Gravitino python client does not support customized filesets defined by users due to the limit of `fsspec` library. 
+:::
+
 
 ### Usage examples
 

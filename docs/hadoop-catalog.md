@@ -52,7 +52,7 @@ Apart from the above properties, to access fileset like HDFS, S3, GCS, OSS or cu
 | `s3-access-key-id`             | The access key of the AWS s3.                                                                                                                                                         | (none)          | Yes if it's a s3 fileset.  | 0.7.0-incubating |
 | `s3-secret-access-key`         | The secret key of the AWS s3.                                                                                                                                                         | (none)          | Yes if it's a s3 fileset.  | 0.7.0-incubating |
 
-At the same time, you need to place the corresponding bundle jar [gravitno-aws-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment.
+At the same time, you need to place the corresponding bundle jar [gravitno-aws-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the directory ${GRAVITINO_HOME}/catalogs/hadoop/libs.
 
 
 #### GCS fileset
@@ -63,7 +63,7 @@ At the same time, you need to place the corresponding bundle jar [gravitno-aws-b
 | `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location. | `builtin-local` | No                         | 0.7.0-incubating |
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                   | (none)          | Yes if it's a gcs fileset. | 0.7.0-incubating |
 
-In the meantime, you need to place the corresponding bundle jar [gravitno-gcp-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/gcp-bundle/) in the Hadoop environment.
+In the meantime, you need to place the corresponding bundle jar [gravitno-gcp-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/gcp-bundle/) in the directory ${GRAVITINO_HOME}/catalogs/hadoop/libs.
 
 #### OSS fileset
 
@@ -75,7 +75,7 @@ In the meantime, you need to place the corresponding bundle jar [gravitno-gcp-bu
 | `oss-access-key-id`           | The access key of the Aliyun oss.                                                                                                                                                                                             | (none)          | Yes if it's a oss fileset. | 0.7.0-incubating |
 | `oss-secret-access-key`       | The secret key of the Aliyun oss.                                                                                                                                                                                             | (none)          | Yes if it's a oss fileset. | 0.7.0-incubating |
 
-In the meantime, you need to place the corresponding bundle jar [gravitno-aliyun-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in the Hadoop environment.
+In the meantime, you need to place the corresponding bundle jar [gravitino-aliyun-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in in the directory ${GRAVITINO_HOME}/catalogs/hadoop/libs.
 
 
 :::note
@@ -86,7 +86,7 @@ In the meantime, you need to place the corresponding bundle jar [gravitno-aliyun
 
 #### How to custom your own HCFS file system fileset?
 
-Developers and users can custom their own HCFS file system fileset by implementing the `FileSystemProvider` interface. The `FileSystemProvider` interface is defined as follows:
+Developers and users can custom their own HCFS file system fileset by implementing the `FileSystemProvider` interface in the jar [gravitino-catalog-hadoop](https://repo1.maven.org/maven2/org/apache/gravitino/catalog-hadoop/) . The `FileSystemProvider` interface is defined as follows:
 
 ```java
   
