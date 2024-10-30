@@ -391,7 +391,7 @@ You could run Gravitino Iceberg REST server though docker container:
 docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
-Gravitino Iceberg REST server in docker image could access local storage, you could change the configuration by environment variables to access S3 or GCS storage, please refer to storage section for more details.
+Gravitino Iceberg REST server in docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, please refer to [storage section](#storage) for more details.
 
 | Environment variables                | Configuration items                               | Since version     |
 |--------------------------------------|---------------------------------------------------|-------------------|

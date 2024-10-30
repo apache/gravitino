@@ -31,6 +31,16 @@ env_map = {
   "GRAVITINO_S3_EXTERNAL_ID" : "s3-external-id"
 }
 
+init_config = {
+  "catalog-backend" : "jdbc",
+  "jdbc-driver" : "org.sqlite.JDBC",
+  "uri" : "jdbc:sqlite::memory:",
+  "jdbc-user" : "iceberg",
+  "jdbc-password" : "iceberg",
+  "jdbc-initialize" : "true",
+  "jdbc.schema-version" : "V1"
+}
+
 
 def parse_config_file(file_path):  
     config_map = {}  
@@ -52,13 +62,8 @@ def update_config(config, key, value):
 config_file_path = 'conf/gravitino-iceberg-rest-server.conf'
 config_map = parse_config_file(config_file_path)
 
-update_config(config_map, "catalog-backend", "jdbc")
-update_config(config_map, "jdbc-driver", "org.sqlite.JDBC")
-update_config(config_map, "uri", "jdbc:sqlite::memory:")
-update_config(config_map, "jdbc-user", "iceberg")
-update_config(config_map, "jdbc-password", "iceberg")
-update_config(config_map, "jdbc-initialize", "true")
-update_config(config_map, "jdbc.schema-version", "V1")
+for k, v in init_config.items():
+    update_config(config_map, k, v)
 
 for k, v in env_map.items():
     if k in os.environ:

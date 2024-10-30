@@ -46,16 +46,16 @@ cp ${gravitino_home}/bundles/aws-bundle/build/libs/gravitino-aws-bundle-*.jar bu
 
 iceberg_gcp_bundle="iceberg-gcp-bundle-1.5.2.jar"
 if [ ! -f "bundles/${iceberg_gcp_bundle}" ]; then
-  wget -P bundles https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-gcp-bundle/1.5.2/${iceberg_gcp_bundle}
+  curl -L -s -o bundles/${iceberg_gcp_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-gcp-bundle/1.5.2/${iceberg_gcp_bundle}
 fi
 
 iceberg_aws_bundle="iceberg-aws-bundle-1.5.2.jar"
 if [ ! -f "bundles/${iceberg_aws_bundle}" ]; then
-  wget -P bundles https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.5.2/${iceberg_aws_bundle}
+  curl -L -s -o bundles/${iceberg_aws_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.5.2/${iceberg_aws_bundle}
 fi
 
 # download jdbc driver
-wget -P bundles https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/sqlite-jdbc-3.42.0.0.jar
+curl -L -s -o bundles/sqlite-jdbc-3.42.0.0.jar https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/sqlite-jdbc-3.42.0.0.jar
 
 cp bundles/*jar ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/libs/
 
