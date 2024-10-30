@@ -145,7 +145,3 @@ class TestTypes(unittest.TestCase):
         self.assertTrue(Types.allowAutoIncrement(integer_type))
         self.assertTrue(Types.allowAutoIncrement(long_type))
         self.assertFalse(Types.allowAutoIncrement(boolean_type))
-
-
-if __name__ == "__main__":
-    unittest.main()
