@@ -529,6 +529,67 @@ public class RangerHiveE2EIT extends BaseIT {
   }
 
   @Test
+  void testDenyPrivileges() throws InterruptedException {
+    // Create a schema
+    catalog.asSchemas().createSchema(schemaName, "test", Collections.emptyMap());
+
+    // Create a role with CREATE_SCHEMA privilege
+    String roleName = currentFunName();
+    SecurableObject allowObject =
+        SecurableObjects.parse(
+            String.format("%s", catalogName),
+            MetadataObject.Type.CATALOG,
+            Lists.newArrayList(Privileges.UseSchema.allow(), Privileges.CreateTable.allow()));
+    SecurableObject denyObject =
+        SecurableObjects.parse(
+            String.format("%s.%s", catalogName, schemaName),
+            MetadataObject.Type.SCHEMA,
+            Lists.newArrayList(Privileges.CreateTable.deny()));
+    // Create a role, catalog allows to create a table, schema denies to create a table
+    metalake.createRole(
+        roleName, Collections.emptyMap(), Lists.newArrayList(allowObject, denyObject));
+
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+    waitForUpdatingPolicies();
+
+    // Fail to create a table
+    sparkSession.sql(SQL_USE_SCHEMA);
+    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+
+    // Delete the role
+    metalake.deleteRole(roleName);
+
+    // Create another role, but catalog denies to create a table, schema allows to create a table
+    allowObject =
+        SecurableObjects.parse(
+            String.format("%s", catalogName),
+            MetadataObject.Type.CATALOG,
+            Lists.newArrayList(Privileges.CreateTable.deny()));
+    denyObject =
+        SecurableObjects.parse(
+            String.format("%s.%s", catalogName, schemaName),
+            MetadataObject.Type.SCHEMA,
+            Lists.newArrayList(Privileges.CreateTable.allow()));
+    metalake.createRole(
+        roleName, Collections.emptyMap(), Lists.newArrayList(allowObject, denyObject));
+
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+
+    waitForUpdatingPolicies();
+
+    // Fail to create a table
+    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+
+    // Clean up
+    catalog.asSchemas().dropSchema(schemaName, true);
+    metalake.deleteRole(roleName);
+  }
+
+  @Test
   void testAllowUseSchemaPrivilege() throws InterruptedException {
     // Create a role with CREATE_SCHEMA privilege
     String roleName = currentFunName();
