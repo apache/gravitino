@@ -808,16 +808,20 @@ public class RangerHiveIT {
       throws RangerServiceException {
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", funcName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", funcName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", funcName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", funcName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     Assertions.assertEquals(
         4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
 
