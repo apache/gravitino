@@ -246,7 +246,8 @@ public class RangerHelper {
     try {
       rangerClient.getRole(roleName, rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
-      throw new AuthorizationPluginException(e);
+      throw new AuthorizationPluginException(
+          e, "Failed to check the role(%s) in the Ranger", roleName);
     }
     return true;
   }
@@ -302,7 +303,8 @@ public class RangerHelper {
         rangerClient.createRole(rangerServiceName, rangerRole);
       }
     } catch (RangerServiceException e) {
-      throw new RuntimeException(e);
+      throw new AuthorizationPluginException(
+          e, "Failed to create the role(%s) in the Ranger", roleName);
     }
     return rangerRole;
   }
