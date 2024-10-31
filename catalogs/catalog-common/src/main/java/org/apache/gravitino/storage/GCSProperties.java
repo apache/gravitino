@@ -16,17 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.gravitino.storage;
 
-// Defines the unified OSS properties for different catalogs and connectors.
-public class OSSProperties {
+public class GCSProperties {
 
-  // The endpoint of Aliyun OSS service.
-  public static final String GRAVITINO_OSS_ENDPOINT = "oss-endpoint";
-  // The static access key ID used to access OSS data.
-  public static final String GRAVITINO_OSS_ACCESS_KEY_ID = "oss-access-key-id";
-  // The static access key secret used to access OSS data.
-  public static final String GRAVITINO_OSS_ACCESS_KEY_SECRET = "oss-secret-access-key";
+  // The path of service account JSON file of Google Cloud Storage.
+  public static final String GCS_SERVICE_ACCOUNT_JSON_PATH = "gcs-service-account-file";
 
-  private OSSProperties() {}
+  private GCSProperties() {}
 }
