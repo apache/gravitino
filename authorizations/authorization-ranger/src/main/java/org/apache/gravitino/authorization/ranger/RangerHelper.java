@@ -163,7 +163,7 @@ public class RangerHelper {
   }
 
   /**
-   * Find the managed policies for the ranger securable object.
+   * Find the managed policy for the ranger metadata names.
    *
    * @param metadataNames The metadata object names to find the managed policy.
    * @return The managed policy for the metadata object.
@@ -182,7 +182,7 @@ public class RangerHelper {
       List<RangerPolicy> policies = rangerClient.findPolicies(searchFilters);
       return policies;
     } catch (RangerServiceException e) {
-      throw new AuthorizationPluginException(e);
+      throw new AuthorizationPluginException(e, "Failed to find the policies in the Ranger");
     }
   }
 
@@ -246,7 +246,8 @@ public class RangerHelper {
     try {
       rangerClient.getRole(roleName, rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
-      throw new AuthorizationPluginException(e);
+      throw new AuthorizationPluginException(
+          e, "Failed to check the role(%s) in the Ranger", roleName);
     }
     return true;
   }
@@ -302,7 +303,8 @@ public class RangerHelper {
         rangerClient.createRole(rangerServiceName, rangerRole);
       }
     } catch (RangerServiceException e) {
-      throw new RuntimeException(e);
+      throw new AuthorizationPluginException(
+          e, "Failed to create the role(%s) in the Ranger", roleName);
     }
     return rangerRole;
   }
