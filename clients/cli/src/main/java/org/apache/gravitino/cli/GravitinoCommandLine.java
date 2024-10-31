@@ -78,6 +78,8 @@ import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
 import org.apache.gravitino.cli.commands.UpdateMetalakeName;
+import org.apache.gravitino.cli.commands.UpdateTableComment;
+import org.apache.gravitino.cli.commands.UpdateTableName;
 import org.apache.gravitino.cli.commands.UpdateTagComment;
 import org.apache.gravitino.cli.commands.UpdateTagName;
 import org.apache.gravitino.cli.commands.UserDetails;
@@ -362,6 +364,15 @@ public class GravitinoCommandLine {
       new RemoveTableProperty(url, ignore, metalake, catalog, schema, table, property).handle();
     } else if (CommandActions.PROPERTIES.equals(command)) {
       new ListTableProperties(url, ignore, metalake, catalog, schema, table).handle();
+    } else if (CommandActions.UPDATE.equals(command)) {
+      if (line.hasOption(GravitinoOptions.COMMENT)) {
+        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+        new UpdateTableComment(url, ignore, metalake, catalog, schema, table, comment).handle();
+      }
+      if (line.hasOption(GravitinoOptions.RENAME)) {
+        String newName = line.getOptionValue(GravitinoOptions.RENAME);
+        new UpdateTableName(url, ignore, metalake, catalog, schema, table, newName).handle();
+      }
     }
   }
 
