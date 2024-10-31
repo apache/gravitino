@@ -53,6 +53,7 @@ import org.apache.gravitino.cli.commands.ListMetalakeProperties;
 import org.apache.gravitino.cli.commands.ListMetalakes;
 import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
+import org.apache.gravitino.cli.commands.ListTableProperties;
 import org.apache.gravitino.cli.commands.ListTables;
 import org.apache.gravitino.cli.commands.ListTagProperties;
 import org.apache.gravitino.cli.commands.ListUsers;
@@ -60,12 +61,14 @@ import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
 import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
+import org.apache.gravitino.cli.commands.RemoveTableProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
 import org.apache.gravitino.cli.commands.SchemaDetails;
 import org.apache.gravitino.cli.commands.ServerVersion;
 import org.apache.gravitino.cli.commands.SetCatalogProperty;
 import org.apache.gravitino.cli.commands.SetMetalakeProperty;
 import org.apache.gravitino.cli.commands.SetSchemaProperty;
+import org.apache.gravitino.cli.commands.SetTableProperty;
 import org.apache.gravitino.cli.commands.SetTagProperty;
 import org.apache.gravitino.cli.commands.TableDetails;
 import org.apache.gravitino.cli.commands.TagDetails;
@@ -350,6 +353,15 @@ public class GravitinoCommandLine {
       // TODO
     } else if (CommandActions.DELETE.equals(command)) {
       new DeleteTable(url, ignore, metalake, catalog, schema, table).handle();
+    } else if (CommandActions.SET.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      String value = line.getOptionValue(GravitinoOptions.VALUE);
+      new SetTableProperty(url, ignore, metalake, catalog, schema, table, property, value).handle();
+    } else if (CommandActions.REMOVE.equals(command)) {
+      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+      new RemoveTableProperty(url, ignore, metalake, catalog, schema, table, property).handle();
+    } else if (CommandActions.PROPERTIES.equals(command)) {
+      new ListTableProperties(url, ignore, metalake, catalog, schema, table).handle();
     }
   }
 
