@@ -113,7 +113,7 @@ public abstract class RangerAuthorizationPlugin
    * 2. Save role name in the Policy items. <br>
    */
   @Override
-  public Boolean onRoleCreated(Role role) throws RuntimeException {
+  public Boolean onRoleCreated(Role role) throws AuthorizationPluginException {
     if (!validAuthorizationOperation(role.securableObjects())) {
       return false;
     }
@@ -127,7 +127,7 @@ public abstract class RangerAuthorizationPlugin
   }
 
   @Override
-  public Boolean onRoleAcquired(Role role) throws RuntimeException {
+  public Boolean onRoleAcquired(Role role) throws AuthorizationPluginException {
     if (!validAuthorizationOperation(role.securableObjects())) {
       return false;
     }
@@ -136,7 +136,7 @@ public abstract class RangerAuthorizationPlugin
 
   /** Remove the role name from the Ranger policy item, and delete this Role in the Ranger. <br> */
   @Override
-  public Boolean onRoleDeleted(Role role) throws RuntimeException {
+  public Boolean onRoleDeleted(Role role) throws AuthorizationPluginException {
     if (!validAuthorizationOperation(role.securableObjects())) {
       return false;
     }
@@ -157,7 +157,8 @@ public abstract class RangerAuthorizationPlugin
   }
 
   @Override
-  public Boolean onRoleUpdated(Role role, RoleChange... changes) throws RuntimeException {
+  public Boolean onRoleUpdated(Role role, RoleChange... changes)
+      throws AuthorizationPluginException {
     for (RoleChange change : changes) {
       if (change instanceof RoleChange.AddSecurableObject) {
         SecurableObject securableObject =
@@ -171,7 +172,7 @@ public abstract class RangerAuthorizationPlugin
             .forEach(
                 rangerSecurableObject -> {
                   if (!doAddSecurableObject(role.name(), rangerSecurableObject)) {
-                    throw new RuntimeException(
+                    throw new AuthorizationPluginException(
                         "Failed to add the securable object to the Ranger policy!");
                   }
                 });
@@ -187,7 +188,7 @@ public abstract class RangerAuthorizationPlugin
             .forEach(
                 rangerSecurableObject -> {
                   if (!doRemoveSecurableObject(role.name(), rangerSecurableObject)) {
-                    throw new RuntimeException(
+                    throw new AuthorizationPluginException(
                         "Failed to add the securable object to the Ranger policy!");
                   }
                 });
@@ -276,7 +277,7 @@ public abstract class RangerAuthorizationPlugin
    */
   @Override
   public Boolean onOwnerSet(MetadataObject metadataObject, Owner preOwner, Owner newOwner)
-      throws RuntimeException {
+      throws AuthorizationPluginException {
     Preconditions.checkArgument(newOwner != null, "The newOwner must be not null");
 
     // Add the user or group to the Ranger
@@ -365,7 +366,8 @@ public abstract class RangerAuthorizationPlugin
                       rangerClient.updatePolicy(policy.getId(), policy);
                     }
                   } catch (RangerServiceException e) {
-                    throw new RuntimeException(e);
+                    throw new AuthorizationPluginException(
+                        e, "Failed to add the owner to the Ranger!");
                   }
                 });
         break;
@@ -385,7 +387,8 @@ public abstract class RangerAuthorizationPlugin
                       rangerClient.updatePolicy(policy.getId(), policy);
                     }
                   } catch (RangerServiceException e) {
-                    throw new RuntimeException(e);
+                    throw new AuthorizationPluginException(
+                        e, "Failed to add the owner to the Ranger!");
                   }
                 });
         break;
@@ -408,7 +411,8 @@ public abstract class RangerAuthorizationPlugin
    * @param user The user to grant the roles.
    */
   @Override
-  public Boolean onGrantedRolesToUser(List<Role> roles, User user) throws RuntimeException {
+  public Boolean onGrantedRolesToUser(List<Role> roles, User user)
+      throws AuthorizationPluginException {
     if (roles.stream().anyMatch(role -> !validAuthorizationOperation(role.securableObjects()))) {
       return false;
     }
@@ -443,7 +447,8 @@ public abstract class RangerAuthorizationPlugin
    * @param user The user to revoke the roles.
    */
   @Override
-  public Boolean onRevokedRolesFromUser(List<Role> roles, User user) throws RuntimeException {
+  public Boolean onRevokedRolesFromUser(List<Role> roles, User user)
+      throws AuthorizationPluginException {
     if (roles.stream().anyMatch(role -> !validAuthorizationOperation(role.securableObjects()))) {
       return false;
     }
@@ -477,7 +482,8 @@ public abstract class RangerAuthorizationPlugin
    * @param group The group to grant the roles.
    */
   @Override
-  public Boolean onGrantedRolesToGroup(List<Role> roles, Group group) throws RuntimeException {
+  public Boolean onGrantedRolesToGroup(List<Role> roles, Group group)
+      throws AuthorizationPluginException {
     if (roles.stream().anyMatch(role -> !validAuthorizationOperation(role.securableObjects()))) {
       return false;
     }
@@ -510,7 +516,8 @@ public abstract class RangerAuthorizationPlugin
    * @param group The group to revoke the roles.
    */
   @Override
-  public Boolean onRevokedRolesFromGroup(List<Role> roles, Group group) throws RuntimeException {
+  public Boolean onRevokedRolesFromGroup(List<Role> roles, Group group)
+      throws AuthorizationPluginException {
     if (roles.stream().anyMatch(role -> !validAuthorizationOperation(role.securableObjects()))) {
       return false;
     }
@@ -533,7 +540,7 @@ public abstract class RangerAuthorizationPlugin
   }
 
   @Override
-  public Boolean onUserAdded(User user) throws RuntimeException {
+  public Boolean onUserAdded(User user) throws AuthorizationPluginException {
     VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
     if (list.getListSize() > 0) {
       LOG.warn("The user({}) already exists in the Ranger!", user.name());
@@ -545,7 +552,7 @@ public abstract class RangerAuthorizationPlugin
   }
 
   @Override
-  public Boolean onUserRemoved(User user) throws RuntimeException {
+  public Boolean onUserRemoved(User user) throws AuthorizationPluginException {
     VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
     if (list.getListSize() == 0) {
       LOG.warn("The user({}) doesn't exist in the Ranger!", user);
@@ -556,7 +563,7 @@ public abstract class RangerAuthorizationPlugin
   }
 
   @Override
-  public Boolean onUserAcquired(User user) throws RuntimeException {
+  public Boolean onUserAcquired(User user) throws AuthorizationPluginException {
     VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
     if (list.getListSize() == 0) {
       LOG.warn("The user({}) doesn't exist in the Ranger!", user);
@@ -566,13 +573,13 @@ public abstract class RangerAuthorizationPlugin
   }
 
   @Override
-  public Boolean onGroupAdded(Group group) throws RuntimeException {
+  public Boolean onGroupAdded(Group group) throws AuthorizationPluginException {
     return rangerClient.createGroup(
         VXGroup.builder().withName(group.name()).withDescription(group.name()).build());
   }
 
   @Override
-  public Boolean onGroupRemoved(Group group) throws RuntimeException {
+  public Boolean onGroupRemoved(Group group) throws AuthorizationPluginException {
     VXGroupList list = rangerClient.searchGroup(ImmutableMap.of("name", group.name()));
     if (list.getListSize() == 0) {
       LOG.warn("The group({}) doesn't exist in the Ranger!", group);
@@ -650,7 +657,8 @@ public abstract class RangerAuthorizationPlugin
         rangerClient.updatePolicy(policy.getId(), policy);
       }
     } catch (RangerServiceException e) {
-      throw new RuntimeException(e);
+      throw new AuthorizationPluginException(
+          e, "Failed to add the securable object to the Ranger!");
     }
 
     return true;
@@ -720,7 +728,8 @@ public abstract class RangerAuthorizationPlugin
       }
     } catch (RangerServiceException e) {
       LOG.error("Failed to remove the policy item from the Ranger policy {}!", policy);
-      throw new RuntimeException(e);
+      throw new AuthorizationPluginException(
+          e, "Failed to remove the securable object from Ranger!");
     }
     return true;
   }
