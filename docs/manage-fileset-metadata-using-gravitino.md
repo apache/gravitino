@@ -52,6 +52,22 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "location": "file:/tmp/root"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
+
+# create a S3 catalog
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "catalog",
+  "type": "FILESET",
+  "comment": "comment",
+  "provider": "hadoop",
+  "properties": {
+    "location": "oss:/bucket/root",
+    "s3-access-key-id": "access_key",
+    "s3-secret-access-key": "secret_key",
+    "s3-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
+    "filesystem-providers": "s3"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
 </TabItem>
@@ -74,6 +90,21 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
     "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a Hadoop fileset catalog",
     properties);
+
+// create a S3 catalog
+s3Properties = ImmutableMap.<String, String>builder()
+    .put("location", "oss:/bucket/root")
+    .put("s3-access-key-id", "access_key")
+    .put("s3-secret-access-key", "secret_key")
+    .put("s3-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
+    .put("filesystem-providers", "s3")
+    .build();
+
+Catalog s3Catalog = gravitinoClient.createCatalog("catalog",
+    Type.FILESET,
+    "hadoop", // provider, Gravitino only supports "hadoop" for now.
+    "This is a S3 fileset catalog",
+    s3Properties);
 // ...
 ```
 
@@ -87,6 +118,20 @@ catalog = gravitino_client.create_catalog(name="catalog",
                                           provider="hadoop", 
                                           comment="This is a Hadoop fileset catalog",
                                           properties={"location": "/tmp/test1"})
+
+# create a S3 catalog
+s3_properties = {
+    "location": "oss:/bucket/root",
+    "s3-access-key-id": "access_key"
+    "s3-secret-access-key": "secret_key",
+    "s3-endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
+}
+
+s3_catalog = gravitino_client.create_catalog(name="catalog",
+                                             type=Catalog.Type.FILESET,
+                                             provider="hadoop",
+                                             comment="This is a S3 fileset catalog",
+                                             properties=s3_properties)
 ```
 
 </TabItem>
@@ -313,6 +358,13 @@ Currently, Gravitino supports two **types** of filesets:
 
 The `storageLocation` is the physical location of the fileset. Users can specify this location
 when creating a fileset, or follow the rules of the catalog/schema location if not specified.
+
+The value of `storageLocation` depends on the configuration settings of the catalog:
+- If this is a S3 fileset catalog, the `storageLocation` should be in the format of `s3a://bucket-name/path/to/fileset`.
+- If this is an OSS fileset catalog, the `storageLocation` should be in the format of `oss://bucket-name/path/to/fileset`.
+- If this is a local fileset catalog, the `storageLocation` should be in the format of `file:/path/to/fileset`.
+- If this is a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
+- If this is a GCS fileset catalog, the `storageLocation` should be in the format of `gs://bucket-name/path/to/fileset`.
 
 For a `MANAGED` fileset, the storage location is:
 
