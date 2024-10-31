@@ -473,6 +473,7 @@ public class CatalogOceanBaseIT extends BaseIT {
             + "  date_col_5 date DEFAULT '2024-04-01',\n"
             + "  timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
             + "  timestamp_col_2 timestamp default 19830905,\n"
+            + "  timestamp_col_3 timestamp(6) default CURRENT_TIMESTAMP(6),\n"
             + "  decimal_6_2_col_1 decimal(6, 2) default 1.2,\n"
             + "  bit_col_1 bit default b'1'\n"
             + ");\n";
@@ -511,6 +512,7 @@ public class CatalogOceanBaseIT extends BaseIT {
           break;
         case "datetime_col_1":
         case "datetime_col_2":
+        case "timestamp_col_3":
           Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
           break;
         case "datetime_col_3":
