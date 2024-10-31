@@ -115,7 +115,6 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
     configMap.put(
         "gravitino.iceberg-rest.authentication.kerberos.keytab-uri",
         tempDir + HIVE_METASTORE_CLIENT_KEYTAB);
-    configMap.put("gravitino.iceberg-rest.hive.metastore.sasl.enabled", "true");
     configMap.put(
         "gravitino.iceberg-rest.hive.metastore.kerberos.principal",
         "hive/_HOST@HADOOPKRB"

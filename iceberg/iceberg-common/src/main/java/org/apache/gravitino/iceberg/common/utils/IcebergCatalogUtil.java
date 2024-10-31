@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.common.utils;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
+import static org.apache.hadoop.hive.conf.HiveConf.ConfVars.METASTORE_USE_THRIFT_SASL;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -78,6 +79,7 @@ public class IcebergCatalogUtil {
       resultProperties.put(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME");
       hdfsConfiguration.set(HADOOP_SECURITY_AUTHORIZATION, "true");
       hdfsConfiguration.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
+      hdfsConfiguration.set(METASTORE_USE_THRIFT_SASL.varname, "true");
       hiveCatalog.setConf(hdfsConfiguration);
       hiveCatalog.initialize(icebergCatalogName, properties);
 

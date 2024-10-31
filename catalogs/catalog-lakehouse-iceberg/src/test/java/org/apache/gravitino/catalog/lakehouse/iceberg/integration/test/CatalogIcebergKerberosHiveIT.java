@@ -232,8 +232,6 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
         CATALOG_BYPASS_PREFIX + "hive.metastore.kerberos.principal",
         "hive/_HOST@HADOOPKRB"
             .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
-    properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
-
     properties.put(IcebergConfig.CATALOG_BACKEND.getKey(), TYPE);
     properties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
     properties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
