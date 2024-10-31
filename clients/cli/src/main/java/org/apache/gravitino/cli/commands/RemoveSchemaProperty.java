@@ -59,6 +59,7 @@ public class RemoveSchemaProperty extends Command {
   }
 
   /** Remove a property of a schema. */
+  @override 
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

@@ -51,6 +51,7 @@ public class ListColumns extends TableCommand {
   }
 
   /** Displays the details of a table's columns. */
+  @override 
   public void handle() {
     Column[] columns = null;
 

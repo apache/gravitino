@@ -40,6 +40,7 @@ public class MetalakeDetails extends Command {
   }
 
   /** Displays the name and comment of a metalake. */
+  @override 
   public void handle() {
     String comment = "";
     try {

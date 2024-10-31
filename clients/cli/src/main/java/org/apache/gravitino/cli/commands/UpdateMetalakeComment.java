@@ -46,6 +46,7 @@ public class UpdateMetalakeComment extends Command {
   }
 
   /** Update the comment of a metalake. */
+  @override 
   public void handle() {
     try {
       GravitinoAdminClient client = buildAdminClient();

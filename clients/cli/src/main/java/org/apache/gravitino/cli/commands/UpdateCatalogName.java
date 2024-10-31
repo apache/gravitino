@@ -49,6 +49,7 @@ public class UpdateCatalogName extends Command {
   }
 
   /** Update the name of a catalog. */
+  @override 
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

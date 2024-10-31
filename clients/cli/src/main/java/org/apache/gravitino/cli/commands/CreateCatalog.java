@@ -60,6 +60,7 @@ public class CreateCatalog extends Command {
   }
 
   /** Create a new catalog. */
+  @override 
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
