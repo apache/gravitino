@@ -588,8 +588,8 @@ class Types:
             def name(self):
                 return self._name
 
-            def type(self):
-                return self._type
+            def field_type(self):
+                return self._field_type
 
             def nullable(self):
                 return self._nullable
@@ -608,18 +608,18 @@ class Types:
                     return False
                 return (
                     self._name == other._name
-                    and self._type == other._type
+                    and self._field_type == other._field_type
                     and self._nullable == other._nullable
                     and self._comment == other._comment
                 )
 
             def __hash__(self):
-                return hash((self._name, self._type, self._nullable))
+                return hash((self._name, self._field_type, self._nullable))
 
             def simple_string(self) -> str:
                 nullable_str = "NULL" if self._nullable else "NOT NULL"
                 comment_str = f" COMMENT '{self._comment}'" if self._comment else ""
-                return f"{self._name}: {self._type.simple_string()} {nullable_str}{comment_str}"
+                return f"{self._name}: {self._field_type.simple_string()} {nullable_str}{comment_str}"
 
     class ListType(ComplexType):
         def __init__(self, element_type: Type, element_nullable: bool):
