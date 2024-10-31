@@ -22,7 +22,7 @@ import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
 /** An exception thrown when an authorization plugin operation failed. */
-public class AuthorizationPluginException extends IllegalArgumentException {
+public class AuthorizationPluginException extends GravitinoRuntimeException {
 
   /**
    * Constructs a new exception with the specified detail message.
@@ -36,11 +36,15 @@ public class AuthorizationPluginException extends IllegalArgumentException {
   }
 
   /**
-   * Constructs a new exception with the specified cause.
+   * Constructs a new exception with the specified detail message and cause.
    *
    * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
    */
-  public AuthorizationPluginException(Throwable cause) {
-    super(cause);
+  @FormatMethod
+  public AuthorizationPluginException(
+      Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
   }
 }

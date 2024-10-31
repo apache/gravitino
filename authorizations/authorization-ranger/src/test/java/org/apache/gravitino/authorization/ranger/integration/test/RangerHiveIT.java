@@ -22,6 +22,7 @@ import static org.apache.gravitino.authorization.ranger.integration.test.RangerI
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.rangerClient;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.verifyRoleInRanger;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -49,6 +50,7 @@ import org.apache.gravitino.authorization.ranger.RangerMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.RangerSecurableObject;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -325,16 +327,20 @@ public class RangerHiveIT {
     String dbName = currentFunName();
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", dbName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", dbName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     // findManagedPolicy function use precise search, so return null
     RangerSecurableObject rangerSecurableObject =
         rangerAuthHivePlugin.generateRangerSecurableObject(
@@ -348,12 +354,33 @@ public class RangerHiveIT {
     // Add a policy for `db3.tab1`
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "tab1"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     // findManagedPolicy function use precise search, so return not null
     Assertions.assertNotNull(rangerHelper.findManagedPolicy(rangerSecurableObject));
   }
 
-  static void createHivePolicy(List<String> metaObjects, String roleName) {
+  @Test
+  public void testManagedByGravitinoLabel() {
+    RoleEntity role = mock3TableRole(currentFunName());
+    role.securableObjects().stream()
+        .forEach(
+            securableObject -> {
+              Joiner DOT_JOINER = Joiner.on('.');
+              List<String> names =
+                  Lists.newArrayList(
+                      SecurableObjects.DOT_SPLITTER.splitToList(securableObject.fullName()));
+              names.remove(0); // remove catalog node
+              // Manual create the Ranger Policy
+              createHivePolicy(Lists.newArrayList(names), DOT_JOINER.join(names), false);
+            });
+    // Use role to create Ranger Policy
+    Assertions.assertThrows(
+        AuthorizationPluginException.class, () -> rangerAuthHivePlugin.onRoleCreated(role));
+  }
+
+  static void createHivePolicy(
+      List<String> metaObjects, String roleName, boolean labelManagedByGravitino) {
     Assertions.assertTrue(metaObjects.size() < 4);
     Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap = new HashMap<>();
     for (int i = 0; i < metaObjects.size(); i++) {
@@ -377,7 +404,8 @@ public class RangerHiveIT {
         RangerITEnv.RANGER_HIVE_REPO_NAME,
         roleName,
         policyResourceMap,
-        Collections.singletonList(policyItem));
+        Collections.singletonList(policyItem),
+        labelManagedByGravitino);
   }
 
   static boolean deleteHivePolicy(RangerSecurableObject rangerSecurableObject) {
@@ -780,16 +808,20 @@ public class RangerHiveIT {
       throws RangerServiceException {
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", funcName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", funcName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", funcName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", funcName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     Assertions.assertEquals(
         4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
 
