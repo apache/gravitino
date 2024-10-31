@@ -20,7 +20,7 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 Changelog
 
 - apache/gravitino:0.7.0-incubating
-  - Based on Gravitino 0.7.0-incubating, you can know more information from 0.7.0-incubating release notes.
+  - Based on Gravitino 0.7.0-incubating, you can know more information from 0.7.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.7.0-incubating).
   - Place bundle jars (gravitino-aws-bundle.jar, gravitino-gcp-bundle.jar, gravitino-aliyun-bundle.jar) in the `${GRAVITINO_HOME}/catalogs/hadoop/libs` folder to support the cloud storage catalog without manually adding the jars to the classpath.
 
 - apache/gravitino:0.6.1-incubating
