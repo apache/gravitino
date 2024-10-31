@@ -45,7 +45,7 @@ public class UpdateMetalakeName extends Command {
   }
 
   /** Update the name of a metalake. */
-  @override 
+  @Override
   public void handle() {
     try {
       GravitinoAdminClient client = buildAdminClient();

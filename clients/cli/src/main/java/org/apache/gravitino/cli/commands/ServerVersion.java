@@ -35,7 +35,7 @@ public class ServerVersion extends Command {
   }
 
   /** Displays the server version. */
-  @override 
+  @Override
   public void handle() {
     String version = "unknown";
     try {

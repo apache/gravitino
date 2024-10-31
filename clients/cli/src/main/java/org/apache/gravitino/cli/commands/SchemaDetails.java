@@ -51,7 +51,7 @@ public class SchemaDetails extends Command {
   }
 
   /** Displays the name and comments of schema. */
-  @override 
+  @Override
   public void handle() {
     Schema result = null;
 

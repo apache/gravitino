@@ -42,7 +42,7 @@ public class CreateMetalake extends Command {
   }
 
   /** Create a new metalake. */
-  @override 
+  @Override
   public void handle() {
     try {
       GravitinoAdminClient client = buildAdminClient();

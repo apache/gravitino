@@ -49,7 +49,7 @@ public class DeleteSchema extends Command {
   }
 
   /** Delete a schema. */
-  @override 
+  @Override
   public void handle() {
     boolean deleted = false;
 

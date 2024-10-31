@@ -35,7 +35,7 @@ public class ClientVersion extends Command {
   }
 
   /** Displays the client version. */
-  @override 
+  @Override
   public void handle() {
     String version = "unknown";
     try {

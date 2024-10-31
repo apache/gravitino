@@ -34,7 +34,7 @@ public class ListProperties extends Command {
     super(url, ignoreVersions);
   }
 
-  @override 
+  @Override
   public void handle() {
     /* Do nothing */
   }

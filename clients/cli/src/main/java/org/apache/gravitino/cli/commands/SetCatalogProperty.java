@@ -58,7 +58,7 @@ public class SetCatalogProperty extends Command {
   }
 
   /** Set a property of a catalog. */
-  @override 
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

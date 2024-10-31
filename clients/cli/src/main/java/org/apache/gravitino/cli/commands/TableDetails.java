@@ -51,7 +51,7 @@ public class TableDetails extends TableCommand {
   }
 
   /** Displays the details of a table. */
-  @override 
+  @Override
   public void handle() {
     Table gTable = null;
 

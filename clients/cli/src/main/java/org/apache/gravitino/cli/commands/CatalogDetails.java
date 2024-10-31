@@ -45,7 +45,7 @@ public class CatalogDetails extends Command {
   }
 
   /** Displays the name and details of a specified catalog. */
-  @override 
+  @Override
   public void handle() {
     Catalog result = null;
 

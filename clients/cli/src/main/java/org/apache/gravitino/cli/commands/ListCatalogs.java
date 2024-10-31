@@ -42,7 +42,7 @@ public class ListCatalogs extends Command {
   }
 
   /** Lists all catalogs in a metalake. */
-  @override 
+  @Override
   public void handle() {
     String[] catalogs = new String[0];
     try {

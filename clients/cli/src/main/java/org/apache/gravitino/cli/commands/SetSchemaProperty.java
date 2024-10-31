@@ -63,7 +63,7 @@ public class SetSchemaProperty extends Command {
   }
 
   /** Set a property of a schema. */
-  @override 
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

@@ -59,7 +59,7 @@ public class DeleteTable extends Command {
   }
 
   /** Delete a table. */
-  @override 
+  @Override
   public void handle() {
     boolean deleted = false;
 

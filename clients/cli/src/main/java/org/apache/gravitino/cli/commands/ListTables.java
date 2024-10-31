@@ -46,7 +46,7 @@ public class ListTables extends TableCommand {
   }
 
   /** List the names of all tables in a schema. */
-  @override 
+  @Override
   public void handle() {
     NameIdentifier[] tables = null;
     Namespace name = Namespace.of(schema);

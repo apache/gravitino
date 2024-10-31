@@ -38,7 +38,7 @@ public class AllMetalakeDetails extends Command {
   }
 
   /** Displays the name and comment of all metalakes. */
-  @override 
+  @Override
   public void handle() {
     Metalake[] metalakes = new Metalake[0];
     try {

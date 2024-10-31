@@ -49,7 +49,7 @@ public class SetMetalakeProperty extends Command {
   }
 
   /** Set a property of a metalake. */
-  @override 
+  @Override
   public void handle() {
     try {
       GravitinoAdminClient client = buildAdminClient();

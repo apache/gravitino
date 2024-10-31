@@ -56,7 +56,7 @@ public class CreateSchema extends Command {
   }
 
   /** Create a new schema. */
-  @override 
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
