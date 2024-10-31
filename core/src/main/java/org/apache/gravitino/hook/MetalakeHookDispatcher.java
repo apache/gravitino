@@ -85,6 +85,9 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
   @Override
   public Metalake alterMetalake(NameIdentifier ident, MetalakeChange... changes)
       throws NoSuchMetalakeException, IllegalArgumentException {
+    // For underlying authorization plugins, the privilege information shouldn't
+    // contain metalake information, so metalake rename won't affect the privileges
+    // of the authorization plugin.
     return dispatcher.alterMetalake(ident, changes);
   }
 
@@ -102,6 +105,12 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
   @Override
   public void disableMetalake(NameIdentifier ident) throws NoSuchMetalakeException {
     dispatcher.disableMetalake(ident);
+  }
+
+  public boolean dropMetalake(NameIdentifier ident) {
+    // For metalake, we don't clear all the privileges of catalog authorization plugin.
+    // we just remove metalake.
+    return dispatcher.dropMetalake(ident);
   }
 
   @Override

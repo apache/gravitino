@@ -88,7 +88,9 @@ public class TopicHookDispatcher implements TopicDispatcher {
 
   @Override
   public boolean dropTopic(NameIdentifier ident) {
-    return dispatcher.dropTopic(ident);
+    boolean dropped = dispatcher.dropTopic(ident);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.TOPIC);
+    return dropped;
   }
 
   @Override
