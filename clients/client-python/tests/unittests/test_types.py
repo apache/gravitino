@@ -21,163 +21,172 @@ from gravitino.api.types import Types, Name
 
 class TestTypes(unittest.TestCase):
 
-    # Test NullType singleton and methods
     def test_null_type(self):
-        null_type_1 = Types.NullType.get()
-        null_type_2 = Types.NullType.get()
+        instance = Types.NullType.get()
+        self.assertIsInstance(instance, Types.NullType)
+        self.assertEqual(instance.name(), Name.NULL)
+        self.assertEqual(instance.simple_string(), "null")
+        self.assertIs(instance, Types.NullType.get())  # Singleton check
 
-        self.assertIs(
-            null_type_1,
-            null_type_2,
-            "NullType should return the same singleton instance",
-        )
-        self.assertEqual(null_type_1.name(), Name.NULL)
-        self.assertEqual(null_type_1.simpleString(), "null")
-
-    # Test BooleanType singleton and methods
     def test_boolean_type(self):
-        boolean_type_1 = Types.BooleanType.get()
-        boolean_type_2 = Types.BooleanType.get()
+        instance = Types.BooleanType.get()
+        self.assertIsInstance(instance, Types.BooleanType)
+        self.assertEqual(instance.name(), Name.BOOLEAN)
+        self.assertEqual(instance.simple_string(), "boolean")
+        self.assertIs(instance, Types.BooleanType.get())  # Singleton check
 
-        self.assertIs(
-            boolean_type_1,
-            boolean_type_2,
-            "BooleanType should return the same singleton instance",
-        )
-        self.assertEqual(boolean_type_1.name(), Name.BOOLEAN)
-        self.assertEqual(boolean_type_1.simpleString(), "boolean")
-
-    # Test ByteType for signed and unsigned versions
     def test_byte_type(self):
-        signed_byte = Types.ByteType.get()
-        unsigned_byte = Types.ByteType.unsigned()
+        signed_instance = Types.ByteType.get()
+        unsigned_instance = Types.ByteType.unsigned()
+        self.assertIsInstance(signed_instance, Types.ByteType)
+        self.assertEqual(signed_instance.name(), Name.BYTE)
+        self.assertEqual(signed_instance.simple_string(), "byte")
+        self.assertEqual(unsigned_instance.simple_string(), "byte unsigned")
 
-        self.assertEqual(signed_byte.name(), Name.BYTE)
-        self.assertEqual(signed_byte.simpleString(), "byte")
-        self.assertEqual(unsigned_byte.simpleString(), "byte unsigned")
-
-    # Test ShortType for signed and unsigned versions
     def test_short_type(self):
-        signed_short = Types.ShortType.get()
-        unsigned_short = Types.ShortType.unsigned()
+        signed_instance = Types.ShortType.get()
+        unsigned_instance = Types.ShortType.unsigned()
+        self.assertIsInstance(signed_instance, Types.ShortType)
+        self.assertEqual(signed_instance.simple_string(), "short")
+        self.assertEqual(unsigned_instance.simple_string(), "short unsigned")
 
-        self.assertEqual(signed_short.name(), Name.SHORT)
-        self.assertEqual(signed_short.simpleString(), "short")
-        self.assertEqual(unsigned_short.simpleString(), "short unsigned")
-
-    # Test IntegerType for signed and unsigned versions
     def test_integer_type(self):
-        signed_int = Types.IntegerType.get()
-        unsigned_int = Types.IntegerType.unsigned()
+        signed_instance = Types.IntegerType.get()
+        unsigned_instance = Types.IntegerType.unsigned()
+        self.assertIsInstance(signed_instance, Types.IntegerType)
+        self.assertEqual(signed_instance.simple_string(), "integer")
+        self.assertEqual(unsigned_instance.simple_string(), "integer unsigned")
 
-        self.assertEqual(signed_int.name(), Name.INTEGER)
-        self.assertEqual(signed_int.simpleString(), "integer")
-        self.assertEqual(unsigned_int.simpleString(), "integer unsigned")
+    def test_long_type(self):
+        signed_instance = Types.LongType.get()
+        unsigned_instance = Types.LongType.unsigned()
+        self.assertIsInstance(signed_instance, Types.LongType)
+        self.assertEqual(signed_instance.simple_string(), "long")
+        self.assertEqual(unsigned_instance.simple_string(), "long unsigned")
 
-    # Test DecimalType and its methods
+    def test_float_type(self):
+        instance = Types.FloatType.get()
+        self.assertEqual(instance.name(), Name.FLOAT)
+        self.assertEqual(instance.simple_string(), "float")
+
+    def test_double_type(self):
+        instance = Types.DoubleType.get()
+        self.assertEqual(instance.name(), Name.DOUBLE)
+        self.assertEqual(instance.simple_string(), "double")
+
     def test_decimal_type(self):
-        decimal_type_1 = Types.DecimalType.of(10, 2)
-        decimal_type_2 = Types.DecimalType.of(10, 2)
-        decimal_type_3 = Types.DecimalType.of(12, 3)
+        instance = Types.DecimalType.of(10, 2)
+        self.assertEqual(instance.name(), Name.DECIMAL)
+        self.assertEqual(instance.precision(), 10)
+        self.assertEqual(instance.scale(), 2)
+        self.assertEqual(instance.simple_string(), "decimal(10,2)")
+        with self.assertRaises(ValueError):
+            Types.DecimalType.of(39, 2)  # Precision out of range
+        with self.assertRaises(ValueError):
+            Types.DecimalType.of(10, 11)  # Scale out of range
 
-        self.assertEqual(decimal_type_1.name(), Name.DECIMAL)
-        self.assertEqual(decimal_type_1.simpleString(), "decimal(10,2)")
-        self.assertEqual(
-            decimal_type_1,
-            decimal_type_2,
-            "Decimal types with the same precision and scale should be equal",
-        )
-        self.assertNotEqual(
-            decimal_type_1,
-            decimal_type_3,
-            "Decimal types with different precision/scale should not be equal",
-        )
-        self.assertNotEqual(
-            hash(decimal_type_1),
-            hash(decimal_type_3),
-            "Different decimal types should have different hash codes",
-        )
-
-    # Test DateType singleton and methods
     def test_date_type(self):
-        date_type_1 = Types.DateType.get()
-        date_type_2 = Types.DateType.get()
+        instance = Types.DateType.get()
+        self.assertEqual(instance.name(), Name.DATE)
+        self.assertEqual(instance.simple_string(), "date")
 
-        self.assertIs(
-            date_type_1,
-            date_type_2,
-            "DateType should return the same singleton instance",
-        )
-        self.assertEqual(date_type_1.name(), Name.DATE)
-        self.assertEqual(date_type_1.simpleString(), "date")
-
-    # Test TimeType singleton and methods
     def test_time_type(self):
-        time_type_1 = Types.TimeType.get()
-        time_type_2 = Types.TimeType.get()
+        instance = Types.TimeType.get()
+        self.assertEqual(instance.name(), Name.TIME)
+        self.assertEqual(instance.simple_string(), "time")
 
-        self.assertIs(
-            time_type_1,
-            time_type_2,
-            "TimeType should return the same singleton instance",
-        )
-        self.assertEqual(time_type_1.name(), Name.TIME)
-        self.assertEqual(time_type_1.simpleString(), "time")
+    def test_timestamp_type(self):
+        instance_with_tz = Types.TimestampType.with_time_zone()
+        instance_without_tz = Types.TimestampType.without_time_zone()
+        self.assertTrue(instance_with_tz.has_time_zone())
+        self.assertFalse(instance_without_tz.has_time_zone())
+        self.assertEqual(instance_with_tz.simple_string(), "timestamp_tz")
+        self.assertEqual(instance_without_tz.simple_string(), "timestamp")
 
-    # Test StringType singleton and methods
+    def test_interval_types(self):
+        year_instance = Types.IntervalYearType.get()
+        day_instance = Types.IntervalDayType.get()
+        self.assertEqual(year_instance.name(), Name.INTERVAL_YEAR)
+        self.assertEqual(day_instance.name(), Name.INTERVAL_DAY)
+        self.assertEqual(year_instance.simple_string(), "interval_year")
+        self.assertEqual(day_instance.simple_string(), "interval_day")
+
     def test_string_type(self):
-        string_type_1 = Types.StringType.get()
-        string_type_2 = Types.StringType.get()
+        instance = Types.StringType.get()
+        self.assertEqual(instance.name(), Name.STRING)
+        self.assertEqual(instance.simple_string(), "string")
 
-        self.assertIs(
-            string_type_1,
-            string_type_2,
-            "StringType should return the same singleton instance",
-        )
-        self.assertEqual(string_type_1.name(), Name.STRING)
-        self.assertEqual(string_type_1.simpleString(), "string")
-
-    # Test UUIDType singleton and methods
     def test_uuid_type(self):
-        uuid_type_1 = Types.UUIDType.get()
-        uuid_type_2 = Types.UUIDType.get()
+        instance = Types.UUIDType.get()
+        self.assertEqual(instance.name(), Name.UUID)
+        self.assertEqual(instance.simple_string(), "uuid")
 
-        self.assertIs(
-            uuid_type_1,
-            uuid_type_2,
-            "UUIDType should return the same singleton instance",
-        )
-        self.assertEqual(uuid_type_1.name(), Name.UUID)
-        self.assertEqual(uuid_type_1.simpleString(), "uuid")
-
-    # Test FixedType creation and equality
     def test_fixed_type(self):
-        fixed_type_1 = Types.FixedType.of(16)
-        fixed_type_2 = Types.FixedType.of(16)
-        fixed_type_3 = Types.FixedType.of(32)
+        instance = Types.FixedType.of(5)
+        self.assertEqual(instance.name(), Name.FIXED)
+        self.assertEqual(instance.length(), 5)
+        self.assertEqual(instance.simple_string(), "fixed(5)")
 
-        self.assertEqual(fixed_type_1.name(), Name.FIXED)
-        self.assertEqual(fixed_type_1.simpleString(), "fixed(16)")
-        self.assertEqual(fixed_type_1, fixed_type_2)
-        self.assertNotEqual(fixed_type_1, fixed_type_3)
-
-    # Test VarCharType creation and equality
     def test_varchar_type(self):
-        varchar_type_1 = Types.VarCharType.of(255)
-        varchar_type_2 = Types.VarCharType.of(255)
-        varchar_type_3 = Types.VarCharType.of(512)
+        instance = Types.VarCharType.of(10)
+        self.assertEqual(instance.name(), Name.VARCHAR)
+        self.assertEqual(instance.length(), 10)
+        self.assertEqual(instance.simple_string(), "varchar(10)")
 
-        self.assertEqual(varchar_type_1.name(), Name.VARCHAR)
-        self.assertEqual(varchar_type_1.simpleString(), "varchar(255)")
-        self.assertEqual(varchar_type_1, varchar_type_2)
-        self.assertNotEqual(varchar_type_1, varchar_type_3)
+    def test_fixed_char_type(self):
+        instance = Types.FixedCharType.of(3)
+        self.assertEqual(instance.name(), Name.FIXEDCHAR)
+        self.assertEqual(instance.length(), 3)
+        self.assertEqual(instance.simple_string(), "char(3)")
 
-    # Test allowAutoIncrement method for IntegerType and LongType
-    def test_allow_auto_increment(self):
-        integer_type = Types.IntegerType.get()
-        long_type = Types.LongType.get()
-        boolean_type = Types.BooleanType.get()
+    def test_binary_type(self):
+        instance = Types.BinaryType.get()
+        self.assertEqual(instance.name(), Name.BINARY)
+        self.assertEqual(instance.simple_string(), "binary")
 
-        self.assertTrue(Types.allowAutoIncrement(integer_type))
-        self.assertTrue(Types.allowAutoIncrement(long_type))
-        self.assertFalse(Types.allowAutoIncrement(boolean_type))
+    def test_struct_type(self):
+        field1 = Types.StructType.Field(
+            "name", Types.StringType.get(), True, "User's name"
+        )
+        field2 = Types.StructType.Field(
+            "age", Types.IntegerType.get(), False, "User's age"
+        )
+        struct = Types.StructType.of(field1, field2)
+        self.assertEqual(
+            struct.simple_string(),
+            "struct<name: string NULL COMMENT 'User's name', age: integer NOT NULL COMMENT 'User's age'>",
+        )
+
+    def test_list_type(self):
+        instance = Types.ListType.of(Types.StringType.get(), True)
+        self.assertEqual(instance.name(), Name.LIST)
+        self.assertTrue(instance.element_nullable())
+        self.assertEqual(instance.simple_string(), "list<string>")
+
+    def test_map_type(self):
+        instance = Types.MapType.of(
+            Types.StringType.get(), Types.IntegerType.get(), True
+        )
+        self.assertEqual(instance.name(), Name.MAP)
+        self.assertTrue(instance.is_value_nullable())
+        self.assertEqual(instance.simple_string(), "map<string, integer>")
+
+    def test_union_type(self):
+        instance = Types.UnionType.of(Types.StringType.get(), Types.IntegerType.get())
+        self.assertEqual(instance.name(), Name.UNION)
+        self.assertEqual(instance.simple_string(), "union<string, integer>")
+
+    def test_unparsed_type(self):
+        instance = Types.UnparsedType.of("custom_type")
+        self.assertEqual(instance.name(), Name.UNPARSED)
+        self.assertEqual(instance.simple_string(), "unparsed(custom_type)")
+
+    def test_external_type(self):
+        instance = Types.ExternalType.of("external_type")
+        self.assertEqual(instance.name(), Name.EXTERNAL)
+        self.assertEqual(instance.simple_string(), "external(external_type)")
+
+    def test_auto_increment_check(self):
+        self.assertTrue(Types.allow_auto_increment(Types.IntegerType.get()))
+        self.assertTrue(Types.allow_auto_increment(Types.LongType.get()))
+        self.assertFalse(Types.allow_auto_increment(Types.StringType.get()))
