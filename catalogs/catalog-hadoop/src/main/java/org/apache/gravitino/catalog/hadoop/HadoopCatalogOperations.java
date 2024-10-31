@@ -782,7 +782,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
         (int)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.REQUEST_TIMEOUT_SECONDS);
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.GET_FILESYSTEM_TIMEOUT_SECONDS);
     try {
       AtomicReference<FileSystem> fileSystem = new AtomicReference<>();
       Awaitility.await()
