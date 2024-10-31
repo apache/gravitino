@@ -875,4 +875,12 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
         });
   }
+
+  public static TableOperationDispatcher getTableOperationDispatcher() {
+    return tableOperationDispatcher;
+  }
+
+  public static SchemaOperationDispatcher getSchemaOperationDispatcher() {
+    return schemaOperationDispatcher;
+  }
 }
