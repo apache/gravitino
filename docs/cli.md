@@ -56,8 +56,8 @@ The following commands are used for entity management:
 - create: Create a new entity
 - delete: Delete an existing entity
 - update: Update an existing entity
-- set: Set an entities property
-- remove: Remove an entities property
+- set: Set a property on an entity
+- remove: Remove a property from an entity
 - properties: Display an entities properties
 
 ### Setting the Metalake name
@@ -68,7 +68,7 @@ As dealing with one Metalake is a typical scenario, you can set the Metalake nam
 2. Set via the `GRAVITINO_METALAKE` environment variable.
 3. Stored in the Gravitino CLI configuration file.
 
-The command line option overrides the environment variable.
+The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
 ## Setting the Gravitino URL
 
@@ -78,7 +78,7 @@ As you need to set the Gravitino URL for every command, you can set the URL in s
 2. Set via the 'GRAVITINO_URL' environment variable.
 3. Stored in the Gravitino CLI configuration file.
 
-The command line option overrides the environment variable.
+The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
 ## Gravitino CLI configuration file
 

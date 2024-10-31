@@ -50,6 +50,7 @@ public class UpdateCatalogComment extends Command {
   }
 
   /** Update the comment of a catalog. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
