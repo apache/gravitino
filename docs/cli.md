@@ -193,7 +193,7 @@ gcli metalake set --metalake metalake_demo --property test --value value
 gcli metalake remove --metalake metalake_demo --property test
 ```
 
-### Catalog
+### Catalog commands
 
 #### Show all catalogs in a metalake
 
@@ -277,7 +277,7 @@ gcli catalog set --metalake metalake_demo --name catalog_mysql --property test -
 gcli catalog remove --metalake metalake_demo --name catalog_mysql --property test
 ```
 
-### Schema
+### Schema commands
 
 #### Show all schemas in a catalog
 
@@ -305,7 +305,7 @@ gcli schema properties --metalake metalake_demo --name catalog_postgres.hr -i
 
 Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
 
-### Table
+### Table commands
 
 #### Show all tables
 
@@ -323,4 +323,56 @@ gcli column list --metalake metalake_demo --name catalog_postgres.hr.departments
 
 ```bash
 gcli table delete --metalake metalake_demo --name catalog_postgres.hr.salaries
+```
+
+### User commands
+
+#### Create a user
+
+```bash
+gcli user create --metalake metalake_demo --user new_user
+```
+
+#### Show a user's details
+
+```bash
+gcli user details --metalake metalake_demo --user new_user
+```
+
+#### List all users
+
+```bash
+gcli user list --metalake metalake_demo
+```
+
+#### Delete a users
+
+```bash
+gcli user delete --metalake metalake_demo --user new_user
+```
+
+### Group commands
+
+#### Create a group
+
+```bash
+gcli group create --metalake metalake_demo --user new_group
+```
+
+#### Display a group's details
+
+```bash
+gcli group details --metalake metalake_demo --user new_group
+```
+
+#### List all groups
+
+```bash
+gcli group list --metalake metalake_demo
+```
+
+#### Delete a group
+
+```bash
+gcli group delete --metalake metalake_demo --user new_group
 ```
