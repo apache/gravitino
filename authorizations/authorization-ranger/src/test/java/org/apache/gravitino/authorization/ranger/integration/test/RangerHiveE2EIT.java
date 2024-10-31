@@ -356,6 +356,17 @@ public class RangerHiveE2EIT extends BaseIT {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
     Assertions.assertThrows(
         AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_DROP_SCHEMA));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_USE_SCHEMA));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+
 
     // Clean up
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
@@ -420,6 +431,16 @@ public class RangerHiveE2EIT extends BaseIT {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
     Assertions.assertThrows(
         AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_DROP_SCHEMA));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_USE_SCHEMA));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
 
     // Clean up
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
@@ -474,6 +495,16 @@ public class RangerHiveE2EIT extends BaseIT {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
     Assertions.assertThrows(
         AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
+    Assertions.assertThrows(
+       AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+    Assertions.assertThrows(
+       AccessControlException.class, () -> sparkSession.sql(SQL_DROP_SCHEMA));
+    Assertions.assertThrows(
+       AccessControlException.class, () -> sparkSession.sql(SQL_USE_SCHEMA));
+    Assertions.assertThrows(
+       AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
 
     // Clean up
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
@@ -529,6 +560,16 @@ public class RangerHiveE2EIT extends BaseIT {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
     Assertions.assertThrows(
         AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_DROP_SCHEMA));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_USE_SCHEMA));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
 
     // Clean up
     catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
@@ -671,7 +712,7 @@ public class RangerHiveE2EIT extends BaseIT {
     // Delete the role and fail to create schema
     metalake.deleteRole(roleName);
     waitForUpdatingPolicies();
-    ;
+
     sparkSession.sql(SQL_CREATE_SCHEMA);
 
     // Clean up

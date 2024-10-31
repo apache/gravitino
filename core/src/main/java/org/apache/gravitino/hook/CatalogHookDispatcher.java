@@ -120,8 +120,7 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
 
   @Override
   public boolean dropCatalog(NameIdentifier ident) {
-    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.CATALOG);
-    return dispatcher.dropCatalog(ident);
+    return dropCatalog(ident, false /* force */);
   }
 
   @Override
