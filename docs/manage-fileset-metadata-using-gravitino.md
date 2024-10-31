@@ -119,7 +119,7 @@ catalog = gravitino_client.create_catalog(name="catalog",
                                           comment="This is a Hadoop fileset catalog",
                                           properties={"location": "/tmp/test1"})
 
-# create a s3 catalog
+# create a S3 catalog
 s3_properties = {
     "location": "oss:/bucket/root",
     "s3-access-key-id": "access_key"

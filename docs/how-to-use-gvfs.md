@@ -74,9 +74,9 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 | Configuration item             | Description                                                                                                                                                                             | Default value | Required                  | Since version    |
 |--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------|------------------|
 | `fs.gvfs.filesystem.providers` | The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`. | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
-| `s3-endpoint`                  | The endpoint of the AWS s3.                                                                                                                                                             | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
-| `s3-access-key-id`             | The access key of the AWS s3.                                                                                                                                                           | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
-| `s3-secret-access-key`         | The secret key of the AWS s3.                                                                                                                                                           | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| `s3-endpoint`                  | The endpoint of the AWS S3.                                                                                                                                                             | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                           | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                           | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
 
 At the same time, you need to place the corresponding bundle jar [gravitino-aws-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
 
@@ -162,7 +162,7 @@ For example if you want to access the S3 fileset, you need to place the S3 bundl
         <value>test_metalake</value>
       </property>
    
-      <!-- Optional. It's only for s3 catalog. For GCs and OSS catalog, you should set the corresponding properties. -->
+      <!-- Optional. It's only for S3 catalog. For GCs and OSS catalog, you should set the corresponding properties. -->
       <property>
         <name>fs.gvfs.filesystem.providers</name>
         <value>s3</value>
@@ -427,27 +427,27 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 
 #### Extra configuration for S3, GCS, OSS fileset
 
-The following properties are required if you want to access the S3 fileset via GVFS python client:
+The following properties are required if you want to access the S3 fileset via the GVFS python client:
 
-| Configuration item         | Description                   | Default value | Required                  | Since version    |
-|----------------------------|-------------------------------|---------------|---------------------------|------------------|
-| `s3_endpoint`              | The endpoint of the AWS s3.   | (none)        | Yes if it's a s3 fileset  | 0.7.0-incubating |
-| `s3_access_key_id`         | The access key of the AWS s3. | (none)        | Yes if it's a s3 fileset  | 0.7.0-incubating |
-| `s3_secret_access_key`     | The secret key of the AWS s3. | (none)        | Yes if it's a s3 fileset  | 0.7.0-incubating |
+| Configuration item         | Description                   | Default value | Required                 | Since version    |
+|----------------------------|-------------------------------|---------------|--------------------------|------------------|
+| `s3_endpoint`              | The endpoint of the AWS S3.   | (none)        | Yes if it's a S3 fileset | 0.7.0-incubating |
+| `s3_access_key_id`         | The access key of the AWS S3. | (none)        | Yes if it's a S3 fileset | 0.7.0-incubating |
+| `s3_secret_access_key`     | The secret key of the AWS S3. | (none)        | Yes if it's a S3 fileset | 0.7.0-incubating |
 
-The following properties are required if you want to access the GCS fileset via GVFS python client:
+The following properties are required if you want to access the GCS fileset via the GVFS python client:
 
 | Configuration item         | Description                                | Default value | Required                  | Since version    |
 |----------------------------|--------------------------------------------|---------------|---------------------------|------------------|
-| `gcs_service_account_file` | The path of GCS service account JSON file. | (none)        | Yes if it's a gcs fileset | 0.7.0-incubating |
+| `gcs_service_account_file` | The path of GCS service account JSON file. | (none)        | Yes if it's a GCS fileset | 0.7.0-incubating |
 
-The following properties are required if you want to access the OSS fileset via GVFS python client:
+The following properties are required if you want to access the OSS fileset via the GVFS python client:
 
 | Configuration item         | Description                       | Default value | Required                  | Since version    |
 |----------------------------|-----------------------------------|---------------|---------------------------|------------------|
-| `oss_endpoint`             | The endpoint of the Aliyun oss.   | (none)        | Yes if it's a oss fileset | 0.7.0-incubating |
-| `oss_access_key_id`        | The access key of the Aliyun oss. | (none)        | Yes if it's a oss fileset | 0.7.0-incubating |
-| `oss_secret_access_key`    | The secret key of the Aliyun oss. | (none)        | Yes if it's a oss fileset | 0.7.0-incubating |
+| `oss_endpoint`             | The endpoint of the Aliyun OSS.   | (none)        | Yes if it's a OSS fileset | 0.7.0-incubating |
+| `oss_access_key_id`        | The access key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset | 0.7.0-incubating |
+| `oss_secret_access_key`    | The secret key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset | 0.7.0-incubating |
 
 You can configure these properties when obtaining the `Gravitino Virtual FileSystem` in Python like this:
 
