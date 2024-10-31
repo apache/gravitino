@@ -16,7 +16,6 @@
 # under the License.
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Optional
 
 
 class Name(Enum):
@@ -125,7 +124,7 @@ class Type(ABC):
         pass
 
     @abstractmethod
-    def simpleString(self) -> str:
+    def simple_string(self) -> str:
         """Returns a readable string representation of the type."""
         pass
 
@@ -175,5 +174,4 @@ class IntegralType(NumericType, ABC):
 class FractionType(NumericType, ABC):
     """Base class for all fractional types."""
 
-    def __init__(self):
-        super().__init__()
+    pass

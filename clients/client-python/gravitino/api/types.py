@@ -26,292 +26,175 @@ from .type import (
 )
 
 
-""" The helper class for Type. """
-
-
 class Types:
-    """The data type representing `NULL` values."""
 
     class NullType(Type):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of NullType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return The name of the Null type.
-            """
             return Name.NULL
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Null type.
-            """
+        def simple_string(self) -> str:
             return "null"
-
-    """ The boolean type in Gravitino. """
 
     class BooleanType(PrimitiveType):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of BooleanType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return The name of the Boolean type.
-            """
             return Name.BOOLEAN
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Boolean type.
-            """
+        def simple_string(self) -> str:
             return "boolean"
-
-    """ The byte type in Gravitino. """
 
     class ByteType(IntegralType):
         _instance = None
         _unsigned_instance = None
 
+        def __init__(self, signed: bool):
+            super().__init__(signed)
+            self._signed = signed
+
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of ByteType.
-            """
             if cls._instance is None:
                 cls._instance = cls(True)
             return cls._instance
 
         @classmethod
         def unsigned(cls):
-            """
-            @return The singleton instance of unsigned ByteType.
-            """
             if cls._unsigned_instance is None:
                 cls._unsigned_instance = cls(False)
             return cls._unsigned_instance
 
-        def __init__(self, signed: bool):
-            """
-            @param signed: True if the byte type is signed, False otherwise.
-            """
-            super().__init__(signed)
-
         def name(self) -> Name:
-            """
-            @return The name of the Byte type.
-            """
             return Name.BYTE
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representa
-            """
+        def simple_string(self) -> str:
             return "byte" if self.signed() else "byte unsigned"
-
-    """ The short type in Gravitino. """
 
     class ShortType(IntegralType):
         _instance = None
         _unsigned_instance = None
 
+        def __init__(self, signed: bool):
+            super().__init__(signed)
+            self._signed = signed
+
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of ShortType.
-            """
             if cls._instance is None:
                 cls._instance = cls(True)
             return cls._instance
 
         @classmethod
         def unsigned(cls):
-            """
-            @return The singleton instance of unsigned ShortType.
-            """
             if cls._unsigned_instance is None:
                 cls._unsigned_instance = cls(False)
             return cls._unsigned_instance
 
-        def __init__(self, signed: bool):
-            """
-            @param signed: True if the short type is signed, False otherwise.
-            """
-            super().__init__(signed)
-
         def name(self) -> Name:
-            """
-            @return The name of the Short type.
-            """
             return Name.SHORT
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Short type.
-            """
+        def simple_string(self) -> str:
             return "short" if self.signed() else "short unsigned"
-
-    """ The integer type in Gravitino. """
 
     class IntegerType(IntegralType):
         _instance = None
         _unsigned_instance = None
 
+        def __init__(self, signed: bool):
+            super().__init__(signed)
+            self._signed = signed
+
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of IntegerType.
-            """
             if cls._instance is None:
                 cls._instance = cls(True)
             return cls._instance
 
         @classmethod
         def unsigned(cls):
-            """
-            @return The singleton instance of unsigned IntegerType.
-            """
             if cls._unsigned_instance is None:
                 cls._unsigned_instance = cls(False)
             return cls._unsigned_instance
 
-        def __init__(self, signed: bool):
-            """
-            @param signed: True if the integer type is signed, False otherwise.
-            """
-            super().__init__(signed)
-
         def name(self) -> Name:
-            """
-            @return The name of the Integer type.
-            """
             return Name.INTEGER
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Integer type.
-            """
+        def simple_string(self) -> str:
             return "integer" if self.signed() else "integer unsigned"
-
-    """ The long type in Gravitino. """
 
     class LongType(IntegralType):
         _instance = None
         _unsigned_instance = None
 
+        def __init__(self, signed: bool):
+            super().__init__(signed)
+            self._signed = signed
+
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of LongType.
-            """
             if cls._instance is None:
                 cls._instance = cls(True)
             return cls._instance
 
         @classmethod
         def unsigned(cls):
-            """
-            @return The singleton instance of unsigned LongType.
-            """
             if cls._unsigned_instance is None:
                 cls._unsigned_instance = cls(False)
             return cls._unsigned_instance
 
-        def __init__(self, signed: bool):
-            """
-            @param signed: True if the long type is signed, False otherwise.
-            """
-            super().__init__(signed)
-
         def name(self) -> Name:
-            """
-            @return The name of the Long type.
-            """
             return Name.LONG
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Long type.
-            """
+        def simple_string(self) -> str:
             return "long" if self.signed() else "long unsigned"
-
-    """ The float type in Gravitino. """
 
     class FloatType(FractionType):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of FloatType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return The name of the Float type.
-            """
             return Name.FLOAT
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Float type.
-            """
+        def simple_string(self) -> str:
             return "float"
-
-    """ The double type in Gravitino. """
 
     class DoubleType(FractionType):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of DoubleType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return The name of the Double type.
-            """
             return Name.DOUBLE
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Double type.
-            """
+        def simple_string(self) -> str:
             return "double"
-
-    """ The decimal type in Gravitino. """
 
     class DecimalType(FractionType):
         @classmethod
         def of(cls, precision: int, scale: int):
-            """
-            @param precision: The precision of the decimal type.
-            @param scale: The scale of the decimal type.
-            @return A DecimalType with the given precision and scale.
-            """
             return cls(precision, scale)
 
         def __init__(self, precision: int, scale: int):
@@ -319,6 +202,7 @@ class Types:
             @param precision: The precision of the decimal type.
             @param scale: The scale of the decimal type.
             """
+            super().__init__()
             self.check_precision_scale(precision, scale)
             self._precision = precision
             self._scale = scale
@@ -330,37 +214,25 @@ class Types:
             @param precision: The precision of the decimal.
             @param scale: The scale of the decimal.
             """
-            if not (1 <= precision <= 38):
+            if not 1 <= precision <= 38:
                 raise ValueError(
                     f"Decimal precision must be in range [1, 38]: {precision}"
                 )
-            if not (0 <= scale <= precision):
+            if not 0 <= scale <= precision:
                 raise ValueError(
                     f"Decimal scale must be in range [0, precision ({precision})]: {scale}"
                 )
 
         def name(self) -> Name:
-            """
-            @return The name of the Decimal type.
-            """
             return Name.DECIMAL
 
         def precision(self) -> int:
-            """
-            @return The precision of the decimal type.
-            """
             return self._precision
 
         def scale(self) -> int:
-            """
-            @return The scale of the decimal type.
-            """
             return self._scale
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Decimal type.
-            """
+        def simple_string(self) -> str:
             return f"decimal({self._precision},{self._scale})"
 
         def __eq__(self, other):
@@ -375,216 +247,125 @@ class Types:
             return self._precision == other._precision and self._scale == other._scale
 
         def __hash__(self):
-            """
-            @return: A hash code for the DecimalType based on its precision and scale.
-            """
             return hash((self._precision, self._scale))
-
-    """ The date time type in Gravitino. """
 
     class DateType(DateTimeType):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of DateType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return The name of the Date type.
-            """
             return Name.DATE
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Date type.
-            """
+        def simple_string(self) -> str:
             return "date"
-
-    """ The time type in Gravitino. """
 
     class TimeType(DateTimeType):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of TimeType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return The name of the Time type.
-            """
             return Name.TIME
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Time type.
-            """
+        def simple_string(self) -> str:
             return "time"
-
-    """ The timestamp type in Gravitino. """
 
     class TimestampType(DateTimeType):
         _instance_with_tz = None
         _instance_without_tz = None
 
         @classmethod
-        def withTimeZone(cls):
-            """
-            @return A TimestampType with time zone.
-            """
+        def with_time_zone(cls):
             if cls._instance_with_tz is None:
                 cls._instance_with_tz = cls(True)
             return cls._instance_with_tz
 
         @classmethod
-        def withoutTimeZone(cls):
-            """
-            @return A TimestampType without time zone.
-            """
+        def without_time_zone(cls):
             if cls._instance_without_tz is None:
                 cls._instance_without_tz = cls(False)
             return cls._instance_without_tz
 
         def __init__(self, with_time_zone: bool):
-            """
-            @param with_time_zone: True if the timestamp type has a time zone, False otherwise.
-            """
             self._with_time_zone = with_time_zone
 
-        def hasTimeZone(self) -> bool:
-            """
-            @return True if the timestamp type has a time zone, False otherwise.
-            """
+        def has_time_zone(self) -> bool:
             return self._with_time_zone
 
         def name(self) -> Name:
-            """
-            @return The name of the Timestamp type.
-            """
             return Name.TIMESTAMP
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the Timestamp type.
-            """
+        def simple_string(self) -> str:
             return "timestamp_tz" if self._with_time_zone else "timestamp"
-
-    """ The interval year type in Gravitino. """
 
     class IntervalYearType(IntervalType):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return The singleton instance of IntervalYearType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return The name of the IntervalYear type.
-            """
             return Name.INTERVAL_YEAR
 
-        def simpleString(self) -> str:
-            """
-            @return A readable string representation of the IntervalYear type.
-            """
+        def simple_string(self) -> str:
             return "interval_year"
-
-    """ The interval day type in Gravitino. """
 
     class IntervalDayType(IntervalType):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return: The singleton instance of IntervalDayType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return: The name of the interval day type.
-            """
             return Name.INTERVAL_DAY
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the interval day type.
-            """
+        def simple_string(self) -> str:
             return "interval_day"
-
-    """ The string type in Gravitino, equivalent to varchar(MAX), where the MAX is determined by the underlying catalog. """
 
     class StringType(PrimitiveType):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return: The singleton instance of StringType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return: The name of the string type.
-            """
             return Name.STRING
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the string type.
-            """
+        def simple_string(self) -> str:
             return "string"
-
-    """ The UUID type in Gravitino. """
 
     class UUIDType(PrimitiveType):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return: The singleton instance of UUIDType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return: The name of the UUID type.
-            """
             return Name.UUID
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the UUID type.
-            """
+        def simple_string(self) -> str:
             return "uuid"
-
-    """ Fixed-length byte array type. Use BinaryType for variable-length byte arrays. """
 
     class FixedType(PrimitiveType):
         def __init__(self, length: int):
@@ -604,21 +385,12 @@ class Types:
             return cls(length)
 
         def name(self) -> Name:
-            """
-            @return: The name of the fixed type.
-            """
             return Name.FIXED
 
         def length(self) -> int:
-            """
-            @return: The length of the fixed type.
-            """
             return self._length
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the fixed type.
-            """
+        def simple_string(self) -> str:
             return f"fixed({self._length})"
 
         def __eq__(self, other):
@@ -633,12 +405,7 @@ class Types:
             return self._length == other._length
 
         def __hash__(self):
-            """
-            @return: A hash code for the FixedType based on its length.
-            """
             return hash(self._length)
-
-    """ The varchar type in Gravitino. """
 
     class VarCharType(PrimitiveType):
         def __init__(self, length: int):
@@ -658,21 +425,12 @@ class Types:
             return cls(length)
 
         def name(self) -> Name:
-            """
-            @return: The name of the varchar type.
-            """
             return Name.VARCHAR
 
         def length(self) -> int:
-            """
-            @return: The length of the varchar type.
-            """
             return self._length
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the varchar type.
-            """
+        def simple_string(self) -> str:
             return f"varchar({self._length})"
 
         def __eq__(self, other):
@@ -687,12 +445,7 @@ class Types:
             return self._length == other._length
 
         def __hash__(self):
-            """
-            @return: A hash code for the VarCharType based on its length.
-            """
             return hash(self._length)
-
-    """ The fixed char type in Gravitino. """
 
     class FixedCharType(PrimitiveType):
         def __init__(self, length: int):
@@ -712,21 +465,12 @@ class Types:
             return cls(length)
 
         def name(self) -> Name:
-            """
-            @return: The name of the fixed char type.
-            """
             return Name.FIXEDCHAR
 
         def length(self) -> int:
-            """
-            @return: The length of the fixed char type.
-            """
             return self._length
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the fixed char type.
-            """
+        def simple_string(self) -> str:
             return f"char({self._length})"
 
         def __eq__(self, other):
@@ -741,38 +485,22 @@ class Types:
             return self._length == other._length
 
         def __hash__(self):
-            """
-            @return: A hash code for the FixedCharType based on its length.
-            """
             return hash(self._length)
-
-    """ The binary type in Gravitino. """
 
     class BinaryType(PrimitiveType):
         _instance = None
 
         @classmethod
         def get(cls):
-            """
-            @return: The singleton instance of BinaryType.
-            """
             if cls._instance is None:
                 cls._instance = cls()
             return cls._instance
 
         def name(self) -> Name:
-            """
-            @return: The name of the binary type.
-            """
             return Name.BINARY
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the binary type.
-            """
+        def simple_string(self) -> str:
             return "binary"
-
-    """ The struct type in Gravitino. Note, this type is not supported in the current version of Gravitino."""
 
     class StructType(ComplexType):
         def __init__(self, fields):
@@ -794,23 +522,14 @@ class Types:
             return cls(fields)
 
         def fields(self):
-            """
-            @return: The fields of the struct type.
-            """
             return self._fields
 
         def name(self) -> Name:
-            """
-            @return: The name of the struct type.
-            """
             return Name.STRUCT
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the struct type.
-            """
+        def simple_string(self) -> str:
             return (
-                f"struct<{', '.join(field.simpleString() for field in self._fields)}>"
+                f"struct<{', '.join(field.simple_string() for field in self._fields)}>"
             )
 
         def __eq__(self, other):
@@ -825,20 +544,15 @@ class Types:
             return self._fields == other._fields
 
         def __hash__(self):
-            """
-            @return: A hash code for the StructType based on its fields.
-            """
             return hash(tuple(self._fields))
 
-        """ A field of a struct type. """
-
         class Field:
-            def __init__(self, name, type, nullable, comment=None):
+            def __init__(self, name, field_type, nullable, comment=None):
                 """
                 Initializes the Field with the given name, type, nullable flag, and comment.
 
                 @param name: The name of the field.
-                @param type: The type of the field.
+                @param field_type: The type of the field.
                 @param nullable: Whether the field is nullable.
                 @param comment: The comment of the field (optional).
                 """
@@ -847,52 +561,40 @@ class Types:
                 if type is None:
                     raise ValueError("type cannot be null")
                 self._name = name
-                self._type = type
+                self._field_type = field_type
                 self._nullable = nullable
                 self._comment = comment
 
             @classmethod
-            def notNullField(cls, name, type, comment=None):
+            def not_null_field(cls, name, field_type, comment=None):
                 """
                 @param name: The name of the field.
-                @param type: The type of the field.
+                @param field_type: The type of the field.
                 @param comment: The comment of the field.
-                @return: A NOT NULL Field instance with the given name, type, and comment.
+                @return: A NOT NULL Field instance with the given name, field_type, and comment.
                 """
-                return cls(name, type, False, comment)
+                return cls(name, field_type, False, comment)
 
             @classmethod
-            def nullableField(cls, name, type, comment=None):
+            def nullable_field(cls, name, field_type, comment=None):
                 """
                 @param name: The name of the field.
-                @param type: The type of the field.
+                @param field_type: The type of the field.
                 @param comment: The comment of the field.
-                @return: A nullable Field instance with the given name, type, and comment.
+                @return: A nullable Field instance with the given name, field_type, and comment.
                 """
-                return cls(name, type, True, comment)
+                return cls(name, field_type, True, comment)
 
             def name(self):
-                """
-                @return: The name of the field.
-                """
                 return self._name
 
             def type(self):
-                """
-                @return: The type of the field.
-                """
                 return self._type
 
             def nullable(self):
-                """
-                @return: Whether the field is nullable.
-                """
                 return self._nullable
 
             def comment(self):
-                """
-                @return: The comment of the field, or None if not set.
-                """
                 return self._comment
 
             def __eq__(self, other):
@@ -912,91 +614,71 @@ class Types:
                 )
 
             def __hash__(self):
-                """
-                @return: A hash code for the Field based on its attributes.
-                """
                 return hash((self._name, self._type, self._nullable))
 
-            def simpleString(self) -> str:
-                """
-                @return: The simple string representation of the field.
-                """
+            def simple_string(self) -> str:
                 nullable_str = "NULL" if self._nullable else "NOT NULL"
                 comment_str = f" COMMENT '{self._comment}'" if self._comment else ""
-                return f"{self._name}: {self._type.simpleString()} {nullable_str}{comment_str}"
-
-    """ A list type. Note, this type is not supported in the current version of Gravitino. """
+                return f"{self._name}: {self._type.simple_string()} {nullable_str}{comment_str}"
 
     class ListType(ComplexType):
-        def __init__(self, elementType: Type, elementNullable: bool):
+        def __init__(self, element_type: Type, element_nullable: bool):
             """
             Create a new ListType with the given element type and the type is nullable.
 
-            @param elementType: The element type of the list.
-            @param elementNullable: Whether the element of the list is nullable.
+            @param element_type: The element type of the list.
+            @param element_nullable: Whether the element of the list is nullable.
             """
-            if elementType is None:
-                raise ValueError("elementType cannot be null")
-            self._elementType = elementType
-            self._elementNullable = elementNullable
+            if element_type is None:
+                raise ValueError("element_type cannot be null")
+            self._element_type = element_type
+            self._element_nullable = element_nullable
 
         @classmethod
-        def nullable(cls, elementType: Type):
+        def nullable(cls, element_type: Type):
             """
             Create a new ListType with the given element type and the type is nullable.
 
-            @param elementType: The element type of the list.
+            @param element_type: The element type of the list.
             @return: A new ListType instance.
             """
-            return cls.of(elementType, True)
+            return cls.of(element_type, True)
 
         @classmethod
-        def notNull(cls, elementType: Type):
+        def not_null(cls, element_type: Type):
             """
             Create a new ListType with the given element type.
 
-            @param elementType: The element type of the list.
+            @param element_type: The element type of the list.
             @return: A new ListType instance.
             """
-            return cls.of(elementType, False)
+            return cls.of(element_type, False)
 
         @classmethod
-        def of(cls, elementType: Type, elementNullable: bool):
+        def of(cls, element_type: Type, element_nullable: bool):
             """
             Create a new ListType with the given element type and whether the element is nullable.
 
-            @param elementType: The element type of the list.
-            @param elementNullable: Whether the element of the list is nullable.
+            @param element_type: The element type of the list.
+            @param element_nullable: Whether the element of the list is nullable.
             @return: A new ListType instance.
             """
-            return cls(elementType, elementNullable)
+            return cls(element_type, element_nullable)
 
-        def elementType(self) -> Type:
-            """
-            @return: The element type of the list.
-            """
-            return self._elementType
+        def element_type(self) -> Type:
+            return self._element_type
 
-        def elementNullable(self) -> bool:
-            """
-            @return: Whether the element of the list is nullable.
-            """
-            return self._elementNullable
+        def element_nullable(self) -> bool:
+            return self._element_nullable
 
         def name(self) -> Name:
-            """
-            @return: The name of the list type.
-            """
             return Name.LIST
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the list type.
-            """
+        def simple_string(self) -> str:
             return (
-                f"list<{self._elementType.simpleString()}>"
-                if self._elementNullable
-                else f"list<{self._elementType.simpleString()}, NOT NULL>"
+                f"list<{self._element_type.simple_string()}>"
+                if self._element_nullable
+                else f"list<{self._element_type.simple_string()}, NOT NULL>"
             )
 
         def __eq__(self, other):
@@ -1009,96 +691,74 @@ class Types:
             if not isinstance(other, Types.ListType):
                 return False
             return (
-                self._elementNullable == other._elementNullable
-                and self._elementType == other._elementType
+                self._element_nullable == other._element_nullable
+                and self._element_type == other._element_type
             )
 
         def __hash__(self):
-            """
-            @return: A hash code for the ListType based on its element type and nullability.
-            """
-            return hash((self._elementType, self._elementNullable))
-
-    """ The map type in Gravitino. Note, this type is not supported in the current version of Gravitino. """
+            return hash((self._element_type, self._element_nullable))
 
     class MapType(ComplexType):
-        def __init__(self, keyType: Type, valueType: Type, valueNullable: bool):
+        def __init__(self, key_type: Type, value_type: Type, value_nullable: bool):
             """
             Create a new MapType with the given key type, value type and the value is nullable.
 
-            @param keyType: The key type of the map.
-            @param valueType: The value type of the map.
-            @param valueNullable: Whether the value of the map is nullable.
+            @param key_type: The key type of the map.
+            @param value_type: The value type of the map.
+            @param value_nullable: Whether the value of the map is nullable.
             """
-            self._keyType = keyType
-            self._valueType = valueType
-            self._valueNullable = valueNullable
+            self._key_type = key_type
+            self._value_type = value_type
+            self._value_nullable = value_nullable
 
         @classmethod
-        def valueNullable(cls, keyType: Type, valueType: Type):
+        def value_nullable(cls, key_type: Type, value_type: Type):
             """
             Create a new MapType with the given key type, value type, and the value is nullable.
 
-            @param keyType: The key type of the map.
-            @param valueType: The value type of the map.
+            @param key_type: The key type of the map.
+            @param value_type: The value type of the map.
             @return: A new MapType instance.
             """
-            return cls.of(keyType, valueType, True)
+            return cls.of(key_type, value_type, True)
 
         @classmethod
-        def valueNotNull(cls, keyType: Type, valueType: Type):
+        def value_not_null(cls, key_type: Type, value_type: Type):
             """
             Create a new MapType with the given key type, value type, and the value is not nullable.
 
-            @param keyType: The key type of the map.
-            @param valueType: The value type of the map.
+            @param key_type: The key type of the map.
+            @param value_type: The value type of the map.
             @return: A new MapType instance.
             """
-            return cls.of(keyType, valueType, False)
+            return cls.of(key_type, value_type, False)
 
         @classmethod
-        def of(cls, keyType: Type, valueType: Type, valueNullable: bool):
+        def of(cls, key_type: Type, value_type: Type, value_nullable: bool):
             """
             Create a new MapType with the given key type, value type, and whether the value is nullable.
 
-            @param keyType: The key type of the map.
-            @param valueType: The value type of the map.
-            @param valueNullable: Whether the value of the map is nullable.
+            @param key_type: The key type of the map.
+            @param value_type: The value type of the map.
+            @param value_nullable: Whether the value of the map is nullable.
             @return: A new MapType instance.
             """
-            return cls(keyType, valueType, valueNullable)
+            return cls(key_type, value_type, value_nullable)
 
-        def keyType(self) -> Type:
-            """
-            @return: The key type of the map.
-            """
-            return self._keyType
+        def key_type(self) -> Type:
+            return self._key_type
 
-        def valueType(self) -> Type:
-            """
-            @return: The value type of the map.
-            """
-            return self._valueType
+        def value_type(self) -> Type:
+            return self._value_type
 
-        def valueNullable(self) -> bool:
-            """
-            @return: Whether the value of the map is nullable.
-            """
-            return self._valueNullable
+        def is_value_nullable(self) -> bool:
+            return self._value_nullable
 
         def name(self) -> Name:
-            """
-            @return: The name of the map type.
-            """
             return Name.MAP
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the map type.
-            """
-            return (
-                f"map<{self._keyType.simpleString()}, {self._valueType.simpleString()}>"
-            )
+        def simple_string(self) -> str:
+            return f"map<{self._key_type.simple_string()}, {self._value_type.simple_string()}>"
 
         def __eq__(self, other):
             """
@@ -1110,18 +770,13 @@ class Types:
             if not isinstance(other, Types.MapType):
                 return False
             return (
-                self._valueNullable == other._valueNullable
-                and self._keyType == other._keyType
-                and self._valueType == other._valueType
+                self._value_nullable == other._value_nullable
+                and self._key_type == other._key_type
+                and self._value_type == other._value_type
             )
 
         def __hash__(self):
-            """
-            @return: A hash code for the MapType based on its key type, value type, and nullability.
-            """
-            return hash((self._keyType, self._valueType, self._valueNullable))
-
-    """ The union type in Gravitino. Note, this type is not supported in the current version of Gravitino. """
+            return hash((self._key_type, self._value_type, self._value_nullable))
 
     class UnionType(ComplexType):
         def __init__(self, types: list):
@@ -1143,22 +798,13 @@ class Types:
             return cls(types)
 
         def types(self) -> list:
-            """
-            @return: The types of the union.
-            """
             return self._types
 
         def name(self) -> Name:
-            """
-            @return: The name of the union type.
-            """
             return Name.UNION
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the union type.
-            """
-            return f"union<{', '.join(t.simpleString() for t in self._types)}>"
+        def simple_string(self) -> str:
+            return f"union<{', '.join(t.simple_string() for t in self._types)}>"
 
         def __eq__(self, other):
             """
@@ -1172,111 +818,80 @@ class Types:
             return self._types == other._types
 
         def __hash__(self):
-            """
-            @return: A hash code for the UnionType based on its types.
-            """
             return hash(tuple(self._types))
 
-    """  Represents a type that is not parsed yet. The parsed type is represented by other types of Types. """
-
     class UnparsedType(Type):
-        def __init__(self, unparsedType: str):
+        def __init__(self, unparsed_type: str):
             """
-            Initializes an UnparsedType instance.
+            Initializes an unparsed_type instance.
 
-            @param unparsedType: The unparsed type as a string.
+            @param unparsed_type: The unparsed type as a string.
             """
-            self._unparsedType = unparsedType
+            self._unparsed_type = unparsed_type
 
         @classmethod
-        def of(cls, unparsedType: str):
+        def of(cls, unparsed_type: str):
             """
-            Creates a new UnparsedType with the given unparsed type.
+            Creates a new unparsed_type with the given unparsed type.
 
-            @param unparsedType: The unparsed type.
-            @return: A new UnparsedType instance.
+            @param unparsed_type: The unparsed type.
+            @return: A new unparsed_type instance.
             """
-            return cls(unparsedType)
+            return cls(unparsed_type)
 
-        def unparsedType(self) -> str:
-            """
-            @return: The unparsed type as a string.
-            """
-            return self._unparsedType
+        def unparsed_type(self) -> str:
+            return self._unparsed_type
 
         def name(self) -> Name:
-            """
-            @return: The name of the unparsed type.
-            """
             return Name.UNPARSED
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the unparsed type.
-            """
-            return f"unparsed({self._unparsedType})"
+        def simple_string(self) -> str:
+            return f"unparsed({self._unparsed_type})"
 
         def __eq__(self, other):
             """
-            Compares two UnparsedType objects for equality.
+            Compares two unparsed_type objects for equality.
 
-            @param other: The other UnparsedType object to compare with.
-            @return: True if both UnparsedType objects have the same unparsed type string, False otherwise.
+            @param other: The other unparsed_type object to compare with.
+            @return: True if both unparsed_type objects have the same unparsed type string, False otherwise.
             """
-            if not isinstance(other, Types.UnparsedType):
+            if not isinstance(other, Types.unparsed_type):
                 return False
-            return self._unparsedType == other._unparsedType
+            return self._unparsed_type == other._unparsed_type
 
         def __hash__(self):
-            """
-            @return: A hash code for the UnparsedType based on its unparsed type string.
-            """
-            return hash(self._unparsedType)
+            return hash(self._unparsed_type)
 
         def __str__(self):
-            """
-            @return: The unparsed type string representation.
-            """
-            return self._unparsedType
-
-    """ Represents a type that is defined in an external catalog. """
+            return self._unparsed_type
 
     class ExternalType(Type):
-        def __init__(self, catalogString: str):
+        def __init__(self, catalog_string: str):
             """
             Initializes an ExternalType instance.
 
-            @param catalogString: The string representation of this type in the catalog.
+            @param catalog_string: The string representation of this type in the catalog.
             """
-            self._catalogString = catalogString
+            self._catalog_string = catalog_string
 
         @classmethod
-        def of(cls, catalogString: str):
+        def of(cls, catalog_string: str):
             """
             Creates a new ExternalType with the given catalog string.
 
-            @param catalogString: The string representation of this type in the catalog.
+            @param catalog_string: The string representation of this type in the catalog.
             @return: A new ExternalType instance.
             """
-            return cls(catalogString)
+            return cls(catalog_string)
 
-        def catalogString(self) -> str:
-            """
-            @return: The string representation of this type in external catalog.
-            """
-            return self._catalogString
+        def catalog_string(self) -> str:
+            return self._catalog_string
 
         def name(self) -> Name:
-            """
-            @return: The name of the external type.
-            """
             return Name.EXTERNAL
 
-        def simpleString(self) -> str:
-            """
-            @return: A readable string representation of the external type.
-            """
-            return f"external({self._catalogString})"
+        def simple_string(self) -> str:
+            return f"external({self._catalog_string})"
 
         def __eq__(self, other):
             """
@@ -1287,26 +902,20 @@ class Types:
             """
             if not isinstance(other, Types.ExternalType):
                 return False
-            return self._catalogString == other._catalogString
+            return self._catalog_string == other._catalog_string
 
         def __hash__(self):
-            """
-            @return: A hash code for the ExternalType based on its catalog string.
-            """
-            return hash(self._catalogString)
+            return hash(self._catalog_string)
 
         def __str__(self):
-            """
-            @return: The string representation of the external type.
-            """
-            return self.simpleString()
+            return self.simple_string()
 
     @staticmethod
-    def allowAutoIncrement(dataType: Type) -> bool:
+    def allow_auto_increment(data_type: Type) -> bool:
         """
         Checks if the given data type is allowed to be an auto-increment column.
 
-        @param dataType: The data type to check.
+        @param data_type: The data type to check.
         @return: True if the given data type is allowed to be an auto-increment column, False otherwise.
         """
-        return isinstance(dataType, (Types.IntegerType, Types.LongType))
+        return isinstance(data_type, (Types.IntegerType, Types.LongType))
