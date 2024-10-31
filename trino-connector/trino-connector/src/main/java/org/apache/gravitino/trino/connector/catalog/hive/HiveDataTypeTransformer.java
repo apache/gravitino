@@ -34,17 +34,8 @@ public class HiveDataTypeTransformer extends GeneralDataTypeTransformer {
 
   @Override
   public io.trino.spi.type.Type getTrinoType(Type type) {
-    boolean unsupportedType = false;
-    if (Type.Name.TIMESTAMP == type.name()) {
-      Types.TimestampType timestampType = (Types.TimestampType) type;
-      if (timestampType.hasTimeZone()) {
-        unsupportedType = true;
-      } else if (Type.Name.TIME == type.name()) {
-        unsupportedType = true;
-      }
-    }
-
-    if (unsupportedType) {
+    if ((Type.Name.TIMESTAMP == type.name() && ((Types.TimestampType) type).hasTimeZone())
+        || Type.Name.TIME == type.name()) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE,
           "Unsupported gravitino datatype: " + type);
