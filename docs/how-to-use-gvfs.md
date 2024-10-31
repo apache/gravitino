@@ -73,10 +73,10 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 
 | Configuration item             | Description                                                                                                                                                                             | Default value | Required                  | Since version    |
 |--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------|------------------|
-| `fs.gvfs.filesystem.providers` | The file system providers to add. Set it to `s3` if it's a s3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`. | (none)        | Yes if it's a s3 fileset. | 0.7.0-incubating |
-| `s3-endpoint`                  | The endpoint of the AWS s3.                                                                                                                                                             | (none)        | Yes if it's a s3 fileset. | 0.7.0-incubating |
-| `s3-access-key-id`             | The access key of the AWS s3.                                                                                                                                                           | (none)        | Yes if it's a s3 fileset. | 0.7.0-incubating |
-| `s3-secret-access-key`         | The secret key of the AWS s3.                                                                                                                                                           | (none)        | Yes if it's a s3 fileset. | 0.7.0-incubating |
+| `fs.gvfs.filesystem.providers` | The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`. | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| `s3-endpoint`                  | The endpoint of the AWS s3.                                                                                                                                                             | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| `s3-access-key-id`             | The access key of the AWS s3.                                                                                                                                                           | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
+| `s3-secret-access-key`         | The secret key of the AWS s3.                                                                                                                                                           | (none)        | Yes if it's a S3 fileset. | 0.7.0-incubating |
 
 At the same time, you need to place the corresponding bundle jar [gravitino-aws-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
 
@@ -85,8 +85,8 @@ At the same time, you need to place the corresponding bundle jar [gravitino-aws-
 
 | Configuration item             | Description                                                                                                                                                                              | Default value | Required                   | Since version    |
 |--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------|------------------|
-| `fs.gvfs.filesystem.providers` | The file system providers to add. Set it to `gs` if it's a gcs fileset, or a comma separated string that contains `gs` like `gs,s3` to support multiple kinds of fileset including `gs`. | (none)        | Yes if it's a gcs fileset  | 0.7.0-incubating |
-| `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                               | (none)        | Yes if it's a gcs fileset. | 0.7.0-incubating |
+| `fs.gvfs.filesystem.providers` | The file system providers to add. Set it to `gs` if it's a GCS fileset, or a comma separated string that contains `gs` like `gs,s3` to support multiple kinds of fileset including `gs`. | (none)        | Yes if it's a GCS fileset  | 0.7.0-incubating |
+| `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                               | (none)        | Yes if it's a GCS fileset. | 0.7.0-incubating |
 
 In the meantime, you need to place the corresponding bundle jar [gravitino-gcp-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/gcp-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
 
@@ -95,16 +95,16 @@ In the meantime, you need to place the corresponding bundle jar [gravitino-gcp-b
 
 | Configuration item              | Description                                                                                                                                                                                     | Default value | Required                   | Since version    |
 |---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------|------------------|
-| `fs.gvfs.filesystem.providers`  | The file system providers to add. Set it to `oss` if it's a oss fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`. | (none)        | Yes if it's a oss fileset  | 0.7.0-incubating |
-| `oss-endpoint`                  | The endpoint of the Aliyun oss.                                                                                                                                                                 | (none)        | Yes if it's a oss fileset. | 0.7.0-incubating |
-| `oss-access-key-id`             | The access key of the Aliyun oss.                                                                                                                                                               | (none)        | Yes if it's a oss fileset. | 0.7.0-incubating |
-| `oss-secret-access-key`         | The secret key of the Aliyun oss.                                                                                                                                                               | (none)        | Yes if it's a oss fileset. | 0.7.0-incubating |
+| `fs.gvfs.filesystem.providers`  | The file system providers to add. Set it to `oss` if it's a OSS fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`. | (none)        | Yes if it's a oss fileset  | 0.7.0-incubating |
+| `oss-endpoint`                  | The endpoint of the Aliyun OSS.                                                                                                                                                                 | (none)        | Yes if it's a oss fileset. | 0.7.0-incubating |
+| `oss-access-key-id`             | The access key of the Aliyun OSS.                                                                                                                                                               | (none)        | Yes if it's a oss fileset. | 0.7.0-incubating |
+| `oss-secret-access-key`         | The secret key of the Aliyun OSS.                                                                                                                                                               | (none)        | Yes if it's a oss fileset. | 0.7.0-incubating |
 
 In the meantime, you need to place the corresponding bundle jar [gravitino-aliyun-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
 
 #### Custom fileset 
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding properties, for more, please refer to [Custom Fileset](./hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
-So, If you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
+So, if you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
 
 | Configuration item             | Description                                                                                             | Default value | Required | Since version    |
 |--------------------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -124,7 +124,7 @@ You can configure these properties in two ways:
     conf.set("fs.gravitino.server.uri","http://localhost:8090");
     conf.set("fs.gravitino.client.metalake","test_metalake");
    
-    // Optional. It's only for s3 catalog. For GCs and OSS catalog, you should set the corresponding properties.
+    // Optional. It's only for S3 catalog. For GCS and OSS catalog, you should set the corresponding properties.
     conf.set("fs.gvfs.filesystem.providers", "s3");
     conf.set("s3-endpoint", "http://localhost:9000");
     conf.set("s3-access-key-id", "minio");
@@ -135,8 +135,8 @@ You can configure these properties in two ways:
     ```
    
 :::note
-If you want to access the s3, gcs, oss or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle jar in the Hadoop environment. 
-For example if you want to access the s3 fileset, you need to place the s3 bundle jar [gravitino-aws-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`) or add it to the classpath. 
+If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle jar in the Hadoop environment. 
+For example if you want to access the S3 fileset, you need to place the S3 bundle jar [gravitino-aws-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`) or add it to the classpath. 
 :::
 
 2. Configure the properties in the `core-site.xml` file of the Hadoop environment:
