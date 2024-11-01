@@ -83,7 +83,7 @@ Supports using static access-key-id and secret-access-key to access S3 data.
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
 :::info
-To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle]([Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle)) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
+To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
 #### OSS
@@ -116,7 +116,7 @@ For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`,
 Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino server is started.
 
 :::info
-Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg gcp bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
 :::
 
 #### Other storages
