@@ -127,11 +127,7 @@ The following tables are the properties supported by the Hive table:
 | Property       | Description                             | Default Value                                              | Required | Reserved | Since Version |
 |----------------|-----------------------------------------|------------------------------------------------------------|----------|----------|---------------|
 | format         | Hive storage format for the table       | TEXTFILE                                                   | No       | No       | 0.2.0         |
-| total_size     | Total size of the table                 | (none)                                                     | No       | Yes      | 0.2.0         |
-| num_files      | Number of files                         | 0                                                          | No       | Yes      | 0.2.0         |
-| external       | Indicate whether it's an external table | (none)                                                     | No       | No       | 0.2.0         |
 | location       | HDFS location for table storage         | (none)                                                     | No       | No       | 0.2.0         |
-| table_type     | The type of Hive table                  | (none)                                                     | No       | No       | 0.2.0         |
 | input_format   | The input format class for the table    | org.apache.hadoop.mapred.TextInputFormat                   | No       | No       | 0.2.0         |
 | output_format  | The output format class for the table   | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | No       | 0.2.0         |
 | serde_lib      | The serde library class for the table   | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | No       | 0.2.0         |
@@ -140,6 +136,15 @@ The following tables are the properties supported by the Hive table:
 | bucketed_by    | Bucket columns for the table            | (none)                                                     | No       | No       | 0.4.0         |
 | bucket_count   | Number of buckets for the table         | (none)                                                     | No       | No       | 0.4.0         |
 | sorted_by      | Sorted columns for the table            | (none)                                                     | No       | No       | 0.4.0         |
+
+The following properties are automatically added and managed as reserved properties. Users are not allowed to set these properties.
+
+| Property       | Description                             | Since Version |
+|----------------|-----------------------------------------|---------------|
+| total_size     | Total size of the table                 | 0.2.0         |
+| num_files      | Number of files                         | 0.2.0         |
+| external       | Indicate whether it's an external table | 0.2.0         |
+| table_type     | The type of Hive table                  | 0.2.0         |
 
 ## Basic usage examples
 
