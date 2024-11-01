@@ -26,14 +26,13 @@ properties
 per catalog:
 
 - ORC
-- Parquet
-- Avro
-- RCText (RCFile using ColumnarSerDe)
-- RCBinary (RCFile using LazyBinaryColumnarSerDe)
-- SequenceFile
-- JSON (using org.apache.hive.hcatalog.data.JsonSerDe)
-- CSV (using org.apache.hadoop.hive.serde2.OpenCSVSerde)
-- TextFile
+- PARQUET
+- AVRO
+- RCFILE
+- SEQUENCEFILE
+- JSON
+- CSV
+- TEXTFILE
 
 
 ## Schema operations
