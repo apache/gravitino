@@ -98,6 +98,10 @@ Changelog
 ### Trino image
 
 Changelog
+- apache/gravitino-playground:trino-435-gravitino-0.7.0-incubating
+  - Use Gravitino release 0.7.0-incubating Dockerfile to build the image.
+
+Changelog
 - apache/gravitino-playground:trino-435-gravitino-0.6.1-incubating
   - Use Gravitino release 0.6.1-incubating Dockerfile to build the image.
 
