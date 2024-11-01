@@ -91,6 +91,7 @@ dependencies {
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.hadoop2.common)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

@@ -23,21 +23,24 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosClient;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.spark.SparkConf;
+import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
-import org.junit.jupiter.api.condition.EnabledIf;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-@EnabledIf("isEmbedded")
 public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
 
   private static final String HIVE_METASTORE_CLIENT_PRINCIPAL = "cli@HADOOPKRB";
@@ -149,12 +152,50 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
     return configMap;
   }
 
-  private static boolean isEmbedded() {
-    String mode =
-        System.getProperty(ITUtils.TEST_MODE) == null
-            ? ITUtils.EMBEDDED_TEST_MODE
-            : System.getProperty(ITUtils.TEST_MODE);
+  protected void initSparkEnv() {
+    int port = getServerPort();
+    LOG.info("Iceberg REST server port:{}", port);
+    String icebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
+    SparkConf sparkConf =
+        new SparkConf()
+            .set(
+                "spark.sql.extensions",
+                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+            .set("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
+            .set("spark.sql.catalog.rest.type", "rest")
+            .set("spark.sql.catalog.rest.uri", icebergRESTUri)
+            .set("spark.locality.wait.node", "0");
 
-    return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
+    if (supportsCredentialVending()) {
+      sparkConf.set(
+          "spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation", "vended-credentials");
+    }
+
+    // Login kerberos and use the users to execute the spark job.
+    try {
+      Configuration configuration = new Configuration();
+      configuration.set("hadoop.security.authentication", "kerberos");
+      KerberosClient kerberosClient =
+          new KerberosClient(
+              ImmutableMap.of(
+                  "authentication.kerberos.principal",
+                  HIVE_METASTORE_CLIENT_PRINCIPAL,
+                  "authentication.kerberos.keytab-uri",
+                  tempDir + HIVE_METASTORE_CLIENT_KEYTAB),
+              configuration);
+
+      kerberosClient.login(tempDir + HIVE_METASTORE_CLIENT_KEYTAB);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    System.setProperty("spark.hadoop.hadoop.security.authentication", "kerberos");
+    sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
+  }
+
+  @AfterAll
+  void cleanup() {
+    purgeAllIcebergTestNamespaces();
+    UserGroupInformation.reset();
   }
 }
