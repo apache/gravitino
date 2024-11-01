@@ -82,7 +82,11 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Supports index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
 
-#### Table column types
+### Table properties
+
+- Doesn't support table properties.
+
+### Table column types
 
 | Gravitino Type    | OceanBase Type      |
 |-------------------|---------------------|
@@ -110,7 +114,7 @@ OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Tim
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-#### Table column auto-increment
+### Table column auto-increment
 
 :::note
 OceanBase setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
