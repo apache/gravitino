@@ -30,6 +30,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.metrics.MetricNames;
@@ -43,9 +44,7 @@ import org.slf4j.LoggerFactory;
 public class IcebergTableRenameOperations {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperations.class);
 
-  @SuppressWarnings("UnusedVariable")
-  @Context
-  private HttpServletRequest httpRequest;
+  @Context private HttpServletRequest httpRequest;
 
   private IcebergTableOperationDispatcher tableOperationDispatcher;
 
@@ -66,7 +65,8 @@ public class IcebergTableRenameOperations {
         catalogName,
         renameTableRequest.source(),
         renameTableRequest.destination());
-    tableOperationDispatcher.renameTable(catalogName, renameTableRequest);
+    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
+    tableOperationDispatcher.renameTable(context, renameTableRequest);
     return IcebergRestUtils.okWithoutContent();
   }
 }
