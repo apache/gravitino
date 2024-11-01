@@ -540,18 +540,25 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       List<String> allTables = clientPool.run(c -> c.getAllTables(schemaIdent.name()));
       if (!listAllTables) {
         // The reason for using the listTableNamesByFilter function is that the
-        // getTableObjectiesByName
-        // function has poor performance. Currently, we only focus on the iceberg table. In the
-        // future,
-        // if necessary, we will need to filter out other tables such as hudi. In addition, the
-        // current
-        // return also includes tables of type VIRTUAL-VIEW.
-        String filter =
+        // getTableObjectiesByName function has poor performance. Currently, we only focus on the
+        // iceberg table. In the future, if necessary, we will need to filter out other tables such
+        // as Paimon. In addition, the current return also includes tables of type VIRTUAL-VIEW.
+        String icebergFilter =
             String.format(
-                "%stable_type = \"ICEBERG\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
-        List<String> allTables_iceberg =
-            clientPool.run(c -> c.listTableNamesByFilter(schemaIdent.name(), filter, (short) -1));
-        allTables.removeAll(allTables_iceberg);
+                "%stable_type like \"ICEBERG\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+        List<String> icebergTables =
+            clientPool.run(
+                c -> c.listTableNamesByFilter(schemaIdent.name(), icebergFilter, (short) -1));
+        allTables.removeAll(icebergTables);
+
+        // filter out the Hudi tables
+        String hudiFilter =
+            String.format(
+                "%sprovider like \"hudi\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+        List<String> hudiTables =
+            clientPool.run(
+                c -> c.listTableNamesByFilter(schemaIdent.name(), hudiFilter, (short) -1));
+        removeHudiTables(allTables, hudiTables);
       }
       return allTables.stream()
           .map(tbName -> NameIdentifier.of(namespace, tbName))
@@ -567,6 +574,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private void removeHudiTables(List<String> allTables, List<String> hudiTables) {
+    for (String hudiTable : hudiTables) {
+      allTables.removeIf(
+          t ->
+              t.equals(hudiTable)
+                  || t.startsWith(hudiTable + "_ro")
+                  || t.startsWith(hudiTable + "_rt"));
     }
   }
 
