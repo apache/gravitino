@@ -85,7 +85,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
 - Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
-#### Table column types
+### Table column types
 
 | Gravitino Type     | MySQL Type          |
 |--------------------|---------------------|
@@ -113,7 +113,7 @@ MySQL doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timesta
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-#### Table column auto-increment
+### Table column auto-increment
 
 :::note
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.

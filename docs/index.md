@@ -72,10 +72,12 @@ Gravitino currently supports the following catalogs:
 
 * [**Iceberg catalog**](./lakehouse-iceberg-catalog.md)
 * [**Paimon catalog**](./lakehouse-paimon-catalog.md)
+* [**Hudi catalog**](./lakehouse-hudi-catalog.md)
 * [**Hive catalog**](./apache-hive-catalog.md)
 * [**MySQL catalog**](./jdbc-mysql-catalog.md)
 * [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
 * [**Doris catalog**](./jdbc-doris-catalog.md)
+* [**OceanBase catalog**](./jdbc-oceanbase-catalog.md)
 
 **Fileset catalogs:**
 
@@ -107,10 +109,12 @@ Gravitino supports different catalogs to manage the metadata in different source
 
 * [Iceberg catalog](./lakehouse-iceberg-catalog.md): a complete guide to using Gravitino to manage Apache Iceberg data.
 * [Paimon catalog](./lakehouse-paimon-catalog.md): a complete guide to using Gravitino to manage Apache Paimon data.
+* [Hudi catalog](./lakehouse-hudi-catalog.md): a complete guide to using Gravitino to manage Apache Hudi data.
 * [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino to manage Apache Hive data.
 * [MySQL catalog](./jdbc-mysql-catalog.md): a complete guide to using Gravitino to manage MySQL data.
 * [PostgreSQL catalog](./jdbc-postgresql-catalog.md): a complete guide to using Gravitino to manage PostgreSQL data.
 * [Doris catalog](./jdbc-doris-catalog.md): a complete guide to using Gravitino to manage Doris data.
+* [OceanBase catalog](./jdbc-oceanbase-catalog.md): a complete guide to using Gravitino to manage OceanBase data.
 * [Hadoop catalog](./hadoop-catalog.md): a complete guide to using Gravitino to manage fileset
   using Hadoop Compatible File System (HCFS).
 * [Kafka catalog](./kafka-catalog.md): a complete guide to using Gravitino to manage Kafka topics metadata.

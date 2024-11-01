@@ -78,7 +78,7 @@ see [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 - The Hive catalog supports creating, updating, and deleting tables in the HMS.
 - Doesn't support column default value.
 
-#### Table partitions
+### Table partitioning
 
 The Hive catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables). Users can create partitioned tables in the Hive catalog with the specific partitioning attribute.
 Although Gravitino supports several partitioning strategies, Apache Hive inherently only supports a single partitioning strategy (partitioned by column). Therefore, the Hive catalog only supports `Identity` partitioning.
@@ -87,7 +87,7 @@ Although Gravitino supports several partitioning strategies, Apache Hive inheren
 The `fieldName` specified in the partitioning attribute must be the name of a column defined in the table.
 :::
 
-#### Table sort orders and distributions
+### Table sort orders and distributions
 
 The Hive catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). Users can create bucketed sorted tables in the Hive catalog with specific `distribution` and `sortOrders` attributes.
 Although Gravitino supports several distribution strategies, Apache Hive inherently only supports a single distribution strategy (clustered by column). Therefore the Hive catalog only supports `Hash` distribution.
@@ -96,7 +96,7 @@ Although Gravitino supports several distribution strategies, Apache Hive inheren
 The `fieldName` specified in the `distribution` and `sortOrders` attribute must be the name of a column defined in the table.
 :::
 
-#### Table column types
+### Table column types
 
 The Hive catalog supports all data types defined in the [Hive Language Manual](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types).
 The following table lists the data types mapped from the Hive catalog to Gravitino.
