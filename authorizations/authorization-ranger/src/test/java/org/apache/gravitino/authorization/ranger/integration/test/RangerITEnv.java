@@ -181,7 +181,7 @@ public class RangerITEnv {
         policyName,
         policyResourceMap,
         Collections.singletonList(policyItem),
-        true);
+        false);
   }
 
   /**

@@ -163,7 +163,7 @@ public class RangerHelper {
   }
 
   /**
-   * Find the managed policy for the ranger metadata names.
+   * Find the managed policies for the ranger securable object.
    *
    * @param metadataNames The metadata object names to find the managed policy.
    * @return The managed policy for the metadata object.
