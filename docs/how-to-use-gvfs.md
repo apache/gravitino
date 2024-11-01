@@ -78,7 +78,7 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 | `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
 | `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                          | (none)        | Yes if it's a S3 fileset.| 0.7.0-incubating |
 
-At the same time, you need to place the corresponding bundle jar [gravitino-aws-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
+At the same time, you need to place the corresponding bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
 
 
 #### GCS fileset
@@ -88,7 +88,7 @@ At the same time, you need to place the corresponding bundle jar [gravitino-aws-
 | `fs.gvfs.filesystem.providers` | The file system providers to add. Set it to `gs` if it's a GCS fileset, or a comma separated string that contains `gs` like `gs,s3` to support multiple kinds of fileset including `gs`. | (none)        | Yes if it's a GCS fileset.|   0.7.0-incubating |
 | `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                               | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating   |
 
-In the meantime, you need to place the corresponding bundle jar [gravitino-gcp-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/gcp-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
+In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gcp-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
 
 
 #### OSS fileset
@@ -100,7 +100,7 @@ In the meantime, you need to place the corresponding bundle jar [gravitino-gcp-b
 | `oss-access-key-id`             | The access key of the Aliyun OSS.                                                                                                                                                              | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
 | `oss-secret-access-key`         | The secret key of the Aliyun OSS.                                                                                                                                                              | (none)        | Yes if it's a OSS fileset.| 0.7.0-incubating |
 
-In the meantime, you need to place the corresponding bundle jar [gravitino-aliyun-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
+In the meantime, you need to place the corresponding bundle jar [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
 
 #### Custom fileset 
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding properties, for more, please refer to [Custom Fileset](./hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
@@ -136,7 +136,7 @@ You can configure these properties in two ways:
    
 :::note
 If you want to access the S3, GCS, OSS or custom fileset through GVFS, apart from the above properties, you need to place the corresponding bundle jar in the Hadoop environment. 
-For example if you want to access the S3 fileset, you need to place the S3 bundle jar [gravitino-aws-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`) or add it to the classpath. 
+For example if you want to access the S3 fileset, you need to place the S3 bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`) or add it to the classpath. 
 :::
 
 2. Configure the properties in the `core-site.xml` file of the Hadoop environment:
