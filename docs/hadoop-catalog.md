@@ -52,7 +52,7 @@ Apart from the above properties, to access fileset like HDFS, S3, GCS, OSS or cu
 | `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                                                               | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
 | `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                                                               | (none)          | Yes if it's a S3 fileset. | 0.7.0-incubating |
 
-At the same time, you need to place the corresponding bundle jar [gravitino-aws-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the directory ${GRAVITINO_HOME}/catalogs/hadoop/libs.
+At the same time, you need to place the corresponding bundle jar [`gravitino-aws-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aws-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
 
 #### GCS fileset
 
@@ -62,7 +62,7 @@ At the same time, you need to place the corresponding bundle jar [gravitino-aws-
 | `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location.| `builtin-local` | No                        | 0.7.0-incubating |
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                  | (none)          | Yes if it's a GCS fileset.| 0.7.0-incubating |
 
-In the meantime, you need to place the corresponding bundle jar [gravitino-gcp-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/gcp-bundle/) in the directory ${GRAVITINO_HOME}/catalogs/hadoop/libs.
+In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gcp-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
 
 #### OSS fileset
 
@@ -74,7 +74,7 @@ In the meantime, you need to place the corresponding bundle jar [gravitino-gcp-b
 | `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                            | (none)          | Yes if it's a OSS fileset.| 0.7.0-incubating |
 | `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                            | (none)          | Yes if it's a OSS fileset.| 0.7.0-incubating |
 
-In the meantime, you need to place the corresponding bundle jar [gravitino-aliyun-bundle-{version}.jar](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in the directory ${GRAVITINO_HOME}/catalogs/hadoop/libs.
+In the meantime, you need to place the corresponding bundle jar [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
 
 :::note
 - Gravitino contains builtin file system providers for local file system(`builtin-local`) and HDFS(`builtin-hdfs`), that is to say if `filesystem-providers` is not set, Gravitino will still support local file system and HDFS. Apart from that, you can set the `filesystem-providerss` to support other file systems like S3, GCS, OSS or custom file system.
