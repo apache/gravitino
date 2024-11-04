@@ -138,26 +138,26 @@ public class SecurableObjectBaseSQLProvider {
         + SECURABLE_OBJECT_TABLE_NAME
         + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE EXISTS ("
+        + " WHERE sect.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.schema_id = #{schemaId} AND sect.deleted_at = 0 "
-        + "AND st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + " st WHERE st.schema_id = #{schemaId} "
+        + " AND st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
         + " UNION "
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.schema_id = #{schemaId} AND sect.deleted_at = 0 AND "
-        + "tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + " tt WHERE tt.schema_id = #{schemaId} AND "
+        + " tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
         + " UNION "
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.schema_id = #{schemaId} AND sect.deleted_at = 0 AND "
-        + "tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + " tat WHERE tat.schema_id = #{schemaId} AND "
+        + " tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
         + " UNION "
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.schema_id = #{schemaId} AND sect.deleted_at = 0 AND "
-        + "ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + " ft WHERE ft.schema_id = #{schemaId} AND "
+        + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
         + ")";
   }
 

@@ -206,30 +206,30 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " tmt SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE EXISTS ("
+        + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.schema_id = #{schemaId} AND tmt.deleted_at = 0 AND "
-        + "st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
+        + " st WHERE st.schema_id = #{schemaId} AND "
+        + " st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
         + " UNION "
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.schema_id = #{schemaId} AND tmt.deleted_at = 0 AND "
+        + " tt WHERE tt.schema_id = #{schemaId} AND "
         + "tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
         + " UNION "
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.schema_id = #{schemaId} AND tmt.deleted_at = 0 AND "
+        + " tat WHERE tat.schema_id = #{schemaId} AND "
         + "tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
         + " UNION "
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.schema_id = #{schemaId} AND tmt.deleted_at = 0 AND"
+        + " ft WHERE ft.schema_id = #{schemaId} AND "
         + " ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
         + " UNION "
         + " SELECT cot.schema_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " cot WHERE cot.schema_id = #{schemaId} AND tmt.deleted_at = 0 AND"
+        + " cot WHERE cot.schema_id = #{schemaId} AND "
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
         + ")";
   }
@@ -239,15 +239,15 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " tmt SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE EXISTS ("
+        + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT tat.table_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.table_id = #{tableId} AND tmt.deleted_at = 0 AND "
-        + "tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
+        + " tat WHERE tat.table_id = #{tableId} AND"
+        + " tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
         + " UNION "
         + " SELECT cot.table_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " cot WHERE cot.table_id = #{tableId} AND tmt.deleted_at = 0 AND"
+        + " cot WHERE cot.table_id = #{tableId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
         + ")";
   }
