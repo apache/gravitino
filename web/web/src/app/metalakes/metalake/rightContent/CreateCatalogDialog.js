@@ -230,8 +230,7 @@ const CreateCatalogDialog = props => {
     let nextProps = propItems
 
     if (
-      propItems[0]?.key === 'catalog-backend' &&
-      propItems[0]?.value === 'hive' &&
+      propItems.some(item => item.key === 'catalog-backend' && ['hive', 'iceberg'].includes(item.value)) &&
       ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
     ) {
       nextProps = propItems.filter(item => !['jdbc-driver', 'jdbc-user', 'jdbc-password'].includes(item.key))
@@ -280,7 +279,7 @@ const CreateCatalogDialog = props => {
 
         if (
           catalogBackend &&
-          catalogBackend === 'hive' &&
+          ['hive', 'iceberg'].includes(catalogBackend) &&
           ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
         ) {
           properties = {
