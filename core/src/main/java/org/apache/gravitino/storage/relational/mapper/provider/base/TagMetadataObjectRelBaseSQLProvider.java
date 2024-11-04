@@ -168,35 +168,35 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " tmt SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE EXISTS ("
+        + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
-        + " ct WHERE ct.catalog_id = #{catalogId}  AND tmt.deleted_at = 0 AND "
+        + " ct WHERE ct.catalog_id = #{catalogId}  AND "
         + "ct.catalog_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'CATALOG'"
         + " UNION "
         + " SELECT st.catalog_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.catalog_id = #{catalogId} AND tmt.deleted_at = 0 AND "
+        + " st WHERE st.catalog_id = #{catalogId} AND "
         + "st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
         + " UNION "
         + " SELECT tt.catalog_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.catalog_id = #{catalogId} AND tmt.deleted_at = 0 AND "
+        + " tt WHERE tt.catalog_id = #{catalogId} AND "
         + "tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
         + " UNION "
         + " SELECT tat.catalog_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.catalog_id = #{catalogId} AND tmt.deleted_at = 0 AND "
+        + " tat WHERE tat.catalog_id = #{catalogId} AND "
         + "tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
         + " UNION "
         + " SELECT ft.catalog_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.catalog_id = #{catalogId} AND tmt.deleted_at = 0 AND"
+        + " ft WHERE ft.catalog_id = #{catalogId}  AND"
         + " ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
         + " UNION "
         + " SELECT cot.catalog_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " cot WHERE cot.catalog_id = #{catalogId} AND tmt.deleted_at = 0 AND"
+        + " cot WHERE cot.catalog_id = #{catalogId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
         + ")";
   }
