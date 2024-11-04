@@ -136,12 +136,12 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
         + " UNION "
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.schema_id = #{schemaId}"
+        + " ft WHERE ft.schema_id = #{schemaId} AND"
         + " ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
         + " UNION "
         + " SELECT cot.schema_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " cot WHERE cot.schema_id = #{schemaId}"
+        + " cot WHERE cot.schema_id = #{schemaId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
         + ")";
   }
@@ -160,7 +160,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
         + " UNION "
         + " SELECT cot.table_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " cot WHERE cot.table_id = #{tableId}"
+        + " cot WHERE cot.table_id = #{tableId} AND "
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
         + ")";
   }

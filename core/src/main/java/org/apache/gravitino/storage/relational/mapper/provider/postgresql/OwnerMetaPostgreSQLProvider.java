@@ -95,7 +95,7 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
     return "UPDATE  "
         + OWNER_TABLE_NAME
         + " ot SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "
-        + " WHERE AND ot.deleted_at = 0 AND EXISTS ("
+        + " WHERE ot.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
         + " st WHERE st.schema_id = #{schemaId} "
