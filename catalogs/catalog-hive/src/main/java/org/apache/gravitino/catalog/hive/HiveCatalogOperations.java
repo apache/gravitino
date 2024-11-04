@@ -115,7 +115,10 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private ScheduledThreadPoolExecutor checkTgtExecutor;
   private String kerberosRealm;
   private ProxyPlugin proxyPlugin;
-  boolean listAllTables = true;
+  private boolean listAllTables = true;
+  // The maximum number of tables that can be returned by the listTableNamesByFilter function.
+  // The default value is -1, which means that all tables are returned.
+  private static final short MAX_TABLES = -1;
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
@@ -548,7 +551,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             clientPool.run(
                 c ->
                     c.listTableNamesByFilter(
-                        schemaIdent.name(), icebergAndPaimonFilter, (short) -1));
+                        schemaIdent.name(), icebergAndPaimonFilter, MAX_TABLES));
         allTables.removeAll(icebergAndPaimonTables);
 
         // filter out the Hudi tables
