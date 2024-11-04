@@ -97,7 +97,7 @@ public class BaseIT {
 
   protected boolean ignoreIcebergRestService = true;
 
-  public static final String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
+  public String DOWNLOAD_MYSQL_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
 
   public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
