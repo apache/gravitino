@@ -19,18 +19,14 @@
 
 package org.apache.gravitino.cli;
 
+import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.ClientVersion;
-import org.apache.gravitino.cli.commands.CreateHadoopCatalog;
-import org.apache.gravitino.cli.commands.CreateHiveCatalog;
-import org.apache.gravitino.cli.commands.CreateIcebergCatalog;
-import org.apache.gravitino.cli.commands.CreateKafkaCatalog;
+import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.CreateMetalake;
-import org.apache.gravitino.cli.commands.CreateMySQLCatalog;
-import org.apache.gravitino.cli.commands.CreatePostgresCatalog;
 import org.apache.gravitino.cli.commands.CreateSchema;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
@@ -214,41 +210,11 @@ public class GravitinoCommandLine {
     if (CommandActions.DETAILS.equals(command)) {
       new CatalogDetails(url, ignore, metalake, catalog).handle();
     } else if (CommandActions.CREATE.equals(command)) {
-      String provider = line.getOptionValue(GravitinoOptions.PROVIDER);
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-      if (provider.equals(Providers.HIVE)) {
-        String metastore = line.getOptionValue(GravitinoOptions.METASTORE);
-        new CreateHiveCatalog(url, ignore, metalake, catalog, provider, comment, metastore)
-            .handle();
-      } else if (provider.equals(Providers.ICEBERG)) {
-        String metastore = line.getOptionValue(GravitinoOptions.METASTORE);
-        String warehouse = line.getOptionValue(GravitinoOptions.WAREHOUSE);
-        new CreateIcebergCatalog(
-                url, ignore, metalake, catalog, provider, comment, metastore, warehouse)
-            .handle();
-      } else if (provider.equals(Providers.MYSQL)) {
-        String jdbcurl = line.getOptionValue(GravitinoOptions.JDBCURL);
-        String user = line.getOptionValue(GravitinoOptions.USER);
-        String password = line.getOptionValue(GravitinoOptions.PASSWORD);
-        new CreateMySQLCatalog(
-                url, ignore, metalake, catalog, provider, comment, jdbcurl, user, password)
-            .handle();
-      } else if (provider.equals(Providers.POSTGRES)) {
-        String jdbcurl = line.getOptionValue(GravitinoOptions.JDBCURL);
-        String user = line.getOptionValue(GravitinoOptions.USER);
-        String password = line.getOptionValue(GravitinoOptions.PASSWORD);
-        String database = line.getOptionValue(GravitinoOptions.DATABASE);
-        new CreatePostgresCatalog(
-                url, ignore, metalake, catalog, provider, comment, jdbcurl, user, password,
-                database)
-            .handle();
-      } else if (provider.equals(Providers.HADOOP)) {
-        new CreateHadoopCatalog(url, ignore, metalake, catalog, provider, comment).handle();
-      } else if (provider.equals(Providers.KAFKA)) {
-        String bootstrap = line.getOptionValue(GravitinoOptions.BOOTSTRAP);
-        new CreateKafkaCatalog(url, ignore, metalake, catalog, provider, comment, bootstrap)
-            .handle();
-      }
+      String provider = line.getOptionValue(GravitinoOptions.PROVIDER);
+      String properties = line.getOptionValue(GravitinoOptions.PROPERTIES);
+      Map<String, String> propertyMap = new Properties().parse(properties);
+      new CreateCatalog(url, ignore, metalake, catalog, provider, comment, propertyMap).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       new DeleteCatalog(url, ignore, metalake, catalog).handle();
     } else if (CommandActions.SET.equals(command)) {

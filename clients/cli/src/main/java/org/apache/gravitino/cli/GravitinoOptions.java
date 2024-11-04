@@ -35,15 +35,8 @@ public class GravitinoOptions {
   public static final String RENAME = "rename";
   public static final String PROPERTY = "property";
   public static final String VALUE = "value";
-  public static final String PROPERTIES = "properties";
   public static final String PROVIDER = "provider";
-  public static final String METASTORE = "metastore";
-  public static final String WAREHOUSE = "warehouse";
-  public static final String JDBCURL = "jdbcurl";
-  public static final String USER = "user";
-  public static final String PASSWORD = "password";
-  public static final String DATABASE = "database";
-  public static final String BOOTSTRAP = "bootstrap";
+  public static final String PROPERTIES = "properties";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -56,7 +49,7 @@ public class GravitinoOptions {
     // Add options using helper method to avoid repetition
     options.addOption(createSimpleOption("h", HELP, "command help information"));
     options.addOption(createSimpleOption("v", VERSION, "Gravitino client version"));
-    options.addOption(createSimpleOption("r", SERVER, "Gravitino server version"));
+    options.addOption(createSimpleOption("s", SERVER, "Gravitino server version"));
     options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
     options.addOption(createArgOption("n", NAME, "full entity name (dot separated)"));
     options.addOption(createArgOption("m", METALAKE, "Metalake name"));
@@ -65,18 +58,17 @@ public class GravitinoOptions {
     // Create/update options
     options.addOption(createArgOption("r", RENAME, "new entity name"));
     options.addOption(createArgOption("c", COMMENT, "entity comment"));
-    options.addOption(createArgOption("p", PROPERTY, "property name"));
-    options.addOption(createArgOption("v", VALUE, "property value"));
+    options.addOption(createArgOption("P", PROPERTY, "property name"));
+    options.addOption(createArgOption("V", VALUE, "property value"));
     options.addOption(
         createArgOption(
-            "p", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
-    options.addOption(createArgOption("m", METASTORE, "Hive metastore URI"));
-    options.addOption(createArgOption("w", WAREHOUSE, "warehouse name"));
-    options.addOption(createArgOption("b", BOOTSTRAP, "Kafka bootstrap servers"));
-    options.addOption(createArgOption("j", JDBCURL, "JDBC URL"));
-    options.addOption(createArgOption("l", USER, "database username"));
-    options.addOption(createArgOption("z", PASSWORD, "database password"));
-    options.addOption(createArgOption("d", DATABASE, "database name"));
+            "g", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
+
+    // Properties option can have multiple values
+    Option properties =
+        createArgOption("p", PROPERTIES, "comma separated property name/value pairs");
+    properties.hasArgs();
+    options.addOption(properties);
 
     return options;
   }
