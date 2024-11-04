@@ -287,6 +287,9 @@ const CreateCatalogDialog = props => {
             uri: uri,
             ...others
           }
+          jdbcDriver && (properties['jdbc-driver'] = jdbcDriver);
+          jdbcUser && (properties['jdbc-user'] = jdbcUser);
+          jdbcPwd && (properties['jdbc-password'] = jdbcPwd);
         } else if (catalogBackend && catalogBackend === 'filesystem' && providerSelect === 'lakehouse-paimon') {
           properties = {
             'catalog-backend': catalogBackend,
