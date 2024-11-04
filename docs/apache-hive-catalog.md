@@ -44,7 +44,10 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 | `list-all-tables`                        | Lists all tables in a database, including non-Hive tables, such as Iceberg, Hudi, etc.                                                                                                                                                              | false         | No                           | 0.5.1         |
 
 :::note
-For `list-all-tables=false`, the Hive catalog will filter out Iceberg tables by table property `table_type=ICEBERG` and filter out Hudi tables by table property `provider=hudi`.
+For `list-all-tables=false`, the Hive catalog will filter out:
+- Iceberg tables by table property `table_type=ICEBERG`
+- Paimon tables by table property `table_type=PAINMON`
+- Hudi tables by table property `provider=hudi`
 :::
 
 When you use the Gravitino with Trino. You can pass the Trino Hive connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
