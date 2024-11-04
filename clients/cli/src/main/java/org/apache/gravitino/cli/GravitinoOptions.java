@@ -46,6 +46,11 @@ public class GravitinoOptions {
   public static final String BOOTSTRAP = "bootstrap";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
+  public static final String DATATYPE = "datatype";
+  public static final String POSITION = "position";
+  public static final String NULL = "null";
+  public static final String AUTO = "auto";
+  public static final String DEFAULT = "default";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -81,6 +86,11 @@ public class GravitinoOptions {
     options.addOption(createArgOption("d", DATABASE, "database name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
     options.addOption(createArgOption("a", TAG, "tag name"));
+    options.addOption(createArgOption(DATATYPE, "column data type"));
+    options.addOption(createArgOption(POSITION, "position of column"));
+    options.addOption(createSimpleOption(NULL, "column value can be null"));
+    options.addOption(createSimpleOption(AUTO, "column value auto-increments"));
+    options.addOption(createArgOption(DEFAULT, "default column value"));
 
     return options;
   }
@@ -98,6 +108,17 @@ public class GravitinoOptions {
   }
 
   /**
+   * Helper method to create an Option that does not require arguments.
+   *
+   * @param longName The long option name.
+   * @param description The option description.
+   * @return The Option object.
+   */
+  public Option createSimpleOption(String longName, String description) {
+    return new Option(null, longName, false, description);
+  }
+
+  /**
    * Helper method to create an Option that requires an argument.
    *
    * @param shortName The option name as a single letter
@@ -107,5 +128,16 @@ public class GravitinoOptions {
    */
   public Option createArgOption(String shortName, String longName, String description) {
     return new Option(shortName, longName, true, description);
+  }
+
+  /**
+   * Helper method to create an Option that requires an argument.
+   *
+   * @param longName The long option name.
+   * @param description The option description.
+   * @return The Option object.
+   */
+  public Option createArgOption(String longName, String description) {
+    return new Option(null, longName, true, description);
   }
 }

@@ -80,7 +80,7 @@ public class FullName {
   }
 
   /**
-   * Retrieves the catalog name from the second part of the full name option.
+   * Retrieves the catalog name from the first part of the full name option.
    *
    * @return The catalog name, or null if not found.
    */
@@ -89,7 +89,7 @@ public class FullName {
   }
 
   /**
-   * Retrieves the schema name from the third part of the full name option.
+   * Retrieves the schema name from the second part of the full name option.
    *
    * @return The schema name, or null if not found.
    */
@@ -98,12 +98,21 @@ public class FullName {
   }
 
   /**
-   * Retrieves the table name from the fourth part of the full name option.
+   * Retrieves the table name from the third part of the full name option.
    *
    * @return The table name, or null if not found.
    */
   public String getTableName() {
     return getNamePart(2);
+  }
+
+  /**
+   * Retrieves the column name from the fourth part of the full name option.
+   *
+   * @return The table name, or null if not found.
+   */
+  public String getColumnName() {
+    return getNamePart(3);
   }
 
   /**
@@ -183,5 +192,14 @@ public class FullName {
    */
   public boolean hasTableName() {
     return hasNamePart(4);
+  }
+
+  /**
+   * Does the column name exist?
+   *
+   * @return True if the column name exists, or false if it does not.
+   */
+  public boolean hasColumnName() {
+    return hasNamePart(5);
   }
 }
