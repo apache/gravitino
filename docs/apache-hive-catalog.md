@@ -41,7 +41,14 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 | `kerberos.keytab-uri`                    | The uri of key tab for the catalog. Now supported protocols are `https`, `http`, `ftp`, `file`.                                                                                                                                                     | (none)        | required if you use kerberos | 0.4.0         |
 | `kerberos.check-interval-sec`            | The interval to check validness of the principal                                                                                                                                                                                                    | 60            | No                           | 0.4.0         |
 | `kerberos.keytab-fetch-timeout-sec`      | The timeout to fetch key tab                                                                                                                                                                                                                        | 60            | No                           | 0.4.0         |
-| `list-all-tables`                        | Lists all tables in a database, including non-Hive tables, such as Iceberg, etc                                                                                                                                                                     | false         | No                           | 0.5.1         |
+| `list-all-tables`                        | Lists all tables in a database, including non-Hive tables, such as Iceberg, Hudi, etc.                                                                                                                                                              | false         | No                           | 0.5.1         |
+
+:::note
+For `list-all-tables=false`, the Hive catalog will filter out:
+- Iceberg tables by table property `table_type=ICEBERG`
+- Paimon tables by table property `table_type=PAINMON`
+- Hudi tables by table property `provider=hudi`
+:::
 
 When you use the Gravitino with Trino. You can pass the Trino Hive connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
 
