@@ -560,7 +560,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                 "%sprovider like \"hudi\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
         List<String> hudiTables =
             clientPool.run(
-                c -> c.listTableNamesByFilter(schemaIdent.name(), hudiFilter, (short) -1));
+                c -> c.listTableNamesByFilter(schemaIdent.name(), hudiFilter, MAX_TABLES));
         removeHudiTables(allTables, hudiTables);
       }
       return allTables.stream()
