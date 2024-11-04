@@ -204,10 +204,6 @@ public class CatalogMetaService {
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
-                  TagMetadataObjectRelMapper.class,
-                  mapper -> mapper.softDeleteTagMetadataObjectRelsByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
                   CatalogMetaMapper.class,
                   mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
           () ->
@@ -240,7 +236,11 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   SecurableObjectMapper.class,
-                  mapper -> mapper.softDeleteObjectRelsByCatalogId(catalogId)));
+                  mapper -> mapper.softDeleteObjectRelsByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TagMetadataObjectRelMapper.class,
+                  mapper -> mapper.softDeleteTagMetadataObjectRelsByCatalogId(catalogId)));
     } else {
       List<SchemaEntity> schemaEntities =
           SchemaMetaService.getInstance()
@@ -251,6 +251,10 @@ public class CatalogMetaService {
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
       }
       SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  CatalogMetaMapper.class,
+                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -268,11 +272,7 @@ public class CatalogMetaService {
                   TagMetadataObjectRelMapper.class,
                   mapper ->
                       mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                          catalogId, MetadataObject.Type.CATALOG.name())),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  CatalogMetaMapper.class,
-                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)));
+                          catalogId, MetadataObject.Type.CATALOG.name())));
     }
 
     return true;

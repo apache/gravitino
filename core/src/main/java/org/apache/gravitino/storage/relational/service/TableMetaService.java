@@ -215,7 +215,7 @@ public class TableMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             deleteResult.set(
-                SessionUtils.doWithCommitAndFetchResult(
+                SessionUtils.doWithoutCommitAndFetchResult(
                     TableMetaMapper.class,
                     mapper -> mapper.softDeleteTableMetasByTableId(tableId))),
         () -> {
