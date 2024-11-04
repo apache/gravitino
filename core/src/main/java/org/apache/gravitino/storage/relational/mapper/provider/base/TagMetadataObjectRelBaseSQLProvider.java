@@ -242,7 +242,7 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT tat.table_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.table_id = #{tableId} AND"
+        + " tat WHERE tat.table_id = #{tableId} AND "
         + " tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
         + " UNION "
         + " SELECT cot.table_id FROM "
