@@ -540,16 +540,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       List<String> allTables = clientPool.run(c -> c.getAllTables(schemaIdent.name()));
       if (!listAllTables) {
         // The reason for using the listTableNamesByFilter function is that the
-        // getTableObjectiesByName function has poor performance. Currently, we only focus on the
-        // iceberg table. In the future, if necessary, we will need to filter out other tables such
-        // as Paimon. In addition, the current return also includes tables of type VIRTUAL-VIEW.
-        String icebergFilter =
-            String.format(
-                "%stable_type like \"ICEBERG\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
-        List<String> icebergTables =
+        // getTableObjectiesByName function has poor performance. Currently, we focus on the
+        // Iceberg, Paimon and Hudi table. In the future, if necessary, we will need to filter out
+        // other tables. In addition, the current return also includes tables of type VIRTUAL-VIEW.
+        String icebergAndPaimonFilter = getIcebergAndPaimonFilter();
+        List<String> icebergAndPaimonTables =
             clientPool.run(
-                c -> c.listTableNamesByFilter(schemaIdent.name(), icebergFilter, (short) -1));
-        allTables.removeAll(icebergTables);
+                c ->
+                    c.listTableNamesByFilter(
+                        schemaIdent.name(), icebergAndPaimonFilter, (short) -1));
+        allTables.removeAll(icebergAndPaimonTables);
 
         // filter out the Hudi tables
         String hudiFilter =
@@ -575,6 +575,16 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private static String getIcebergAndPaimonFilter() {
+    String icebergFilter =
+        String.format(
+            "%stable_type like \"ICEBERG\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+    String paimonFilter =
+        String.format(
+            "%stable_type like \"PAIMON\"", hive_metastoreConstants.HIVE_FILTER_FIELD_PARAMS);
+    return String.format("%s or %s", icebergFilter, paimonFilter);
   }
 
   private void removeHudiTables(List<String> allTables, List<String> hudiTables) {

@@ -616,12 +616,16 @@ public class CatalogHiveIT extends BaseIT {
 
   @Test
   public void testListTables() {
-    // mock iceberg table and hudi table
+    // mock iceberg, paimon, and hudi tables
     NameIdentifier icebergTable = NameIdentifier.of(schemaName, "iceberg_table");
+    NameIdentifier paimonTable = NameIdentifier.of(schemaName, "paimon_table");
     NameIdentifier hudiTable = NameIdentifier.of(schemaName, "hudi_table");
     catalog
         .asTableCatalog()
         .createTable(icebergTable, createColumns(), null, ImmutableMap.of("table_type", "ICEBERG"));
+    catalog
+        .asTableCatalog()
+        .createTable(paimonTable, createColumns(), null, ImmutableMap.of("table_type", "PAIMON"));
     catalog
         .asTableCatalog()
         .createTable(hudiTable, createColumns(), null, ImmutableMap.of("provider", "hudi"));
