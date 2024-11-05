@@ -17,4 +17,4 @@
 # under the License.
 #
 
-org.apache.gravitino.shaded.com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem
+org.apache.gravitino.gcp.shaded.com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem
