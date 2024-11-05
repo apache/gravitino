@@ -348,7 +348,7 @@ public class Configs {
   public static final String AUDIT_LOG_WRITER_CONFIG_PREFIX = "gravitino.audit.writer.";
 
   public static final ConfigEntry<Boolean> AUDIT_LOG_ENABLED_CONF =
-      new ConfigBuilder("gravitino.audit.enable")
+      new ConfigBuilder("gravitino.audit.enabled")
           .doc("Gravitino audit log enable flag")
           .version(ConfigConstants.VERSION_0_7_0)
           .booleanConf()
