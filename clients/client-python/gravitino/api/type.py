@@ -161,8 +161,11 @@ class ComplexType(Type, ABC):
     pass
 
 
-# Define IntegralType class
 class IntegralType(NumericType, ABC):
+    """Base class for all integral types."""
+
+    _signed: bool
+
     def __init__(self, signed: bool):
         self._signed = signed
 
@@ -171,7 +174,6 @@ class IntegralType(NumericType, ABC):
         return self._signed
 
 
-# Define FractionType class
 class FractionType(NumericType, ABC):
     """Base class for all fractional types."""
 
