@@ -83,10 +83,10 @@ At the same time, you need to place the corresponding bundle jar [`gravitino-aws
 
 #### GCS fileset
 
-| Configuration item             | Description                                                                                                                                                                              | Default value | Required                  | Since version      |
-|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------|--------------------|
-| `fs.gvfs.filesystem.providers` | The file system providers to add. Set it to `gs` if it's a GCS fileset, or a comma separated string that contains `gs` like `gs,s3` to support multiple kinds of fileset including `gs`. | (none)        | Yes if it's a GCS fileset.|   0.7.0-incubating |
-| `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                               | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating   |
+| Configuration item             | Description                                                                                                                                                                              | Default value | Required                  | Since version    |
+|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|---------------------------|------------------|
+| `fs.gvfs.filesystem.providers` | The file system providers to add. Set it to `gs` if it's a GCS fileset, or a comma separated string that contains `gs` like `gs,s3` to support multiple kinds of fileset including `gs`. | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
+| `gcs-service-account-file`     | The path of GCS service account JSON file.                                                                                                                                               | (none)        | Yes if it's a GCS fileset.| 0.7.0-incubating |
 
 In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/gcp-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
 
