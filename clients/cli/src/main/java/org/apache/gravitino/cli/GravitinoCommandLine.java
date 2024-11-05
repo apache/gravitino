@@ -220,7 +220,7 @@ public class GravitinoCommandLine {
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       String provider = line.getOptionValue(GravitinoOptions.PROVIDER);
-      String properties = line.getOptionValue(GravitinoOptions.PROPERTIES);
+      String[] properties = line.getOptionValues(GravitinoOptions.PROPERTIES);
       Map<String, String> propertyMap = new Properties().parse(properties);
       new CreateCatalog(url, ignore, metalake, catalog, provider, comment, propertyMap).handle();
     } else if (CommandActions.DELETE.equals(command)) {

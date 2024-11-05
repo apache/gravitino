@@ -37,7 +37,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -m,--metalake <arg>     Metalake name
  -n,--name <arg>         full entity name (dot separated)
  -P,--property <arg>     property name
- -p,--properties <arg>   comma separated property name/value pairs
+ -p,--properties <arg>   property name/value pairs
  -r,--rename <arg>       new entity name
  -s,--server             Gravitino server version
  -t,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
@@ -135,6 +135,16 @@ If the client and server are running different versions of the Gravitino softwar
 1. Passed in on the command line via the `--ignore` parameter.
 2. Set via the `GRAVITINO_IGNORE` environment variable.
 3. Stored in the Gravitino CLI configuration file.
+
+### Multiple properties
+
+For commands that accept multiple properties they can be specified in a couple of different ways:
+
+1. gcli --properties n1=v1,n2=v2,n3=v3
+
+2. gcli --properties n1=v1 n2=v2 n3=v3
+
+3. gcli --properties n1=v1 --properties n2=v2 --properties n3=v3
 
 ### Metalake commands
 

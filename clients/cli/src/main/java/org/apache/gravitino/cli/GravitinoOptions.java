@@ -70,8 +70,7 @@ public class GravitinoOptions {
 
     // Properties option can have multiple values
     Option properties =
-        createArgOption("p", PROPERTIES, "comma separated property name/value pairs");
-    properties.hasArgs();
+        Option.builder("p").longOpt(PROPERTIES).desc("property name/value pairs").hasArgs().build();
     options.addOption(properties);
 
     return options;
