@@ -29,6 +29,7 @@ import org.apache.gravitino.cli.commands.ListColumns;
 import org.apache.gravitino.cli.commands.ListMetalakes;
 import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListTables;
+import org.apache.gravitino.cli.commands.MetalakeAuditInfo;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.SchemaDetails;
 import org.apache.gravitino.cli.commands.ServerVersion;
@@ -124,6 +125,9 @@ public class GravitinoCommandLine {
 
     if (CommandActions.DETAILS.equals(command)) {
       new MetalakeDetails(url, ignore, metalake).handle();
+      if (line.hasOption(GravitinoOptions.AUDIT)) {
+        new MetalakeAuditInfo(url, ignore, metalake).handle();
+      }
     } else if (CommandActions.LIST.equals(command)) {
       new ListMetalakes(url, ignore).handle();
     }
