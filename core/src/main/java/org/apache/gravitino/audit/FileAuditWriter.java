@@ -105,7 +105,6 @@ public class FileAuditWriter implements AuditLogWriter {
     Instant now = Instant.now();
     if (now.isAfter(nextFlushTime)) {
       nextFlushTime = now.plusSeconds(flushIntervalSecs);
-      Log.info("Try flush audit writer");
       doFlush();
     }
   }
