@@ -37,6 +37,8 @@ public class GravitinoOptions {
   public static final String VALUE = "value";
   public static final String PROVIDER = "provider";
   public static final String PROPERTIES = "properties";
+  public static final String USER = "user";
+  public static final String GROUP = "group";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -62,7 +64,9 @@ public class GravitinoOptions {
     options.addOption(createArgOption("V", VALUE, "property value"));
     options.addOption(
         createArgOption(
-            "g", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
+            "t", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
+    options.addOption(createArgOption("l", USER, "database username"));
+    options.addOption(createArgOption("g", GROUP, "group name"));
 
     // Properties option can have multiple values
     Option properties =
