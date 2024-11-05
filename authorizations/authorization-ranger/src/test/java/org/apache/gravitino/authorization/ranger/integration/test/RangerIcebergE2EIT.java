@@ -161,6 +161,7 @@ public class RangerIcebergE2EIT extends BaseIT {
             .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
             .config("spark.sql.catalog.iceberg.type", "hive")
             .config("spark.sql.catalog.iceberg.uri", HIVE_METASTORE_URIS)
+            .config("spark.sql.catalog.iceberg.cache-enabled", "false")
             .config(
                 "spark.sql.extensions",
                 "org.apache.kyuubi.plugin.spark.authz.ranger.RangerSparkExtension,"
