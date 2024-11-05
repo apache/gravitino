@@ -56,7 +56,7 @@ public class TableDetails extends TableCommand {
     Table gTable = null;
 
     try {
-      NameIdentifier name = NameIdentifier.of(table);
+      NameIdentifier name = NameIdentifier.of(schema, table);
       gTable = tableCatalog().loadTable(name);
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
