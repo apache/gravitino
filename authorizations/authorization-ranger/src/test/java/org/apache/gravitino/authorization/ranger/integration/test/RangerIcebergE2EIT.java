@@ -19,7 +19,6 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
-import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.cleanup;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
 import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
@@ -173,9 +172,9 @@ public class RangerIcebergE2EIT extends BaseIT {
     createMetalake();
     createCatalog();
 
-    metalake.addUser("test");
+    metalake.addUser(System.getenv(HADOOP_USER_NAME));
 
-    cleanup();
+    RangerITEnv.cleanup();
   }
 
   private static void generateRangerSparkSecurityXML() throws IOException {
@@ -1017,11 +1016,28 @@ public class RangerIcebergE2EIT extends BaseIT {
 
   @Test
   void testDenyPrivileges() throws InterruptedException {
-    // Create a schema
-    catalog.asSchemas().createSchema(schemaName, "test", Collections.emptyMap());
-
     // Create a role with CREATE_SCHEMA privilege
     String roleName = currentFunName();
+    SecurableObject securableObject =
+            SecurableObjects.parse(
+                    String.format("%s", catalogName),
+                    MetadataObject.Type.CATALOG,
+                    Lists.newArrayList(Privileges.CreateSchema.allow()));
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
+
+    // Granted this role to the spark execution user `HADOOP_USER_NAME`
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+    waitForUpdatingPolicies();
+
+    // create a schema
+    sparkSession.sql(SQL_USE_CATALOG);
+    sparkSession.sql(SQL_CREATE_SCHEMA);
+
+    metalake.deleteRole(roleName);
+
+    // Create a role with CREATE_SCHEMA privilege
+    roleName = currentFunName();
     SecurableObject allowObject =
         SecurableObjects.parse(
             String.format("%s", catalogName),
@@ -1040,7 +1056,7 @@ public class RangerIcebergE2EIT extends BaseIT {
         roleName, Collections.emptyMap(), Lists.newArrayList(allowObject, denyObject));
 
     // Granted this role to the spark execution user `HADOOP_USER_NAME`
-    String userName1 = System.getenv(HADOOP_USER_NAME);
+    userName1 = System.getenv(HADOOP_USER_NAME);
     metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
     waitForUpdatingPolicies();
 

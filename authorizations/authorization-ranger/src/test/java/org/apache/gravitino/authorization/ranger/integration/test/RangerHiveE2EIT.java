@@ -175,7 +175,8 @@ public class RangerHiveE2EIT extends BaseIT {
     createMetalake();
     createCatalog();
 
-    metalake.addUser("test");
+    RangerITEnv.cleanup();
+    metalake.addUser(System.getenv(HADOOP_USER_NAME));
   }
 
   private static void generateRangerSparkSecurityXML() throws IOException {

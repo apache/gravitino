@@ -129,7 +129,7 @@ tasks {
 
 tasks.test {
   doFirst {
-    environment("HADOOP_USER_NAME", "test")
+    environment("HADOOP_USER_NAME", "gravitino")
   }
   dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
 
