@@ -49,10 +49,10 @@ tasks.withType(ShadowJar::class.java) {
   archiveClassifier.set("")
 
   // Relocate dependencies to avoid conflicts
-  relocate("org.apache.httpcomponents", "org.apache.gravitino.shaded.org.apache.httpcomponents")
-  relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")
-  relocate("com.google", "org.apache.gravitino.shaded.com.google")
-  relocate("com.fasterxml", "org.apache.gravitino.shaded.com.fasterxml")
+  relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
+  relocate("org.apache.commons", "org.apache.gravitino.gcp.shaded.org.apache.commons")
+  relocate("com.google", "org.apache.gravitino.gcp.shaded.com.google")
+  relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
 }
 
 tasks.jar {
