@@ -61,7 +61,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "comment": "comment",
   "provider": "hadoop",
   "properties": {
-    "location": "oss:/bucket/root",
+    "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key",
     "s3-secret-access-key": "secret_key",
     "s3-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
@@ -93,7 +93,7 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 
 // create a S3 catalog
 s3Properties = ImmutableMap.<String, String>builder()
-    .put("location", "oss:/bucket/root")
+    .put("location", "s3a://bucket/root")
     .put("s3-access-key-id", "access_key")
     .put("s3-secret-access-key", "secret_key")
     .put("s3-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
@@ -121,7 +121,7 @@ catalog = gravitino_client.create_catalog(name="catalog",
 
 # create a S3 catalog
 s3_properties = {
-    "location": "oss:/bucket/root",
+    "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key"
     "s3-secret-access-key": "secret_key",
     "s3-endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
