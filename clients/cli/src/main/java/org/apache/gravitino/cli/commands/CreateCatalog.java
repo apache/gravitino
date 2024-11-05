@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.cli.Providers;
@@ -43,6 +42,7 @@ public class CreateCatalog extends Command {
    * @param catalog The name of the catalog.
    * @param provider The provider/type of catalog.
    * @param comment The catalog's comment.
+   * @param properties The catalog's properties.
    */
   public CreateCatalog(
       String url,
@@ -50,13 +50,14 @@ public class CreateCatalog extends Command {
       String metalake,
       String catalog,
       String provider,
-      String comment) {
+      String comment,
+      Map<String, String> properties) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.provider = provider;
     this.comment = comment;
-    properties = new HashMap<>();
+    this.properties = properties;
   }
 
   /** Create a new catalog. */
@@ -81,6 +82,6 @@ public class CreateCatalog extends Command {
       return;
     }
 
-    System.out.println(catalog + " created");
+    System.out.println(catalog + " catalog created");
   }
 }

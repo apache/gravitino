@@ -29,22 +29,20 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  ```bash
  usage: gcli [metalake|catalog|schema|table|column] [list|details|create|delete|update|set|remove|properties] [options]
  Options
- -b,--bootstrap <arg>   Kafka bootstrap servers
- -c,--comment <arg>     entity comment
- -d,--database <arg>    database name
- -h,--help              command help information
- -i,--ignore            Ignore client/sever version check
- -j,--jdbcurl <arg>     JDBC URL
- -l,--user <arg>        database username
- -m,--metastore <arg>   Hive metastore URI
- -n,--name <arg>        full entity name (dot separated)
- -p,--provider <arg>    provider one of hadoop, hive, mysql, postgres,
-                        iceberg, kafka
- -r,--rename <arg>      new entity name
- -u,--url <arg>         Gravitino URL (default: http://localhost:8090)
- -v,--value <arg>       property value
- -w,--warehouse <arg>   warehouse name
- -z,--password <arg>    database password
+ -c,--comment <arg>      entity comment
+ -g,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
+                         iceberg, kafka
+ -h,--help               command help information
+ -i,--ignore             Ignore client/sever version check
+ -m,--metalake <arg>     Metalake name
+ -n,--name <arg>         full entity name (dot separated)
+ -P,--property <arg>     property name
+ -p,--properties <arg>   comma separated property name/value pairs
+ -r,--rename <arg>       new entity name
+ -s,--server             Gravitino server version
+ -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
+ -v,--version            Gravitino client version
+ -V,--value <arg>        property value
  ```
 
 ## Commands
@@ -99,7 +97,6 @@ URL=http://localhost:8090
 ignore=true
 
 ```
-
 
 ## Manage metadata
 
@@ -209,36 +206,36 @@ gcli catalog details --metalake metalake_demo --name catalog_postgres
 
 #### Creating a catalog
 
-The type of catalog to be created is specified by the `--provider` option. Different catalogs require different options, for example, a Hive catalog requires a metastore URI to be passed in as an option.
+The type of catalog to be created is specified by the `--provider` option. Different catalogs require different properties, for example, a Hive catalog requires a metastore-uri property.
 
 ##### Create a Hive catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name hive --provider hive --metastore thrift://hive-host:9083
+gcli catalog create --metalake metalake_demo --name hive --provider hive --properties metastore.uris=thrift://hive-host:9083
 ```
 
 ##### Create an Iceberg catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name iceberg --provider iceberg --metastore thrift://hive-host:9083 --warehouse hdfs://hdfs-host:9000/user/iceberg/warehouse
+gcli catalog create --metalake metalake_demo -name iceberg --provider iceberg --properties uri=thrift://hive-host:9083,catalog-backend=hive,warehouse=hdfs://hdfs-host:9000/user/iceberg/warehouse
 ```
 
 ##### Create a MySQL catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name mysql --provider mysql --jdbcurl "jdbc:mysql://mysql-host:3306?useSSL=false" --user user --password password
+gcli catalog create --metalake metalake_demo -name mysql --provider mysql --properties jdbc-url=jdbc:mysql://mysql-host:3306?useSSL=false,jdbc-user=user,jdbc-password=password,jdbc-driver=com.mysql.cj.jdbc.Driver
 ```
 
 ##### Create a Postgres catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name postgres --provider postgres --jdbcurl jdbc:postgresql://postgresql-host/mydb --user user --password password -database db
+gcli catalog create --metalake metalake_demo -name postgres --provider postgres --properties jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver
 ```
 
 ##### Create a Kafka catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name kafka --provider kafka --bootstrap 127.0.0.1:9092,127.0.0.2:9092
+gcli catalog create --metalake metalake_demo -name kafka --provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092
 ```
 
 #### Delete a catalog
