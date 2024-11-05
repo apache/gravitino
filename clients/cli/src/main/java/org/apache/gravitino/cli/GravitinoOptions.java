@@ -65,7 +65,7 @@ public class GravitinoOptions {
     options.addOption(
         createArgOption(
             "t", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
-    options.addOption(createArgOption("l", USER, "database username"));
+    options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
 
     // Properties option can have multiple values
