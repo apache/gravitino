@@ -171,10 +171,11 @@ The `AuditLogWriter` defines an interface that enables the writing of metadata a
 
 Writer configuration begins with `gravitino.audit.writer.${name}`, where ${name} is replaced with the actual writer name defined in method `name()`. `FileAuditWriter` is a default implement to log audit information, whose name is `file`.
 
-| Property name                          | Description                                                                   | Default value       | Required | Since Version    |
-|----------------------------------------|-------------------------------------------------------------------------------|---------------------|----------|------------------|
-| `gravitino.audit.writer.file.fileName` | The audit log file name, the path is `${sys:gravitino.log.path}/${fileName}`. | gravitino_audit.log | NO       | 0.7.0-incubating |
-| `gravitino.audit.writer.file.append`   | Whether the log will be written to the end or the beginning of the file.      | true                | NO       | 0.7.0-incubating |
+| Property name                                   | Description                                                                   | Default value       | Required | Since Version    |
+|-------------------------------------------------|-------------------------------------------------------------------------------|---------------------|----------|------------------|
+| `gravitino.audit.writer.file.fileName`          | The audit log file name, the path is `${sys:gravitino.log.path}/${fileName}`. | gravitino_audit.log | NO       | 0.7.0-incubating |
+| `gravitino.audit.writer.file.flushIntervalSecs` | The flush interval time of the audit file in seconds.                         | 10                  | NO       | 0.7.0-incubating |
+| `gravitino.audit.writer.file.append`            | Whether the log will be written to the end or the beginning of the file.      | true                | NO       | 0.7.0-incubating |
 
 ### Security configuration
 
