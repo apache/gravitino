@@ -61,10 +61,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "comment": "comment",
   "provider": "hadoop",
   "properties": {
-    "location": "oss:/bucket/root",
+    "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key",
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
     "filesystem-providers": "s3"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
@@ -93,10 +93,10 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 
 // create a S3 catalog
 s3Properties = ImmutableMap.<String, String>builder()
-    .put("location", "oss:/bucket/root")
+    .put("location", "s3a://bucket/root")
     .put("s3-access-key-id", "access_key")
     .put("s3-secret-access-key", "secret_key")
-    .put("s3-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
+    .put("s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
     .put("filesystem-providers", "s3")
     .build();
 
@@ -121,10 +121,10 @@ catalog = gravitino_client.create_catalog(name="catalog",
 
 # create a S3 catalog
 s3_properties = {
-    "location": "oss:/bucket/root",
+    "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key"
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
 }
 
 s3_catalog = gravitino_client.create_catalog(name="catalog",
