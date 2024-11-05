@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.cleanup;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
 import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
@@ -173,6 +174,8 @@ public class RangerIcebergE2EIT extends BaseIT {
     createCatalog();
 
     metalake.addUser("test");
+
+    cleanup();
   }
 
   private static void generateRangerSparkSecurityXML() throws IOException {
