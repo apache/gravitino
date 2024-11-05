@@ -306,6 +306,7 @@ export const providers = [
         value: 'hms',
         defaultValue: 'hms',
         required: true,
+        select: ['hms'],
         description: 'Apache Hudi catalog type choose properties'
       },
       {
