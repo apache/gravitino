@@ -37,6 +37,7 @@ jobs:
               - core/**
               - dev/**
               - docs/open-api/**
+              - bundles/**
               - docs/build.gradle.kts
               - flink-connector/**
               - gradle/**

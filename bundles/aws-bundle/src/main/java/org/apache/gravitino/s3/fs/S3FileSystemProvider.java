@@ -55,6 +55,10 @@ public class S3FileSystemProvider implements FileSystemProvider {
     return S3AFileSystem.newInstance(path.toUri(), configuration);
   }
 
+  /**
+   * Get the scheme of the FileSystem. Attention, for S3 the schema is "s3a", not "s3". Users should
+   * use "s3a://..." to access S3.
+   */
   @Override
   public String scheme() {
     return "s3a";
