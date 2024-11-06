@@ -19,50 +19,53 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.rel.Table;
+import java.util.Map;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the details of a table. */
-public class TableDetails extends TableCommand {
+/** List the properties of a catalog. */
+public class ListCatalogProperties extends ListProperties {
 
-  protected final String schema;
-  protected final String table;
+  protected final String metalake;
+  protected final String catalog;
 
   /**
-   * Displays the details of a table.
+   * List the properties of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
-   * @param table The name of the table.
    */
-  public TableDetails(
-      String url,
-      boolean ignoreVersions,
-      String metalake,
-      String catalog,
-      String schema,
-      String table) {
-    super(url, ignoreVersions, metalake, catalog);
-    this.schema = schema;
-    this.table = table;
+  public ListCatalogProperties(
+      String url, boolean ignoreVersions, String metalake, String catalog) {
+    super(url, ignoreVersions);
+    this.metalake = metalake;
+    this.catalog = catalog;
   }
 
-  /** Displays the details of a table. */
+  /** List the properties of a catalog. */
   @Override
   public void handle() {
-    Table gTable = null;
-
+    Catalog gCatalog = null;
     try {
-      NameIdentifier name = NameIdentifier.of(table);
-      gTable = tableCatalog().loadTable(name);
+      GravitinoClient client = buildClient(metalake);
+      gCatalog = client.loadCatalog(catalog);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(gTable.name() + "," + gTable.comment());
+    Map<String, String> properties = gCatalog.properties();
+    printProperties(properties);
   }
 }

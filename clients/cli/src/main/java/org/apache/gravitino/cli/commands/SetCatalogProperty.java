@@ -19,50 +19,62 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the details of a table. */
-public class TableDetails extends TableCommand {
+/** Set a property of a catalog. */
+public class SetCatalogProperty extends Command {
 
-  protected final String schema;
-  protected final String table;
+  protected final String metalake;
+  protected final String catalog;
+  protected final String property;
+  protected final String value;
 
   /**
-   * Displays the details of a table.
+   * Set a property of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
-   * @param table The name of the table.
+   * @param property The name of the property.
+   * @param value The value of the property.
    */
-  public TableDetails(
+  public SetCatalogProperty(
       String url,
       boolean ignoreVersions,
       String metalake,
       String catalog,
-      String schema,
-      String table) {
-    super(url, ignoreVersions, metalake, catalog);
-    this.schema = schema;
-    this.table = table;
+      String property,
+      String value) {
+    super(url, ignoreVersions);
+    this.metalake = metalake;
+    this.catalog = catalog;
+    this.property = property;
+    this.value = value;
   }
 
-  /** Displays the details of a table. */
+  /** Set a property of a catalog. */
   @Override
   public void handle() {
-    Table gTable = null;
-
     try {
-      NameIdentifier name = NameIdentifier.of(table);
-      gTable = tableCatalog().loadTable(name);
+      GravitinoClient client = buildClient(metalake);
+      CatalogChange change = CatalogChange.setProperty(property, value);
+      client.alterCatalog(catalog, change);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(gTable.name() + "," + gTable.comment());
+    System.out.println(catalog + " property set.");
   }
 }

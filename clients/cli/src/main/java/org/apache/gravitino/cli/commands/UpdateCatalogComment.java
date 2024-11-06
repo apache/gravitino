@@ -19,39 +19,43 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class CatalogDetails extends Command {
+/** Update the comment of a catalog. */
+public class UpdateCatalogComment extends Command {
 
   protected final String metalake;
   protected final String catalog;
+  protected final String comment;
 
   /**
-   * Displays the name and comment of a catalog.
+   * Update the comment of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
+   * @param comment New metalake comment.
    */
-  public CatalogDetails(String url, boolean ignoreVersions, String metalake, String catalog) {
+  public UpdateCatalogComment(
+      String url, boolean ignoreVersions, String metalake, String catalog, String comment) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
+    this.comment = comment;
   }
 
-  /** Displays the name and details of a specified catalog. */
+  /** Update the comment of a catalog. */
   @Override
   public void handle() {
-    Catalog result = null;
-
     try {
       GravitinoClient client = buildClient(metalake);
-      result = client.loadCatalog(catalog);
+      CatalogChange change = CatalogChange.updateComment(comment);
+      client.alterCatalog(catalog, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -63,9 +67,6 @@ public class CatalogDetails extends Command {
       return;
     }
 
-    if (result != null) {
-      System.out.println(
-          result.name() + "," + result.type() + "," + result.provider() + "," + result.comment());
-    }
+    System.out.println(catalog + " comment changed.");
   }
 }

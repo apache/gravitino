@@ -19,32 +19,46 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Map;
+import org.apache.gravitino.Metalake;
+import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the Gravitino client version. */
-public class ClientVersion extends Command {
+/** List the properties of a metalake. */
+public class ListMetalakeProperties extends ListProperties {
+
+  protected final String metalake;
 
   /**
-   * Displays the client version.
+   * List the properties of a metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param metalake The name of the metalake.
    */
-  public ClientVersion(String url, boolean ignoreVersions) {
+  public ListMetalakeProperties(String url, boolean ignoreVersions, String metalake) {
     super(url, ignoreVersions);
+    this.metalake = metalake;
   }
 
-  /** Displays the client version. */
+  /** List the properties of a metalake. */
   @Override
   public void handle() {
-    String version = "unknown";
+    Metalake gMetalake = null;
     try {
       GravitinoAdminClient client = buildAdminClient();
-      version = client.clientVersion().version();
+      gMetalake = client.loadMetalake(metalake);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
-    System.out.println("Apache Gravitino " + version);
+
+    Map<String, String> properties = gMetalake.properties();
+
+    printProperties(properties);
   }
 }

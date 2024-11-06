@@ -19,32 +19,42 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 
-/** Displays the Gravitino client version. */
-public class ClientVersion extends Command {
+public class CreateMetalake extends Command {
+  protected final String metalake;
+  protected final String comment;
 
   /**
-   * Displays the client version.
+   * Create a new metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param metalake The name of the metalake.
+   * @param comment The metalake's comment.
    */
-  public ClientVersion(String url, boolean ignoreVersions) {
+  public CreateMetalake(String url, boolean ignoreVersions, String metalake, String comment) {
     super(url, ignoreVersions);
+    this.metalake = metalake;
+    this.comment = comment;
   }
 
-  /** Displays the client version. */
+  /** Create a new metalake. */
   @Override
   public void handle() {
-    String version = "unknown";
     try {
       GravitinoAdminClient client = buildAdminClient();
-      version = client.clientVersion().version();
+      client.createMetalake(metalake, comment, null);
+    } catch (MetalakeAlreadyExistsException err) {
+      System.err.println(ErrorMessages.METALAKE_EXISTS);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
-    System.out.println("Apache Gravitino " + version);
+
+    System.out.println(metalake + " created");
   }
 }

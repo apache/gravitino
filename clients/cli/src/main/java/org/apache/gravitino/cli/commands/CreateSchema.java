@@ -19,50 +19,62 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 
-/** Displays the details of a table. */
-public class TableDetails extends TableCommand {
-
+public class CreateSchema extends Command {
+  protected final String metalake;
+  protected final String catalog;
   protected final String schema;
-  protected final String table;
+  protected final String comment;
 
   /**
-   * Displays the details of a table.
+   * Create a new schema.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
-   * @param table The name of the table.
+   * @param schema The name of the schema.
+   * @param comment The schema's comment.
    */
-  public TableDetails(
+  public CreateSchema(
       String url,
       boolean ignoreVersions,
       String metalake,
       String catalog,
       String schema,
-      String table) {
-    super(url, ignoreVersions, metalake, catalog);
+      String comment) {
+    super(url, ignoreVersions);
+    this.metalake = metalake;
+    this.catalog = catalog;
     this.schema = schema;
-    this.table = table;
+    this.comment = comment;
   }
 
-  /** Displays the details of a table. */
+  /** Create a new schema. */
   @Override
   public void handle() {
-    Table gTable = null;
-
     try {
-      NameIdentifier name = NameIdentifier.of(table);
-      gTable = tableCatalog().loadTable(name);
+      GravitinoClient client = buildClient(metalake);
+      client.loadCatalog(catalog).asSchemas().createSchema(schema, comment, null);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
+    } catch (SchemaAlreadyExistsException err) {
+      System.err.println(ErrorMessages.SCHEMA_EXISTS);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(gTable.name() + "," + gTable.comment());
+    System.out.println(schema + " created");
   }
 }

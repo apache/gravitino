@@ -19,53 +19,69 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Catalog;
+import java.util.Map;
 import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.cli.Providers;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class CatalogDetails extends Command {
-
+public class CreateCatalog extends Command {
   protected final String metalake;
   protected final String catalog;
+  protected final String provider;
+  protected final String comment;
+  protected final Map<String, String> properties;
 
   /**
-   * Displays the name and comment of a catalog.
+   * Create a new catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
+   * @param provider The provider/type of catalog.
+   * @param comment The catalog's comment.
+   * @param properties The catalog's properties.
    */
-  public CatalogDetails(String url, boolean ignoreVersions, String metalake, String catalog) {
+  public CreateCatalog(
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String provider,
+      String comment,
+      Map<String, String> properties) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
+    this.provider = provider;
+    this.comment = comment;
+    this.properties = properties;
   }
 
-  /** Displays the name and details of a specified catalog. */
+  /** Create a new catalog. */
   @Override
   public void handle() {
-    Catalog result = null;
-
     try {
       GravitinoClient client = buildClient(metalake);
-      result = client.loadCatalog(catalog);
+      client.createCatalog(
+          catalog,
+          Providers.catalogType(provider),
+          Providers.internal(provider),
+          comment,
+          properties);
     } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      System.err.println(ErrorMessages.METALAKE_EXISTS);
       return;
-    } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (CatalogAlreadyExistsException err) {
+      System.err.println(ErrorMessages.CATALOG_EXISTS);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    if (result != null) {
-      System.out.println(
-          result.name() + "," + result.type() + "," + result.provider() + "," + result.comment());
-    }
+    System.out.println(catalog + " catalog created");
   }
 }

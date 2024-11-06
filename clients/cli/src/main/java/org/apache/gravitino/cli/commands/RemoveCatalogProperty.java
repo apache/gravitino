@@ -19,39 +19,43 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-public class CatalogDetails extends Command {
+/** Remove a property of a catalog. */
+public class RemoveCatalogProperty extends Command {
 
   protected final String metalake;
   protected final String catalog;
+  protected final String property;
 
   /**
-   * Displays the name and comment of a catalog.
+   * Remove a property of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
+   * @param property The name of the property.
    */
-  public CatalogDetails(String url, boolean ignoreVersions, String metalake, String catalog) {
+  public RemoveCatalogProperty(
+      String url, boolean ignoreVersions, String metalake, String catalog, String property) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
+    this.property = property;
   }
 
-  /** Displays the name and details of a specified catalog. */
+  /** Remove a property of a catalog. */
   @Override
   public void handle() {
-    Catalog result = null;
-
     try {
       GravitinoClient client = buildClient(metalake);
-      result = client.loadCatalog(catalog);
+      CatalogChange change = CatalogChange.removeProperty(property);
+      client.alterCatalog(catalog, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -63,9 +67,6 @@ public class CatalogDetails extends Command {
       return;
     }
 
-    if (result != null) {
-      System.out.println(
-          result.name() + "," + result.type() + "," + result.provider() + "," + result.comment());
-    }
+    System.out.println(property + " property removed.");
   }
 }

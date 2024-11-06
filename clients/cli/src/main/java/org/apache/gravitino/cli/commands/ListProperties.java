@@ -19,32 +19,38 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.client.GravitinoAdminClient;
+import java.util.Map;
 
-/** Displays the Gravitino client version. */
-public class ClientVersion extends Command {
+/** List the properties of a metalake. */
+public class ListProperties extends Command {
 
   /**
-   * Displays the client version.
+   * List the properties of an entity.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    */
-  public ClientVersion(String url, boolean ignoreVersions) {
+  public ListProperties(String url, boolean ignoreVersions) {
     super(url, ignoreVersions);
   }
 
-  /** Displays the client version. */
   @Override
   public void handle() {
-    String version = "unknown";
-    try {
-      GravitinoAdminClient client = buildAdminClient();
-      version = client.clientVersion().version();
-    } catch (Exception exp) {
-      System.err.println(exp.getMessage());
-      return;
+    /* Do nothing */
+  }
+
+  /**
+   * List the properties of an entity.
+   *
+   * @param properties The name, value pairs of properties.
+   */
+  public void printProperties(Map<String, String> properties) {
+    StringBuilder all = new StringBuilder();
+
+    for (Map.Entry<String, String> property : properties.entrySet()) {
+      all.append(property.getKey() + "," + property.getValue() + System.lineSeparator());
     }
-    System.out.println("Apache Gravitino " + version);
+
+    System.out.print(all.toString());
   }
 }

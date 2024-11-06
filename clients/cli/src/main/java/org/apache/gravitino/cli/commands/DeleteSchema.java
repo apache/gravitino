@@ -19,53 +19,61 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
-public class CatalogDetails extends Command {
+public class DeleteSchema extends Command {
 
   protected final String metalake;
   protected final String catalog;
+  protected final String schema;
 
   /**
-   * Displays the name and comment of a catalog.
+   * Delete a schema.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
+   * @param schema The name of the schema.
    */
-  public CatalogDetails(String url, boolean ignoreVersions, String metalake, String catalog) {
+  public DeleteSchema(
+      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
+    this.schema = schema;
   }
 
-  /** Displays the name and details of a specified catalog. */
+  /** Delete a schema. */
   @Override
   public void handle() {
-    Catalog result = null;
+    boolean deleted = false;
 
     try {
       GravitinoClient client = buildClient(metalake);
-      result = client.loadCatalog(catalog);
+      deleted = client.loadCatalog(catalog).asSchemas().dropSchema(schema, false);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
     } catch (NoSuchCatalogException err) {
       System.err.println(ErrorMessages.UNKNOWN_CATALOG);
       return;
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    if (result != null) {
-      System.out.println(
-          result.name() + "," + result.type() + "," + result.provider() + "," + result.comment());
+    if (deleted) {
+      System.out.println(schema + " deleted.");
+    } else {
+      System.out.println(schema + " not deleted.");
     }
   }
 }

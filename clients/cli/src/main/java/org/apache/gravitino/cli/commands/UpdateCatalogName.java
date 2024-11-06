@@ -19,32 +19,50 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the Gravitino client version. */
-public class ClientVersion extends Command {
+/** Update the name of a catalog. */
+public class UpdateCatalogName extends Command {
+
+  protected final String metalake;
+  protected final String catalog;
+  protected final String name;
 
   /**
-   * Displays the client version.
+   * Update the name of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
+   * @param name The new metalake name.
    */
-  public ClientVersion(String url, boolean ignoreVersions) {
+  public UpdateCatalogName(
+      String url, boolean ignoreVersions, String metalake, String catalog, String name) {
     super(url, ignoreVersions);
+    this.metalake = metalake;
+    this.catalog = catalog;
+    this.name = name;
   }
 
-  /** Displays the client version. */
+  /** Update the name of a catalog. */
   @Override
   public void handle() {
-    String version = "unknown";
     try {
-      GravitinoAdminClient client = buildAdminClient();
-      version = client.clientVersion().version();
+      GravitinoClient client = buildClient(metalake);
+      CatalogChange change = CatalogChange.rename(name);
+      client.alterCatalog(catalog, change);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
-    System.out.println("Apache Gravitino " + version);
+
+    System.out.println(catalog + " name changed.");
   }
 }

@@ -19,32 +19,47 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.MetalakeChange;
+import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the Gravitino client version. */
-public class ClientVersion extends Command {
+/** Remove a property of a metalake. */
+public class RemoveMetalakeProperty extends Command {
+
+  protected final String metalake;
+  protected final String property;
 
   /**
-   * Displays the client version.
+   * Remove a property of a metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param metalake The name of the metalake.
+   * @param property The name of the property.
    */
-  public ClientVersion(String url, boolean ignoreVersions) {
+  public RemoveMetalakeProperty(
+      String url, boolean ignoreVersions, String metalake, String property) {
     super(url, ignoreVersions);
+    this.metalake = metalake;
+    this.property = property;
   }
 
-  /** Displays the client version. */
+  /** Remove a property of a metalake. */
   @Override
   public void handle() {
-    String version = "unknown";
     try {
       GravitinoAdminClient client = buildAdminClient();
-      version = client.clientVersion().version();
+      MetalakeChange change = MetalakeChange.removeProperty(property);
+      client.alterMetalake(metalake, change);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
-    System.out.println("Apache Gravitino " + version);
+
+    System.out.println(property + " property removed.");
   }
 }

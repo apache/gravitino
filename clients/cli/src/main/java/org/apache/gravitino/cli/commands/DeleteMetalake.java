@@ -19,32 +19,44 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the Gravitino client version. */
-public class ClientVersion extends Command {
+public class DeleteMetalake extends Command {
+  protected final String metalake;
 
   /**
-   * Displays the client version.
+   * Delete a metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param metalake The name of the metalake.
    */
-  public ClientVersion(String url, boolean ignoreVersions) {
+  public DeleteMetalake(String url, boolean ignoreVersions, String metalake) {
     super(url, ignoreVersions);
+    this.metalake = metalake;
   }
 
-  /** Displays the client version. */
+  /** Delete a metalake. */
   @Override
   public void handle() {
-    String version = "unknown";
+    boolean deleted = false;
     try {
       GravitinoAdminClient client = buildAdminClient();
-      version = client.clientVersion().version();
+      deleted = client.dropMetalake(metalake);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
-    System.out.println("Apache Gravitino " + version);
+
+    if (deleted) {
+      System.out.println(metalake + " deleted.");
+    } else {
+      System.out.println(metalake + " not deleted.");
+    }
   }
 }

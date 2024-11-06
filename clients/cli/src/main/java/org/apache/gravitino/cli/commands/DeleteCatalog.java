@@ -19,32 +19,53 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the Gravitino client version. */
-public class ClientVersion extends Command {
+public class DeleteCatalog extends Command {
+
+  protected final String metalake;
+  protected final String catalog;
 
   /**
-   * Displays the client version.
+   * Delete a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param metalake The name of the metalake.
+   * @param catalog The name of the catalog.
    */
-  public ClientVersion(String url, boolean ignoreVersions) {
+  public DeleteCatalog(String url, boolean ignoreVersions, String metalake, String catalog) {
     super(url, ignoreVersions);
+    this.metalake = metalake;
+    this.catalog = catalog;
   }
 
-  /** Displays the client version. */
+  /** Delete a catalog. */
   @Override
   public void handle() {
-    String version = "unknown";
+    boolean deleted = false;
+
     try {
-      GravitinoAdminClient client = buildAdminClient();
-      version = client.clientVersion().version();
+      GravitinoClient client = buildClient(metalake);
+      deleted = client.dropCatalog(catalog);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
-    System.out.println("Apache Gravitino " + version);
+
+    if (deleted) {
+      System.out.println(catalog + " deleted.");
+    } else {
+      System.out.println(catalog + " not deleted.");
+    }
   }
 }

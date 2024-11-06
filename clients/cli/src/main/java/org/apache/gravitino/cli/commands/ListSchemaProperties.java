@@ -19,53 +19,60 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Catalog;
+import java.util.Map;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
-public class CatalogDetails extends Command {
+/** List the properties of a catalog. */
+public class ListSchemaProperties extends ListProperties {
 
   protected final String metalake;
   protected final String catalog;
+  protected final String schema;
 
   /**
-   * Displays the name and comment of a catalog.
+   * List the properties of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
+   * @param schema The name of the schema.
    */
-  public CatalogDetails(String url, boolean ignoreVersions, String metalake, String catalog) {
+  public ListSchemaProperties(
+      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
+    this.schema = schema;
   }
 
-  /** Displays the name and details of a specified catalog. */
+  /** List the properties of a catalog. */
   @Override
   public void handle() {
-    Catalog result = null;
-
+    Schema gSchema = null;
     try {
       GravitinoClient client = buildClient(metalake);
-      result = client.loadCatalog(catalog);
+      gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
     } catch (NoSuchCatalogException err) {
       System.err.println(ErrorMessages.UNKNOWN_CATALOG);
       return;
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    if (result != null) {
-      System.out.println(
-          result.name() + "," + result.type() + "," + result.provider() + "," + result.comment());
-    }
+    Map<String, String> properties = gSchema.properties();
+    printProperties(properties);
   }
 }

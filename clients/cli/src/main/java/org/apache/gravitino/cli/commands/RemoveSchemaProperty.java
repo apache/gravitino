@@ -19,53 +19,66 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Catalog;
+import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
-public class CatalogDetails extends Command {
+/** Remove a property of a schema. */
+public class RemoveSchemaProperty extends Command {
 
   protected final String metalake;
   protected final String catalog;
+  protected final String schema;
+  protected final String property;
 
   /**
-   * Displays the name and comment of a catalog.
+   * Remove a property of a schema.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
+   * @param schema The name of the schema.
+   * @param property The name of the property.
    */
-  public CatalogDetails(String url, boolean ignoreVersions, String metalake, String catalog) {
+  public RemoveSchemaProperty(
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String schema,
+      String property) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
+    this.schema = schema;
+    this.property = property;
   }
 
-  /** Displays the name and details of a specified catalog. */
+  /** Remove a property of a schema. */
   @Override
   public void handle() {
-    Catalog result = null;
-
     try {
       GravitinoClient client = buildClient(metalake);
-      result = client.loadCatalog(catalog);
+      SchemaChange change = SchemaChange.removeProperty(property);
+      client.loadCatalog(catalog).asSchemas().alterSchema(schema, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
     } catch (NoSuchCatalogException err) {
       System.err.println(ErrorMessages.UNKNOWN_CATALOG);
       return;
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    if (result != null) {
-      System.out.println(
-          result.name() + "," + result.type() + "," + result.provider() + "," + result.comment());
-    }
+    System.out.println(property + " property removed.");
   }
 }

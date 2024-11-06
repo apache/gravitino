@@ -31,6 +31,9 @@ public class CommandActions {
   public static final String UPDATE = "update";
   public static final String CREATE = "create";
   public static final String DELETE = "delete";
+  public static final String SET = "set";
+  public static final String REMOVE = "remove";
+  public static final String PROPERTIES = "properties";
 
   private static final HashSet<String> VALID_COMMANDS = new HashSet<>();
 
@@ -40,6 +43,9 @@ public class CommandActions {
     VALID_COMMANDS.add(UPDATE);
     VALID_COMMANDS.add(CREATE);
     VALID_COMMANDS.add(DELETE);
+    VALID_COMMANDS.add(SET);
+    VALID_COMMANDS.add(REMOVE);
+    VALID_COMMANDS.add(PROPERTIES);
   }
 
   /**
