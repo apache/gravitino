@@ -1036,6 +1036,122 @@ public class TestJDBCBackend {
     }
   }
 
+  protected Integer countAllObjectRel(Long roleId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM role_meta_securable_object WHERE role_id = %d",
+                    roleId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  protected Integer countActiveObjectRel(Long roleId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM role_meta_securable_object WHERE role_id = %d AND deleted_at = 0",
+                    roleId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  protected Integer countAllTagRel(Long tagId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format("SELECT count(*) FROM tag_relation_meta WHERE tag_id = %d", tagId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  protected Integer countActiveTagRel(Long tagId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM tag_relation_meta WHERE tag_id = %d AND deleted_at = 0",
+                    tagId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  protected Integer countAllOwnerRel(Long ownerId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format("SELECT count(*) FROM owner_meta WHERE owner_id = %d", ownerId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  protected Integer countActiveOwnerRel(long ownerId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM owner_meta WHERE owner_id = %d AND deleted_at = 0",
+                    ownerId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
   public static BaseMetalake createBaseMakeLake(Long id, String name, AuditInfo auditInfo) {
     return BaseMetalake.builder()
         .withId(id)

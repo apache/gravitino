@@ -41,19 +41,21 @@ import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class RangerAuthorizationHivePlugin extends RangerAuthorizationPlugin {
-  private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationHivePlugin.class);
-  private static volatile RangerAuthorizationHivePlugin instance = null;
+public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugin {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RangerAuthorizationHadoopSQLPlugin.class);
+  private static volatile RangerAuthorizationHadoopSQLPlugin instance = null;
 
-  private RangerAuthorizationHivePlugin(Map<String, String> config) {
+  private RangerAuthorizationHadoopSQLPlugin(Map<String, String> config) {
     super(config);
   }
 
-  public static synchronized RangerAuthorizationHivePlugin getInstance(Map<String, String> config) {
+  public static synchronized RangerAuthorizationHadoopSQLPlugin getInstance(
+      Map<String, String> config) {
     if (instance == null) {
-      synchronized (RangerAuthorizationHivePlugin.class) {
+      synchronized (RangerAuthorizationHadoopSQLPlugin.class) {
         if (instance == null) {
-          instance = new RangerAuthorizationHivePlugin(config);
+          instance = new RangerAuthorizationHadoopSQLPlugin(config);
         }
       }
     }

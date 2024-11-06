@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationHivePlugin;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
 import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
@@ -89,7 +89,7 @@ public class RangerITEnv {
     rangerClient = containerSuite.getRangerContainer().rangerClient;
 
     rangerAuthHivePlugin =
-        RangerAuthorizationHivePlugin.getInstance(
+        RangerAuthorizationHadoopSQLPlugin.getInstance(
             ImmutableMap.of(
                 AuthorizationPropertiesMeta.RANGER_ADMIN_URL,
                 String.format(
