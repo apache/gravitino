@@ -179,7 +179,6 @@ if [[ "$PYGRAVITINO_VERSION" == *"dev"* ]]; then
 else
   RC_PYGRAVITINO_VERSION="${PYGRAVITINO_VERSION}rc${RC_COUNT}"
 fi
-sed -i".tmp3" 's/    version=.*$/    version="'"$RC_PYGRAVITINO_VERSION"'",/g' clients/client-python/setup.py
 
 # This is a band-aid fix to avoid the failure of Maven nightly snapshot in some Jenkins
 # machines by explicitly calling /usr/sbin/lsof.
@@ -224,6 +223,7 @@ if [[ "$1" == "package" ]]; then
 
     echo "Creating distribution"
 
+    sed -i".tmp3" 's/    version=.*$/    version="'"$RC_PYGRAVITINO_VERSION"'",/g' clients/client-python/setup.py
     $GRADLE assembleDistribution -x test
     $GRADLE :clients:client-python:distribution -x test
     cd ..
