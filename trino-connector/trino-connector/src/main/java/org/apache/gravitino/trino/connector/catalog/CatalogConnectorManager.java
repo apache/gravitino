@@ -127,7 +127,7 @@ public class CatalogConnectorManager {
         try {
           GravitinoMetalake metalake =
               metalakes.computeIfAbsent(usedMetalake, this::retrieveMetalake);
-          LOG.info("Load metalake: {}", usedMetalake);
+          LOG.debug("Load metalake: {}", usedMetalake);
           loadCatalogs(metalake);
         } catch (Exception e) {
           LOG.error("Load Metalake {} failed.", usedMetalake, e);
@@ -158,7 +158,7 @@ public class CatalogConnectorManager {
       return;
     }
 
-    LOG.info(
+    LOG.debug(
         "Load metalake {}'s catalogs. catalogs: {}.",
         metalake.name(),
         Arrays.toString(catalogNames));

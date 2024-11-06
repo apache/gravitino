@@ -53,6 +53,8 @@ public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
     catalogProperties.put(PaimonCatalogPropertiesMetadata.URI, URI);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_USER, jdbcUser);
     catalogProperties.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD, jdbcPassword);
+    catalogProperties.put(
+        PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER, "com.mysql.cj.jdbc.Driver");
 
     return catalogProperties;
   }

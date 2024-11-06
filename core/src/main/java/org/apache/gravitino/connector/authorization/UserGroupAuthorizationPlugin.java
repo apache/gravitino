@@ -22,6 +22,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 
 /**
  * Interface for authorization User and Group plugin operation of the underlying access control
@@ -34,9 +35,9 @@ interface UserGroupAuthorizationPlugin {
    *
    * @param user The user entity.
    * @return True if the add User was successfully added, false if the add User failed.
-   * @throws RuntimeException If adding the User encounters storage issues.
+   * @throws AuthorizationPluginException If adding the User encounters storage issues.
    */
-  Boolean onUserAdded(User user) throws RuntimeException;
+  Boolean onUserAdded(User user) throws AuthorizationPluginException;
 
   /**
    * After removing a User from Gravitino, this method is called to remove the User from the
@@ -44,9 +45,9 @@ interface UserGroupAuthorizationPlugin {
    *
    * @param user The user entity.
    * @return True if the User was successfully removed, false if the remove User failed.
-   * @throws RuntimeException If removing the User encounters storage issues.
+   * @throws AuthorizationPluginException If removing the User encounters storage issues.
    */
-  Boolean onUserRemoved(User user) throws RuntimeException;
+  Boolean onUserRemoved(User user) throws AuthorizationPluginException;
 
   /**
    * After acquiring a User from Gravitino, this method is called to acquire the User in the
@@ -57,10 +58,10 @@ interface UserGroupAuthorizationPlugin {
    *
    * @param user The user entity.
    * @return IF exist return true, else return false.
-   * @throws RuntimeException If getting the User encounters underlying access control system
-   *     issues.
+   * @throws AuthorizationPluginException If getting the User encounters underlying access control
+   *     system issues.
    */
-  Boolean onUserAcquired(User user) throws RuntimeException;
+  Boolean onUserAcquired(User user) throws AuthorizationPluginException;
 
   /**
    * After adding a Group to Gravitino, this method is called to add the Group to the underlying
@@ -68,9 +69,9 @@ interface UserGroupAuthorizationPlugin {
    *
    * @param group The group entity.
    * @return True if the add Group was successfully added, false if the add Group failed.
-   * @throws RuntimeException If adding the Group encounters storage issues.
+   * @throws AuthorizationPluginException If adding the Group encounters storage issues.
    */
-  Boolean onGroupAdded(Group group) throws RuntimeException;
+  Boolean onGroupAdded(Group group) throws AuthorizationPluginException;
 
   /**
    * After removing a Group from Gravitino, this method is called to remove the Group from the
@@ -79,9 +80,9 @@ interface UserGroupAuthorizationPlugin {
    * @param group The group entity.
    * @return True if the remove Group was successfully removed, false if the remove Group was
    *     failed.
-   * @throws RuntimeException If removing the Group encounters storage issues.
+   * @throws AuthorizationPluginException If removing the Group encounters storage issues.
    */
-  Boolean onGroupRemoved(Group group) throws RuntimeException;
+  Boolean onGroupRemoved(Group group) throws AuthorizationPluginException;
 
   /**
    * After acquiring a Group from Gravitino, this method is called to acquire the Group in the
@@ -92,10 +93,10 @@ interface UserGroupAuthorizationPlugin {
    *
    * @param group The group entity.
    * @return If exist return true, else return false.
-   * @throws RuntimeException If getting the Group encounters underlying access control system
-   *     issues.
+   * @throws AuthorizationPluginException If getting the Group encounters underlying access control
+   *     system issues.
    */
-  Boolean onGroupAcquired(Group group) throws RuntimeException;
+  Boolean onGroupAcquired(Group group) throws AuthorizationPluginException;
 
   /**
    * After set a Owner to Gravitino, this method is called to set the Owner to the underlying
@@ -105,8 +106,8 @@ interface UserGroupAuthorizationPlugin {
    * @param preOwner The previous owner.
    * @param newOwner The new owner.
    * @return True if the set Owner was successfully set, false if the set Owner failed.
-   * @throws RuntimeException If adding the Group encounters storage issues.
+   * @throws AuthorizationPluginException If adding the Group encounters storage issues.
    */
   Boolean onOwnerSet(MetadataObject metadataObject, Owner preOwner, Owner newOwner)
-      throws RuntimeException;
+      throws AuthorizationPluginException;
 }
