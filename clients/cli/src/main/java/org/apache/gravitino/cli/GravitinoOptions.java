@@ -31,6 +31,7 @@ public class GravitinoOptions {
   public static final String NAME = "name";
   public static final String METALAKE = "metalake";
   public static final String IGNORE = "ignore";
+  public static final String AUDIT = "audit";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -48,6 +49,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("f", NAME, "full entity name (dot separated)"));
     options.addOption(createArgOption("m", METALAKE, "Metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "Ignore client/sever version check"));
+    options.addOption(createSimpleOption("a", AUDIT, "Display audit information"));
 
     return options;
   }
