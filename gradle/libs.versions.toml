@@ -38,6 +38,7 @@ hadoop-minikdc = "3.3.6"
 htrace-core4 = "4.1.0-incubating"
 httpclient5 = "5.2.1"
 mockserver = "5.15.0"
+commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
 commons-lang = "2.6"
 commons-io = "2.15.0"
@@ -166,6 +167,7 @@ airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.r
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
+commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
 commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons-io" }
