@@ -21,14 +21,18 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 
 /** Represent an event after check Iceberg table exists successfully. */
 @DeveloperApi
 public class IcebergTableExistsEvent extends IcebergTableEvent {
   private boolean isExists;
 
-  public IcebergTableExistsEvent(String user, NameIdentifier resourceIdentifier, boolean isExists) {
-    super(user, resourceIdentifier);
+  public IcebergTableExistsEvent(
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      boolean isExists) {
+    super(icebergRequestContext, resourceIdentifier);
     this.isExists = isExists;
   }
 

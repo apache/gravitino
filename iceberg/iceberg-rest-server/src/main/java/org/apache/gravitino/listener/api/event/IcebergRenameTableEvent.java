@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
@@ -30,8 +31,10 @@ public class IcebergRenameTableEvent extends IcebergTableEvent {
   private RenameTableRequest renameTableRequest;
 
   public IcebergRenameTableEvent(
-      String user, NameIdentifier resourceIdentifier, RenameTableRequest renameTableRequest) {
-    super(user, resourceIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      RenameTableRequest renameTableRequest) {
+    super(icebergRequestContext, resourceIdentifier);
     this.renameTableRequest =
         IcebergRestUtils.cloneIcebergRESTObject(renameTableRequest, RenameTableRequest.class);
   }

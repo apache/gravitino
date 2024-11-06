@@ -19,16 +19,23 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import lombok.Getter;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /** The general request context information for Iceberg REST operations. */
 public class IcebergRequestContext {
-  @Getter private final HttpServletRequest httpRequest;
+
   @Getter private final String catalogName;
+  @Getter private final String userName;
+  @Getter private final String remoteIp;
+  @Getter private final Map<String, String> httpHeaders;
 
   public IcebergRequestContext(HttpServletRequest httpRequest, String catalogName) {
-    this.httpRequest = httpRequest;
+    this.remoteIp = httpRequest.getRemoteAddr();
+    this.httpHeaders = IcebergRestUtils.getHttpHeaders(httpRequest);
     this.catalogName = catalogName;
+    this.userName = PrincipalUtils.getCurrentUserName();
   }
 }

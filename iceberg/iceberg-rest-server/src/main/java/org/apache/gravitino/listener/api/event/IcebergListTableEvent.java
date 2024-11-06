@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 
 /**
  * Represent an event after listing Iceberg table successfully.
@@ -31,7 +32,8 @@ import org.apache.gravitino.annotation.DeveloperApi;
  */
 @DeveloperApi
 public class IcebergListTableEvent extends IcebergTableEvent {
-  public IcebergListTableEvent(String user, NameIdentifier resourceIdentifier) {
-    super(user, resourceIdentifier);
+  public IcebergListTableEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier resourceIdentifier) {
+    super(icebergRequestContext, resourceIdentifier);
   }
 }

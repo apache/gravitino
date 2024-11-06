@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 
 /** Represent a failure event when dropping Iceberg table failed. */
 @DeveloperApi
@@ -28,8 +29,11 @@ public class IcebergDropTableFailureEvent extends IcebergTableFailureEvent {
   private boolean purgeRequested;
 
   public IcebergDropTableFailureEvent(
-      String user, NameIdentifier nameIdentifier, Boolean purgeRequested, Exception e) {
-    super(user, nameIdentifier, e);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier nameIdentifier,
+      Boolean purgeRequested,
+      Exception e) {
+    super(icebergRequestContext, nameIdentifier, e);
     this.purgeRequested = purgeRequested;
   }
 

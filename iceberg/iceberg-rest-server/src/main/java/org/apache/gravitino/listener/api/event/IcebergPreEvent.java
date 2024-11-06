@@ -21,11 +21,20 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 
 /** Represents an abstract pre event in Gravitino Iceberg REST server. */
 @DeveloperApi
 public abstract class IcebergPreEvent extends PreEvent {
-  protected IcebergPreEvent(String user, NameIdentifier resourceIdentifier) {
-    super(user, resourceIdentifier);
+  private IcebergRequestContext icebergRequestContext;
+
+  protected IcebergPreEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier resourceIdentifier) {
+    super(icebergRequestContext.getUserName(), resourceIdentifier);
+    this.icebergRequestContext = icebergRequestContext;
+  }
+
+  public IcebergRequestContext icebergRequestContext() {
+    return icebergRequestContext;
   }
 }

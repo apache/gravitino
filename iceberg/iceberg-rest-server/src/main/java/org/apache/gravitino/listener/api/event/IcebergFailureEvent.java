@@ -21,11 +21,20 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 
 /** Represents an abstract failure event in Gravitino Iceberg REST server. */
 @DeveloperApi
 public abstract class IcebergFailureEvent extends FailureEvent {
-  protected IcebergFailureEvent(String user, NameIdentifier nameIdentifier, Exception e) {
-    super(user, nameIdentifier, e);
+  private IcebergRequestContext icebergRequestContext;
+
+  protected IcebergFailureEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
+    super(icebergRequestContext.getUserName(), nameIdentifier, e);
+    this.icebergRequestContext = icebergRequestContext;
+  }
+
+  public IcebergRequestContext icebergRequestContext() {
+    return icebergRequestContext;
   }
 }

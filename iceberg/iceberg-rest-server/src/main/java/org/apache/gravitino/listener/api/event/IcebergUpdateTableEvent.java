@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -33,11 +34,11 @@ public class IcebergUpdateTableEvent extends IcebergTableEvent {
   private LoadTableResponse loadTableResponse;
 
   public IcebergUpdateTableEvent(
-      String user,
+      IcebergRequestContext icebergRequestContext,
       NameIdentifier resourceIdentifier,
       UpdateTableRequest updateTableRequest,
       LoadTableResponse loadTableResponse) {
-    super(user, resourceIdentifier);
+    super(icebergRequestContext, resourceIdentifier);
     this.updateTableRequest =
         IcebergRestUtils.cloneIcebergRESTObject(updateTableRequest, UpdateTableRequest.class);
     this.loadTableResponse =

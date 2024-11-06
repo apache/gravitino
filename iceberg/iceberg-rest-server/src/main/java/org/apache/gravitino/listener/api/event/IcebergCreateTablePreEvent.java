@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 
 /** Represent a pre event before creating Iceberg table. */
@@ -29,8 +30,10 @@ public class IcebergCreateTablePreEvent extends IcebergTablePreEvent {
   private CreateTableRequest createTableRequest;
 
   public IcebergCreateTablePreEvent(
-      String user, NameIdentifier resourceIdentifier, CreateTableRequest createTableRequest) {
-    super(user, resourceIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      CreateTableRequest createTableRequest) {
+    super(icebergRequestContext, resourceIdentifier);
     this.createTableRequest = createTableRequest;
   }
 

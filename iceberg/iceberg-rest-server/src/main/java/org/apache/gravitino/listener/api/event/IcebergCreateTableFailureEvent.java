@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 
@@ -30,11 +31,11 @@ public class IcebergCreateTableFailureEvent extends IcebergTableFailureEvent {
   private CreateTableRequest createTableRequest;
 
   public IcebergCreateTableFailureEvent(
-      String user,
+      IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
       CreateTableRequest createTableRequest,
       Exception e) {
-    super(user, nameIdentifier, e);
+    super(icebergRequestContext, nameIdentifier, e);
     this.createTableRequest =
         IcebergRestUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
   }

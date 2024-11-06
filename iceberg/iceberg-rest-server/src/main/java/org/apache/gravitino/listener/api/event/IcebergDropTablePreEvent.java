@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 
 /** Represent a pre event before dropping Iceberg table. */
 @DeveloperApi
@@ -28,8 +29,10 @@ public class IcebergDropTablePreEvent extends IcebergTablePreEvent {
   private boolean purgeRequested;
 
   public IcebergDropTablePreEvent(
-      String user, NameIdentifier tableIdentifier, boolean purgeRequested) {
-    super(user, tableIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier tableIdentifier,
+      boolean purgeRequested) {
+    super(icebergRequestContext, tableIdentifier);
     this.purgeRequested = purgeRequested;
   }
 

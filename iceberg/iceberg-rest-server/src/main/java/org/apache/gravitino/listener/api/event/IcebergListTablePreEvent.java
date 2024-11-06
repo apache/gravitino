@@ -21,11 +21,13 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 
 /** Represent a pre event before listing Iceberg table. */
 @DeveloperApi
 public class IcebergListTablePreEvent extends IcebergTablePreEvent {
-  public IcebergListTablePreEvent(String user, NameIdentifier tableIdentifier) {
-    super(user, tableIdentifier);
+  public IcebergListTablePreEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier tableIdentifier) {
+    super(icebergRequestContext, tableIdentifier);
   }
 }
