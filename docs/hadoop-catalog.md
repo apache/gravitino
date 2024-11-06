@@ -77,13 +77,13 @@ In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-
 In the meantime, you need to place the corresponding bundle jar [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
 
 :::note
-- Gravitino contains builtin file system providers for local file system(`builtin-local`) and HDFS(`builtin-hdfs`), that is to say if `filesystem-providers` is not set, Gravitino will still support local file system and HDFS. Apart from that, you can set the `filesystem-providerss` to support other file systems like S3, GCS, OSS or custom file system.
+- Gravitino contains builtin file system providers for local file system(`builtin-local`) and HDFS(`builtin-hdfs`), that is to say if `filesystem-providers` is not set, Gravitino will still support local file system and HDFS. Apart from that, you can set the `filesystem-providers` to support other file systems like S3, GCS, OSS or custom file system.
 - `default-filesystem-provider` is used to set the default file system provider for the Hadoop catalog. If the user does not specify the scheme in the URI, Gravitino will use the default file system provider to access the fileset. For example, if the default file system provider is set to `builtin-local`, the user can omit the prefix `file://` in the location. 
 :::
 
 #### How to custom your own HCFS file system fileset?
 
-Developers and users can custom their own HCFS file system fileset by implementing the `FileSystemProvider` interface in the jar [gravitino-catalog-hadoop](https://repo1.maven.org/maven2/org/apache/gravitino/catalog-hadoop/) . The `FileSystemProvider` interface is defined as follows:
+Developers and users can custom their own HCFS file system fileset by implementing the `FileSystemProvider` interface in the jar [gravitino-catalog-hadoop](https://repo1.maven.org/maven2/org/apache/gravitino/catalog-hadoop/). The `FileSystemProvider` interface is defined as follows:
 
 ```java
   
@@ -97,13 +97,15 @@ Developers and users can custom their own HCFS file system fileset by implementi
 
   // Name of the file system provider. 'builtin-local' for Local file system, 'builtin-hdfs' for HDFS, 
   // 's3' for AWS S3, 'gcs' for GCS, 'oss' for Aliyun OSS.
-  
   // You need to set catalog properties `filesystem-providers` to support this file system.
   String name();
 ```
 
-After implementing the `FileSystemProvider` interface, you need to put the jar file into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory. Then you can set the `filesystem-providers` property to use your custom file system provider.
+In the meantime, `FileSystemProvider` uses Java SPI to load the custom file system provider. You need to create a file named `org.apache.gravitino.catalog.fs.FileSystemProvider` in the `META-INF/services` directory of the jar file. The content of the file is the full class name of the custom file system provider. 
+For example, the content of `S3FileSystemProvider` is as follows:
+![img.png](assets/fileset/custom-filesystem-provider.png)
 
+After implementing the `FileSystemProvider` interface, you need to put the jar file into the `$GRAVITINO_HOME/catalogs/hadoop/libs` directory. Then you can set the `filesystem-providers` property to use your custom file system provider.
 
 ### Authentication for Hadoop Catalog
 

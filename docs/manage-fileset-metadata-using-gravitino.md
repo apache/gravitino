@@ -68,6 +68,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "filesystem-providers": "s3"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
+
+# For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
+# The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -106,6 +109,9 @@ Catalog s3Catalog = gravitinoClient.createCatalog("catalog",
     "This is a S3 fileset catalog",
     s3Properties);
 // ...
+
+// For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
+// The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -132,6 +138,9 @@ s3_catalog = gravitino_client.create_catalog(name="catalog",
                                              provider="hadoop",
                                              comment="This is a S3 fileset catalog",
                                              properties=s3_properties)
+
+# For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
+# The following link about the catalog properties.
 ```
 
 </TabItem>
