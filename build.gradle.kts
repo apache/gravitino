@@ -29,7 +29,7 @@ import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.IOException
-import java.util.Locale
+import java.util.*
 
 plugins {
   `maven-publish`
@@ -784,6 +784,7 @@ tasks {
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-maxcompute:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
       ":catalogs:catalog-kafka:copyLibAndConfig"
     )

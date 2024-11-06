@@ -66,6 +66,7 @@ metrics = "4.2.25"
 prometheus = "0.16.0"
 mysql = "8.0.23"
 postgresql = "42.6.0"
+odps = "3.3.6"
 immutables-value = "2.10.0"
 selenium = "3.141.59"
 rauschig = "1.2.0"
@@ -207,6 +208,7 @@ prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwiza
 prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", version.ref = "prometheus" }
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
+odps-jdbc = { group = "com.aliyun.odps", name = "odps-jdbc", version.ref = "odps" }
 minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop-minikdc"}
 immutables-value = { module = "org.immutables:value", version.ref = "immutables-value" }
 commons-cli = { group = "commons-cli", name = "commons-cli", version.ref = "commons-cli" }
