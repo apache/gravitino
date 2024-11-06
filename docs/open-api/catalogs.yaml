@@ -361,8 +361,14 @@ components:
           enum:
             - hive
             - lakehouse-iceberg
+            - lakehouse-paimon
+            - lakehouse-hudi
             - jdbc-mysql
             - jdbc-postgresql
+            - jdbc-doris
+            - jdbc-oceanbase
+            - hadoop
+            - kafka
         comment:
           type: string
           description: A comment for the catalog
