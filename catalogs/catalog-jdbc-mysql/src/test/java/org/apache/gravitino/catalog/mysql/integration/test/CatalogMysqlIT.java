@@ -1296,6 +1296,11 @@ public class CatalogMysqlIT extends BaseIT {
 
     Table t3 = tableCatalog.loadTable(NameIdentifier.of(schemaName, t3_name));
     Arrays.stream(t3.columns()).anyMatch(c -> Objects.equals(c.name(), "t_12"));
+    System.out.println("t3_indexs indexs length "+t3_indexes.length);
+    System.out.println("t3 indexs length "+t3.index().length);
+    if (tableCatalog.tableExists(NameIdentifier.of(schemaName, t3_name))) {
+      tableCatalog.dropTable(NameIdentifier.of(schemaName, t3_name));
+    }
     ITUtils.assertionsTableInfo(
         t3_name,
         table_comment,
