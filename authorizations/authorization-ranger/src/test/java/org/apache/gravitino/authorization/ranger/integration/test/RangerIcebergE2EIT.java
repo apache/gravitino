@@ -175,6 +175,7 @@ public class RangerIcebergE2EIT extends BaseIT {
     metalake.addUser(System.getenv(HADOOP_USER_NAME));
 
     RangerITEnv.cleanup();
+    waitForUpdatingPolicies();
   }
 
   private static void generateRangerSparkSecurityXML() throws IOException {
@@ -1019,10 +1020,10 @@ public class RangerIcebergE2EIT extends BaseIT {
     // Create a role with CREATE_SCHEMA privilege
     String roleName = currentFunName();
     SecurableObject securableObject =
-            SecurableObjects.parse(
-                    String.format("%s", catalogName),
-                    MetadataObject.Type.CATALOG,
-                    Lists.newArrayList(Privileges.CreateSchema.allow()));
+        SecurableObjects.parse(
+            String.format("%s", catalogName),
+            MetadataObject.Type.CATALOG,
+            Lists.newArrayList(Privileges.CreateSchema.allow()));
     metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
 
     // Granted this role to the spark execution user `HADOOP_USER_NAME`
