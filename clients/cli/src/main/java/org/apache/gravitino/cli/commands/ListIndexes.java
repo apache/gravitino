@@ -37,7 +37,7 @@ public class ListIndexes extends TableCommand {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    * @param table The name of the table.
    */
   public ListIndexes(
@@ -66,17 +66,17 @@ public class ListIndexes extends TableCommand {
 
     StringBuilder all = new StringBuilder();
     for (Index index : indexes) {
-      // Flatten the two-dimensional array fieldNames to a single comma-separated string
+      // Flatten the two-dimensional array fieldNames to a single dot-separated string
       List<String> flattenedFieldNames = new ArrayList<>();
       for (String[] fieldHierarchy : index.fieldNames()) {
         // Join nested fields (e.g., "a.b.c") for each inner array
         flattenedFieldNames.add(String.join(".", fieldHierarchy));
       }
 
-      String fields = String.join(", ", flattenedFieldNames);
-      String indexTitle = index.name();
-
-      all.append(indexTitle).append(": ").append(fields).append(System.lineSeparator());
+      String indexName = index.name();
+      for (String field : flattenedFieldNames) {
+        all.append(field).append(",").append(indexName).append(System.lineSeparator());
+      }
     }
 
     System.out.print(all);
