@@ -31,7 +31,7 @@ public class GroupDetails extends Command {
   protected final String group;
 
   /**
-   * Displays the users in a group.
+   * Displays the roles in a group.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -44,7 +44,7 @@ public class GroupDetails extends Command {
     this.group = group;
   }
 
-  /** Displays the roles of a specified user. */
+  /** Displays the roles of a specified group. */
   public void handle() {
     List<String> roles = null;
 

@@ -52,6 +52,7 @@ public class ListSchemaProperties extends ListProperties {
   }
 
   /** List the properties of a catalog. */
+  @Override
   public void handle() {
     Schema gSchema = null;
     try {

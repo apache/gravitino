@@ -29,22 +29,22 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  ```bash
  usage: gcli [metalake|catalog|schema|table|column] [list|details|create|delete|update|set|remove|properties] [options]
  Options
- -b,--bootstrap <arg>   Kafka bootstrap servers
- -c,--comment <arg>     entity comment
- -d,--database <arg>    database name
- -h,--help              command help information
- -i,--ignore            Ignore client/sever version check
- -j,--jdbcurl <arg>     JDBC URL
- -l,--user <arg>        database username
- -m,--metastore <arg>   Hive metastore URI
- -n,--name <arg>        full entity name (dot separated)
- -p,--provider <arg>    provider one of hadoop, hive, mysql, postgres,
-                        iceberg, kafka
- -r,--rename <arg>      new entity name
- -u,--url <arg>         Gravitino URL (default: http://localhost:8090)
- -v,--value <arg>       property value
- -w,--warehouse <arg>   warehouse name
- -z,--password <arg>    database password
+ -c,--comment <arg>      entity comment
+ -g,--group <arg>        group name
+ -h,--help               command help information
+ -i,--ignore             Ignore client/sever version check
+ -l,--user <arg>         user name
+ -m,--metalake <arg>     Metalake name
+ -n,--name <arg>         full entity name (dot separated)
+ -P,--property <arg>     property name
+ -p,--properties <arg>   property name/value pairs
+ -r,--rename <arg>       new entity name
+ -s,--server             Gravitino server version
+ -t,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
+                         iceberg, kafka
+ -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
+ -v,--version            Gravitino client version
+ -V,--value <arg>        property value
  ```
 
 ## Commands
@@ -56,8 +56,8 @@ The following commands are used for entity management:
 - create: Create a new entity
 - delete: Delete an existing entity
 - update: Update an existing entity
-- set: Set an entities property
-- remove: Remove an entities property
+- set: Set a property on an entity
+- remove: Remove a property from an entity
 - properties: Display an entities properties
 
 ### Setting the Metalake name
@@ -68,7 +68,7 @@ As dealing with one Metalake is a typical scenario, you can set the Metalake nam
 2. Set via the `GRAVITINO_METALAKE` environment variable.
 3. Stored in the Gravitino CLI configuration file.
 
-The command line option overrides the environment variable.
+The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
 ## Setting the Gravitino URL
 
@@ -78,7 +78,7 @@ As you need to set the Gravitino URL for every command, you can set the URL in s
 2. Set via the 'GRAVITINO_URL' environment variable.
 3. Stored in the Gravitino CLI configuration file.
 
-The command line option overrides the environment variable.
+The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
 ## Gravitino CLI configuration file
 
@@ -99,7 +99,6 @@ URL=http://localhost:8090
 ignore=true
 
 ```
-
 
 ## Manage metadata
 
@@ -136,6 +135,16 @@ If the client and server are running different versions of the Gravitino softwar
 1. Passed in on the command line via the `--ignore` parameter.
 2. Set via the `GRAVITINO_IGNORE` environment variable.
 3. Stored in the Gravitino CLI configuration file.
+
+### Multiple properties
+
+For commands that accept multiple properties they can be specified in a couple of different ways:
+
+1. gcli --properties n1=v1,n2=v2,n3=v3
+
+2. gcli --properties n1=v1 n2=v2 n3=v3
+
+3. gcli --properties n1=v1 --properties n2=v2 --properties n3=v3
 
 ### Metalake commands
 
@@ -193,7 +202,7 @@ gcli metalake set --metalake metalake_demo --property test --value value
 gcli metalake remove --metalake metalake_demo --property test
 ```
 
-### Catalog
+### Catalog commands
 
 #### Show all catalogs in a metalake
 
@@ -209,36 +218,36 @@ gcli catalog details --metalake metalake_demo --name catalog_postgres
 
 #### Creating a catalog
 
-The type of catalog to be created is specified by the `--provider` option. Different catalogs require different options, for example, a Hive catalog requires a metastore URI to be passed in as an option.
+The type of catalog to be created is specified by the `--provider` option. Different catalogs require different properties, for example, a Hive catalog requires a metastore-uri property.
 
 ##### Create a Hive catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name hive --provider hive --metastore thrift://hive-host:9083
+gcli catalog create --metalake metalake_demo --name hive --provider hive --properties metastore.uris=thrift://hive-host:9083
 ```
 
 ##### Create an Iceberg catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name iceberg --provider iceberg --metastore thrift://hive-host:9083 --warehouse hdfs://hdfs-host:9000/user/iceberg/warehouse
+gcli catalog create --metalake metalake_demo -name iceberg --provider iceberg --properties uri=thrift://hive-host:9083,catalog-backend=hive,warehouse=hdfs://hdfs-host:9000/user/iceberg/warehouse
 ```
 
 ##### Create a MySQL catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name mysql --provider mysql --jdbcurl "jdbc:mysql://mysql-host:3306?useSSL=false" --user user --password password
+gcli catalog create --metalake metalake_demo -name mysql --provider mysql --properties jdbc-url=jdbc:mysql://mysql-host:3306?useSSL=false,jdbc-user=user,jdbc-password=password,jdbc-driver=com.mysql.cj.jdbc.Driver
 ```
 
 ##### Create a Postgres catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name postgres --provider postgres --jdbcurl jdbc:postgresql://postgresql-host/mydb --user user --password password -database db
+gcli catalog create --metalake metalake_demo -name postgres --provider postgres --properties jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver
 ```
 
 ##### Create a Kafka catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name kafka --provider kafka --bootstrap 127.0.0.1:9092,127.0.0.2:9092
+gcli catalog create --metalake metalake_demo -name kafka --provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092
 ```
 
 #### Delete a catalog
@@ -277,7 +286,7 @@ gcli catalog set --metalake metalake_demo --name catalog_mysql --property test -
 gcli catalog remove --metalake metalake_demo --name catalog_mysql --property test
 ```
 
-### Schema
+### Schema commands
 
 #### Show all schemas in a catalog
 
@@ -305,7 +314,7 @@ gcli schema properties --metalake metalake_demo --name catalog_postgres.hr -i
 
 Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
 
-### Table
+### Table commands
 
 #### Show all tables
 
@@ -323,4 +332,56 @@ gcli column list --metalake metalake_demo --name catalog_postgres.hr.departments
 
 ```bash
 gcli table delete --metalake metalake_demo --name catalog_postgres.hr.salaries
+```
+
+### User commands
+
+#### Create a user
+
+```bash
+gcli user create --metalake metalake_demo --user new_user
+```
+
+#### Show a user's details
+
+```bash
+gcli user details --metalake metalake_demo --user new_user
+```
+
+#### List all users
+
+```bash
+gcli user list --metalake metalake_demo
+```
+
+#### Delete a users
+
+```bash
+gcli user delete --metalake metalake_demo --user new_user
+```
+
+### Group commands
+
+#### Create a group
+
+```bash
+gcli group create --metalake metalake_demo --user new_group
+```
+
+#### Display a group's details
+
+```bash
+gcli group details --metalake metalake_demo --user new_group
+```
+
+#### List all groups
+
+```bash
+gcli group list --metalake metalake_demo
+```
+
+#### Delete a group
+
+```bash
+gcli group delete --metalake metalake_demo --user new_group
 ```

@@ -46,6 +46,7 @@ public class ListSchema extends Command {
   }
 
   /** List all schema names in a schema. */
+  @Override
   public void handle() {
     String[] schemas = new String[0];
     try {
