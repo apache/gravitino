@@ -370,7 +370,7 @@ public class TestFilesetOperations extends JerseyTest {
 
   @Test
   public void testRemoveFilesetComment() {
-    FilesetUpdateRequest req = new FilesetUpdateRequest.RemoveFilesetCommentRequest();
+    FilesetUpdateRequest req = new FilesetUpdateRequest.UpdateFilesetCommentRequest(null);
     Fileset fileset =
         mockFileset("fileset1", Fileset.Type.MANAGED, null, "mock location", ImmutableMap.of());
     assertUpdateFileset(new FilesetUpdatesRequest(ImmutableList.of(req)), fileset);
@@ -387,7 +387,7 @@ public class TestFilesetOperations extends JerseyTest {
     // remove k2
     FilesetUpdateRequest req5 = new FilesetUpdateRequest.RemoveFilesetPropertiesRequest("k2");
     // remove comment
-    FilesetUpdateRequest req6 = new FilesetUpdateRequest.RemoveFilesetCommentRequest();
+    FilesetUpdateRequest req6 = new FilesetUpdateRequest.UpdateFilesetCommentRequest(null);
 
     Fileset fileset =
         mockFileset(

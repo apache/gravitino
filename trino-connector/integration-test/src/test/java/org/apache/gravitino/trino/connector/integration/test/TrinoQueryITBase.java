@@ -211,9 +211,7 @@ public class TrinoQueryITBase {
                     .forEach(
                         table -> {
                           boolean dropped =
-                              tableCatalog.dropTable(
-                                  NameIdentifier.of(
-                                      metalakeName, catalogName, schema, table.name()));
+                              tableCatalog.dropTable(NameIdentifier.of(schema, table.name()));
                           LOG.info(
                               "Drop table \"{}.{}\".{}.{}",
                               metalakeName,
@@ -227,7 +225,7 @@ public class TrinoQueryITBase {
 
                 schemas.dropSchema(schema, false);
               } catch (Exception e) {
-                LOG.error("Failed to drop schema {}", schema);
+                LOG.error("Failed to drop schema {}", schema, e);
               }
               LOG.info("Drop schema \"{}.{}\".{}", metalakeName, catalogName, schema);
             });

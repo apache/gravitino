@@ -306,11 +306,13 @@
    Apache Iceberg core
    Apache Iceberg Hive metastore
    Apache Iceberg GCP
+   Apache Iceberg GCP bundle
    Apache Ivy
    Apache Log4j 1.x Compatibility API
    Apache Log4j API
    Apache Log4j Core
    Apache Log4j SLF4J 2.0 Binding
+   Apache Log4j Layout For Templated JSON Encoding
    Apache ORC
    Apache Parquet Hadoop Bundle
    Apache Thrift
@@ -398,6 +400,8 @@
    RE2/J
    ZSTD JNI
    fsspec
+   Google auth HTTP
+   Google auth Credentials
 
    This product bundles various third-party components also under the
    MIT license

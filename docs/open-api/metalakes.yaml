@@ -135,12 +135,46 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
 
+    patch:
+      tags:
+        - metalake
+      summary: set metalake in-use
+      operationId: setMetalake
+      description: Set a specified metalake in-use or not in-use
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetalakeSetRequest"
+      responses:
+        "200":
+          $ref: "./openapi.yaml#/components/responses/BaseResponse"
+        "404":
+            description: Not Found - The metalake does not exist
+            content:
+              application/vnd.gravitino.v1+json:
+                schema:
+                  $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                examples:
+                  NoSuchMetalakeException:
+                    $ref: "#/components/examples/NoSuchMetalakeException"
+        "500":
+          description:
+            Internal server error. It is possible that the server
+            encountered a storage issue.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+
     delete:
       tags:
         - metalake
       summary: Drop metalake
       operationId: dropMetalake
       description: Drops a specified metalake
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/force"
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/DropResponse"
@@ -172,6 +206,18 @@ components:
           default: {}
           additionalProperties:
             type: string
+
+    MetalakeSetRequest:
+      type: object
+      required:
+        - inUse
+      properties:
+          inUse:
+            type: boolean
+            description: The in-use status of the metalake to set
+      example: {
+          "inUse": true
+      }
 
     MetalakeUpdatesRequest:
       type: object

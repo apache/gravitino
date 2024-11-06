@@ -20,6 +20,8 @@ package org.apache.gravitino.iceberg.integration.test;
 
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.FormatMethod;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -27,11 +29,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
@@ -46,6 +51,7 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("FormatStringAnnotation")
 public abstract class IcebergRESTServiceBaseIT {
+
   public static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceBaseIT.class);
   private SparkSession sparkSession;
   protected IcebergCatalogBackend catalogType = IcebergCatalogBackend.MEMORY;
@@ -84,6 +90,31 @@ public abstract class IcebergRESTServiceBaseIT {
 
   abstract Map<String, String> getCatalogConfig();
 
+  protected boolean supportsCredentialVending() {
+    return false;
+  }
+
+  private void copyBundleJar(String bundleName) {
+    String bundleFileName = ITUtils.getBundleJarName(bundleName);
+
+    String rootDir = System.getenv("GRAVITINO_ROOT_DIR");
+    String sourceFile =
+        String.format("%s/bundles/gcp-bundle/build/libs/%s", rootDir, bundleFileName);
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
+    String targetFile = String.format("%s/%s", targetDir, bundleFileName);
+    LOG.info("Source file: {}, target directory: {}", sourceFile, targetDir);
+    try {
+      File target = new File(targetFile);
+      if (!target.exists()) {
+        LOG.info("Copy source file: {} to target directory: {}", sourceFile, targetDir);
+        FileUtils.copyFileToDirectory(new File(sourceFile), new File(targetDir));
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   private void registerIcebergCatalogConfig() {
     Map<String, String> icebergConfigs = getCatalogConfig();
     icebergRESTServerManager.registerCustomConfigs(icebergConfigs);
@@ -100,19 +131,24 @@ public abstract class IcebergRESTServiceBaseIT {
   private void initSparkEnv() {
     int port = getServerPort();
     LOG.info("Iceberg REST server port:{}", port);
-    String IcebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
-    sparkSession =
-        SparkSession.builder()
-            .master("local[1]")
-            .config(
+    String icebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", port);
+    SparkConf sparkConf =
+        new SparkConf()
+            .set(
                 "spark.sql.extensions",
                 "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-            .config("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
-            .config("spark.sql.catalog.rest.type", "rest")
-            .config("spark.sql.catalog.rest.uri", IcebergRESTUri)
+            .set("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
+            .set("spark.sql.catalog.rest.type", "rest")
+            .set("spark.sql.catalog.rest.uri", icebergRESTUri)
             // drop Iceberg table purge may hang in spark local mode
-            .config("spark.locality.wait.node", "0")
-            .getOrCreate();
+            .set("spark.locality.wait.node", "0");
+
+    if (supportsCredentialVending()) {
+      sparkConf.set(
+          "spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation", "vended-credentials");
+    }
+
+    sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }
 
   private void stopSparkEnv() {

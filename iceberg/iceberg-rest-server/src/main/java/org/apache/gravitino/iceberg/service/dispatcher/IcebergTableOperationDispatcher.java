@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -36,66 +37,69 @@ public interface IcebergTableOperationDispatcher {
   /**
    * Creates a new Iceberg table.
    *
-   * @param catalogName The catalog name when creating the table.
+   * @param context Iceberg REST request context information.
    * @param namespace The namespace within which the table should be created.
    * @param createTableRequest The request object containing the details for creating the table.
    * @return A {@link LoadTableResponse} object containing the result of the operation.
    */
   LoadTableResponse createTable(
-      String catalogName, Namespace namespace, CreateTableRequest createTableRequest);
+      IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest);
 
   /**
    * Updates an Iceberg table.
    *
-   * @param catalogName The catalog name when updating the table.
+   * @param context Iceberg REST request context information.
    * @param tableIdentifier The Iceberg table identifier.
    * @param updateTableRequest The request object containing the details for updating the table.
    * @return A {@link LoadTableResponse} object containing the result of the operation.
    */
   LoadTableResponse updateTable(
-      String catalogName, TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest);
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      UpdateTableRequest updateTableRequest);
 
   /**
    * Drops an Iceberg table.
    *
-   * @param catalogName The catalog name when dropping the table.
+   * @param context Iceberg REST request context information.
    * @param tableIdentifier The Iceberg table identifier.
    * @param purgeRequested Whether to purge the table.
    */
-  void dropTable(String catalogName, TableIdentifier tableIdentifier, boolean purgeRequested);
+  void dropTable(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested);
 
   /**
    * Loads an Iceberg table.
    *
-   * @param catalogName The catalog name when dropping the table.
+   * @param context Iceberg REST request context information.
    * @param tableIdentifier The Iceberg table identifier.
    * @return A {@link LoadTableResponse} object containing the result of the operation.
    */
-  LoadTableResponse loadTable(String catalogName, TableIdentifier tableIdentifier);
+  LoadTableResponse loadTable(IcebergRequestContext context, TableIdentifier tableIdentifier);
 
   /**
    * Lists Iceberg tables.
    *
-   * @param catalogName The catalog name when dropping the table.
+   * @param context Iceberg REST request context information.
    * @param namespace The Iceberg namespace.
    * @return A {@link ListTablesResponse} object containing the list of table identifiers.
    */
-  ListTablesResponse listTable(String catalogName, Namespace namespace);
+  ListTablesResponse listTable(IcebergRequestContext context, Namespace namespace);
 
   /**
    * Check whether an Iceberg table exists.
    *
-   * @param catalogName The catalog name when dropping the table.
+   * @param context Iceberg REST request context information.
    * @param tableIdentifier The Iceberg table identifier.
    * @return Whether table exists.
    */
-  boolean tableExists(String catalogName, TableIdentifier tableIdentifier);
+  boolean tableExists(IcebergRequestContext context, TableIdentifier tableIdentifier);
 
   /**
    * Rename an Iceberg table.
    *
-   * @param catalogName The catalog name when dropping the table.
+   * @param context Iceberg REST request context information.
    * @param renameTableRequest Rename table request information.
    */
-  void renameTable(String catalogName, RenameTableRequest renameTableRequest);
+  void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest);
 }

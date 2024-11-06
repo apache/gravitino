@@ -39,6 +39,7 @@ public class GravitinoOptions {
   public static final String PROPERTIES = "properties";
   public static final String USER = "user";
   public static final String GROUP = "group";
+  public static final String AUDIT = "audit";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -56,6 +57,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("n", NAME, "full entity name (dot separated)"));
     options.addOption(createArgOption("m", METALAKE, "Metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "Ignore client/sever version check"));
+    options.addOption(createSimpleOption("a", AUDIT, "Display audit information"));
 
     // Create/update options
     options.addOption(createArgOption("r", RENAME, "new entity name"));

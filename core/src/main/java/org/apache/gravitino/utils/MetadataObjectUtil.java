@@ -93,12 +93,9 @@ public class MetadataObjectUtil {
       case TABLE:
       case TOPIC:
       case FILESET:
+      case COLUMN:
         String fullName = DOT.join(metalakeName, metadataObject.fullName());
         return NameIdentifier.parse(fullName);
-      case COLUMN:
-        throw new IllegalArgumentException(
-            "Cannot convert column metadata object to entity identifier: "
-                + metadataObject.fullName());
       default:
         throw new IllegalArgumentException(
             "Unknown metadata object type: " + metadataObject.type());
@@ -148,6 +145,12 @@ public class MetadataObjectUtil {
       case TABLE:
         NameIdentifierUtil.checkTable(identifier);
         check(env.tableDispatcher().tableExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case COLUMN:
+        NameIdentifierUtil.checkColumn(identifier);
+        NameIdentifier tableIdent = NameIdentifier.of(identifier.namespace().levels());
+        check(env.tableDispatcher().tableExists(tableIdent), exceptionToThrowSupplier);
         break;
 
       case TOPIC:
