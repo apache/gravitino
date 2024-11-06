@@ -42,14 +42,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugin {
-  private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationHadoopSQLPlugin.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(RangerAuthorizationHadoopSQLPlugin.class);
   private static volatile RangerAuthorizationHadoopSQLPlugin instance = null;
 
   private RangerAuthorizationHadoopSQLPlugin(Map<String, String> config) {
     super(config);
   }
 
-  public static synchronized RangerAuthorizationHadoopSQLPlugin getInstance(Map<String, String> config) {
+  public static synchronized RangerAuthorizationHadoopSQLPlugin getInstance(
+      Map<String, String> config) {
     if (instance == null) {
       synchronized (RangerAuthorizationHadoopSQLPlugin.class) {
         if (instance == null) {
