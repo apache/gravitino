@@ -30,7 +30,6 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  usage: gcli [metalake|catalog|schema|table|column] [list|details|create|delete|update|set|remove|properties] [options]
  Options
  -c,--comment <arg>      entity comment
-<<<<<<< HEAD
  -g,--group <arg>        group name
  -h,--help               command help information
  -i,--ignore             Ignore client/sever version check
@@ -43,18 +42,6 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -s,--server             Gravitino server version
  -t,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
                          iceberg, kafka
-=======
- -g,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
-                         iceberg, kafka
- -h,--help               command help information
- -i,--ignore             Ignore client/sever version check
- -m,--metalake <arg>     Metalake name
- -n,--name <arg>         full entity name (dot separated)
- -P,--property <arg>     property name
- -p,--properties <arg>   comma separated property name/value pairs
- -r,--rename <arg>       new entity name
- -s,--server             Gravitino server version
->>>>>>> main
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
@@ -149,7 +136,6 @@ If the client and server are running different versions of the Gravitino softwar
 2. Set via the `GRAVITINO_IGNORE` environment variable.
 3. Stored in the Gravitino CLI configuration file.
 
-<<<<<<< HEAD
 ### Multiple properties
 
 For commands that accept multiple properties they can be specified in a couple of different ways:
@@ -160,8 +146,6 @@ For commands that accept multiple properties they can be specified in a couple o
 
 3. gcli --properties n1=v1 --properties n2=v2 --properties n3=v3
 
-=======
->>>>>>> main
 ### Metalake commands
 
 #### Show all metalakes
@@ -174,51 +158,6 @@ gcli metalake list
 
 ```bash
 gcli metalake details --metalake metalake_demo
-<<<<<<< HEAD
-=======
-```
-
-#### Create a metalake
-
-```bash
-gcli metalake create --metalake my_metalake --comment "This is my metalake"
-```
-
-#### Delete a metalake
-
-```bash
-gcli metalake delete --metalake my_metalake
-```
-
-#### Rename a metalake
-
-```bash
-gcli metalake update --metalake metalake_demo --rename demo
-```
-
-#### Update a metalake's comment
-
-```bash
-gcli metalake update --metalake metalake_demo --comment "new comment"
-```
-
-#### Display a metalake's properties
-
-```bash
-gcli metalake properties --metalake metalake_demo
-```
-
-#### Set a metalake's property
-
-```bash
-gcli metalake set --metalake metalake_demo --property test --value value
-```
-
-#### Remove a metalake's property
-
-```bash
-gcli metalake remove --metalake metalake_demo --property test
->>>>>>> main
 ```
 
 #### Create a metalake
@@ -347,11 +286,7 @@ gcli catalog set --metalake metalake_demo --name catalog_mysql --property test -
 gcli catalog remove --metalake metalake_demo --name catalog_mysql --property test
 ```
 
-<<<<<<< HEAD
 ### Schema commands
-=======
-### Schema
->>>>>>> main
 
 #### Show all schemas in a catalog
 
@@ -379,11 +314,7 @@ gcli schema properties --metalake metalake_demo --name catalog_postgres.hr -i
 
 Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
 
-<<<<<<< HEAD
 ### Table commands
-=======
-### Table
->>>>>>> main
 
 #### Show all tables
 
@@ -402,7 +333,6 @@ gcli column list --metalake metalake_demo --name catalog_postgres.hr.departments
 ```bash
 gcli table delete --metalake metalake_demo --name catalog_postgres.hr.salaries
 ```
-<<<<<<< HEAD
 
 ### User commands
 
@@ -455,5 +385,3 @@ gcli group list --metalake metalake_demo
 ```bash
 gcli group delete --metalake metalake_demo --user new_group
 ```
-=======
->>>>>>> main
