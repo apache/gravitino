@@ -54,9 +54,15 @@ public class MetalakeAuditInfo extends Command {
     }
 
     String auditInfo =
-        String.format(
-            "creator: %s\ncreateTime: %s\nlastModifier: %s\nlastModifiedTime: %s",
-            audit.creator(), audit.createTime(), audit.lastModifier(), audit.lastModifiedTime());
+        "creator,createTime,lastModifier,lastModifiedTime\n"
+            + audit.creator()
+            + ","
+            + audit.createTime()
+            + ","
+            + audit.lastModifier()
+            + ","
+            + audit.lastModifiedTime();
+
     System.out.println(auditInfo);
   }
 }

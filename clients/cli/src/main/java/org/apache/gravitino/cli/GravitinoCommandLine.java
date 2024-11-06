@@ -124,9 +124,10 @@ public class GravitinoCommandLine {
     String metalake = name.getMetalakeName();
 
     if (CommandActions.DETAILS.equals(command)) {
-      new MetalakeDetails(url, ignore, metalake).handle();
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         new MetalakeAuditInfo(url, ignore, metalake).handle();
+      } else {
+        new MetalakeDetails(url, ignore, metalake).handle();
       }
     } else if (CommandActions.LIST.equals(command)) {
       new ListMetalakes(url, ignore).handle();
