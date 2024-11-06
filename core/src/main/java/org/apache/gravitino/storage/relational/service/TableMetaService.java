@@ -225,33 +225,17 @@ public class TableMetaService {
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         tableId, MetadataObject.Type.TABLE.name()));
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
             TableColumnMetaService.getInstance().deleteColumnsByTableId(tableId);
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper ->
                     mapper.softDeleteObjectRelsByMetadataObject(
                         tableId, MetadataObject.Type.TABLE.name()));
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         tableId, MetadataObject.Type.TABLE.name()));
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(tableId));
