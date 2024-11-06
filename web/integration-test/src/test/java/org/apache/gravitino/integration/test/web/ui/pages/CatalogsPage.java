@@ -208,6 +208,15 @@ public class CatalogsPage extends BaseWebIT {
     }
   }
 
+  public void clickInUseSwitch(String name) {
+    try {
+      String xpath = "//*[@data-refer='catalog-in-use-" + name + "']";
+      clickAndWait(By.xpath(xpath));
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
   public void clickDeleteCatalogBtn(String name) {
     try {
       String xpath = "//button[@data-refer='delete-entity-" + name + "']";

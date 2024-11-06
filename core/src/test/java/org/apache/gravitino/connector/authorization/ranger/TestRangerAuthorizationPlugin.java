@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
@@ -110,4 +111,9 @@ public class TestRangerAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public void close() throws IOException {}
+
+  @Override
+  public Boolean onMetadataUpdated(MetadataObjectChange... changes) throws RuntimeException {
+    return null;
+  }
 }

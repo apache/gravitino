@@ -23,6 +23,7 @@ import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 
 /** Interface for authorization Role plugin operation of the underlying access control system */
 interface RoleAuthorizationPlugin {
@@ -32,9 +33,9 @@ interface RoleAuthorizationPlugin {
    *
    * @param role The entity of the Role.
    * @return True if the create operation success; False if the create operation failed.
-   * @throws RuntimeException If creating the Role encounters storage issues.
+   * @throws AuthorizationPluginException If creating the Role encounters storage issues.
    */
-  Boolean onRoleCreated(Role role) throws RuntimeException;
+  Boolean onRoleCreated(Role role) throws AuthorizationPluginException;
 
   /**
    * After acquiring a role from Gravitino, this method is called to acquire the role in the
@@ -45,10 +46,10 @@ interface RoleAuthorizationPlugin {
    *
    * @param role The entity of the Role.
    * @return IF exist return true, else return false.
-   * @throws RuntimeException If getting the Role encounters underlying access control system
-   *     issues.
+   * @throws AuthorizationPluginException If getting the Role encounters underlying access control
+   *     system issues.
    */
-  Boolean onRoleAcquired(Role role) throws RuntimeException;
+  Boolean onRoleAcquired(Role role) throws AuthorizationPluginException;
 
   /**
    * After deleting a role from Gravitino, this method is called to delete the role in the
@@ -56,9 +57,9 @@ interface RoleAuthorizationPlugin {
    *
    * @param role The entity of the Role.
    * @return True if the Role was successfully deleted, false only when there's no such role
-   * @throws RuntimeException If deleting the Role encounters storage issues.
+   * @throws AuthorizationPluginException If deleting the Role encounters storage issues.
    */
-  Boolean onRoleDeleted(Role role) throws RuntimeException;
+  Boolean onRoleDeleted(Role role) throws AuthorizationPluginException;
 
   /**
    * After updating a role in Gravitino, this method is called to update the role in the underlying
@@ -67,9 +68,9 @@ interface RoleAuthorizationPlugin {
    * @param role The entity of the Role.
    * @param changes role changes apply to the role.
    * @return True if the update operation is successful; False if the update operation fails.
-   * @throws RuntimeException If update role encounters storage issues.
+   * @throws AuthorizationPluginException If update role encounters storage issues.
    */
-  Boolean onRoleUpdated(Role role, RoleChange... changes) throws RuntimeException;
+  Boolean onRoleUpdated(Role role, RoleChange... changes) throws AuthorizationPluginException;
 
   /**
    * After granting roles to a user from Gravitino, this method is called to grant roles to the user
@@ -78,9 +79,9 @@ interface RoleAuthorizationPlugin {
    * @param user The entity of the User.
    * @param roles The entities of the Roles.
    * @return True if the Grant was successful, false if the Grant was failed.
-   * @throws RuntimeException If granting roles to a user encounters storage issues.
+   * @throws AuthorizationPluginException If granting roles to a user encounters storage issues.
    */
-  Boolean onGrantedRolesToUser(List<Role> roles, User user) throws RuntimeException;
+  Boolean onGrantedRolesToUser(List<Role> roles, User user) throws AuthorizationPluginException;
 
   /**
    * After revoking roles from a user from Gravitino, this method is called to revoke roles from the
@@ -89,9 +90,9 @@ interface RoleAuthorizationPlugin {
    * @param user The entity of the User.
    * @param roles The entities of the Roles.
    * @return True if the revoke was successfully removed, false if the revoke failed.
-   * @throws RuntimeException If revoking roles from a user encounters storage issues.
+   * @throws AuthorizationPluginException If revoking roles from a user encounters storage issues.
    */
-  Boolean onRevokedRolesFromUser(List<Role> roles, User user) throws RuntimeException;
+  Boolean onRevokedRolesFromUser(List<Role> roles, User user) throws AuthorizationPluginException;
 
   /**
    * After granting roles to a group from Gravitino, this method is called to grant roles to the
@@ -100,9 +101,9 @@ interface RoleAuthorizationPlugin {
    * @param group The entity of the Group.
    * @param roles The entities of the Roles.
    * @return True if the revoke was successfully removed, False if the revoke failed.
-   * @throws RuntimeException If granting roles to a group encounters storage issues.
+   * @throws AuthorizationPluginException If granting roles to a group encounters storage issues.
    */
-  Boolean onGrantedRolesToGroup(List<Role> roles, Group group) throws RuntimeException;
+  Boolean onGrantedRolesToGroup(List<Role> roles, Group group) throws AuthorizationPluginException;
 
   /**
    * After revoking roles from a group from Gravitino, this method is called to revoke roles from
@@ -111,7 +112,8 @@ interface RoleAuthorizationPlugin {
    * @param group The entity of the Group.
    * @param roles The entities of the Roles.
    * @return True if the revoke was successfully removed, False if the revoke failed.
-   * @throws RuntimeException If revoking roles from a group encounters storage issues.
+   * @throws AuthorizationPluginException If revoking roles from a group encounters storage issues.
    */
-  Boolean onRevokedRolesFromGroup(List<Role> roles, Group group) throws RuntimeException;
+  Boolean onRevokedRolesFromGroup(List<Role> roles, Group group)
+      throws AuthorizationPluginException;
 }
