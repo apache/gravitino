@@ -114,6 +114,6 @@ public class TestLiteral {
 
     literal = decimalLiteral(Decimal.of("0.00"));
     Assertions.assertEquals(Decimal.of(new BigDecimal("0.00")), literal.value());
-    Assertions.assertEquals(Types.DecimalType(2, 2), literal.dataType());
+    Assertions.assertEquals(Types.DecimalType.of(2, 2), literal.dataType());
   }
 }
