@@ -39,6 +39,7 @@ public class DeleteMetalake extends Command {
   }
 
   /** Delete a metalake. */
+  @Override
   public void handle() {
     boolean deleted = false;
     try {

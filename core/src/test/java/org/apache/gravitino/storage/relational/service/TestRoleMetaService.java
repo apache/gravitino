@@ -442,8 +442,7 @@ class TestRoleMetaService extends TestJDBCBackend {
     roleMetaService.insertRole(role2, false);
 
     List<RoleEntity> roleEntities =
-        roleMetaService.listRolesByMetadataObjectIdentAndType(
-            catalog.nameIdentifier(), catalog.type(), true);
+        roleMetaService.listRolesByMetadataObject(catalog.nameIdentifier(), catalog.type(), true);
     roleEntities.sort(Comparator.comparing(RoleEntity::name));
     Assertions.assertEquals(Lists.newArrayList(role1, role2), roleEntities);
   }

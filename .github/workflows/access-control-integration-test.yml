@@ -87,9 +87,9 @@ jobs:
       - name: Authorization Integration Test (JDK${{ matrix.java-version }})
         id: integrationTest
         run: |
-          ./gradlew -PtestMode=embedded -PjdbcBackend=h2 -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test --tests "org.apache.gravitino.authorization.ranger.**"
-          ./gradlew -PtestMode=deploy -PjdbcBackend=mysql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test --tests "org.apache.gravitino.authorization.ranger.**"
-          ./gradlew -PtestMode=deploy -PjdbcBackend=postgresql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test --tests "org.apache.gravitino.authorization.ranger.**"
+          ./gradlew -PtestMode=embedded -PjdbcBackend=h2 -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test
+          ./gradlew -PtestMode=deploy -PjdbcBackend=mysql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test
+          ./gradlew -PtestMode=deploy -PjdbcBackend=postgresql -PjdkVersion=${{ matrix.java-version }} -PskipDockerTests=false :authorizations:authorization-ranger:test
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v3

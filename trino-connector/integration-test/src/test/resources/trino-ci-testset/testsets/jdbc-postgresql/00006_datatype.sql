@@ -17,17 +17,19 @@ CREATE TABLE tb01 (
     f12 BIGINT,
     f13 DATE,
     f14 TIME,
-    f15 TIMESTAMP
+    f15 TIMESTAMP,
+    f16 TIMESTAMP WITH TIME ZONE
 );
 
 
 SHOW CREATE TABLE tb01;
 
-INSERT INTO tb01 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15)
-VALUES ('Sample text 1', 'Text1', x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, 100000, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
+INSERT INTO tb01 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15, f16)
+VALUES ('Sample text 1', 'Text1', x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, 100000, DATE '2024-01-01',
+        TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00', TIMESTAMP '2024-01-01 08:00:00 UTC');
 
-INSERT INTO tb01 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15)
-VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT INTO tb01 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15, f16)
+VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 select * from tb01 order by f1;
 
@@ -45,25 +47,30 @@ CREATE TABLE tb02 (
     f12 BIGINT not null ,
     f13 DATE not null ,
     f14 TIME not null ,
-    f15 TIMESTAMP not null
+    f15 TIMESTAMP not null,
+    f16 TIMESTAMP WITH TIME ZONE not null
 );
 
 show create table tb02;
 
-INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15)
-VALUES ('Sample text 1', 'Text1', x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, 100000, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
+INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15, f16)
+VALUES ('Sample text 1', 'Text1', x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, 100000, DATE '2024-01-01',
+        TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00', TIMESTAMP '2024-01-01 08:00:00 UTC');
 
-INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15)
-VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15, f16)
+VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
-INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15)
-VALUES ('Sample text 1', NULL, x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, 100000, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
+INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15, f16)
+VALUES ('Sample text 1', NULL, x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, 100000,
+        DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00', TIMESTAMP '2024-01-01 08:00:00 UTC');
 
-INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15)
-VALUES ('Sample text 1', 'same3', x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, NULl, DATE '2024-01-01', TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00');
+INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15, f16)
+VALUES ('Sample text 1', 'same3', x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, NULl, DATE '2024-01-01',
+        TIME '08:00:00', TIMESTAMP '2024-01-01 08:00:00', TIMESTAMP '2024-01-01 08:00:00 UTC');
 
-INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15)
-VALUES ('Sample text 1', 'same9', x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, 1992382342, DATE '2024-01-01', NULL, TIMESTAMP '2024-01-01 08:00:00');
+INSERT INTO tb02 (f1, f2, f3, f4, f5, f6, f7, f9, f10, f11, f12, f13, f14, f15, f16)
+VALUES ('Sample text 1', 'same9', x'65', 123.456, 7.89, 12.34, false, 100, 1000, 1000, 1992382342, DATE '2024-01-01',
+        NULL, TIMESTAMP '2024-01-01 08:00:00', TIMESTAMP '2024-01-01 08:00:00 UTC');
 
 drop table tb01;
 

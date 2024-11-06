@@ -51,8 +51,8 @@ import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
 public class TestMysqlTableOperations extends TestMysql {
-  private static Type VARCHAR = Types.VarCharType.of(255);
-  private static Type INT = Types.IntegerType.get();
+  private static final Type VARCHAR = Types.VarCharType.of(255);
+  private static final Type INT = Types.IntegerType.get();
 
   @Test
   public void testOperationTable() {
