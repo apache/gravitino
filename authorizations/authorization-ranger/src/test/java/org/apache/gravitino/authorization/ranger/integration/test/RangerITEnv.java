@@ -57,7 +57,6 @@ public class RangerITEnv {
   protected static final String RANGER_TRINO_REPO_NAME = "trinoDev";
   private static final String RANGER_TRINO_TYPE = "trino";
   protected static final String RANGER_HIVE_REPO_NAME = "hiveDev";
-  protected static final String RANGER_ICEBERG_REPO_NAME = "icebergDev";
   private static final String RANGER_HIVE_TYPE = "hive";
   protected static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
   private static final String RANGER_HDFS_TYPE = "hdfs";
