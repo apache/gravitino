@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.MetalakeChange;
+import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -29,17 +30,21 @@ public class UpdateMetalakeName extends Command {
 
   protected final String metalake;
   protected final String name;
+  protected final boolean force;
 
   /**
    * Update the name of a metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param name The new metalake name.
    */
-  public UpdateMetalakeName(String url, boolean ignoreVersions, String metalake, String name) {
+  public UpdateMetalakeName(
+      String url, boolean ignoreVersions, boolean force, String metalake, String name) {
     super(url, ignoreVersions);
+    this.force = force;
     this.metalake = metalake;
     this.name = name;
   }
@@ -47,6 +52,11 @@ public class UpdateMetalakeName extends Command {
   /** Update the name of a metalake. */
   @Override
   public void handle() {
+
+    if (!AreYouSure.really(force)) {
+      return;
+    }
+
     try {
       GravitinoAdminClient client = buildAdminClient();
       MetalakeChange change = MetalakeChange.rename(name);

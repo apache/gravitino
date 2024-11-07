@@ -100,6 +100,10 @@ ignore=true
 
 ```
 
+## Potentially unsafe operations
+
+For operations that delete data or rename a metalake the user with be prompted to make sure they wish to run this command. The `--force` option can be specified to override this behaviour.
+
 ## Manage metadata
 
 All the commands are performed by using the [Java API](api/java-api) internally.
