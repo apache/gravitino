@@ -24,7 +24,6 @@ Apache Gravitino CLI is a command-line tool that interacts with the Gravitino se
 ## Table of Contents
 
 - [Installation](#installation)
-- [Table Commands](#table-commands)
 - [Running Tests](#running-tests)
 - [Contributing](#contributing)
 - [License](#license)
@@ -59,75 +58,6 @@ Before you can build and run this project, it is suggested you have the followin
     ```bash
     gcli --help
     ```
-
-## Table Commands
-
-The CLI supports the following operations for tables:
-
-### List Tables
-
-Lists all tables in a specified schema.
-
-```bash
-gcli table list --metalake <metalake_name> --name <catalog_name>.<schema_name>
-```
-
-Example:
-```bash
-gcli table list --metalake metalake_demo --name catalog_mysql.db
-```
-
-### Show Table Details
-
-Shows detailed information about a specific table.
-
-```bash
-gcli table details --metalake <metalake_name> --name <catalog_name>.<schema_name>.<table_name>
-```
-
-Example:
-```bash
-gcli table details --metalake metalake_demo --name catalog_mysql.db.iceberg_namespace_properties
-```
-
-### List Table Indexes
-
-Shows all indexes defined for a specific table.
-
-```bash
-gcli table details --metalake <metalake_name> --name <catalog_name>.<schema_name>.<table_name> --index
-```
-
-Example:
-```bash
-gcli table details --metalake metalake_demo --name catalog_mysql.db.iceberg_namespace_properties --index
-```
-
-### Create Table
-
-Creates a new table.
-
-```bash
-gcli table create --metalake <metalake_name> --name <catalog_name>.<schema_name>.<table_name>
-```
-
-Example:
-```bash
-gcli table create --metalake metalake_demo --name catalog_mysql.db.iceberg_namespace_properties
-```
-
-### Delete Table
-
-Deletes a specified table.
-
-```bash
-gcli table delete --metalake <metalake_name> --name <catalog_name>.<schema_name>.<table_name>
-```
-
-Example:
-```bash
-gcli table delete --metalake metalake_demo --name catalog_mysql.db.iceberg_namespace_properties
-```
 
 ## Running Tests
 
