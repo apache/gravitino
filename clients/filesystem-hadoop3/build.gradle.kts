@@ -45,6 +45,7 @@ dependencies {
   testImplementation(project(":bundles:gcp-bundle"))
   testImplementation(project(":bundles:aliyun-bundle"))
   testImplementation(project(":bundles:aws-bundle"))
+  testImplementation(project(":bundles:azure-bundle"))
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)

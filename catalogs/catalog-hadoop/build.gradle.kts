@@ -80,6 +80,7 @@ dependencies {
   testImplementation(project(":bundles:aws-bundle"))
   testImplementation(project(":bundles:gcp-bundle"))
   testImplementation(project(":bundles:aliyun-bundle"))
+  testImplementation(project(":bundles:azure-bundle"))
 
   testImplementation(libs.minikdc)
   testImplementation(libs.hadoop3.minicluster)

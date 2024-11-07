@@ -74,3 +74,5 @@ include("integration-test-common")
 include(":bundles:aws-bundle")
 include(":bundles:gcp-bundle")
 include(":bundles:aliyun-bundle")
+include("bundles:azure-bundle")
+findProject(":bundles:azure-bundle")?.name = "azure-bundle"
