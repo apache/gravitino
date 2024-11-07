@@ -172,6 +172,12 @@ public class GravitinoCommandLine {
       handleCatalogCommand();
     } else if (entity.equals(CommandEntities.METALAKE)) {
       handleMetalakeCommand();
+    } else if (entity.equals(CommandEntities.GROUP)) {
+      handleGroupCommand();
+    } else if (entity.equals(CommandEntities.USER)) {
+      handleUserCommand();
+    } else if (entity.equals(CommandEntities.TAG)) {
+      handleTagCommand();
     }
   }
 
