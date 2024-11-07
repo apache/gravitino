@@ -25,7 +25,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 /** Displays the audit information of a metalake. */
-public class MetalakeAuditInfo extends Command {
+public class MetalakeAudit extends AuditCommand {
   protected final String metalake;
 
   /**
@@ -35,7 +35,7 @@ public class MetalakeAuditInfo extends Command {
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    */
-  public MetalakeAuditInfo(String url, boolean ignoreVersions, String metalake) {
+  public MetalakeAudit(String url, boolean ignoreVersions, String metalake) {
     super(url, ignoreVersions);
     this.metalake = metalake;
   }
@@ -54,17 +54,6 @@ public class MetalakeAuditInfo extends Command {
       return;
     }
 
-    String auditInfo =
-        "creator,createTime,lastModifier,lastModifiedTime"
-            + System.lineSeparator()
-            + audit.creator()
-            + ","
-            + audit.createTime()
-            + ","
-            + audit.lastModifier()
-            + ","
-            + audit.lastModifiedTime();
-
-    System.out.println(auditInfo);
+    displayAuditInfo(audit);
   }
 }

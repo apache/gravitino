@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.ClientVersion;
 import org.apache.gravitino.cli.commands.CreateCatalog;
@@ -47,16 +48,18 @@ import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
 import org.apache.gravitino.cli.commands.ListTables;
 import org.apache.gravitino.cli.commands.ListUsers;
-import org.apache.gravitino.cli.commands.MetalakeAuditInfo;
+import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
 import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
+import org.apache.gravitino.cli.commands.SchemaAudit;
 import org.apache.gravitino.cli.commands.SchemaDetails;
 import org.apache.gravitino.cli.commands.ServerVersion;
 import org.apache.gravitino.cli.commands.SetCatalogProperty;
 import org.apache.gravitino.cli.commands.SetMetalakeProperty;
 import org.apache.gravitino.cli.commands.SetSchemaProperty;
+import org.apache.gravitino.cli.commands.TableAudit;
 import org.apache.gravitino.cli.commands.TableDetails;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
@@ -177,7 +180,7 @@ public class GravitinoCommandLine {
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
-        new MetalakeAuditInfo(url, ignore, metalake).handle();
+        new MetalakeAudit(url, ignore, metalake).handle();
       } else {
         new MetalakeDetails(url, ignore, metalake).handle();
       }
@@ -225,7 +228,11 @@ public class GravitinoCommandLine {
     String catalog = name.getCatalogName();
 
     if (CommandActions.DETAILS.equals(command)) {
-      new CatalogDetails(url, ignore, metalake, catalog).handle();
+      if (line.hasOption(GravitinoOptions.AUDIT)) {
+        new CatalogAudit(url, ignore, metalake, catalog).handle();
+      } else {
+        new CatalogDetails(url, ignore, metalake, catalog).handle();
+      }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       String provider = line.getOptionValue(GravitinoOptions.PROVIDER);
@@ -272,7 +279,11 @@ public class GravitinoCommandLine {
     String schema = name.getSchemaName();
 
     if (CommandActions.DETAILS.equals(command)) {
-      new SchemaDetails(url, ignore, metalake, catalog, schema).handle();
+      if (line.hasOption(GravitinoOptions.AUDIT)) {
+        new SchemaAudit(url, ignore, metalake, catalog, schema).handle();
+      } else {
+        new SchemaDetails(url, ignore, metalake, catalog, schema).handle();
+      }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       new CreateSchema(url, ignore, metalake, catalog, schema, comment).handle();
@@ -308,7 +319,11 @@ public class GravitinoCommandLine {
     String table = name.getTableName();
 
     if (CommandActions.DETAILS.equals(command)) {
-      new TableDetails(url, ignore, metalake, catalog, schema, table).handle();
+      if (line.hasOption(GravitinoOptions.AUDIT)) {
+        new TableAudit(url, ignore, metalake, catalog, schema, table).handle();
+      } else {
+        new TableDetails(url, ignore, metalake, catalog, schema, table).handle();
+      }
     } else if (CommandActions.CREATE.equals(command)) {
       // TODO
     } else if (CommandActions.DELETE.equals(command)) {
