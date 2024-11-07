@@ -45,6 +45,7 @@ public class GroupDetails extends Command {
   }
 
   /** Displays the roles of a specified group. */
+  @Override
   public void handle() {
     List<String> roles = null;
 

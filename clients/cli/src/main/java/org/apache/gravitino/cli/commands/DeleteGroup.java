@@ -44,12 +44,13 @@ public class DeleteGroup extends Command {
   }
 
   /** Delete a group. */
+  @Override
   public void handle() {
     boolean deleted = false;
 
     try {
       GravitinoClient client = buildClient(metalake);
-      deleted = client.removeUser(group);
+      deleted = client.removeGroup(group);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
