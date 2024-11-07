@@ -146,6 +146,10 @@ For commands that accept multiple properties they can be specified in a couple o
 
 3. gcli --properties n1=v1 --properties n2=v2 --properties n3=v3
 
+### CLI commands
+
+Please set the metalake in the Gravitino configuration file or the environment variable before running any of these commands.
+
 ### Metalake commands
 
 #### Show all metalakes
@@ -157,49 +161,49 @@ gcli metalake list
 #### Show a metalake details
 
 ```bash
-gcli metalake details --metalake metalake_demo
+gcli metalake details
 ```
 
 #### Create a metalake
 
 ```bash
-gcli metalake create --metalake my_metalake --comment "This is my metalake"
+gcli metalake create --comment "This is my metalake"
 ```
 
 #### Delete a metalake
 
 ```bash
-gcli metalake delete --metalake my_metalake
+gcli metalake delete
 ```
 
 #### Rename a metalake
 
 ```bash
-gcli metalake update --metalake metalake_demo --rename demo
+gcli metalake update  --rename demo
 ```
 
 #### Update a metalake's comment
 
 ```bash
-gcli metalake update --metalake metalake_demo --comment "new comment"
+gcli metalake update  --comment "new comment"
 ```
 
 #### Display a metalake's properties
 
 ```bash
-gcli metalake properties --metalake metalake_demo
+gcli metalake properties
 ```
 
 #### Set a metalake's property
 
 ```bash
-gcli metalake set --metalake metalake_demo --property test --value value
+gcli metalake set  --property test --value value
 ```
 
 #### Remove a metalake's property
 
 ```bash
-gcli metalake remove --metalake metalake_demo --property test
+gcli metalake remove  --property test
 ```
 
 ### Catalog commands
@@ -207,13 +211,13 @@ gcli metalake remove --metalake metalake_demo --property test
 #### Show all catalogs in a metalake
 
 ```bash
-gcli catalog list --metalake metalake_demo
+gcli catalog list
 ```
 
 #### Show a catalog details
 
 ```bash
-gcli catalog details --metalake metalake_demo --name catalog_postgres
+gcli catalog details  --name catalog_postgres
 ```
 
 #### Creating a catalog
@@ -223,67 +227,67 @@ The type of catalog to be created is specified by the `--provider` option. Diffe
 ##### Create a Hive catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo --name hive --provider hive --properties metastore.uris=thrift://hive-host:9083
+gcli catalog create  --name hive --provider hive --properties metastore.uris=thrift://hive-host:9083
 ```
 
 ##### Create an Iceberg catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo -name iceberg --provider iceberg --properties uri=thrift://hive-host:9083,catalog-backend=hive,warehouse=hdfs://hdfs-host:9000/user/iceberg/warehouse
+gcli catalog create  -name iceberg --provider iceberg --properties uri=thrift://hive-host:9083,catalog-backend=hive,warehouse=hdfs://hdfs-host:9000/user/iceberg/warehouse
 ```
 
 ##### Create a MySQL catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo -name mysql --provider mysql --properties jdbc-url=jdbc:mysql://mysql-host:3306?useSSL=false,jdbc-user=user,jdbc-password=password,jdbc-driver=com.mysql.cj.jdbc.Driver
+gcli catalog create  -name mysql --provider mysql --properties jdbc-url=jdbc:mysql://mysql-host:3306?useSSL=false,jdbc-user=user,jdbc-password=password,jdbc-driver=com.mysql.cj.jdbc.Driver
 ```
 
 ##### Create a Postgres catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo -name postgres --provider postgres --properties jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver
+gcli catalog create  -name postgres --provider postgres --properties jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver
 ```
 
 ##### Create a Kafka catalog
 
 ```bash
-gcli catalog create --metalake metalake_demo -name kafka --provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092
+gcli catalog create  -name kafka --provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092
 ```
 
 #### Delete a catalog
 
 ```bash
-gcli catalog delete --metalake metalake_demo --name hive
+gcli catalog delete  --name hive
 ```
 
 #### Rename a catalog
 
 ```bash
-gcli catalog update --metalake metalake_demo --name catalog_mysql --rename mysql
+gcli catalog update  --name catalog_mysql --rename mysql
 ```
 
 #### Change a catalog comment
 
 ```bash
-gcli catalog update --metalake metalake_demo --name catalog_mysql --comment "new comment"
+gcli catalog update  --name catalog_mysql --comment "new comment"
 ```
 
 #### Display a catalog's properties
 
 ```bash
-gcli catalog properties --metalake metalake_demo --name catalog_mysql
+gcli catalog properties  --name catalog_mysql
 ```
 
 #### Set a catalog's property
 
 ```bash
-gcli catalog set --metalake metalake_demo --name catalog_mysql --property test --value value
+gcli catalog set  --name catalog_mysql --property test --value value
 ```
 
 #### Remove a catalog's property
 
 ```bash
-gcli catalog remove --metalake metalake_demo --name catalog_mysql --property test
+gcli catalog remove  --name catalog_mysql --property test
 ```
 
 ### Schema commands
@@ -291,25 +295,25 @@ gcli catalog remove --metalake metalake_demo --name catalog_mysql --property tes
 #### Show all schemas in a catalog
 
 ```bash
-gcli schema list --metalake metalake_demo --name catalog_postgres
+gcli schema list  --name catalog_postgres
 ```
 
 #### Show schema details
 
 ```bash
-gcli schema details --metalake metalake_demo --name catalog_postgres.hr
+gcli schema details  --name catalog_postgres.hr
 ```
 
 #### Create a schema
 
 ```bash
-gcli schema create --metalake metalake_demo --name catalog_postgres.new_db
+gcli schema create  --name catalog_postgres.new_db
 ```
 
 #### Display schema properties
 
 ```bash
-gcli schema properties --metalake metalake_demo --name catalog_postgres.hr -i
+gcli schema properties  --name catalog_postgres.hr -i
 ```
 
 Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
@@ -319,19 +323,19 @@ Setting and removing schema properties is not currently supported by the Java AP
 #### Show all tables
 
 ```bash
-gcli table list --metalake metalake_demo --name catalog_postgres.hr
+gcli table list  --name catalog_postgres.hr
 ```
 
 #### Show tables details
 
 ```bash
-gcli column list --metalake metalake_demo --name catalog_postgres.hr.departments
+gcli column list  --name catalog_postgres.hr.departments
 ```
 
 #### Delete a table
 
 ```bash
-gcli table delete --metalake metalake_demo --name catalog_postgres.hr.salaries
+gcli table delete  --name catalog_postgres.hr.salaries
 ```
 
 ### User commands
@@ -339,25 +343,25 @@ gcli table delete --metalake metalake_demo --name catalog_postgres.hr.salaries
 #### Create a user
 
 ```bash
-gcli user create --metalake metalake_demo --user new_user
+gcli user create  --user new_user
 ```
 
 #### Show a user's details
 
 ```bash
-gcli user details --metalake metalake_demo --user new_user
+gcli user details  --user new_user
 ```
 
 #### List all users
 
 ```bash
-gcli user list --metalake metalake_demo
+gcli user list 
 ```
 
 #### Delete a users
 
 ```bash
-gcli user delete --metalake metalake_demo --user new_user
+gcli user delete  --user new_user
 ```
 
 ### Group commands
@@ -365,23 +369,23 @@ gcli user delete --metalake metalake_demo --user new_user
 #### Create a group
 
 ```bash
-gcli group create --metalake metalake_demo --user new_group
+gcli group create  --user new_group
 ```
 
 #### Display a group's details
 
 ```bash
-gcli group details --metalake metalake_demo --user new_group
+gcli group details  --user new_group
 ```
 
 #### List all groups
 
 ```bash
-gcli group list --metalake metalake_demo
+gcli group list 
 ```
 
 #### Delete a group
 
 ```bash
-gcli group delete --metalake metalake_demo --user new_group
+gcli group delete  --user new_group
 ```
