@@ -452,7 +452,7 @@ gcli tag remove --metalake metalake_demo --name catalog_postgres.hr --tag tagA
 #### List all tags on an entity
 
 ```bash
-gcli tag remove --metalake metalake_demo --name catalog_postgres.hr --tag tagA
+gcli tag list --metalake metalake_demo --name catalog_postgres.hr
 ```
 
 #### List the properties of a tag
@@ -467,7 +467,7 @@ gcli tag properties --metalake metalake_demo --tag tagA
 gcli tag set --metalake metalake_demo --tag tagA --property test --value value
 ```
 
-#### Delete a properties of a tag
+#### Delete a property of a tag
 
 ```bash
 gcli tag remove --metalake metalake_demo --tag tagA --property test
