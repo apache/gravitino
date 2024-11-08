@@ -385,3 +385,41 @@ gcli group list --metalake metalake_demo
 ```bash
 gcli group delete --metalake metalake_demo --group new_group
 ```
+
+### Tag commands
+
+#### Create a tag
+
+```bash
+gcli tag create --metalake metalake_demo --tag tagA
+```
+
+#### List all tag
+
+```bash
+gcli tag list --metalake metalake_demo
+```
+
+#### Delete a tag
+
+```bash
+gcli tag delete --metalake metalake_demo --tag tagA
+```
+
+#### Add a tag to an entity
+
+```bash
+gcli tag set --metalake metalake_demo --name catalog_postgres.hr --tag tagA
+```
+
+#### Remove a tag from an entity
+
+```bash
+gcli tag remove --metalake metalake_demo --name catalog_postgres.hr --tag tagA
+```
+
+#### List all tags on an entity
+
+```bash
+gcli tag remove --metalake metalake_demo --name catalog_postgres.hr --tag tagA
+```
