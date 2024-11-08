@@ -365,7 +365,7 @@ gcli table details --metalake metalake_demo --name catalog_postgres.hr.departmen
 gcli table details --metalake metalake_demo --name catalog_postgres.hr.departments --audit
 ```
 
-### Show table indexex
+### Show table indexes
 
 ```bash
 gcli table details --metalake metalake_demo --name catalog_mysql.db.iceberg_namespace_properties --index

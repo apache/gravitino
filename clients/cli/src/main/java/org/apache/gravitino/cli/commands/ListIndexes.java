@@ -19,8 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.rel.indexes.Index;
 
@@ -66,17 +65,16 @@ public class ListIndexes extends TableCommand {
 
     StringBuilder all = new StringBuilder();
     for (Index index : indexes) {
-      // Flatten the two-dimensional array fieldNames to a single dot-separated string
-      List<String> flattenedFieldNames = new ArrayList<>();
-      for (String[] fieldHierarchy : index.fieldNames()) {
-        // Join nested fields (e.g., "a.b.c") for each inner array
-        flattenedFieldNames.add(String.join(".", fieldHierarchy));
-      }
-
-      String indexName = index.name();
-      for (String field : flattenedFieldNames) {
-        all.append(field).append(",").append(indexName).append(System.lineSeparator());
-      }
+      // Flatten nested field names into dot-separated strings (e.g., "a.b.c")
+      Arrays.stream(index.fieldNames())
+          // Convert nested fields to a single string
+          .map(nestedFieldName -> String.join(".", nestedFieldName))
+          .forEach(
+              fieldName ->
+                  all.append(fieldName)
+                      .append(",")
+                      .append(index.name())
+                      .append(System.lineSeparator()));
     }
 
     System.out.print(all);
