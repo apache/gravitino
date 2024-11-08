@@ -46,13 +46,7 @@ import {
   updateSchemaApi,
   deleteSchemaApi
 } from '@/lib/api/schemas'
-import {
-  getTablesApi,
-  getTableDetailsApi,
-  createTableApi,
-  updateTableApi,
-  deleteTableApi
-} from '@/lib/api/tables'
+import { getTablesApi, getTableDetailsApi, createTableApi, updateTableApi, deleteTableApi } from '@/lib/api/tables'
 import {
   getFilesetsApi,
   getFilesetDetailsApi,

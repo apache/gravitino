@@ -92,7 +92,6 @@ const RightContent = () => {
       searchParams.get('type') === 'relational' &&
       searchParams.has('schema')
     setTableBtnVisible(isTableList)
-
   }, [searchParams, store.catalogs, store.catalogs.length])
 
   return (

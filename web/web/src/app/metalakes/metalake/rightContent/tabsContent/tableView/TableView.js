@@ -45,13 +45,7 @@ import CreateFilesetDialog from '../../CreateFilesetDialog'
 import CreateTableDialog from '../../CreateTableDialog'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import {
-  deleteCatalog,
-  deleteFileset,
-  deleteSchema,
-  deleteTable,
-  setCatalogInUse
-} from '@/lib/store/metalakes'
+import { deleteCatalog, deleteFileset, deleteSchema, deleteTable, setCatalogInUse } from '@/lib/store/metalakes'
 
 import { to } from '@/lib/utils'
 import { getCatalogDetailsApi, switchInUseApi } from '@/lib/api/catalogs'
@@ -634,11 +628,11 @@ const TableView = () => {
         searchParams.has('catalog') &&
         searchParams.get('type') === 'fileset' &&
         searchParams.has('schema')) ||
-        (paramsSize == 4 &&
-          searchParams.has('metalake') &&
-          searchParams.has('catalog') &&
-          searchParams.get('type') === 'relational' &&
-          searchParams.has('schema'))
+      (paramsSize == 4 &&
+        searchParams.has('metalake') &&
+        searchParams.has('catalog') &&
+        searchParams.get('type') === 'relational' &&
+        searchParams.has('schema'))
     ) {
       return actionsColumns
     } else if (paramsSize == 5 && searchParams.has('table')) {
@@ -693,12 +687,7 @@ const TableView = () => {
         type={dialogType}
       />
 
-      <CreateTableDialog
-        open={openTableDialog}
-        setOpen={setOpenTableDialog}
-        data={dialogData}
-        type={dialogType}
-      />
+      <CreateTableDialog open={openTableDialog} setOpen={setOpenTableDialog} data={dialogData} type={dialogType} />
     </Box>
   )
 }

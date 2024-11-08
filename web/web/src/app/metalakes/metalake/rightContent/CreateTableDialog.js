@@ -265,6 +265,7 @@ const CreateTableDialog = props => {
    */
   const handleFormSubmit = e => {
     e.preventDefault()
+
     return handleSubmit(submitForm(getValues()), handleValidationError)
   }
 
@@ -293,6 +294,7 @@ const CreateTableDialog = props => {
       .then(() => {
         const properties = innerProps.reduce((acc, item) => {
           acc[item.key] = item.value
+
           return acc
         }, {})
 
@@ -370,7 +372,14 @@ const CreateTableDialog = props => {
   }, [open, data, setValue, type])
 
   return (
-    <Dialog fullWidth maxWidth='md' scroll='body' TransitionComponent={Transition} open={open} onClose={handleDialogClose}>
+    <Dialog
+      fullWidth
+      maxWidth='md'
+      scroll='body'
+      TransitionComponent={Transition}
+      open={open}
+      onClose={handleDialogClose}
+    >
       <form onSubmit={e => handleFormSubmit(e)}>
         <DialogContent
           sx={{
