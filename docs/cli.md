@@ -340,6 +340,7 @@ Setting and removing schema properties is not currently supported by the Java AP
 ```bash
 gcli table list --metalake metalake_demo --name catalog_postgres.hr
 ```
+
 #### Show tables details
 
 ```bash
