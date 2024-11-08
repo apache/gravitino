@@ -34,6 +34,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -h,--help               command help information
  -i,--ignore             Ignore client/sever version check
  -l,--user <arg>         user name
+ -a,--audit              display audit information
  -m,--metalake <arg>     Metalake name
  -n,--name <arg>         full entity name (dot separated)
  -P,--property <arg>     property name
@@ -160,6 +161,12 @@ gcli metalake list
 gcli metalake details --metalake metalake_demo
 ```
 
+#### Show a metalake audit information
+
+```bash
+gcli metalake details --metalake metalake_demo --audit
+```
+
 #### Create a metalake
 
 ```bash
@@ -214,6 +221,12 @@ gcli catalog list --metalake metalake_demo
 
 ```bash
 gcli catalog details --metalake metalake_demo --name catalog_postgres
+```
+
+#### Show a catalog audit information
+
+```bash
+gcli catalog details --metalake metalake_demo --name catalog_postgres --audit
 ```
 
 #### Creating a catalog
@@ -300,6 +313,12 @@ gcli schema list --metalake metalake_demo --name catalog_postgres
 gcli schema details --metalake metalake_demo --name catalog_postgres.hr
 ```
 
+#### Show schema audit information
+
+```bash
+gcli schema details --metalake metalake_demo --name catalog_postgres.hr --audit
+```
+
 #### Create a schema
 
 ```bash
@@ -326,6 +345,12 @@ gcli table list --metalake metalake_demo --name catalog_postgres.hr
 
 ```bash
 gcli column list --metalake metalake_demo --name catalog_postgres.hr.departments
+```
+
+#### Show tables audit information
+
+```bash
+gcli table details --metalake metalake_demo --name catalog_postgres.hr.departments --audit
 ```
 
 #### Delete a table
