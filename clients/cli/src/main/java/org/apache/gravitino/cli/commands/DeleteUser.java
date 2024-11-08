@@ -30,7 +30,11 @@ public class DeleteUser extends Command {
   protected final String user;
 
   /**
+<<<<<<< HEAD
    * Delete a user.
+=======
+   * Deletes a user.
+>>>>>>> main
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
@@ -44,6 +48,7 @@ public class DeleteUser extends Command {
   }
 
   /** Delete a user. */
+  @Override
   public void handle() {
     boolean deleted = false;
 

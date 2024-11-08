@@ -41,6 +41,7 @@ public class MetalakeAuditInfo extends Command {
   }
 
   /** Displays the audit information of a metalake. */
+  @Override
   public void handle() {
     Audit audit;
     try (GravitinoClient client = buildClient(metalake)) {

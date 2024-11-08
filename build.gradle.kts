@@ -401,9 +401,17 @@ subprojects {
   publishing {
     publications {
       create<MavenPublication>("MavenJava") {
-        from(components["java"])
-        artifact(sourcesJar)
-        artifact(javadocJar)
+        if (project.name == "web" ||
+          project.name == "docs" ||
+          project.name == "integration-test" ||
+          project.name == "integration-test-common"
+        ) {
+          setArtifacts(emptyList<Any>())
+        } else {
+          from(components["java"])
+          artifact(sourcesJar)
+          artifact(javadocJar)
+        }
 
         pom {
           name.set("Gravitino")

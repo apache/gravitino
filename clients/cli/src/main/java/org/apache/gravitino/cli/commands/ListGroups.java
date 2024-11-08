@@ -41,6 +41,7 @@ public class ListGroups extends Command {
   }
 
   /** Lists all groups in a metalake. */
+  @Override
   public void handle() {
     String[] groups = new String[0];
     try {

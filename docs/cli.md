@@ -354,7 +354,7 @@ gcli user details --metalake metalake_demo --user new_user
 gcli user list --metalake metalake_demo
 ```
 
-#### Delete a users
+#### Delete a user
 
 ```bash
 gcli user delete --metalake metalake_demo --user new_user
@@ -365,13 +365,13 @@ gcli user delete --metalake metalake_demo --user new_user
 #### Create a group
 
 ```bash
-gcli group create --metalake metalake_demo --user new_group
+gcli group create --metalake metalake_demo --group new_group
 ```
 
 #### Display a group's details
 
 ```bash
-gcli group details --metalake metalake_demo --user new_group
+gcli group details --metalake metalake_demo --group new_group
 ```
 
 #### List all groups
@@ -383,5 +383,5 @@ gcli group list --metalake metalake_demo
 #### Delete a group
 
 ```bash
-gcli group delete --metalake metalake_demo --user new_group
+gcli group delete --metalake metalake_demo --group new_group
 ```
