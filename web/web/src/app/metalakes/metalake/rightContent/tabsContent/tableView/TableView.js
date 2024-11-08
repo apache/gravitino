@@ -42,15 +42,15 @@ import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 import CreateCatalogDialog from '../../CreateCatalogDialog'
 import CreateSchemaDialog from '../../CreateSchemaDialog'
 import CreateFilesetDialog from '../../CreateFilesetDialog'
+import CreateTableDialog from '../../CreateTableDialog'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import {
   deleteCatalog,
   deleteFileset,
   deleteSchema,
-  resetExpandNode,
-  setCatalogInUse,
-  setIntoTreeNodes
+  deleteTable,
+  setCatalogInUse
 } from '@/lib/store/metalakes'
 
 import { to } from '@/lib/utils'
@@ -58,6 +58,7 @@ import { getCatalogDetailsApi, switchInUseApi } from '@/lib/api/catalogs'
 import { getSchemaDetailsApi } from '@/lib/api/schemas'
 import { useSearchParams } from 'next/navigation'
 import { getFilesetDetailsApi } from '@/lib/api/filesets'
+import { getTableDetailsApi } from '@/lib/api/tables'
 
 const fonts = Inconsolata({ subsets: ['latin'] })
 
@@ -110,6 +111,7 @@ const TableView = () => {
   const [openDialog, setOpenDialog] = useState(false)
   const [openSchemaDialog, setOpenSchemaDialog] = useState(false)
   const [openFilesetDialog, setOpenFilesetDialog] = useState(false)
+  const [openTableDialog, setOpenTableDialog] = useState(false)
   const [dialogData, setDialogData] = useState({})
   const [dialogType, setDialogType] = useState('create')
   const [isHideSchemaEdit, setIsHideSchemaEdit] = useState(true)
@@ -504,6 +506,17 @@ const TableView = () => {
 
         setDrawerData(res.fileset)
         setOpenDrawer(true)
+        break
+      }
+      case 'table': {
+        const [err, res] = await to(getTableDetailsApi({ metalake, catalog, schema, table: row.name }))
+        if (err || !res) {
+          throw new Error(err)
+        }
+
+        setDrawerData(res.table)
+        setOpenDrawer(true)
+        break
       }
       default:
         return
@@ -551,6 +564,20 @@ const TableView = () => {
           setDialogData(res.fileset)
           setOpenFilesetDialog(true)
         }
+        break
+      }
+      case 'table': {
+        if (metalake && catalog && schema) {
+          const [err, res] = await to(getTableDetailsApi({ metalake, catalog, schema, table: data.row?.name }))
+          if (err || !res) {
+            throw new Error(err)
+          }
+
+          setDialogType('update')
+          setDialogData(res.table)
+          setOpenTableDialog(true)
+        }
+        break
       }
       default:
         return
@@ -579,6 +606,9 @@ const TableView = () => {
         case 'fileset':
           dispatch(deleteFileset({ metalake, catalog, type, schema, fileset: confirmCacheData.name }))
           break
+        case 'table':
+          dispatch(deleteTable({ metalake, catalog, type, schema, table: confirmCacheData.name }))
+          break
         default:
           break
       }
@@ -603,7 +633,12 @@ const TableView = () => {
         searchParams.has('metalake') &&
         searchParams.has('catalog') &&
         searchParams.get('type') === 'fileset' &&
-        searchParams.has('schema'))
+        searchParams.has('schema')) ||
+        (paramsSize == 4 &&
+          searchParams.has('metalake') &&
+          searchParams.has('catalog') &&
+          searchParams.get('type') === 'relational' &&
+          searchParams.has('schema'))
     ) {
       return actionsColumns
     } else if (paramsSize == 5 && searchParams.has('table')) {
@@ -654,6 +689,13 @@ const TableView = () => {
       <CreateFilesetDialog
         open={openFilesetDialog}
         setOpen={setOpenFilesetDialog}
+        data={dialogData}
+        type={dialogType}
+      />
+
+      <CreateTableDialog
+        open={openTableDialog}
+        setOpen={setOpenTableDialog}
         data={dialogData}
         type={dialogType}
       />
