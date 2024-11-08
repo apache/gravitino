@@ -65,8 +65,12 @@ public class IcebergTableRenameOperations {
         catalogName,
         renameTableRequest.source(),
         renameTableRequest.destination());
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     tableOperationDispatcher.renameTable(context, renameTableRequest);
     return IcebergRestUtils.okWithoutContent();
+  }
+
+  HttpServletRequest httpServletRequest() {
+    return httpRequest;
   }
 }

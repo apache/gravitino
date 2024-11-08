@@ -66,10 +66,10 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   @Override
   protected Application configure() {
     ResourceConfig resourceConfig =
-        IcebergRestTestUtil.getIcebergResourceConfig(IcebergTableOperations.class);
+        IcebergRestTestUtil.getIcebergResourceConfig(MockIcebergTableOperations.class);
     // create namespace before each table test
     resourceConfig.register(IcebergNamespaceOperations.class);
-    resourceConfig.register(IcebergTableRenameOperations.class);
+    resourceConfig.register(MockIcebergTableRenameOperations.class);
 
     return resourceConfig;
   }

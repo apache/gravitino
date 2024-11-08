@@ -25,7 +25,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import javax.inject.Inject;
-import javax.inject.Provider;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -39,6 +38,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -82,7 +82,7 @@ public class IcebergTableOperations {
   private ObjectMapper icebergObjectMapper;
   private IcebergTableOperationDispatcher tableOperationDispatcher;
 
-  @Inject private Provider<HttpServletRequest> httpRequest;
+  @Context private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergTableOperations(
@@ -104,7 +104,7 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest.get(), catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     ListTablesResponse listTablesResponse = tableOperationDispatcher.listTable(context, icebergNS);
     return IcebergRestUtils.ok(listTablesResponse);
   }
@@ -129,7 +129,7 @@ public class IcebergTableOperations {
         createTableRequest,
         accessDelegation,
         isCredentialVending);
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest.get(), catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     LoadTableResponse loadTableResponse =
         tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
     if (isCredentialVending) {
@@ -163,7 +163,7 @@ public class IcebergTableOperations {
           table,
           SerializeUpdateTableRequest(updateTableRequest));
     }
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest.get(), catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
     LoadTableResponse loadTableResponse =
         tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
@@ -189,7 +189,7 @@ public class IcebergTableOperations {
         table,
         purgeRequested);
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, table);
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest.get(), catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
     return IcebergRestUtils.noContent();
   }
@@ -218,7 +218,7 @@ public class IcebergTableOperations {
         isCredentialVending);
     // todo support snapshots
     TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest.get(), catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     LoadTableResponse loadTableResponse =
         tableOperationDispatcher.loadTable(context, tableIdentifier);
     if (isCredentialVending) {
@@ -245,7 +245,7 @@ public class IcebergTableOperations {
         catalogName,
         icebergNS,
         table);
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest.get(), catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
     boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
     if (exists) {
@@ -267,6 +267,10 @@ public class IcebergTableOperations {
       ReportMetricsRequest request) {
     icebergMetricsManager.recordMetric(request.report());
     return IcebergRestUtils.noContent();
+  }
+
+  HttpServletRequest httpServletRequest() {
+    return httpRequest;
   }
 
   private String SerializeUpdateTableRequest(UpdateTableRequest updateTableRequest) {

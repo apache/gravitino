@@ -19,11 +19,16 @@
 
 package org.apache.gravitino.iceberg.service.rest;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.google.common.collect.Maps;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -118,5 +123,12 @@ public class IcebergRestTestUtil {
           });
     }
     return resourceConfig;
+  }
+
+  static HttpServletRequest createMockHttpRequest() {
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    when(mockRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+    when(mockRequest.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
+    return mockRequest;
   }
 }
