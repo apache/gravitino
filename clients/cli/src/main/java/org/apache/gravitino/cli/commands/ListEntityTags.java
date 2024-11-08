@@ -52,6 +52,7 @@ public class ListEntityTags extends Command {
   }
 
   /** Lists all tags in a metalake. */
+  @Override
   public void handle() {
     String[] tags = new String[0];
     try {

@@ -44,6 +44,7 @@ public class DeleteTag extends Command {
   }
 
   /** Delete a catalog. */
+  @Override
   public void handle() {
     boolean deleted = false;
 
