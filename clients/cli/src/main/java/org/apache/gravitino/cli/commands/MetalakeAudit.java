@@ -19,59 +19,41 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.exceptions.NoSuchTableException;
-import org.apache.gravitino.rel.TableCatalog;
 
-/* Common code for all table commands. */
-public class TableCommand extends AuditCommand {
-
+/** Displays the audit information of a metalake. */
+public class MetalakeAudit extends AuditCommand {
   protected final String metalake;
-  protected final String catalog;
 
   /**
-   * Common code for all table commands.
+   * Displays metalake audit information.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param catalog The name of the catalog.
    */
-  public TableCommand(String url, boolean ignoreVersions, String metalake, String catalog) {
+  public MetalakeAudit(String url, boolean ignoreVersions, String metalake) {
     super(url, ignoreVersions);
     this.metalake = metalake;
-    this.catalog = catalog;
   }
 
-  /* Overridden in parent - do nothing  */
+  /** Displays the audit information of a metalake. */
   @Override
-  public void handle() {}
-
-  /**
-   * Returns the table catalog for a given metalake and catalog.
-   *
-   * @return The TableCatalog or null if an error occurs.
-   */
-  public TableCatalog tableCatalog() {
-    try {
-      GravitinoClient client = buildClient(metalake);
-      return client.loadMetalake(metalake).loadCatalog(catalog).asTableCatalog();
+  public void handle() {
+    Audit audit;
+    try (GravitinoClient client = buildClient(metalake)) {
+      audit = client.loadMetalake(metalake).auditInfo();
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchCatalogException err) {
-      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
-    } catch (NoSuchSchemaException err) {
-      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
-    } catch (NoSuchTableException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TABLE);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
+      return;
     }
 
-    return null;
+    displayAuditInfo(audit);
   }
 }
