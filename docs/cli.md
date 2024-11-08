@@ -388,6 +388,12 @@ gcli group delete --metalake metalake_demo --group new_group
 
 ### Tag commands
 
+#### Display a tag's details
+
+```bash
+gcli tag details --metalake metalake_demo --tag tagA
+```
+
 #### Create a tag
 
 ```bash
@@ -422,4 +428,34 @@ gcli tag remove --metalake metalake_demo --name catalog_postgres.hr --tag tagA
 
 ```bash
 gcli tag remove --metalake metalake_demo --name catalog_postgres.hr --tag tagA
+```
+
+#### List the properties of a tag
+
+```bash
+gcli tag properties --metalake metalake_demo --tag tagA
+```
+
+#### Set a properties of a tag
+
+```bash
+gcli tag set --metalake metalake_demo --tag tagA --property test --value value
+```
+
+#### Delete a properties of a tag
+
+```bash
+gcli tag remove --metalake metalake_demo --tag tagA --property test
+```
+
+#### Rename a tag
+
+```bash
+gcli tag update --metalake metalake_demo --tag tagA --rename newTag
+```
+
+#### Update a tag's comment
+
+```bash
+gcli tag update --metalake metalake_demo --tag tagA --comment "new comment"
 ```
