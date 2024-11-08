@@ -60,9 +60,9 @@ Once you have used the correct configuration, you can perform authorization oper
 
 #### Example of using the Authorization Ranger Iceberg Plugin
 
-Suppose you have an Apache Hive service in your datacenter and have created a `icebergRepo` in Apache Ranger to manage its permissions.
+Suppose you have an Apache Iceberg service in your datacenter and have created a `icebergRepo` in Apache Ranger to manage its permissions.
 The Ranger service is accessible at `172.0.0.100:6080`, with the username `Jack` and the password `PWD123`.
-To add this Hive service to Gravitino using the Hive catalog, you'll need to configure the following parameters.
+To add this Iceberg service to Gravitino using the Iceberg catalog, you'll need to configure the following parameters.
 
 ```properties
 authorization-provider=ranger
@@ -73,6 +73,38 @@ authorization.ranger.password=PWD123
 authorization.ranger.service.name=icebergRepo
 ```
 
+### Authorization Paimon with Ranger properties
+
+In order to use the Authorization Ranger Paimon Plugin, you need to configure the following properties and [Lakehouse_Paimon catalog properties](../lakehouse-paimon-catalog.md#catalog-properties):
+
+| Property Name                       | Description                                                                                                                                          | Default Value | Required | Since Version    |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `authorization-provider`            | Providers to use to implement authorization plugin such as `ranger`.                                                                                 | (none)        | No       | 0.8.0-incubating |
+| `authorization.ranger.admin.url`    | The Apache Ranger web URIs.                                                                                                                          | (none)        | No       | 0.8.0-incubating |
+| `authorization.ranger.auth.type`    | The Apache Ranger authentication type `simple` or `kerberos`.                                                                                        | `simple`      | No       | 0.8.0-incubating |
+| `authorization.ranger.username`     | The Apache Ranger admin web login username (auth type=simple), or kerberos principal(auth type=kerberos), Need have Ranger administrator permission. | (none)        | No       | 0.8.0-incubating |
+| `authorization.ranger.password`     | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)        | No       | 0.8.0-incubating |
+| `authorization.ranger.service.name` | The Apache Ranger service name.                                                                                                                      | (none)        | No       | 0.8.0-incubating |
+
+Once you have used the correct configuration, you can perform authorization operations by calling Gravitino [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-roles-to-a-user).
+
+#### Example of using the Authorization Ranger Paimon Plugin
+
+Suppose you have an Apache Paimon service in your datacenter and have created a `paimonRepo` in Apache Ranger to manage its permissions.
+The Ranger service is accessible at `172.0.0.100:6080`, with the username `Jack` and the password `PWD123`.
+To add this Paimon service to Gravitino using the Paimon catalog, you'll need to configure the following parameters.
+
+```properties
+authorization-provider=ranger
+authorization.ranger.admin.url=172.0.0.100:6080
+authorization.ranger.auth.type=simple
+authorization.ranger.username=Jack
+authorization.ranger.password=PWD123
+authorization.ranger.service.name=paimonRepo
+```
+
 :::caution
-Gravitino 0.8.0 only supports the authorization Apache Ranger Hive service and Apache Iceberg service. More data source authorization is under development.
+Gravitino 0.8.0 only supports the authorization Apache Ranger Hive service , Apache Iceberg service and Apache Paimon Service. 
+Spark can use Kyuubi authorization plugin to access Gravitino's catalog. But the plugin can't support to update or delete data for Paimon catalog.
+More data source authorization is under development.
 :::

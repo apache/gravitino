@@ -269,7 +269,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
         AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
 
     // Clean up
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
     metalake.deleteRole(createTableRole);
     metalake.deleteRole(createSchemaRole);
@@ -326,7 +326,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     checkHaveNoPrivileges();
 
     // Clean up
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
   }
 
@@ -390,7 +390,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     checkHaveNoPrivileges();
 
     // Clean up
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
   }
 
@@ -444,7 +444,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     checkHaveNoPrivileges();
 
     // Clean up
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
   }
 
@@ -499,7 +499,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     checkHaveNoPrivileges();
 
     // Clean up
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
   }
 
@@ -546,7 +546,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_CREATE_TABLE);
 
     // Clean up
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
     metalake.deleteRole(roleName);
   }
@@ -689,7 +689,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_RENAME_BACK_TABLE);
 
     // Clean up
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
     metalake.deleteRole(roleName);
   }
@@ -738,7 +738,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_INSERT_TABLE);
 
     // Clean up
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
     metalake.deleteRole(roleName);
   }
@@ -786,7 +786,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     checkTableAllPrivilegesExceptForCreating();
 
     // Delete Gravitino's meta data
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     waitForUpdatingPolicies();
 
     // Fail to create the table
@@ -853,7 +853,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_DROP_SCHEMA);
 
     // Clean up
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
   }
 
@@ -914,7 +914,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
         1, rows2.stream().filter(row -> row.getString(0).equals(schemaName)).count());
 
     // Clean up
-    catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, tableName));
+    catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
     metalake.revokeRolesFromUser(Lists.newArrayList(roleName), userName1);
     metalake.deleteRole(roleName);
