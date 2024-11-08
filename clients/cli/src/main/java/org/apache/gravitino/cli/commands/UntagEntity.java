@@ -54,6 +54,7 @@ public class UntagEntity extends Command {
   }
 
   /** Create a new tag. */
+  @Override
   public void handle() {
     String entity = "unknown";
     String[] tags = new String[0];
@@ -104,6 +105,10 @@ public class UntagEntity extends Command {
 
     String all = String.join(",", tags);
 
-    System.out.println(entity + " untagged, tagged with " + all);
+    if (all.equals("")) {
+      all = "nothing";
+    }
+
+    System.out.println(entity + " removed tag " + tag + ", now tagged with " + all);
   }
 }
