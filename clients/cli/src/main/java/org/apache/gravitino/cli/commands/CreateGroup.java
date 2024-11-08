@@ -19,52 +19,46 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the audit information of a metalake. */
-public class MetalakeAuditInfo extends Command {
+public class CreateGroup extends Command {
   protected final String metalake;
+  protected final String group;
 
   /**
-   * Displays metalake audit information.
+   * Create a new group.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
+   * @param group The name of the group.
    */
-  public MetalakeAuditInfo(String url, boolean ignoreVersions, String metalake) {
+  public CreateGroup(String url, boolean ignoreVersions, String metalake, String group) {
     super(url, ignoreVersions);
     this.metalake = metalake;
+    this.group = group;
   }
 
-  /** Displays the audit information of a metalake. */
+  /** Create a new group. */
   @Override
   public void handle() {
-    Audit audit;
-    try (GravitinoClient client = buildClient(metalake)) {
-      audit = client.loadMetalake(metalake).auditInfo();
+    try {
+      GravitinoClient client = buildClient(metalake);
+      client.addGroup(group);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (GroupAlreadyExistsException err) {
+      System.err.println(ErrorMessages.GROUP_EXISTS);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    String auditInfo =
-        "creator,createTime,lastModifier,lastModifiedTime"
-            + System.lineSeparator()
-            + audit.creator()
-            + ","
-            + audit.createTime()
-            + ","
-            + audit.lastModifier()
-            + ","
-            + audit.lastModifiedTime();
-
-    System.out.println(auditInfo);
+    System.out.println(group + " created");
   }
 }

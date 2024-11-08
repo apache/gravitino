@@ -19,52 +19,52 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Audit;
+import java.util.List;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 
-/** Displays the audit information of a metalake. */
-public class MetalakeAuditInfo extends Command {
+public class UserDetails extends Command {
+
   protected final String metalake;
+  protected final String user;
 
   /**
-   * Displays metalake audit information.
+   * Displays the roles of a user.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
+   * @param user The name of the user.
    */
-  public MetalakeAuditInfo(String url, boolean ignoreVersions, String metalake) {
+  public UserDetails(String url, boolean ignoreVersions, String metalake, String user) {
     super(url, ignoreVersions);
     this.metalake = metalake;
+    this.user = user;
   }
 
-  /** Displays the audit information of a metalake. */
+  /** Displays the roles of a specified user. */
   @Override
   public void handle() {
-    Audit audit;
-    try (GravitinoClient client = buildClient(metalake)) {
-      audit = client.loadMetalake(metalake).auditInfo();
+    List<String> roles = null;
+
+    try {
+      GravitinoClient client = buildClient(metalake);
+      roles = client.getUser(user).roles();
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchUserException err) {
+      System.err.println(ErrorMessages.UNKNOWN_USER);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    String auditInfo =
-        "creator,createTime,lastModifier,lastModifiedTime"
-            + System.lineSeparator()
-            + audit.creator()
-            + ","
-            + audit.createTime()
-            + ","
-            + audit.lastModifier()
-            + ","
-            + audit.lastModifiedTime();
+    String all = String.join(",", roles);
 
-    System.out.println(auditInfo);
+    System.out.println(all.toString());
   }
 }

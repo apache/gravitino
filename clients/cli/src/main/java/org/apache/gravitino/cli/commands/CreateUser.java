@@ -19,52 +19,46 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 
-/** Displays the audit information of a metalake. */
-public class MetalakeAuditInfo extends Command {
+public class CreateUser extends Command {
   protected final String metalake;
+  protected final String user;
 
   /**
-   * Displays metalake audit information.
+   * Create a new User.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
+   * @param user The name of the user.
    */
-  public MetalakeAuditInfo(String url, boolean ignoreVersions, String metalake) {
+  public CreateUser(String url, boolean ignoreVersions, String metalake, String user) {
     super(url, ignoreVersions);
     this.metalake = metalake;
+    this.user = user;
   }
 
-  /** Displays the audit information of a metalake. */
+  /** Create a new user. */
   @Override
   public void handle() {
-    Audit audit;
-    try (GravitinoClient client = buildClient(metalake)) {
-      audit = client.loadMetalake(metalake).auditInfo();
+    try {
+      GravitinoClient client = buildClient(metalake);
+      client.addUser(user);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (UserAlreadyExistsException err) {
+      System.err.println(ErrorMessages.USER_EXISTS);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    String auditInfo =
-        "creator,createTime,lastModifier,lastModifiedTime"
-            + System.lineSeparator()
-            + audit.creator()
-            + ","
-            + audit.createTime()
-            + ","
-            + audit.lastModifier()
-            + ","
-            + audit.lastModifiedTime();
-
-    System.out.println(auditInfo);
+    System.out.println(user + " created");
   }
 }

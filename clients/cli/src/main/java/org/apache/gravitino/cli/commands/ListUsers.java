@@ -19,33 +19,34 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the audit information of a metalake. */
-public class MetalakeAuditInfo extends Command {
+/* Lists all users in a metalake. */
+public class ListUsers extends Command {
+
   protected final String metalake;
 
   /**
-   * Displays metalake audit information.
+   * Lists all users in a metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    */
-  public MetalakeAuditInfo(String url, boolean ignoreVersions, String metalake) {
+  public ListUsers(String url, boolean ignoreVersions, String metalake) {
     super(url, ignoreVersions);
     this.metalake = metalake;
   }
 
-  /** Displays the audit information of a metalake. */
+  /** Lists all users in a metalake. */
   @Override
   public void handle() {
-    Audit audit;
-    try (GravitinoClient client = buildClient(metalake)) {
-      audit = client.loadMetalake(metalake).auditInfo();
+    String[] users = new String[0];
+    try {
+      GravitinoClient client = buildClient(metalake);
+      users = client.listUserNames();
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -54,17 +55,8 @@ public class MetalakeAuditInfo extends Command {
       return;
     }
 
-    String auditInfo =
-        "creator,createTime,lastModifier,lastModifiedTime"
-            + System.lineSeparator()
-            + audit.creator()
-            + ","
-            + audit.createTime()
-            + ","
-            + audit.lastModifier()
-            + ","
-            + audit.lastModifiedTime();
+    String all = String.join(",", users);
 
-    System.out.println(auditInfo);
+    System.out.println(all.toString());
   }
 }

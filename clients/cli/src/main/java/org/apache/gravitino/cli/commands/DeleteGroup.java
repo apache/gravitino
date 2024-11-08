@@ -19,52 +19,53 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
-/** Displays the audit information of a metalake. */
-public class MetalakeAuditInfo extends Command {
+public class DeleteGroup extends Command {
+
   protected final String metalake;
+  protected final String group;
 
   /**
-   * Displays metalake audit information.
+   * Delete a group.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
+   * @param group The name of the group.
    */
-  public MetalakeAuditInfo(String url, boolean ignoreVersions, String metalake) {
+  public DeleteGroup(String url, boolean ignoreVersions, String metalake, String group) {
     super(url, ignoreVersions);
     this.metalake = metalake;
+    this.group = group;
   }
 
-  /** Displays the audit information of a metalake. */
+  /** Delete a group. */
   @Override
   public void handle() {
-    Audit audit;
-    try (GravitinoClient client = buildClient(metalake)) {
-      audit = client.loadMetalake(metalake).auditInfo();
+    boolean deleted = false;
+
+    try {
+      GravitinoClient client = buildClient(metalake);
+      deleted = client.removeGroup(group);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchGroupException err) {
+      System.err.println(ErrorMessages.UNKNOWN_GROUP);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    String auditInfo =
-        "creator,createTime,lastModifier,lastModifiedTime"
-            + System.lineSeparator()
-            + audit.creator()
-            + ","
-            + audit.createTime()
-            + ","
-            + audit.lastModifier()
-            + ","
-            + audit.lastModifiedTime();
-
-    System.out.println(auditInfo);
+    if (deleted) {
+      System.out.println(group + " deleted.");
+    } else {
+      System.out.println(group + " not deleted.");
+    }
   }
 }

@@ -19,52 +19,53 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 
-/** Displays the audit information of a metalake. */
-public class MetalakeAuditInfo extends Command {
+public class DeleteUser extends Command {
+
   protected final String metalake;
+  protected final String user;
 
   /**
-   * Displays metalake audit information.
+   * Deletes a user.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
+   * @param user The name of the user.
    */
-  public MetalakeAuditInfo(String url, boolean ignoreVersions, String metalake) {
+  public DeleteUser(String url, boolean ignoreVersions, String metalake, String user) {
     super(url, ignoreVersions);
     this.metalake = metalake;
+    this.user = user;
   }
 
-  /** Displays the audit information of a metalake. */
+  /** Delete a user. */
   @Override
   public void handle() {
-    Audit audit;
-    try (GravitinoClient client = buildClient(metalake)) {
-      audit = client.loadMetalake(metalake).auditInfo();
+    boolean deleted = false;
+
+    try {
+      GravitinoClient client = buildClient(metalake);
+      deleted = client.removeUser(user);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchUserException err) {
+      System.err.println(ErrorMessages.UNKNOWN_USER);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    String auditInfo =
-        "creator,createTime,lastModifier,lastModifiedTime"
-            + System.lineSeparator()
-            + audit.creator()
-            + ","
-            + audit.createTime()
-            + ","
-            + audit.lastModifier()
-            + ","
-            + audit.lastModifiedTime();
-
-    System.out.println(auditInfo);
+    if (deleted) {
+      System.out.println(user + " deleted.");
+    } else {
+      System.out.println(user + " not deleted.");
+    }
   }
 }
