@@ -94,10 +94,9 @@ public class TestFulllName {
 
   @Test
   public void hasPartNameMetalake() throws Exception {
-    String[] args = {"metalake", "details", "--name", "metalake"};
+    String[] args = {"metalake", "details", "--metalake", "metalake"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
-    assertTrue(fullName.hasMetalakeName());
     assertFalse(fullName.hasCatalogName());
     assertFalse(fullName.hasSchemaName());
     assertFalse(fullName.hasTableName());
@@ -105,10 +104,9 @@ public class TestFulllName {
 
   @Test
   public void hasPartNameCatalog() throws Exception {
-    String[] args = {"catalog", "details", "--name", "metalake.catalog"};
+    String[] args = {"catalog", "details", "--metalake", "metalake", "--name", "catalog"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
-    assertTrue(fullName.hasMetalakeName());
     assertTrue(fullName.hasCatalogName());
     assertFalse(fullName.hasSchemaName());
     assertFalse(fullName.hasTableName());
@@ -116,10 +114,9 @@ public class TestFulllName {
 
   @Test
   public void hasPartNameSchema() throws Exception {
-    String[] args = {"schema", "details", "--name", "metalake.catalog.schema"};
+    String[] args = {"schema", "details", "--metalake", "metalake", "--name", "catalog.schema"};
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
-    assertTrue(fullName.hasMetalakeName());
     assertTrue(fullName.hasCatalogName());
     assertTrue(fullName.hasSchemaName());
     assertFalse(fullName.hasTableName());
@@ -127,10 +124,11 @@ public class TestFulllName {
 
   @Test
   public void hasPartNameTable() throws Exception {
-    String[] args = {"table", "details", "--name", "metalake.catalog.schema.table"};
+    String[] args = {
+      "table", "details", "--metalake", "metalake", "--name", "catalog.schema.table"
+    };
     CommandLine commandLine = new DefaultParser().parse(options, args);
     FullName fullName = new FullName(commandLine);
-    assertTrue(fullName.hasMetalakeName());
     assertTrue(fullName.hasCatalogName());
     assertTrue(fullName.hasSchemaName());
     assertTrue(fullName.hasTableName());

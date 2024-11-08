@@ -376,7 +376,7 @@ public class GravitinoCommandLine {
     if (CommandActions.DETAILS.equals(command)) {
       new TagDetails(url, ignore, metalake, tag).handle();
     } else if (CommandActions.LIST.equals(command)) {
-      if (name.hasMetalakeName() && !name.hasCatalogName()) {
+      if (!name.hasCatalogName()) {
         new ListAllTags(url, ignore, metalake).handle();
       } else {
         new ListEntityTags(url, ignore, metalake, name).handle();
