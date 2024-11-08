@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -66,6 +67,7 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
@@ -581,29 +583,65 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     try {
+      Namespace filesetNs =
+          Namespace.of(
+              Stream.concat(Stream.of(ident.namespace().levels()), Stream.of(ident.name()))
+                  .toArray(String[]::new));
+      List<FilesetEntity> filesets =
+          store.list(filesetNs, FilesetEntity.class, Entity.EntityType.FILESET);
+      if (filesets.size() > 0 && !cascade) {
+        throw new NonEmptySchemaException("Schema %s is not empty", ident);
+      }
+
+      // Delete all the managed filesets no matter whether the storage location is under the
+      // schema path or not.
+      // The reason why we delete the managed fileset's storage location one by one is because we
+      // may mis-delete the storage location of the external fileset if it happens to be under
+      // the schema path.
+      // Besides, we don't delete the schema path to avoid mis-delete some unmanaged files/folders
+      // under this path.
+      filesets.stream()
+          .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
+          .forEach(
+              f -> {
+                try {
+                  Path filesetPath = new Path(f.storageLocation());
+                  FileSystem fs = getFileSystem(filesetPath, conf);
+                  if (fs.exists(filesetPath)) {
+                    if (!fs.delete(filesetPath, true)) {
+                      LOG.warn("Failed to delete fileset {} location {}", f.name(), filesetPath);
+                    }
+                  }
+                } catch (IOException ioe) {
+                  LOG.warn(
+                      "Failed to delete fileset {} location {}",
+                      f.name(),
+                      f.storageLocation(),
+                      ioe);
+                }
+              });
+
       SchemaEntity schemaEntity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
       Map<String, String> properties =
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
 
       Path schemaPath = getSchemaPath(ident.name(), properties);
-      // Nothing to delete if the schema path is not set.
-      if (schemaPath == null) {
-        return false;
-      }
-      FileSystem fs = getFileSystem(schemaPath, conf);
-      // Nothing to delete if the schema path does not exist.
-      if (!fs.exists(schemaPath)) {
-        return false;
-      }
-
-      if (fs.listStatus(schemaPath).length > 0 && !cascade) {
-        throw new NonEmptySchemaException(
-            "Schema %s with location %s is not empty", ident, schemaPath);
-      } else {
-        fs.delete(schemaPath, true);
+      if (schemaPath != null) {
+        FileSystem fs = getFileSystem(schemaPath, conf);
+        // If the schema path is empty, we should delete the schema path.
+        if (fs.exists(schemaPath)) {
+          FileStatus[] statuses = fs.listStatus(schemaPath);
+          if (statuses.length == 0) {
+            if (fs.delete(schemaPath, true)) {
+              LOG.info("Deleted schema {} location {}", ident, schemaPath);
+            } else {
+              LOG.warn("Failed to delete schema {} location {}", ident, schemaPath);
+            }
+          }
+        }
       }
 
-      LOG.info("Deleted schema {} location {}", ident, schemaPath);
+      LOG.info("Deleted schema {}", ident);
       return true;
 
     } catch (IOException ioe) {
