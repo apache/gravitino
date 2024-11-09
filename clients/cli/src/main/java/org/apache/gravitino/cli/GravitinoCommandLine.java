@@ -75,6 +75,7 @@ import org.apache.gravitino.cli.commands.TableDetails;
 import org.apache.gravitino.cli.commands.TagDetails;
 import org.apache.gravitino.cli.commands.TagEntity;
 import org.apache.gravitino.cli.commands.UntagEntity;
+import org.apache.gravitino.cli.commands.TableDistribution;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
