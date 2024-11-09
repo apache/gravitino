@@ -22,14 +22,14 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 
-/** Displays the details of a table's columns. */
+/** Displays the details of a table's distirbution. */
 public class TableDistribution extends TableCommand {
 
   protected final String schema;
   protected final String table;
 
   /**
-   * Displays the details of a table's columns.
+   * Displays the details of a table's distirbution.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
