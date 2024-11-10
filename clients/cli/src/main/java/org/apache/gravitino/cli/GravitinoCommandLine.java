@@ -21,7 +21,6 @@ package org.apache.gravitino.cli;
 
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.ErrorMessages;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CatalogAudit;
