@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.iceberg.service.rest;
 
-import com.google.common.annotations.VisibleForTesting;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
@@ -36,7 +35,7 @@ public class MockIcebergTableOperations extends IcebergTableOperations {
     super(icebergCatalogWrapperManager, icebergMetricsManager, tableOperationDispatcher);
   }
 
-  @VisibleForTesting
+  // HTTP request is null in Jersey test, create a mock request
   @Override
   HttpServletRequest httpServletRequest() {
     return IcebergRestTestUtil.createMockHttpRequest();

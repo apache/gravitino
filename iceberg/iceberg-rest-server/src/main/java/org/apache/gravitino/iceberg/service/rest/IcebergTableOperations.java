@@ -269,6 +269,8 @@ public class IcebergTableOperations {
     return IcebergRestUtils.noContent();
   }
 
+  // HTTP request is null in Jersey test, override with a mock request when testing.
+  @VisibleForTesting
   HttpServletRequest httpServletRequest() {
     return httpRequest;
   }

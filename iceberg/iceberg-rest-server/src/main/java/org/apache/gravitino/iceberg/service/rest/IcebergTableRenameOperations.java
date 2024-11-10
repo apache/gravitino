@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.annotations.VisibleForTesting;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -70,6 +71,8 @@ public class IcebergTableRenameOperations {
     return IcebergRestUtils.okWithoutContent();
   }
 
+  // HTTP request is null in Jersey test, override with a mock request when testing.
+  @VisibleForTesting
   HttpServletRequest httpServletRequest() {
     return httpRequest;
   }
