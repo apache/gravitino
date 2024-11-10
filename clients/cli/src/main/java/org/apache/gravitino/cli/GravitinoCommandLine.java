@@ -21,6 +21,7 @@ package org.apache.gravitino.cli;
 
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.ErrorMessages;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.gravitino.cli.commands.CatalogAudit;
@@ -404,17 +405,22 @@ public class GravitinoCommandLine {
     } else if (CommandActions.SET.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       String value = line.getOptionValue(GravitinoOptions.VALUE);
-      if (property != null && value != null) {
+
+      if (name == null && property != null && value != null) {
         new SetTagProperty(url, ignore, metalake, tag, property, value).handle();
-      } else {
+      } else if (name != null && property == null && value == null) {
         new TagEntity(url, ignore, metalake, name, tag).handle();
+      } else {
+        System.err.println(ErrorMessages.INVALID_SET_COMMAND);
       }
     } else if (CommandActions.REMOVE.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       if (property != null) {
         new RemoveTagProperty(url, ignore, metalake, tag, property).handle();
-      } else {
+      } else if (name != null) {
         new UntagEntity(url, ignore, metalake, name, tag).handle();
+      } else {
+        System.err.println(ErrorMessages.INVALID_REMOVE_COMMAND);
       }
     } else if (CommandActions.PROPERTIES.equals(command)) {
       new ListTagProperties(url, ignore, metalake, tag).handle();
