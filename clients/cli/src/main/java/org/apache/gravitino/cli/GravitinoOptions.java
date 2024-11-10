@@ -56,9 +56,9 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("s", SERVER, "Gravitino server version"));
     options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
     options.addOption(createArgOption("n", NAME, "full entity name (dot separated)"));
-    options.addOption(createArgOption("m", METALAKE, "Metalake name"));
-    options.addOption(createSimpleOption("i", IGNORE, "Ignore client/sever version check"));
-    options.addOption(createSimpleOption("a", AUDIT, "Display audit information"));
+    options.addOption(createArgOption("m", METALAKE, "metalake name"));
+    options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
+    options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
 
     // Create/update options
     options.addOption(createArgOption("r", RENAME, "new entity name"));
