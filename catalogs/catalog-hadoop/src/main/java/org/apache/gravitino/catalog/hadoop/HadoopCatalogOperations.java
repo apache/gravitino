@@ -22,6 +22,7 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -91,7 +92,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private CatalogInfo catalogInfo;
 
-  private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
+  private Map<String, FileSystemProvider> fileSystemProvidersMap;
 
   private FileSystemProvider defaultFileSystemProvider;
 
@@ -135,7 +136,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
-    this.fileSystemProvidersMap.putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders));
+    this.fileSystemProvidersMap =
+        ImmutableMap.<String, FileSystemProvider>builder()
+            .putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders))
+            .build();
 
     String defaultFileSystemProviderName =
         (String)
@@ -601,7 +605,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       // The reason why we delete the managed fileset's storage location one by one is because we
       // may mis-delete the storage location of the external fileset if it happens to be under
       // the schema path.
-      filesets.parallelStream()
+      filesets
+          .parallelStream()
           .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
           .forEach(
               f -> {
