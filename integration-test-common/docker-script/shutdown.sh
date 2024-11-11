@@ -21,7 +21,9 @@
 cd "$(dirname "$0")"
 
 LOG_DIR=../build/trino-ci-container-log
-docker cp trino-ci-hive:/usr/local/hadoop/logs $LOG_DIR/hdfs
-docker cp trino-ci-hive:/tmp/root $LOG_DIR/hive
+if [ -d $LOG_DIR ]; then
+  docker cp trino-ci-hive:/usr/local/hadoop/logs $LOG_DIR/hdfs
+  docker cp trino-ci-hive:/tmp/root $LOG_DIR/hive
+fi
 
 docker compose down

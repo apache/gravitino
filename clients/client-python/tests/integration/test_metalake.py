@@ -90,6 +90,14 @@ class TestMetalake(IntegrationTestEnv):
         with self.assertRaises(MetalakeAlreadyExistsException):
             _ = self.create_metalake(self.metalake_name)
 
+    def test_nullable_comment_metalake(self):
+        self.create_metalake(self.metalake_name)
+        changes = (MetalakeChange.update_comment(None),)
+        null_comment_metalake = self.gravitino_admin_client.alter_metalake(
+            self.metalake_name, *changes
+        )
+        self.assertIsNone(null_comment_metalake.comment())
+
     def test_alter_metalake(self):
         self.create_metalake(self.metalake_name)
 

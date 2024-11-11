@@ -104,12 +104,12 @@ public class TestNameIdentifierUtil {
     assertEquals(
         filesetObject, NameIdentifierUtil.toMetadataObject(fileset, Entity.EntityType.FILESET));
 
-    // test column
-    Throwable e =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> NameIdentifierUtil.toMetadataObject(fileset, Entity.EntityType.COLUMN));
-    assertTrue(e.getMessage().contains("Entity type COLUMN is not supported"));
+    NameIdentifier column =
+        NameIdentifier.of("metalake1", "catalog1", "schema1", "table1", "column1");
+    MetadataObject columnObject =
+        MetadataObjects.parse("catalog1.schema1.table1.column1", MetadataObject.Type.COLUMN);
+    assertEquals(
+        columnObject, NameIdentifierUtil.toMetadataObject(column, Entity.EntityType.COLUMN));
 
     // test null
     Throwable e1 =

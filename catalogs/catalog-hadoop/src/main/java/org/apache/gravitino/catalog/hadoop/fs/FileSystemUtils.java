@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.hadoop.fs;
 
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_HDFS_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.BUILTIN_LOCAL_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -100,5 +101,63 @@ public class FileSystemUtils {
                     String.format(
                         "File system provider with name '%s' not found in the file system provider list.",
                         fileSystemProviderName)));
+  }
+
+  /**
+   * Convert the Gravitino configuration to Hadoop configuration.
+   *
+   * <p>Predefined keys have the highest priority. If the key does not exist in the predefined keys,
+   * it will be set to the configuration. Keys with prefixes 'gravitino.bypass' has the lowest
+   * priority.
+   *
+   * <p>Consider the following example:
+   *
+   * <pre>
+   * config:
+   *  k1=v1
+   *  gravitino.bypass.k1=v2
+   *  custom-k1=v3
+   * predefinedKeys:
+   *  custom-k1=k1
+   * then the result will be:
+   *  k1=v3
+   * </pre>
+   *
+   * @param config Gravitino configuration
+   * @return Hadoop configuration Map
+   */
+  public static Map<String, String> toHadoopConfigMap(
+      Map<String, String> config, Map<String, String> predefinedKeys) {
+    Map<String, String> result = Maps.newHashMap();
+
+    // First, add those keys that start with 'gravitino.bypass' to the result map as it has the
+    // lowest priority.
+    config.forEach(
+        (k, v) -> {
+          if (k.startsWith(GRAVITINO_BYPASS)) {
+            String key = k.replace(GRAVITINO_BYPASS, "");
+            result.put(key, v);
+          }
+        });
+
+    // Then add those keys that are not in the predefined keys and not start with 'gravitino.bypass'
+    // to the result map.
+    config.forEach(
+        (k, v) -> {
+          if (!predefinedKeys.containsKey(k) && !k.startsWith(GRAVITINO_BYPASS)) {
+            result.put(k, v);
+          }
+        });
+
+    // Last, add those keys that are in the predefined keys to the result map.
+    config.forEach(
+        (k, v) -> {
+          if (predefinedKeys.containsKey(k)) {
+            String key = predefinedKeys.get(k);
+            result.put(key, v);
+          }
+        });
+
+    return result;
   }
 }

@@ -45,6 +45,7 @@ public class UserDetails extends Command {
   }
 
   /** Displays the roles of a specified user. */
+  @Override
   public void handle() {
     List<String> roles = null;
 

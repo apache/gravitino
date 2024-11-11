@@ -21,7 +21,7 @@ package org.apache.gravitino.cli;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -74,7 +74,10 @@ public class TestProviders {
 
   @Test
   public void internalNull() {
-    assertNull(Providers.internal("unknown"), "Internal string should be null");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> Providers.internal("unknown"),
+        "Expected an IllegalArgumentException for an unknown provider");
   }
 
   @Test
@@ -89,6 +92,9 @@ public class TestProviders {
 
   @Test
   public void catalogTypeNull() {
-    assertNull(Providers.internal("unknown"), "Catalog type should be null");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> Providers.catalogType("unknown"),
+        "Expected an IllegalArgumentException for an unknown provider");
   }
 }

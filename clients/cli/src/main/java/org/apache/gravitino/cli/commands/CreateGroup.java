@@ -43,6 +43,7 @@ public class CreateGroup extends Command {
   }
 
   /** Create a new group. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

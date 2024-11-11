@@ -50,6 +50,7 @@ public class UpdateTagComment extends Command {
   }
 
   /** Update the comment of a tag. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

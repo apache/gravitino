@@ -46,6 +46,7 @@ public class RemoveMetalakeProperty extends Command {
   }
 
   /** Remove a property of a metalake. */
+  @Override
   public void handle() {
     try {
       GravitinoAdminClient client = buildAdminClient();

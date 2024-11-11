@@ -291,77 +291,77 @@ public class HudiCatalogHMSIT extends BaseIT {
     Column[] columns = table.columns();
     Assertions.assertEquals(11, columns.length);
     if (table.name().endsWith("_rt") || table.name().endsWith("_ro")) {
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("_hoodie_commit_time")
               .withDataType(Types.StringType.get())
               .withComment("")
               .build(),
           columns[0]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("_hoodie_commit_seqno")
               .withDataType(Types.StringType.get())
               .withComment("")
               .build(),
           columns[1]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("_hoodie_record_key")
               .withDataType(Types.StringType.get())
               .withComment("")
               .build(),
           columns[2]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("_hoodie_partition_path")
               .withDataType(Types.StringType.get())
               .withComment("")
               .build(),
           columns[3]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("_hoodie_file_name")
               .withDataType(Types.StringType.get())
               .withComment("")
               .build(),
           columns[4]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("ts")
               .withDataType(Types.LongType.get())
               .withComment("")
               .build(),
           columns[5]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("uuid")
               .withDataType(Types.StringType.get())
               .withComment("")
               .build(),
           columns[6]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("rider")
               .withDataType(Types.StringType.get())
               .withComment("")
               .build(),
           columns[7]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("driver")
               .withDataType(Types.StringType.get())
               .withComment("")
               .build(),
           columns[8]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("fare")
               .withDataType(Types.DoubleType.get())
               .withComment("")
               .build(),
           columns[9]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("city")
               .withDataType(Types.StringType.get())
@@ -369,55 +369,64 @@ public class HudiCatalogHMSIT extends BaseIT {
               .build(),
           columns[10]);
     } else {
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("_hoodie_commit_time")
               .withDataType(Types.StringType.get())
               .build(),
           columns[0]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("_hoodie_commit_seqno")
               .withDataType(Types.StringType.get())
               .build(),
           columns[1]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("_hoodie_record_key")
               .withDataType(Types.StringType.get())
               .build(),
           columns[2]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("_hoodie_partition_path")
               .withDataType(Types.StringType.get())
               .build(),
           columns[3]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder()
               .withName("_hoodie_file_name")
               .withDataType(Types.StringType.get())
               .build(),
           columns[4]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder().withName("ts").withDataType(Types.LongType.get()).build(),
           columns[5]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder().withName("uuid").withDataType(Types.StringType.get()).build(),
           columns[6]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder().withName("rider").withDataType(Types.StringType.get()).build(),
           columns[7]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder().withName("driver").withDataType(Types.StringType.get()).build(),
           columns[8]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder().withName("fare").withDataType(Types.DoubleType.get()).build(),
           columns[9]);
-      Assertions.assertEquals(
+      assertColumn(
           ColumnDTO.builder().withName("city").withDataType(Types.StringType.get()).build(),
           columns[10]);
     }
+  }
+
+  private void assertColumn(ColumnDTO columnDTO, Column column) {
+    Assertions.assertEquals(columnDTO.name(), column.name());
+    Assertions.assertEquals(columnDTO.dataType(), column.dataType());
+    Assertions.assertEquals(columnDTO.comment(), column.comment());
+    Assertions.assertEquals(columnDTO.nullable(), column.nullable());
+    Assertions.assertEquals(columnDTO.autoIncrement(), column.autoIncrement());
+    Assertions.assertEquals(columnDTO.defaultValue(), column.defaultValue());
   }
 
   private static void createHudiTables() {

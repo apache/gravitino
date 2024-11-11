@@ -91,6 +91,7 @@ public class MetalakePageTest extends BaseWebIT {
   @Test
   @Order(4)
   public void testDeleteMetalake() {
+    metalakePage.clickInUseSwitch(EDITED_METALAKE_NAME);
     metalakePage.clickDeleteMetalakeBtn(EDITED_METALAKE_NAME);
     metalakePage.confirmDeleteBtn.click();
     Assertions.assertTrue(metalakePage.verifyEmptyMetalake());
