@@ -19,8 +19,10 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.rangerClient;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.verifyRoleInRanger;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -31,8 +33,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
@@ -46,6 +50,7 @@ import org.apache.gravitino.authorization.ranger.RangerMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.RangerSecurableObject;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -86,26 +91,7 @@ public class RangerHiveIT {
 
   @AfterEach
   public void clean() {
-    // Clean up the test Ranger policy
-    Role mockCatalogRole = mockCatalogRole(currentFunName());
-    mockCatalogRole.securableObjects().stream()
-        .forEach(
-            securableObject -> {
-              rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                  .forEach(
-                      rangerSecurableObject -> {
-                        deleteHivePolicy(rangerSecurableObject);
-                      });
-            });
-    mockCatalogRole.securableObjects().stream()
-        .forEach(
-            securableObject -> {
-              rangerAuthHivePlugin.translateOwner(securableObject).stream()
-                  .forEach(
-                      rangerSecurableObject -> {
-                        deleteHivePolicy(rangerSecurableObject);
-                      });
-            });
+    RangerITEnv.cleanAllPolicy(RangerITEnv.RANGER_HIVE_REPO_NAME);
   }
 
   /**
@@ -153,11 +139,116 @@ public class RangerHiveIT {
   }
 
   @Test
+  public void testOnDenyRoleCreated() {
+    String schemaName = currentFunName();
+    SecurableObject securableObject1 =
+        SecurableObjects.parse(
+            String.format("catalog.%s", schemaName), // use unique db name to avoid conflict
+            MetadataObject.Type.SCHEMA,
+            Lists.newArrayList(Privileges.CreateTable.deny()));
+
+    SecurableObject securableObject2 =
+        SecurableObjects.parse(
+            String.format("catalog.%s.tab2", schemaName),
+            SecurableObject.Type.TABLE,
+            Lists.newArrayList(Privileges.SelectTable.deny()));
+
+    SecurableObject securableObject3 =
+        SecurableObjects.parse(
+            String.format("catalog.%s.tab3", schemaName),
+            SecurableObject.Type.TABLE,
+            Lists.newArrayList(Privileges.ModifyTable.deny()));
+
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(schemaName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(
+                Lists.newArrayList(securableObject1, securableObject2, securableObject3))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    verifyRoleInRanger(rangerAuthHivePlugin, role);
+  }
+
+  @Test
+  public void testOnMixRoleCreated() {
+    String schemaName = currentFunName();
+    SecurableObject securableObject1 =
+        SecurableObjects.parse(
+            String.format("catalog.%s", schemaName), // use unique db name to avoid conflict
+            MetadataObject.Type.SCHEMA,
+            Lists.newArrayList(Privileges.SelectTable.allow(), Privileges.CreateTable.deny()));
+
+    SecurableObject securableObject2 =
+        SecurableObjects.parse(
+            String.format("catalog.%s.tab2", schemaName),
+            SecurableObject.Type.TABLE,
+            Lists.newArrayList(Privileges.SelectTable.allow(), Privileges.ModifyTable.deny()));
+
+    SecurableObject securableObject3 =
+        SecurableObjects.parse(
+            String.format("catalog.%s.tab3", schemaName),
+            SecurableObject.Type.TABLE,
+            Lists.newArrayList(Privileges.SelectTable.deny(), Privileges.ModifyTable.allow()));
+
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(schemaName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(
+                Lists.newArrayList(securableObject1, securableObject2, securableObject3))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    verifyRoleInRanger(rangerAuthHivePlugin, role);
+  }
+
+  @Test
   public void testOnRoleCreatedCatalog() {
     Role mockCatalogRole = mockCatalogRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(mockCatalogRole));
     // Check if exist this policy
     assertFindManagedPolicy(mockCatalogRole, true);
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(mockCatalogRole));
+    assertFindManagedPolicy(mockCatalogRole, false);
+  }
+
+  @Test
+  public void testOnDenyRoleCreatedCatalog() {
+    String roleName = currentFunName();
+    SecurableObject securableObject1 =
+        SecurableObjects.parse(
+            currentFunName(),
+            SecurableObject.Type.CATALOG,
+            Lists.newArrayList(Privileges.CreateSchema.deny()));
+    RoleEntity mockCatalogRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(roleName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(securableObject1))
+            .build();
+
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(mockCatalogRole));
+    // Check if exist this policy
+    assertFindManagedPolicy(mockCatalogRole, true);
+    mockCatalogRole.securableObjects().stream()
+        .forEach(
+            securableObject -> {
+              rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
+                  .forEach(
+                      rangerSecurableObject -> {
+                        verifyRangerSecurableObjectInRanger(
+                            rangerSecurableObject,
+                            null,
+                            null,
+                            null,
+                            null,
+                            Lists.newArrayList(roleName));
+                      });
+            });
+
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(mockCatalogRole));
     assertFindManagedPolicy(mockCatalogRole, false);
   }
@@ -236,16 +327,20 @@ public class RangerHiveIT {
     String dbName = currentFunName();
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", dbName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", dbName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     // findManagedPolicy function use precise search, so return null
     RangerSecurableObject rangerSecurableObject =
         rangerAuthHivePlugin.generateRangerSecurableObject(
@@ -259,12 +354,33 @@ public class RangerHiveIT {
     // Add a policy for `db3.tab1`
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "tab1"),
-        GravitinoITUtils.genRandomName(currentFunName()));
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
     // findManagedPolicy function use precise search, so return not null
     Assertions.assertNotNull(rangerHelper.findManagedPolicy(rangerSecurableObject));
   }
 
-  static void createHivePolicy(List<String> metaObjects, String roleName) {
+  @Test
+  public void testManagedByGravitinoLabel() {
+    RoleEntity role = mock3TableRole(currentFunName());
+    role.securableObjects().stream()
+        .forEach(
+            securableObject -> {
+              Joiner DOT_JOINER = Joiner.on('.');
+              List<String> names =
+                  Lists.newArrayList(
+                      SecurableObjects.DOT_SPLITTER.splitToList(securableObject.fullName()));
+              names.remove(0); // remove catalog node
+              // Manual create the Ranger Policy
+              createHivePolicy(Lists.newArrayList(names), DOT_JOINER.join(names), false);
+            });
+    // Use role to create Ranger Policy
+    Assertions.assertThrows(
+        AuthorizationPluginException.class, () -> rangerAuthHivePlugin.onRoleCreated(role));
+  }
+
+  static void createHivePolicy(
+      List<String> metaObjects, String roleName, boolean labelManagedByGravitino) {
     Assertions.assertTrue(metaObjects.size() < 4);
     Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap = new HashMap<>();
     for (int i = 0; i < metaObjects.size(); i++) {
@@ -288,7 +404,8 @@ public class RangerHiveIT {
         RangerITEnv.RANGER_HIVE_REPO_NAME,
         roleName,
         policyResourceMap,
-        Collections.singletonList(policyItem));
+        Collections.singletonList(policyItem),
+        labelManagedByGravitino);
   }
 
   static boolean deleteHivePolicy(RangerSecurableObject rangerSecurableObject) {
@@ -507,6 +624,330 @@ public class RangerHiveIT {
     assertFindManagedPolicy(mockCatalogRole, false);
   }
 
+  @Test
+  public void testMetadataObjectChangeRenameMetalake() {
+    String currentFunName = currentFunName();
+    MetadataObject oldMetadataObject =
+        MetadataObjects.parse(
+            String.format("metalake-%s", currentFunName), MetadataObject.Type.METALAKE);
+    SecurableObject oldSecurableObject1 =
+        SecurableObjects.parse(
+            oldMetadataObject.fullName(),
+            oldMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    assertFindManagedPolicy(role, true);
+
+    MetadataObject newMetadataObject =
+        MetadataObjects.parse(
+            String.format("metalake-new-%s", currentFunName), oldMetadataObject.type());
+    Assertions.assertTrue(
+        rangerAuthHivePlugin.onMetadataUpdated(
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+    SecurableObject newSecurableObject1 =
+        SecurableObjects.parse(
+            newMetadataObject.fullName(),
+            newMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity newRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
+            .build();
+    assertFindManagedPolicy(newRole, true);
+  }
+
+  @Test
+  public void testMetadataObjectChangeRenameCatalog() {
+    String currentFunName = currentFunName();
+    MetadataObject oldMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog-%s", currentFunName), MetadataObject.Type.CATALOG);
+    SecurableObject oldSecurableObject1 =
+        SecurableObjects.parse(
+            oldMetadataObject.fullName(),
+            oldMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    assertFindManagedPolicy(role, true);
+
+    MetadataObject newMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog-new-%s", currentFunName), oldMetadataObject.type());
+    Assertions.assertTrue(
+        rangerAuthHivePlugin.onMetadataUpdated(
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+    SecurableObject newSecurableObject1 =
+        SecurableObjects.parse(
+            newMetadataObject.fullName(),
+            newMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity newRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
+            .build();
+    assertFindManagedPolicy(newRole, true);
+  }
+
+  @Test
+  public void testMetadataObjectChangeRenameSchema() {
+    String currentFunName = currentFunName();
+    MetadataObject oldMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog.old-%s", currentFunName), MetadataObject.Type.SCHEMA);
+    SecurableObject oldSecurableObject1 =
+        SecurableObjects.parse(
+            oldMetadataObject.fullName(),
+            oldMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    assertFindManagedPolicy(role, true);
+
+    MetadataObject newMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog.new-%s", currentFunName), oldMetadataObject.type());
+    Assertions.assertTrue(
+        rangerAuthHivePlugin.onMetadataUpdated(
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+    assertFindManagedPolicy(role, false);
+    SecurableObject newSecurableObject1 =
+        SecurableObjects.parse(
+            newMetadataObject.fullName(),
+            newMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity newRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
+            .build();
+    assertFindManagedPolicy(newRole, true);
+  }
+
+  @Test
+  public void testMetadataObjectChangeRenameTable() {
+    String currentFunName = currentFunName();
+    MetadataObject oldMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog.schema1.old-%s", currentFunName), MetadataObject.Type.TABLE);
+    SecurableObject oldSecurableObject1 =
+        SecurableObjects.parse(
+            oldMetadataObject.fullName(),
+            oldMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    assertFindManagedPolicy(role, true);
+
+    MetadataObject newMetadataObject =
+        MetadataObjects.parse(
+            String.format("catalog.schema1.new-%s", currentFunName), oldMetadataObject.type());
+    Assertions.assertTrue(
+        rangerAuthHivePlugin.onMetadataUpdated(
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+    assertFindManagedPolicy(role, false);
+    SecurableObject newSecurableObject1 =
+        SecurableObjects.parse(
+            newMetadataObject.fullName(),
+            newMetadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity newRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
+            .build();
+    assertFindManagedPolicy(newRole, true);
+  }
+
+  @Test
+  public void testMetadataObjectChangeRemoveMetalake() throws RangerServiceException {
+    metadataObjectChangeRemoveMetalakeOrCatalog(currentFunName(), MetadataObject.Type.METALAKE);
+  }
+
+  @Test
+  public void testMetadataObjectChangeRemoveCatalog() throws RangerServiceException {
+    metadataObjectChangeRemoveMetalakeOrCatalog(currentFunName(), MetadataObject.Type.CATALOG);
+  }
+
+  void metadataObjectChangeRemoveMetalakeOrCatalog(String funcName, MetadataObject.Type type)
+      throws RangerServiceException {
+    createHivePolicy(
+        Lists.newArrayList(String.format("%s*", funcName), "*"),
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
+    createHivePolicy(
+        Lists.newArrayList(String.format("%s*", funcName), "tab*"),
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
+    createHivePolicy(
+        Lists.newArrayList(String.format("%s3", funcName), "*"),
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
+    createHivePolicy(
+        Lists.newArrayList(String.format("%s3", funcName), "tab*"),
+        GravitinoITUtils.genRandomName(currentFunName()),
+        true);
+    Assertions.assertEquals(
+        4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+
+    String currentFunName = currentFunName();
+    MetadataObject metadataObject =
+        MetadataObjects.parse(String.format("metalake-%s", currentFunName), type);
+    SecurableObject oldSecurableObject1 =
+        SecurableObjects.parse(
+            metadataObject.fullName(),
+            metadataObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    assertFindManagedPolicy(role, true);
+
+    Assertions.assertTrue(
+        rangerAuthHivePlugin.onMetadataUpdated(MetadataObjectChange.remove(metadataObject)));
+    assertFindManagedPolicy(role, false);
+
+    Assertions.assertEquals(
+        0, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+  }
+
+  @Test
+  public void testMetadataObjectChangeRemoveSchema() throws RangerServiceException {
+    String currentFunName = currentFunName();
+    MetadataObject schemaObject =
+        MetadataObjects.parse(
+            String.format("catalog.old-%s", currentFunName), MetadataObject.Type.SCHEMA);
+    SecurableObject schemaSecurableObject =
+        SecurableObjects.parse(
+            schemaObject.fullName(),
+            schemaObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("catalog.old-%s.tab1", currentFunName), MetadataObject.Type.TABLE);
+    SecurableObject tableSecurableObject =
+        SecurableObjects.parse(
+            tableObject.fullName(),
+            tableObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(schemaSecurableObject, tableSecurableObject))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    assertFindManagedPolicy(role, true);
+    Assertions.assertEquals(
+        4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+
+    Assertions.assertTrue(
+        rangerAuthHivePlugin.onMetadataUpdated(MetadataObjectChange.remove(schemaObject)));
+    RoleEntity roleVerify =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(schemaSecurableObject))
+            .build();
+    assertFindManagedPolicy(roleVerify, false);
+    Assertions.assertEquals(
+        2, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+  }
+
+  @Test
+  public void testMetadataObjectChangeRemoveTable() throws RangerServiceException {
+    String currentFunName = currentFunName();
+    MetadataObject schemaObject =
+        MetadataObjects.parse(
+            String.format("catalog.old-%s", currentFunName), MetadataObject.Type.SCHEMA);
+    SecurableObject securableObjectSchema =
+        SecurableObjects.parse(
+            schemaObject.fullName(),
+            schemaObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("catalog.old-%s.tab1", currentFunName), MetadataObject.Type.TABLE);
+    SecurableObject securableObjectTab =
+        SecurableObjects.parse(
+            tableObject.fullName(),
+            tableObject.type(),
+            Lists.newArrayList(Privileges.SelectTable.allow()));
+    RoleEntity role =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(securableObjectSchema, securableObjectTab))
+            .build();
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    assertFindManagedPolicy(role, true);
+
+    Assertions.assertTrue(
+        rangerAuthHivePlugin.onMetadataUpdated(MetadataObjectChange.remove(tableObject)));
+    RoleEntity verifyScheamRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(securableObjectSchema))
+            .build();
+    RoleEntity verifyTableRole =
+        RoleEntity.builder()
+            .withId(1L)
+            .withName(currentFunName)
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(Lists.newArrayList(securableObjectTab))
+            .build();
+    assertFindManagedPolicy(verifyScheamRole, true);
+    assertFindManagedPolicy(verifyTableRole, false);
+    Assertions.assertEquals(
+        2, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+  }
+
+  @Test
   public void testRoleChangeCombinedOperation() {
     MetadataObject oldMetadataObject =
         MetadataObjects.parse(
@@ -517,7 +958,8 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(oldMetadataObject).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(rangerSecurableObject, Lists.newArrayList(userName));
+              verifyRangerSecurableObjectInRanger(
+                  rangerSecurableObject, Lists.newArrayList(userName));
             });
 
     SecurableObject oldSecurableObject =
@@ -558,7 +1000,8 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(oldMetadataObject).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(rangerSecurableObject, Lists.newArrayList(userName));
+              verifyRangerSecurableObjectInRanger(
+                  rangerSecurableObject, Lists.newArrayList(userName));
             });
 
     // Delete the role
@@ -568,7 +1011,8 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(oldMetadataObject).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(rangerSecurableObject, Lists.newArrayList(userName));
+              verifyRangerSecurableObjectInRanger(
+                  rangerSecurableObject, Lists.newArrayList(userName));
             });
   }
 
@@ -768,7 +1212,8 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(schema).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(rangerSecurableObject, Lists.newArrayList(userName1));
+              verifyRangerSecurableObjectInRanger(
+                  rangerSecurableObject, Lists.newArrayList(userName1));
             });
 
     MetadataObject table =
@@ -780,7 +1225,8 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(table).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(rangerSecurableObject, Lists.newArrayList(userName2));
+              verifyRangerSecurableObjectInRanger(
+                  rangerSecurableObject, Lists.newArrayList(userName2));
             });
 
     String userName3 = "user3";
@@ -789,7 +1235,7 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(table).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(
+              verifyRangerSecurableObjectInRanger(
                   rangerSecurableObject,
                   Lists.newArrayList(userName3),
                   Lists.newArrayList(userName2));
@@ -801,7 +1247,7 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(table).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(
+              verifyRangerSecurableObjectInRanger(
                   rangerSecurableObject,
                   null,
                   Lists.newArrayList(userName1, userName2),
@@ -814,7 +1260,7 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(table).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(
+              verifyRangerSecurableObjectInRanger(
                   rangerSecurableObject,
                   null,
                   Lists.newArrayList(userName1, userName2),
@@ -834,7 +1280,7 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(metalake).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(
+              verifyRangerSecurableObjectInRanger(
                   rangerSecurableObject,
                   null,
                   null,
@@ -852,7 +1298,7 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(catalog).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(
+              verifyRangerSecurableObjectInRanger(
                   rangerSecurableObject,
                   null,
                   null,
@@ -913,7 +1359,7 @@ public class RangerHiveIT {
     rangerAuthHivePlugin.translateOwner(securableObject1).stream()
         .forEach(
             rangerSecurableObject -> {
-              verifyOwnerInRanger(
+              verifyRangerSecurableObjectInRanger(
                   rangerSecurableObject, Lists.newArrayList(ownerName), null, null, null);
             });
 
@@ -1296,10 +1742,10 @@ public class RangerHiveIT {
   /**
    * Verify the Gravitino role in Ranger service
    *
-   * <p>metadataObject: the Gravitino securable object to be verified
+   * @param rangerSecurableObject: the Ranger securable object to be verified
    */
-  private void verifyOwnerInRanger(
-      RangerMetadataObject metadataObject,
+  private void verifyRangerSecurableObjectInRanger(
+      RangerSecurableObject rangerSecurableObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups,
@@ -1307,7 +1753,7 @@ public class RangerHiveIT {
       List<String> includeRoles,
       List<String> excludeRoles) {
     // Find policy by each metadata Object
-    String policyName = metadataObject.fullName();
+    String policyName = rangerSecurableObject.fullName();
     RangerPolicy policy;
     try {
       policy = RangerITEnv.rangerClient.getPolicy(RangerITEnv.RANGER_HIVE_REPO_NAME, policyName);
@@ -1321,7 +1767,7 @@ public class RangerHiveIT {
     Assertions.assertTrue(policy.getPolicyLabels().contains(RangerHelper.MANAGED_BY_GRAVITINO));
 
     // verify namespace
-    List<String> metaObjNamespaces = metadataObject.names();
+    List<String> metaObjNamespaces = rangerSecurableObject.names();
     List<String> rolePolicies = new ArrayList<>();
     for (int i = 0; i < metaObjNamespaces.size(); i++) {
       rolePolicies.add(
@@ -1336,113 +1782,126 @@ public class RangerHiveIT {
     }
     Assertions.assertEquals(metaObjNamespaces, rolePolicies);
 
-    policy.getPolicyItems().stream()
-        .filter(
-            policyItem -> {
-              // Filter Ranger policy item by Gravitino privilege
-              return policyItem.getAccesses().stream()
-                  .anyMatch(
-                      access -> {
-                        return rangerAuthHivePlugin
-                            .ownerMappingRule()
-                            .contains(RangerPrivileges.valueOf(access.getType()));
+    AtomicReference<List<RangerPolicy.RangerPolicyItem>> policyItems = new AtomicReference<>();
+    rangerSecurableObject.privileges().stream()
+        .forEach(
+            privilege -> {
+              if (privilege.condition() == Privilege.Condition.ALLOW) {
+                policyItems.set(policy.getPolicyItems());
+              } else {
+                policyItems.set(policy.getDenyPolicyItems());
+              }
+              policyItems.get().stream()
+                  .filter(
+                      policyItem -> {
+                        // Filter Ranger policy item by Gravitino privilege
+                        return policyItem.getAccesses().stream()
+                            .anyMatch(
+                                access -> {
+                                  return rangerAuthHivePlugin
+                                      .ownerMappingRule()
+                                      .contains(RangerPrivileges.valueOf(access.getType()));
+                                });
+                      })
+                  .allMatch(
+                      policyItem -> {
+                        if (includeUsers != null && !includeUsers.isEmpty()) {
+                          if (!policyItem.getUsers().containsAll(includeUsers)) {
+                            return false;
+                          }
+                        }
+                        if (excludeUsers != null && !excludeUsers.isEmpty()) {
+                          boolean containExcludeUser =
+                              policyItem.getUsers().stream()
+                                  .anyMatch(
+                                      user -> {
+                                        return excludeUsers.contains(user);
+                                      });
+                          if (containExcludeUser) {
+                            return false;
+                          }
+                        }
+                        if (includeGroups != null && !includeGroups.isEmpty()) {
+                          if (!policyItem.getGroups().containsAll(includeGroups)) {
+                            return false;
+                          }
+                        }
+                        if (excludeGroups != null && !excludeGroups.isEmpty()) {
+                          boolean containExcludeGroup =
+                              policyItem.getGroups().stream()
+                                  .anyMatch(
+                                      user -> {
+                                        return excludeGroups.contains(user);
+                                      });
+                          if (containExcludeGroup) {
+                            return false;
+                          }
+                        }
+                        if (includeRoles != null && !includeRoles.isEmpty()) {
+                          if (!policyItem.getRoles().containsAll(includeRoles)) {
+                            return false;
+                          }
+                        }
+                        if (excludeRoles != null && !excludeRoles.isEmpty()) {
+                          boolean containExcludeRole =
+                              policyItem.getRoles().stream()
+                                  .anyMatch(
+                                      role -> {
+                                        return excludeRoles.contains(role);
+                                      });
+                          if (containExcludeRole) {
+                            return false;
+                          }
+                        }
+                        return true;
                       });
-            })
-        .anyMatch(
-            policyItem -> {
-              if (includeUsers != null && !includeUsers.isEmpty()) {
-                if (!policyItem.getUsers().containsAll(includeUsers)) {
-                  return false;
-                }
-              }
-              if (excludeUsers != null && !excludeUsers.isEmpty()) {
-                boolean containExcludeUser =
-                    policyItem.getUsers().stream()
-                        .anyMatch(
-                            user -> {
-                              return excludeUsers.contains(user);
-                            });
-                if (containExcludeUser) {
-                  return false;
-                }
-              }
-              if (includeGroups != null && !includeGroups.isEmpty()) {
-                if (!policyItem.getGroups().containsAll(includeGroups)) {
-                  return false;
-                }
-              }
-              if (excludeGroups != null && !excludeGroups.isEmpty()) {
-                boolean containExcludeGroup =
-                    policyItem.getGroups().stream()
-                        .anyMatch(
-                            user -> {
-                              return excludeGroups.contains(user);
-                            });
-                if (containExcludeGroup) {
-                  return false;
-                }
-              }
-              if (includeRoles != null && !includeRoles.isEmpty()) {
-                if (!policyItem.getRoles().containsAll(includeRoles)) {
-                  return false;
-                }
-              }
-              if (excludeRoles != null && !excludeRoles.isEmpty()) {
-                boolean containExcludeRole =
-                    policyItem.getRoles().stream()
-                        .anyMatch(
-                            role -> {
-                              return excludeRoles.contains(role);
-                            });
-                if (containExcludeRole) {
-                  return false;
-                }
-              }
-              return true;
             });
   }
 
-  private void verifyOwnerInRanger(RangerMetadataObject metadataObject) {
-    verifyOwnerInRanger(metadataObject, null, null, null, null, null, null);
+  private void verifyRangerSecurableObjectInRanger(RangerSecurableObject securableObject) {
+    verifyRangerSecurableObjectInRanger(securableObject, null, null, null, null, null, null);
   }
 
-  private void verifyOwnerInRanger(RangerMetadataObject metadataObject, List<String> includeUsers) {
-    verifyOwnerInRanger(metadataObject, includeUsers, null, null, null, null, null);
+  private void verifyRangerSecurableObjectInRanger(
+      RangerSecurableObject securableObject, List<String> includeUsers) {
+    verifyRangerSecurableObjectInRanger(
+        securableObject, includeUsers, null, null, null, null, null);
   }
 
-  private void verifyOwnerInRanger(
-      RangerMetadataObject metadataObject, List<String> includeUsers, List<String> excludeUsers) {
-    verifyOwnerInRanger(metadataObject, includeUsers, excludeUsers, null, null, null, null);
+  private void verifyRangerSecurableObjectInRanger(
+      RangerSecurableObject securableObject, List<String> includeUsers, List<String> excludeUsers) {
+    verifyRangerSecurableObjectInRanger(
+        securableObject, includeUsers, excludeUsers, null, null, null, null);
   }
 
-  private void verifyOwnerInRanger(
-      RangerMetadataObject metadataObject,
+  private void verifyRangerSecurableObjectInRanger(
+      RangerSecurableObject securableObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups) {
-    verifyOwnerInRanger(
-        metadataObject, includeUsers, excludeUsers, includeGroups, null, null, null);
+    verifyRangerSecurableObjectInRanger(
+        securableObject, includeUsers, excludeUsers, includeGroups, null, null, null);
   }
 
-  private void verifyOwnerInRanger(
-      RangerMetadataObject metadataObject,
+  private void verifyRangerSecurableObjectInRanger(
+      RangerSecurableObject securableObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups,
       List<String> excludeGroups) {
-    verifyOwnerInRanger(
-        metadataObject, includeUsers, excludeUsers, includeGroups, excludeGroups, null, null);
+    verifyRangerSecurableObjectInRanger(
+        securableObject, includeUsers, excludeUsers, includeGroups, excludeGroups, null, null);
   }
 
-  private void verifyOwnerInRanger(
-      RangerMetadataObject metadataObject,
+  private void verifyRangerSecurableObjectInRanger(
+      RangerSecurableObject securableObject,
       List<String> includeUsers,
       List<String> excludeUsers,
       List<String> includeGroups,
       List<String> excludeGroups,
       List<String> includeRoles) {
-    verifyOwnerInRanger(
-        metadataObject,
+    verifyRangerSecurableObjectInRanger(
+        securableObject,
         includeUsers,
         excludeUsers,
         includeGroups,

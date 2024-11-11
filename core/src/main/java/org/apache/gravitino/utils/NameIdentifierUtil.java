@@ -94,6 +94,22 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the column {@link NameIdentifier} with the given metalake, catalog, schema, table and
+   * column name.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param table The table name
+   * @param column The column name
+   * @return The created column {@link NameIdentifier}
+   */
+  public static NameIdentifier ofColumn(
+      String metalake, String catalog, String schema, String table, String column) {
+    return NameIdentifier.of(metalake, catalog, schema, table, column);
+  }
+
+  /**
    * Create the fileset {@link NameIdentifier} with the given metalake, catalog, schema and fileset
    * name.
    *
@@ -197,6 +213,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a column identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The column {@link NameIdentifier} to check.
+   */
+  public static void checkColumn(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Column identifier must not be null");
+    NamespaceUtil.checkColumn(ident.namespace());
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a fileset identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -265,6 +292,12 @@ public class NameIdentifierUtil {
         checkTable(ident);
         String tableParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(tableParent, ident.name(), MetadataObject.Type.TABLE);
+
+      case COLUMN:
+        checkColumn(ident);
+        Namespace columnNs = ident.namespace();
+        String columnParent = dot.join(columnNs.level(1), columnNs.level(2), columnNs.level(3));
+        return MetadataObjects.of(columnParent, ident.name(), MetadataObject.Type.COLUMN);
 
       case FILESET:
         checkFileset(ident);
