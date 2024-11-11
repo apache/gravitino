@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -28,24 +29,32 @@ public class DeleteRole extends Command {
 
   protected String metalake;
   protected String role;
+  protected boolean force;
 
   /**
    * Delete a role.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param role The name of the role.
    */
-  public DeleteRole(String url, boolean ignoreVersions, String metalake, String role) {
+  public DeleteRole(
+      String url, boolean ignoreVersions, boolean force, String metalake, String role) {
     super(url, ignoreVersions);
     this.metalake = metalake;
+    this.force = force;
     this.role = role;
   }
 
   /** Delete a role. */
   public void handle() {
     boolean deleted = false;
+
+    if (!AreYouSure.really(force)) {
+      return;
+    }
 
     try {
       GravitinoClient client = buildClient(metalake);

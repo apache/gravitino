@@ -461,7 +461,8 @@ public class GravitinoCommandLine {
     } else if (CommandActions.CREATE.equals(command)) {
       new CreateRole(url, ignore, metalake, role).handle();
     } else if (CommandActions.DELETE.equals(command)) {
-      new DeleteRole(url, ignore, metalake, role).handle();
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      new DeleteRole(url, ignore, force, metalake, role).handle();
     }
   }
 
