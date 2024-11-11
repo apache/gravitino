@@ -364,7 +364,8 @@ public class GravitinoCommandLine {
     } else if (CommandActions.CREATE.equals(command)) {
       new CreateUser(url, ignore, metalake, user).handle();
     } else if (CommandActions.DELETE.equals(command)) {
-      new DeleteUser(url, ignore, metalake, user).handle();
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      new DeleteUser(url, ignore, force, metalake, user).handle();
     }
   }
 
@@ -382,7 +383,8 @@ public class GravitinoCommandLine {
     } else if (CommandActions.CREATE.equals(command)) {
       new CreateGroup(url, ignore, metalake, group).handle();
     } else if (CommandActions.DELETE.equals(command)) {
-      new DeleteGroup(url, ignore, metalake, group).handle();
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      new DeleteGroup(url, ignore, force, metalake, group).handle();
     }
   }
 
@@ -405,7 +407,8 @@ public class GravitinoCommandLine {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       new CreateTag(url, ignore, metalake, tag, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
-      new DeleteTag(url, ignore, metalake, tag).handle();
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      new DeleteTag(url, ignore, force, metalake, tag).handle();
     } else if (CommandActions.SET.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       String value = line.getOptionValue(GravitinoOptions.VALUE);

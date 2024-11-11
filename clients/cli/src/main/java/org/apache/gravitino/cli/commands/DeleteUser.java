@@ -19,10 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
-<<<<<<< HEAD
 import org.apache.gravitino.cli.AreYouSure;
-=======
->>>>>>> main
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
