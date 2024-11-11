@@ -28,8 +28,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class IcebergRequestContext {
 
   // To keep compatibility with old IcebergRequestContext, will remove in new release.
-  @Deprecated
-  private final HttpServletRequest httpServletRequest;
+  @Deprecated private final HttpServletRequest httpServletRequest;
   private final String catalogName;
   private final String userName;
   private final String remoteHostName;

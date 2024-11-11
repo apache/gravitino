@@ -21,7 +21,6 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import java.util.LinkedList;
 import java.util.Map;
-import lombok.Getter;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.PreEvent;
