@@ -72,10 +72,10 @@ import org.apache.gravitino.cli.commands.SetSchemaProperty;
 import org.apache.gravitino.cli.commands.SetTagProperty;
 import org.apache.gravitino.cli.commands.TableAudit;
 import org.apache.gravitino.cli.commands.TableDetails;
+import org.apache.gravitino.cli.commands.TableDistribution;
 import org.apache.gravitino.cli.commands.TagDetails;
 import org.apache.gravitino.cli.commands.TagEntity;
 import org.apache.gravitino.cli.commands.UntagEntity;
-import org.apache.gravitino.cli.commands.TableDistribution;
 import org.apache.gravitino.cli.commands.UpdateCatalogComment;
 import org.apache.gravitino.cli.commands.UpdateCatalogName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
@@ -346,7 +346,7 @@ public class GravitinoCommandLine {
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         new TableAudit(url, ignore, metalake, catalog, schema, table).handle();
-      } else if (line.hasOption(GravitinoOptions.DISTRIBUTION)){
+      } else if (line.hasOption(GravitinoOptions.DISTRIBUTION)) {
         new TableDistribution(url, ignore, metalake, catalog, schema, table).handle();
       } else {
         new TableDetails(url, ignore, metalake, catalog, schema, table).handle();
@@ -377,7 +377,7 @@ public class GravitinoCommandLine {
       new DeleteUser(url, ignore, force, metalake, user).handle();
     }
   }
-  //tung
+
   /** Handles the command execution for Group based on command type and the command line options. */
   protected void handleGroupCommand() {
     String url = getUrl();
