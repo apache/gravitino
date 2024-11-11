@@ -78,7 +78,7 @@ public class GravitinoOptions {
         Option.builder("p").longOpt(PROPERTIES).desc("property name/value pairs").hasArgs().build();
     options.addOption(properties);
 
-    // Force delete entity and rename metlake operations
+    // Force delete entity and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
 
     return options;
