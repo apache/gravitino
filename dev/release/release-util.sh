@@ -111,7 +111,6 @@ function get_release_info {
   # - If not, need to check whether the previous version has been already released or not.
   #   - If it has, then we're building rc1 of the current version.
   #   - If it has not, we're building the next RC of the previous version.
-  local RC_COUNT
   if [ $REV != 0 ]; then
     local PREV_REL_REV=$((REV - 1))
     local PREV_REL_TAG="v${SHORT_VERSION}.${PREV_REL_REV}-incubating"
@@ -134,6 +133,7 @@ function get_release_info {
   export RELEASE_VERSION=$(read_config "Release" "$RELEASE_VERSION")
 
   RC_COUNT=$(read_config "RC #" "$RC_COUNT")
+  export RC_COUNT
 
   # Check if the RC already exists, and if re-creating the RC, skip tag creation.
   RELEASE_TAG="v${RELEASE_VERSION}-rc${RC_COUNT}"

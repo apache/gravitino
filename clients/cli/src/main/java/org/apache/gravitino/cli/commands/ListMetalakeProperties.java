@@ -43,6 +43,7 @@ public class ListMetalakeProperties extends ListProperties {
   }
 
   /** List the properties of a metalake. */
+  @Override
   public void handle() {
     Metalake gMetalake = null;
     try {

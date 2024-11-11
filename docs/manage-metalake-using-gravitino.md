@@ -151,8 +151,107 @@ The following table outlines the supported modifications that you can make to a 
 | Set property           | `{"@type":"setProperty","property":"key1","value":"value1"}` | `MetalakeChange.setProperty("key1", "value1")`  | `MetalakeChange.set_property("key1", "value1")` |
 | Remove property        | `{"@type":"removeProperty","property":"key1"}`               | `MetalakeChange.removeProperty("key1")`         | `MetalakeChange.remove_property("key1")`                               |
 
+## Enable a metalake
+
+Metalake has a reserved property - `in-use`, which indicates whether the metalake is available for use. By default, the `in-use` property is set to `true`.
+To enable a disabled metalake, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
+
+The following is an example of enabling a metalake:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{"inUse": true}' \
+http://localhost:8090/api/metalakes/metalake
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient
+    .builder("http://localhost:8090")
+    .build();
+
+gravitinoAdminClient.enableMetalake("metalake");
+  // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(uri="http://localhost:8090")
+gravitino_admin_client.enable_metalake("metalake")
+```
+
+</TabItem>
+</Tabs>
+
+:::info
+This operation does nothing if the metalake is already enabled.
+:::
+
+## Disable a metalake
+
+Once a metalake is disabled:
+ - Users can only [list](#list-all-metalakes), [load](#load-a-metalake), [drop](#drop-a-metalake), or [enable](#enable-a-metalake) it.
+ - Any other operation on the metalake or its sub-entities will result in an error.
+
+To disable a metalake, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
+
+The following is an example of disabling a metalake:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{"inUse": false}' \
+http://localhost:8090/api/metalakes/metalake
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient
+    .builder("http://localhost:8090")
+    .build();
+
+gravitinoAdminClient.disableMetalake("metalake");
+  // ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(uri="http://localhost:8090")
+gravitino_admin_client.disable_metalake("metalake")
+```
+
+</TabItem>
+</Tabs>
+
+:::info
+This operation does nothing if the metalake is already disabled.
+:::
 
 ## Drop a metalake
+
+Deleting a metalake by "force" is not a default behavior, so please make sure:
+
+- There are no catalogs under the metalake. Otherwise, you will get an error.
+- The metalake is [disabled](#disable-a-metalake). Otherwise, you will get an error.
+
+Deleting a metalake by "force" will:
+
+- Delete all sub-entities (tags, catalogs, schemas, etc.) under the metalake.
+- Delete the metalake itself even if it is enabled.
+- Not delete the external resources (such as database, table, etc.) associated with sub-entities unless they are managed (such as managed fileset).
 
 To drop a metalake, you can send a `DELETE` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
 
@@ -163,7 +262,7 @@ The following is an example of dropping a metalake:
 
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake
+-H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake?force=false
 ```
 
 </TabItem>
@@ -171,7 +270,8 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 // ...
-boolean success = gravitinoAdminClient.dropMetalake("metalake");
+// force can be true or false
+boolean success = gravitinoAdminClient.dropMetalake("metalake", false);
 // ...
 ```
 
@@ -179,16 +279,11 @@ boolean success = gravitinoAdminClient.dropMetalake("metalake");
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_admin_client.drop_metalake("metalake")
+gravitino_admin_client.drop_metalake("metalake", force=True)
 ```
 
 </TabItem>
 </Tabs>
-
-:::note
-Dropping a metalake in cascade mode is not allowed. That is, all the 
-catalogs, schemas, and tables under a metalake must be removed before you can drop the metalake.
-:::
 
 ## List all metalakes
 

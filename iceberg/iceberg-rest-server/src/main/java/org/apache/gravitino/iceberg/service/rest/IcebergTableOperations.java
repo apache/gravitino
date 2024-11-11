@@ -49,6 +49,7 @@ import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
+import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
@@ -81,9 +82,7 @@ public class IcebergTableOperations {
   private ObjectMapper icebergObjectMapper;
   private IcebergTableOperationDispatcher tableOperationDispatcher;
 
-  @SuppressWarnings("UnusedVariable")
-  @Context
-  private HttpServletRequest httpRequest;
+  @Context private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergTableOperations(
@@ -105,8 +104,8 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
-    ListTablesResponse listTablesResponse =
-        tableOperationDispatcher.listTable(catalogName, icebergNS);
+    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
+    ListTablesResponse listTablesResponse = tableOperationDispatcher.listTable(context, icebergNS);
     return IcebergRestUtils.ok(listTablesResponse);
   }
 
@@ -130,10 +129,15 @@ public class IcebergTableOperations {
         createTableRequest,
         accessDelegation,
         isCredentialVending);
+    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
     LoadTableResponse loadTableResponse =
-        tableOperationDispatcher.createTable(catalogName, icebergNS, createTableRequest);
+        tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
     if (isCredentialVending) {
-      return IcebergRestUtils.ok(injectCredentialConfig(catalogName, loadTableResponse));
+      return IcebergRestUtils.ok(
+          injectCredentialConfig(
+              catalogName,
+              TableIdentifier.of(icebergNS, createTableRequest.name()),
+              loadTableResponse));
     } else {
       return IcebergRestUtils.ok(loadTableResponse);
     }
@@ -159,9 +163,10 @@ public class IcebergTableOperations {
           table,
           SerializeUpdateTableRequest(updateTableRequest));
     }
+    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
     TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
     LoadTableResponse loadTableResponse =
-        tableOperationDispatcher.updateTable(catalogName, tableIdentifier, updateTableRequest);
+        tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
     return IcebergRestUtils.ok(loadTableResponse);
   }
 
@@ -184,7 +189,8 @@ public class IcebergTableOperations {
         table,
         purgeRequested);
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, table);
-    tableOperationDispatcher.dropTable(catalogName, tableIdentifier, purgeRequested);
+    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
+    tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
     return IcebergRestUtils.noContent();
   }
 
@@ -212,10 +218,12 @@ public class IcebergTableOperations {
         isCredentialVending);
     // todo support snapshots
     TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
     LoadTableResponse loadTableResponse =
-        tableOperationDispatcher.loadTable(catalogName, tableIdentifier);
+        tableOperationDispatcher.loadTable(context, tableIdentifier);
     if (isCredentialVending) {
-      return IcebergRestUtils.ok(injectCredentialConfig(catalogName, loadTableResponse));
+      return IcebergRestUtils.ok(
+          injectCredentialConfig(catalogName, tableIdentifier, loadTableResponse));
     } else {
       return IcebergRestUtils.ok(loadTableResponse);
     }
@@ -237,8 +245,9 @@ public class IcebergTableOperations {
         catalogName,
         icebergNS,
         table);
+    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
     TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    boolean exists = tableOperationDispatcher.tableExists(catalogName, tableIdentifier);
+    boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
     if (exists) {
       return IcebergRestUtils.okWithoutContent();
     } else {
@@ -270,7 +279,7 @@ public class IcebergTableOperations {
   }
 
   private LoadTableResponse injectCredentialConfig(
-      String catalogName, LoadTableResponse loadTableResponse) {
+      String catalogName, TableIdentifier tableIdentifier, LoadTableResponse loadTableResponse) {
     CredentialProvider credentialProvider =
         icebergCatalogWrapperManager.getCredentialProvider(catalogName);
     if (credentialProvider == null) {
@@ -286,6 +295,12 @@ public class IcebergTableOperations {
       throw new ServiceUnavailableException(
           "Couldn't generate credential for %s", credentialProvider.credentialType());
     }
+
+    LOG.info(
+        "Generate credential: {} for Iceberg table: {}",
+        credential.credentialType(),
+        tableIdentifier);
+
     Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())

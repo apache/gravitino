@@ -270,4 +270,12 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(entityStore.exists(NameIdentifier.of(topicNs.levels()), SCHEMA));
     Assertions.assertTrue(entityStore.exists(topicIdent, Entity.EntityType.TOPIC));
   }
+
+  public static SchemaOperationDispatcher getSchemaOperationDispatcher() {
+    return schemaOperationDispatcher;
+  }
+
+  public static TopicOperationDispatcher getTopicOperationDispatcher() {
+    return topicOperationDispatcher;
+  }
 }

@@ -35,11 +35,25 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestTransforms {
+  @Test
+  public void testBucketTransform() {
+    Column column = Column.of("col_1", Types.ByteType.get());
+    String[] fieldName = new String[] {column.name()};
+
+    Transform bucket = Transforms.bucket(10, fieldName);
+    Expression[] arguments = bucket.arguments();
+    Assertions.assertEquals(2, arguments.length);
+    Assertions.assertInstanceOf(Literals.LiteralImpl.class, arguments[0]);
+    Assertions.assertEquals(10, ((Literals.LiteralImpl<Integer>) arguments[0]).value());
+    Assertions.assertEquals(fieldName, ((NamedReference.FieldReference) arguments[1]).fieldName());
+  }
+
   @Test
   public void testSingleFieldTransform() {
     Column column = Column.of("col_1", Types.ByteType.get());

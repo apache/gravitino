@@ -36,6 +36,10 @@ dependencies {
     exclude(group = "*")
   }
 
+  implementation(project(":catalogs:catalog-common")) {
+    exclude(group = "*")
+  }
+
   compileOnly(libs.guava)
 
   implementation(libs.hadoop3.common) {

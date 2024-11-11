@@ -27,6 +27,8 @@ plugins {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark35.get()
+val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
+val icebergVersion: String = libs.versions.iceberg4spark.get()
 
 dependencies {
   implementation(project(":api")) {
@@ -97,6 +99,7 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("io.netty")
   }
+  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
 }
 
 tasks {
@@ -125,6 +128,9 @@ tasks {
 }
 
 tasks.test {
+  doFirst {
+    environment("HADOOP_USER_NAME", "gravitino")
+  }
   dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
 
   val skipITs = project.hasProperty("skipITs")

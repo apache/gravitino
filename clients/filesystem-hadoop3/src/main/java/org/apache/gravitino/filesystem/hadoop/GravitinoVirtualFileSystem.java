@@ -19,7 +19,6 @@
 package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.GVFS_CONFIG_PREFIX;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -87,7 +86,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$");
   private static final String SLASH = "/";
   private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
-  private static final String GRAVITINO_BYPASS_PREFIX = "gravitino.bypass.";
 
   @Override
   public void initialize(URI name, Configuration configuration) throws IOException {
@@ -385,13 +383,14 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             scheme,
             str -> {
               try {
-                Map<String, String> maps = getConfigMap(getConf());
                 FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
                 if (provider == null) {
                   throw new GravitinoRuntimeException(
                       "Unsupported file system scheme: %s for %s.",
                       scheme, GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME);
                 }
+
+                Map<String, String> maps = getConfigMap(getConf());
                 return provider.getFileSystem(filePath, maps);
               } catch (IOException ioe) {
                 throw new GravitinoRuntimeException(
@@ -405,16 +404,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   private Map<String, String> getConfigMap(Configuration configuration) {
     Map<String, String> maps = Maps.newHashMap();
-    configuration.forEach(
-        entry -> {
-          String key = entry.getKey();
-          if (key.startsWith(GRAVITINO_BYPASS_PREFIX)) {
-            maps.put(key.substring(GRAVITINO_BYPASS_PREFIX.length()), entry.getValue());
-          } else if (!key.startsWith(GVFS_CONFIG_PREFIX)) {
-            maps.put(key, entry.getValue());
-          }
-        });
-
+    configuration.forEach(entry -> maps.put(entry.getKey(), entry.getValue()));
     return maps;
   }
 
