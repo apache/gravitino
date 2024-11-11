@@ -72,7 +72,7 @@ As dealing with one Metalake is a typical scenario, you can set the Metalake nam
 
 The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
-## Setting the Gravitino URL
+### Setting the Gravitino URL
 
 As you need to set the Gravitino URL for every command, you can set the URL in several ways.
 
@@ -82,7 +82,7 @@ As you need to set the Gravitino URL for every command, you can set the URL in s
 
 The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
-## Gravitino CLI configuration file
+### Gravitino CLI configuration file
 
 The gravitino CLI can read commonly used CLI options from a configuration file. By default, the file is `.gravitino` in the user's home directory. The metalake, URL and ignore parameters can be set in this file.
 
@@ -102,11 +102,11 @@ ignore=true
 
 ```
 
-## Potentially unsafe operations
+### Potentially unsafe operations
 
 For operations that delete data or rename a metalake the user with be prompted to make sure they wish to run this command. The `--force` option can be specified to override this behaviour.
 
-## Manage metadata
+### Manage metadata
 
 All the commands are performed by using the [Java API](api/java-api) internally.
 
@@ -151,6 +151,16 @@ For commands that accept multiple properties they can be specified in a couple o
 2. gcli --properties n1=v1 n2=v2 n3=v3
 
 3. gcli --properties n1=v1 --properties n2=v2 --properties n3=v3
+
+### Setting properties and tags
+
+ Different options are needed to add a tag and set a property of a tag with `gcli tag set`. To add a
+ tag, specify the tag (via --tag) and the entity to tag (via --name). To set the property of a tag
+ (via --tag) you need to specify the property (via --property) and value (via --value) you want to
+ set.
+
+ To delete a tag, again, you need to specify the tag and entity, to remove a tag's property you need
+ to select the tag and property.
 
 ### CLI commands
 
@@ -418,130 +428,4 @@ gcli group list
 
 ```bash
 gcli group delete --user new_group
-```
-
-### User commands
-
-#### Create a user
-
-```bash
-gcli user create --user new_user
-```
-
-#### Show a user's details
-
-```bash
-gcli user details --user new_user
-```
-
-#### List all users
-
-```bash
-gcli user list
-```
-
-#### Delete a user
-
-```bash
-gcli user delete --user new_user
-```
-
-### Group commands
-
-#### Create a group
-
-```bash
-gcli group create --group new_group
-```
-
-#### Display a group's details
-
-```bash
-gcli group details --group new_group
-```
-
-#### List all groups
-
-```bash
-gcli group list
-```
-
-#### Delete a group
-
-```bash
-gcli group delete --group new_group
-```
-
-### Tag commands
-
-#### Display a tag's details
-
-```bash
-gcli tag details --tag tagA
-```
-
-#### Create a tag
-
-```bash
-gcli tag create --tag tagA
-```
-
-#### List all tag
-
-```bash
-gcli tag list
-```
-
-#### Delete a tag
-
-```bash
-gcli tag delete --tag tagA
-```
-
-#### Add a tag to an entity
-
-```bash
-gcli tag set --name catalog_postgres.hr --tag tagA
-```
-
-#### Remove a tag from an entity
-
-```bash
-gcli tag remove --name catalog_postgres.hr --tag tagA
-```
-
-#### List all tags on an entity
-
-```bash
-gcli tag list --name catalog_postgres.hr
-```
-
-#### List the properties of a tag
-
-```bash
-gcli tag properties --tag tagA
-```
-
-#### Set a properties of a tag
-
-```bash
-gcli tag set --tag tagA --property test --value value
-```
-
-#### Delete a property of a tag
-
-```bash
-gcli tag remove --tag tagA --property test
-```
-
-#### Rename a tag
-
-```bash
-gcli tag update --tag tagA --rename newTag
-```
-
-#### Update a tag's comment
-
-```bash
-gcli tag update --tag tagA --comment "new comment"
 ```
