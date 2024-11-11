@@ -239,7 +239,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertEqual(fileset_new.comment(), fileset_new_comment)
 
         fileset_comment_removed = catalog.as_fileset_catalog().alter_fileset(
-            self.fileset_ident, FilesetChange.remove_comment()
+            self.fileset_ident, FilesetChange.update_comment(None)
         )
         self.assertEqual(fileset_comment_removed.name(), self.fileset_name)
         self.assertIsNone(fileset_comment_removed.comment())

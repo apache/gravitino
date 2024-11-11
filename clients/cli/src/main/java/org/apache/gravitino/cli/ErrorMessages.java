@@ -41,4 +41,9 @@ public class ErrorMessages {
   public static final String TAG_EXISTS = "Tag already exists.";
   public static final String UNKNOWN_FILESET = "Unknown fileset.";
   public static final String FILESET_EXISTS = "Fileset already exists.";
+  public static final String UNKNOWN_ROLE = "Unknown role.";
+  public static final String INVALID_SET_COMMAND =
+      "Unsupported combination of options either use --name or --property and --value.";
+  public static final String INVALID_REMOVE_COMMAND =
+      "Unsupported combination of options either use --name or --property.";
 }

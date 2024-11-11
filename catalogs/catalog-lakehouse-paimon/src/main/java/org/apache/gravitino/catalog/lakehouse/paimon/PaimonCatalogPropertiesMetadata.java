@@ -53,6 +53,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   public static final String PAIMON_JDBC_USER = "jdbc.user";
   public static final String GRAVITINO_JDBC_PASSWORD = "jdbc-password";
   public static final String PAIMON_JDBC_PASSWORD = "jdbc.password";
+  public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
 
   // S3 properties needed by Paimon
   public static final String S3_ENDPOINT = "s3.endpoint";
@@ -70,7 +71,9 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
           GRAVITINO_JDBC_USER,
           PAIMON_JDBC_USER,
           GRAVITINO_JDBC_PASSWORD,
-          PAIMON_JDBC_PASSWORD);
+          PAIMON_JDBC_PASSWORD,
+          GRAVITINO_JDBC_DRIVER,
+          GRAVITINO_JDBC_DRIVER);
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
   public static final Map<String, String> KERBEROS_CONFIGURATION =
       ImmutableMap.of(
@@ -125,13 +128,19 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 "Gravitino Paimon catalog jdbc user",
                 false /* immutable */,
                 null /* defaultValue */,
-                true /* hidden */),
+                false /* hidden */),
             stringOptionalPropertyEntry(
                 GRAVITINO_JDBC_PASSWORD,
                 "Gravitino Paimon catalog jdbc password",
                 false /* immutable */,
                 null /* defaultValue */,
-                true /* hidden */));
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                GRAVITINO_JDBC_DRIVER,
+                "The driver of the Jdbc connection",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);

@@ -43,6 +43,7 @@ public class CreateGroup extends Command {
   }
 
   /** Create a new group. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
@@ -51,7 +52,7 @@ public class CreateGroup extends Command {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
     } catch (GroupAlreadyExistsException err) {
-      System.err.println(ErrorMessages.USER_EXISTS);
+      System.err.println(ErrorMessages.GROUP_EXISTS);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());

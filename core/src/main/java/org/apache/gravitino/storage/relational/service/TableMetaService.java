@@ -33,7 +33,9 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -213,7 +215,7 @@ public class TableMetaService {
     SessionUtils.doMultipleWithCommit(
         () ->
             deleteResult.set(
-                SessionUtils.doWithCommitAndFetchResult(
+                SessionUtils.doWithoutCommitAndFetchResult(
                     TableMetaMapper.class,
                     mapper -> mapper.softDeleteTableMetasByTableId(tableId))),
         () -> {
@@ -223,11 +225,20 @@ public class TableMetaService {
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         tableId, MetadataObject.Type.TABLE.name()));
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
             TableColumnMetaService.getInstance().deleteColumnsByTableId(tableId);
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        tableId, MetadataObject.Type.TABLE.name()));
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                        tableId, MetadataObject.Type.TABLE.name()));
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(tableId));
           }
         });
 

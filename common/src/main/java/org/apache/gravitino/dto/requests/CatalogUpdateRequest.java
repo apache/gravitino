@@ -117,17 +117,9 @@ public interface CatalogUpdateRequest extends RESTRequest {
       this(null);
     }
 
-    /**
-     * Validates the fields of the request.
-     *
-     * @throws IllegalArgumentException if the new comment is not set.
-     */
+    /** Validates the fields of the request. Always pass. */
     @Override
-    public void validate() throws IllegalArgumentException {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(newComment),
-          "\"newComment\" field is required and cannot be empty");
-    }
+    public void validate() throws IllegalArgumentException {}
 
     @Override
     public CatalogChange catalogChange() {
