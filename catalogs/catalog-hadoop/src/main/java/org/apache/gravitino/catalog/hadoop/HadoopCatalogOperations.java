@@ -30,7 +30,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -65,6 +64,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -584,12 +584,15 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     try {
       Namespace filesetNs =
-          Namespace.of(
-              Stream.concat(Stream.of(ident.namespace().levels()), Stream.of(ident.name()))
-                  .toArray(String[]::new));
+          NamespaceUtil.ofFileset(
+              ident.namespace().level(0), // metalake name
+              ident.namespace().level(1), // catalog name
+              ident.name() // schema name
+              );
+
       List<FilesetEntity> filesets =
           store.list(filesetNs, FilesetEntity.class, Entity.EntityType.FILESET);
-      if (filesets.size() > 0 && !cascade) {
+      if (!filesets.isEmpty() && !cascade) {
         throw new NonEmptySchemaException("Schema %s is not empty", ident);
       }
 
@@ -642,6 +645,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       LOG.info("Deleted schema {}", ident);
       return true;
 
+    } catch (NoSuchEntityException ne) {
+      LOG.warn("Schema {} does not exist", ident);
+      return false;
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete schema " + ident + " location", ioe);
     }
