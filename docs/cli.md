@@ -430,76 +430,76 @@ gcli group list
 gcli group delete --group new_group
  ```
 
- ### Tag commands
+### Tag commands
 
- #### Display a tag's details
+#### Display a tag's details
 
- ```bash
- gcli tag details --tag tagA
- ```
+```bash
+gcli tag details --tag tagA
+```
 
- #### Create a tag
+#### Create a tag
 
- ```bash
+```bash
  gcli tag create --tag tagA
  ```
 
- #### List all tag
+#### List all tag
 
- ```bash
- gcli tag list
- ```
+```bash
+gcli tag list
+```
 
- #### Delete a tag
+#### Delete a tag
 
- ```bash
- gcli tag delete --tag tagA
- ```
+```bash
+gcli tag delete --tag tagA
+```
 
- #### Add a tag to an entity
+#### Add a tag to an entity
 
- ```bash
- gcli tag set --name catalog_postgres.hr --tag tagA
- ```
+```bash
+gcli tag set --name catalog_postgres.hr --tag tagA
+```
 
- #### Remove a tag from an entity
+#### Remove a tag from an entity
 
- ```bash
- gcli tag remove --name catalog_postgres.hr --tag tagA
- ```
+```bash
+gcli tag remove --name catalog_postgres.hr --tag tagA
+```
 
- #### List all tags on an entity
+#### List all tags on an entity
 
- ```bash
- gcli tag list --name catalog_postgres.hr
- ```
+```bash
+gcli tag list --name catalog_postgres.hr
+```
 
- #### List the properties of a tag
+#### List the properties of a tag
 
- ```bash
- gcli tag properties --tag tagA
- ```
+```bash
+gcli tag properties --tag tagA
+```
 
- #### Set a properties of a tag
+#### Set a properties of a tag
 
- ```bash
- gcli tag set --tag tagA --property test --value value
- ```
+```bash
+gcli tag set --tag tagA --property test --value value
+```
 
- #### Delete a property of a tag
+#### Delete a property of a tag
 
- ```bash
- gcli tag remove --tag tagA --property test
- ```
+```bash
+gcli tag remove --tag tagA --property test
+```
 
- #### Rename a tag
+#### Rename a tag
 
- ```bash
- gcli tag update --tag tagA --rename newTag
- ```
+```bash
+gcli tag update --tag tagA --rename newTag
+```
 
- #### Update a tag's comment
+#### Update a tag's comment
 
- ```bash
- gcli tag update --tag tagA --comment "new comment"
- ```
+```bash
+gcli tag update --tag tagA --comment "new comment"
+```
