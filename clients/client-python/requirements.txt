@@ -25,3 +25,4 @@ pyarrow==15.0.2
 cachetools==5.3.3
 gcsfs==2024.3.1
 s3fs==2024.3.1
+ossfs==2023.12.0

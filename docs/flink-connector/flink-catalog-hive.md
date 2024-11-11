@@ -11,7 +11,7 @@ With the Apache Gravitino Flink connector, accessing data or managing metadata i
 
 Supports most DDL and DML operations in Flink SQL, except such operations:
 
-- Function operations 
+- Function operations
 - Partition operations
 - View operations
 - Querying UDF
@@ -59,13 +59,13 @@ The configuration of Flink Hive Connector is the same with the original Flink Hi
 Gravitino catalog property names with the prefix `flink.bypass.` are passed to Flink Hive connector. For example, using `flink.bypass.hive-conf-dir` to pass the `hive-conf-dir` to the Flink Hive connector.
 The validated catalog properties are listed below. Any other properties with the prefix `flink.bypass.` in Gravitino Catalog will be ignored by Gravitino Flink Connector.
 
-| Property name in Gravitino catalog properties | Flink Hive connector configuration | Description           | Since Version |
-|-----------------------------------------------|------------------------------------|-----------------------|---------------|
-| `flink.bypass.default-database`               | `default-database`                 | Hive default database | 0.6.0         |
-| `flink.bypass.hive-conf-dir`                  | `hive-conf-dir`                    | Hive conf dir         | 0.6.0         |
-| `flink.bypass.hive-version`                   | `hive-version`                     | Hive version          | 0.6.0         |
-| `flink.bypass.hadoop-conf-dir`                | `hadoop-conf-dir`                  | Hadoop conf dir       | 0.6.0         |
-| `metastore.uris`                              | `hive.metastore.uris`              | Hive metastore uri    | 0.6.0         |
+| Property name in Gravitino catalog properties | Flink Hive connector configuration | Description           | Since Version    |
+|-----------------------------------------------|------------------------------------|-----------------------|------------------|
+| `flink.bypass.default-database`               | `default-database`                 | Hive default database | 0.6.0-incubating |
+| `flink.bypass.hive-conf-dir`                  | `hive-conf-dir`                    | Hive conf dir         | 0.6.0-incubating |
+| `flink.bypass.hive-version`                   | `hive-version`                     | Hive version          | 0.6.0-incubating |
+| `flink.bypass.hadoop-conf-dir`                | `hadoop-conf-dir`                  | Hadoop conf dir       | 0.6.0-incubating |
+| `metastore.uris`                              | `hive.metastore.uris`              | Hive metastore uri    | 0.6.0-incubating |
 
 :::caution
 You can set other hadoop properties (with the prefix `hadoop.`, `dfs.`, `fs.`, `hive.`) in Gravitino Catalog properties. If so, it will override

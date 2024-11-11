@@ -124,6 +124,16 @@ public class CatalogUtils {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(uri), "Paimon Catalog uri can not be null or empty.");
     }
+
+    if (PaimonCatalogBackend.JDBC.name().equalsIgnoreCase(metastore)) {
+      String driverClassName = paimonConfig.getJdbcDriver();
+      try {
+        // Load the jdbc driver
+        Class.forName(driverClassName);
+      } catch (ClassNotFoundException e) {
+        throw new IllegalArgumentException("Couldn't load jdbc driver " + driverClassName);
+      }
+    }
   }
 
   public static Map<String, String> toInnerProperty(

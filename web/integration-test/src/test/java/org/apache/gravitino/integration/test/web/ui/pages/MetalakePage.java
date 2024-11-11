@@ -148,6 +148,15 @@ public class MetalakePage extends BaseWebIT {
     queryMetalakeInput.clear();
   }
 
+  public void clickInUseSwitch(String name) {
+    try {
+      String xpath = "//*[@data-refer='metalake-in-use-" + name + "']";
+      clickAndWait(By.xpath(xpath));
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+  }
+
   public void clickDeleteMetalakeBtn(String name) {
     try {
       String xpath = "//button[@data-refer='delete-metalake-" + name + "']";

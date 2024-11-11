@@ -37,6 +37,7 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.Lists;
@@ -418,6 +419,115 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> TableMetaService.getInstance().getTableByIdentifier(retrievedTable.nameIdentifier()));
+  }
+
+  @Test
+  public void testGetColumnIdAndPO() throws IOException {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName);
+
+    // Create a table entity with column
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withPosition(0)
+            .withComment("comment1")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withDefaultValue(Literals.integerLiteral(1))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableEntity createdTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table1")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(Lists.newArrayList(column))
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableMetaService.getInstance().insertTable(createdTable, false);
+
+    TableEntity retrievedTable =
+        TableMetaService.getInstance().getTableByIdentifier(createdTable.nameIdentifier());
+    Assertions.assertEquals(1, retrievedTable.columns().size());
+    Assertions.assertEquals(column.id(), retrievedTable.columns().get(0).id());
+
+    Long columnId =
+        TableColumnMetaService.getInstance()
+            .getColumnIdByTableIdAndName(retrievedTable.id(), column.name());
+    Assertions.assertEquals(column.id(), columnId);
+
+    ColumnPO retrievedColumn = TableColumnMetaService.getInstance().getColumnPOById(column.id());
+    Assertions.assertEquals(column.id(), retrievedColumn.getColumnId());
+    Assertions.assertEquals(column.name(), retrievedColumn.getColumnName());
+    Assertions.assertEquals(column.position(), retrievedColumn.getColumnPosition());
+    Assertions.assertEquals(column.comment(), retrievedColumn.getColumnComment());
+    Assertions.assertEquals(
+        ColumnPO.ColumnOpType.CREATE.value(), retrievedColumn.getColumnOpType());
+
+    // Update the column name
+    ColumnEntity updatedColumn =
+        ColumnEntity.builder()
+            .withId(column.id())
+            .withName("column1_updated")
+            .withPosition(column.position())
+            .withComment(column.comment())
+            .withDataType(column.dataType())
+            .withNullable(column.nullable())
+            .withAutoIncrement(column.autoIncrement())
+            .withDefaultValue(column.defaultValue())
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableEntity updatedTable =
+        TableEntity.builder()
+            .withId(retrievedTable.id())
+            .withName(retrievedTable.name())
+            .withNamespace(retrievedTable.namespace())
+            .withColumns(Lists.newArrayList(updatedColumn))
+            .withAuditInfo(retrievedTable.auditInfo())
+            .build();
+
+    Function<TableEntity, TableEntity> updater = oldTable -> updatedTable;
+    TableMetaService.getInstance().updateTable(retrievedTable.nameIdentifier(), updater);
+
+    Long updatedColumnId =
+        TableColumnMetaService.getInstance()
+            .getColumnIdByTableIdAndName(retrievedTable.id(), updatedColumn.name());
+    Assertions.assertEquals(updatedColumn.id(), updatedColumnId);
+
+    ColumnPO updatedColumnPO =
+        TableColumnMetaService.getInstance().getColumnPOById(updatedColumn.id());
+    Assertions.assertEquals(updatedColumn.id(), updatedColumnPO.getColumnId());
+    Assertions.assertEquals(updatedColumn.name(), updatedColumnPO.getColumnName());
+
+    // Delete the column
+    TableEntity updatedTable2 =
+        TableEntity.builder()
+            .withId(retrievedTable.id())
+            .withName(retrievedTable.name())
+            .withNamespace(retrievedTable.namespace())
+            .withColumns(Lists.newArrayList())
+            .withAuditInfo(retrievedTable.auditInfo())
+            .build();
+
+    Function<TableEntity, TableEntity> updater2 = oldTable -> updatedTable2;
+    TableMetaService.getInstance().updateTable(retrievedTable.nameIdentifier(), updater2);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TableColumnMetaService.getInstance()
+                .getColumnIdByTableIdAndName(retrievedTable.id(), updatedColumn.name()));
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> TableColumnMetaService.getInstance().getColumnPOById(updatedColumn.id()));
   }
 
   private void compareTwoColumns(

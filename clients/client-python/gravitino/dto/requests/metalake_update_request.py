@@ -74,13 +74,8 @@ class MetalakeUpdateRequest:
             self._new_comment = new_comment
 
         def validate(self):
-            """Validates the fields of the request.
-
-            Raises:
-                IllegalArgumentException if the new comment is not set.
-            """
-            if not self._new_comment:
-                raise ValueError('"newComment" field is required and cannot be empty')
+            """Validates the fields of the request. Always pass."""
+            pass
 
         def metalake_change(self):
             return MetalakeChange.update_comment(self._new_comment)

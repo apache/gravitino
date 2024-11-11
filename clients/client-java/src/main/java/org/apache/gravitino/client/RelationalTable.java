@@ -23,6 +23,7 @@ import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -113,7 +114,17 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags, Suppor
   /** @return the columns of the table. */
   @Override
   public Column[] columns() {
-    return table.columns();
+    return Arrays.stream(table.columns())
+        .map(
+            c ->
+                new GenericColumn(
+                    c,
+                    restClient,
+                    namespace.level(0),
+                    namespace.level(1),
+                    namespace.level(2),
+                    name()))
+        .toArray(Column[]::new);
   }
 
   /** @return the partitioning of the table. */

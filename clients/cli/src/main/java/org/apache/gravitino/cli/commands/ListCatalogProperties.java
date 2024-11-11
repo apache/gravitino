@@ -48,6 +48,7 @@ public class ListCatalogProperties extends ListProperties {
   }
 
   /** List the properties of a catalog. */
+  @Override
   public void handle() {
     Catalog gCatalog = null;
     try {

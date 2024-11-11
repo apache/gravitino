@@ -50,6 +50,7 @@ public class RemoveTagProperty extends Command {
   }
 
   /** Remove a property of a catalog. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

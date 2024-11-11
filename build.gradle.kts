@@ -163,7 +163,11 @@ allprojects {
       // Default use MiniGravitino to run integration tests
       param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
       param.environment("IT_PROJECT_DIR", project.buildDir.path)
-      param.environment("HADOOP_USER_NAME", "anonymous")
+      // If the environment variable `HADOOP_USER_NAME` is not customized in submodule,
+      // then set it to "anonymous"
+      if (param.environment["HADOOP_USER_NAME"] == null) {
+        param.environment("HADOOP_USER_NAME", "anonymous")
+      }
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
 
@@ -367,6 +371,22 @@ subprojects {
     from(tasks["javadoc"])
   }
 
+  tasks.withType<Jar> {
+    into("META-INF") {
+      from(rootDir) {
+        if (name == "sourcesJar") {
+          include("LICENSE")
+          include("NOTICE")
+        } else {
+          include("LICENSE.bin")
+          rename("LICENSE.bin", "LICENSE")
+          include("NOTICE.bin")
+          rename("NOTICE.bin", "NOTICE")
+        }
+      }
+    }
+  }
+
   if (project.name in listOf("web", "docs")) {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
@@ -381,9 +401,17 @@ subprojects {
   publishing {
     publications {
       create<MavenPublication>("MavenJava") {
-        from(components["java"])
-        artifact(sourcesJar)
-        artifact(javadocJar)
+        if (project.name == "web" ||
+          project.name == "docs" ||
+          project.name == "integration-test" ||
+          project.name == "integration-test-common"
+        ) {
+          setArtifacts(emptyList<Any>())
+        } else {
+          from(components["java"])
+          artifact(sourcesJar)
+          artifact(javadocJar)
+        }
 
         pom {
           name.set("Gravitino")
@@ -488,11 +516,9 @@ tasks.rat {
     "dev/docker/kerberos-hive/kadm5.acl",
     "**/*.log",
     "**/*.out",
-    "**/testsets",
+    "**/trino-ci-testset",
     "**/licenses/*.txt",
     "**/licenses/*.md",
-    "integration-test/**/*.sql",
-    "integration-test/**/*.txt",
     "docs/**/*.md",
     "spark-connector/spark-common/src/test/resources/**",
     "web/web/.**",
@@ -789,6 +815,7 @@ tasks {
       "catalogs:catalog-lakehouse-hudi:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-hadoop:copyLibAndConfig",
       ":catalogs:catalog-kafka:copyLibAndConfig"

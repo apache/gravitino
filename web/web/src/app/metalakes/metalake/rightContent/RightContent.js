@@ -26,6 +26,7 @@ import Icon from '@/components/Icon'
 import MetalakePath from './MetalakePath'
 import CreateCatalogDialog from './CreateCatalogDialog'
 import CreateSchemaDialog from './CreateSchemaDialog'
+import CreateFilesetDialog from './CreateFilesetDialog'
 import TabsContent from './tabsContent/TabsContent'
 import { useSearchParams } from 'next/navigation'
 import { useAppSelector } from '@/lib/hooks/useStore'
@@ -33,9 +34,11 @@ import { useAppSelector } from '@/lib/hooks/useStore'
 const RightContent = () => {
   const [open, setOpen] = useState(false)
   const [openSchema, setOpenSchema] = useState(false)
+  const [openFileset, setOpenFileset] = useState(false)
   const searchParams = useSearchParams()
   const [isShowBtn, setBtnVisible] = useState(true)
   const [isShowSchemaBtn, setSchemaBtnVisible] = useState(false)
+  const [isShowFilesetBtn, setFilesetBtnVisible] = useState(false)
   const store = useAppSelector(state => state.metalakes)
 
   const handleCreateCatalog = () => {
@@ -46,15 +49,33 @@ const RightContent = () => {
     setOpenSchema(true)
   }
 
+  const handleCreateFileset = () => {
+    setOpenFileset(true)
+  }
+
   useEffect(() => {
     const paramsSize = [...searchParams.keys()].length
     const isCatalogList = paramsSize == 1 && searchParams.get('metalake')
     setBtnVisible(isCatalogList)
 
+    const isFilesetList =
+      paramsSize == 4 &&
+      searchParams.has('metalake') &&
+      searchParams.has('catalog') &&
+      searchParams.get('type') === 'fileset'
+    searchParams.has('schema')
+    setFilesetBtnVisible(isFilesetList)
+
     if (store.catalogs.length) {
       const currentCatalog = store.catalogs.filter(ca => ca.name === searchParams.get('catalog'))[0]
-      const isHideSchemaAction = ['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3
-      setSchemaBtnVisible(!isHideSchemaAction && !isCatalogList)
+
+      const isSchemaList =
+        paramsSize == 3 &&
+        searchParams.has('metalake') &&
+        searchParams.has('catalog') &&
+        searchParams.has('type') &&
+        !['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider)
+      setSchemaBtnVisible(isSchemaList)
     }
   }, [searchParams, store.catalogs, store.catalogs.length])
 
@@ -103,6 +124,20 @@ const RightContent = () => {
               Create Schema
             </Button>
             <CreateSchemaDialog open={openSchema} setOpen={setOpenSchema} />
+          </Box>
+        )}
+        {isShowFilesetBtn && (
+          <Box className={`twc-flex twc-items-center`}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleCreateFileset}
+              sx={{ width: 200 }}
+              data-refer='create-schema-btn'
+            >
+              Create Fileset
+            </Button>
+            <CreateFilesetDialog open={openFileset} setOpen={setOpenFileset} />
           </Box>
         )}
       </Box>

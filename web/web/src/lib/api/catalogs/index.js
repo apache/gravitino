@@ -18,6 +18,7 @@
  */
 
 import { defHttp } from '@/lib/utils/axios'
+import { Api } from '@mui/icons-material'
 
 const Apis = {
   GET: ({ metalake }) => `/api/metalakes/${encodeURIComponent(metalake)}/catalogs?details=true`,
@@ -27,7 +28,9 @@ const Apis = {
   UPDATE: ({ metalake, catalog }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`,
   DELETE: ({ metalake, catalog }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}?force=true`
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`,
+  UPDATEINUSE: ({ metalake, catalog }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}`
 }
 
 export const getCatalogsApi = params => {
@@ -59,5 +62,12 @@ export const updateCatalogApi = ({ metalake, catalog, data }) => {
 export const deleteCatalogApi = ({ metalake, catalog }) => {
   return defHttp.delete({
     url: `${Apis.DELETE({ metalake, catalog })}`
+  })
+}
+
+export const switchInUseApi = ({ metalake, catalog, isInUse }) => {
+  return defHttp.patch({
+    url: `${Apis.UPDATEINUSE({ metalake, catalog })}`,
+    data: { inUse: isInUse }
   })
 }

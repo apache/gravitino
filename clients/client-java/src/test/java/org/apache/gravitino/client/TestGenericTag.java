@@ -100,6 +100,11 @@ public class TestGenericTag extends TestBase {
               .withParent("catalog1.schema1")
               .withName("table1")
               .withType(MetadataObject.Type.TABLE)
+              .build(),
+          MetadataObjectDTO.builder()
+              .withParent("catalog1.schema1.table1")
+              .withName("column1")
+              .withType(MetadataObject.Type.COLUMN)
               .build()
         };
 
