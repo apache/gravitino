@@ -27,6 +27,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
 /** The general request context information for Iceberg REST operations. */
 public class IcebergRequestContext {
 
+  // To keep compatibility with old IcebergRequestContext, will remove in new release.
+  @Deprecated
   private final HttpServletRequest httpServletRequest;
   private final String catalogName;
   private final String userName;
