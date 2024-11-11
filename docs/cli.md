@@ -29,23 +29,24 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  ```bash
  usage: gcli [metalake|catalog|schema|table|column] [list|details|create|delete|update|set|remove|properties] [options]
  Options
+ -a,--audit              display audit information
  -c,--comment <arg>      entity comment
  -g,--group <arg>        group name
  -h,--help               command help information
- -i,--ignore             Ignore client/sever version check
+ -i,--ignore             ignore client/sever version check
  -l,--user <arg>         user name
- -a,--audit              display audit information
- -m,--metalake <arg>     Metalake name
+ -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
  -r,--rename <arg>       new entity name
  -s,--server             Gravitino server version
- -t,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
-                         iceberg, kafka
+ -t,--tag <arg>          tag name
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
+ -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
+                         iceberg, kafka
  ```
 
 ## Commands
@@ -146,6 +147,16 @@ For commands that accept multiple properties they can be specified in a couple o
 2. gcli --properties n1=v1 n2=v2 n3=v3
 
 3. gcli --properties n1=v1 --properties n2=v2 --properties n3=v3
+
+### Setting properties and tags
+
+Different options are needed to add a tag and set a property of a tag with `gcli tag set`. To add a
+tag, specify the tag (via --tag) and the entity to tag (via --name). To set the property of a tag
+(via --tag) you need to specify the property (via --property) and value (via --value) you want to
+set.
+
+To delete a tag, again, you need to specify the tag and entity, to remove a tag's property you need
+to select the tag and property.
 
 ### Metalake commands
 
@@ -409,4 +420,78 @@ gcli group list --metalake metalake_demo
 
 ```bash
 gcli group delete --metalake metalake_demo --group new_group
+```
+
+### Tag commands
+
+#### Display a tag's details
+
+```bash
+gcli tag details --metalake metalake_demo --tag tagA
+```
+
+#### Create a tag
+
+```bash
+gcli tag create --metalake metalake_demo --tag tagA
+```
+
+#### List all tag
+
+```bash
+gcli tag list --metalake metalake_demo
+```
+
+#### Delete a tag
+
+```bash
+gcli tag delete --metalake metalake_demo --tag tagA
+```
+
+#### Add a tag to an entity
+
+```bash
+gcli tag set --metalake metalake_demo --name catalog_postgres.hr --tag tagA
+```
+
+#### Remove a tag from an entity
+
+```bash
+gcli tag remove --metalake metalake_demo --name catalog_postgres.hr --tag tagA
+```
+
+#### List all tags on an entity
+
+```bash
+gcli tag list --metalake metalake_demo --name catalog_postgres.hr
+```
+
+#### List the properties of a tag
+
+```bash
+gcli tag properties --metalake metalake_demo --tag tagA
+```
+
+#### Set a properties of a tag
+
+```bash
+gcli tag set --metalake metalake_demo --tag tagA --property test --value value
+```
+
+#### Delete a property of a tag
+
+```bash
+gcli tag remove --metalake metalake_demo --tag tagA --property test
+```
+
+#### Rename a tag
+
+```bash
+gcli tag update --metalake metalake_demo --tag tagA --rename newTag
+```
+
+#### Update a tag's comment
+
+```bash
+gcli tag update --metalake metalake_demo --tag tagA --comment "new comment"
 ```

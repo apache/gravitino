@@ -22,50 +22,41 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchUserException;
 
-public class DeleteUser extends Command {
+/* Lists all tags in a metalake. */
+public class ListAllTags extends Command {
 
   protected final String metalake;
-  protected final String user;
 
   /**
-   * Delete a user.
+   * Lists all tags in a metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param user The name of the user.
    */
-  public DeleteUser(String url, boolean ignoreVersions, String metalake, String user) {
+  public ListAllTags(String url, boolean ignoreVersions, String metalake) {
     super(url, ignoreVersions);
     this.metalake = metalake;
-    this.user = user;
   }
 
-  /** Delete a user. */
+  /** Lists all tags in a metalake. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
+    String[] tags = new String[0];
     try {
       GravitinoClient client = buildClient(metalake);
-      deleted = client.removeUser(user);
+      tags = client.listTags();
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
-    } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_USER);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    if (deleted) {
-      System.out.println(user + " deleted.");
-    } else {
-      System.out.println(user + " not deleted.");
-    }
+    String all = String.join(",", tags);
+
+    System.out.println(all.toString());
   }
 }

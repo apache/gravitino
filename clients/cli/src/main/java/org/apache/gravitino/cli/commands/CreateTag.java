@@ -22,50 +22,47 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 
-public class DeleteUser extends Command {
-
+public class CreateTag extends Command {
   protected final String metalake;
-  protected final String user;
+  protected final String tag;
+  protected final String comment;
 
   /**
-   * Delete a user.
+   * Create a new tag.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param user The name of the user.
+   * @param tag The name of the tag.
+   * @param comment The comment of the tag.
    */
-  public DeleteUser(String url, boolean ignoreVersions, String metalake, String user) {
+  public CreateTag(
+      String url, boolean ignoreVersions, String metalake, String tag, String comment) {
     super(url, ignoreVersions);
     this.metalake = metalake;
-    this.user = user;
+    this.tag = tag;
+    this.comment = comment;
   }
 
-  /** Delete a user. */
+  /** Create a new tag. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
     try {
       GravitinoClient client = buildClient(metalake);
-      deleted = client.removeUser(user);
+      client.createTag(tag, comment, null);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_USER);
+    } catch (TagAlreadyExistsException err) {
+      System.err.println(ErrorMessages.TAG_EXISTS);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    if (deleted) {
-      System.out.println(user + " deleted.");
-    } else {
-      System.out.println(user + " not deleted.");
-    }
+    System.out.println(tag + " created");
   }
 }

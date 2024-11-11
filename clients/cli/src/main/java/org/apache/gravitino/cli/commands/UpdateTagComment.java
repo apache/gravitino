@@ -22,50 +22,51 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.tag.TagChange;
 
-public class DeleteUser extends Command {
+/** Update the comment of a tag. */
+public class UpdateTagComment extends Command {
 
   protected final String metalake;
-  protected final String user;
+  protected final String tag;
+  protected final String comment;
 
   /**
-   * Delete a user.
+   * Update the comment of a tag.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param user The name of the user.
+   * @param tag The name of the tag.
+   * @param comment New metalake comment.
    */
-  public DeleteUser(String url, boolean ignoreVersions, String metalake, String user) {
+  public UpdateTagComment(
+      String url, boolean ignoreVersions, String metalake, String tag, String comment) {
     super(url, ignoreVersions);
     this.metalake = metalake;
-    this.user = user;
+    this.tag = tag;
+    this.comment = comment;
   }
 
-  /** Delete a user. */
+  /** Update the comment of a tag. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
     try {
       GravitinoClient client = buildClient(metalake);
-      deleted = client.removeUser(user);
+      TagChange change = TagChange.updateComment(comment);
+      client.alterTag(tag, change);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_USER);
+    } catch (NoSuchTagException err) {
+      System.err.println(ErrorMessages.UNKNOWN_TAG);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    if (deleted) {
-      System.out.println(user + " deleted.");
-    } else {
-      System.out.println(user + " not deleted.");
-    }
+    System.out.println(tag + " comment changed.");
   }
 }

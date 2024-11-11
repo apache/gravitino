@@ -21,51 +21,50 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.tag.Tag;
 
-public class DeleteUser extends Command {
+public class TagDetails extends Command {
 
   protected final String metalake;
-  protected final String user;
+  protected final String tag;
 
   /**
-   * Delete a user.
+   * Displays the name and comment of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param user The name of the user.
+   * @param tag The name of the tag.
    */
-  public DeleteUser(String url, boolean ignoreVersions, String metalake, String user) {
+  public TagDetails(String url, boolean ignoreVersions, String metalake, String tag) {
     super(url, ignoreVersions);
     this.metalake = metalake;
-    this.user = user;
+    this.tag = tag;
   }
 
-  /** Delete a user. */
+  /** Displays the name and details of a specified tag. */
   @Override
   public void handle() {
-    boolean deleted = false;
+    Tag result = null;
 
     try {
       GravitinoClient client = buildClient(metalake);
-      deleted = client.removeUser(user);
+      result = client.getTag(tag);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchUserException err) {
-      System.err.println(ErrorMessages.UNKNOWN_USER);
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    if (deleted) {
-      System.out.println(user + " deleted.");
-    } else {
-      System.out.println(user + " not deleted.");
+    if (result != null) {
+      System.out.println(result.name() + "," + result.comment());
     }
   }
 }
