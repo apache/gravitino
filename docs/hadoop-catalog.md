@@ -76,6 +76,18 @@ In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-
 
 In the meantime, you need to place the corresponding bundle jar [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
 
+
+#### Azure Blob Storage fileset
+
+| Configuration item            | Description                                                                                                                                                                                                                     | Default value   | Required                                  | Since version    |
+|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|-------------------------------------------|------------------|
+| `filesystem-providers`        | The file system providers to add. Set it to `abfss` if it's a Azure block storage fileset, or a comma separated string that contains `abfss` like `oss,abfss,s3` to support multiple kinds of fileset including `abfss`.        | (none)          | Yes                                       | 0.8.0-incubating |
+| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'abfss://' in the location. | `builtin-local` | No                                        | 0.8.0-incubating |
+| `abs-account-name`            | The account name of Azure blob storage.                                                                                                                                                                                         | (none)          | Yes if it's a Azure blob storage fileset. | 0.8.0-incubating |
+| `abs-account-key`             | The account key of Azure blob storage.                                                                                                                                                                                          | (none)          | Yes if it's a Azure blob storage fileset. | 0.8.0-incubating |
+
+Similar to the above, you need to place the corresponding bundle jar [`gravitino-azure-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/azure-bundle/) in the directory `${GRAVITINO_HOME}/catalogs/hadoop/libs`.
+
 :::note
 - Gravitino contains builtin file system providers for local file system(`builtin-local`) and HDFS(`builtin-hdfs`), that is to say if `filesystem-providers` is not set, Gravitino will still support local file system and HDFS. Apart from that, you can set the `filesystem-providers` to support other file systems like S3, GCS, OSS or custom file system.
 - `default-filesystem-provider` is used to set the default file system provider for the Hadoop catalog. If the user does not specify the scheme in the URI, Gravitino will use the default file system provider to access the fileset. For example, if the default file system provider is set to `builtin-local`, the user can omit the prefix `file://` in the location. 

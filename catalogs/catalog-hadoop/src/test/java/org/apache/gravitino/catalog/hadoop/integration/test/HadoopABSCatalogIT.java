@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.abs.fs.AzureFileSystemProvider;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.storage.ABSProperties;
@@ -43,9 +44,9 @@ import org.junit.platform.commons.util.StringUtils;
 @EnabledIf("absEnabled")
 public class HadoopABSCatalogIT extends HadoopCatalogIT {
 
-  public static final String ABS_ACCOUNT_NAME = System.getenv("ABS_ACCOUNT_NAME");
-  public static final String ABS_ACCOUNT_KEY = System.getenv("ABS_ACCOUNT_KEY");
-  public static final String ABS_CONTAINER_NAME = System.getenv("ABS_CONTAINER_NAME");
+  public static final String ABS_ACCOUNT_NAME = System.getenv("ADLS_ACCOUNT_NAME");
+  public static final String ABS_ACCOUNT_KEY = System.getenv("ADLS_ACCOUNT_KEY");
+  public static final String ABS_CONTAINER_NAME = System.getenv("ADLS_CONTAINER_NAME");
 
   @Override
   public void startIntegrationTest() throws Exception {
@@ -70,14 +71,14 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
     Configuration conf = new Configuration();
 
     conf.set(
-        String.format("fs.azure.account.key.%s.blob.core.windows.net", ABS_ACCOUNT_NAME),
+        String.format("fs.azure.account.key.%s.dfs.core.windows.net", ABS_ACCOUNT_NAME),
         ABS_ACCOUNT_KEY);
 
     fileSystem =
         FileSystem.get(
             URI.create(
                 String.format(
-                    "wasbs://%s@%s.blob.core.windows.net", ABS_CONTAINER_NAME, ABS_ACCOUNT_NAME)),
+                    "abfs://%s@%s.dfs.core.windows.net", ABS_CONTAINER_NAME, ABS_ACCOUNT_NAME)),
             conf);
 
     createMetalake();
@@ -91,7 +92,8 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
         Path bucket =
             new Path(
                 String.format(
-                    "wasbs://%s@%s.blob.core.windows.net/%s",
+                    "%s://%s@%s.dfs.core.windows.net/%s",
+                    AzureFileSystemProvider.ABS_PROVIDER_SCHEME,
                     ABS_CONTAINER_NAME,
                     ABS_ACCOUNT_NAME,
                     GravitinoITUtils.genRandomName("CatalogFilesetIT")));
@@ -113,7 +115,7 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
     Map<String, String> map = Maps.newHashMap();
     map.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
     map.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
-    map.put(FILESYSTEM_PROVIDERS, "abs");
+    map.put(FILESYSTEM_PROVIDERS, AzureFileSystemProvider.ABS_PROVIDER_NAME);
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
 
     catalog = metalake.loadCatalog(catalogName);
@@ -129,7 +131,8 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
 
     String ossLocation =
         String.format(
-            "wasbs://%s@%s.blob.core.windows.net/%s",
+            "%s://%s@%s.dfs.core.windows.net/%s",
+            AzureFileSystemProvider.ABS_PROVIDER_SCHEME,
             ABS_CONTAINER_NAME,
             ABS_ACCOUNT_NAME,
             GravitinoITUtils.genRandomName("CatalogCatalogIT"));
@@ -137,7 +140,7 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
     catalogProps.put("location", ossLocation);
     catalogProps.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
     catalogProps.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
-    catalogProps.put(FILESYSTEM_PROVIDERS, "abs");
+    catalogProps.put(FILESYSTEM_PROVIDERS, AzureFileSystemProvider.ABS_PROVIDER_NAME);
 
     Catalog localCatalog =
         metalake.createCatalog(
@@ -190,8 +193,8 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
   }
 
   private static boolean absEnabled() {
-    return StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_NAME"))
-        && StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_KEY"))
-        && StringUtils.isNotBlank(System.getenv("ABS_CONTAINER_NAME"));
+    return StringUtils.isNotBlank(System.getenv("ADLS_ACCOUNT_NAME"))
+        && StringUtils.isNotBlank(System.getenv("ADLS_ACCOUNT_KEY"))
+        && StringUtils.isNotBlank(System.getenv("ADLS_CONTAINER_NAME"));
   }
 }

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.abs.fs;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
@@ -30,10 +31,15 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-public class ABSFileSystemProvider implements FileSystemProvider {
+public class AzureFileSystemProvider implements FileSystemProvider {
 
-  private static final String ABS_PROVIDER_SCHEME = "wasbs";
-  public static final String ABS_PROVIDER_NAME = "abs";
+  @VisibleForTesting public static final String ABS_PROVIDER_SCHEME = "abfss";
+
+  @VisibleForTesting public static final String ABS_PROVIDER_NAME = "abfs";
+
+  private static final String ABFS_IMPL = "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem";
+
+  private static final String ABFS_IMPL_KEY = "fs.abfss.impl";
 
   @Override
   public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
@@ -47,9 +53,13 @@ public class ABSFileSystemProvider implements FileSystemProvider {
         && config.containsKey(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY)) {
       hadoopConfMap.put(
           String.format(
-              "fs.azure.account.key.%s.blob.core.windows.net",
+              "fs.azure.account.key.%s.dfs.core.windows.net",
               config.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME)),
           config.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY));
+    }
+
+    if (!config.containsKey(ABFS_IMPL_KEY)) {
+      configuration.set(ABFS_IMPL_KEY, ABFS_IMPL);
     }
 
     hadoopConfMap.forEach(configuration::set);

@@ -102,6 +102,17 @@ In the meantime, you need to place the corresponding bundle jar [`gravitino-gcp-
 
 In the meantime, you need to place the corresponding bundle jar [`gravitino-aliyun-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/aliyun-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
 
+#### Azure blob storage fileset
+
+| Configuration item             | Description                                                                                                                                                                                                                     | Default value   | Required                                  | Since version    |
+|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|-------------------------------------------|------------------|
+| `fs.gvfs.filesystem.providers` | The file system providers to add. Set it to `abfss` if it's a Azure block storage fileset, or a comma separated string that contains `abfss` like `oss,abfss,s3` to support multiple kinds of fileset including `abfss`.        | (none)          | Yes                                       | 0.8.0-incubating |
+| `abs-account-name`             | The account name of Azure blob storage.                                                                                                                                                                                         | (none)          | Yes if it's a Azure blob storage fileset. | 0.8.0-incubating |
+| `abs-account-key`              | The account key of Azure blob storage.                                                                                                                                                                                          | (none)          | Yes if it's a Azure blob storage fileset. | 0.8.0-incubating |
+
+Similar to the above, you need to place the corresponding bundle jar [`gravitino-azure-bundle-${version}.jar`](https://repo1.maven.org/maven2/org/apache/gravitino/azure-bundle/) in the Hadoop environment(typically located in `${HADOOP_HOME}/share/hadoop/common/lib/`).
+
+
 #### Custom fileset 
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding properties, for more, please refer to [Custom Fileset](./hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
 So, if you want to access the custom fileset through GVFS, you need to configure the corresponding properties.

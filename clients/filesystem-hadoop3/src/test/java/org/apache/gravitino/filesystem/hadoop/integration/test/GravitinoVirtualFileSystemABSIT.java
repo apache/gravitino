@@ -27,7 +27,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.abs.fs.ABSFileSystemProvider;
+import org.apache.gravitino.abs.fs.AzureFileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.storage.ABSProperties;
@@ -79,7 +79,7 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
 
     properties.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
     properties.put(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
-    properties.put(FILESYSTEM_PROVIDERS, "abs");
+    properties.put(FILESYSTEM_PROVIDERS, AzureFileSystemProvider.ABS_PROVIDER_NAME);
 
     Catalog catalog =
         metalake.createCatalog(
@@ -95,10 +95,11 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.server.uri", serverUri);
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
-    conf.set("fs.gvfs.filesystem.providers", ABSFileSystemProvider.ABS_PROVIDER_NAME);
+    conf.set("fs.gvfs.filesystem.providers", AzureFileSystemProvider.ABS_PROVIDER_NAME);
     // Pass this configuration to the real file system
     conf.set(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
     conf.set(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
+    conf.set("fs.abfss.impl", "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem");
   }
 
   @AfterAll
@@ -137,7 +138,7 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
         && gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY) != null) {
       hadoopConfMap.put(
           String.format(
-              "fs.azure.account.key.%s.blob.core.windows.net",
+              "fs.azure.account.key.%s.dfs.core.windows.net",
               gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_NAME)),
           gvfsConf.get(ABSProperties.GRAVITINO_ABS_ACCOUNT_KEY));
     }
@@ -149,7 +150,8 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
 
   protected String genStorageLocation(String fileset) {
     return String.format(
-        "wasbs://%s@%s.blob.core.windows.net/%s", ABS_CONTAINER_NAME, ABS_ACCOUNT_NAME, fileset);
+        "%s://%s@%s.dfs.core.windows.net/%s",
+        AzureFileSystemProvider.ABS_PROVIDER_SCHEME, ABS_CONTAINER_NAME, ABS_ACCOUNT_NAME, fileset);
   }
 
   @Disabled("java.lang.UnsupportedOperationException: Append Support not enabled")
