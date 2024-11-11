@@ -38,15 +38,25 @@ import {
 } from '@mui/material'
 
 import clsx from 'clsx'
+import axios from 'axios'
 
 import VersionView from './VersionView'
 import LogoutButton from './Logout'
+import GitHubInfo from './GitHubInfo'
 import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { fetchMetalakes } from '@/lib/store/metalakes'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
+function checkCountMore1k(count) {
+  let newCount = count
+  if (count >= 1000) {
+    newCount = (count / 1000).toFixed(1) + 'k'
+  }
+
+  return String(newCount)
+}
 
 const AppBar = () => {
   const searchParams = useSearchParams()
@@ -56,14 +66,29 @@ const AppBar = () => {
   const [metalakes, setMetalakes] = useState([])
   const router = useRouter()
   const logoSrc = (process.env.NEXT_PUBLIC_BASE_PATH ?? '') + '/icons/gravitino.svg'
+  const username = 'apache'
+  const repository = 'gravitino'
+  const [githubData, setGithubData] = useState({ stars: 0, forks: 0 })
 
   useEffect(() => {
+    axios
+      .get(`https://api.github.com/repos/${username}/${repository}`)
+      .then(response => {
+        let { stargazers_count, forks_count } = response.data
+        stargazers_count = checkCountMore1k(stargazers_count)
+        forks_count = checkCountMore1k(forks_count)
+        setGithubData({ stars: stargazers_count, forks: forks_count })
+      })
+      .catch(e => {
+        console.log(`Error fetching data: ${e}`)
+      })
     if (!store.metalakes.length && metalake) {
       dispatch(fetchMetalakes())
     }
     const metalakeItems = store.metalakes.map(i => i.name)
     setMetalakes(metalakeItems)
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    axios.get('/')
   }, [store.metalakes, metalake, dispatch])
 
   return (
@@ -94,6 +119,7 @@ const AppBar = () => {
               >
                 Gravitino
               </Typography>
+              <VersionView />
             </Link>
             <Box className={'app-bar-content-right twc-flex twc-items-center'}>
               <Stack direction='row' spacing={2} alignItems='center'>
@@ -135,7 +161,12 @@ const AppBar = () => {
                     </Select>
                   </FormControl>
                 ) : null}
-                <VersionView />
+                <GitHubInfo
+                  stars={githubData.stars}
+                  forks={githubData.forks}
+                  username={username}
+                  repository={repository}
+                />
                 <LogoutButton />
               </Stack>
             </Box>
