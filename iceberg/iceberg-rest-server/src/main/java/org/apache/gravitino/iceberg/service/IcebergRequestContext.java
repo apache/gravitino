@@ -29,11 +29,11 @@ public class IcebergRequestContext {
 
   @Getter private final String catalogName;
   @Getter private final String userName;
-  @Getter private final String remoteIp;
+  @Getter private final String remoteHostName;
   @Getter private final Map<String, String> httpHeaders;
 
   public IcebergRequestContext(HttpServletRequest httpRequest, String catalogName) {
-    this.remoteIp = httpRequest.getRemoteAddr();
+    this.remoteHostName = httpRequest.getRemoteHost();
     this.httpHeaders = IcebergRestUtils.getHttpHeaders(httpRequest);
     this.catalogName = catalogName;
     this.userName = PrincipalUtils.getCurrentUserName();

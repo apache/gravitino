@@ -127,7 +127,7 @@ public class IcebergRestTestUtil {
 
   static HttpServletRequest createMockHttpRequest() {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
-    when(mockRequest.getRemoteAddr()).thenReturn("127.0.0.1");
+    when(mockRequest.getRemoteHost()).thenReturn("localhost");
     when(mockRequest.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
     return mockRequest;
   }
