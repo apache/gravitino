@@ -63,6 +63,6 @@ public class TableDistribution extends TableCommand {
       return;
     }
 
-    System.out.println(distribution.strategy() + ", " + distribution.number());
+    System.out.println(distribution.strategy() + "," + distribution.number());
   }
 }

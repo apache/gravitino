@@ -62,7 +62,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
-      options.addOption(createSimpleOption("d", DISTRIBUTION, "Display distribution information"));
+    options.addOption(createSimpleOption("d", DISTRIBUTION, "Display distribution information"));
 
     // Create/update options
     options.addOption(createArgOption(null, RENAME, "new entity name"));

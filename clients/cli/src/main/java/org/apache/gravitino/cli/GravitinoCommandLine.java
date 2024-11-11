@@ -346,6 +346,8 @@ public class GravitinoCommandLine {
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         new TableAudit(url, ignore, metalake, catalog, schema, table).handle();
+      } else if (line.hasOption(GravitinoOptions.DISTRIBUTION)){
+        new TableDistribution(url, ignore, metalake, catalog, schema, table).handle();
       } else {
         new TableDetails(url, ignore, metalake, catalog, schema, table).handle();
       }
