@@ -189,7 +189,7 @@ gcli metalake details --audit
 #### Create a metalake
 
 ```bash
-gcli metalake create --comment "This is my metalake"
+gcli metalake create --metalake my_metalake --comment "This is my metalake"
 ```
 
 #### Delete a metalake
@@ -409,13 +409,13 @@ gcli user delete --user new_user
 #### Create a group
 
 ```bash
-gcli group create --user new_group
+gcli group create --group new_group
 ```
 
 #### Display a group's details
 
 ```bash
-gcli group details --user new_group
+gcli group details --group new_group
 ```
 
 #### List all groups
