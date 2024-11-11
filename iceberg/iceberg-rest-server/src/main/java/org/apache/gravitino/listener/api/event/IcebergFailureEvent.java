@@ -21,7 +21,6 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 
 /** Represents an abstract failure event in Gravitino Iceberg REST server. */
 @DeveloperApi
@@ -30,7 +29,7 @@ public abstract class IcebergFailureEvent extends FailureEvent {
 
   protected IcebergFailureEvent(
       IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
-    super(icebergRequestContext.getUserName(), nameIdentifier, e);
+    super(icebergRequestContext.userName(), nameIdentifier, e);
     this.icebergRequestContext = icebergRequestContext;
   }
 

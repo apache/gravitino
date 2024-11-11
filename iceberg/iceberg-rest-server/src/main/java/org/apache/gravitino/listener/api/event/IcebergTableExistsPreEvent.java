@@ -21,7 +21,6 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 
 /** Represent a pre event before checking Iceberg table exists. */
 @DeveloperApi

@@ -21,7 +21,6 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
 /** Represent an pre event before rename an Iceberg table. */

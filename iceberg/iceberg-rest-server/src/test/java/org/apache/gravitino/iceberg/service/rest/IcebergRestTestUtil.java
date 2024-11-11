@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -44,6 +45,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.apache.gravitino.iceberg.service.provider.StaticIcebergConfigProvider;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.logging.LoggingFeature;
@@ -69,10 +71,11 @@ public class IcebergRestTestUtil {
   public static final boolean DEBUG_SERVER_LOG_ENABLED = true;
 
   public static ResourceConfig getIcebergResourceConfig(Class c) {
-    return getIcebergResourceConfig(c, true);
+    return getIcebergResourceConfig(c, true, Arrays.asList());
   }
 
-  public static ResourceConfig getIcebergResourceConfig(Class c, boolean bindIcebergTableOps) {
+  public static ResourceConfig getIcebergResourceConfig(
+      Class c, boolean bindIcebergTableOps, List<EventListenerPlugin> eventListenerPlugins) {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(c);
     resourceConfig.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
@@ -103,7 +106,7 @@ public class IcebergRestTestUtil {
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
           new IcebergCatalogWrapperManagerForTest(catalogConf, configProvider);
 
-      EventBus eventBus = new EventBus(Arrays.asList());
+      EventBus eventBus = new EventBus(eventListenerPlugins);
 
       IcebergTableOperationExecutor icebergTableOperationExecutor =
           new IcebergTableOperationExecutor(icebergCatalogWrapperManager);

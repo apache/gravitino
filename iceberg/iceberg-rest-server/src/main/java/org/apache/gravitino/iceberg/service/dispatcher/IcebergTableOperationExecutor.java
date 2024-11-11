@@ -20,7 +20,7 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
-import org.apache.gravitino.iceberg.service.IcebergRequestContext;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -41,7 +41,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
     return icebergCatalogWrapperManager
-        .getCatalogWrapper(context.getCatalogName())
+        .getCatalogWrapper(context.catalogName())
         .createTable(namespace, createTableRequest);
   }
 
@@ -51,7 +51,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       TableIdentifier tableIdentifier,
       UpdateTableRequest updateTableRequest) {
     return icebergCatalogWrapperManager
-        .getCatalogWrapper(context.getCatalogName())
+        .getCatalogWrapper(context.catalogName())
         .updateTable(tableIdentifier, updateTableRequest);
   }
 
@@ -60,11 +60,11 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
     if (purgeRequested) {
       icebergCatalogWrapperManager
-          .getCatalogWrapper(context.getCatalogName())
+          .getCatalogWrapper(context.catalogName())
           .purgeTable(tableIdentifier);
     } else {
       icebergCatalogWrapperManager
-          .getCatalogWrapper(context.getCatalogName())
+          .getCatalogWrapper(context.catalogName())
           .dropTable(tableIdentifier);
     }
   }
@@ -73,28 +73,28 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     return icebergCatalogWrapperManager
-        .getCatalogWrapper(context.getCatalogName())
+        .getCatalogWrapper(context.catalogName())
         .loadTable(tableIdentifier);
   }
 
   @Override
   public ListTablesResponse listTable(IcebergRequestContext context, Namespace namespace) {
     return icebergCatalogWrapperManager
-        .getCatalogWrapper(context.getCatalogName())
+        .getCatalogWrapper(context.catalogName())
         .listTable(namespace);
   }
 
   @Override
   public boolean tableExists(IcebergRequestContext context, TableIdentifier tableIdentifier) {
     return icebergCatalogWrapperManager
-        .getCatalogWrapper(context.getCatalogName())
+        .getCatalogWrapper(context.catalogName())
         .tableExists(tableIdentifier);
   }
 
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
     icebergCatalogWrapperManager
-        .getCatalogWrapper(context.getCatalogName())
+        .getCatalogWrapper(context.catalogName())
         .renameTable(renameTableRequest);
   }
 }
