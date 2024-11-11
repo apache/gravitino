@@ -89,6 +89,10 @@ public class TestTableEvent {
     Assertions.assertEquals(CreateTableEvent.class, event.getClass());
     TableInfo tableInfo = ((CreateTableEvent) event).createdTableInfo();
     checkTableInfo(tableInfo, table);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(CreateTablePreEvent.class, preEvent.getClass());
   }
 
   @Test
