@@ -231,7 +231,7 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     SecurableObjectMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+                    mapper -> mapper.softDeleteSecurableObjectsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     TagMetaMapper.class,
@@ -280,7 +280,7 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     SecurableObjectMapper.class,
-                    mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+                    mapper -> mapper.softDeleteSecurableObjectsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     TagMetaMapper.class,

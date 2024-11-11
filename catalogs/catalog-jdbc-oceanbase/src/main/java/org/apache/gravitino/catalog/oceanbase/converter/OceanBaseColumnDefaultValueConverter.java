@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -34,6 +35,10 @@ import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Types;
 
 public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
+
+  // match CURRENT_TIMESTAMP or CURRENT_TIMESTAMP(fsp)
+  private static final Pattern CURRENT_TIMESTAMP =
+      Pattern.compile("^CURRENT_TIMESTAMP(\\(\\d+\\))?$");
 
   @Override
   public Expression toGravitino(
@@ -50,7 +55,7 @@ public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValue
     }
 
     if (isExpression) {
-      if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
+      if (CURRENT_TIMESTAMP.matcher(columnDefaultValue).matches()) {
         return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
       }
       // The parsing of OceanBase expressions is complex, so we are not currently undertaking the
@@ -93,7 +98,7 @@ public class OceanBaseColumnDefaultValueConverter extends JdbcColumnDefaultValue
         return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case JdbcTypeConverter.TIMESTAMP:
       case OceanBaseTypeConverter.DATETIME:
-        return CURRENT_TIMESTAMP.equals(columnDefaultValue)
+        return CURRENT_TIMESTAMP.matcher(columnDefaultValue).matches()
             ? DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
             : Literals.timestampLiteral(
                 LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));

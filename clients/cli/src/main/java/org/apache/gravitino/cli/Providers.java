@@ -69,9 +69,9 @@ public class Providers {
         return "lakehouse-iceberg";
       case KAFKA:
         return "kafka";
+      default:
+        throw new IllegalArgumentException("Unsupported provider: " + provider);
     }
-
-    return null;
   }
 
   public static Catalog.Type catalogType(String provider) {
@@ -85,8 +85,8 @@ public class Providers {
         return Catalog.Type.RELATIONAL;
       case KAFKA:
         return Catalog.Type.MESSAGING;
+      default:
+        throw new IllegalArgumentException("Unsupported provider: " + provider);
     }
-
-    return null;
   }
 }

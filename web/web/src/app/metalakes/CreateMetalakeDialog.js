@@ -287,6 +287,7 @@ const CreateMetalakeDialog = props => {
                           name='key'
                           label='Key'
                           value={item.key}
+                          disabled={item.key === 'in-use' && type === 'update'}
                           onChange={event => handleFormChange(index, event)}
                           error={item.hasDuplicateKey}
                           data-refer={`add-props-key-${index}`}
@@ -296,14 +297,19 @@ const CreateMetalakeDialog = props => {
                           name='value'
                           label='Value'
                           value={item.value}
+                          disabled={item.key === 'in-use' && type === 'update'}
                           onChange={event => handleFormChange(index, event)}
                           data-refer={`add-props-value-${index}`}
                         />
-                        <Box className={'twc-min-w-[40px]'}>
-                          <IconButton onClick={() => removeFields(index)}>
-                            <Icon icon='mdi:minus-circle-outline' />
-                          </IconButton>
-                        </Box>
+                        {!(item.key === 'in-use' && type === 'update') ? (
+                          <Box className={'twc-min-w-[40px]'}>
+                            <IconButton onClick={() => removeFields(index)}>
+                              <Icon icon='mdi:minus-circle-outline' />
+                            </IconButton>
+                          </Box>
+                        ) : (
+                          <Box sx={{ minWidth: 40 }}></Box>
+                        )}
                       </Box>
                       {item.hasDuplicateKey && (
                         <FormHelperText className={'twc-text-error-main'}>Key already exists</FormHelperText>

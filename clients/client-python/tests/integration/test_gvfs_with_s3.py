@@ -113,9 +113,9 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
             comment="",
             properties={
                 "filesystem-providers": "s3",
-                "gravitino.bypass.fs.s3a.access.key": cls.s3_access_key,
-                "gravitino.bypass.fs.s3a.secret.key": cls.s3_secret_key,
-                "gravitino.bypass.fs.s3a.endpoint": cls.s3_endpoint,
+                "s3-access-key-id": cls.s3_access_key,
+                "s3-secret-access-key": cls.s3_secret_key,
+                "s3-endpoint": cls.s3_endpoint,
             },
         )
         catalog.as_schemas().create_schema(

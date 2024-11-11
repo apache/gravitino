@@ -126,7 +126,10 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
    */
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
+    // Paimon JDBC catalog backend may produce duplicate schema names, remove the duplicate schema
+    // in Gravitino side util the bug is fixed in Paimon
     return paimonCatalogOps.listDatabases().stream()
+        .distinct()
         .map(paimonNamespace -> NameIdentifier.of(namespace, paimonNamespace))
         .toArray(NameIdentifier[]::new);
   }
