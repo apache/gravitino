@@ -45,6 +45,7 @@ public class TagDetails extends Command {
   }
 
   /** Displays the name and details of a specified tag. */
+  @Override
   public void handle() {
     Tag result = null;
 

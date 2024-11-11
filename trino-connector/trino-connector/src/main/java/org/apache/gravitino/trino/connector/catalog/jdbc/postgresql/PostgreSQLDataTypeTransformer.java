@@ -21,6 +21,9 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.postgresql;
 
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.CharType;
+import io.trino.spi.type.TimeType;
+import io.trino.spi.type.TimestampType;
+import io.trino.spi.type.TimestampWithTimeZoneType;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Type.Name;
 import org.apache.gravitino.rel.types.Types;
@@ -40,6 +43,15 @@ public class PostgreSQLDataTypeTransformer extends GeneralDataTypeTransformer {
   public io.trino.spi.type.Type getTrinoType(Type type) {
     if (type.name() == Name.STRING) {
       return io.trino.spi.type.VarcharType.createUnboundedVarcharType();
+    } else if (Name.TIMESTAMP == type.name()) {
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      if (timestampType.hasTimeZone()) {
+        return TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS;
+      } else {
+        return TimestampType.TIMESTAMP_MICROS;
+      }
+    } else if (Name.TIME == type.name()) {
+      return TimeType.TIME_MICROS;
     }
 
     return super.getTrinoType(type);

@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.hadoop.integration.test;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.URI;
@@ -28,14 +29,20 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -170,12 +177,9 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put("gravitino.bypass.fs.s3a.access.key", accessKey);
-    map.put("gravitino.bypass.fs.s3a.secret.key", secretKey);
-    map.put("gravitino.bypass.fs.s3a.endpoint", s3Endpoint);
-    map.put(
-        "gravitino.bypass.fs.s3a.aws.credentials.provider",
-        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
+    map.put(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
+    map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
+    map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
     map.put(FILESYSTEM_PROVIDERS, "s3");
 
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
@@ -185,5 +189,67 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
 
   protected String generateLocation(String filesetName) {
     return String.format("%s/%s", defaultBaseLocation, filesetName);
+  }
+
+  @Test
+  public void testCreateSchemaAndFilesetWithSpecialLocation() {
+    String localCatalogName = GravitinoITUtils.genRandomName("local_catalog");
+
+    String s3Location = String.format("s3a://%s", bucketName);
+    Map<String, String> catalogProps = Maps.newHashMap();
+    catalogProps.put("location", s3Location);
+    catalogProps.put(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
+    catalogProps.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
+    catalogProps.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
+    catalogProps.put(FILESYSTEM_PROVIDERS, "s3");
+
+    Catalog localCatalog =
+        metalake.createCatalog(
+            localCatalogName, Catalog.Type.FILESET, provider, "comment", catalogProps);
+    Assertions.assertEquals(s3Location, localCatalog.properties().get("location"));
+
+    // Create schema without specifying location.
+    Schema localSchema =
+        localCatalog
+            .asSchemas()
+            .createSchema("local_schema", "comment", ImmutableMap.of("key1", "val1"));
+
+    Fileset localFileset =
+        localCatalog
+            .asFilesetCatalog()
+            .createFileset(
+                NameIdentifier.of(localSchema.name(), "local_fileset"),
+                "fileset comment",
+                Fileset.Type.MANAGED,
+                null,
+                ImmutableMap.of("k1", "v1"));
+    Assertions.assertEquals(
+        s3Location + "/local_schema/local_fileset", localFileset.storageLocation());
+
+    // Delete schema
+    localCatalog.asSchemas().dropSchema(localSchema.name(), true);
+
+    // Create schema with specifying location.
+    Map<String, String> schemaProps = ImmutableMap.of("location", s3Location);
+    Schema localSchema2 =
+        localCatalog.asSchemas().createSchema("local_schema2", "comment", schemaProps);
+    Assertions.assertEquals(s3Location, localSchema2.properties().get("location"));
+
+    Fileset localFileset2 =
+        localCatalog
+            .asFilesetCatalog()
+            .createFileset(
+                NameIdentifier.of(localSchema2.name(), "local_fileset2"),
+                "fileset comment",
+                Fileset.Type.MANAGED,
+                null,
+                ImmutableMap.of("k1", "v1"));
+    Assertions.assertEquals(s3Location + "/local_fileset2", localFileset2.storageLocation());
+
+    // Delete schema
+    localCatalog.asSchemas().dropSchema(localSchema2.name(), true);
+
+    // Delete catalog
+    metalake.dropCatalog(localCatalogName, true);
   }
 }

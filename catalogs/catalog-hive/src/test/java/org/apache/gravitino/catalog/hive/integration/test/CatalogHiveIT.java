@@ -52,6 +52,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
@@ -611,6 +612,25 @@ public class CatalogHiveIT extends BaseIT {
               tableCatalog.alterTable(id, change);
             });
     Assertions.assertTrue(exception.getMessage().contains("cannot be set"));
+  }
+
+  @Test
+  public void testListTables() {
+    // mock iceberg, paimon, and hudi tables
+    NameIdentifier icebergTable = NameIdentifier.of(schemaName, "iceberg_table");
+    NameIdentifier paimonTable = NameIdentifier.of(schemaName, "paimon_table");
+    NameIdentifier hudiTable = NameIdentifier.of(schemaName, "hudi_table");
+    catalog
+        .asTableCatalog()
+        .createTable(icebergTable, createColumns(), null, ImmutableMap.of("table_type", "ICEBERG"));
+    catalog
+        .asTableCatalog()
+        .createTable(paimonTable, createColumns(), null, ImmutableMap.of("table_type", "PAIMON"));
+    catalog
+        .asTableCatalog()
+        .createTable(hudiTable, createColumns(), null, ImmutableMap.of("provider", "hudi"));
+    NameIdentifier[] tables = catalog.asTableCatalog().listTables(Namespace.of(schemaName));
+    Assertions.assertEquals(0, tables.length);
   }
 
   @Test

@@ -298,7 +298,6 @@ public class TagManager {
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     Preconditions.checkArgument(
         !metadataObject.type().equals(MetadataObject.Type.METALAKE)
-            && !metadataObject.type().equals(MetadataObject.Type.COLUMN)
             && !metadataObject.type().equals(MetadataObject.Type.ROLE),
         "Cannot associate tags for unsupported metadata object type %s",
         metadataObject.type());

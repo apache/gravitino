@@ -383,7 +383,7 @@ public class GravitinoMetalake extends MetalakeDTO
     return this;
   }
 
-  /*
+  /**
    * List all the tag names under a metalake.
    *
    * @return A list of the tag names under the current metalake.

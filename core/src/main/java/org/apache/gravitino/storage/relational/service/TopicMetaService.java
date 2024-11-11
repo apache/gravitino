@@ -31,6 +31,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -205,6 +207,18 @@ public class TopicMetaService {
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        topicId, MetadataObject.Type.TOPIC.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        topicId, MetadataObject.Type.TOPIC.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         topicId, MetadataObject.Type.TOPIC.name())));
 
     return true;

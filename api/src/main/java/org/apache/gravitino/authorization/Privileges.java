@@ -407,7 +407,7 @@ public class Privileges {
     }
   }
 
-  /** The privilege to execute SQL `ALTER`, `INSERT`, `UPDATE`, or `DELETE` for a table. */
+  /** The privilege to write data to a table or modify the table schema. */
   public static class ModifyTable extends GenericPrivilege<ModifyTable> {
     private static final ModifyTable ALLOW_INSTANCE =
         new ModifyTable(Condition.ALLOW, Name.MODIFY_TABLE);
