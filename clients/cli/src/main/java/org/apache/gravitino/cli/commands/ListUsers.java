@@ -41,6 +41,7 @@ public class ListUsers extends Command {
   }
 
   /** Lists all users in a metalake. */
+  @Override
   public void handle() {
     String[] users = new String[0];
     try {

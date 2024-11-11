@@ -51,6 +51,7 @@ public class ListColumns extends TableCommand {
   }
 
   /** Displays the details of a table's columns. */
+  @Override
   public void handle() {
     Column[] columns = null;
 
@@ -67,8 +68,12 @@ public class ListColumns extends TableCommand {
       String name = columns[i].name();
       String dataType = columns[i].dataType().simpleString();
       String comment = columns[i].comment();
-      String nullable = columns[i].nullable() ? "null" : "";
-      String autoIncrement = columns[i].autoIncrement() ? "auto" : "";
+      String nullable = columns[i].nullable() ? "true" : "false";
+      String autoIncrement = columns[i].autoIncrement() ? "true" : "false";
+
+      if (i == 0) {
+        all.append("name,datatype,comment,nullable,auto_increment" + System.lineSeparator());
+      }
       // TODO default values
       all.append(
           name

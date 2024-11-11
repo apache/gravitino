@@ -90,8 +90,10 @@ public class TestMetalakeManager {
     NameIdentifier ident2 = NameIdentifier.of("test12");
     Map<String, String> props = ImmutableMap.of("key1", "value1");
 
-    BaseMetalake metalake1 = metalakeManager.createMetalake(ident1, "comment", props);
-    BaseMetalake metalake2 = metalakeManager.createMetalake(ident2, "comment", props);
+    metalakeManager.createMetalake(ident1, "comment", props);
+    BaseMetalake metalake1 = metalakeManager.loadMetalake(ident1);
+    metalakeManager.createMetalake(ident2, "comment", props);
+    BaseMetalake metalake2 = metalakeManager.loadMetalake(ident2);
 
     Set<BaseMetalake> metalakes = Sets.newHashSet(metalakeManager.listMetalakes());
     Assertions.assertTrue(metalakes.contains(metalake1));

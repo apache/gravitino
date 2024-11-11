@@ -62,4 +62,13 @@ public interface TableColumnMapper {
       method = "deleteColumnPOsByLegacyTimeline")
   Integer deleteColumnPOsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(
+      type = TableColumnSQLProviderFactory.class,
+      method = "selectColumnIdByTableIdAndName")
+  Long selectColumnIdByTableIdAndName(
+      @Param("tableId") Long tableId, @Param("columnName") String name);
+
+  @SelectProvider(type = TableColumnSQLProviderFactory.class, method = "selectColumnPOById")
+  ColumnPO selectColumnPOById(@Param("columnId") Long columnId);
 }

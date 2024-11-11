@@ -43,6 +43,7 @@ public class CreateUser extends Command {
   }
 
   /** Create a new user. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

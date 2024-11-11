@@ -45,9 +45,9 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /* The utilization class of authorization module*/
 public class AuthorizationUtils {
 
-  static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in th metalake %s";
-  static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in th metalake %s";
-  static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in th metalake %s";
+  static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in the metalake %s";
+  static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
+  static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
 
   private static final Set<Privilege.Name> FILESET_PRIVILEGES =
       Sets.immutableEnumSet(
@@ -149,9 +149,11 @@ public class AuthorizationUtils {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
     for (SecurableObject securableObject : securableObjects) {
       if (needApplyAuthorizationPluginAllCatalogs(securableObject)) {
-        Catalog[] catalogs = catalogManager.listCatalogsInfo(Namespace.of(metalake));
-        for (Catalog catalog : catalogs) {
-          callAuthorizationPluginImpl(consumer, catalog);
+        NameIdentifier[] catalogs = catalogManager.listCatalogs(Namespace.of(metalake));
+        // ListCatalogsInfo return `CatalogInfo` instead of `BaseCatalog`, we need `BaseCatalog` to
+        // call authorization plugin method.
+        for (NameIdentifier catalog : catalogs) {
+          callAuthorizationPluginImpl(consumer, catalogManager.loadCatalog(catalog));
         }
 
       } else if (needApplyAuthorization(securableObject.type())) {
@@ -181,17 +183,6 @@ public class AuthorizationUtils {
               MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
       Catalog catalog = catalogManager.loadCatalog(catalogIdent);
       callAuthorizationPluginImpl(consumer, catalog);
-    }
-  }
-
-  private static void callAuthorizationPluginImpl(
-      Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
-
-    if (catalog instanceof BaseCatalog) {
-      BaseCatalog baseCatalog = (BaseCatalog) catalog;
-      if (baseCatalog.getAuthorizationPlugin() != null) {
-        consumer.accept(baseCatalog.getAuthorizationPlugin());
-      }
     }
   }
 
@@ -268,5 +259,51 @@ public class AuthorizationUtils {
 
   private static boolean needApplyAuthorization(MetadataObject.Type type) {
     return type != MetadataObject.Type.ROLE && type != MetadataObject.Type.METALAKE;
+  }
+
+  private static void callAuthorizationPluginImpl(
+      Consumer<AuthorizationPlugin> consumer, Catalog catalog) {
+
+    if (catalog instanceof BaseCatalog) {
+      BaseCatalog baseCatalog = (BaseCatalog) catalog;
+      if (baseCatalog.getAuthorizationPlugin() != null) {
+        consumer.accept(baseCatalog.getAuthorizationPlugin());
+      }
+    }
+  }
+
+  public static void authorizationPluginRemovePrivileges(
+      NameIdentifier ident, Entity.EntityType type) {
+    // If we enable authorization, we should remove the privileges about the entity in the
+    // authorization plugin.
+    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+      MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
+      MetadataObjectChange removeObject = MetadataObjectChange.remove(metadataObject);
+      callAuthorizationPluginForMetadataObject(
+          ident.namespace().level(0),
+          metadataObject,
+          authorizationPlugin -> {
+            authorizationPlugin.onMetadataUpdated(removeObject);
+          });
+    }
+  }
+
+  public static void authorizationPluginRenamePrivileges(
+      NameIdentifier ident, Entity.EntityType type, String newName) {
+    // If we enable authorization, we should rename the privileges about the entity in the
+    // authorization plugin.
+    if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+      MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
+      MetadataObject newMetadataObject =
+          NameIdentifierUtil.toMetadataObject(NameIdentifier.of(ident.namespace(), newName), type);
+      MetadataObjectChange renameObject =
+          MetadataObjectChange.rename(oldMetadataObject, newMetadataObject);
+      callAuthorizationPluginForMetadataObject(
+          ident.namespace().level(0),
+          oldMetadataObject,
+          authorizationPlugin -> {
+            authorizationPlugin.onMetadataUpdated(renameObject);
+          });
+    }
   }
 }

@@ -49,6 +49,7 @@ class StorageType(Enum):
     LOCAL = "file"
     GCS = "gs"
     S3A = "s3a"
+    OSS = "oss"
 
 
 class FilesetContextPair:
@@ -318,6 +319,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             StorageType.HDFS,
             StorageType.GCS,
             StorageType.S3A,
+            StorageType.OSS,
         ]:
             src_context_pair.filesystem().mv(
                 self._strip_storage_protocol(storage_type, src_actual_path),
@@ -567,6 +569,14 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             or storage_location.startswith(f"{StorageType.S3A.value}://")
         ):
             actual_prefix = infer_storage_options(storage_location)["path"]
+        elif storage_location.startswith(f"{StorageType.OSS.value}:/"):
+            ops = infer_storage_options(storage_location)
+            if "host" not in ops or "path" not in ops:
+                raise GravitinoRuntimeException(
+                    f"Storage location:{storage_location} doesn't support now."
+                )
+
+            actual_prefix = ops["host"] + ops["path"]
         elif storage_location.startswith(f"{StorageType.LOCAL.value}:/"):
             actual_prefix = storage_location[len(f"{StorageType.LOCAL.value}:") :]
         else:
@@ -733,6 +743,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             return StorageType.GCS
         if path.startswith(f"{StorageType.S3A.value}://"):
             return StorageType.S3A
+        if path.startswith(f"{StorageType.OSS.value}://"):
+            return StorageType.OSS
         raise GravitinoRuntimeException(
             f"Storage type doesn't support now. Path:{path}"
         )
@@ -756,11 +768,45 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param storage_type: The storage type
         :param path: The path
         :return: The stripped path
+
+        We will handle OSS differently from S3 and GCS, because OSS has different behavior than S3 and GCS.
+        Please see the following example:
+
+        ```
+        >> oss = context_pair.filesystem()
+        >> oss.ls('oss://bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls')
+            DEBUG:ossfs:Get directory listing page for bucket-xiaoyu/test_gvfs_catalog678/
+            test_gvfs_schema/test_gvfs_fileset
+            DEBUG:ossfs:CALL: ObjectIterator - () - {'prefix': 'test_gvfs_catalog678/test_gvfs_schema
+            /test_gvfs_fileset/', 'delimiter': '/'}
+            []
+        >> oss.ls('bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls')
+            DEBUG:ossfs:Get directory listing page for bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema
+            /test_gvfs_fileset/test_ls
+            DEBUG:ossfs:CALL: ObjectIterator - () - {'prefix': 'test_gvfs_catalog678/test_gvfs_schema
+            /test_gvfs_fileset/test_ls/', 'delimiter': '/'}
+            [{'name': 'bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/test_gvfs_fileset/test_ls
+            /test.file', 'type': 'file', 'size': 0, 'LastModified': 1729754793,
+            'Size': 0, 'Key': 'bucket-xiaoyu/test_gvfs_catalog678/test_gvfs_schema/
+            test_gvfs_fileset/test_ls/test.file'}]
+
+        ```
+
+        Please take a look at the above example: if we do not remove the protocol (starts with oss://),
+        it will always return an empty array when we call `oss.ls`, however, if we remove the protocol,
+        it will produce the correct result as expected.
         """
         if storage_type in (StorageType.HDFS, StorageType.GCS, StorageType.S3A):
             return path
         if storage_type == StorageType.LOCAL:
             return path[len(f"{StorageType.LOCAL.value}:") :]
+
+        # OSS has different behavior than S3 and GCS, if we do not remove the
+        # protocol, it will always return an empty array.
+        if storage_type == StorageType.OSS:
+            if path.startswith(f"{StorageType.OSS.value}://"):
+                return path[len(f"{StorageType.OSS.value}://") :]
+            return path
 
         raise GravitinoRuntimeException(
             f"Storage type:{storage_type} doesn't support now."
@@ -835,6 +881,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 fs = self._get_gcs_filesystem()
             elif storage_type == StorageType.S3A:
                 fs = self._get_s3_filesystem()
+            elif storage_type == StorageType.OSS:
+                fs = self._get_oss_filesystem()
             else:
                 raise GravitinoRuntimeException(
                     f"Storage type: `{storage_type}` doesn't support now."
@@ -885,6 +933,36 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             key=aws_access_key_id,
             secret=aws_secret_access_key,
             endpoint_url=aws_endpoint_url,
+        )
+
+    def _get_oss_filesystem(self):
+        # get 'oss_access_key_id' from oss options, if the key is not found, throw an exception
+        oss_access_key_id = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ACCESS_KEY)
+        if oss_access_key_id is None:
+            raise GravitinoRuntimeException(
+                "OSS access key id is not found in the options."
+            )
+
+        # get 'oss_secret_access_key' from oss options, if the key is not found, throw an exception
+        oss_secret_access_key = self._options.get(
+            GVFSConfig.GVFS_FILESYSTEM_OSS_SECRET_KEY
+        )
+        if oss_secret_access_key is None:
+            raise GravitinoRuntimeException(
+                "OSS secret access key is not found in the options."
+            )
+
+        # get 'oss_endpoint_url' from oss options, if the key is not found, throw an exception
+        oss_endpoint_url = self._options.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT)
+        if oss_endpoint_url is None:
+            raise GravitinoRuntimeException(
+                "OSS endpoint url is not found in the options."
+            )
+
+        return importlib.import_module("ossfs").OSSFileSystem(
+            key=oss_access_key_id,
+            secret=oss_secret_access_key,
+            endpoint=oss_endpoint_url,
         )
 
 
