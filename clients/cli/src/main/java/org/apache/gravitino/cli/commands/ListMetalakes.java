@@ -39,6 +39,7 @@ public class ListMetalakes extends Command {
   }
 
   /** Lists all metalakes. */
+  @Override
   public void handle() {
     Metalake[] metalakes = new Metalake[0];
     try {

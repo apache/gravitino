@@ -47,6 +47,7 @@ public class CreateTag extends Command {
   }
 
   /** Create a new tag. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

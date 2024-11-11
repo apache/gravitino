@@ -35,6 +35,9 @@ dependencies {
   // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem.initialize(AliyunOSSFileSystem.java:323)
   // org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:3611)
   implementation(libs.commons.lang)
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
 }
 
 tasks.withType(ShadowJar::class.java) {

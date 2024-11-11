@@ -151,7 +151,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.LOCATION);
     this.catalogStorageLocation =
         StringUtils.isNotBlank(catalogLocation)
-            ? Optional.of(catalogLocation).map(Path::new)
+            ? Optional.of(catalogLocation)
+                .map(s -> s.endsWith(SLASH) ? s : s + SLASH)
+                .map(Path::new)
             : Optional.empty();
   }
 
@@ -722,6 +724,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                 .getOrDefault(properties, HadoopSchemaPropertiesMetadata.LOCATION);
 
     return Optional.ofNullable(schemaLocation)
+        .map(s -> s.endsWith(SLASH) ? s : s + SLASH)
         .map(Path::new)
         .orElse(catalogStorageLocation.map(p -> new Path(p, name)).orElse(null));
   }

@@ -95,6 +95,26 @@ public class TagMetadataObjectRelSQLProviderFactory {
     return getProvider().softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId);
   }
 
+  public static String softDeleteTagMetadataObjectRelsByMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .softDeleteTagMetadataObjectRelsByMetadataObject(metadataObjectId, metadataObjectType);
+  }
+
+  public static String softDeleteTagMetadataObjectRelsByCatalogId(
+      @Param("catalogId") Long catalogId) {
+    return getProvider().softDeleteTagMetadataObjectRelsByCatalogId(catalogId);
+  }
+
+  public static String softDeleteTagMetadataObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
+    return getProvider().softDeleteTagMetadataObjectRelsBySchemaId(schemaId);
+  }
+
+  public static String softDeleteTagMetadataObjectRelsByTableId(@Param("tableId") Long tableId) {
+    return getProvider().softDeleteTagMetadataObjectRelsByTableId(tableId);
+  }
+
   public static String deleteTagEntityRelsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteTagEntityRelsByLegacyTimeline(legacyTimeline, limit);

@@ -28,7 +28,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.TableCatalog;
 
 /* Common code for all table commands. */
-public class TableCommand extends Command {
+public class TableCommand extends AuditCommand {
 
   protected final String metalake;
   protected final String catalog;
@@ -48,6 +48,7 @@ public class TableCommand extends Command {
   }
 
   /* Overridden in parent - do nothing  */
+  @Override
   public void handle() {}
 
   /**

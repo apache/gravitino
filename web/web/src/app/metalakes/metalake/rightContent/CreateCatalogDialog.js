@@ -240,10 +240,10 @@ const CreateCatalogDialog = props => {
       propItems[0]?.value === 'filesystem' &&
       providerSelect === 'lakehouse-paimon'
     ) {
-      nextProps = propItems.filter(item => item.key !== 'uri')
+      nextProps = propItems.filter(item => !['jdbc-driver', 'jdbc-user', 'jdbc-password', 'uri'].includes(item.key))
     }
     const parentField = nextProps.find(i => i.key === 'authentication.type')
-    if (parentField && parentField.value === 'simple') {
+    if (!parentField || parentField?.value === 'simple') {
       nextProps = nextProps.filter(
         item => item.key !== 'authentication.kerberos.principal' && item.key !== 'authentication.kerberos.keytab-uri'
       )
@@ -294,19 +294,19 @@ const CreateCatalogDialog = props => {
             ...others
           }
           uri && (properties['uri'] = uri)
-        } else if (
-          (!authType || authType === 'simple') &&
-          ['lakehouse-iceberg', 'lakehouse-paimon'].includes(providerSelect)
-        ) {
+        } else {
           properties = {
-            'catalog-backend': catalogBackend,
+            uri: uri,
             ...others
           }
-          uri && (properties['uri'] = uri)
-          authType && (properties['authType'] = authType)
-        } else {
-          properties = prevProperties
+          catalogBackend && (properties['catalog-backend'] = catalogBackend)
+          jdbcDriver && (properties['jdbc-driver'] = jdbcDriver)
+          jdbcUser && (properties['jdbc-user'] = jdbcUser)
+          jdbcPwd && (properties['jdbc-password'] = jdbcPwd)
         }
+        authType && (properties['authType'] = authType)
+        kerberosPrincipal && (properties['authentication.kerberos.principal'] = kerberosPrincipal)
+        kerberosKeytabUri && (properties['authentication.kerberos.keytab-uri'] = kerberosKeytabUri)
 
         const catalogData = {
           ...mainData,
@@ -600,7 +600,9 @@ const CreateCatalogDialog = props => {
                                   name='key'
                                   label='Key'
                                   value={item.key}
-                                  disabled={item.required || item.disabled}
+                                  disabled={
+                                    item.required || item.disabled || (item.key === 'in-use' && type === 'update')
+                                  }
                                   onChange={event => handleFormChange({ index, event })}
                                   error={item.hasDuplicateKey || item.invalid || !item.key.trim()}
                                   data-refer={`props-key-${index}`}
@@ -631,7 +633,7 @@ const CreateCatalogDialog = props => {
                                     label='Value'
                                     error={item.required && item.value === ''}
                                     value={item.value}
-                                    disabled={item.disabled}
+                                    disabled={item.disabled || (item.key === 'in-use' && type === 'update')}
                                     onChange={event => handleFormChange({ index, event })}
                                     data-refer={`props-value-${index}`}
                                     data-prev-refer={`props-${item.key}`}
@@ -640,7 +642,7 @@ const CreateCatalogDialog = props => {
                                 )}
                               </Box>
 
-                              {!(item.required || item.disabled) ? (
+                              {!(item.required || item.disabled || (item.key === 'in-use' && type === 'update')) ? (
                                 <Box sx={{ minWidth: 40 }}>
                                   <IconButton onClick={() => removeFields(index)}>
                                     <Icon icon='mdi:minus-circle-outline' />
