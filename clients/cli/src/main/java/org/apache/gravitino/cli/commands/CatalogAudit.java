@@ -19,52 +19,51 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.tag.Tag;
 
-/** List the properties of a tag. */
-public class ListTagProperties extends ListProperties {
+public class CatalogAudit extends AuditCommand {
 
   protected final String metalake;
-  protected final String tag;
+  protected final String catalog;
 
   /**
-   * List the properties of a tag.
+   * Displays the audit information of a catalog.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param tag The name of the tag.
+   * @param catalog The name of the catalog.
    */
-  public ListTagProperties(String url, boolean ignoreVersions, String metalake, String tag) {
+  public CatalogAudit(String url, boolean ignoreVersions, String metalake, String catalog) {
     super(url, ignoreVersions);
     this.metalake = metalake;
-    this.tag = tag;
+    this.catalog = catalog;
   }
 
-  /** List the properties of a tag. */
+  /** Displays the audit information of a specified catalog. */
   @Override
   public void handle() {
-    Tag gTag = null;
-    try {
-      GravitinoClient client = buildClient(metalake);
-      gTag = client.getTag(tag);
+    Catalog result;
+
+    try (GravitinoClient client = buildClient(metalake)) {
+      result = client.loadCatalog(this.catalog);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchTagException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TAG);
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    Map<String, String> properties = gTag.properties();
-    printProperties(properties);
+    if (result != null) {
+      displayAuditInfo(result.auditInfo());
+    }
   }
 }

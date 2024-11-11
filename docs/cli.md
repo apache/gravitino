@@ -29,22 +29,24 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  ```bash
  usage: gcli [metalake|catalog|schema|table|column] [list|details|create|delete|update|set|remove|properties] [options]
  Options
+ -a,--audit              display audit information
  -c,--comment <arg>      entity comment
  -g,--group <arg>        group name
  -h,--help               command help information
- -i,--ignore             Ignore client/sever version check
+ -i,--ignore             ignore client/sever version check
  -l,--user <arg>         user name
- -m,--metalake <arg>     Metalake name
+ -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
  -r,--rename <arg>       new entity name
  -s,--server             Gravitino server version
- -t,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
-                         iceberg, kafka
+ -t,--tag <arg>          tag name
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
+ -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
+                         iceberg, kafka
  ```
 
 ## Commands
@@ -168,6 +170,12 @@ gcli metalake list
 gcli metalake details
 ```
 
+#### Show a metalake audit information
+
+```bash
+gcli metalake details --audit
+```
+
 #### Create a metalake
 
 ```bash
@@ -221,7 +229,13 @@ gcli catalog list
 #### Show a catalog details
 
 ```bash
-gcli catalog details  --name catalog_postgres
+gcli catalog details --name catalog_postgres
+```
+
+#### Show a catalog audit information
+
+```bash
+gcli catalog details --name catalog_postgres --audit
 ```
 
 #### Creating a catalog
@@ -231,7 +245,7 @@ The type of catalog to be created is specified by the `--provider` option. Diffe
 ##### Create a Hive catalog
 
 ```bash
-gcli catalog create  --name hive --provider hive --properties metastore.uris=thrift://hive-host:9083
+gcli catalog create --name hive --provider hive --properties metastore.uris=thrift://hive-host:9083
 ```
 
 ##### Create an Iceberg catalog
@@ -255,43 +269,43 @@ gcli catalog create  -name postgres --provider postgres --properties jdbc-url=jd
 ##### Create a Kafka catalog
 
 ```bash
-gcli catalog create  -name kafka --provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092
+gcli catalog create --name kafka --provider kafka --properties bootstrap.servers=127.0.0.1:9092,127.0.0.2:9092
 ```
 
 #### Delete a catalog
 
 ```bash
-gcli catalog delete  --name hive
+gcli catalog delete --name hive
 ```
 
 #### Rename a catalog
 
 ```bash
-gcli catalog update  --name catalog_mysql --rename mysql
+gcli catalog update --name catalog_mysql --rename mysql
 ```
 
 #### Change a catalog comment
 
 ```bash
-gcli catalog update  --name catalog_mysql --comment "new comment"
+gcli catalog update --name catalog_mysql --comment "new comment"
 ```
 
 #### Display a catalog's properties
 
 ```bash
-gcli catalog properties  --name catalog_mysql
+gcli catalog properties --name catalog_mysql
 ```
 
 #### Set a catalog's property
 
 ```bash
-gcli catalog set  --name catalog_mysql --property test --value value
+gcli catalog set --name catalog_mysql --property test --value value
 ```
 
 #### Remove a catalog's property
 
 ```bash
-gcli catalog remove  --name catalog_mysql --property test
+gcli catalog remove --name catalog_mysql --property test
 ```
 
 ### Schema commands
@@ -299,25 +313,31 @@ gcli catalog remove  --name catalog_mysql --property test
 #### Show all schemas in a catalog
 
 ```bash
-gcli schema list  --name catalog_postgres
+gcli schema list --name catalog_postgres
 ```
 
 #### Show schema details
 
 ```bash
-gcli schema details  --name catalog_postgres.hr
+gcli schema details --name catalog_postgres.hr
+```
+
+#### Show schema audit information
+
+```bash
+gcli schema details --name catalog_postgres.hr --audit
 ```
 
 #### Create a schema
 
 ```bash
-gcli schema create  --name catalog_postgres.new_db
+gcli schema create --name catalog_postgres.new_db
 ```
 
 #### Display schema properties
 
 ```bash
-gcli schema properties  --name catalog_postgres.hr -i
+gcli schema properties --name catalog_postgres.hr -i
 ```
 
 Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
@@ -327,19 +347,25 @@ Setting and removing schema properties is not currently supported by the Java AP
 #### Show all tables
 
 ```bash
-gcli table list  --name catalog_postgres.hr
+gcli table list --name catalog_postgres.hr
 ```
 
 #### Show tables details
 
 ```bash
-gcli column list  --name catalog_postgres.hr.departments
+gcli column list --name catalog_postgres.hr.departments
+```
+
+#### Show tables audit information
+
+```bash
+gcli table details --name catalog_postgres.hr.departments --audit
 ```
 
 #### Delete a table
 
 ```bash
-gcli table delete  --name catalog_postgres.hr.salaries
+gcli table delete --name catalog_postgres.hr.salaries
 ```
 
 ### User commands
@@ -347,25 +373,25 @@ gcli table delete  --name catalog_postgres.hr.salaries
 #### Create a user
 
 ```bash
-gcli user create  --user new_user
+gcli user create --user new_user
 ```
 
 #### Show a user's details
 
 ```bash
-gcli user details  --user new_user
+gcli user details --user new_user
 ```
 
 #### List all users
 
 ```bash
-gcli user list 
+gcli user list
 ```
 
 #### Delete a users
 
 ```bash
-gcli user delete  --user new_user
+gcli user delete --user new_user
 ```
 
 ### Group commands
@@ -373,23 +399,149 @@ gcli user delete  --user new_user
 #### Create a group
 
 ```bash
-gcli group create  --user new_group
+gcli group create --user new_group
 ```
 
 #### Display a group's details
 
 ```bash
-gcli group details  --user new_group
+gcli group details --user new_group
 ```
 
 #### List all groups
 
 ```bash
-gcli group list 
+gcli group list
 ```
 
 #### Delete a group
 
 ```bash
-gcli group delete  --user new_group
+gcli group delete --user new_group
+```
+
+### User commands
+
+#### Create a user
+
+```bash
+gcli user create --user new_user
+```
+
+#### Show a user's details
+
+```bash
+gcli user details --user new_user
+```
+
+#### List all users
+
+```bash
+gcli user list
+```
+
+#### Delete a user
+
+```bash
+gcli user delete --user new_user
+```
+
+### Group commands
+
+#### Create a group
+
+```bash
+gcli group create --group new_group
+```
+
+#### Display a group's details
+
+```bash
+gcli group details --group new_group
+```
+
+#### List all groups
+
+```bash
+gcli group list
+```
+
+#### Delete a group
+
+```bash
+gcli group delete --group new_group
+```
+
+### Tag commands
+
+#### Display a tag's details
+
+```bash
+gcli tag details --tag tagA
+```
+
+#### Create a tag
+
+```bash
+gcli tag create --tag tagA
+```
+
+#### List all tag
+
+```bash
+gcli tag list
+```
+
+#### Delete a tag
+
+```bash
+gcli tag delete --tag tagA
+```
+
+#### Add a tag to an entity
+
+```bash
+gcli tag set --name catalog_postgres.hr --tag tagA
+```
+
+#### Remove a tag from an entity
+
+```bash
+gcli tag remove --name catalog_postgres.hr --tag tagA
+```
+
+#### List all tags on an entity
+
+```bash
+gcli tag list --name catalog_postgres.hr
+```
+
+#### List the properties of a tag
+
+```bash
+gcli tag properties --tag tagA
+```
+
+#### Set a properties of a tag
+
+```bash
+gcli tag set --tag tagA --property test --value value
+```
+
+#### Delete a property of a tag
+
+```bash
+gcli tag remove --tag tagA --property test
+```
+
+#### Rename a tag
+
+```bash
+gcli tag update --tag tagA --rename newTag
+```
+
+#### Update a tag's comment
+
+```bash
+gcli tag update --tag tagA --comment "new comment"
 ```

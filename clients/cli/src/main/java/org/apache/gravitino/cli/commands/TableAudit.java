@@ -19,52 +19,50 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
-import org.apache.gravitino.cli.ErrorMessages;
-import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.rel.Table;
 
-/** List the properties of a tag. */
-public class ListTagProperties extends ListProperties {
+/** Displays the audit information of a table. */
+public class TableAudit extends TableCommand {
 
-  protected final String metalake;
-  protected final String tag;
+  protected final String schema;
+  protected final String table;
 
   /**
-   * List the properties of a tag.
+   * Displays the audit information of a table.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param tag The name of the tag.
+   * @param catalog The name of the catalog.
+   * @param schema The name of the schenma.
+   * @param table The name of the table.
    */
-  public ListTagProperties(String url, boolean ignoreVersions, String metalake, String tag) {
-    super(url, ignoreVersions);
-    this.metalake = metalake;
-    this.tag = tag;
+  public TableAudit(
+      String url,
+      boolean ignoreVersions,
+      String metalake,
+      String catalog,
+      String schema,
+      String table) {
+    super(url, ignoreVersions, metalake, catalog);
+    this.schema = schema;
+    this.table = table;
   }
 
-  /** List the properties of a tag. */
+  /** Displays the audit information of a table. */
   @Override
   public void handle() {
-    Tag gTag = null;
+    Table gTable;
+
     try {
-      GravitinoClient client = buildClient(metalake);
-      gTag = client.getTag(tag);
-    } catch (NoSuchMetalakeException err) {
-      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
-    } catch (NoSuchTagException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TAG);
-      return;
+      NameIdentifier name = NameIdentifier.of(schema, table);
+      gTable = tableCatalog().loadTable(name);
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    Map<String, String> properties = gTag.properties();
-    printProperties(properties);
+    displayAuditInfo(gTable.auditInfo());
   }
 }

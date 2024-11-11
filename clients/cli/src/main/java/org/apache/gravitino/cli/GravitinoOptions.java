@@ -57,9 +57,9 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("s", SERVER, "Gravitino server version"));
     options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
     options.addOption(createArgOption("n", NAME, "full entity name (dot separated)"));
-    options.addOption(createArgOption("m", METALAKE, "Metalake name"));
-    options.addOption(createSimpleOption("i", IGNORE, "Ignore client/sever version check"));
-    options.addOption(createSimpleOption("a", AUDIT, "Display audit information"));
+    options.addOption(createArgOption("m", METALAKE, "metalake name"));
+    options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
+    options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
 
     // Create/update options
     options.addOption(createArgOption("r", RENAME, "new entity name"));
@@ -68,10 +68,10 @@ public class GravitinoOptions {
     options.addOption(createArgOption("V", VALUE, "property value"));
     options.addOption(
         createArgOption(
-            "t", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
+            "z", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
     options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
-    options.addOption(createArgOption("a", TAG, "tag name"));
+    options.addOption(createArgOption("t", TAG, "tag name"));
 
     // Properties option can have multiple values
     Option properties =

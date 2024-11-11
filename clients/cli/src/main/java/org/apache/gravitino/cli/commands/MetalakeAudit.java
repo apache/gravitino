@@ -19,52 +19,41 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.tag.Tag;
 
-/** List the properties of a tag. */
-public class ListTagProperties extends ListProperties {
-
+/** Displays the audit information of a metalake. */
+public class MetalakeAudit extends AuditCommand {
   protected final String metalake;
-  protected final String tag;
 
   /**
-   * List the properties of a tag.
+   * Displays metalake audit information.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param tag The name of the tag.
    */
-  public ListTagProperties(String url, boolean ignoreVersions, String metalake, String tag) {
+  public MetalakeAudit(String url, boolean ignoreVersions, String metalake) {
     super(url, ignoreVersions);
     this.metalake = metalake;
-    this.tag = tag;
   }
 
-  /** List the properties of a tag. */
+  /** Displays the audit information of a metalake. */
   @Override
   public void handle() {
-    Tag gTag = null;
-    try {
-      GravitinoClient client = buildClient(metalake);
-      gTag = client.getTag(tag);
+    Audit audit;
+    try (GravitinoClient client = buildClient(metalake)) {
+      audit = client.loadMetalake(metalake).auditInfo();
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
-      return;
-    } catch (NoSuchTagException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TAG);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    Map<String, String> properties = gTag.properties();
-    printProperties(properties);
+    displayAuditInfo(audit);
   }
 }

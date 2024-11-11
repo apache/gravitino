@@ -19,52 +19,60 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
-/** List the properties of a tag. */
-public class ListTagProperties extends ListProperties {
+/** Displays the audit information of schema. */
+public class SchemaAudit extends AuditCommand {
 
   protected final String metalake;
-  protected final String tag;
+  protected final String catalog;
+  protected final String schema;
 
   /**
-   * List the properties of a tag.
+   * Displays the audit information of a schema.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param tag The name of the tag.
+   * @param catalog The name of the catalog.
+   * @param schema The name of the schenma.
    */
-  public ListTagProperties(String url, boolean ignoreVersions, String metalake, String tag) {
+  public SchemaAudit(
+      String url, boolean ignoreVersions, String metalake, String catalog, String schema) {
     super(url, ignoreVersions);
     this.metalake = metalake;
-    this.tag = tag;
+    this.catalog = catalog;
+    this.schema = schema;
   }
 
-  /** List the properties of a tag. */
+  /** Displays the audit information of schema. */
   @Override
   public void handle() {
-    Tag gTag = null;
-    try {
-      GravitinoClient client = buildClient(metalake);
-      gTag = client.getTag(tag);
+    Schema result;
+
+    try (GravitinoClient client = buildClient(metalake)) {
+      result = client.loadCatalog(catalog).asSchemas().loadSchema(this.schema);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchTagException err) {
-      System.err.println(ErrorMessages.UNKNOWN_TAG);
+    } catch (NoSuchCatalogException err) {
+      System.err.println(ErrorMessages.UNKNOWN_CATALOG);
+      return;
+    } catch (NoSuchSchemaException err) {
+      System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    Map<String, String> properties = gTag.properties();
-    printProperties(properties);
+    if (result != null) {
+      displayAuditInfo(result.auditInfo());
+    }
   }
 }
