@@ -398,7 +398,7 @@ gcli user details --user new_user
 gcli user list
 ```
 
-#### Delete a users
+#### Delete a user
 
 ```bash
 gcli user delete --user new_user
@@ -426,8 +426,8 @@ gcli group list
 
 #### Delete a group
 
-```
-gcli group delete --metalake metalake_demo --group new_group
+```bash
+gcli group delete --group new_group
  ```
 
  ### Tag commands
@@ -435,71 +435,71 @@ gcli group delete --metalake metalake_demo --group new_group
  #### Display a tag's details
 
  ```bash
- gcli tag details --metalake metalake_demo --tag tagA
+ gcli tag details --tag tagA
  ```
 
  #### Create a tag
 
  ```bash
- gcli tag create --metalake metalake_demo --tag tagA
+ gcli tag create --tag tagA
  ```
 
  #### List all tag
 
  ```bash
- gcli tag list --metalake metalake_demo
+ gcli tag list
  ```
 
  #### Delete a tag
 
  ```bash
- gcli tag delete --metalake metalake_demo --tag tagA
+ gcli tag delete --tag tagA
  ```
 
  #### Add a tag to an entity
 
  ```bash
- gcli tag set --metalake metalake_demo --name catalog_postgres.hr --tag tagA
+ gcli tag set --name catalog_postgres.hr --tag tagA
  ```
 
  #### Remove a tag from an entity
 
  ```bash
- gcli tag remove --metalake metalake_demo --name catalog_postgres.hr --tag tagA
+ gcli tag remove --name catalog_postgres.hr --tag tagA
  ```
 
  #### List all tags on an entity
 
  ```bash
- gcli tag list --metalake metalake_demo --name catalog_postgres.hr
+ gcli tag list --name catalog_postgres.hr
  ```
 
  #### List the properties of a tag
 
  ```bash
- gcli tag properties --metalake metalake_demo --tag tagA
+ gcli tag properties --tag tagA
  ```
 
  #### Set a properties of a tag
 
  ```bash
- gcli tag set --metalake metalake_demo --tag tagA --property test --value value
+ gcli tag set --tag tagA --property test --value value
  ```
 
  #### Delete a property of a tag
 
  ```bash
- gcli tag remove --metalake metalake_demo --tag tagA --property test
+ gcli tag remove --tag tagA --property test
  ```
 
  #### Rename a tag
 
  ```bash
- gcli tag update --metalake metalake_demo --tag tagA --rename newTag
+ gcli tag update --tag tagA --rename newTag
  ```
 
  #### Update a tag's comment
 
  ```bash
- gcli tag update --metalake metalake_demo --tag tagA --comment "new comment"
+ gcli tag update --tag tagA --comment "new comment"
  ```
