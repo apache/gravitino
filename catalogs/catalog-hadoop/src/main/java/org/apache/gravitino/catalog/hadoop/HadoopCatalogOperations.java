@@ -605,12 +605,15 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       // The reason why we delete the managed fileset's storage location one by one is because we
       // may mis-delete the storage location of the external fileset if it happens to be under
       // the schema path.
+      ClassLoader cl = Thread.currentThread().getContextClassLoader();
       filesets
           .parallelStream()
           .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
           .forEach(
               f -> {
+                ClassLoader oldCl = Thread.currentThread().getContextClassLoader();
                 try {
+                  Thread.currentThread().setContextClassLoader(cl);
                   Path filesetPath = new Path(f.storageLocation());
                   FileSystem fs = getFileSystem(filesetPath, conf);
                   if (fs.exists(filesetPath)) {
@@ -624,6 +627,8 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
                       f.name(),
                       f.storageLocation(),
                       ioe);
+                } finally {
+                  Thread.currentThread().setContextClassLoader(oldCl);
                 }
               });
 
