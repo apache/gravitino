@@ -377,7 +377,7 @@ public class GravitinoCommandLine {
       new DeleteUser(url, ignore, force, metalake, user).handle();
     }
   }
-
+  //tung
   /** Handles the command execution for Group based on command type and the command line options. */
   protected void handleGroupCommand() {
     String url = getUrl();
