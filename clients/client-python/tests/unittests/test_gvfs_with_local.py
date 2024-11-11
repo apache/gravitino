@@ -49,6 +49,7 @@ from tests.unittests.auth.mock_base import (
 )
 
 
+# pylint: disable=C0302
 def generate_unique_random_string(length):
     characters = string.ascii_letters + string.digits
     random_string = "".join(random.sample(characters, length))

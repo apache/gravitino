@@ -72,15 +72,15 @@ public interface MetadataObject {
   String parent();
 
   /**
-   * The name of th object.
+   * The name of the object.
    *
    * @return The name of the object.
    */
   String name();
 
   /**
-   * The full name of th object. Full name will be separated by "." to represent a string identifier
-   * of the object, like catalog, catalog.table, etc.
+   * The full name of the object. Full name will be separated by "." to represent a string
+   * identifier of the object, like catalog, catalog.table, etc.
    *
    * @return The name of the object.
    */

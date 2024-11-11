@@ -47,6 +47,7 @@ public class ListTagProperties extends ListProperties {
   }
 
   /** List the properties of a tag. */
+  @Override
   public void handle() {
     Tag gTag = null;
     try {

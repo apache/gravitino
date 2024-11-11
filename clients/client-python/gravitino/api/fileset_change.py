@@ -81,8 +81,11 @@ class FilesetChange(ABC):
 
         Returns:
             The fileset change.
+
+        Deprecated:
+            Please use `update_comment(str)` with null value as the argument instead.
         """
-        return FilesetChange.RemoveComment()
+        return FilesetChange.UpdateFilesetComment(None)
 
     @dataclass
     class RenameFileset:
@@ -279,7 +282,11 @@ class FilesetChange(ABC):
 
     @dataclass
     class RemoveComment:
-        """A fileset change to remove comment from the fileset."""
+        """A fileset change to remove comment from the fileset.
+
+        Deprecated:
+            Please use `UpdateFilesetComment(str)` with null value as the argument instead.
+        """
 
         def __eq__(self, other) -> bool:
             """Compares this RemoveComment instance with another object for equality.

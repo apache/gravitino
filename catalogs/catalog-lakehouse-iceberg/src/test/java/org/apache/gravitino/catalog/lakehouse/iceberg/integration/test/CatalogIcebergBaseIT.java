@@ -51,7 +51,6 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMet
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -417,7 +416,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     Assertions.assertEquals(createdTable.columns().length, columns.length);
 
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), createdTable.columns()[i]);
+      assertColumn(columns[i], createdTable.columns()[i]);
     }
 
     // TODO add partitioning and sort order check
@@ -434,7 +433,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     }
     Assertions.assertEquals(loadTable.columns().length, columns.length);
     for (int i = 0; i < columns.length; i++) {
-      Assertions.assertEquals(DTOConverters.toDTO(columns[i]), loadTable.columns()[i]);
+      assertColumn(columns[i], loadTable.columns()[i]);
     }
 
     Assertions.assertEquals(partitioning.length, loadTable.partitioning().length);
@@ -1256,5 +1255,14 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       Assertions.assertEquals(entry.getValue(), table.properties().get(entry.getKey()));
     }
+  }
+
+  protected void assertColumn(Column expectedColumn, Column actualColumn) {
+    Assertions.assertEquals(expectedColumn.name(), actualColumn.name());
+    Assertions.assertEquals(expectedColumn.dataType(), actualColumn.dataType());
+    Assertions.assertEquals(expectedColumn.comment(), actualColumn.comment());
+    Assertions.assertEquals(expectedColumn.nullable(), actualColumn.nullable());
+    Assertions.assertEquals(expectedColumn.autoIncrement(), actualColumn.autoIncrement());
+    Assertions.assertEquals(expectedColumn.defaultValue(), actualColumn.defaultValue());
   }
 }

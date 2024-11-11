@@ -575,7 +575,7 @@ public class HadoopCatalogIT extends BaseIT {
         catalog
             .asFilesetCatalog()
             .alterFileset(
-                NameIdentifier.of(schemaName, filesetName), FilesetChange.removeComment());
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.updateComment(null));
     assertFilesetExists(filesetName);
 
     // verify fileset is updated
@@ -688,6 +688,66 @@ public class HadoopCatalogIT extends BaseIT {
     } finally {
       CallerContext.CallerContextHolder.remove();
     }
+  }
+
+  @Test
+  public void testCreateSchemaAndFilesetWithSpecialLocation() {
+    String localCatalogName = GravitinoITUtils.genRandomName("local_catalog");
+    String hdfsLocation =
+        String.format(
+            "hdfs://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HDFS_DEFAULTFS_PORT);
+    Map<String, String> catalogProps = ImmutableMap.of("location", hdfsLocation);
+
+    Catalog localCatalog =
+        metalake.createCatalog(
+            localCatalogName, Catalog.Type.FILESET, provider, "comment", catalogProps);
+    Assertions.assertEquals(hdfsLocation, localCatalog.properties().get("location"));
+
+    // Create schema without specifying location.
+    Schema localSchema =
+        localCatalog
+            .asSchemas()
+            .createSchema("local_schema", "comment", ImmutableMap.of("key1", "val1"));
+
+    Fileset localFileset =
+        localCatalog
+            .asFilesetCatalog()
+            .createFileset(
+                NameIdentifier.of(localSchema.name(), "local_fileset"),
+                "fileset comment",
+                Fileset.Type.MANAGED,
+                null,
+                ImmutableMap.of("k1", "v1"));
+    Assertions.assertEquals(
+        hdfsLocation + "/local_schema/local_fileset", localFileset.storageLocation());
+
+    // Delete schema
+    localCatalog.asSchemas().dropSchema(localSchema.name(), true);
+
+    // Create schema with specifying location.
+    Map<String, String> schemaProps = ImmutableMap.of("location", hdfsLocation);
+    Schema localSchema2 =
+        localCatalog.asSchemas().createSchema("local_schema2", "comment", schemaProps);
+    Assertions.assertEquals(hdfsLocation, localSchema2.properties().get("location"));
+
+    Fileset localFileset2 =
+        localCatalog
+            .asFilesetCatalog()
+            .createFileset(
+                NameIdentifier.of(localSchema2.name(), "local_fileset2"),
+                "fileset comment",
+                Fileset.Type.MANAGED,
+                null,
+                ImmutableMap.of("k1", "v1"));
+    Assertions.assertEquals(hdfsLocation + "/local_fileset2", localFileset2.storageLocation());
+
+    // Delete schema
+    localCatalog.asSchemas().dropSchema(localSchema2.name(), true);
+
+    // Delete catalog
+    metalake.dropCatalog(localCatalogName, true);
   }
 
   protected String generateLocation(String filesetName) {

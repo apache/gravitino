@@ -19,28 +19,38 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
 public class DeleteMetalake extends Command {
   protected final String metalake;
+  protected final boolean force;
 
   /**
    * Delete a metalake.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param force Force operation.
    * @param metalake The name of the metalake.
    */
-  public DeleteMetalake(String url, boolean ignoreVersions, String metalake) {
+  public DeleteMetalake(String url, boolean ignoreVersions, boolean force, String metalake) {
     super(url, ignoreVersions);
+    this.force = force;
     this.metalake = metalake;
   }
 
   /** Delete a metalake. */
+  @Override
   public void handle() {
     boolean deleted = false;
+
+    if (!AreYouSure.really(force)) {
+      return;
+    }
+
     try {
       GravitinoAdminClient client = buildAdminClient();
       deleted = client.dropMetalake(metalake);

@@ -150,21 +150,12 @@ public class FullName {
   }
 
   /**
-   * Does the metalake name exist?
-   *
-   * @return True if the catalog name exists, or false if it does not.
-   */
-  public boolean hasMetalakeName() {
-    return hasNamePart(1);
-  }
-
-  /**
    * Does the catalog name exist?
    *
    * @return True if the catalog name exists, or false if it does not.
    */
   public boolean hasCatalogName() {
-    return hasNamePart(2);
+    return hasNamePart(1);
   }
 
   /**
@@ -173,7 +164,7 @@ public class FullName {
    * @return True if the schema name exists, or false if it does not.
    */
   public boolean hasSchemaName() {
-    return hasNamePart(3);
+    return hasNamePart(2);
   }
 
   /**
@@ -182,6 +173,6 @@ public class FullName {
    * @return True if the table name exists, or false if it does not.
    */
   public boolean hasTableName() {
-    return hasNamePart(4);
+    return hasNamePart(3);
   }
 }

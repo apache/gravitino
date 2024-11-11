@@ -53,6 +53,7 @@ public class TagEntity extends Command {
   }
 
   /** Create a new tag. */
+  @Override
   public void handle() {
     String entity = "unknown";
     String[] tags = new String[0];

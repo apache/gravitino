@@ -36,6 +36,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.IntStream;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -727,9 +728,22 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertEquals(expected.name(), actual.name());
     Assertions.assertEquals(expected.comment(), actual.comment());
     Assertions.assertEquals(expected.properties(), actual.properties());
-
-    Assertions.assertArrayEquals(expected.columns(), actual.columns());
-
+    Assertions.assertEquals(expected.columns().length, actual.columns().length);
+    IntStream.range(0, expected.columns().length)
+        .forEach(
+            i -> {
+              Assertions.assertEquals(expected.columns()[i].name(), actual.columns()[i].name());
+              Assertions.assertEquals(
+                  expected.columns()[i].dataType(), actual.columns()[i].dataType());
+              Assertions.assertEquals(
+                  expected.columns()[i].comment(), actual.columns()[i].comment());
+              Assertions.assertEquals(
+                  expected.columns()[i].nullable(), actual.columns()[i].nullable());
+              Assertions.assertEquals(
+                  expected.columns()[i].autoIncrement(), actual.columns()[i].autoIncrement());
+              Assertions.assertEquals(
+                  expected.columns()[i].defaultValue(), actual.columns()[i].defaultValue());
+            });
     Assertions.assertArrayEquals(expected.partitioning(), actual.partitioning());
   }
 
