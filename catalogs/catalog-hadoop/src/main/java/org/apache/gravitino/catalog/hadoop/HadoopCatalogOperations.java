@@ -601,7 +601,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
       // The reason why we delete the managed fileset's storage location one by one is because we
       // may mis-delete the storage location of the external fileset if it happens to be under
       // the schema path.
-      filesets.stream()
+      filesets.parallelStream()
           .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
           .forEach(
               f -> {
@@ -628,17 +628,22 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
       // Delete the schema path if it exists and is empty.
       Path schemaPath = getSchemaPath(ident.name(), properties);
-      if (schemaPath != null) {
-        FileSystem fs = getFileSystem(schemaPath, conf);
-        if (fs.exists(schemaPath)) {
-          FileStatus[] statuses = fs.listStatus(schemaPath);
-          if (statuses.length == 0) {
-            if (fs.delete(schemaPath, true)) {
-              LOG.info("Deleted schema {} location {}", ident, schemaPath);
-            } else {
-              LOG.warn("Failed to delete schema {} location {}", ident, schemaPath);
-            }
-          }
+      if (schemaPath == null) {
+        return false;
+      }
+
+      FileSystem fs = getFileSystem(schemaPath, conf);
+      if (!fs.exists(schemaPath)) {
+        return false;
+      }
+
+      FileStatus[] statuses = fs.listStatus(schemaPath);
+      if (statuses.length == 0) {
+        if (fs.delete(schemaPath, true)) {
+          LOG.info("Deleted schema {} location {}", ident, schemaPath);
+        } else {
+          LOG.warn("Failed to delete schema {} location {}", ident, schemaPath);
+          return false;
         }
       }
 
