@@ -36,12 +36,21 @@ from gravitino.filesystem.gvfs_config import GVFSConfig
 logger = logging.getLogger(__name__)
 
 
-@unittest.skip("This test require GCS service account key file")
+def oss_is_prepare():
+    return all(
+        [
+            os.environ.get("GCS_SERVICE_ACCOUNT_JSON_PATH") is not None,
+            os.environ.get("GCS_BUCKET_NAME") is not None,
+        ]
+    )
+
+
+@unittest.skipUnless(oss_is_prepare(), "GCS environment is not prepared.")
 class TestGvfsWithGCS(TestGvfsWithHDFS):
     # Before running this test, please set the make sure gcp-bundle-x.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
-    key_file = "your_key_file.json"
-    bucket_name = "your_bucket_name"
+    key_file = os.environ.get("GCS_SERVICE_ACCOUNT_JSON_PATH")
+    bucket_name = os.environ.get("GCS_BUCKET_NAME")
     metalake_name: str = "TestGvfsWithGCS_metalake" + str(randint(1, 10000))
 
     def setUp(self):

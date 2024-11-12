@@ -38,21 +38,19 @@ import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Disabled(
-    "Disabled due to we don't have a real OSS account to test. If you have a GCP account,"
-        + "please change the configuration(BUCKET_NAME, OSS_ACCESS_KEY, OSS_SECRET_KEY, "
-        + "OSS_ENDPOINT) and enable this test.")
+@EnabledIf(value = "ossIsPrepare", disabledReason = "OSS is not prepared")
 public class HadoopOSSCatalogIT extends HadoopCatalogIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopOSSCatalogIT.class);
-  public static final String BUCKET_NAME = "YOUR_BUCKET";
-  public static final String OSS_ACCESS_KEY = "YOUR_OSS_ACCESS_KEY";
-  public static final String OSS_SECRET_KEY = "YOUR_OSS_SECRET_KEY";
-  public static final String OSS_ENDPOINT = "YOUR_OSS_ENDPOINT";
+  public static final String BUCKET_NAME = System.getenv("OSS_BUCKET_NAME");
+  public static final String OSS_ACCESS_KEY = System.getenv("OSS_ACCESS_KEY_ID");
+  public static final String OSS_SECRET_KEY = System.getenv("OSS_SECRET_ACCESS_KEY");
+  public static final String OSS_ENDPOINT = System.getenv("OSS_ENDPOINT");
 
   @VisibleForTesting
   public void startIntegrationTest() throws Exception {}
@@ -196,5 +194,12 @@ public class HadoopOSSCatalogIT extends HadoopCatalogIT {
 
     // Delete catalog
     metalake.dropCatalog(localCatalogName, true);
+  }
+
+  protected static boolean ossIsPrepare() {
+    return StringUtils.isNotBlank(System.getenv("OSS_ACCESS_KEY_ID"))
+        && StringUtils.isNotBlank(System.getenv("OSS_SECRET_ACCESS_KEY"))
+        && StringUtils.isNotBlank(System.getenv("OSS_ENDPOINT"))
+        && StringUtils.isNotBlank(System.getenv("OSS_BUCKET_NAME"));
   }
 }
