@@ -26,7 +26,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an event that is triggered before listing of tables within a namespace. */
 @DeveloperApi
 public class ListTablePreEvent extends TablePreEvent {
-  private Namespace namespace;
+  private final Namespace namespace;
 
   public ListTablePreEvent(String user, Namespace namespace) {
     super(user, NameIdentifier.of(namespace.levels()));

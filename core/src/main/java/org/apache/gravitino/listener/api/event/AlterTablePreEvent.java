@@ -33,6 +33,12 @@ public class AlterTablePreEvent extends TablePreEvent {
     this.tableChanges = tableChanges;
   }
 
+  /**
+   * Retrieves the specific changes that were made to the table during the alteration process.
+   *
+   * @return An array of {@link TableChange} objects detailing each modification applied to the
+   *     table.
+   */
   public TableChange[] tableChanges() {
     return tableChanges;
   }
