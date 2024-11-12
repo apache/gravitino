@@ -46,6 +46,7 @@ public class RoleDetails extends Command {
   }
 
   /** Displays the securable objects of a specified role. */
+  @Override
   public void handle() {
     List<SecurableObject> objects = null;
 

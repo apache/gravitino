@@ -51,6 +51,7 @@ public class AddRoleToGroup extends Command {
   }
 
   /** Adds a role to a group. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

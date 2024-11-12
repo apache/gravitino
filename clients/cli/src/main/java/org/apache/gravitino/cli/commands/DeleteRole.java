@@ -49,6 +49,7 @@ public class DeleteRole extends Command {
   }
 
   /** Delete a role. */
+  @Override
   public void handle() {
     boolean deleted = false;
 

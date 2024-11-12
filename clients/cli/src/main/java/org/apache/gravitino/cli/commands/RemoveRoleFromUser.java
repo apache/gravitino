@@ -51,6 +51,7 @@ public class RemoveRoleFromUser extends Command {
   }
 
   /** Removes a role from a user. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
