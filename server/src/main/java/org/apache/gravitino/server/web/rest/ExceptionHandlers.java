@@ -121,6 +121,11 @@ public class ExceptionHandlers {
     return TagExceptionHandler.INSTANCE.handle(op, tag, parent, e);
   }
 
+  public static Response handleCredentialException(
+      OperationType op, String tag, String parent, Exception e) {
+    return CredentialExceptionHandler.INSTANCE.handle(op, tag, parent, e);
+  }
+
   public static Response handleTestConnectionException(Exception e) {
     ErrorResponse response;
     if (e instanceof IllegalArgumentException) {
@@ -618,6 +623,38 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, roles, parent, e);
+      }
+    }
+  }
+
+  private static class CredentialExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new CredentialExceptionHandler();
+
+    private static String getCredentialErrorMsg(
+        String tag, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate credential(s)%s operation [%s] under object [%s], reason [%s]",
+          tag, operation, parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String credential, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(credential) ? "" : " [" + credential + "]";
+      String errorMsg = getCredentialErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, credential, parent, e);
       }
     }
   }
