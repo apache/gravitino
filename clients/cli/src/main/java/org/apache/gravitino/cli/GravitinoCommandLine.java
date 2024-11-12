@@ -477,10 +477,13 @@ public class GravitinoCommandLine {
     } else if (CommandActions.UPDATE.equals(command)) {
       String owner = line.getOptionValue(GravitinoOptions.USER);
       String group = line.getOptionValue(GravitinoOptions.GROUP);
-      if (owner != null) {
+
+      if (owner != null && group == null) {
         new SetOwner(url, ignore, metalake, entityName, entity, owner, false).handle();
-      } else if (group != null) {
+      } else if (owner == null && group != null) {
         new SetOwner(url, ignore, metalake, entityName, entity, group, true).handle();
+      } else {
+        System.err.println(ErrorMessages.INVALID_OWNER_COMMAND);
       }
     }
   }

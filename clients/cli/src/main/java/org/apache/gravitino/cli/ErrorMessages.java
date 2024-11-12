@@ -44,4 +44,6 @@ public class ErrorMessages {
       "Unsupported combination of options either use --name or --property and --value.";
   public static final String INVALID_REMOVE_COMMAND =
       "Unsupported combination of options either use --name or --property.";
+  public static final String INVALID_OWNER_COMMAND =
+      "Unsupported combination of options either use --user or --group.";
 }
