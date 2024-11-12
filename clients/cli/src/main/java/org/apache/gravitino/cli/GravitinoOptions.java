@@ -41,6 +41,7 @@ public class GravitinoOptions {
   public static final String GROUP = "group";
   public static final String TAG = "tag";
   public static final String AUDIT = "audit";
+  public static final String FORCE = "force";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -76,6 +77,9 @@ public class GravitinoOptions {
     Option properties =
         Option.builder("p").longOpt(PROPERTIES).desc("property name/value pairs").hasArgs().build();
     options.addOption(properties);
+
+    // Force delete entity and rename metalake operations
+    options.addOption(createSimpleOption("f", FORCE, "force operation"));
 
     return options;
   }
