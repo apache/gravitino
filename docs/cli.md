@@ -530,3 +530,26 @@ gcli role create --role admin
 ```bash
 gcli role delete --role admin
  ```
+
+#### Add a role to a user
+
+```bash
+gcli user update --metalake metalake_demo --user new_user --role admin
+```
+
+#### Remove a role from a user
+
+```bash
+gcli user delete --metalake metalake_demo --user new_user --role admin
+```
+
+#### Add a role to a group
+
+```bash
+gcli group update --metalake metalake_demo --group groupA --role admin
+```
+
+#### Remove a role from a group
+```bash
+gcli group delete --metalake metalake_demo --group groupA --role admin
+```
