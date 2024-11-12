@@ -21,25 +21,11 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.rel.TableChange;
 
-/** Represents an event triggered before altering a table. */
+/** Represents a pre-event for schema operations. */
 @DeveloperApi
-public class AlterTablePreEvent extends TablePreEvent {
-  private final TableChange[] tableChanges;
-
-  public AlterTablePreEvent(String user, NameIdentifier identifier, TableChange[] tableChanges) {
+public abstract class SchemaPreEvent extends PreEvent {
+  protected SchemaPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
-    this.tableChanges = tableChanges.clone();
-  }
-
-  /**
-   * Retrieves the specific changes that were made to the table during the alteration process.
-   *
-   * @return An array of {@link TableChange} objects detailing each modification applied to the
-   *     table.
-   */
-  public TableChange[] tableChanges() {
-    return tableChanges;
   }
 }
