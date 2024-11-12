@@ -37,7 +37,6 @@ disable=missing-class-docstring,
         no-member,
         fixme,          
         unnecessary-pass,               
-        missing-timeout,                #TODO-fix
         duplicate-code,                 #TODO-fix
         too-many-arguments,             #TODO-fix
 
