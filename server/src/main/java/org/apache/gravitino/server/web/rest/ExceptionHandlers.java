@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.server.web.Utils;
 import org.eclipse.jetty.util.StringUtil;
@@ -137,6 +138,9 @@ public class ExceptionHandlers {
 
     } else if (e instanceof NotInUseException) {
       response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), e);
+
+    } else if (e instanceof UnauthorizedException) {
+      response = ErrorResponse.unauthorized(e.getClass().getSimpleName(), e.getMessage(), e);
 
     } else {
       return Utils.internalError(e.getMessage(), e);

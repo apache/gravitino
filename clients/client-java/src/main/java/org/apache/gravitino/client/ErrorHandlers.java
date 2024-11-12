@@ -470,6 +470,9 @@ public class ErrorHandlers {
         case ErrorConstants.NON_EMPTY_CODE:
           throw new NonEmptyCatalogException(errorMessage);
 
+        case ErrorConstants.UNAUTHORIZED_CODE:
+          throw new UnauthorizedException(errorMessage);
+
         default:
           super.accept(errorResponse);
       }

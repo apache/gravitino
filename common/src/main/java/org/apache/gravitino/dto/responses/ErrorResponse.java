@@ -235,7 +235,7 @@ public class ErrorResponse extends BaseResponse {
   }
 
   /**
-   * Create a new entity in use error instance of {@link ErrorResponse}.
+   * Create a new not in use error instance of {@link ErrorResponse}.
    *
    * @param type The type of the error.
    * @param message The message of the error.
@@ -295,7 +295,7 @@ public class ErrorResponse extends BaseResponse {
   }
 
   /**
-   * Create a new unknown error instance of {@link ErrorResponse}.
+   * Create a new oauth error instance of {@link ErrorResponse}.
    *
    * @param code The code of the error.
    * @param type The type of the error.
@@ -304,6 +304,19 @@ public class ErrorResponse extends BaseResponse {
    */
   public static ErrorResponse oauthError(int code, String type, String message) {
     return new ErrorResponse(code, type, message, null);
+  }
+
+  /**
+   * Create a new unauthorized error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse unauthorized(String type, String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.UNAUTHORIZED_CODE, type, message, getStackTrace(throwable));
   }
 
   /**

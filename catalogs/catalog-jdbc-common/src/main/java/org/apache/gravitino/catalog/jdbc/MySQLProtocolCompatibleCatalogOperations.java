@@ -50,7 +50,7 @@ public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperati
   }
 
   @Override
-  public boolean checkJDBCDriverVersion() {
+  public void checkJDBCDriverVersion() {
     JDBCDriverInfo driverInfo = getDiverInfo();
     if (driverInfo.majorVersion < MYSQL_JDBC_DRIVER_MINIMAL_SUPPORT_VERSION) {
       throw new RuntimeException(
@@ -58,7 +58,6 @@ public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperati
               "Mysql catalog does not support the jdbc driver version %s, minimal required version is 8.0",
               driverInfo.version));
     }
-    return true;
   }
 
   @Override

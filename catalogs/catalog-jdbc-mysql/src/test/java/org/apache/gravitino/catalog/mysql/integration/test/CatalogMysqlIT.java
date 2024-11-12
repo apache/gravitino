@@ -48,6 +48,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -254,6 +255,34 @@ public class CatalogMysqlIT extends BaseIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(GRAVITINO_ENGINE_KEY, "InnoDB");
     return properties;
+  }
+
+  @Test
+  void testTestConnection() throws SQLException {
+    Map<String, String> catalogProperties = Maps.newHashMap();
+
+    catalogProperties.put(
+        JdbcConfig.JDBC_URL.getKey(),
+        StringUtils.substring(
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+            0,
+            MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME).lastIndexOf("/")));
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), "wrong_password");
+
+    Exception exception =
+        assertThrows(
+            UnauthorizedException.class,
+            () ->
+                metalake.testConnection(
+                    GravitinoITUtils.genRandomName("mysql_it_catalog"),
+                    Catalog.Type.RELATIONAL,
+                    provider,
+                    "comment",
+                    catalogProperties));
+    Assertions.assertTrue(exception.getMessage().contains("Access denied for user"));
   }
 
   @Test

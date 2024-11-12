@@ -109,6 +109,9 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
       case CODE_PARTITION_ALREADY_EXISTS:
         return new PartitionAlreadyExistsException(se, se.getMessage());
       default:
+        if (se.getMessage() != null && se.getMessage().contains("Access denied")) {
+          return new UnauthorizedException(se, se.getMessage());
+        }
         return new GravitinoRuntimeException(se, se.getMessage());
     }
   }

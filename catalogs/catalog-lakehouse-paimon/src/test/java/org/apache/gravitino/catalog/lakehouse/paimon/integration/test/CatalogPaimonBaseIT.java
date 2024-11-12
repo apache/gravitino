@@ -104,7 +104,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
   protected String schemaName = GravitinoITUtils.genRandomName("paimon_it_schema");
   protected static final String schema_comment = "schema_comment";
 
-  private static final String provider = "lakehouse-paimon";
+  protected static final String provider = "lakehouse-paimon";
   private static final String catalog_comment = "catalog_comment";
   private static final String table_comment = "table_comment";
   private static final String PAIMON_COL_NAME1 = "paimon_col_name1";
@@ -116,7 +116,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
   private static String INSERT_BATCH_WITHOUT_PARTITION_TEMPLATE = "INSERT INTO paimon.%s VALUES %s";
   private static final String SELECT_ALL_TEMPLATE = "SELECT * FROM paimon.%s";
   private static final String DEFAULT_DB = "default";
-  private GravitinoMetalake metalake;
+  protected GravitinoMetalake metalake;
   private Map<String, String> catalogProperties;
 
   @BeforeAll

@@ -31,6 +31,7 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
@@ -96,8 +97,24 @@ public class TestMultipleJDBCLoad extends BaseIT {
     icebergMysqlConf.put(
         IcebergConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
     icebergMysqlConf.put(GRAVITINO_JDBC_USER, mySQLContainer.getUsername());
-    icebergMysqlConf.put(GRAVITINO_JDBC_PASSWORD, mySQLContainer.getPassword());
+    icebergMysqlConf.put(GRAVITINO_JDBC_PASSWORD, "wrong_password");
     String mysqlCatalogName = RandomNameUtils.genRandomName("it_iceberg_mysql");
+
+    // test wrong password
+    Exception exception =
+        Assertions.assertThrows(
+            UnauthorizedException.class,
+            () ->
+                metalake.testConnection(
+                    mysqlCatalogName,
+                    Catalog.Type.RELATIONAL,
+                    "lakehouse-iceberg",
+                    "comment",
+                    icebergMysqlConf));
+    Assertions.assertTrue(exception.getMessage().contains("Access denied for user"));
+
+    // test correct password
+    icebergMysqlConf.put(GRAVITINO_JDBC_PASSWORD, mySQLContainer.getPassword());
     Catalog mysqlCatalog =
         metalake.createCatalog(
             mysqlCatalogName,

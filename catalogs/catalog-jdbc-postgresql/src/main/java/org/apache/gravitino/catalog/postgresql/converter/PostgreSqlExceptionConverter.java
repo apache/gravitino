@@ -25,6 +25,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 
 public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
 
@@ -47,6 +48,9 @@ public class PostgreSqlExceptionConverter extends JdbcExceptionConverter {
           return new GravitinoRuntimeException(se.getMessage(), se);
       }
     } else {
+      if (se.getMessage() != null && se.getMessage().contains("password authentication failed")) {
+        return new UnauthorizedException(se.getMessage(), se);
+      }
       return new GravitinoRuntimeException(se.getMessage(), se);
     }
   }

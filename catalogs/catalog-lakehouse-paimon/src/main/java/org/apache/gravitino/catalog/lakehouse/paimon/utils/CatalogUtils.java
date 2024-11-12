@@ -30,6 +30,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -39,6 +40,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.CatalogContext;
@@ -103,11 +105,20 @@ public class CatalogUtils {
    * @param paimonConfig The Paimon configuration.
    * @return The {@link Catalog} instance of catalog backend.
    */
+  @SuppressWarnings("FormatStringAnnotation")
   public static Catalog loadCatalogBackendWithSimpleAuth(PaimonConfig paimonConfig) {
     checkPaimonConfig(paimonConfig);
     CatalogContext catalogContext =
         CatalogContext.create(Options.fromMap(paimonConfig.getAllConfig()));
-    return CatalogFactory.createCatalog(catalogContext);
+    try {
+      return CatalogFactory.createCatalog(catalogContext);
+    } catch (RuntimeException e) {
+      if (e.getCause() instanceof SQLException
+          && e.getCause().getMessage().contains("Access denied")) {
+        throw new UnauthorizedException(e, e.getMessage());
+      }
+      throw e;
+    }
   }
 
   private static void checkPaimonConfig(PaimonConfig paimonConfig) {

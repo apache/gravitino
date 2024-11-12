@@ -20,9 +20,14 @@ package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 @Tag("gravitino-docker-test")
@@ -57,5 +62,23 @@ public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
         PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_DRIVER, "com.mysql.cj.jdbc.Driver");
 
     return catalogProperties;
+  }
+
+  @Test
+  void testTestConnection() {
+    Map<String, String> props = initPaimonCatalogProperties();
+    props.put(PaimonCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD, "wrong_password");
+
+    Exception exception =
+        Assertions.assertThrows(
+            UnauthorizedException.class,
+            () ->
+                metalake.testConnection(
+                    GravitinoITUtils.genRandomName("paimon_it_catalog"),
+                    Catalog.Type.RELATIONAL,
+                    provider,
+                    null,
+                    props));
+    Assertions.assertTrue(exception.getMessage().contains("Access denied for user"));
   }
 }
