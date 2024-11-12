@@ -133,6 +133,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       this.classLoader = classLoader;
     }
 
+    public BaseCatalog catalog() {
+      return catalog;
+    }
+
     public <R> R doWithSchemaOps(ThrowableFunction<SupportsSchemas, R> fn) throws Exception {
       return classLoader.withClassLoader(
           cl -> {
