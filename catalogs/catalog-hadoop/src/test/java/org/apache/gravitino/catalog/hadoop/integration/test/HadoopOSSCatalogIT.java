@@ -44,7 +44,7 @@ import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@EnabledIf(value = "ossIsPrepare", disabledReason = "OSS is not prepared")
+@EnabledIf(value = "ossIsConfigured", disabledReason = "OSS is not prepared")
 public class HadoopOSSCatalogIT extends HadoopCatalogIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopOSSCatalogIT.class);
   public static final String BUCKET_NAME = System.getenv("OSS_BUCKET_NAME");
@@ -196,7 +196,7 @@ public class HadoopOSSCatalogIT extends HadoopCatalogIT {
     metalake.dropCatalog(localCatalogName, true);
   }
 
-  protected static boolean ossIsPrepare() {
+  protected static boolean ossIsConfigured() {
     return StringUtils.isNotBlank(System.getenv("OSS_ACCESS_KEY_ID"))
         && StringUtils.isNotBlank(System.getenv("OSS_SECRET_ACCESS_KEY"))
         && StringUtils.isNotBlank(System.getenv("OSS_ENDPOINT"))
