@@ -460,6 +460,14 @@ The following properties are required if you want to access the OSS fileset via 
 | `oss_access_key_id`        | The access key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset. | 0.7.0-incubating |
 | `oss_secret_access_key`    | The secret key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset. | 0.7.0-incubating |
 
+For Azure blob storage fileset, you need to configure the following properties:
+
+| Configuration item           | Description                            | Default value | Required                                  | Since version    |
+|------------------------------|----------------------------------------|---------------|-------------------------------------------|------------------|
+| `azure_storage_account_name` | The account name of Azure blob storage | (none)        | Yes if it's a Azure blob storage fileset. | 0.8.0-incubating |
+| `azure_storage_account_key`  | The account key of Azure blob storage  | (none)        | Yes if it's a Azure blob storage fileset. | 0.8.0-incubating |
+
+
 You can configure these properties when obtaining the `Gravitino Virtual FileSystem` in Python like this:
 
 ```python

@@ -50,6 +50,7 @@ class StorageType(Enum):
     GCS = "gs"
     S3A = "s3a"
     OSS = "oss"
+    ABS = "abfss"
 
 
 class FilesetContextPair:
@@ -320,6 +321,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             StorageType.GCS,
             StorageType.S3A,
             StorageType.OSS,
+            StorageType.ABS,
         ]:
             src_context_pair.filesystem().mv(
                 self._strip_storage_protocol(storage_type, src_actual_path),
@@ -577,6 +579,30 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 )
 
             actual_prefix = ops["host"] + ops["path"]
+        elif storage_location.startswith(f"{StorageType.ABS.value}://"):
+            ops = infer_storage_options(storage_location)
+            if "username" not in ops or "host" not in ops or "path" not in ops:
+                raise GravitinoRuntimeException(
+                    f"Storage location:{storage_location} doesn't support now. as the username,"
+                    f"host and path are required in the storage location."
+                )
+            actual_prefix = f"{StorageType.ABS.value}://{ops['username']}@{ops['host']}{ops['path']}"
+
+            # For ABS, the actual path should be the same as the virtual path is like
+            # 'wasbs//bucket1@xiaoyu123.blob.core.windows.net/test_gvfs_catalog6588/test_gvfs_schema/
+            # test_gvfs_fileset/test_cat/test.file'
+            # we need to add ':' after the wasbs
+            if actual_path.startswith(f"{StorageType.ABS.value}//"):
+                actual_path = actual_path.replace(
+                    f"{StorageType.ABS.value}//", f"{StorageType.ABS.value}://"
+                )
+
+            # the actual path may be '{container}/{path}', we need to add the host and username
+            # get the path from {container}/{path}
+            if not actual_path.startswith(f"{StorageType.ABS}"):
+                path_without_username = actual_path[actual_path.index("/") + 1 :]
+                actual_path = f"{StorageType.ABS.value}://{ops['username']}@{ops['host']}/{path_without_username}"
+
         elif storage_location.startswith(f"{StorageType.LOCAL.value}:/"):
             actual_prefix = storage_location[len(f"{StorageType.LOCAL.value}:") :]
         else:
@@ -613,33 +639,22 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             entry["name"], storage_location, virtual_location
         )
 
-        # if entry contains 'mtime', then return the entry with 'mtime' else
-        # if entry contains 'LastModified', then return the entry with 'LastModified'
-
+        last_modified = None
         if "mtime" in entry:
             # HDFS and GCS
-            return {
-                "name": path,
-                "size": entry["size"],
-                "type": entry["type"],
-                "mtime": entry["mtime"],
-            }
-
-        if "LastModified" in entry:
+            last_modified = entry["mtime"]
+        elif "LastModified" in entry:
             # S3 and OSS
-            return {
-                "name": path,
-                "size": entry["size"],
-                "type": entry["type"],
-                "mtime": entry["LastModified"],
-            }
+            last_modified = entry["LastModified"]
+        elif "last_modified" in entry:
+            # Azure Blob Storage
+            last_modified = entry["last_modified"]
 
-        # Unknown
         return {
             "name": path,
             "size": entry["size"],
             "type": entry["type"],
-            "mtime": None,
+            "mtime": last_modified,
         }
 
     def _get_fileset_context(self, virtual_path: str, operation: FilesetDataOperation):
@@ -745,6 +760,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             return StorageType.S3A
         if path.startswith(f"{StorageType.OSS.value}://"):
             return StorageType.OSS
+        if path.startswith(f"{StorageType.ABS.value}://"):
+            return StorageType.ABS
         raise GravitinoRuntimeException(
             f"Storage type doesn't support now. Path:{path}"
         )
@@ -800,6 +817,12 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             return path
         if storage_type == StorageType.LOCAL:
             return path[len(f"{StorageType.LOCAL.value}:") :]
+
+        ## We need to remove the protocol and host from the path for instance
+        # 'wsabs://container@account/path' to 'container/path'
+        if storage_type == StorageType.ABS:
+            ops = infer_storage_options(path)
+            return ops["username"] + ops["path"]
 
         # OSS has different behavior than S3 and GCS, if we do not remove the
         # protocol, it will always return an empty array.
@@ -883,6 +906,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 fs = self._get_s3_filesystem()
             elif storage_type == StorageType.OSS:
                 fs = self._get_oss_filesystem()
+            elif storage_type == StorageType.ABS:
+                fs = self._get_abs_filesystem()
             else:
                 raise GravitinoRuntimeException(
                     f"Storage type: `{storage_type}` doesn't support now."
@@ -963,6 +988,30 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             key=oss_access_key_id,
             secret=oss_secret_access_key,
             endpoint=oss_endpoint_url,
+        )
+
+    def _get_abs_filesystem(self):
+        # get 'abs_account_name' from abs options, if the key is not found, throw an exception
+        abs_account_name = self._options.get(
+            GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME
+        )
+        if abs_account_name is None:
+            raise GravitinoRuntimeException(
+                "ABS account name is not found in the options."
+            )
+
+        # get 'abs_account_key' from abs options, if the key is not found, throw an exception
+        abs_account_key = self._options.get(
+            GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY
+        )
+        if abs_account_key is None:
+            raise GravitinoRuntimeException(
+                "ABS account key is not found in the options."
+            )
+
+        return importlib.import_module("adlfs").AzureBlobFileSystem(
+            account_name=abs_account_name,
+            account_key=abs_account_key,
         )
 
 
