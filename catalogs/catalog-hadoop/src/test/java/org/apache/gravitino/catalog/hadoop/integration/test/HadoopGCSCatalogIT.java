@@ -171,7 +171,7 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
   }
 
   private static boolean isGCPConfigured() {
-    return StringUtils.isNotBlank("GCS_SERVICE_ACCOUNT_JSON_PATH")
-        && StringUtils.isNotBlank("GCS_BUCKET_NAME");
+    return StringUtils.isNotBlank(System.getenv("GCS_SERVICE_ACCOUNT_JSON_PATH"))
+        && StringUtils.isNotBlank(System.getenv("GCS_BUCKET_NAME"));
   }
 }
