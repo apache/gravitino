@@ -75,6 +75,9 @@ public class GravitinoOptions {
     options.addOption(createArgOption("t", TAG, "tag name"));
     options.addOption(createArgOption("r", ROLE, "role name"));
 
+    // Force delete entity and rename metalake operations
+    options.addOption(createSimpleOption("f", FORCE, "force operation"));
+
     return options;
   }
 

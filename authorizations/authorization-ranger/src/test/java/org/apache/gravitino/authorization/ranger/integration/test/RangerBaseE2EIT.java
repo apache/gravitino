@@ -529,7 +529,8 @@ public abstract class RangerBaseE2EIT extends BaseIT {
                 Privileges.ModifyTable.allow(),
                 Privileges.ManageUsers.allow(),
                 Privileges.ManageGroups.allow(),
-                Privileges.CreateRole.allow()));
+                Privileges.CreateRole.allow(),
+                Privileges.ManageGrants.allow()));
     metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
 
     // Granted this role to the spark execution user `HADOOP_USER_NAME`
