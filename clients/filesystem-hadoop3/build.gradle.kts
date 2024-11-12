@@ -29,6 +29,9 @@ dependencies {
   implementation(project(":catalogs:catalog-hadoop")) {
     exclude(group = "*")
   }
+  implementation(project(":catalogs:catalog-common")) {
+    exclude(group = "*")
+  }
 
   implementation(libs.caffeine)
 

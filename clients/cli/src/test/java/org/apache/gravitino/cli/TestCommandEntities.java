@@ -38,6 +38,10 @@ public class TestCommandEntities {
     assertTrue(
         CommandEntities.isValidEntity(CommandEntities.TABLE), "TABLE should be a valid entity");
     assertTrue(CommandEntities.isValidEntity(CommandEntities.TAG), "TAG should be a valid entity");
+    assertTrue(
+        CommandEntities.isValidEntity(CommandEntities.FILESET), "FILESET should be a valid entity");
+    assertTrue(
+        CommandEntities.isValidEntity(CommandEntities.OWNER), "OWNER should be a valid entity");
   }
 
   @Test

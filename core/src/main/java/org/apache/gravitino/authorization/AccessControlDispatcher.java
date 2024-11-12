@@ -272,6 +272,7 @@ public interface AccessControlDispatcher {
    * Lists the role names associated the metadata object.
    *
    * @param metalake The Metalake of the Role.
+   * @param object The object of the Roles.
    * @return The role list.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws NoSuchMetadataObjectException If the Metadata object with the given name does not

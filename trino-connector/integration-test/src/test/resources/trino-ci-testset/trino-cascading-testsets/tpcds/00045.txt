@@ -1,0 +1,5 @@
+"68339     ","Whitney","43.34"
+"70534     ","Crossroads","9.18"
+"71952     ","Sunnyside","32.84"
+"80059     ","Centerville","7.06"
+"83003     ","Hillcrest","79.87"

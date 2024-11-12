@@ -14,10 +14,14 @@ You can deploy the service with the Gravitino Docker image.
 Container startup commands
 
 ```shell
-docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.6.1-incubating
+docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 ```
 
 Changelog
+
+- apache/gravitino:0.7.0-incubating
+  - Based on Gravitino 0.7.0-incubating, you can know more information from 0.7.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.7.0-incubating).
+  - Place bundle jars (gravitino-aws-bundle.jar, gravitino-gcp-bundle.jar, gravitino-aliyun-bundle.jar) in the `${GRAVITINO_HOME}/catalogs/hadoop/libs` folder to support the cloud storage catalog without manually adding the jars to the classpath.
 
 - apache/gravitino:0.6.1-incubating
   - Based on Gravitino 0.6.1-incubating, you can know more information from 0.6.1-incubating release notes.
@@ -51,10 +55,16 @@ You can deploy the standalone Gravitino Iceberg REST server with the Docker imag
 Container startup commands
 
 ```shell
-docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.6.1-incubating
+docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
 Changelog
+
+- apache/gravitino-iceberg-rest:0.7.0-incubating
+  - Using JDBC catalog backend.
+  - Supports S3 and GCS storage.
+  - Supports credential vending.
+  - Supports changing configuration by environment variables.
 
 - apache/gravitino-iceberg-rest:0.6.1-incubating
   - Based on Gravitino 0.6.1-incubating, you can know more information from 0.6.1-incubating release notes.
@@ -86,6 +96,10 @@ Changelog
   - Don't start YARN when container startup
 
 ### Trino image
+
+Changelog
+- apache/gravitino-playground:trino-435-gravitino-0.7.0-incubating
+  - Use Gravitino release 0.7.0-incubating Dockerfile to build the image.
 
 Changelog
 - apache/gravitino-playground:trino-435-gravitino-0.6.1-incubating

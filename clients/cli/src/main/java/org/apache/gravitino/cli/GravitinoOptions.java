@@ -35,15 +35,9 @@ public class GravitinoOptions {
   public static final String RENAME = "rename";
   public static final String PROPERTY = "property";
   public static final String VALUE = "value";
-  public static final String PROPERTIES = "properties";
   public static final String PROVIDER = "provider";
-  public static final String METASTORE = "metastore";
-  public static final String WAREHOUSE = "warehouse";
-  public static final String JDBCURL = "jdbcurl";
+  public static final String PROPERTIES = "properties";
   public static final String USER = "user";
-  public static final String PASSWORD = "password";
-  public static final String DATABASE = "database";
-  public static final String BOOTSTRAP = "bootstrap";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
   public static final String DATATYPE = "datatype";
@@ -51,6 +45,12 @@ public class GravitinoOptions {
   public static final String NULL = "null";
   public static final String AUTO = "auto";
   public static final String DEFAULT = "default";
+  public static final String FILESET = "fileset";
+  public static final String MANAGED = "managed";
+  public static final String LOCATION = "location";
+  public static final String OWNER = "owner";
+  public static final String AUDIT = "audit";
+  public static final String FORCE = "force";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -63,27 +63,22 @@ public class GravitinoOptions {
     // Add options using helper method to avoid repetition
     options.addOption(createSimpleOption("h", HELP, "command help information"));
     options.addOption(createSimpleOption("v", VERSION, "Gravitino client version"));
-    options.addOption(createSimpleOption("r", SERVER, "Gravitino server version"));
+    options.addOption(createSimpleOption("s", SERVER, "Gravitino server version"));
     options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
     options.addOption(createArgOption("n", NAME, "full entity name (dot separated)"));
-    options.addOption(createArgOption("m", METALAKE, "Metalake name"));
-    options.addOption(createSimpleOption("i", IGNORE, "Ignore client/sever version check"));
+    options.addOption(createArgOption("m", METALAKE, "metalake name"));
+    options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
+    options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
 
     // Create/update options
     options.addOption(createArgOption("r", RENAME, "new entity name"));
     options.addOption(createArgOption("c", COMMENT, "entity comment"));
-    options.addOption(createArgOption("p", PROPERTY, "property name"));
-    options.addOption(createArgOption("v", VALUE, "property value"));
+    options.addOption(createArgOption("P", PROPERTY, "property name"));
+    options.addOption(createArgOption("V", VALUE, "property value"));
     options.addOption(
         createArgOption(
-            "p", PROVIDER, "the provider one of hadoop, hive, mysql, postgres, iceberg or kafka"));
-    options.addOption(createArgOption("m", METASTORE, "Hive metastore URI"));
-    options.addOption(createArgOption("w", WAREHOUSE, "warehouse name"));
-    options.addOption(createArgOption("b", BOOTSTRAP, "Kafka bootstrap servers"));
-    options.addOption(createArgOption("j", JDBCURL, "JDBC URL"));
-    options.addOption(createArgOption("l", USER, "database username"));
-    options.addOption(createArgOption("z", PASSWORD, "database password"));
-    options.addOption(createArgOption("d", DATABASE, "database name"));
+            "z", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
+    options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
     options.addOption(createArgOption("a", TAG, "tag name"));
     options.addOption(createArgOption(DATATYPE, "column data type"));
@@ -91,6 +86,19 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(NULL, "column value can be null"));
     options.addOption(createSimpleOption(AUTO, "column value auto-increments"));
     options.addOption(createArgOption(DEFAULT, "default column value"));
+    options.addOption(createArgOption("f", FILESET, "fileset name"));
+    options.addOption(createSimpleOption("m", MANAGED, "a managed fileset"));
+    options.addOption(createArgOption("l", LOCATION, "fieset location"));
+    options.addOption(createArgOption("t", TAG, "tag name"));
+    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
+
+    // Properties option can have multiple values
+    Option properties =
+        Option.builder("p").longOpt(PROPERTIES).desc("property name/value pairs").hasArgs().build();
+    options.addOption(properties);
+
+    // Force delete entity and rename metalake operations
+    options.addOption(createSimpleOption("f", FORCE, "force operation"));
 
     return options;
   }

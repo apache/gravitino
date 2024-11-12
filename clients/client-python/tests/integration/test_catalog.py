@@ -125,6 +125,14 @@ class TestCatalog(IntegrationTestEnv):
         with self.assertRaises(CatalogAlreadyExistsException):
             _ = self.create_catalog(self.catalog_name)
 
+    def test_nullable_comment_catalog(self):
+        self.create_catalog(self.catalog_name)
+        changes = (CatalogChange.update_comment(None),)
+        null_comment_catalog = self.gravitino_client.alter_catalog(
+            self.catalog_name, *changes
+        )
+        self.assertIsNone(null_comment_catalog.comment())
+
     def test_alter_catalog(self):
         catalog = self.create_catalog(self.catalog_name)
 
