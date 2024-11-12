@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.compress.utils.Lists;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
@@ -33,9 +34,13 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.tag.TagManager;
@@ -657,5 +662,323 @@ public class TestTagMetaService extends TestJDBCBackend {
             TagManager.ofTagIdent(metalakeName, "tag2"));
 
     Assertions.assertEquals(0, metadataObjects5.size());
+  }
+
+  @Test
+  public void testDeleteMetadataObjectForTag() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog1", auditInfo);
+    backend.insert(catalog, false);
+
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name()),
+            "schema1",
+            auditInfo);
+    backend.insert(schema, false);
+
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withPosition(0)
+            .withAutoIncrement(false)
+            .withNullable(false)
+            .withDataType(Types.IntegerType.get())
+            .withAuditInfo(auditInfo)
+            .build();
+
+    List<ColumnEntity> columns = Lists.newArrayList();
+    columns.add(column);
+
+    TableEntity table =
+        TableEntity.builder()
+            .withName("table")
+            .withNamespace(Namespace.of(metalakeName, catalog.name(), schema.name()))
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withColumns(columns)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    backend.insert(table, false);
+
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            "topic1",
+            auditInfo);
+    backend.insert(topic, false);
+
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            "fileset1",
+            auditInfo);
+    backend.insert(fileset, false);
+
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tagEntity1 =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag1")
+            .withNamespace(TagManager.ofTagNamespace(metalakeName))
+            .withComment("comment")
+            .withProperties(props)
+            .withAuditInfo(auditInfo)
+            .build();
+    tagMetaService.insertTag(tagEntity1, false);
+    tagMetaService.associateTagsWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        schema.nameIdentifier(),
+        schema.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        table.nameIdentifier(),
+        table.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        topic.nameIdentifier(),
+        topic.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        fileset.nameIdentifier(),
+        fileset.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    NameIdentifier columnIdentifier =
+        NameIdentifier.of(Namespace.fromString(table.nameIdentifier().toString()), column.name());
+    tagMetaService.associateTagsWithMetadataObject(
+        columnIdentifier,
+        column.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+
+    Assertions.assertEquals(6, countActiveTagRel(tagEntity1.id()));
+    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+
+    // Test to drop a table
+    TableMetaService.getInstance().deleteTable(table.nameIdentifier());
+    Assertions.assertEquals(4, countActiveTagRel(tagEntity1.id()));
+    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+
+    // Test to drop a topic
+    TopicMetaService.getInstance().deleteTopic(topic.nameIdentifier());
+    Assertions.assertEquals(3, countActiveTagRel(tagEntity1.id()));
+    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+
+    // Test to drop a fileset
+    FilesetMetaService.getInstance().deleteFileset(fileset.nameIdentifier());
+    Assertions.assertEquals(2, countActiveTagRel(tagEntity1.id()));
+    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+
+    // Test to drop a schema
+    SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), false);
+    Assertions.assertEquals(1, countActiveTagRel(tagEntity1.id()));
+    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+
+    // Test to drop a catalog
+    CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), false);
+    Assertions.assertEquals(0, countActiveTagRel(tagEntity1.id()));
+    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+
+    // Test to drop a catalog using cascade mode
+    catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog1", auditInfo);
+    backend.insert(catalog, false);
+
+    schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name()),
+            "schema1",
+            auditInfo);
+    backend.insert(schema, false);
+
+    column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withPosition(0)
+            .withAutoIncrement(false)
+            .withNullable(false)
+            .withDataType(Types.IntegerType.get())
+            .withAuditInfo(auditInfo)
+            .build();
+
+    columns = Lists.newArrayList();
+    columns.add(column);
+
+    table =
+        TableEntity.builder()
+            .withName("table")
+            .withNamespace(Namespace.of(metalakeName, catalog.name(), schema.name()))
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withColumns(columns)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    backend.insert(table, false);
+
+    topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            "topic1",
+            auditInfo);
+    backend.insert(topic, false);
+
+    fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            "fileset1",
+            auditInfo);
+    backend.insert(fileset, false);
+
+    tagMetaService.associateTagsWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        schema.nameIdentifier(),
+        schema.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        table.nameIdentifier(),
+        table.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        topic.nameIdentifier(),
+        topic.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        fileset.nameIdentifier(),
+        fileset.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    columnIdentifier =
+        NameIdentifier.of(Namespace.fromString(table.nameIdentifier().toString()), column.name());
+    tagMetaService.associateTagsWithMetadataObject(
+        columnIdentifier,
+        column.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+
+    CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), true);
+    Assertions.assertEquals(0, countActiveTagRel(tagEntity1.id()));
+    Assertions.assertEquals(12, countAllTagRel(tagEntity1.id()));
+
+    // Test to drop a schema using cascade mode
+    catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog1", auditInfo);
+    backend.insert(catalog, false);
+
+    schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name()),
+            "schema1",
+            auditInfo);
+    backend.insert(schema, false);
+
+    column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column1")
+            .withPosition(0)
+            .withAutoIncrement(false)
+            .withNullable(false)
+            .withDataType(Types.IntegerType.get())
+            .withAuditInfo(auditInfo)
+            .build();
+
+    columns = Lists.newArrayList();
+    columns.add(column);
+
+    table =
+        TableEntity.builder()
+            .withName("table")
+            .withNamespace(Namespace.of(metalakeName, catalog.name(), schema.name()))
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withColumns(columns)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    backend.insert(table, false);
+
+    topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            "topic1",
+            auditInfo);
+    backend.insert(topic, false);
+
+    fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            "fileset1",
+            auditInfo);
+    backend.insert(fileset, false);
+
+    tagMetaService.associateTagsWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        schema.nameIdentifier(),
+        schema.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        table.nameIdentifier(),
+        table.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        topic.nameIdentifier(),
+        topic.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        fileset.nameIdentifier(),
+        fileset.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+    columnIdentifier =
+        NameIdentifier.of(Namespace.fromString(table.nameIdentifier().toString()), column.name());
+    tagMetaService.associateTagsWithMetadataObject(
+        columnIdentifier,
+        column.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
+
+    // Test to drop a schema
+    SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
+    Assertions.assertEquals(1, countActiveTagRel(tagEntity1.id()));
+    Assertions.assertEquals(18, countAllTagRel(tagEntity1.id()));
   }
 }

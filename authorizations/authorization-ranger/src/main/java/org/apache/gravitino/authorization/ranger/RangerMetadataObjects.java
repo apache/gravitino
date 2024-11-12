@@ -21,15 +21,14 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
-import com.google.common.collect.Lists;
 import java.util.List;
 import org.apache.gravitino.MetadataObject;
 
 /** The helper class for {@link RangerMetadataObject}. */
 public class RangerMetadataObjects {
-  private static final Splitter DOT_SPLITTER = Splitter.on('.');
+  protected static final Splitter DOT_SPLITTER = Splitter.on('.');
 
-  private static final Joiner DOT_JOINER = Joiner.on('.');
+  protected static final Joiner DOT_JOINER = Joiner.on('.');
 
   private RangerMetadataObjects() {}
 
@@ -84,7 +83,7 @@ public class RangerMetadataObjects {
 
     @Override
     public List<String> names() {
-      return Lists.newArrayList(DOT_SPLITTER.splitToList(fullName()));
+      return DOT_SPLITTER.splitToList(fullName());
     }
 
     @Override

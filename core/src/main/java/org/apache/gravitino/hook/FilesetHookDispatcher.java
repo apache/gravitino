@@ -86,12 +86,26 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    return dispatcher.alterFileset(ident, changes);
+    Fileset alteredFileset = dispatcher.alterFileset(ident, changes);
+    FilesetChange.RenameFileset lastRenameChange = null;
+    for (FilesetChange change : changes) {
+      if (change instanceof FilesetChange.RenameFileset) {
+        lastRenameChange = (FilesetChange.RenameFileset) change;
+      }
+    }
+    if (lastRenameChange != null) {
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.FILESET, lastRenameChange.getNewName());
+    }
+
+    return alteredFileset;
   }
 
   @Override
   public boolean dropFileset(NameIdentifier ident) {
-    return dispatcher.dropFileset(ident);
+    boolean dropped = dispatcher.dropFileset(ident);
+    AuthorizationUtils.authorizationPluginRemovePrivileges(ident, Entity.EntityType.FILESET);
+    return dropped;
   }
 
   @Override

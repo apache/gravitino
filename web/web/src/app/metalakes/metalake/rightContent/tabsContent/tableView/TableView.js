@@ -25,7 +25,7 @@ import { useState, useEffect, Fragment } from 'react'
 
 import Link from 'next/link'
 
-import { styled, Box, Typography, IconButton, Stack } from '@mui/material'
+import { styled, Box, Typography, IconButton, Stack, Switch } from '@mui/material'
 import Tooltip, { tooltipClasses } from '@mui/material/Tooltip'
 import { DataGrid } from '@mui/x-data-grid'
 import {
@@ -41,14 +41,23 @@ import DetailsDrawer from '@/components/DetailsDrawer'
 import ConfirmDeleteDialog from '@/components/ConfirmDeleteDialog'
 import CreateCatalogDialog from '../../CreateCatalogDialog'
 import CreateSchemaDialog from '../../CreateSchemaDialog'
+import CreateFilesetDialog from '../../CreateFilesetDialog'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { deleteCatalog, deleteSchema } from '@/lib/store/metalakes'
+import {
+  deleteCatalog,
+  deleteFileset,
+  deleteSchema,
+  resetExpandNode,
+  setCatalogInUse,
+  setIntoTreeNodes
+} from '@/lib/store/metalakes'
 
 import { to } from '@/lib/utils'
-import { getCatalogDetailsApi } from '@/lib/api/catalogs'
+import { getCatalogDetailsApi, switchInUseApi } from '@/lib/api/catalogs'
 import { getSchemaDetailsApi } from '@/lib/api/schemas'
 import { useSearchParams } from 'next/navigation'
+import { getFilesetDetailsApi } from '@/lib/api/filesets'
 
 const fonts = Inconsolata({ subsets: ['latin'] })
 
@@ -76,6 +85,15 @@ const TableView = () => {
   const metalake = searchParams.get('metalake') || ''
   const catalog = searchParams.get('catalog') || ''
   const type = searchParams.get('type') || ''
+  const schema = searchParams.get('schema') || ''
+
+  const isCatalogList = paramsSize == 1 && searchParams.has('metalake')
+
+  const isKafkaSchema =
+    paramsSize == 3 &&
+    searchParams.has('metalake') &&
+    searchParams.has('catalog') &&
+    searchParams.get('type') === 'messaging'
 
   const defaultPaginationConfig = { pageSize: 10, page: 0 }
   const pageSizeOptions = [10, 25, 50]
@@ -91,6 +109,7 @@ const TableView = () => {
   const [openConfirmDelete, setOpenConfirmDelete] = useState(false)
   const [openDialog, setOpenDialog] = useState(false)
   const [openSchemaDialog, setOpenSchemaDialog] = useState(false)
+  const [openFilesetDialog, setOpenFilesetDialog] = useState(false)
   const [dialogData, setDialogData] = useState({})
   const [dialogType, setDialogType] = useState('create')
   const [isHideSchemaEdit, setIsHideSchemaEdit] = useState(true)
@@ -227,26 +246,40 @@ const TableView = () => {
 
         return (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Tooltip title={row.comment} placement='right'>
-              <Typography
-                noWrap
-                {...(path
-                  ? {
-                      component: Link,
-                      href: path
-                    }
-                  : {})}
-                onClick={() => handleClickUrl(path)}
-                sx={{
-                  fontWeight: 400,
-                  color: 'primary.main',
-                  textDecoration: 'none',
-                  '&:hover': { color: 'primary.main', textDecoration: 'underline' }
-                }}
-              >
-                {name}
-              </Typography>
+            <Tooltip title={row.comment} placement='left'>
+              {(isCatalogList && row.inUse === 'true') || !isCatalogList ? (
+                <Typography
+                  noWrap
+                  {...(path
+                    ? {
+                        component: Link,
+                        href: path
+                      }
+                    : {})}
+                  onClick={() => handleClickUrl(path)}
+                  sx={{
+                    fontWeight: 400,
+                    color: 'primary.main',
+                    textDecoration: 'none',
+                    '&:hover': { color: 'primary.main', textDecoration: 'underline' }
+                  }}
+                >
+                  {name}
+                </Typography>
+              ) : (
+                <Typography>{name}</Typography>
+              )}
             </Tooltip>
+            {isCatalogList && (
+              <Tooltip title={row.inUse === 'true' ? 'In-use' : 'Not In-use'} placement='right'>
+                <Switch
+                  data-refer={`catalog-in-use-${name}`}
+                  checked={row.inUse === 'true'}
+                  onChange={(e, value) => handleChangeInUse(name, row.type, value)}
+                  size='small'
+                />
+              </Tooltip>
+            )}
           </Box>
         )
       }
@@ -463,6 +496,15 @@ const TableView = () => {
         setOpenDrawer(true)
         break
       }
+      case 'fileset': {
+        const [err, res] = await to(getFilesetDetailsApi({ metalake, catalog, schema, fileset: row.name }))
+        if (err || !res) {
+          throw new Error(err)
+        }
+
+        setDrawerData(res.fileset)
+        setOpenDrawer(true)
+      }
       default:
         return
     }
@@ -498,6 +540,18 @@ const TableView = () => {
         }
         break
       }
+      case 'fileset': {
+        if (metalake && catalog && schema) {
+          const [err, res] = await to(getFilesetDetailsApi({ metalake, catalog, schema, fileset: data.row?.name }))
+          if (err || !res) {
+            throw new Error(err)
+          }
+
+          setDialogType('update')
+          setDialogData(res.fileset)
+          setOpenFilesetDialog(true)
+        }
+      }
       default:
         return
     }
@@ -522,6 +576,9 @@ const TableView = () => {
         case 'schema':
           dispatch(deleteSchema({ metalake, catalog, type, schema: confirmCacheData.name }))
           break
+        case 'fileset':
+          dispatch(deleteFileset({ metalake, catalog, type, schema, fileset: confirmCacheData.name }))
+          break
         default:
           break
       }
@@ -530,10 +587,23 @@ const TableView = () => {
     }
   }
 
+  const handleChangeInUse = async (name, catalogType, isInUse) => {
+    const [err, res] = await to(switchInUseApi({ metalake, catalog: name, isInUse }))
+    if (err || !res) {
+      throw new Error(err)
+    }
+    dispatch(setCatalogInUse({ name, catalogType, metalake, isInUse }))
+  }
+
   const checkColumns = () => {
     if (
       (paramsSize == 1 && searchParams.has('metalake')) ||
-      (paramsSize == 3 && searchParams.has('metalake') && searchParams.has('catalog') && searchParams.has('type'))
+      (paramsSize == 3 && searchParams.has('metalake') && searchParams.has('catalog') && searchParams.has('type')) ||
+      (paramsSize == 4 &&
+        searchParams.has('metalake') &&
+        searchParams.has('catalog') &&
+        searchParams.get('type') === 'fileset' &&
+        searchParams.has('schema'))
     ) {
       return actionsColumns
     } else if (paramsSize == 5 && searchParams.has('table')) {
@@ -580,6 +650,13 @@ const TableView = () => {
       <CreateCatalogDialog open={openDialog} setOpen={setOpenDialog} data={dialogData} type={dialogType} />
 
       <CreateSchemaDialog open={openSchemaDialog} setOpen={setOpenSchemaDialog} data={dialogData} type={dialogType} />
+
+      <CreateFilesetDialog
+        open={openFilesetDialog}
+        setOpen={setOpenFilesetDialog}
+        data={dialogData}
+        type={dialogType}
+      />
     </Box>
   )
 }

@@ -25,7 +25,7 @@ control mechanism without needing to set access controls across different storag
 To use fileset, please make sure that:
 
  - Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
- - A metalake has been created.
+ - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake)
 
 ## Catalog operations
 
@@ -52,6 +52,25 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "location": "file:/tmp/root"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
+
+# create a S3 catalog
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "catalog",
+  "type": "FILESET",
+  "comment": "comment",
+  "provider": "hadoop",
+  "properties": {
+    "location": "s3a://bucket/root",
+    "s3-access-key-id": "access_key",
+    "s3-secret-access-key": "secret_key",
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
+    "filesystem-providers": "s3"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+
+# For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
+# The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -74,7 +93,25 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
     "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a Hadoop fileset catalog",
     properties);
+
+// create a S3 catalog
+s3Properties = ImmutableMap.<String, String>builder()
+    .put("location", "s3a://bucket/root")
+    .put("s3-access-key-id", "access_key")
+    .put("s3-secret-access-key", "secret_key")
+    .put("s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
+    .put("filesystem-providers", "s3")
+    .build();
+
+Catalog s3Catalog = gravitinoClient.createCatalog("catalog",
+    Type.FILESET,
+    "hadoop", // provider, Gravitino only supports "hadoop" for now.
+    "This is a S3 fileset catalog",
+    s3Properties);
 // ...
+
+// For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
+// The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -87,6 +124,23 @@ catalog = gravitino_client.create_catalog(name="catalog",
                                           provider="hadoop", 
                                           comment="This is a Hadoop fileset catalog",
                                           properties={"location": "/tmp/test1"})
+
+# create a S3 catalog
+s3_properties = {
+    "location": "s3a://bucket/root",
+    "s3-access-key-id": "access_key"
+    "s3-secret-access-key": "secret_key",
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
+}
+
+s3_catalog = gravitino_client.create_catalog(name="catalog",
+                                             type=Catalog.Type.FILESET,
+                                             provider="hadoop",
+                                             comment="This is a S3 fileset catalog",
+                                             properties=s3_properties)
+
+# For others HCFS like GCS, OSS, etc., the properties should be set accordingly. please refer to
+# The following link about the catalog properties.
 ```
 
 </TabItem>
@@ -314,6 +368,13 @@ Currently, Gravitino supports two **types** of filesets:
 The `storageLocation` is the physical location of the fileset. Users can specify this location
 when creating a fileset, or follow the rules of the catalog/schema location if not specified.
 
+The value of `storageLocation` depends on the configuration settings of the catalog:
+- If this is a S3 fileset catalog, the `storageLocation` should be in the format of `s3a://bucket-name/path/to/fileset`.
+- If this is an OSS fileset catalog, the `storageLocation` should be in the format of `oss://bucket-name/path/to/fileset`.
+- If this is a local fileset catalog, the `storageLocation` should be in the format of `file:/path/to/fileset`.
+- If this is a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
+- If this is a GCS fileset catalog, the `storageLocation` should be in the format of `gs://bucket-name/path/to/fileset`.
+
 For a `MANAGED` fileset, the storage location is:
 
 1. The one specified by the user during the fileset creation.
@@ -389,13 +450,13 @@ fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("sche
 
 Currently, Gravitino supports the following changes to a fileset:
 
-| Supported modification     | JSON                                                         | Java                                          |
-|----------------------------|--------------------------------------------------------------|-----------------------------------------------|
-| Rename a fileset           | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
-| Update a comment           | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
-| Set a fileset property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
-| Remove a fileset property  | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
-| Remove comment             | `{"@type":"removeComment"}`                                  | `FilesetChange.removeComment()`               |
+| Supported modification      | JSON                                                         | Java                                          |
+|-----------------------------|--------------------------------------------------------------|-----------------------------------------------|
+| Rename a fileset            | `{"@type":"rename","newName":"fileset_renamed"}`             | `FilesetChange.rename("fileset_renamed")`     |
+| Update a comment            | `{"@type":"updateComment","newComment":"new_comment"}`       | `FilesetChange.updateComment("new_comment")`  |
+| Set a fileset property      | `{"@type":"setProperty","property":"key1","value":"value1"}` | `FilesetChange.setProperty("key1", "value1")` |
+| Remove a fileset property   | `{"@type":"removeProperty","property":"key1"}`               | `FilesetChange.removeProperty("key1")`        |
+| Remove comment (deprecated) | `{"@type":"removeComment"}`                                  | `FilesetChange.removeComment()`               |
 
 ### Drop a fileset
 

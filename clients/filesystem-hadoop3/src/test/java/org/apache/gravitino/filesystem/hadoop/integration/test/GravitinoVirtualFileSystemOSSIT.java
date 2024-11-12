@@ -27,7 +27,10 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.oss.fs.OSSFileSystemProvider;
+import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -74,11 +77,9 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
 
     Map<String, String> properties = Maps.newHashMap();
     properties.put(FILESYSTEM_PROVIDERS, "oss");
-    properties.put("gravitino.bypass.fs.oss.accessKeyId", OSS_ACCESS_KEY);
-    properties.put("gravitino.bypass.fs.oss.accessKeySecret", OSS_SECRET_KEY);
-    properties.put("gravitino.bypass.fs.oss.endpoint", OSS_ENDPOINT);
-    properties.put(
-        "gravitino.bypass.fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
+    properties.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY);
+    properties.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, OSS_SECRET_KEY);
+    properties.put(OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
 
     Catalog catalog =
         metalake.createCatalog(
@@ -95,11 +96,10 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set("gravitino.bypass.fs.oss.accessKeyId", OSS_ACCESS_KEY);
-    conf.set("gravitino.bypass.fs.oss.accessKeySecret", OSS_SECRET_KEY);
-    conf.set("gravitino.bypass.fs.oss.endpoint", OSS_ENDPOINT);
-    conf.set("gravitino.bypass.fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
-
+    conf.set(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY);
+    conf.set(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, OSS_SECRET_KEY);
+    conf.set(OSSProperties.GRAVITINO_OSS_ENDPOINT, OSS_ENDPOINT);
+    conf.set("fs.oss.impl", "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
     conf.set(FS_FILESYSTEM_PROVIDERS, "oss");
   }
 
@@ -108,7 +108,7 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
     metalake.dropCatalog(catalogName, true);
-    client.dropMetalake(metalakeName);
+    client.dropMetalake(metalakeName, true);
 
     if (client != null) {
       client.close();
@@ -128,13 +128,18 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
    * .GravitinoVirtualFileSystem#getConfigMap(Configuration) in the original code.
    */
   protected Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
-    Configuration gcsConf = new Configuration();
-    gvfsConf.forEach(
-        entry -> {
-          gcsConf.set(entry.getKey().replace("gravitino.bypass.", ""), entry.getValue());
-        });
+    Configuration ossConf = new Configuration();
+    Map<String, String> map = Maps.newHashMap();
 
-    return gcsConf;
+    gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
+
+    Map<String, String> hadoopConfMap =
+        FileSystemUtils.toHadoopConfigMap(
+            map, OSSFileSystemProvider.GRAVITINO_KEY_TO_OSS_HADOOP_KEY);
+
+    hadoopConfMap.forEach(ossConf::set);
+
+    return ossConf;
   }
 
   protected String genStorageLocation(String fileset) {

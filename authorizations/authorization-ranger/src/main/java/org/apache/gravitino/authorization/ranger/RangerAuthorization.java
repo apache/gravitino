@@ -33,7 +33,8 @@ public class RangerAuthorization extends BaseAuthorization<RangerAuthorization> 
   protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
     switch (catalogProvider) {
       case "hive":
-        return RangerAuthorizationHivePlugin.getInstance(config);
+      case "lakehouse-iceberg":
+        return RangerAuthorizationHadoopSQLPlugin.getInstance(config);
       default:
         throw new IllegalArgumentException("Unknown catalog provider: " + catalogProvider);
     }

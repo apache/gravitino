@@ -58,6 +58,7 @@ public class SetTagProperty extends Command {
   }
 
   /** Set a property of a tag. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

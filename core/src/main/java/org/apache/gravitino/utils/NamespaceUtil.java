@@ -71,6 +71,19 @@ public class NamespaceUtil {
   }
 
   /**
+   * Create a namespace for column.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param table The table name
+   * @return A namespace for column
+   */
+  public static Namespace ofColumn(String metalake, String catalog, String schema, String table) {
+    return Namespace.of(metalake, catalog, schema, table);
+  }
+
+  /**
    * Create a namespace for fileset.
    *
    * @param metalake The metalake name
@@ -143,6 +156,19 @@ public class NamespaceUtil {
     check(
         namespace != null && namespace.length() == 3,
         "Table namespace must be non-null and have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  /**
+   * Check if the given column namespace is legal, throw an {@link IllegalNamespaceException} if
+   * it's illegal.
+   *
+   * @param namespace The column namespace
+   */
+  public static void checkColumn(Namespace namespace) {
+    check(
+        namespace != null && namespace.length() == 4,
+        "Column namespace must be non-null and have 4 levels, the input namespace is %s",
         namespace);
   }
 

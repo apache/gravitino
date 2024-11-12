@@ -109,8 +109,7 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             comment="",
             properties={
                 "filesystem-providers": "gcs",
-                "gravitino.bypass.fs.gs.auth.service.account.enable": "true",
-                "gravitino.bypass.fs.gs.auth.service.account.json.keyfile": cls.key_file,
+                "gcs-service-account-file": cls.key_file,
             },
         )
         catalog.as_schemas().create_schema(

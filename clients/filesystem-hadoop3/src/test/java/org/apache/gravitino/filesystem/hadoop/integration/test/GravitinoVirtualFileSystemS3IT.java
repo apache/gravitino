@@ -29,8 +29,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.s3.fs.S3FileSystemProvider;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -151,11 +154,9 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set("fs.s3a.access.key", accessKey);
-    conf.set("fs.s3a.secret.key", secretKey);
-    conf.set("fs.s3a.endpoint", s3Endpoint);
-    conf.set(
-        "fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
+    conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, accessKey);
+    conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, secretKey);
+    conf.set(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
     conf.set(FS_FILESYSTEM_PROVIDERS, "s3");
   }
 
@@ -184,13 +185,17 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
    * .GravitinoVirtualFileSystem#getConfigMap(Configuration) in the original code.
    */
   protected Configuration convertGvfsConfigToRealFileSystemConfig(Configuration gvfsConf) {
-    Configuration gcsConf = new Configuration();
-    gvfsConf.forEach(
-        entry -> {
-          gcsConf.set(entry.getKey().replace("gravitino.bypass.", ""), entry.getValue());
-        });
+    Configuration s3Conf = new Configuration();
+    Map<String, String> map = Maps.newHashMap();
 
-    return gcsConf;
+    gvfsConf.forEach(entry -> map.put(entry.getKey(), entry.getValue()));
+
+    Map<String, String> hadoopConfMap =
+        FileSystemUtils.toHadoopConfigMap(map, S3FileSystemProvider.GRAVITINO_KEY_TO_S3_HADOOP_KEY);
+
+    hadoopConfMap.forEach(s3Conf::set);
+
+    return s3Conf;
   }
 
   protected String genStorageLocation(String fileset) {

@@ -103,4 +103,32 @@ public class TableColumnBaseSQLProvider {
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String selectColumnIdByTableIdAndName(
+      @Param("tableId") Long tableId, @Param("columnName") String name) {
+    return "SELECT"
+        + "   CASE"
+        + "     WHEN column_op_type = 3 THEN NULL"
+        + "     ELSE column_id"
+        + "   END"
+        + " FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " WHERE table_id = #{tableId} AND column_name = #{columnName} AND deleted_at = 0"
+        + " ORDER BY table_version DESC LIMIT 1";
+  }
+
+  public String selectColumnPOById(@Param("columnId") Long columnId) {
+    return "SELECT column_id AS columnId, column_name AS columnName,"
+        + " column_position AS columnPosition, metalake_id AS metalakeId, catalog_id AS catalogId,"
+        + " schema_id AS schemaId, table_id AS tableId,"
+        + " table_version AS tableVersion, column_type AS columnType,"
+        + " column_comment AS columnComment, column_nullable AS nullable,"
+        + " column_auto_increment AS autoIncrement,"
+        + " column_default_value AS defaultValue, column_op_type AS columnOpType,"
+        + " deleted_at AS deletedAt, audit_info AS auditInfo"
+        + " FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " WHERE column_id = #{columnId} AND deleted_at = 0"
+        + " ORDER BY table_version DESC LIMIT 1";
+  }
 }

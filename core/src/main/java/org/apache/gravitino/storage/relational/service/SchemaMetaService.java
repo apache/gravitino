@@ -37,8 +37,10 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -216,8 +218,15 @@ public class SchemaMetaService {
                     mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)),
             () ->
                 SessionUtils.doWithoutCommit(
-                    OwnerMetaMapper.class,
-                    mapper -> mapper.softDeleteOwnerRelBySchemaId(schemaId)));
+                    OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SecurableObjectMapper.class,
+                    mapper -> mapper.softDeleteObjectRelsBySchemaId(schemaId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TagMetadataObjectRelMapper.class,
+                    mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaId(schemaId)));
       } else {
         List<TableEntity> tableEntities =
             TableMetaService.getInstance()
@@ -251,6 +260,18 @@ public class SchemaMetaService {
                     OwnerMetaMapper.class,
                     mapper ->
                         mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                            schemaId, MetadataObject.Type.SCHEMA.name())),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SecurableObjectMapper.class,
+                    mapper ->
+                        mapper.softDeleteObjectRelsByMetadataObject(
+                            schemaId, MetadataObject.Type.SCHEMA.name())),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    TagMetadataObjectRelMapper.class,
+                    mapper ->
+                        mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                             schemaId, MetadataObject.Type.SCHEMA.name())));
       }
     }

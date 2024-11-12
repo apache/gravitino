@@ -47,7 +47,13 @@ import {
   deleteSchemaApi
 } from '@/lib/api/schemas'
 import { getTablesApi, getTableDetailsApi } from '@/lib/api/tables'
-import { getFilesetsApi, getFilesetDetailsApi } from '@/lib/api/filesets'
+import {
+  getFilesetsApi,
+  getFilesetDetailsApi,
+  createFilesetApi,
+  updateFilesetApi,
+  deleteFilesetApi
+} from '@/lib/api/filesets'
 import { getTopicsApi, getTopicDetailsApi } from '@/lib/api/topics'
 
 export const fetchMetalakes = createAsyncThunk('appMetalakes/fetchMetalakes', async (params, { getState }) => {
@@ -289,6 +295,7 @@ export const fetchCatalogs = createAsyncThunk(
         path: `?${new URLSearchParams({ metalake, catalog: catalog.name, type: catalog.type }).toString()}`,
         type: catalog.type,
         provider: catalog.provider,
+        inUse: catalog.properties['in-use'],
         name: catalog.name,
         title: catalog.name,
         namespace: [metalake],
@@ -885,6 +892,67 @@ export const getFilesetDetails = createAsyncThunk(
   }
 )
 
+export const createFileset = createAsyncThunk(
+  'appMetalakes/createFileset',
+  async ({ data, metalake, catalog, type, schema }, { dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(createFilesetApi({ data, metalake, catalog, schema }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      return { err: true }
+    }
+
+    const { fileset: filesetItem } = res
+
+    const filesetData = {
+      ...filesetItem,
+      node: 'fileset',
+      id: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
+      key: `{{${metalake}}}{{${catalog}}}{{${type}}}{{${schema}}}{{${filesetItem.name}}}`,
+      path: `?${new URLSearchParams({ metalake, catalog, type, schema, fileset: filesetItem.name }).toString()}`,
+      name: filesetItem.name,
+      title: filesetItem.name,
+      tables: [],
+      children: []
+    }
+
+    dispatch(fetchFilesets({ metalake, catalog, schema, type, init: true }))
+
+    return filesetData
+  }
+)
+
+export const updateFileset = createAsyncThunk(
+  'appMetalakes/updateFileset',
+  async ({ metalake, catalog, type, schema, fileset, data }, { dispatch }) => {
+    const [err, res] = await to(updateFilesetApi({ metalake, catalog, schema, fileset, data }))
+    if (err || !res) {
+      return { err: true }
+    }
+    dispatch(fetchFilesets({ metalake, catalog, type, schema, init: true }))
+
+    return res.catalog
+  }
+)
+
+export const deleteFileset = createAsyncThunk(
+  'appMetalakes/deleteFileset',
+  async ({ metalake, catalog, type, schema, fileset }, { dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(deleteFilesetApi({ metalake, catalog, schema, fileset }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    dispatch(fetchFilesets({ metalake, catalog, type, schema, page: 'schemas', init: true }))
+
+    return res
+  }
+)
+
 export const fetchTopics = createAsyncThunk(
   'appMetalakes/fetchTopics',
   async ({ init, page, metalake, catalog, schema }, { getState, dispatch }) => {
@@ -1063,6 +1131,34 @@ export const appMetalakesSlice = createSlice({
     },
     removeCatalogFromTree(state, action) {
       state.metalakeTree = state.metalakeTree.filter(i => i.key !== action.payload)
+    },
+    setCatalogInUse(state, action) {
+      const { name, catalogType, metalake, isInUse } = action.payload
+      for (let i = 0; i < state.catalogs.length; i++) {
+        if (state.catalogs[i].name === name) {
+          state.catalogs[i].inUse = isInUse + ''
+          state.tableData[i].inUse = isInUse + ''
+          const catalogItem = state.metalakeTree[i]
+          catalogItem.inUse = isInUse + ''
+          state.metalakeTree.splice(i, 1, catalogItem)
+          break
+        }
+      }
+      if (!isInUse) {
+        state.expandedNodes = state.expandedNodes.filter(key => !key.includes(name))
+        state.loadedNodes = state.loadedNodes.filter(key => !key.includes(name))
+        state.metalakeTree = updateTreeData(state.metalakeTree, `{{${metalake}}}{{${name}}}{{${catalogType}}}`, [])
+      } else {
+        state.metalakeTree = updateTreeData(state.metalakeTree, `{{${metalake}}}{{${name}}}{{${catalogType}}}`, null)
+      }
+    },
+    setMetalakeInUse(state, action) {
+      for (let i = 0; i < state.metalakes.length; i++) {
+        if (state.metalakes[i].name === action.payload.name) {
+          state.metalakes[i].properties['in-use'] = action.payload.isInUse + ''
+          break
+        }
+      }
     },
     setTableProps(state, action) {
       state.tableProps = action.payload
@@ -1248,6 +1344,8 @@ export const {
   setExpanded,
   setExpandedNodes,
   addCatalogToTree,
+  setCatalogInUse,
+  setMetalakeInUse,
   removeCatalogFromTree,
   setTableProps
 } = appMetalakesSlice.actions
