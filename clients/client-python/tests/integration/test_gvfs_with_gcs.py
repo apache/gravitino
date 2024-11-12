@@ -36,7 +36,7 @@ from gravitino.filesystem.gvfs_config import GVFSConfig
 logger = logging.getLogger(__name__)
 
 
-def oss_is_prepare():
+def oss_is_configured():
     return all(
         [
             os.environ.get("GCS_SERVICE_ACCOUNT_JSON_PATH") is not None,
@@ -45,7 +45,7 @@ def oss_is_prepare():
     )
 
 
-@unittest.skipUnless(oss_is_prepare(), "GCS environment is not prepared.")
+@unittest.skipUnless(oss_is_configured(), "GCS is not configured.")
 class TestGvfsWithGCS(TestGvfsWithHDFS):
     # Before running this test, please set the make sure gcp-bundle-x.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory

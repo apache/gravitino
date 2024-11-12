@@ -40,7 +40,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 
-@EnabledIf(value = "isGCPConfigured", disabledReason = "GCP is not configured")
+@EnabledIf(value = "isGCPConfigured", disabledReason = "GCP is not configured.")
 public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
   public static final String BUCKET_NAME = System.getenv("GCS_BUCKET_NAME");

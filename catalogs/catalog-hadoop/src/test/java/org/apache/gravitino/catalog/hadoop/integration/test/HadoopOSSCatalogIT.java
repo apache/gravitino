@@ -44,7 +44,7 @@ import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@EnabledIf(value = "ossIsConfigured", disabledReason = "OSS is not prepared")
+@EnabledIf(value = "ossIsConfigured", disabledReason = "OSS is not configured.")
 public class HadoopOSSCatalogIT extends HadoopCatalogIT {
   private static final Logger LOG = LoggerFactory.getLogger(HadoopOSSCatalogIT.class);
   public static final String BUCKET_NAME = System.getenv("OSS_BUCKET_NAME");
