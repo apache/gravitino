@@ -17,37 +17,42 @@
  *  under the License.
  */
 
-package org.apache.gravitino.catalog;
+package org.apache.gravitino.credential;
 
 import java.util.List;
-import org.apache.commons.lang3.NotImplementedException;
+import javax.ws.rs.NotAuthorizedException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.OperationDispatcher;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Get credentials with the specific catalog classloader. */
-public class CredentialManager extends OperationDispatcher {
+public class CredentialOperationDispatcher extends OperationDispatcher {
 
-  public CredentialManager(
+  public CredentialOperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
     super(catalogManager, store, idGenerator);
   }
 
   public List<Credential> getCredentials(NameIdentifier identifier) {
+    CredentialPrivilege privilege =
+        getCredentialPrivilege(PrincipalUtils.getCurrentUserName(), identifier);
     return doWithCatalog(
         NameIdentifierUtil.getCatalogIdentifier(identifier),
-        c -> getCredentials(c.catalog(), identifier),
+        catalogWrapper ->
+            catalogWrapper.doWithCredentialOps(
+                credentialOps -> credentialOps.getCredentials(identifier, privilege)),
         NoSuchCatalogException.class);
   }
 
-  private List<Credential> getCredentials(BaseCatalog catalog, NameIdentifier identifier) {
-    throw new NotImplementedException(
-        String.format(
-            "Load credentials is not implemented for catalog: %s, identifier: %s",
-            catalog.name(), identifier));
+  @SuppressWarnings("UnusedVariable")
+  private CredentialPrivilege getCredentialPrivilege(String user, NameIdentifier identifier)
+      throws NotAuthorizedException {
+    // TODO: will implement in another PR
+    return CredentialPrivilege.WRITE;
   }
 }

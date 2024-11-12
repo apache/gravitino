@@ -19,14 +19,81 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public class CredentialUtils {
+
+  private static final Splitter splitter = Splitter.on(",");
+  private static final Set<MetadataObject.Type> supportsCredentialMetadataTypes =
+      ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.FILESET);
+
   public static Credential vendCredential(CredentialProvider credentialProvider, String[] path) {
     PathBasedCredentialContext pathBasedCredentialContext =
         new PathBasedCredentialContext(
             PrincipalUtils.getCurrentUserName(), ImmutableSet.copyOf(path), ImmutableSet.of());
     return credentialProvider.getCredential(pathBasedCredentialContext);
+  }
+
+  public static boolean supportsCredentialOperations(MetadataObject metadataObject) {
+    return supportsCredentialMetadataTypes.contains(metadataObject.type());
+  }
+
+  public static Map<String, CredentialProvider> loadCredentialProviders(
+      Map<String, String> catalogProperties) {
+    Set<String> credentialProviders =
+        CredentialUtils.getCredentialProviders(() -> catalogProperties);
+
+    return credentialProviders.stream()
+        .collect(
+            Collectors.toMap(
+                String::toString,
+                credentialType ->
+                    CredentialProviderFactory.create(credentialType, catalogProperties)));
+  }
+
+  /**
+   * Get Credential providers from properties supplier.
+   *
+   * <p>If there are multiple properties suppliers, will try to get the credential providers in the
+   * input order.
+   *
+   * @param propertiesSuppliers The properties suppliers.
+   * @return A set of credential providers.
+   */
+  public static Set<String> getCredentialProviders(
+      Supplier<Map<String, String>>... propertiesSuppliers) {
+
+    for (Supplier<Map<String, String>> supplier : propertiesSuppliers) {
+      Map<String, String> properties = supplier.get();
+      Set<String> providers = getCredentialProvidersFromProperties(properties);
+      if (!providers.isEmpty()) {
+        return providers;
+      }
+    }
+
+    return ImmutableSet.of();
+  }
+
+  private static Set<String> getCredentialProvidersFromProperties(Map<String, String> properties) {
+    if (properties == null) {
+      return ImmutableSet.of();
+    }
+
+    String providers = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    if (providers == null) {
+      return ImmutableSet.of();
+    }
+    return splitter
+        .trimResults()
+        .omitEmptyStrings()
+        .splitToStream(providers)
+        .collect(Collectors.toSet());
   }
 }

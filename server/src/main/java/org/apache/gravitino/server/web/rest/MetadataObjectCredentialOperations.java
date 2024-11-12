@@ -26,6 +26,7 @@ import java.util.Locale;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
+import javax.ws.rs.NotSupportedException;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -34,8 +35,9 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.CredentialManager;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -51,15 +53,15 @@ public class MetadataObjectCredentialOperations {
   private static final Logger LOG =
       LoggerFactory.getLogger(MetadataObjectCredentialOperations.class);
 
-  private CredentialManager credentialManager;
+  private CredentialOperationDispatcher credentialOperationDispatcher;
 
   @SuppressWarnings("unused")
   @Context
   private HttpServletRequest httpRequest;
 
   @Inject
-  public MetadataObjectCredentialOperations(CredentialManager dispatcher) {
-    this.credentialManager = dispatcher;
+  public MetadataObjectCredentialOperations(CredentialOperationDispatcher dispatcher) {
+    this.credentialOperationDispatcher = dispatcher;
   }
 
   @GET
@@ -83,9 +85,13 @@ public class MetadataObjectCredentialOperations {
             MetadataObject object =
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            if (!CredentialUtils.supportsCredentialOperations(object)) {
+              throw new NotSupportedException(
+                  "Doesn't support credential operations for metadata object type");
+            }
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-            List<Credential> credentials = credentialManager.getCredentials(identifier);
+            List<Credential> credentials = credentialOperationDispatcher.getCredentials(identifier);
             if (credentials == null) {
               return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
             }
