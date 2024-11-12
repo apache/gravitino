@@ -613,6 +613,9 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
               f -> {
                 ClassLoader oldCl = Thread.currentThread().getContextClassLoader();
                 try {
+                  // parallelStream uses forkjoin thread pool, which has a different classloader
+                  // than the catalog thread. We need to set the context classloader to the
+                  // catalog's classloader to avoid classloading issues.
                   Thread.currentThread().setContextClassLoader(cl);
                   Path filesetPath = new Path(f.storageLocation());
                   FileSystem fs = getFileSystem(filesetPath, conf);
