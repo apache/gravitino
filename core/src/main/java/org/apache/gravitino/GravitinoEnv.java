@@ -28,6 +28,7 @@ import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
+import org.apache.gravitino.catalog.CredentialOperationDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FilesetNormalizeDispatcher;
 import org.apache.gravitino.catalog.FilesetOperationDispatcher;
@@ -104,6 +105,8 @@ public class GravitinoEnv {
   private ModelDispatcher modelDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
+
+  private CredentialOperationDispatcher credentialOperationDispatcher;
 
   private AccessControlDispatcher accessControlDispatcher;
 
@@ -255,6 +258,10 @@ public class GravitinoEnv {
    */
   public MetalakeDispatcher metalakeDispatcher() {
     return metalakeDispatcher;
+  }
+
+  public CredentialOperationDispatcher credentialOperationDispatcher() {
+    return credentialOperationDispatcher;
   }
 
   /**
@@ -416,6 +423,9 @@ public class GravitinoEnv {
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogHookDispatcher);
     this.catalogDispatcher = new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
+
+    this.credentialOperationDispatcher =
+        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);

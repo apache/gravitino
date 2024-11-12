@@ -33,8 +33,8 @@ public class S3SecretKeyCredential implements Credential {
   /** The static secret access key used to access S3 data. */
   public static final String GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY = "s3-secret-access-key";
 
-  private final String accessKeyId;
-  private final String secretAccessKey;
+  private String accessKeyId;
+  private String secretAccessKey;
 
   /**
    * Constructs an instance of {@link S3SecretKeyCredential} with the static S3 access key ID and
@@ -50,6 +50,12 @@ public class S3SecretKeyCredential implements Credential {
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
   }
+
+  /**
+   * This is the constructor that is used by CredentialProvider to create an instance of Credential
+   * according to the credential information.
+   */
+  public S3SecretKeyCredential() {}
 
   @Override
   public String credentialType() {
@@ -67,6 +73,14 @@ public class S3SecretKeyCredential implements Credential {
         .put(GRAVITINO_S3_STATIC_ACCESS_KEY_ID, accessKeyId)
         .put(GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY, secretAccessKey)
         .build();
+  }
+
+  @Override
+  public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+    Preconditions.checkArgument(
+        expireTimeInMs == 0, "The expire time of S3SecretKeyCredential is not 0");
+    this.accessKeyId = credentialInfo.get(GRAVITINO_S3_STATIC_ACCESS_KEY_ID);
+    this.secretAccessKey = credentialInfo.get(GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY);
   }
 
   /**
