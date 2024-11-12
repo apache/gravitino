@@ -17,18 +17,22 @@
  *  under the License.
  */
 
-package org.apache.gravitino.iceberg.service;
+package org.apache.gravitino.iceberg.service.rest;
 
+import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
-import lombok.Getter;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 
-/** The general request context information for Iceberg REST operations. */
-public class IcebergRequestContext {
-  @Getter private final HttpServletRequest httpRequest;
-  @Getter private final String catalogName;
+public class MockIcebergTableRenameOperations extends IcebergTableRenameOperations {
+  @Inject
+  public MockIcebergTableRenameOperations(
+      IcebergTableOperationDispatcher tableOperationDispatcher) {
+    super(tableOperationDispatcher);
+  }
 
-  public IcebergRequestContext(HttpServletRequest httpRequest, String catalogName) {
-    this.httpRequest = httpRequest;
-    this.catalogName = catalogName;
+  // HTTP request is null in Jersey test, create a mock request
+  @Override
+  HttpServletRequest httpServletRequest() {
+    return IcebergRestTestUtil.createMockHttpRequest();
   }
 }

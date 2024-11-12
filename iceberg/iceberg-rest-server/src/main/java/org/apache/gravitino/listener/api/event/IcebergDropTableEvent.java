@@ -28,8 +28,10 @@ public class IcebergDropTableEvent extends IcebergTableEvent {
   private boolean purgeRequested;
 
   public IcebergDropTableEvent(
-      String user, NameIdentifier resourceIdentifier, boolean purgeRequested) {
-    super(user, resourceIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      boolean purgeRequested) {
+    super(icebergRequestContext, resourceIdentifier);
     this.purgeRequested = purgeRequested;
   }
 
