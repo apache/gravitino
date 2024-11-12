@@ -23,7 +23,7 @@ hive_dir="$(cd "${hive_dir}">/dev/null; pwd)"
 
 # Environment variables definition
 HADOOP2_VERSION="2.7.3"
-HADOOP3_VERSION="3.1.0"
+HADOOP3_VERSION="3.3.0"
 
 HIVE2_VERSION="2.3.9"
 HIVE3_VERSION="3.1.3"

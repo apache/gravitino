@@ -63,4 +63,14 @@
     <value>org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider,com.amazonaws.auth.EnvironmentVariableCredentialsProvider,org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider</value>
   </property>
 
+  <property>
+    <name>fs.abfss.impl</name>
+    <value>org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem</value>
+  </property>
+
+  <property>
+    <name>fs.azure.account.key.ADLS_ACCOUNT_NAME.dfs.core.windows.net</name>
+    <value>ADLS_ACCOUNT_KEY</value>
+  </property>
+
 </configuration>
