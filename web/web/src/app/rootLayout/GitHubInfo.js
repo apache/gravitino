@@ -33,30 +33,32 @@ const GitHubInfo = ({ stars, forks, username, repository }) => {
       <Link href={githubUrl}>
         <Image className={'twc-align-middle'} src={githubLogoUrl} width={24} height={24} alt='logo' />
       </Link>
-      <Box className={'twc-flex twc-items-center twc-gap-x-3  twc-ml-2'}>
-        <Link
-          href={githubForkUrl}
-          className={
-            'twc-flex twc-items-center twc-gap-1 twc-no-underline twc-text-customs-black twc-bg-customs-dark twc-rounded-full twc-px-2.5 twc-py-1 twc-text-[0.75rem] twc-font-bold'
-          }
-        >
-          <Image
-            className={'twc-align-middle twc-text-customs-white'}
-            src={forkLogoUrl}
-            width={24}
-            height={24}
-            alt='logo'
-          />
-          {forks} Forks
+      <Box className={'twc-flex twc-items-center twc-gap-x-3 twc-ml-2'}>
+        <Link href={githubForkUrl} className={'twc-no-underline  twc-bg-customs-dark twc-rounded-full '}>
+          <Typography
+            className={
+              'twc-flex twc-items-center twc-gap-2 twc-text-customs-black twc-px-2.5 twc-py-1 twc-text-[0.75rem] twc-font-bold'
+            }
+          >
+            <Image
+              className={'twc-align-middle twc-text-customs-white'}
+              src={forkLogoUrl}
+              width={24}
+              height={24}
+              alt='logo'
+            />
+            {forks} Forks
+          </Typography>
         </Link>
-        <Link
-          href={githubUrl}
-          className={
-            'twc-flex twc-items-center twc-gap-1 twc-no-underline twc-text-customs-black twc-bg-customs-dark twc-rounded-full twc-px-2.5 twc-py-1 twc-text-[0.75rem] twc-font-bold'
-          }
-        >
-          <Star className={'twc-text-customs-black'} />
-          {stars} Stars
+        <Link href={githubUrl} className={'twc-no-underline  twc-bg-customs-dark twc-rounded-full '}>
+          <Typography
+            className={
+              'twc-flex twc-items-center twc-gap-2 twc-text-customs-black twc-px-2.5 twc-py-1 twc-text-[0.75rem] twc-font-bold'
+            }
+          >
+            <Star className={'twc-text-customs-black'} />
+            {stars} Stars
+          </Typography>
         </Link>
       </Box>
     </Box>
