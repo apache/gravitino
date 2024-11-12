@@ -55,13 +55,7 @@ public class ListRoles extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < roles.length; i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(roles[i]);
-    }
+    String all = String.join(",", roles);
 
     System.out.println(all.toString());
   }
