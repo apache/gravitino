@@ -62,6 +62,8 @@
 #
 ##############################################################################
 
+# Refer from https://github.com/gradle/gradle/blob/master/gradlew
+
 # Attempt to set APP_HOME
 
 # Resolve links: $0 may be a link
