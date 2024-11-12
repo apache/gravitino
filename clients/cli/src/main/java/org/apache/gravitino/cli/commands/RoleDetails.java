@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -64,13 +65,8 @@ public class RoleDetails extends Command {
       return;
     }
 
-    StringBuilder all = new StringBuilder();
-    for (int i = 0; i < objects.size(); i++) {
-      if (i > 0) {
-        all.append(",");
-      }
-      all.append(objects.get(i).name());
-    }
+    // TODO expand in securable objects PR
+    String all = objects.stream().map(SecurableObject::name).collect(Collectors.joining(","));
 
     System.out.println(all.toString());
   }
