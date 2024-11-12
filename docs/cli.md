@@ -503,3 +503,24 @@ gcli tag update --tag tagA --rename newTag
 ```bash
 gcli tag update --tag tagA --comment "new comment"
 ```
+
+### Owners commands
+
+#### List an owner
+
+```bash
+gcli catalog details --name postgres --owner
+```
+
+#### Set an owner to a user
+
+```bash
+gcli catalog update --name postgres --user admin --owner
+```
+
+#### Set an owner to a group
+
+```bash
+gcli catalog update --name postgres --group groupA --owner
+```
+
