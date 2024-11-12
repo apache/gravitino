@@ -169,7 +169,9 @@ public class GravitinoCommandLine {
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand() {
-    if (entity.equals(CommandEntities.TABLE)) {
+    if (entity.equals(CommandEntities.COLUMN)) {
+      handleColumnCommand();
+    } else if (entity.equals(CommandEntities.TABLE)) {
       handleTableCommand();
     } else if (entity.equals(CommandEntities.SCHEMA)) {
       handleSchemaCommand();
