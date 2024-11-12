@@ -25,7 +25,8 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represent a pre event before listing Iceberg table. */
 @DeveloperApi
 public class IcebergListTablePreEvent extends IcebergTablePreEvent {
-  public IcebergListTablePreEvent(String user, NameIdentifier tableIdentifier) {
-    super(user, tableIdentifier);
+  public IcebergListTablePreEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier tableIdentifier) {
+    super(icebergRequestContext, tableIdentifier);
   }
 }

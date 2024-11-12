@@ -44,6 +44,7 @@ public class CreateRole extends Command {
   }
 
   /** Create a new role. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);

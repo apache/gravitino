@@ -41,6 +41,7 @@ public class ListRoles extends Command {
   }
 
   /** Lists all roles in a metalake. */
+  @Override
   public void handle() {
     String[] roles = new String[0];
     try {
