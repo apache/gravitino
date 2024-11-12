@@ -192,6 +192,19 @@ const CreateTableDialog = props => {
   const handleColumnChange = ({ index, field, value }) => {
     let updatedColumns = [...tableColumns]
     updatedColumns[index][field] = value
+
+    if (field === 'name') {
+      const nonEmptyNames = updatedColumns.filter(col => col.name.trim() !== '')
+      const groupedNames = groupBy(nonEmptyNames, 'name')
+      const hasDuplicateNames = Object.keys(groupedNames).some(name => groupedNames[name].length > 1)
+
+      if (hasDuplicateNames) {
+        updatedColumns[index].hasDuplicateName = hasDuplicateNames
+      } else {
+        updatedColumns.forEach(col => (col.hasDuplicateName = false))
+      }
+    }
+
     setTableColumns(updatedColumns)
     setValue('columns', updatedColumns)
   }
@@ -283,7 +296,14 @@ const CreateTableDialog = props => {
 
     const hasInvalidKeys = innerProps.some(prop => prop.invalid)
 
-    if (hasDuplicateKeys || hasInvalidKeys) {
+    const hasDuplicateColumnNames = tableColumns
+      .filter(col => col.name.trim() !== '')
+      .some(
+        (col, index, filteredCols) =>
+          filteredCols.findIndex(otherCol => otherCol !== col && otherCol.name.trim() === col.name.trim()) !== -1
+      )
+
+    if (hasDuplicateKeys || hasInvalidKeys || hasDuplicateColumnNames) {
       return
     }
 
@@ -474,40 +494,53 @@ const CreateTableDialog = props => {
                   <TableBody>
                     {tableColumns.map((column, index) => (
                       <TableRow key={index}>
-                        <TableCell>
-                          <TextField
-                            size='small'
-                            fullWidth
-                            value={column.name}
-                            onChange={e => handleColumnChange({ index, field: 'name', value: e.target.value })}
-                            error={!column.name.trim()}
-                            data-refer={`column-name-${index}`}
-                          />
+                        <TableCell sx={{ verticalAlign: 'top' }}>
+                          <FormControl fullWidth>
+                            <TextField
+                              size='small'
+                              fullWidth
+                              value={column.name}
+                              onChange={e => handleColumnChange({ index, field: 'name', value: e.target.value })}
+                              error={!column.name.trim() || column.hasDuplicateName}
+                              data-refer={`column-name-${index}`}
+                            />
+                            {column.hasDuplicateName && (
+                              <FormHelperText className={'twc-text-error-main'}>Name already exists</FormHelperText>
+                            )}
+                            {!column.name.trim() && (
+                              <FormHelperText className={'twc-text-error-main'}>Name is required</FormHelperText>
+                            )}
+                          </FormControl>
                         </TableCell>
-                        <TableCell>
-                          <Select
-                            size='small'
-                            fullWidth
-                            value={column.type}
-                            onChange={e => handleColumnChange({ index, field: 'type', value: e.target.value })}
-                            error={!column.type.trim()}
-                            data-refer={`column-type-${index}`}
-                          >
-                            {relationalTypes.map(type => (
-                              <MenuItem key={type.value} value={type.value}>
-                                {type.label}
-                              </MenuItem>
-                            ))}
-                          </Select>
+                        <TableCell sx={{ verticalAlign: 'top' }}>
+                          <FormControl fullWidth>
+                            <Select
+                              size='small'
+                              fullWidth
+                              value={column.type}
+                              onChange={e => handleColumnChange({ index, field: 'type', value: e.target.value })}
+                              error={!column.type.trim()}
+                              data-refer={`column-type-${index}`}
+                            >
+                              {relationalTypes.map(type => (
+                                <MenuItem key={type.value} value={type.value}>
+                                  {type.label}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                            {!column.type.trim() && (
+                              <FormHelperText className={'twc-text-error-main'}>Type is required</FormHelperText>
+                            )}
+                          </FormControl>
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ verticalAlign: 'top' }}>
                           <Switch
                             checked={column.nullable || false}
                             onChange={e => handleColumnChange({ index, field: 'nullable', value: e.target.checked })}
                             data-refer={`column-nullable-${index}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ verticalAlign: 'top' }}>
                           <TextField
                             size='small'
                             fullWidth
@@ -516,7 +549,7 @@ const CreateTableDialog = props => {
                             data-refer={`column-comment-${index}`}
                           />
                         </TableCell>
-                        <TableCell>
+                        <TableCell sx={{ verticalAlign: 'top' }}>
                           <IconButton onClick={() => removeColumn(index)}>
                             <Icon icon='mdi:minus-circle-outline' />
                           </IconButton>
