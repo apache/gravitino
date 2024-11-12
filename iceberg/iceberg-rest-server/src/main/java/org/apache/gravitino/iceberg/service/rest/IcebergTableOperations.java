@@ -49,10 +49,10 @@ import org.apache.gravitino.credential.CredentialProvider;
 import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
-import org.apache.gravitino.iceberg.service.IcebergRequestContext;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -104,7 +104,7 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     ListTablesResponse listTablesResponse = tableOperationDispatcher.listTable(context, icebergNS);
     return IcebergRestUtils.ok(listTablesResponse);
   }
@@ -129,7 +129,7 @@ public class IcebergTableOperations {
         createTableRequest,
         accessDelegation,
         isCredentialVending);
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     LoadTableResponse loadTableResponse =
         tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
     if (isCredentialVending) {
@@ -163,7 +163,7 @@ public class IcebergTableOperations {
           table,
           SerializeUpdateTableRequest(updateTableRequest));
     }
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
     LoadTableResponse loadTableResponse =
         tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
@@ -189,7 +189,7 @@ public class IcebergTableOperations {
         table,
         purgeRequested);
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, table);
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
     return IcebergRestUtils.noContent();
   }
@@ -218,7 +218,7 @@ public class IcebergTableOperations {
         isCredentialVending);
     // todo support snapshots
     TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     LoadTableResponse loadTableResponse =
         tableOperationDispatcher.loadTable(context, tableIdentifier);
     if (isCredentialVending) {
@@ -245,7 +245,7 @@ public class IcebergTableOperations {
         catalogName,
         icebergNS,
         table);
-    IcebergRequestContext context = new IcebergRequestContext(httpRequest, catalogName);
+    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
     boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
     if (exists) {
@@ -267,6 +267,12 @@ public class IcebergTableOperations {
       ReportMetricsRequest request) {
     icebergMetricsManager.recordMetric(request.report());
     return IcebergRestUtils.noContent();
+  }
+
+  // HTTP request is null in Jersey test, override with a mock request when testing.
+  @VisibleForTesting
+  HttpServletRequest httpServletRequest() {
+    return httpRequest;
   }
 
   private String SerializeUpdateTableRequest(UpdateTableRequest updateTableRequest) {

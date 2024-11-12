@@ -28,8 +28,11 @@ public class IcebergDropTableFailureEvent extends IcebergTableFailureEvent {
   private boolean purgeRequested;
 
   public IcebergDropTableFailureEvent(
-      String user, NameIdentifier nameIdentifier, Boolean purgeRequested, Exception e) {
-    super(user, nameIdentifier, e);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier nameIdentifier,
+      Boolean purgeRequested,
+      Exception e) {
+    super(icebergRequestContext, nameIdentifier, e);
     this.purgeRequested = purgeRequested;
   }
 

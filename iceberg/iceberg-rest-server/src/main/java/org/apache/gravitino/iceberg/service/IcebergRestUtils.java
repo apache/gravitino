@@ -25,7 +25,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Stream;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
@@ -120,6 +124,19 @@ public class IcebergRestUtils {
     Stream<String> catalogNS =
         Stream.concat(Stream.of(metalakeName, catalogName), Arrays.stream(namespace.levels()));
     return NameIdentifier.of(catalogNS.toArray(String[]::new));
+  }
+
+  public static Map<String, String> getHttpHeaders(HttpServletRequest httpServletRequest) {
+    Map<String, String> headers = new HashMap<>();
+    Enumeration<String> headerNames = httpServletRequest.getHeaderNames();
+    while (headerNames.hasMoreElements()) {
+      String headerName = headerNames.nextElement();
+      String headerValue = httpServletRequest.getHeader(headerName);
+      if (headerValue != null) {
+        headers.put(headerName, headerValue);
+      }
+    }
+    return headers;
   }
 
   // remove the last '/' from the prefix, for example transform 'iceberg_catalog/' to
