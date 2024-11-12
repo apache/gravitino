@@ -37,7 +37,6 @@ public class DeleteUser extends Command {
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param force Force operation.
-   * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    */
@@ -50,6 +49,7 @@ public class DeleteUser extends Command {
   }
 
   /** Delete a user. */
+  @Override
   public void handle() {
     boolean deleted = false;
 
