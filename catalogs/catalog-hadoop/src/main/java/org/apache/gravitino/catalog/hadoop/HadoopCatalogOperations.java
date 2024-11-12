@@ -641,11 +641,13 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
       // Delete the schema path if it exists and is empty.
       Path schemaPath = getSchemaPath(ident.name(), properties);
+      // Nothing to delete if the schema path is not set.
       if (schemaPath == null) {
         return false;
       }
 
       FileSystem fs = getFileSystem(schemaPath, conf);
+      // Nothing to delete if the schema path does not exist.
       if (!fs.exists(schemaPath)) {
         return false;
       }
