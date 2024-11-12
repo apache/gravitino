@@ -40,7 +40,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosClient;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
-import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.CatalogContext;
@@ -115,7 +115,7 @@ public class CatalogUtils {
     } catch (RuntimeException e) {
       if (e.getCause() instanceof SQLException
           && e.getCause().getMessage().contains("Access denied")) {
-        throw new UnauthorizedException(e, e.getMessage());
+        throw new ConnectionFailedException(e, e.getMessage());
       }
       throw e;
     }

@@ -44,9 +44,9 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.postgresql.integration.test.service.PostgreSqlService;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.PGImageName;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
@@ -254,7 +254,7 @@ public class CatalogPostgreSqlIT extends BaseIT {
 
     Exception exception =
         assertThrows(
-            UnauthorizedException.class,
+            ConnectionFailedException.class,
             () ->
                 metalake.testConnection(
                     GravitinoITUtils.genRandomName("postgresql_it_catalog"),

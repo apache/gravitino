@@ -31,7 +31,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -144,7 +144,7 @@ public class IcebergCatalogUtil {
     } catch (UncheckedSQLException e) {
       if (e.getCause() instanceof SQLException
           && e.getCause().getMessage().contains("Access denied")) {
-        throw new UnauthorizedException(e, e.getMessage());
+        throw new ConnectionFailedException(e, e.getMessage());
       }
       throw e;
     }

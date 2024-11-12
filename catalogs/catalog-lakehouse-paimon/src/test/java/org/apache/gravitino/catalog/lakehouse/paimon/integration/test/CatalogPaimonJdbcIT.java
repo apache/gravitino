@@ -22,7 +22,7 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
-import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.junit.jupiter.api.Assertions;
@@ -71,7 +71,7 @@ public class CatalogPaimonJdbcIT extends CatalogPaimonBaseIT {
 
     Exception exception =
         Assertions.assertThrows(
-            UnauthorizedException.class,
+            ConnectionFailedException.class,
             () ->
                 metalake.testConnection(
                     GravitinoITUtils.genRandomName("paimon_it_catalog"),

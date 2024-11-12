@@ -42,10 +42,10 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -474,7 +474,7 @@ public class CatalogDorisIT extends BaseIT {
 
     Exception exception =
         assertThrows(
-            UnauthorizedException.class,
+            ConnectionFailedException.class,
             () ->
                 metalake.testConnection(
                     GravitinoITUtils.genRandomName("doris_it_catalog"),

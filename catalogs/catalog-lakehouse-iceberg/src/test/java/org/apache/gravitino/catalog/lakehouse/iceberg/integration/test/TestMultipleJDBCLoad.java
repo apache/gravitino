@@ -31,7 +31,7 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
@@ -103,7 +103,7 @@ public class TestMultipleJDBCLoad extends BaseIT {
     // test wrong password
     Exception exception =
         Assertions.assertThrows(
-            UnauthorizedException.class,
+            ConnectionFailedException.class,
             () ->
                 metalake.testConnection(
                     mysqlCatalogName,
