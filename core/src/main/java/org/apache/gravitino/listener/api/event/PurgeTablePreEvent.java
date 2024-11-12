@@ -22,9 +22,9 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event generate before purging a table. */
+/** Represents an event triggered before purging a table. */
 @DeveloperApi
-public class PurgeTablePreEvent extends PreEvent {
+public class PurgeTablePreEvent extends TablePreEvent {
   public PurgeTablePreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }

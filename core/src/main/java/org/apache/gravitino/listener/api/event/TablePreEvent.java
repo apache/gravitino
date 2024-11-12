@@ -22,9 +22,9 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents a pre event for table operations. */
+/** Represents a pre-event for table operations. */
 @DeveloperApi
-public abstract class TablePreEvent extends BaseEvent {
+public abstract class TablePreEvent extends PreEvent {
   protected TablePreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }

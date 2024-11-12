@@ -23,8 +23,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.rel.TableChange;
 
+/** Represents an event triggered before altering a table. */
 @DeveloperApi
-public class AlterTablePreEvent extends PreEvent {
+public class AlterTablePreEvent extends TablePreEvent {
   private final TableChange[] tableChanges;
 
   public AlterTablePreEvent(String user, NameIdentifier identifier, TableChange[] tableChanges) {

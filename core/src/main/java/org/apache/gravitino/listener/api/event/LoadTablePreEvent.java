@@ -24,7 +24,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event triggered before loading a table. */
 @DeveloperApi
-public class LoadTablePreEvent extends PreEvent {
+public class LoadTablePreEvent extends TablePreEvent {
   public LoadTablePreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
