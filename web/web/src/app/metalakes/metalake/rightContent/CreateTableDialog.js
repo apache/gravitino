@@ -200,7 +200,7 @@ const CreateTableDialog = props => {
    * Add a new empty column
    */
   const addColumn = () => {
-    const newColumn = { name: '', type: '', nullable: false, comment: '' }
+    const newColumn = { name: '', type: '', nullable: true, comment: '' }
     setTableColumns([...tableColumns, newColumn])
     setValue('columns', [...tableColumns, newColumn])
   }
@@ -356,8 +356,18 @@ const CreateTableDialog = props => {
       setInitialTableData(data)
       setValue('name', data.name)
       setValue('comment', data.comment)
+
+      const columnsData = columns.map(column => {
+        // Set uniqueId to the column name to detect changes
+        column.uniqueId = column.name
+
+        return {
+          ...column,
+        }
+      })
+
+      setTableColumns(columnsData)
       setValue('columns', columns)
-      setTableColumns(columns)
 
       const propertyItems = Object.entries(properties).map(([key, value]) => {
         return {
