@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.Set;
+import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 
 public class DummyCredentialProvider implements CredentialProvider {
@@ -78,6 +79,11 @@ public class DummyCredentialProvider implements CredentialProvider {
     public Map<String, String> credentialInfo() {
       return ImmutableMap.of(
           "writeLocation", writeLocations.toString(), "readLocation", readLocations.toString());
+    }
+
+    @Override
+    public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+      throw new NotSupportedException();
     }
   }
 }

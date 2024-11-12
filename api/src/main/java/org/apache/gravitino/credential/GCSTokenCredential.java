@@ -33,19 +33,24 @@ public class GCSTokenCredential implements Credential {
   /** GCS credential property, token name. */
   public static final String GCS_TOKEN_NAME = "token";
 
-  private final String token;
-  private final long expireMs;
+  private String token;
+  private long expireTimeInMs;
 
   /**
    * @param token The GCS token.
-   * @param expireMs The GCS token expire time at ms.
+   * @param expireTimeInMs The GCS token expire time at ms.
    */
-  public GCSTokenCredential(String token, long expireMs) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(token), "GCS session token should not be null");
+  public GCSTokenCredential(String token, long expireTimeInMs) {
+    validate(token, expireTimeInMs);
     this.token = token;
-    this.expireMs = expireMs;
+    this.expireTimeInMs = expireTimeInMs;
   }
+
+  /**
+   * This is the constructor that is used by credential factory to create an instance of credential
+   * according to the credential information.
+   */
+  public GCSTokenCredential() {}
 
   @Override
   public String credentialType() {
@@ -54,12 +59,20 @@ public class GCSTokenCredential implements Credential {
 
   @Override
   public long expireTimeInMs() {
-    return expireMs;
+    return expireTimeInMs;
   }
 
   @Override
   public Map<String, String> credentialInfo() {
     return (new ImmutableMap.Builder<String, String>()).put(GCS_TOKEN_NAME, token).build();
+  }
+
+  @Override
+  public void initWithCredentialInfo(Map<String, String> credentialInfo, long expireTimeInMs) {
+    String token = credentialInfo.get(GCS_TOKEN_NAME);
+    validate(token, expireTimeInMs);
+    this.token = token;
+    this.expireTimeInMs = expireTimeInMs;
   }
 
   /**
@@ -69,5 +82,12 @@ public class GCSTokenCredential implements Credential {
    */
   public String token() {
     return token;
+  }
+
+  private void validate(String token, long expireTimeInMs) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(token), "GCS session token should not be empty");
+    Preconditions.checkArgument(
+        expireTimeInMs > 0, "The expire time of GcsTokenCredential should great than 0");
   }
 }
