@@ -81,7 +81,13 @@ export const genUpdates = (originalData, newData) => {
   for (const key in newColumnsMap) {
     if (!(key in originalColumnsMap)) {
       const { uniqueId, ...newColumn } = newColumnsMap[key]
-      updates.push({ '@type': 'addColumn', fieldName: [newColumn.name], type: newColumn.type, nullable: newColumn.nullable, comment: newColumn.comment })
+      updates.push({
+        '@type': 'addColumn',
+        fieldName: [newColumn.name],
+        type: newColumn.type,
+        nullable: newColumn.nullable,
+        comment: newColumn.comment
+      })
     }
   }
 
@@ -90,16 +96,32 @@ export const genUpdates = (originalData, newData) => {
       updates.push({ '@type': 'deleteColumn', fieldName: [originalColumnsMap[key].name] })
     } else {
       if (originalColumnsMap[key].name !== newColumnsMap[key].name) {
-        updates.push({ '@type': 'renameColumn', oldFieldName: [originalColumnsMap[key].name], newFieldName: newColumnsMap[key].name })
+        updates.push({
+          '@type': 'renameColumn',
+          oldFieldName: [originalColumnsMap[key].name],
+          newFieldName: newColumnsMap[key].name
+        })
       }
       if (originalColumnsMap[key].type !== newColumnsMap[key].type) {
-        updates.push({ '@type': 'updateColumnType', fieldName: [newColumnsMap[key].name], newType: newColumnsMap[key].type })
+        updates.push({
+          '@type': 'updateColumnType',
+          fieldName: [newColumnsMap[key].name],
+          newType: newColumnsMap[key].type
+        })
       }
       if (originalColumnsMap[key].nullable !== newColumnsMap[key].nullable) {
-        updates.push({ '@type': 'updateColumnNullability', fieldName: [newColumnsMap[key].name], nullable: newColumnsMap[key].nullable })
+        updates.push({
+          '@type': 'updateColumnNullability',
+          fieldName: [newColumnsMap[key].name],
+          nullable: newColumnsMap[key].nullable
+        })
       }
       if (originalColumnsMap[key].comment !== newColumnsMap[key].comment) {
-        updates.push({ '@type': 'updateColumnComment', fieldName: [newColumnsMap[key].name], newComment: newColumnsMap[key].comment })
+        updates.push({
+          '@type': 'updateColumnComment',
+          fieldName: [newColumnsMap[key].name],
+          newComment: newColumnsMap[key].comment
+        })
       }
     }
   }

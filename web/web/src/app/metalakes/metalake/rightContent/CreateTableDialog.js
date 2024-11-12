@@ -382,7 +382,7 @@ const CreateTableDialog = props => {
         column.uniqueId = column.name
 
         return {
-          ...column,
+          ...column
         }
       })
 
