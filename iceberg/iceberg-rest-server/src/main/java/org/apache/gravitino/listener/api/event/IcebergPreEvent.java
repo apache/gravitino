@@ -25,7 +25,15 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an abstract pre event in Gravitino Iceberg REST server. */
 @DeveloperApi
 public abstract class IcebergPreEvent extends PreEvent {
-  protected IcebergPreEvent(String user, NameIdentifier resourceIdentifier) {
-    super(user, resourceIdentifier);
+  private IcebergRequestContext icebergRequestContext;
+
+  protected IcebergPreEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier resourceIdentifier) {
+    super(icebergRequestContext.userName(), resourceIdentifier);
+    this.icebergRequestContext = icebergRequestContext;
+  }
+
+  public IcebergRequestContext icebergRequestContext() {
+    return icebergRequestContext;
   }
 }
