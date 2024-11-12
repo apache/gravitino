@@ -370,6 +370,8 @@ public class GravitinoCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       new DeleteUser(url, ignore, force, metalake, user).handle();
+    } else {
+      System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
     }
   }
 
@@ -389,6 +391,8 @@ public class GravitinoCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       new DeleteGroup(url, ignore, force, metalake, group).handle();
+    } else {
+      System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
     }
   }
 
@@ -485,6 +489,8 @@ public class GravitinoCommandLine {
       } else {
         System.err.println(ErrorMessages.INVALID_OWNER_COMMAND);
       }
+    } else {
+      System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
     }
   }
 

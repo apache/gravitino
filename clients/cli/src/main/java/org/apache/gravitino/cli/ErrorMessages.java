@@ -46,4 +46,5 @@ public class ErrorMessages {
       "Unsupported combination of options either use --name or --property.";
   public static final String INVALID_OWNER_COMMAND =
       "Unsupported combination of options either use --user or --group.";
+  public static final String UNSUPPORTED_ACTION = "Entity doesn't support this action.";
 }
