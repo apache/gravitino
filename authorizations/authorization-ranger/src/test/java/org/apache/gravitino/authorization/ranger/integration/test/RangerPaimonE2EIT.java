@@ -89,7 +89,7 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
-            .appName("Ranger Hive E2E integration test")
+            .appName("Ranger Paimon E2E integration test")
             .config("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
             .config("spark.sql.catalog.paimon.metastore", "hive")
             .config("spark.sql.catalog.paimon.uri", HIVE_METASTORE_URIS)
@@ -165,7 +165,7 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void checkHaveNoPrivileges() {
+  protected void checkWithoutPrivileges() {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
     Assertions.assertThrows(
         AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());

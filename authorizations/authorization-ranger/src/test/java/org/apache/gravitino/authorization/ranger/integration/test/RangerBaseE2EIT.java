@@ -193,7 +193,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
   protected abstract void useCatalog() throws InterruptedException;
 
-  protected abstract void checkHaveNoPrivileges();
+  protected abstract void checkWithoutPrivileges();
 
   protected abstract void testAlterTable();
 
@@ -323,7 +323,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // case 7: If we don't have the role, we can't insert and select from data.
     metalake.deleteRole(readWriteRole);
     waitForUpdatingPolicies();
-    checkHaveNoPrivileges();
+    checkWithoutPrivileges();
 
     // Clean up
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
@@ -387,7 +387,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // case 7: If we don't have the role, we can't insert and select from data.
     metalake.deleteRole(roleName);
     waitForUpdatingPolicies();
-    checkHaveNoPrivileges();
+    checkWithoutPrivileges();
 
     // Clean up
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
@@ -441,7 +441,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // case 7: If we don't have the role, we can't insert and select from data.
     metalake.deleteRole(readOnlyRole);
     waitForUpdatingPolicies();
-    checkHaveNoPrivileges();
+    checkWithoutPrivileges();
 
     // Clean up
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
@@ -496,7 +496,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // case 7: If we don't have the role, we can't insert and select from data.
     metalake.deleteRole(writeOnlyRole);
     waitForUpdatingPolicies();
-    checkHaveNoPrivileges();
+    checkWithoutPrivileges();
 
     // Clean up
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
@@ -773,7 +773,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     metalake.deleteRole(helperRole);
     waitForUpdatingPolicies();
 
-    checkHaveNoPrivileges();
+    checkWithoutPrivileges();
 
     // case 2. user is the  table owner
     MetadataObject tableObject =
