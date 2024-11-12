@@ -26,6 +26,7 @@ import org.apache.gravitino.rel.TableChange;
 @DeveloperApi
 public class AlterTablePreEvent extends PreEvent {
   private final TableChange[] tableChanges;
+
   public AlterTablePreEvent(String user, NameIdentifier identifier, TableChange[] tableChanges) {
     super(user, identifier);
     this.tableChanges = tableChanges;

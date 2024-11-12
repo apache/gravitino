@@ -23,9 +23,23 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TableInfo;
 
+/** Represents an event triggered before create a table. */
 @DeveloperApi
 public class CreateTablePreEvent extends PreEvent {
+  private final TableInfo createTableRequest;
+
   public CreateTablePreEvent(String user, NameIdentifier identifier, TableInfo createTableRequest) {
     super(user, identifier);
+    this.createTableRequest = createTableRequest;
+  }
+
+  /**
+   * Retrieves the create table request.
+   *
+   * @return A {@link TableInfo} instance encapsulating the comprehensive details of create table
+   *     request.
+   */
+  public TableInfo createTableRequest() {
+    return createTableRequest;
   }
 }

@@ -69,9 +69,9 @@ public class TableEventDispatcher implements TableDispatcher {
   /**
    * Constructs a TableEventDispatcher with a specified EventBus and TableCatalog.
    *
-   * @param eventBus   The EventBus to which events will be dispatched.
+   * @param eventBus The EventBus to which events will be dispatched.
    * @param dispatcher The underlying {@link TableOperationDispatcher} that will perform the actual
-   *                   table operations.
+   *     table operations.
    */
   public TableEventDispatcher(EventBus eventBus, TableDispatcher dispatcher) {
     this.eventBus = eventBus;
@@ -149,7 +149,8 @@ public class TableEventDispatcher implements TableDispatcher {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    eventBus.dispatchEvent(new AlterTablePreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
+    eventBus.dispatchEvent(
+        new AlterTablePreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
     try {
       Table table = dispatcher.alterTable(ident, changes);
       eventBus.dispatchEvent(

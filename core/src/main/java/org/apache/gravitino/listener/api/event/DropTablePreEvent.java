@@ -22,6 +22,7 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
+/** Represents an event that is generated before dropping a table. */
 @DeveloperApi
 public class DropTablePreEvent extends PreEvent {
   public DropTablePreEvent(String user, NameIdentifier identifier) {
