@@ -34,7 +34,6 @@ public class CommandEntities {
   public static final String USER = "user";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
-  public static final String OWNER = "owner";
 
   private static final HashSet<String> VALID_ENTITIES = new HashSet<>();
 
@@ -47,7 +46,6 @@ public class CommandEntities {
     VALID_ENTITIES.add(USER);
     VALID_ENTITIES.add(GROUP);
     VALID_ENTITIES.add(TAG);
-    VALID_ENTITIES.add(OWNER);
   }
 
   /**
