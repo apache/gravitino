@@ -41,7 +41,7 @@ import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@EnabledIf("absEnabled")
+@EnabledIf("absIsConfigured")
 public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemABSIT.class);
 
@@ -157,7 +157,7 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
   @Disabled("java.lang.UnsupportedOperationException: Append Support not enabled")
   public void testAppend() throws IOException {}
 
-  private static boolean absEnabled() {
+  private static boolean absIsConfigured() {
     return StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_NAME"))
         && StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_KEY"))
         && StringUtils.isNotBlank(System.getenv("ABS_CONTAINER_NAME"));

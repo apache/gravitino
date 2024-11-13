@@ -41,12 +41,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.junit.platform.commons.util.StringUtils;
 
-@EnabledIf("absEnabled")
+@EnabledIf("absIsConfigured")
 public class HadoopABSCatalogIT extends HadoopCatalogIT {
 
-  public static final String ABS_ACCOUNT_NAME = System.getenv("ADLS_ACCOUNT_NAME");
-  public static final String ABS_ACCOUNT_KEY = System.getenv("ADLS_ACCOUNT_KEY");
-  public static final String ABS_CONTAINER_NAME = System.getenv("ADLS_CONTAINER_NAME");
+  public static final String ABS_ACCOUNT_NAME = System.getenv("ABS_ACCOUNT_NAME");
+  public static final String ABS_ACCOUNT_KEY = System.getenv("ABS_ACCOUNT_KEY");
+  public static final String ABS_CONTAINER_NAME = System.getenv("ABS_CONTAINER_NAME");
 
   @Override
   public void startIntegrationTest() throws Exception {
@@ -192,9 +192,9 @@ public class HadoopABSCatalogIT extends HadoopCatalogIT {
     metalake.dropCatalog(localCatalogName, true);
   }
 
-  private static boolean absEnabled() {
-    return StringUtils.isNotBlank(System.getenv("ADLS_ACCOUNT_NAME"))
-        && StringUtils.isNotBlank(System.getenv("ADLS_ACCOUNT_KEY"))
-        && StringUtils.isNotBlank(System.getenv("ADLS_CONTAINER_NAME"));
+  private static boolean absIsConfigured() {
+    return StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_NAME"))
+        && StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_KEY"))
+        && StringUtils.isNotBlank(System.getenv("ABS_CONTAINER_NAME"));
   }
 }
