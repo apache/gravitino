@@ -486,13 +486,13 @@ public class GravitinoCommandLine {
       new ListFilesets(url, ignore, metalake, catalog, schema).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-      boolean managed = line.hasOption(GravitinoOptions.MANAGED);
-      String location = line.getOptionValue(GravitinoOptions.LOCATION);
-
-      new CreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, managed, location)
+      String[] properties = line.getOptionValues(GravitinoOptions.PROPERTIES);
+      Map<String, String> propertyMap = new Properties().parse(properties);
+      new CreateFileset(url, ignore, metalake, catalog, schema, fileset, comment, propertyMap)
           .handle();
     } else if (CommandActions.DELETE.equals(command)) {
-      new DeleteFileset(url, ignore, metalake, catalog, schema, fileset).handle();
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      new DeleteFileset(url, ignore, force, metalake, catalog, schema, fileset).handle();
     }
   }
 

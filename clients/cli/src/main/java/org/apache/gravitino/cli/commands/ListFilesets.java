@@ -53,6 +53,7 @@ public class ListFilesets extends Command {
   }
 
   /** List all filesets names in a schema. */
+  @Override
   public void handle() {
     Namespace name = Namespace.of(schema);
     NameIdentifier[] filesets = new NameIdentifier[0];
