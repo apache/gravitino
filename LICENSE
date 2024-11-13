@@ -291,12 +291,6 @@
    Apache Arrow
    ./dev/ci/util_free_space.sh
 
-   This product bundles a third-party component under the
-   MIT License.
-
-   Kyligence/kylinpy
-   ./clients/client-python/gravitino/utils/http_client.py
-
    Apache Ranger
    ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/JsonDateSerializer.java
    ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/RangerCommonEnums.java
@@ -306,3 +300,9 @@
    ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXGroupList.java
    ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXUser.java
    ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXUserList.java
+
+   This product bundles a third-party component under the
+   MIT License.
+
+   Kyligence/kylinpy
+   ./clients/client-python/gravitino/utils/http_client.py
