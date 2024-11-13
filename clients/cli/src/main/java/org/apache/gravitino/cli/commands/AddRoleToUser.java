@@ -51,6 +51,7 @@ public class AddRoleToUser extends Command {
   }
 
   /** Adds a role to a user. */
+  @Override
   public void handle() {
     try {
       GravitinoClient client = buildClient(metalake);
