@@ -24,10 +24,10 @@
 
 FAILED=0
 
-PROJECT_ROOT=$(dirname $(dirname $(dirname $(readlink -f "$0"))))
-cd "$PROJECT_ROOT" || exit 1
+PROJECT_ROOT=${1:-$(dirname $(dirname $(dirname $(readlink -f "$0"))))}
+LICENSE_FILE=$(cat "$PROJECT_ROOT"/LICENSE)
 
-LICENSE_FILE=$(cat LICENSE)
+cd "$PROJECT_ROOT" || exit 1
 
 while IFS= read -r line; do
   echo -n "$line"
@@ -54,7 +54,7 @@ done <<< "$LICENSE_FILE"
 
 # check if any file is missing
 if [ $FAILED -ne 0 ]; then
-  echo -e "\033[0;31mSome files are missing in the LICENSE file.\033[0m"
+  echo -e "\033[0;31mSome files listed in the LICENSE file are missing. \033[0m"
   exit 1
 fi
-echo -e "\033[0;32mAll files are present in the LICENSE file.\033[0m"
+echo -e "\033[0;32mAll files listed in the LICENSE file are present. \033[0m"
