@@ -130,7 +130,9 @@ dependencies {
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.hadoop2.aws)
   testImplementation(libs.hadoop3.abfs)
-  testImplementation(libs.hadoop3.common)
+
+  // You need this to run test CatalogHiveABSIT
+  // testImplementation(libs.hadoop3.common)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
