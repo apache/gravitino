@@ -41,12 +41,18 @@ sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/core-site.xml
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HIVE_CONF_DIR}/hive-site.xml
 
-sed -i "s|S3_ACCESS_KEY_ID|${S3_ACCESS_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
-sed -i "s|S3_SECRET_KEY_ID|${S3_SECRET_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
-sed -i "s|S3_ENDPOINT_ID|${S3_ENDPOINT}|g" ${HIVE_CONF_DIR}/hive-site.xml
+# whether S3 is set
+if [[ -n "${S3_ACCESS_KEY}" && -n "${S3_SECRET_KEY}" && -n "${S3_ENDPOINT}" ]]; then
+  sed -i "s|S3_ACCESS_KEY_ID|${S3_ACCESS_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
+  sed -i "s|S3_SECRET_KEY_ID|${S3_SECRET_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
+  sed -i "s|S3_ENDPOINT_ID|${S3_ENDPOINT}|g" ${HIVE_CONF_DIR}/hive-site.xml
+fi
 
-sed -i "s|ADLS_ACCOUNT_NAME|${ADLS_ACCOUNT_NAME}|g" ${HIVE_CONF_DIR}/hive-site.xml
-sed -i "s|ADLS_ACCOUNT_KEY|${ADLS_ACCOUNT_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
+# whether ADLS is set
+if [[ -n "${ADLS_ACCOUNT_NAME}" && -n "${ADLS_ACCOUNT_KEY}" ]]; then
+  sed -i "s|ADLS_ACCOUNT_NAME|${ADLS_ACCOUNT_NAME}|g" ${HIVE_CONF_DIR}/hive-site.xml
+  sed -i "s|ADLS_ACCOUNT_KEY|${ADLS_ACCOUNT_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
+fi
 
 # Link mysql-connector-java after deciding where HIVE_HOME symbolic link points to.
 ln -s /opt/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}/mysql-connector-java-${MYSQL_JDBC_DRIVER_VERSION}.jar ${HIVE_HOME}/lib

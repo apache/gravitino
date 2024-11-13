@@ -31,13 +31,13 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 @EnabledIf(
-    value = "isAzureBlobStorageEnabled",
+    value = "isAzureBlobStorageConfigured",
     disabledReason = "Azure Blob Storage is not enabled")
 public class CatalogHiveABSIT extends CatalogHiveIT {
 
-  private static final String ABS_BUCKET_NAME = System.getenv("ADLS_CONTAINER_NAME");
-  private static final String ABS_USER_ACCOUNT_NAME = System.getenv("ADLS_ACCOUNT_NAME");
-  private static final String ABS_USER_ACCOUNT_KEY = System.getenv("ADLS_ACCOUNT_KEY");
+  private static final String ABS_BUCKET_NAME = System.getenv("ABS_CONTAINER_NAME");
+  private static final String ABS_USER_ACCOUNT_NAME = System.getenv("ABS_ACCOUNT_NAME");
+  private static final String ABS_USER_ACCOUNT_KEY = System.getenv("ABS_ACCOUNT_KEY");
 
   @Override
   protected void startNecessaryContainer() {
@@ -111,9 +111,9 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
     return properties;
   }
 
-  private static boolean isAzureBlobStorageEnabled() {
-    return StringUtils.isNotBlank(System.getenv("ADLS_ACCOUNT_NAME"))
-        && StringUtils.isNotBlank(System.getenv("ADLS_ACCOUNT_KEY"))
-        && StringUtils.isNotBlank(System.getenv("ADLS_CONTAINER_NAME"));
+  private static boolean isAzureBlobStorageConfigured() {
+    return StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_NAME"))
+        && StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_KEY"))
+        && StringUtils.isNotBlank(System.getenv("ABS_CONTAINER_NAME"));
   }
 }
