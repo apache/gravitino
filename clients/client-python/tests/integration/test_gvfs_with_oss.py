@@ -37,14 +37,25 @@ from gravitino.filesystem.gvfs_config import GVFSConfig
 logger = logging.getLogger(__name__)
 
 
-@unittest.skip("This test require oss service account")
+def oss_is_configured():
+    return all(
+        [
+            os.environ.get("OSS_ACCESS_KEY_ID") is not None,
+            os.environ.get("OSS_SECRET_ACCESS_KEY") is not None,
+            os.environ.get("OSS_ENDPOINT") is not None,
+            os.environ.get("OSS_BUCKET_NAME") is not None,
+        ]
+    )
+
+
+@unittest.skipUnless(oss_is_configured(), "OSS is not configured.")
 class TestGvfsWithOSS(TestGvfsWithHDFS):
     # Before running this test, please set the make sure aliyun-bundle-x.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
-    oss_access_key = "your_access_key"
-    oss_secret_key = "your_secret_key"
-    oss_endpoint = "your_endpoint"
-    bucket_name = "your_bucket_name"
+    oss_access_key = os.environ.get("OSS_ACCESS_KEY_ID")
+    oss_secret_key = os.environ.get("OSS_SECRET_ACCESS_KEY")
+    oss_endpoint = os.environ.get("OSS_ENDPOINT")
+    bucket_name = os.environ.get("OSS_BUCKET_NAME")
 
     metalake_name: str = "TestGvfsWithOSS_metalake" + str(randint(1, 10000))
 
