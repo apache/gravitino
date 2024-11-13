@@ -1,6 +1,6 @@
-CREATE SCHEMA gt_hive.row_db1;
+CREATE SCHEMA gt_hive.gt_row_db1;
 
-USE gt_hive.row_db1;
+USE gt_hive.gt_row_db1;
 
 CREATE TABLE test_row_basic (person ROW(id INTEGER, name VARCHAR));
 
@@ -72,20 +72,20 @@ INSERT INTO test_row_basic SELECT ROW(id, name) FROM source_tb1;
 
 SELECT person.id, COUNT(*) FROM test_row_basic GROUP BY person.id ORDER BY person.id;
 
-DROP TABLE gt_hive.row_db1.test_row_basic;
+DROP TABLE gt_hive.gt_row_db1.test_row_basic;
 
-DROP TABLE gt_hive.row_db1.source_tb1;
+DROP TABLE gt_hive.gt_row_db1.source_tb1;
 
-DROP TABLE gt_hive.row_db1.test_nested_row;
+DROP TABLE gt_hive.gt_row_db1.test_nested_row;
 
-DROP TABLE gt_hive.row_db1.test_mixed_row;
+DROP TABLE gt_hive.gt_row_db1.test_mixed_row;
 
-DROP TABLE gt_hive.row_db1.source_tb2;
+DROP TABLE gt_hive.gt_row_db1.source_tb2;
 
-DROP TABLE gt_hive.row_db1.source_tb3;
+DROP TABLE gt_hive.gt_row_db1.source_tb3;
 
-DROP TABLE gt_hive.row_db1.test_row_in_array_map;
+DROP TABLE gt_hive.gt_row_db1.test_row_in_array_map;
 
-DROP TABLE gt_hive.row_db1.source_tb5;
+DROP TABLE gt_hive.gt_row_db1.source_tb5;
 
-DROP SCHEMA gt_hive.row_db1;
+DROP SCHEMA gt_hive.gt_row_db1;

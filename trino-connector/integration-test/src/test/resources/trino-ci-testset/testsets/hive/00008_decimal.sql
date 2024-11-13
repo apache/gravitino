@@ -1,6 +1,6 @@
-CREATE SCHEMA gt_hive.decimal_db1;
+CREATE SCHEMA gt_hive.gt_decimal_db1;
 
-USE gt_hive.decimal_db1;
+USE gt_hive.gt_decimal_db1;
 
 CREATE TABLE test_decimal_bounds (amount DECIMAL(10, 2));
 
@@ -44,14 +44,14 @@ INSERT INTO test_decimal_nulls VALUES (NULL), (123.45), (NULL);
 
 SELECT * FROM test_decimal_nulls;
 
-DROP TABLE gt_hive.decimal_db1.test_decimal_bounds;
+DROP TABLE gt_hive.gt_decimal_db1.test_decimal_bounds;
 
-DROP TABLE gt_hive.decimal_db1.test_decimal_aggregation;
+DROP TABLE gt_hive.gt_decimal_db1.test_decimal_aggregation;
 
-DROP TABLE gt_hive.decimal_db1.test_decimal_arithmetic;
+DROP TABLE gt_hive.gt_decimal_db1.test_decimal_arithmetic;
 
-DROP TABLE gt_hive.decimal_db1.test_decimal_max_min;
+DROP TABLE gt_hive.gt_decimal_db1.test_decimal_max_min;
 
-DROP TABLE gt_hive.decimal_db1.test_decimal_nulls;
+DROP TABLE gt_hive.gt_decimal_db1.test_decimal_nulls;
 
-DROP SCHEMA gt_hive.decimal_db1;
+DROP SCHEMA gt_hive.gt_decimal_db1;

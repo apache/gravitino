@@ -1,6 +1,6 @@
-CREATE SCHEMA gt_hive.format_db1;
+CREATE SCHEMA gt_hive.gt_format_db1;
 
-USE gt_hive.format_db1;
+USE gt_hive.gt_format_db1;
 
 CREATE TABLE storage_formats_orc (
 c_boolean boolean,
@@ -161,16 +161,16 @@ INSERT INTO storage_formats_avro VALUES (true,127,32767,2147483647,9223372036854
 
 SELECT * FROM storage_formats_avro;
 
-DROP TABLE gt_hive.format_db1.storage_formats_orc;
+DROP TABLE gt_hive.gt_format_db1.storage_formats_orc;
 
-DROP TABLE gt_hive.format_db1.storage_formats_textfile;
+DROP TABLE gt_hive.gt_format_db1.storage_formats_textfile;
 
-DROP TABLE gt_hive.format_db1.storage_formats_parquet;
+DROP TABLE gt_hive.gt_format_db1.storage_formats_parquet;
 
-DROP TABLE gt_hive.format_db1.storage_formats_rcfile;
+DROP TABLE gt_hive.gt_format_db1.storage_formats_rcfile;
 
-DROP TABLE gt_hive.format_db1.storage_formats_sequencefile;
+DROP TABLE gt_hive.gt_format_db1.storage_formats_sequencefile;
 
-DROP TABLE gt_hive.format_db1.storage_formats_avro;
+DROP TABLE gt_hive.gt_format_db1.storage_formats_avro;
 
-DROP SCHEMA gt_hive.format_db1;
+DROP SCHEMA gt_hive.gt_format_db1;

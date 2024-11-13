@@ -1,6 +1,6 @@
-CREATE SCHEMA gt_hive.array_db1;
+CREATE SCHEMA gt_hive.gt_array_db1;
 
-USE gt_hive.array_db1;
+USE gt_hive.gt_array_db1;
 
 CREATE TABLE test_array_basic (int_array ARRAY(INTEGER));
 
@@ -48,18 +48,18 @@ INSERT INTO test_nested_array VALUES (ARRAY[ARRAY['a', 'b'], ARRAY['c', 'd']]);
 
 SELECT nested_array FROM test_nested_array;
 
-DROP TABLE gt_hive.array_db1.test_array_basic;
+DROP TABLE gt_hive.gt_array_db1.test_array_basic;
 
-DROP TABLE gt_hive.array_db1.test_array_access;
+DROP TABLE gt_hive.gt_array_db1.test_array_access;
 
-DROP TABLE gt_hive.array_db1.test_array_concat;
+DROP TABLE gt_hive.gt_array_db1.test_array_concat;
 
-DROP TABLE gt_hive.array_db1.test_array_sort;
+DROP TABLE gt_hive.gt_array_db1.test_array_sort;
 
-DROP TABLE gt_hive.array_db1.test_array_nulls;
+DROP TABLE gt_hive.gt_array_db1.test_array_nulls;
 
-DROP TABLE gt_hive.array_db1.test_array_agg;
+DROP TABLE gt_hive.gt_array_db1.test_array_agg;
 
-DROP TABLE gt_hive.array_db1.test_nested_array;
+DROP TABLE gt_hive.gt_array_db1.test_nested_array;
 
-DROP SCHEMA gt_hive.array_db1;
+DROP SCHEMA gt_hive.gt_array_db1;

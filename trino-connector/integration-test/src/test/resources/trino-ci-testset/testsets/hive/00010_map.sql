@@ -1,6 +1,6 @@
-CREATE SCHEMA gt_hive.map_db1;
+CREATE SCHEMA gt_hive.gt_map_db1;
 
-USE gt_hive.map_db1;
+USE gt_hive.gt_map_db1;
 
 CREATE TABLE test_map_nulls (string_map MAP(VARCHAR, VARCHAR));
 
@@ -38,12 +38,12 @@ INSERT INTO test_map_aggregation VALUES (MAP(ARRAY['a', 'b'], ARRAY[1, 2])), (MA
 
 SELECT map_data['a'] AS key_a, SUM(map_data['b']) AS sum_b FROM test_map_aggregation GROUP BY map_data['a'] ORDER BY key_a;
 
-DROP TABLE gt_hive.map_db1.test_map_nulls;
+DROP TABLE gt_hive.gt_map_db1.test_map_nulls;
 
-DROP TABLE gt_hive.map_db1.test_map_types;
+DROP TABLE gt_hive.gt_map_db1.test_map_types;
 
-DROP TABLE gt_hive.map_db1.test_map_complex;
+DROP TABLE gt_hive.gt_map_db1.test_map_complex;
 
-DROP TABLE gt_hive.map_db1.test_map_aggregation;
+DROP TABLE gt_hive.gt_map_db1.test_map_aggregation;
 
-DROP SCHEMA gt_hive.map_db1;
+DROP SCHEMA gt_hive.gt_map_db1;
