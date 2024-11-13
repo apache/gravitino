@@ -339,7 +339,7 @@ if [[ "$1" == "publish-release" ]]; then
   pushd $tmp_repo/org/apache/gravitino
 
   # Remove any extra files generated during install
-  find . -type f |grep -v \.jar |grep -v \.pom |grep -v cyclonedx | xargs rm
+  find . -type f |grep -v \.jar |grep -v \.pom |grep -v cyclonedx | grep -v \.module | xargs rm
 
   echo "Creating hash and signature files"
   # this must have .asc, .md5 and .sha1 - it really doesn't like anything else there
