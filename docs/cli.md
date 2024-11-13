@@ -31,12 +31,14 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
+ -f,--force              force operation
  -g,--group <arg>        group name
  -h,--help               command help information
  -i,--ignore             ignore client/sever version check
  -l,--user <arg>         user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
+ -o,--owner              entity owner
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
  -r,--rename <arg>       new entity name
