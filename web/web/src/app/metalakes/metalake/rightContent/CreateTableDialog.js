@@ -140,7 +140,7 @@ const CreateTableDialog = props => {
 
   // Component state
   const [innerProps, setInnerProps] = useState([])
-  const [tableColumns, setTableColumns] = useState([])
+  const [tableColumns, setTableColumns] = useState([{ name: '', type: '', nullable: true, comment: '' }])
   const [initialTableData, setInitialTableData] = useState()
   const dispatch = useAppDispatch()
 
@@ -321,7 +321,7 @@ const CreateTableDialog = props => {
         const tableData = {
           name: formData.name,
           comment: formData.comment,
-          columns: formData.columns.map(({hasDuplicateName, ...rest}) => rest),
+          columns: formData.columns.map(({ hasDuplicateName, ...rest }) => rest),
           properties
         }
 
@@ -550,9 +550,11 @@ const CreateTableDialog = props => {
                           />
                         </TableCell>
                         <TableCell sx={{ verticalAlign: 'top' }}>
-                          <IconButton onClick={() => removeColumn(index)}>
-                            <Icon icon='mdi:minus-circle-outline' />
-                          </IconButton>
+                          {tableColumns.length > 1 && (
+                            <IconButton onClick={() => removeColumn(index)}>
+                              <Icon icon='mdi:minus-circle-outline' />
+                            </IconButton>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
