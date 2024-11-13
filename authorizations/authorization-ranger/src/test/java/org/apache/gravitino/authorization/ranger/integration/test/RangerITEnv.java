@@ -212,7 +212,7 @@ public class RangerITEnv {
     policyItem.setAccesses(
         Arrays.asList(
             new RangerPolicy.RangerPolicyItemAccess(
-                RangerPrivileges.RangerHivePrivilege.SELECT.toString())));
+                RangerPrivileges.RangerHadoopSQLPrivilege.SELECT.toString())));
     updateOrCreateRangerPolicy(
         RANGER_HIVE_TYPE,
         RANGER_HIVE_REPO_NAME,

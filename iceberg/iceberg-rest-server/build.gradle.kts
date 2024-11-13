@@ -60,7 +60,6 @@ dependencies {
   implementation(libs.metrics.jersey2)
 
   annotationProcessor(libs.lombok)
-
   compileOnly(libs.lombok)
 
   testImplementation(project(":bundles:aws-bundle"))

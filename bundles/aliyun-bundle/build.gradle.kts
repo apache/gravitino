@@ -29,12 +29,12 @@ dependencies {
   compileOnly(libs.hadoop3.common)
   implementation(libs.hadoop3.oss)
 
-  // oss needs StringUtils from commons-lang or the following error will occur in 3.1.0
-  // java.lang.NoClassDefFoundError: org/apache/commons/lang/StringUtils
+  // oss needs StringUtils from commons-lang3 or the following error will occur in 3.3.0
+  // java.lang.NoClassDefFoundError: org/apache/commons/lang3/StringUtils
   // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystemStore.initialize(AliyunOSSFileSystemStore.java:111)
   // org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem.initialize(AliyunOSSFileSystem.java:323)
   // org.apache.hadoop.fs.FileSystem.createFileSystem(FileSystem.java:3611)
-  implementation(libs.commons.lang)
+  implementation(libs.commons.lang3)
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
@@ -48,7 +48,7 @@ tasks.withType(ShadowJar::class.java) {
 
   // Relocate dependencies to avoid conflicts
   relocate("org.jdom", "org.apache.gravitino.shaded.org.jdom")
-  relocate("org.apache.commons.lang", "org.apache.gravitino.shaded.org.apache.commons.lang")
+  relocate("org.apache.commons.lang3", "org.apache.gravitino.shaded.org.apache.commons.lang3")
 }
 
 tasks.jar {
