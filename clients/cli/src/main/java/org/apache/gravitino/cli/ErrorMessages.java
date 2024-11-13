@@ -41,7 +41,7 @@ public class ErrorMessages {
   public static final String TAG_EXISTS = "Tag already exists.";
   public static final String UNKNOWN_ROLE = "Unknown role.";
   public static final String INVALID_SET_COMMAND =
-      "Unsupported combination of options either use --name or --property and --value.";
+      "Unsupported combination of options either use --name, --user, --group or --property and --value.";
   public static final String INVALID_REMOVE_COMMAND =
       "Unsupported combination of options either use --name or --property.";
   public static final String INVALID_OWNER_COMMAND =

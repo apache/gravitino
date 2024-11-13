@@ -73,7 +73,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
     options.addOption(createArgOption("t", TAG, "tag name"));
-    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
+    options.addOption(createSimpleOption("o", OWNER, "entity owner"));
 
     // Properties option can have multiple values
     Option properties =
