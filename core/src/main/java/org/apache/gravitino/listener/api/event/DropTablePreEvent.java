@@ -17,18 +17,15 @@
  *  under the License.
  */
 
-package org.apache.gravitino.iceberg.service;
+package org.apache.gravitino.listener.api.event;
 
-import javax.servlet.http.HttpServletRequest;
-import lombok.Getter;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
-/** The general request context information for Iceberg REST operations. */
-public class IcebergRequestContext {
-  @Getter private final HttpServletRequest httpRequest;
-  @Getter private final String catalogName;
-
-  public IcebergRequestContext(HttpServletRequest httpRequest, String catalogName) {
-    this.httpRequest = httpRequest;
-    this.catalogName = catalogName;
+/** Represents an event that is triggered before dropping a table. */
+@DeveloperApi
+public class DropTablePreEvent extends TablePreEvent {
+  public DropTablePreEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
   }
 }

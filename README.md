@@ -30,20 +30,20 @@
 
 ## Introduction
 
-Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages metadata directly in different sources, types, and regions and provides users with unified metadata access for data and AI assets.
+Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages metadata directly in different sources, types, and regions, providing users with unified metadata access for data and AI assets.
 
 ![Gravitino Architecture](docs/assets/gravitino-architecture.png)
 
 Gravitino aims to provide several key features:
 
-* Single Source of Truth for multi-regional data with geo-distributed architecture support.
-* Unified Data and AI asset management for both users and engines.
+* Single source of truth for multi-regional data with geo-distributed architecture support.
+* Unified data and AI asset management for both users and engines.
 * Security in one place, centralizing the security for different sources.
 * Built-in data management and data access management.
 
 ## Contributing to Apache Gravitino
 
-Gravitino is open source software available under the Apache 2.0 license. For information on how to contribute to Gravitino, please see the [Contribution guidelines](https://gravitino.apache.org/contrib/).
+Gravitino is open source software available under the Apache 2.0 license. For information on contributing to Gravitino, please see the [Contribution guidelines](https://gravitino.apache.org/contrib/).
 
 ## Online documentation
 
@@ -83,14 +83,13 @@ Please see [How to build Gravitino](https://gravitino.apache.org/docs/latest/how
 
 ### Use Gravitino playground
 
-This is the most recommended way: Gravitino provides a docker-compose based playground to quickly experience the whole system together with other components. Clone or download the [Gravitino playground repository](https://github.com/apache/gravitino-playground) and then follow the [README](https://github.com/apache/gravitino-playground/blob/main/README.md), you will have all then.
+This is the recommended approach. Gravitino provides a docker-compose-based playground where you can experience a whole system alongside other components. Clone or download the [Gravitino playground repository](https://github.com/apache/gravitino-playground) and then follow the [README](https://github.com/apache/gravitino-playground/blob/main/README.md), to get everything running.
 
 ### Configure and start Gravitino server in local
 
-If you want to start Gravitino in your machine, download a binary package from the [download page](https://gravitino.apache.org/downloads), and then decompressed the package.
+To start Gravitino on your machine, download a binary package from the [download page](https://gravitino.apache.org/downloads) and decompress the package.
 
-Before starting the Gravitino server, please configure the Gravitino server configuration file. The
-configuration file, `gravitino.conf`, is in the `conf` directory and follows the standard property file format. You can modify the configuration within this file.
+Before starting the Gravitino server, configure its settings by editing the `gravitino.conf` file located in the `conf` directory. This file follows the standard properties file format, allowing you to modify the server configuration as needed.
 
 To start the Gravitino server, please run:
 
@@ -114,11 +113,11 @@ And press `CTRL+C` to stop the Gravitino server.
 
 ### Gravitino Iceberg REST catalog service
 
-Gravitino provides Iceberg REST catalog service to manage Iceberg. For more details, please refer to [Gravitino Iceberg REST catalog service](https://gravitino.apache.org/docs/latest/iceberg-rest-service/).
+Gravitino provides Iceberg REST catalog service to manage Iceberg efficiently. For more details, refer to [Gravitino Iceberg REST catalog service](https://gravitino.apache.org/docs/latest/iceberg-rest-service/).
 
 ### Using Trino with Apache Gravitino
 
-Gravitino provides a Trino connector to access the metadata in Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](https://gravitino.apache.org/docs/latest/trino-connector/index/).
+Gravitino provides a Trino connector for accessing metadata within Gravitino. To use Trino with Gravitino, please follow the [trino-gravitino-connector doc](https://gravitino.apache.org/docs/latest/trino-connector/index/).
 
 ## Development guide
 
