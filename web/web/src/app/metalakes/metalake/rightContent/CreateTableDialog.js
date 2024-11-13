@@ -321,7 +321,7 @@ const CreateTableDialog = props => {
         const tableData = {
           name: formData.name,
           comment: formData.comment,
-          columns: formData.columns,
+          columns: formData.columns.map(({hasDuplicateName, ...rest}) => rest),
           properties
         }
 
