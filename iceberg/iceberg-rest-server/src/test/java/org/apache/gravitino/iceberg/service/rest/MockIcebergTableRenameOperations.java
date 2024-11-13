@@ -17,16 +17,22 @@
  *  under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.iceberg.service.rest;
 
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.DeveloperApi;
+import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
+import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 
-/** Represent a failure event when listing Iceberg table failed. */
-@DeveloperApi
-public class IcebergListTableFailureEvent extends IcebergTableFailureEvent {
-  public IcebergListTableFailureEvent(
-      IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
-    super(icebergRequestContext, nameIdentifier, e);
+public class MockIcebergTableRenameOperations extends IcebergTableRenameOperations {
+  @Inject
+  public MockIcebergTableRenameOperations(
+      IcebergTableOperationDispatcher tableOperationDispatcher) {
+    super(tableOperationDispatcher);
+  }
+
+  // HTTP request is null in Jersey test, create a mock request
+  @Override
+  HttpServletRequest httpServletRequest() {
+    return IcebergRestTestUtil.createMockHttpRequest();
   }
 }

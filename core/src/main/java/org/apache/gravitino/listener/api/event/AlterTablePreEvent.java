@@ -21,12 +21,25 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.rel.TableChange;
 
-/** Represent a failure event when listing Iceberg table failed. */
+/** Represents an event triggered before altering a table. */
 @DeveloperApi
-public class IcebergListTableFailureEvent extends IcebergTableFailureEvent {
-  public IcebergListTableFailureEvent(
-      IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
-    super(icebergRequestContext, nameIdentifier, e);
+public class AlterTablePreEvent extends TablePreEvent {
+  private final TableChange[] tableChanges;
+
+  public AlterTablePreEvent(String user, NameIdentifier identifier, TableChange[] tableChanges) {
+    super(user, identifier);
+    this.tableChanges = tableChanges;
+  }
+
+  /**
+   * Retrieves the specific changes that were made to the table during the alteration process.
+   *
+   * @return An array of {@link TableChange} objects detailing each modification applied to the
+   *     table.
+   */
+  public TableChange[] tableChanges() {
+    return tableChanges;
   }
 }

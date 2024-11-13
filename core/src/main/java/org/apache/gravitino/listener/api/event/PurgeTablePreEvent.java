@@ -22,11 +22,10 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represent a failure event when listing Iceberg table failed. */
+/** Represents an event triggered before purging a table. */
 @DeveloperApi
-public class IcebergListTableFailureEvent extends IcebergTableFailureEvent {
-  public IcebergListTableFailureEvent(
-      IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
-    super(icebergRequestContext, nameIdentifier, e);
+public class PurgeTablePreEvent extends TablePreEvent {
+  public PurgeTablePreEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
   }
 }

@@ -17,24 +17,19 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener;
+package org.apache.gravitino.iceberg.service.rest;
 
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import lombok.Getter;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.PreEvent;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 
 public class DummyEventListener implements EventListenerPlugin {
   Map<String, String> properties;
-  @Getter LinkedList<Event> postEvents = new LinkedList<>();
-  @Getter LinkedList<PreEvent> preEvents = new LinkedList<>();
+  LinkedList<Event> postEvents = new LinkedList<>();
+  LinkedList<PreEvent> preEvents = new LinkedList<>();
 
   @Override
   public void init(Map<String, String> properties) {
@@ -54,11 +49,6 @@ public class DummyEventListener implements EventListenerPlugin {
 
   @Override
   public void onPreEvent(PreEvent preEvent) {
-    if (preEvent.equals(TestEventListenerManager.DUMMY_FORBIDDEN_PRE_EVENT_INSTANCE)) {
-      throw new ForbiddenException("");
-    } else if (preEvent.equals(TestEventListenerManager.DUMMY_EXCEPTION_PRE_EVENT_INSTANCE)) {
-      throw new RuntimeException("");
-    }
     preEvents.add(preEvent);
   }
 
@@ -68,42 +58,17 @@ public class DummyEventListener implements EventListenerPlugin {
   }
 
   public Event popPostEvent() {
-    Assertions.assertTrue(postEvents.size() > 0, "No events to pop");
+    Assertions.assertTrue(postEvents.size() > 0, "No post events to pop");
     return postEvents.removeLast();
   }
 
   public PreEvent popPreEvent() {
-    Assertions.assertTrue(preEvents.size() > 0, "No events to pop");
+    Assertions.assertTrue(preEvents.size() > 0, "No pre events to pop");
     return preEvents.removeLast();
   }
 
-  public static class DummyAsyncEventListener extends DummyEventListener {
-    public List<Event> tryGetPostEvents() {
-      Awaitility.await()
-          .atMost(20, TimeUnit.SECONDS)
-          .pollInterval(10, TimeUnit.MILLISECONDS)
-          .until(() -> getPostEvents().size() > 0);
-      return getPostEvents();
-    }
-
-    public List<PreEvent> tryGetPreEvents() {
-      Awaitility.await()
-          .atMost(20, TimeUnit.SECONDS)
-          .pollInterval(10, TimeUnit.MILLISECONDS)
-          .until(() -> getPreEvents().size() > 0);
-      return getPreEvents();
-    }
-
-    @Override
-    public Mode mode() {
-      return Mode.ASYNC_SHARED;
-    }
-  }
-
-  public static class DummyAsyncIsolatedEventListener extends DummyAsyncEventListener {
-    @Override
-    public Mode mode() {
-      return Mode.ASYNC_ISOLATED;
-    }
+  public void clearEvent() {
+    preEvents.clear();
+    postEvents.clear();
   }
 }
