@@ -29,26 +29,25 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  ```bash
  usage: gcli [metalake|catalog|schema|table|column|user|group|tag] [list|details|create|delete|update|set|remove|properties] [options]
  Options
- -a,--audit              display audit information
- -c,--comment <arg>      entity comment
- -f,--force              force operation
- -g,--group <arg>        group name
- -h,--help               command help information
- -i,--ignore             ignore client/sever version check
- -l,--user <arg>         user name
- -m,--metalake <arg>     metalake name
- -n,--name <arg>         full entity name (dot separated)
- -o,--owner              entity owner
- -P,--property <arg>     property name
- -p,--properties <arg>   property name/value pairs
- -r,--rename <arg>       new entity name
- -s,--server             Gravitino server version
- -t,--tag <arg>          tag name
- -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
- -v,--version            Gravitino client version
- -V,--value <arg>        property value
- -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
-                         iceberg, kafka
+ -a,--audit            display audit information
+ -c,--comment <arg>    entity comment
+ -f,--force            force operation
+ -g,--group <arg>      group name
+ -h,--help             command help information
+ -i,--ignore           ignore client/sever version check
+ -l,--user <arg>       user name
+ -m,--metalake <arg>   metalake name
+ -n,--name <arg>       full entity name (dot separated)
+ -P,--property <arg>   property name
+ -r,--role <arg>       role name
+    --rename <arg>     new entity name
+ -s,--server           Gravitino server version
+ -t,--tag <arg>        tag name
+ -u,--url <arg>        Gravitino URL (default: http://localhost:8090)
+ -v,--version          Gravitino client version
+ -V,--value <arg>      property value
+ -z,--provider <arg>   provider one of hadoop, hive, mysql, postgres,
+                       iceberg, kafka
  ```
 
 ## Commands
@@ -526,3 +525,28 @@ gcli catalog set --name postgres --user admin
 gcli catalog set --name postgres --group groupA
 ```
 
+### Role commands
+
+#### Display role details
+
+```bash
+gcli role details --role admin
+```
+
+#### List all roles
+
+```bash
+gcli role list
+```
+
+#### Create a role
+
+```bash
+gcli role create --role admin
+ ```
+
+#### Delete a role
+
+```bash
+gcli role delete --role admin
+ ```
