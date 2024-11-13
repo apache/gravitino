@@ -1,0 +1,53 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+INSERT: 1 row
+
+<QUERY_FAILED> map key cannot be null
+
+"{key1=NULL}"
+
+INSERT: 1 row
+
+"{}"
+"{key1=NULL}"
+
+<QUERY_FAILED> Duplicate map keys (dup) are not allowed
+
+CREATE TABLE
+
+INSERT: 1 row
+
+"{2147483647=99999.99, 1=12345.67}"
+
+INSERT: 1 row
+
+"v1","v3"
+"",""
+"",""
+
+CREATE TABLE
+
+INSERT: 1 row
+
+"{a=[1, 2], b=[3, 4, 5]}"
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"1","2"
+"3","4"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA
