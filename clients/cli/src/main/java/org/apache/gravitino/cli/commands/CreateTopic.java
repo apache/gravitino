@@ -63,6 +63,7 @@ public class CreateTopic extends Command {
   }
 
   /** Add a topic. */
+  @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, topic);
 

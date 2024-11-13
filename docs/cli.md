@@ -503,3 +503,36 @@ gcli tag update --tag tagA --rename newTag
 ```bash
 gcli tag update --tag tagA --comment "new comment"
 ```
+
+
+### Topic commands
+
+#### Display a topic's details
+
+```bash
+gcli topic details --metalake metalake_demo --name kafka.default --topic topic3
+```
+
+#### Create a tag
+
+```bash
+gcli topic create --metalake metalake_demo --name kafka.default --topic topic3
+ ```
+
+#### List all topics
+
+```bash
+gcli topic list --metalake metalake_demo --name kafka.default 
+```
+
+#### Delete a topic
+
+```bash
+gcli topic delete --metalake metalake_demo --name kafka.default --topic topic3
+```
+
+#### Change a topic's comment
+
+```bash
+gcli topic update --metalake metalake_demo --name kafka.default --topic topic3 --comment new_comment
+```

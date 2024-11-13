@@ -489,7 +489,8 @@ public class GravitinoCommandLine {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       new CreateTopic(url, ignore, metalake, catalog, schema, topic, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
-      new DeleteTopic(url, ignore, metalake, catalog, schema, topic).handle();
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      new DeleteTopic(url, ignore, force, metalake, catalog, schema, topic).handle();
     } else if (CommandActions.UPDATE.equals(command)) {
       if (line.hasOption(GravitinoOptions.COMMENT)) {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);

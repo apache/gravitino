@@ -65,6 +65,7 @@ public class UpdateTopicComment extends Command {
   }
 
   /** Update the comment of a topic. */
+  @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, topic);
 

@@ -61,6 +61,7 @@ public class TopicDetails extends Command {
   }
 
   /** Displays the details of a topic. */
+  @Override
   public void handle() {
     Topic gTopic = null;
 
