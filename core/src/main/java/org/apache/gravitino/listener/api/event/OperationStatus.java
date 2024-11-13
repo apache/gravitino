@@ -19,21 +19,9 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.DeveloperApi;
-
-/** Represents a pre-event for table operations. */
-@DeveloperApi
-public abstract class TablePreEvent extends PreEvent {
-  protected TablePreEvent(String user, NameIdentifier identifier) {
-    super(user, identifier);
-  }
-
-  public EventSource eventSource() {
-    return EventSource.GRAVITINO_SERVER;
-  }
-
-  public OperationStatus operationStatus() {
-    return OperationStatus.NOT_PROCESS;
-  }
+public enum OperationStatus {
+  NOT_PROCESS,
+  SUCCESS,
+  FAIL,
+  UNKNOWN,
 }

@@ -27,6 +27,7 @@ import org.apache.gravitino.listener.api.event.FailureEvent;
 public class SimpleFormatter implements Formatter {
 
   @Override
+  @SuppressWarnings("deprecation")
   public SimpleAuditLog format(Event event) {
     Status status = event instanceof FailureEvent ? Status.FAILURE : Status.SUCCESS;
     return SimpleAuditLog.builder()

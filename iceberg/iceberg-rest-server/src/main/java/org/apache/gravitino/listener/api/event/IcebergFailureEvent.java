@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
@@ -33,7 +34,19 @@ public abstract class IcebergFailureEvent extends FailureEvent {
     this.icebergRequestContext = icebergRequestContext;
   }
 
+  public EventSource eventSource() {
+    return EventSource.GRAVITINO_ICEBERG_REST_SERVER;
+  }
+
   public IcebergRequestContext icebergRequestContext() {
     return icebergRequestContext;
+  }
+
+  public String remoteAddr() {
+    return icebergRequestContext.remoteHostName();
+  }
+
+  public Map<String, String> httpHeaders() {
+    return icebergRequestContext.httpHeaders();
   }
 }

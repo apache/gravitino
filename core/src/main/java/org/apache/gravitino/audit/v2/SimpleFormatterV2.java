@@ -17,23 +17,16 @@
  *  under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.audit.v2;
 
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.audit.Formatter;
+import org.apache.gravitino.listener.api.event.Event;
 
-/** Represents a pre-event for table operations. */
-@DeveloperApi
-public abstract class TablePreEvent extends PreEvent {
-  protected TablePreEvent(String user, NameIdentifier identifier) {
-    super(user, identifier);
-  }
+/** The default formatter implementation of the audit log. */
+public class SimpleFormatterV2 implements Formatter {
 
-  public EventSource eventSource() {
-    return EventSource.GRAVITINO_SERVER;
-  }
-
-  public OperationStatus operationStatus() {
-    return OperationStatus.NOT_PROCESS;
+  @Override
+  public SimpleAuditLogV2 format(Event event) {
+    return new SimpleAuditLogV2(event);
   }
 }

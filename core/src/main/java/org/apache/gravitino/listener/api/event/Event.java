@@ -28,4 +28,9 @@ public abstract class Event extends BaseEvent {
   protected Event(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }

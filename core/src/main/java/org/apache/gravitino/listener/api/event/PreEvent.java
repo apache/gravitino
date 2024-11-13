@@ -28,4 +28,9 @@ public abstract class PreEvent extends BaseEvent {
   protected PreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.NOT_PROCESS;
+  }
 }

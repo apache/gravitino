@@ -25,6 +25,8 @@ import lombok.Builder;
 
 /** The default implementation of the audit log. */
 @Builder
+@Deprecated
+@SuppressWarnings("deprecation")
 public class SimpleAuditLog implements AuditLog {
 
   private String user;

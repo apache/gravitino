@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
@@ -47,6 +49,10 @@ public abstract class BaseEvent {
     this.identifier = identifier;
     this.eventTime = System.currentTimeMillis();
   }
+
+  public abstract EventSource eventSource();
+
+  public abstract OperationStatus operationStatus();
 
   /**
    * Retrieves the user associated with this event.
@@ -78,5 +84,17 @@ public abstract class BaseEvent {
    */
   public long eventTime() {
     return eventTime;
+  }
+
+  public OperationType operationType() {
+    return OperationType.UNKNOWN;
+  }
+
+  public String remoteAddr() {
+    return "unknown";
+  }
+
+  public Map<String, String> customInfo() {
+    return ImmutableMap.of();
   }
 }
