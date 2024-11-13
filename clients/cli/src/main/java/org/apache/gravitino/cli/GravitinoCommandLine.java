@@ -374,17 +374,15 @@ public class GravitinoCommandLine {
     } else if (CommandActions.CREATE.equals(command)) {
       new CreateUser(url, ignore, metalake, user).handle();
     } else if (CommandActions.DELETE.equals(command)) {
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      new DeleteUser(url, ignore, force, metalake, user).handle();
+    } else if (CommandActions.REVOKE.equals(command)) {
       String role = line.getOptionValue(GravitinoOptions.ROLE);
-
       if (role != null) {
         new RemoveRoleFromUser(url, ignore, metalake, user, role).handle();
-      } else {
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        new DeleteUser(url, ignore, force, metalake, user).handle();
       }
-    } else if (CommandActions.UPDATE.equals(command)) {
+    } else if (CommandActions.GRANT.equals(command)) {
       String role = line.getOptionValue(GravitinoOptions.ROLE);
-
       if (role != null) {
         new AddRoleToUser(url, ignore, metalake, user, role).handle();
       }
@@ -405,17 +403,15 @@ public class GravitinoCommandLine {
     } else if (CommandActions.CREATE.equals(command)) {
       new CreateGroup(url, ignore, metalake, group).handle();
     } else if (CommandActions.DELETE.equals(command)) {
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      new DeleteGroup(url, ignore, force, metalake, group).handle();
+    } else if (CommandActions.REVOKE.equals(command)) {
       String role = line.getOptionValue(GravitinoOptions.ROLE);
-
       if (role != null) {
         new RemoveRoleFromGroup(url, ignore, metalake, group, role).handle();
-      } else {
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        new DeleteGroup(url, ignore, force, metalake, group).handle();
       }
-    } else if (CommandActions.UPDATE.equals(command)) {
+    } else if (CommandActions.GRANT.equals(command)) {
       String role = line.getOptionValue(GravitinoOptions.ROLE);
-
       if (role != null) {
         new AddRoleToGroup(url, ignore, metalake, group, role).handle();
       }
