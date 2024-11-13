@@ -76,7 +76,7 @@ public class TestSchemaEvent {
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(CreateSchemaPreEvent.class, preEvent.getClass());
-    SchemaInfo preSchemaInfo = ((CreateSchemaPreEvent) preEvent).createdSchemaInfo();
+    SchemaInfo preSchemaInfo = ((CreateSchemaPreEvent) preEvent).createSchemaRequest();
     checkSchemaInfo(preSchemaInfo, schema);
   }
 

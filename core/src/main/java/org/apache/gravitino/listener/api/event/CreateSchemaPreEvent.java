@@ -26,21 +26,21 @@ import org.apache.gravitino.listener.api.info.SchemaInfo;
 /** Represents an event triggered before creating a schema. */
 @DeveloperApi
 public final class CreateSchemaPreEvent extends SchemaPreEvent {
-  private final SchemaInfo createdSchemaRequest;
+  private final SchemaInfo createSchemaRequest;
 
   public CreateSchemaPreEvent(
-      String user, NameIdentifier identifier, SchemaInfo createdSchemaRequest) {
+      String user, NameIdentifier identifier, SchemaInfo createSchemaRequest) {
     super(user, identifier);
-    this.createdSchemaRequest = createdSchemaRequest;
+    this.createSchemaRequest = createSchemaRequest;
   }
 
   /**
    * Retrieves the create schema request.
    *
-   * @return A {@link SchemaInfo} instance encapsulating the comprehensive details of the newly
-   *     created schema.
+   * @return A {@link SchemaInfo} instance encapsulating the comprehensive details of create schema
+   *     request.
    */
-  public SchemaInfo createdSchemaInfo() {
-    return createdSchemaRequest;
+  public SchemaInfo createSchemaRequest() {
+    return createSchemaRequest;
   }
 }

@@ -30,7 +30,7 @@ public class AlterTablePreEvent extends TablePreEvent {
 
   public AlterTablePreEvent(String user, NameIdentifier identifier, TableChange[] tableChanges) {
     super(user, identifier);
-    this.tableChanges = tableChanges.clone();
+    this.tableChanges = tableChanges;
   }
 
   /**

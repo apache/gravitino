@@ -30,7 +30,7 @@ public final class AlterSchemaPreEvent extends SchemaPreEvent {
 
   public AlterSchemaPreEvent(String user, NameIdentifier identifier, SchemaChange[] schemaChanges) {
     super(user, identifier);
-    this.schemaChanges = schemaChanges.clone();
+    this.schemaChanges = schemaChanges;
   }
 
   /**
