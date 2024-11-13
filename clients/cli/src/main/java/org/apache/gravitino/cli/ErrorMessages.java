@@ -33,4 +33,14 @@ public class ErrorMessages {
   public static final String METALAKE_EXISTS = "Metalake already exists.";
   public static final String CATALOG_EXISTS = "Catalog already exists.";
   public static final String SCHEMA_EXISTS = "Schema already exists.";
+  public static final String UNKNOWN_USER = "Unknown user.";
+  public static final String USER_EXISTS = "User already exists.";
+  public static final String UNKNOWN_GROUP = "Unknown group.";
+  public static final String GROUP_EXISTS = "Group already exists.";
+  public static final String UNKNOWN_TAG = "Unknown tag.";
+  public static final String TAG_EXISTS = "Tag already exists.";
+  public static final String INVALID_SET_COMMAND =
+      "Unsupported combination of options either use --name or --property and --value.";
+  public static final String INVALID_REMOVE_COMMAND =
+      "Unsupported combination of options either use --name or --property.";
 }

@@ -26,9 +26,10 @@ plugins {
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
-val kyuubiVersion: String = libs.versions.kyuubi4spark35.get()
+val kyuubiVersion: String = libs.versions.kyuubi4paimon.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg4spark.get()
+val paimonVersion: String = libs.versions.paimon.get()
 
 dependencies {
   implementation(project(":api")) {
@@ -86,7 +87,7 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-  testImplementation("org.apache.kyuubi:kyuubi-spark-authz_$scalaVersion:$kyuubiVersion") {
+  testImplementation("org.apache.kyuubi:kyuubi-spark-authz-shaded_$scalaVersion:$kyuubiVersion") {
     exclude("com.sun.jersey")
   }
   testImplementation(libs.hadoop3.client)
@@ -100,6 +101,7 @@ dependencies {
     exclude("io.netty")
   }
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
 }
 
 tasks {

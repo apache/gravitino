@@ -129,4 +129,50 @@ public class FullName {
     System.err.println(ErrorMessages.MISSING_NAME);
     return null;
   }
+
+  /**
+   * Helper method to determine a specific part of the full name exits.
+   *
+   * @param partNo The part of the name to obtain.
+   * @return True if the part exitsts.
+   */
+  public boolean hasNamePart(int partNo) {
+    /* Extract the name part from the full name if available. */
+    if (line.hasOption(GravitinoOptions.NAME)) {
+      String[] names = line.getOptionValue(GravitinoOptions.NAME).split("\\.");
+      int length = names.length;
+      int position = partNo;
+
+      return position <= length;
+    }
+
+    return false;
+  }
+
+  /**
+   * Does the catalog name exist?
+   *
+   * @return True if the catalog name exists, or false if it does not.
+   */
+  public boolean hasCatalogName() {
+    return hasNamePart(1);
+  }
+
+  /**
+   * Does the schema name exist?
+   *
+   * @return True if the schema name exists, or false if it does not.
+   */
+  public boolean hasSchemaName() {
+    return hasNamePart(2);
+  }
+
+  /**
+   * Does the table name exist?
+   *
+   * @return True if the table name exists, or false if it does not.
+   */
+  public boolean hasTableName() {
+    return hasNamePart(3);
+  }
 }

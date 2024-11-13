@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
-import org.apache.gravitino.iceberg.service.IcebergRequestContext;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;

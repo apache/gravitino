@@ -550,8 +550,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     Assertions.assertDoesNotThrow(
         () -> catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(SCHEMA_NAME, fileset2)));
 
-    Assertions.assertThrows(
-        Exception.class, () -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
+    Assertions.assertDoesNotThrow(() -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-chown", "-R", "cli_schema", "/user/hadoop/" + catalogName);
     Assertions.assertDoesNotThrow(() -> catalog.asSchemas().dropSchema(SCHEMA_NAME, true));

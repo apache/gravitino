@@ -55,19 +55,21 @@ public class Properties {
    * <p>Each pair in the input string is split by the specified delimiter, and then each pair is
    * further split by the key-value separator.
    *
-   * @param input The input string containing name-value pairs.
+   * @param inputs An arrays of input strings containing name-value pairs.
    * @return A map of entries, where each entry represents a key-value pair from the input string.
    */
-  public Map<String, String> parse(String input) {
+  public Map<String, String> parse(String[] inputs) {
     HashMap<String, String> map = new HashMap<>();
 
-    // Split the input by the delimiter into key-value pairs
-    String[] pairs = input.split(delimiter);
-    for (String pair : pairs) {
-      // Split each key-value pair by the separator
-      String[] keyValue = pair.split(keyValueSeparator, 2);
-      if (keyValue.length == 2) {
-        map.put(keyValue[0].trim(), keyValue[1].trim());
+    for (String input : inputs) {
+      // Split the input by the delimiter into key-value pairs
+      String[] pairs = input.split(delimiter);
+      for (String pair : pairs) {
+        // Split each key-value pair by the separator
+        String[] keyValue = pair.split(keyValueSeparator, 2);
+        if (keyValue.length == 2) {
+          map.put(keyValue[0].trim(), keyValue[1].trim());
+        }
       }
     }
 
