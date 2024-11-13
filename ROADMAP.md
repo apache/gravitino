@@ -34,7 +34,7 @@ As of March 2024, this is the current roadmap for the Apache Gravitino project. 
 
 - Provide support for Filesystem in Userspace (FUSE) and Container Storage Interface (CSI).
 - Introduce cloud storage support, including secure credential vending to simplify access management in cloud-native setups.
-- Develop and release a comprehensive auditing framework for tracking and logging data acces.
+- Develop and release a comprehensive auditing framework for tracking and logging data access.
 - Release Gravitino 0.7.0 with focus on advanced security and cloud integration features.
 
 ## 2025 Roadmap
