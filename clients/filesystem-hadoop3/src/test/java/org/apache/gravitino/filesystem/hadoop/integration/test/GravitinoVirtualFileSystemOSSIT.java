@@ -41,7 +41,7 @@ import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@EnabledIf(value = "ossIsPrepare", disabledReason = "OSS is not prepared")
+@EnabledIf(value = "ossIsConfigured", disabledReason = "OSS is not prepared")
 public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemOSSIT.class);
 
@@ -150,7 +150,7 @@ public class GravitinoVirtualFileSystemOSSIT extends GravitinoVirtualFileSystemI
       "OSS does not support append, java.io.IOException: The append operation is not supported")
   public void testAppend() throws IOException {}
 
-  protected static boolean ossIsPrepare() {
+  protected static boolean ossIsConfigured() {
     return StringUtils.isNotBlank(System.getenv("OSS_ACCESS_KEY_ID"))
         && StringUtils.isNotBlank(System.getenv("OSS_SECRET_ACCESS_KEY"))
         && StringUtils.isNotBlank(System.getenv("OSS_ENDPOINT"))
