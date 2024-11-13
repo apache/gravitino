@@ -24,10 +24,23 @@ As of March 2024, this is the current roadmap for the Apache Gravitino project. 
 
 ### Q3 (July-September)
 
-Continue to improve and expand the features of Gravitino, including adding more functionality to the data compliance framework.
+- Implement centralized mechanisms for managing and enforcing access control policies across Gravitino deployments.
+- Deploy a standalone REST catalog server compatible with Iceberg.
+- Develop and release a connector for Flink, enhancing Gravitino’s compatibility with stream processing frameworks.
+- Enable metadata tagging for easier resource categorization and management.
+- Release Gravitino 0.6.1
 
 ### Q4 (October-December)
 
-Refine and polish Gravitino based on user feedback and market/community demands.
+- Provide support for Filesystem in Userspace (FUSE) and Container Storage Interface (CSI).
+- Introduce cloud storage support, including secure credential vending to simplify access management in cloud-native setups.
+- Develop and release a comprehensive auditing framework for tracking and logging data acces.
+- Release Gravitino 0.7.0 with focus on advanced security and cloud integration features.
+
+## 2025 Roadmap
+
+- Streamline dataset versioning, metadata organization, and secure sharing across teams.
+- Add storage and indexing for vector data, improving compatibility with ML workflows.
+- Improve support for large text datasets tailored for LLM applications.
 
 Apache, Apache Doris, Apache Kafka, Apache Spark, Apache Ranger, Apache Paimon are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries.
