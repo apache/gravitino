@@ -120,7 +120,7 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void checkHaveNoPrivileges() {
+  protected void checkWithoutPrivileges() {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
     Assertions.assertThrows(
         AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
