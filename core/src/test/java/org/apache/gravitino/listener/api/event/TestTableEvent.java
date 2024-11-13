@@ -183,7 +183,7 @@ public class TestTableEvent {
 
   @Test
   void testCreateTableFailureEvent() {
-    NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () ->

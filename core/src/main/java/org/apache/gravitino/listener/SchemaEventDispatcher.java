@@ -32,14 +32,19 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.listener.api.event.AlterSchemaEvent;
 import org.apache.gravitino.listener.api.event.AlterSchemaFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterSchemaPreEvent;
 import org.apache.gravitino.listener.api.event.CreateSchemaEvent;
 import org.apache.gravitino.listener.api.event.CreateSchemaFailureEvent;
+import org.apache.gravitino.listener.api.event.CreateSchemaPreEvent;
 import org.apache.gravitino.listener.api.event.DropSchemaEvent;
 import org.apache.gravitino.listener.api.event.DropSchemaFailureEvent;
+import org.apache.gravitino.listener.api.event.DropSchemaPreEvent;
 import org.apache.gravitino.listener.api.event.ListSchemaEvent;
 import org.apache.gravitino.listener.api.event.ListSchemaFailureEvent;
+import org.apache.gravitino.listener.api.event.ListSchemaPreEvent;
 import org.apache.gravitino.listener.api.event.LoadSchemaEvent;
 import org.apache.gravitino.listener.api.event.LoadSchemaFailureEvent;
+import org.apache.gravitino.listener.api.event.LoadSchemaPreEvent;
 import org.apache.gravitino.listener.api.info.SchemaInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -67,6 +72,7 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
 
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
+    eventBus.dispatchEvent(new ListSchemaPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listSchemas(namespace);
       eventBus.dispatchEvent(new ListSchemaEvent(PrincipalUtils.getCurrentUserName(), namespace));
@@ -86,6 +92,9 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    SchemaInfo createSchemaRequest = new SchemaInfo(ident.name(), comment, properties, null);
+    eventBus.dispatchEvent(
+        new CreateSchemaPreEvent(PrincipalUtils.getCurrentUserName(), ident, createSchemaRequest));
     try {
       Schema schema = dispatcher.createSchema(ident, comment, properties);
       eventBus.dispatchEvent(
@@ -93,7 +102,6 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
               PrincipalUtils.getCurrentUserName(), ident, new SchemaInfo(schema)));
       return schema;
     } catch (Exception e) {
-      SchemaInfo createSchemaRequest = new SchemaInfo(ident.name(), comment, properties, null);
       eventBus.dispatchEvent(
           new CreateSchemaFailureEvent(
               PrincipalUtils.getCurrentUserName(), ident, e, createSchemaRequest));
@@ -103,6 +111,7 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
 
   @Override
   public Schema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
+    eventBus.dispatchEvent(new LoadSchemaPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       Schema schema = dispatcher.loadSchema(ident);
       eventBus.dispatchEvent(
@@ -118,6 +127,8 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
+    eventBus.dispatchEvent(
+        new AlterSchemaPreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
     try {
       Schema schema = dispatcher.alterSchema(ident, changes);
       eventBus.dispatchEvent(
@@ -133,6 +144,7 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
 
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
+    eventBus.dispatchEvent(new DropSchemaPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       boolean isExists = dispatcher.dropSchema(ident, cascade);
       eventBus.dispatchEvent(
