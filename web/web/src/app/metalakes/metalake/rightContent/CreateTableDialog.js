@@ -267,7 +267,7 @@ const CreateTableDialog = props => {
   const handleDialogClose = () => {
     reset()
     setInnerProps([])
-    setTableColumns([])
+    setTableColumns([{ name: '', type: '', nullable: true, comment: '' }])
     setValue('propItems', [])
     setValue('columns', [])
     setOpen(false)
