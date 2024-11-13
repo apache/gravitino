@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cli.commands;
 
+import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -28,17 +29,21 @@ public class DeleteUser extends Command {
 
   protected final String metalake;
   protected final String user;
+  protected final boolean force;
 
   /**
    * Delete a user.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param user The name of the user.
    */
-  public DeleteUser(String url, boolean ignoreVersions, String metalake, String user) {
+  public DeleteUser(
+      String url, boolean ignoreVersions, boolean force, String metalake, String user) {
     super(url, ignoreVersions);
+    this.force = force;
     this.metalake = metalake;
     this.user = user;
   }
@@ -47,6 +52,10 @@ public class DeleteUser extends Command {
   @Override
   public void handle() {
     boolean deleted = false;
+
+    if (!AreYouSure.really(force)) {
+      return;
+    }
 
     try {
       GravitinoClient client = buildClient(metalake);

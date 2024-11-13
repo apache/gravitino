@@ -29,8 +29,10 @@ public class IcebergRenameTablePreEvent extends IcebergTablePreEvent {
   private RenameTableRequest renameTableRequest;
 
   public IcebergRenameTablePreEvent(
-      String user, NameIdentifier resourceIdentifier, RenameTableRequest renameTableRequest) {
-    super(user, resourceIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      RenameTableRequest renameTableRequest) {
+    super(icebergRequestContext, resourceIdentifier);
     this.renameTableRequest = renameTableRequest;
   }
 

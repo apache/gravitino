@@ -84,10 +84,17 @@ public class TestTableEvent {
         table.distribution(),
         table.sortOrder(),
         table.index());
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(CreateTableEvent.class, event.getClass());
     TableInfo tableInfo = ((CreateTableEvent) event).createdTableInfo();
+    checkTableInfo(tableInfo, table);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(CreateTablePreEvent.class, preEvent.getClass());
+    tableInfo = ((CreateTablePreEvent) preEvent).createTableRequest();
     checkTableInfo(tableInfo, table);
   }
 
@@ -95,11 +102,16 @@ public class TestTableEvent {
   void testLoadTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.loadTable(identifier);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadTableEvent.class, event.getClass());
     TableInfo tableInfo = ((LoadTableEvent) event).loadedTableInfo();
     checkTableInfo(tableInfo, table);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(LoadTablePreEvent.class, preEvent.getClass());
   }
 
   @Test
@@ -107,6 +119,7 @@ public class TestTableEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     TableChange change = TableChange.setProperty("a", "b");
     dispatcher.alterTable(identifier, change);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterTableEvent.class, event.getClass());
@@ -114,41 +127,63 @@ public class TestTableEvent {
     checkTableInfo(tableInfo, table);
     Assertions.assertEquals(1, ((AlterTableEvent) event).tableChanges().length);
     Assertions.assertEquals(change, ((AlterTableEvent) event).tableChanges()[0]);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(AlterTablePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(1, ((AlterTablePreEvent) preEvent).tableChanges().length);
+    Assertions.assertEquals(change, ((AlterTablePreEvent) preEvent).tableChanges()[0]);
   }
 
   @Test
   void testDropTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.dropTable(identifier);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropTableEvent.class, event.getClass());
     Assertions.assertEquals(true, ((DropTableEvent) event).isExists());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropTablePreEvent.class, preEvent.getClass());
   }
 
   @Test
   void testPurgeTableEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     dispatcher.purgeTable(identifier);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(PurgeTableEvent.class, event.getClass());
     Assertions.assertEquals(true, ((PurgeTableEvent) event).isExists());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(PurgeTablePreEvent.class, preEvent.getClass());
   }
 
   @Test
   void testListTableEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     dispatcher.listTables(namespace);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListTableEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListTableEvent) event).namespace());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListTablePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListTablePreEvent) preEvent).namespace());
   }
 
   @Test
   void testCreateTableFailureEvent() {
-    NameIdentifier identifier = NameIdentifier.of("metalake", "table", table.name());
+    NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", table.name());
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () ->
