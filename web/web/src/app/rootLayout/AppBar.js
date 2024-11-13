@@ -71,17 +71,19 @@ const AppBar = () => {
   const [githubData, setGithubData] = useState({ stars: 0, forks: 0 })
 
   useEffect(() => {
-    axios
-      .get(`https://api.github.com/repos/${username}/${repository}`)
-      .then(response => {
+    const fetchGitHubData = async () => {
+      try {
+        const response = await axios.get(`https://api.github.com/repos/${username}/${repository}`)
         let { stargazers_count, forks_count } = response.data
         stargazers_count = checkCountMore1k(stargazers_count)
         forks_count = checkCountMore1k(forks_count)
         setGithubData({ stars: stargazers_count, forks: forks_count })
-      })
-      .catch(e => {
-        console.log(`Error fetching data: ${e}`)
-      })
+      } catch (error) {
+        console.log(`Error fetching data: ${error}`)
+      }
+    }
+    fetchGitHubData()
+
     if (!store.metalakes.length && metalake) {
       dispatch(fetchMetalakes())
     }
