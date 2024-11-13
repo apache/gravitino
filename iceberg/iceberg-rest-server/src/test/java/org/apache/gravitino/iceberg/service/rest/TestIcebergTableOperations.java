@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.rest;
 
 import com.google.common.collect.ImmutableSet;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -31,6 +32,27 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
+import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergDropTableEvent;
+import org.apache.gravitino.listener.api.event.IcebergDropTableFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
+import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTableFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergLoadTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
+import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergTableExistsEvent;
+import org.apache.gravitino.listener.api.event.IcebergTableExistsPreEvent;
+import org.apache.gravitino.listener.api.event.IcebergUpdateTableEvent;
+import org.apache.gravitino.listener.api.event.IcebergUpdateTableFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
@@ -63,13 +85,17 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   private static final Schema newTableSchema =
       new Schema(NestedField.of(2, false, "foo_string1", StringType.get()));
 
+  private DummyEventListener dummyEventListener;
+
   @Override
   protected Application configure() {
+    this.dummyEventListener = new DummyEventListener();
     ResourceConfig resourceConfig =
-        IcebergRestTestUtil.getIcebergResourceConfig(IcebergTableOperations.class);
+        IcebergRestTestUtil.getIcebergResourceConfig(
+            MockIcebergTableOperations.class, true, Arrays.asList(dummyEventListener));
     // create namespace before each table test
     resourceConfig.register(IcebergNamespaceOperations.class);
-    resourceConfig.register(IcebergTableRenameOperations.class);
+    resourceConfig.register(MockIcebergTableRenameOperations.class);
 
     return resourceConfig;
   }
@@ -77,10 +103,15 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   @Test
   void testCreateTable() {
     verifyCreateTableFail("create_foo1", 404);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergCreateTablePreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergCreateTableFailureEvent);
 
     verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
 
     verifyCreateTableSucc("create_foo1");
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergCreateTablePreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergCreateTableEvent);
 
     verifyCreateTableFail("create_foo1", 409);
     verifyCreateTableFail("", 400);
@@ -89,10 +120,17 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   @Test
   void testLoadTable() {
     verifyLoadTableFail("load_foo1", 404);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergLoadTablePreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergLoadTableFailureEvent);
 
     verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyCreateTableSucc("load_foo1");
+
+    dummyEventListener.clearEvent();
     verifyLoadTableSucc("load_foo1");
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergLoadTablePreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergLoadTableEvent);
 
     verifyLoadTableFail("load_foo2", 404);
   }
@@ -100,11 +138,20 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   @Test
   void testDropTable() {
     verifyDropTableFail("drop_foo1", 404);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergDropTablePreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergDropTableFailureEvent);
+
     verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyDropTableFail("drop_foo1", 404);
 
     verifyCreateTableSucc("drop_foo1");
+
+    dummyEventListener.clearEvent();
     verifyDropTableSucc("drop_foo1");
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergDropTablePreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergDropTableEvent);
+
     verifyLoadTableFail("drop_foo1", 404);
   }
 
@@ -113,10 +160,19 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyCreateTableSucc("update_foo1");
     TableMetadata metadata = getTableMeta("update_foo1");
+
+    dummyEventListener.clearEvent();
     verifyUpdateSucc("update_foo1", metadata);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergUpdateTablePreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergUpdateTableEvent);
 
     verifyDropTableSucc("update_foo1");
+
+    dummyEventListener.clearEvent();
     verifyUpdateTableFail("update_foo1", 404, metadata);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergUpdateTablePreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergUpdateTableFailureEvent);
 
     verifyDropNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyUpdateTableFail("update_foo1", 404, metadata);
@@ -127,21 +183,39 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
   void testListTables(String prefix) {
     setUrlPathWithPrefix(prefix);
     verifyListTableFail(404);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListTablePreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergListTableFailureEvent);
 
     verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyCreateTableSucc("list_foo1");
     verifyCreateTableSucc("list_foo2");
+
+    dummyEventListener.clearEvent();
     verifyListTableSucc(ImmutableSet.of("list_foo1", "list_foo2"));
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListTablePreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergListTableEvent);
   }
 
   @Test
   void testTableExits() {
     verifyTableExistsStatusCode("exists_foo2", 404);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergTableExistsPreEvent);
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(postEvent instanceof IcebergTableExistsEvent);
+    Assertions.assertEquals(false, ((IcebergTableExistsEvent) postEvent).isExists());
+
     verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyTableExistsStatusCode("exists_foo2", 404);
 
     verifyCreateTableSucc("exists_foo1");
+    dummyEventListener.clearEvent();
     verifyTableExistsStatusCode("exists_foo1", 200);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergTableExistsPreEvent);
+    postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(postEvent instanceof IcebergTableExistsEvent);
+    Assertions.assertEquals(true, ((IcebergTableExistsEvent) postEvent).isExists());
+
     verifyLoadTableSucc("exists_foo1");
   }
 
@@ -151,11 +225,19 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     setUrlPathWithPrefix(prefix);
     // namespace not exits
     verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRenameTablePreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergRenameTableFailureEvent);
 
     verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
     verifyCreateTableSucc("rename_foo1");
+
+    dummyEventListener.clearEvent();
     // rename
     verifyRenameTableSucc("rename_foo1", "rename_foo2");
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRenameTablePreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergRenameTableEvent);
+
     verifyLoadTableFail("rename_foo1", 404);
     verifyLoadTableSucc("rename_foo2");
 
