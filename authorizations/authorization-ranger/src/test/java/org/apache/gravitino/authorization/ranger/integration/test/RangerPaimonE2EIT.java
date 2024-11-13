@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
 import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
-import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_PASSWORD;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_SERVICE_NAME;
@@ -39,7 +38,6 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
@@ -54,10 +52,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class RangerIcebergE2EIT extends RangerBaseE2EIT {
-  private static final Logger LOG = LoggerFactory.getLogger(RangerIcebergE2EIT.class);
-  private static final String SQL_USE_CATALOG = "USE iceberg";
-  private static final String provider = "lakehouse-iceberg";
+public class RangerPaimonE2EIT extends RangerBaseE2EIT {
+  private static final Logger LOG = LoggerFactory.getLogger(RangerPaimonE2EIT.class);
+
+  private static final String provider = "lakehouse-paimon";
+  private static final String SQL_USE_CATALOG = "USE paimon";
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
@@ -90,25 +89,29 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
-            .appName("Ranger Iceberg E2E integration test")
-            .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
-            .config("spark.sql.catalog.iceberg.type", "hive")
-            .config("spark.sql.catalog.iceberg.uri", HIVE_METASTORE_URIS)
-            .config("spark.sql.catalog.iceberg.cache-enabled", "false")
+            .appName("Ranger Paimon E2E integration test")
+            .config("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
+            .config("spark.sql.catalog.paimon.metastore", "hive")
+            .config("spark.sql.catalog.paimon.uri", HIVE_METASTORE_URIS)
+            .config(
+                "spark.sql.catalog.paimon.warehouse",
+                String.format(
+                    "hdfs://%s:%d/user/hive/warehouse",
+                    containerSuite.getHiveRangerContainer().getContainerIpAddress(),
+                    HiveContainer.HDFS_DEFAULTFS_PORT))
+            .config("spark.sql.catalog.paimon.cache-enabled", "false")
             .config(
                 "spark.sql.extensions",
                 "org.apache.kyuubi.plugin.spark.authz.ranger.RangerSparkExtension,"
-                    + "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+                    + "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
             .enableHiveSupport()
             .getOrCreate();
 
     createMetalake();
     createCatalog();
 
-    metalake.addUser(System.getenv(HADOOP_USER_NAME));
-
     RangerITEnv.cleanup();
-    waitForUpdatingPolicies();
+    metalake.addUser(System.getenv(HADOOP_USER_NAME));
   }
 
   @AfterAll
@@ -117,33 +120,48 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
+  protected void useCatalog() throws InterruptedException {
+    String userName1 = System.getenv(HADOOP_USER_NAME);
+    String roleName = currentFunName();
+    SecurableObject securableObject =
+        SecurableObjects.ofMetalake(
+            metalakeName, Lists.newArrayList(Privileges.UseCatalog.allow()));
+    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
+    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
+    waitForUpdatingPolicies();
+    sparkSession.sql(SQL_USE_CATALOG);
+    metalake.deleteRole(roleName);
+    waitForUpdatingPolicies();
+  }
+
+  @Override
   protected void checkUpdateSQLWithReadWritePrivileges() {
-    sparkSession.sql(SQL_UPDATE_TABLE);
+    // Kyuubi Paimon Ranger plugin doesn't support to update yet.
   }
 
   @Override
   protected void checkUpdateSQLWithReadPrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
+    // Kyuubi Paimon Ranger plugin doesn't support to update yet.
   }
 
   @Override
   protected void checkUpdateSQLWithWritePrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
+    // Kyuubi Paimon Ranger plugin doesn't support to update yet.
   }
 
   @Override
   protected void checkDeleteSQLWithReadWritePrivileges() {
-    sparkSession.sql(SQL_DELETE_TABLE);
+    // Kyuubi Paimon Ranger plugin doesn't support to delete yet.
   }
 
   @Override
   protected void checkDeleteSQLWithReadPrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
+    // Kyuubi Paimon Ranger plugin doesn't support to delete yet.
   }
 
   @Override
   protected void checkDeleteSQLWithWritePrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
+    // Kyuubi Paimon Ranger plugin doesn't support to delete yet.
   }
 
   @Override
@@ -157,8 +175,6 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     Assertions.assertThrows(
         AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
   @Override
@@ -170,17 +186,15 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
   private static void createCatalog() {
     Map<String, String> properties =
         ImmutableMap.of(
-            IcebergConstants.URI,
+            "uri",
             HIVE_METASTORE_URIS,
-            IcebergConstants.CATALOG_BACKEND,
+            "catalog-backend",
             "hive",
-            IcebergConstants.WAREHOUSE,
+            "warehouse",
             String.format(
                 "hdfs://%s:%d/user/hive/warehouse",
                 containerSuite.getHiveRangerContainer().getContainerIpAddress(),
                 HiveContainer.HDFS_DEFAULTFS_PORT),
-            IMPERSONATION_ENABLE,
-            "true",
             AUTHORIZATION_PROVIDER,
             "ranger",
             RANGER_SERVICE_NAME,
@@ -197,21 +211,6 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
     catalog = metalake.loadCatalog(catalogName);
     LOG.info("Catalog created: {}", catalog);
-  }
-
-  @Override
-  protected void useCatalog() throws InterruptedException {
-    String userName1 = System.getenv(HADOOP_USER_NAME);
-    String roleName = currentFunName();
-    SecurableObject securableObject =
-        SecurableObjects.ofMetalake(
-            metalakeName, Lists.newArrayList(Privileges.UseCatalog.allow()));
-    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
-    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
-    waitForUpdatingPolicies();
-    sparkSession.sql(SQL_USE_CATALOG);
-    metalake.deleteRole(roleName);
-    waitForUpdatingPolicies();
   }
 
   protected void checkTableAllPrivilegesExceptForCreating() {

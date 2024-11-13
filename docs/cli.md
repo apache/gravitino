@@ -523,13 +523,13 @@ gcli role list
 
 ```bash
 gcli role create --role admin
- ```
+```
 
 #### Delete a role
 
 ```bash
 gcli role delete --role admin
- ```
+```
 
 #### Add a role to a user
 
