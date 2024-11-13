@@ -33,11 +33,11 @@ public class IcebergCreateTableEvent extends IcebergTableEvent {
   private LoadTableResponse loadTableResponse;
 
   public IcebergCreateTableEvent(
-      String user,
+      IcebergRequestContext icebergRequestContext,
       NameIdentifier resourceIdentifier,
       CreateTableRequest createTableRequest,
       LoadTableResponse loadTableResponse) {
-    super(user, resourceIdentifier);
+    super(icebergRequestContext, resourceIdentifier);
     this.createTableRequest =
         IcebergRestUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
     this.loadTableResponse =
