@@ -43,4 +43,4 @@ As of March 2024, this is the current roadmap for the Apache Gravitino project. 
 - Add storage and indexing for vector data, improving compatibility with ML workflows.
 - Improve support for large text datasets tailored for LLM applications.
 
-Apache, Apache Doris, Apache Kafka, Apache Spark, Apache Ranger, Apache Paimon are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries.
+Apache, Apache Doris, Apache Flink, Apache Iceburg, Apache Kafka, Apache Spark, Apache Ranger, Apache Paimon are either registered trademarks or trademarks of The Apache Software Foundation in the United States and other countries.
