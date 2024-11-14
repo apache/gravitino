@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization.ranger.integration.test;
 
 import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
+import static org.apache.gravitino.authorization.ranger.integration.test.RangerBaseE2EIT.generateRangerSparkSecurityXML;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_PASSWORD;
 import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_SERVICE_NAME;
@@ -27,16 +28,18 @@ import static org.apache.gravitino.integration.test.container.RangerContainer.RA
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.kyuubi.plugin.spark.authz.AccessControlException;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -46,10 +49,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
-public class RangerHudiE2EIT extends RangerBaseE2EIT {
+public class RangerHudiE2EIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHudiE2EIT.class);
   private static final String SQL_USE_CATALOG = "USE hudi";
   private static final String provider = "lakehouse-hudi";
+
+  public static final String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
+
+  public static String metalakeName;
+  protected static GravitinoMetalake metalake;
+  protected static Catalog catalog;
+  protected static String HIVE_METASTORE_URIS;
+  protected static String RANGER_ADMIN_URL = null;
+
+  protected static SparkSession sparkSession = null;
+  protected static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
@@ -104,65 +118,22 @@ public class RangerHudiE2EIT extends RangerBaseE2EIT {
     createCatalog();
 
     metalake.addUser(System.getenv(HADOOP_USER_NAME));
-
-    RangerITEnv.cleanup();
-    waitForUpdatingPolicies();
   }
 
   @AfterAll
   public void stop() {
-    cleanIT();
+    //
   }
 
-  @Override
-  protected void checkUpdateSQLWithReadWritePrivileges() {
-    sparkSession.sql(SQL_UPDATE_TABLE);
-  }
+  void createMetalake() {
+    GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
+    Assertions.assertEquals(0, gravitinoMetalakes.length);
 
-  @Override
-  protected void checkUpdateSQLWithReadPrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
-  }
+    client.createMetalake(metalakeName, "comment", Collections.emptyMap());
+    GravitinoMetalake loadMetalake = client.loadMetalake(metalakeName);
+    Assertions.assertEquals(metalakeName, loadMetalake.name());
 
-  @Override
-  protected void checkUpdateSQLWithWritePrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
-  }
-
-  @Override
-  protected void checkDeleteSQLWithReadWritePrivileges() {
-    sparkSession.sql(SQL_DELETE_TABLE);
-  }
-
-  @Override
-  protected void checkDeleteSQLWithReadPrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
-  }
-
-  @Override
-  protected void checkDeleteSQLWithWritePrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
-  }
-
-  @Override
-  protected void checkWithoutPrivileges() {
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
-    Assertions.assertThrows(
-        AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_SCHEMA));
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_USE_SCHEMA));
-    Assertions.assertThrows(
-        AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
-  }
-
-  @Override
-  protected void testAlterTable() {
-    sparkSession.sql(SQL_ALTER_TABLE);
-    sparkSession.sql(SQL_ALTER_TABLE_BACK);
+    metalake = loadMetalake;
   }
 
   private static void createCatalog() {
@@ -188,30 +159,5 @@ public class RangerHudiE2EIT extends RangerBaseE2EIT {
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
     catalog = metalake.loadCatalog(catalogName);
     LOG.info("Catalog created: {}", catalog);
-  }
-
-  @Override
-  protected void useCatalog() throws InterruptedException {
-    sparkSession.sql(SQL_USE_CATALOG);
-  }
-
-  protected void checkTableAllPrivilegesExceptForCreating() {
-    // - a. Succeed to insert data into the table
-    sparkSession.sql(SQL_INSERT_TABLE);
-
-    // - b. Succeed to select data from the table
-    sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
-
-    // - c: Succeed to update data in the table.
-    sparkSession.sql(SQL_UPDATE_TABLE);
-
-    // - d: Succeed to delete data from the table.
-    sparkSession.sql(SQL_DELETE_TABLE);
-
-    // - e: Succeed to alter the table
-    sparkSession.sql(SQL_ALTER_TABLE);
-
-    // - f: Succeed to drop the table
-    sparkSession.sql(SQL_DROP_TABLE);
   }
 }

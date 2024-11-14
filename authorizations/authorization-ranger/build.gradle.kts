@@ -107,6 +107,7 @@ dependencies {
   }
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
+  testRuntimeOnly("org.apache.hudi:hudi-spark$sparkMajorVersion-bundle_$scalaVersion:$hudiVersion")
 }
 
 tasks {
