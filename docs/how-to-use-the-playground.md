@@ -208,7 +208,7 @@ SHOW TABLES from catalog_hive.company;
 
 ### Cross-catalog queries
 
-In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data and the sales department uses PostgreSQL. You can run some interesting queries by joining the two departments' data together with Gravitino.
+In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data, and the sales department uses PostgreSQL. You can run some interesting queries by joining the two departments' data together with Gravitino.
 
 To know which employee has the largest sales amount, run this SQL:
 
