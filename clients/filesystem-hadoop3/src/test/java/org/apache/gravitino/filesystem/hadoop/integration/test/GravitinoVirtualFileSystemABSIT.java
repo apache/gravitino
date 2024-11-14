@@ -64,7 +64,7 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
     // This value can be by tune by the user, please change it accordingly.
     defaultBockSize = 32 * 1024 * 1024;
 
-    // This value is 1 for ABFS, 3 for GCS, and 1 for S3A.
+    // This value is 1 for ABS, 3 for GCS, and 1 for S3A.
     defaultReplication = 1;
 
     metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
