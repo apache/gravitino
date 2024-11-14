@@ -39,7 +39,7 @@ Gravitino aims to provide several key features:
 * End-to-End Data Governance: Gravitino offers a unified governance layer for managing metadata with features like access control, auditing, and discovery.
 * Direct Metadata Management: Gravitino connects directly to metadata sources via connectors, ensuring changes are instantly reflected between Gravitino and the underlying systems.
 * Geo-Distribution Support: Gravitino enables deployment across multiple regions or clouds, allowing instances to share metadata for a global cross-region view.
-Multi-Engine Support: Gravitino supports query engines enabling metadata access without modifying SQL dialects.
+* Multi-Engine Support: Gravitino supports query engines enabling metadata access without modifying SQL dialects.
 * AI Asset Management (WIP): Gravitino is expanding to manage both data and AI assets, with support for AI models and features currently in development.
 
 ## Contributing to Apache Gravitino
