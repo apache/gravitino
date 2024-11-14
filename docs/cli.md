@@ -365,7 +365,7 @@ gcli table list --name catalog_postgres.hr
 #### Show tables details
 
 ```bash
-gcli column list --name catalog_postgres.hr.departments
+gcli table details --name catalog_postgres.hr.departments
 ```
 
 #### Show tables audit information
@@ -375,9 +375,12 @@ gcli table details --name catalog_postgres.hr.departments --audit
 ```
 #### Show tables distribution information
 
+### Show table indexes
+
 ```bash
-gcli table details --metalake metalake_demo --name catalog_postgres.hr.departments --distribution
+gcli table details --name catalog_mysql.db.iceberg_namespace_properties --index
 ```
+
 #### Delete a table
 
 ```bash

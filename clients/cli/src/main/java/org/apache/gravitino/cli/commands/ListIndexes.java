@@ -19,26 +19,27 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.indexes.Index;
 
-/** Displays the details of a table. */
-public class TableDetails extends TableCommand {
+/** Displays the index of a table. */
+public class ListIndexes extends TableCommand {
 
   protected final String schema;
   protected final String table;
 
   /**
-   * Displays the details of a table.
+   * Displays the index of a table.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    * @param table The name of the table.
    */
-  public TableDetails(
+  public ListIndexes(
       String url,
       boolean ignoreVersions,
       String metalake,
@@ -50,19 +51,32 @@ public class TableDetails extends TableCommand {
     this.table = table;
   }
 
-  /** Displays the details of a table. */
-  @Override
+  /** Displays the details of a table's index. */
   public void handle() {
-    Table gTable = null;
+    Index[] indexes;
 
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
-      gTable = tableCatalog().loadTable(name);
+      indexes = tableCatalog().loadTable(name).index();
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(gTable.name() + "," + gTable.comment());
+    StringBuilder all = new StringBuilder();
+    for (Index index : indexes) {
+      // Flatten nested field names into dot-separated strings (e.g., "a.b.c")
+      Arrays.stream(index.fieldNames())
+          // Convert nested fields to a single string
+          .map(nestedFieldName -> String.join(".", nestedFieldName))
+          .forEach(
+              fieldName ->
+                  all.append(fieldName)
+                      .append(",")
+                      .append(index.name())
+                      .append(System.lineSeparator()));
+    }
+
+    System.out.print(all);
   }
 }
