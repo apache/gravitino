@@ -208,10 +208,10 @@ public class IcebergViewOperations {
   @Timed(name = "report-view-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "report-table-metrics", absolute = true)
   public Response reportTableMetrics(
-          @PathParam("prefix") String prefix,
-          @PathParam("namespace") String namespace,
-          @PathParam("view") String view,
-          ReportMetricsRequest request) {
+      @PathParam("prefix") String prefix,
+      @PathParam("namespace") String namespace,
+      @PathParam("view") String view,
+      ReportMetricsRequest request) {
     icebergMetricsManager.recordMetric(request.report());
     return IcebergRestUtils.noContent();
   }
