@@ -373,7 +373,11 @@ gcli column list --name catalog_postgres.hr.departments
 ```bash
 gcli table details --name catalog_postgres.hr.departments --audit
 ```
+#### Show tables distribution information
 
+```bash
+gcli table details --metalake metalake_demo --name catalog_postgres.hr.departments --distribution
+```
 #### Delete a table
 
 ```bash
