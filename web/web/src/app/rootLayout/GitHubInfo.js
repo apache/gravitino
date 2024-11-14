@@ -31,7 +31,14 @@ const GitHubInfo = ({ stars, forks, username, repository }) => {
   return (
     <Box className={'twc-flex  twc-gap-x-3 twc-bg-customs-lightBg twc-px-3 twc-py-2 twc-rounded-full'}>
       <Link href={githubUrl}>
-        <Image className={'twc-align-middle'} src={githubLogoUrl} width={24} height={24} alt='logo' />
+        <Image
+          className={'twc-align-middle'}
+          src={githubLogoUrl}
+          overrideSrc={githubLogoUrl}
+          width={24}
+          height={24}
+          alt='logo'
+        />
       </Link>
       <Box className={'twc-flex twc-items-center twc-gap-x-3 twc-ml-2'}>
         <Link href={githubForkUrl} className={'twc-no-underline  twc-bg-customs-dark twc-rounded-full '}>
@@ -43,6 +50,7 @@ const GitHubInfo = ({ stars, forks, username, repository }) => {
             <Image
               className={'twc-align-middle twc-text-customs-white'}
               src={forkLogoUrl}
+              overrideSrc={githubLogoUrl}
               width={24}
               height={24}
               alt='logo'

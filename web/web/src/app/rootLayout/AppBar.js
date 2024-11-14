@@ -47,16 +47,10 @@ import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { fetchMetalakes } from '@/lib/store/metalakes'
+import { defHttp } from '@/lib/utils/axios'
+import { formatNumber } from '@/lib/utils'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
-function checkCountMore1k(count) {
-  let newCount = count
-  if (count >= 1000) {
-    newCount = (count / 1000).toFixed(1) + 'k'
-  }
-
-  return String(newCount)
-}
 
 const AppBar = () => {
   const searchParams = useSearchParams()
@@ -71,12 +65,24 @@ const AppBar = () => {
   const [githubData, setGithubData] = useState({ stars: 0, forks: 0 })
 
   useEffect(() => {
+    // console.log(formatNumber(1100))
+    //
+    // const test = async () => {
+    //   try {
+    //     const response = await defHttp.get({ url: `https://api.github.com/repos/${username}/${repository}` })
+    //     console.log(response)
+    //   } catch (error) {
+    //     console.log(error)
+    //   }
+    // }
+    // test()
+
     const fetchGitHubData = async () => {
       try {
         const response = await axios.get(`https://api.github.com/repos/${username}/${repository}`)
         let { stargazers_count, forks_count } = response.data
-        stargazers_count = checkCountMore1k(stargazers_count)
-        forks_count = checkCountMore1k(forks_count)
+        stargazers_count = formatNumber(stargazers_count)
+        forks_count = formatNumber(forks_count)
         setGithubData({ stars: stargazers_count, forks: forks_count })
       } catch (error) {
         console.log(`Error fetching data: ${error}`)
