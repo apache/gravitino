@@ -134,6 +134,7 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 | Iceberg REST server table operation | `IcebergCreateTablePreEvent`, `IcebergUpdateTablePreEvent`, `IcebergDropTablePreEvent`, `IcebergLoadTablePreEvent`, `IcebergListTablePreEvent`, `IcebergTableExistsPreEvent`, `IcebergRenameTablePreEvent` | 0.7.0-incubating |
 | Gravitino server table operation    | `CreateTablePreEvent`, `AlterTablePreEvent`, `DropTablePreEvent`, `PurgeTablePreEvent`, `LoadTablePreEvent`, `ListTablePreEvent`                                                                           | 0.8.0-incubating |
 | Gravitino server schema operation   | `CreareSchemaPreEvent`, `AlterSchemaPreEvent`, `DropSchemaPreEvent`, `LoadSchemaPreEvent`, `ListSchemaPreEvent`                                                                                            | 0.8.0-incubating |
+| Gravitino server metalake operation | `CreateMetalakePreEvent`, `AlterMetalakePreEvent`,`DropMetalakePreEvent`,`LoadMetalakePreEvent`,`ListMetalakePreEvent`                                                                                     | 0.8.0-incubating |
 
 #### Event listener plugin
 
