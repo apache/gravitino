@@ -23,6 +23,8 @@ import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+import org.apache.gravitino.cli.commands.AddRoleToGroup;
+import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.ClientVersion;
@@ -30,6 +32,7 @@ import org.apache.gravitino.cli.commands.CreateCatalog;
 import org.apache.gravitino.cli.commands.CreateFileset;
 import org.apache.gravitino.cli.commands.CreateGroup;
 import org.apache.gravitino.cli.commands.CreateMetalake;
+import org.apache.gravitino.cli.commands.CreateRole;
 import org.apache.gravitino.cli.commands.CreateSchema;
 import org.apache.gravitino.cli.commands.CreateTag;
 import org.apache.gravitino.cli.commands.CreateUser;
@@ -37,6 +40,7 @@ import org.apache.gravitino.cli.commands.DeleteCatalog;
 import org.apache.gravitino.cli.commands.DeleteFileset;
 import org.apache.gravitino.cli.commands.DeleteGroup;
 import org.apache.gravitino.cli.commands.DeleteMetalake;
+import org.apache.gravitino.cli.commands.DeleteRole;
 import org.apache.gravitino.cli.commands.DeleteSchema;
 import org.apache.gravitino.cli.commands.DeleteTable;
 import org.apache.gravitino.cli.commands.DeleteTag;
@@ -52,6 +56,7 @@ import org.apache.gravitino.cli.commands.ListFilesets;
 import org.apache.gravitino.cli.commands.ListGroups;
 import org.apache.gravitino.cli.commands.ListMetalakeProperties;
 import org.apache.gravitino.cli.commands.ListMetalakes;
+import org.apache.gravitino.cli.commands.ListRoles;
 import org.apache.gravitino.cli.commands.ListSchema;
 import org.apache.gravitino.cli.commands.ListSchemaProperties;
 import org.apache.gravitino.cli.commands.ListTables;
@@ -62,8 +67,11 @@ import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.OwnerDetails;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
+import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
+import org.apache.gravitino.cli.commands.RemoveRoleFromUser;
 import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
+import org.apache.gravitino.cli.commands.RoleDetails;
 import org.apache.gravitino.cli.commands.SchemaAudit;
 import org.apache.gravitino.cli.commands.SchemaDetails;
 import org.apache.gravitino.cli.commands.ServerVersion;
@@ -191,6 +199,8 @@ public class GravitinoCommandLine {
       handleGroupCommand();
     } else if (entity.equals(CommandEntities.TAG)) {
       handleTagCommand();
+    } else if (entity.equals(CommandEntities.ROLE)) {
+      handleRoleCommand();
     }
   }
 
@@ -376,6 +386,16 @@ public class GravitinoCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       new DeleteUser(url, ignore, force, metalake, user).handle();
+    } else if (CommandActions.REVOKE.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        new RemoveRoleFromUser(url, ignore, metalake, user, role).handle();
+      }
+    } else if (CommandActions.GRANT.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        new AddRoleToUser(url, ignore, metalake, user, role).handle();
+      }
     }
   }
 
@@ -395,6 +415,16 @@ public class GravitinoCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       new DeleteGroup(url, ignore, force, metalake, group).handle();
+    } else if (CommandActions.REVOKE.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        new RemoveRoleFromGroup(url, ignore, metalake, group, role).handle();
+      }
+    } else if (CommandActions.GRANT.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        new AddRoleToGroup(url, ignore, metalake, group, role).handle();
+      }
     }
   }
 
@@ -450,6 +480,25 @@ public class GravitinoCommandLine {
         String newName = line.getOptionValue(GravitinoOptions.RENAME);
         new UpdateTagName(url, ignore, metalake, tag, newName).handle();
       }
+    }
+  }
+
+  /** Handles the command execution for Roles based on command type and the command line options. */
+  protected void handleRoleCommand() {
+    String url = getUrl();
+    FullName name = new FullName(line);
+    String metalake = name.getMetalakeName();
+    String role = line.getOptionValue(GravitinoOptions.ROLE);
+
+    if (CommandActions.DETAILS.equals(command)) {
+      new RoleDetails(url, ignore, metalake, role).handle();
+    } else if (CommandActions.LIST.equals(command)) {
+      new ListRoles(url, ignore, metalake).handle();
+    } else if (CommandActions.CREATE.equals(command)) {
+      new CreateRole(url, ignore, metalake, role).handle();
+    } else if (CommandActions.DELETE.equals(command)) {
+      boolean force = line.hasOption(GravitinoOptions.FORCE);
+      new DeleteRole(url, ignore, force, metalake, role).handle();
     }
   }
 
