@@ -30,6 +30,7 @@ val kyuubiVersion: String = libs.versions.kyuubi4paimon.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg4spark.get()
 val paimonVersion: String = libs.versions.paimon.get()
+val hudiVersion = libs.versions.hudi.get()
 
 dependencies {
   implementation(project(":api")) {
@@ -78,8 +79,12 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
-  testImplementation(libs.postgresql.driver)
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.hadoop")
+    exclude("io.dropwizard.metrics")
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12")
+  }
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
     exclude("org.apache.avro")
     exclude("org.apache.hadoop")

@@ -18,17 +18,20 @@
  */
 package org.apache.gravitino.authorization.ranger.integration.test;
 
+import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
+import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_AUTH_TYPE;
+import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_PASSWORD;
+import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_SERVICE_NAME;
+import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.RANGER_USERNAME;
+import static org.apache.gravitino.integration.test.container.RangerContainer.RANGER_SERVER_PORT;
+
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
-import org.apache.gravitino.authorization.Privileges;
-import org.apache.gravitino.authorization.SecurableObject;
-import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
@@ -41,15 +44,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Collections;
-import java.util.Map;
-
-import static org.apache.gravitino.Catalog.AUTHORIZATION_PROVIDER;
-import static org.apache.gravitino.authorization.ranger.integration.test.RangerITEnv.currentFunName;
-import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENABLE;
-import static org.apache.gravitino.connector.AuthorizationPropertiesMeta.*;
-import static org.apache.gravitino.integration.test.container.RangerContainer.RANGER_SERVER_PORT;
 
 @Tag("gravitino-docker-test")
 public class RangerHudiE2EIT extends RangerBaseE2EIT {
@@ -86,25 +80,25 @@ public class RangerHudiE2EIT extends RangerBaseE2EIT {
     generateRangerSparkSecurityXML();
 
     sparkSession =
-            SparkSession.builder()
-                    .master("local[1]")
-                    .appName("Hudi Catalog integration test")
-                    .config("hive.metastore.uris", HIVE_METASTORE_URIS)
-                    .config(
-                            "spark.sql.warehouse.dir",
-                            String.format(
-                                    "hdfs://%s:%d/user/hive/warehouse-catalog-hudi",
-                                    containerSuite.getHiveContainer().getContainerIpAddress(),
-                                    HiveContainer.HDFS_DEFAULTFS_PORT))
-                    .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-                    .config("spark.sql.extensions", "org.apache.spark.sql.hudi.HoodieSparkSessionExtension")
-                    .config(
-                            "spark.sql.catalog.spark_catalog",
-                            "org.apache.spark.sql.hudi.catalog.HoodieCatalog")
-                    .config("spark.kryo.registrator", "org.apache.spark.HoodieSparkKryoRegistrar")
-                    .config("dfs.replication", "1")
-                    .enableHiveSupport()
-                    .getOrCreate();
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("Hudi Catalog integration test")
+            .config("hive.metastore.uris", HIVE_METASTORE_URIS)
+            .config(
+                "spark.sql.warehouse.dir",
+                String.format(
+                    "hdfs://%s:%d/user/hive/warehouse-catalog-hudi",
+                    containerSuite.getHiveRangerContainer().getContainerIpAddress(),
+                    HiveContainer.HDFS_DEFAULTFS_PORT))
+            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+            .config("spark.sql.extensions", "org.apache.spark.sql.hudi.HoodieSparkSessionExtension")
+            .config(
+                "spark.sql.catalog.spark_catalog",
+                "org.apache.spark.sql.hudi.catalog.HoodieCatalog")
+            .config("spark.kryo.registrator", "org.apache.spark.HoodieSparkKryoRegistrar")
+            .config("dfs.replication", "1")
+            .enableHiveSupport()
+            .getOrCreate();
 
     createMetalake();
     createCatalog();
@@ -151,7 +145,7 @@ public class RangerHudiE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void checkHaveNoPrivileges() {
+  protected void checkWithoutPrivileges() {
     Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
     Assertions.assertThrows(
         AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
@@ -174,17 +168,10 @@ public class RangerHudiE2EIT extends RangerBaseE2EIT {
   private static void createCatalog() {
     Map<String, String> properties =
         ImmutableMap.of(
-            IcebergConstants.URI,
+            "uri",
             HIVE_METASTORE_URIS,
-            IcebergConstants.CATALOG_BACKEND,
-            "hive",
-            IcebergConstants.WAREHOUSE,
-            String.format(
-                "hdfs://%s:%d/user/hive/warehouse",
-                containerSuite.getHiveRangerContainer().getContainerIpAddress(),
-                HiveContainer.HDFS_DEFAULTFS_PORT),
-            IMPERSONATION_ENABLE,
-            "true",
+            "catalog-backend",
+            "hms",
             AUTHORIZATION_PROVIDER,
             "ranger",
             RANGER_SERVICE_NAME,
@@ -205,17 +192,7 @@ public class RangerHudiE2EIT extends RangerBaseE2EIT {
 
   @Override
   protected void useCatalog() throws InterruptedException {
-    String userName1 = System.getenv(HADOOP_USER_NAME);
-    String roleName = currentFunName();
-    SecurableObject securableObject =
-        SecurableObjects.ofMetalake(
-            metalakeName, Lists.newArrayList(Privileges.UseCatalog.allow()));
-    metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
-    metalake.grantRolesToUser(Lists.newArrayList(roleName), userName1);
-    waitForUpdatingPolicies();
     sparkSession.sql(SQL_USE_CATALOG);
-    metalake.deleteRole(roleName);
-    waitForUpdatingPolicies();
   }
 
   protected void checkTableAllPrivilegesExceptForCreating() {
