@@ -35,7 +35,7 @@ public class AzureFileSystemProvider implements FileSystemProvider {
 
   @VisibleForTesting public static final String ABS_PROVIDER_SCHEME = "abfss";
 
-  @VisibleForTesting public static final String ABS_PROVIDER_NAME = "abfs";
+  @VisibleForTesting public static final String ABS_PROVIDER_NAME = "abs";
 
   private static final String ABFS_IMPL = "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem";
 
