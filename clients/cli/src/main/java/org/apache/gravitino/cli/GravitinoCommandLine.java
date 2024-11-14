@@ -23,6 +23,8 @@ import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
+import org.apache.gravitino.cli.commands.AddRoleToGroup;
+import org.apache.gravitino.cli.commands.AddRoleToUser;
 import org.apache.gravitino.cli.commands.CatalogAudit;
 import org.apache.gravitino.cli.commands.CatalogDetails;
 import org.apache.gravitino.cli.commands.ClientVersion;
@@ -61,6 +63,8 @@ import org.apache.gravitino.cli.commands.MetalakeDetails;
 import org.apache.gravitino.cli.commands.OwnerDetails;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
+import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
+import org.apache.gravitino.cli.commands.RemoveRoleFromUser;
 import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
 import org.apache.gravitino.cli.commands.RemoveTagProperty;
 import org.apache.gravitino.cli.commands.RoleDetails;
@@ -428,6 +432,16 @@ public class GravitinoCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       new DeleteUser(url, ignore, force, metalake, user).handle();
+    } else if (CommandActions.REVOKE.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        new RemoveRoleFromUser(url, ignore, metalake, user, role).handle();
+      }
+    } else if (CommandActions.GRANT.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        new AddRoleToUser(url, ignore, metalake, user, role).handle();
+      }
     } else {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
     }
@@ -449,6 +463,16 @@ public class GravitinoCommandLine {
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       new DeleteGroup(url, ignore, force, metalake, group).handle();
+    } else if (CommandActions.REVOKE.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        new RemoveRoleFromGroup(url, ignore, metalake, group, role).handle();
+      }
+    } else if (CommandActions.GRANT.equals(command)) {
+      String role = line.getOptionValue(GravitinoOptions.ROLE);
+      if (role != null) {
+        new AddRoleToGroup(url, ignore, metalake, group, role).handle();
+      }
     } else {
       System.err.println(ErrorMessages.UNSUPPORTED_ACTION);
     }
