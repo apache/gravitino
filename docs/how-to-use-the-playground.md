@@ -37,9 +37,8 @@ The playground runs several services. The TCP ports used may clash with existing
 
 ## Playground usage
 
-
-
 ### One curl command launch playground
+
 ```shell
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/apache/gravitino-playground/HEAD/install.sh)"
 ```
@@ -60,10 +59,13 @@ cd gravitino-playground
 ```
 
 ##### Check status
+
 ```shell 
 ./playground.sh docker status
 ```
+
 ##### Stop playground
+
 ```shell
 ./playground.sh docker stop
 ```
@@ -85,6 +87,7 @@ helm upgrade --install gravitino-playground ./helm-chart/ --create-namespace --n
 ```
 
 ##### Check status
+
 ```shell 
 ./playground.sh k8s status
 ```
@@ -99,6 +102,7 @@ To access pods or services at `localhost`, you needs to do these steps:
 TRINO_POD=$(kubectl get pods --namespace gravitino-playground -l app=trino -o jsonpath="{.items[0].metadata.name}")
 kubectl exec $TRINO_POD -n gravitino-playground -it -- /bin/bash
 ```
+
 2. Log in to the Gravitino playground Spark pod using the following command:
 
 ```
@@ -119,12 +123,10 @@ kubectl port-forward svc/jupyternotebook -n gravitino-playground 8888:8888
 ```
 
 ##### Stop playground
+
 ```shell
 ./playground.sh k8s stop
 ```
-
-
-
 
 ## Experiencing Apache Gravitino with Trino SQL
 
