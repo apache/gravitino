@@ -68,7 +68,7 @@ public class IcebergViewRenameOperations {
         renameViewRequest.destination());
     IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     viewOperationDispatcher.renameView(context, renameViewRequest);
-    return IcebergRestUtils.okWithoutContent();
+    return IcebergRestUtils.noContent();
   }
 
   // HTTP request is null in Jersey test, override with a mock request when testing.

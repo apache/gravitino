@@ -200,7 +200,7 @@ public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
 
     verifyCreateViewSucc("exists_foo1");
     dummyEventListener.clearEvent();
-    verifyViewExistsStatusCode("exists_foo1", 200);
+    verifyViewExistsStatusCode("exists_foo1", 204);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergViewExistsPreEvent);
     postEvent = dummyEventListener.popPostEvent();
     Assertions.assertTrue(postEvent instanceof IcebergViewExistsEvent);
@@ -385,6 +385,6 @@ public class TestIcebergViewOperations extends TestIcebergNamespaceOperations {
 
   private void verifyRenameViewSucc(String source, String dest) {
     Response response = doRenameView(source, dest);
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 }

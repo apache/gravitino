@@ -22,15 +22,12 @@ package org.apache.gravitino.iceberg.service.rest;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
-import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 
 public class MockIcebergViewOperations extends IcebergViewOperations {
 
   @Inject
-  public MockIcebergViewOperations(
-      IcebergMetricsManager icebergMetricsManager,
-      IcebergViewOperationDispatcher viewOperationDispatcher) {
-    super(icebergMetricsManager, viewOperationDispatcher);
+  public MockIcebergViewOperations(IcebergViewOperationDispatcher viewOperationDispatcher) {
+    super(viewOperationDispatcher);
   }
 
   // HTTP request is null in Jersey test, create a mock request

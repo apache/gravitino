@@ -39,14 +39,12 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
-import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
-import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
@@ -60,18 +58,13 @@ public class IcebergViewOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergViewOperations.class);
 
-  private IcebergMetricsManager icebergMetricsManager;
-
   private ObjectMapper icebergObjectMapper;
   private IcebergViewOperationDispatcher viewOperationDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public IcebergViewOperations(
-      IcebergMetricsManager icebergMetricsManager,
-      IcebergViewOperationDispatcher viewOperationDispatcher) {
-    this.icebergMetricsManager = icebergMetricsManager;
+  public IcebergViewOperations(IcebergViewOperationDispatcher viewOperationDispatcher) {
     this.viewOperationDispatcher = viewOperationDispatcher;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
   }
@@ -196,24 +189,10 @@ public class IcebergViewOperations {
     TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, view);
     boolean exists = viewOperationDispatcher.viewExists(context, viewIdentifier);
     if (exists) {
-      return IcebergRestUtils.okWithoutContent();
+      return IcebergRestUtils.noContent();
     } else {
       return IcebergRestUtils.notExists();
     }
-  }
-
-  @POST
-  @Path("{view}/metrics")
-  @Produces(MediaType.APPLICATION_JSON)
-  @Timed(name = "report-view-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "report-table-metrics", absolute = true)
-  public Response reportTableMetrics(
-      @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
-      @PathParam("view") String view,
-      ReportMetricsRequest request) {
-    icebergMetricsManager.recordMetric(request.report());
-    return IcebergRestUtils.noContent();
   }
 
   // HTTP request is null in Jersey test, override with a mock request when testing.
