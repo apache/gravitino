@@ -51,7 +51,6 @@ import org.slf4j.LoggerFactory;
 @Tag("gravitino-docker-test")
 public class RangerHudiE2EIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHudiE2EIT.class);
-  private static final String SQL_USE_CATALOG = "USE hudi";
   private static final String provider = "lakehouse-hudi";
 
   public static final String catalogName = GravitinoITUtils.genRandomName("catalog").toLowerCase();
