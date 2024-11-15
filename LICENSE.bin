@@ -285,6 +285,7 @@
    Apache Hadoop Aliyun connector
    Apache Hadoop GCS connector
    Apache Hadoop AWS connector
+   Apache Hadoop Azure connector
    Apache Hadoop Annotatations
    Apache Hadoop Auth
    Apache Hadoop Client Aggregator
