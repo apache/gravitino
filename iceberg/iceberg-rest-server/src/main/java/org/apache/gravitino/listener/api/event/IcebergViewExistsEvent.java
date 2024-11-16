@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represent an event after check Iceberg view exists successfully. */
 @DeveloperApi
 public class IcebergViewExistsEvent extends IcebergViewEvent {
-  private boolean isExists;
+  private final boolean isExists;
 
   public IcebergViewExistsEvent(
       IcebergRequestContext icebergRequestContext,

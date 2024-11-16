@@ -27,7 +27,7 @@ import org.apache.iceberg.rest.responses.LoadViewResponse;
 /** Represent an event after loading Iceberg view successfully. */
 @DeveloperApi
 public class IcebergLoadViewEvent extends IcebergViewEvent {
-  private LoadViewResponse loadViewResponse;
+  private final LoadViewResponse loadViewResponse;
 
   public IcebergLoadViewEvent(
       IcebergRequestContext icebergRequestContext,

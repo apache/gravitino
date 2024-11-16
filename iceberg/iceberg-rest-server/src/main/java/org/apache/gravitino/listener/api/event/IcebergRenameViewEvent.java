@@ -27,7 +27,7 @@ import org.apache.iceberg.rest.requests.RenameTableRequest;
 /** Represent an event after rename Iceberg view successfully. */
 @DeveloperApi
 public class IcebergRenameViewEvent extends IcebergViewEvent {
-  private RenameTableRequest renameViewRequest;
+  private final RenameTableRequest renameViewRequest;
 
   public IcebergRenameViewEvent(
       IcebergRequestContext icebergRequestContext,

@@ -29,8 +29,8 @@ import org.apache.iceberg.rest.responses.LoadViewResponse;
 @DeveloperApi
 public class IcebergReplaceViewEvent extends IcebergViewEvent {
 
-  private UpdateTableRequest replaceViewRequest;
-  private LoadViewResponse loadViewResponse;
+  private final UpdateTableRequest replaceViewRequest;
+  private final LoadViewResponse loadViewResponse;
 
   public IcebergReplaceViewEvent(
       IcebergRequestContext icebergRequestContext,

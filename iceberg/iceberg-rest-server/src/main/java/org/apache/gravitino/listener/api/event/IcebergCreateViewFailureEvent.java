@@ -27,7 +27,7 @@ import org.apache.iceberg.rest.requests.CreateViewRequest;
 /** Represent a failure event when creating Iceberg view failed. */
 @DeveloperApi
 public class IcebergCreateViewFailureEvent extends IcebergViewFailureEvent {
-  private CreateViewRequest createViewRequest;
+  private final CreateViewRequest createViewRequest;
 
   public IcebergCreateViewFailureEvent(
       IcebergRequestContext icebergRequestContext,

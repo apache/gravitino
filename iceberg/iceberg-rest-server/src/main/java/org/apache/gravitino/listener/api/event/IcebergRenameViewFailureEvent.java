@@ -26,7 +26,7 @@ import org.apache.iceberg.rest.requests.RenameTableRequest;
 /** Represent an event when rename Iceberg view failed. */
 @DeveloperApi
 public class IcebergRenameViewFailureEvent extends IcebergViewFailureEvent {
-  private RenameTableRequest renameViewRequest;
+  private final RenameTableRequest renameViewRequest;
 
   public IcebergRenameViewFailureEvent(
       IcebergRequestContext icebergRequestContext,

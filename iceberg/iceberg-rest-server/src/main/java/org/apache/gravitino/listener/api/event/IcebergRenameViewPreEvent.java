@@ -26,7 +26,7 @@ import org.apache.iceberg.rest.requests.RenameTableRequest;
 /** Represent an pre event before rename an Iceberg view. */
 @DeveloperApi
 public class IcebergRenameViewPreEvent extends IcebergViewPreEvent {
-  private RenameTableRequest renameViewRequest;
+  private final RenameTableRequest renameViewRequest;
 
   public IcebergRenameViewPreEvent(
       IcebergRequestContext icebergRequestContext,

@@ -30,7 +30,7 @@ import org.apache.iceberg.rest.responses.LoadViewResponse;
 public class IcebergCreateViewEvent extends IcebergViewEvent {
 
   private final CreateViewRequest createViewRequest;
-  private LoadViewResponse loadViewResponse;
+  private final LoadViewResponse loadViewResponse;
 
   public IcebergCreateViewEvent(
       IcebergRequestContext icebergRequestContext,
