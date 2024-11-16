@@ -27,7 +27,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 /** Represent a failure event when updating Iceberg table failed. */
 @DeveloperApi
 public class IcebergUpdateTableFailureEvent extends IcebergTableFailureEvent {
-  private UpdateTableRequest updateTableRequest;
+  private final UpdateTableRequest updateTableRequest;
 
   public IcebergUpdateTableFailureEvent(
       IcebergRequestContext icebergRequestContext,
