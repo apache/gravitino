@@ -30,7 +30,7 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
 public class IcebergUpdateTableEvent extends IcebergTableEvent {
 
   private final UpdateTableRequest updateTableRequest;
-  private LoadTableResponse loadTableResponse;
+  private final LoadTableResponse loadTableResponse;
 
   public IcebergUpdateTableEvent(
       IcebergRequestContext icebergRequestContext,
