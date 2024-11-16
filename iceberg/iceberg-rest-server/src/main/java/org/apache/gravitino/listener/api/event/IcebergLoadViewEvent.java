@@ -21,12 +21,24 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 
-/** Represent a failure event when do Iceberg table operation failed. */
+/** Represent an event after loading Iceberg view successfully. */
 @DeveloperApi
-public abstract class IcebergTableFailureEvent extends IcebergFailureEvent {
-  protected IcebergTableFailureEvent(
-      IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
-    super(icebergRequestContext, nameIdentifier, e);
+public class IcebergLoadViewEvent extends IcebergViewEvent {
+  private final LoadViewResponse loadViewResponse;
+
+  public IcebergLoadViewEvent(
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier viewIdentifier,
+      LoadViewResponse loadViewResponse) {
+    super(icebergRequestContext, viewIdentifier);
+    this.loadViewResponse =
+        IcebergRestUtils.cloneIcebergRESTObject(loadViewResponse, LoadViewResponse.class);
+  }
+
+  public LoadViewResponse loadViewResponse() {
+    return loadViewResponse;
   }
 }

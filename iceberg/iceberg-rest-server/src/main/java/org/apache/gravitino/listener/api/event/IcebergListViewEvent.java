@@ -22,11 +22,17 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represent a failure event when do Iceberg table operation failed. */
+/**
+ * Represent an event after listing Iceberg view successfully.
+ *
+ * <p>To optimize memory usage and avoid the potential overhead associated with storing a large
+ * number of views directly within the ListViewEvent, the actual views listed are not maintained in
+ * this event.
+ */
 @DeveloperApi
-public abstract class IcebergTableFailureEvent extends IcebergFailureEvent {
-  protected IcebergTableFailureEvent(
-      IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
-    super(icebergRequestContext, nameIdentifier, e);
+public class IcebergListViewEvent extends IcebergViewEvent {
+  public IcebergListViewEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier viewIdentifier) {
+    super(icebergRequestContext, viewIdentifier);
   }
 }
