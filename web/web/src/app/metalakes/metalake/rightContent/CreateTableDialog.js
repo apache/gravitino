@@ -418,6 +418,7 @@ const CreateTableDialog = props => {
       const columnsData = columns.map(column => {
         // Set uniqueId to the column name to detect changes
         column.uniqueId = column.name
+
         // Extract type suffix for types with parameters
         const match = column.type.match(/(\w+)(\([\d,]+\))/)
         if (match && match.length === 3) {
