@@ -206,6 +206,10 @@
    This product bundles various third-party components also under the
    Apache Software License 2.0.
 
+   Gradle (https://github.com/gradle/gradle)
+   ./gradlew
+   ./gradle/wrapper/gradle-wrapper.properties
+
    Apache Spark
    ./api/src/main/java/org/apache/gravitino/SchemaChange.java
    ./api/src/main/java/org/apache/gravitino/SupportsSchemas.java
@@ -219,7 +223,7 @@
    ./api/src/main/java/org/apache/gravitino/rel/expressions/transforms/Transform.java
    ./api/src/main/java/org/apache/gravitino/rel/expressions/Expression.java
    ./api/src/main/java/org/apache/gravitino/rel/expressions/NamedReference.java
-   ./spark-connector/spark-connector/src/test/java/org/apache/gravitino/spark/connector/integration/test/util/SparkUtilIT.java
+   ./spark-connector/spark-common/src/test/java/org/apache/gravitino/spark/connector/integration/test/util/SparkUtilIT.java
    ./dev/release/do-release.sh
    ./dev/release/release-build.sh
    ./dev/release/release-tag.sh
@@ -227,15 +231,15 @@
 
    Apache Iceberg
    ./api/src/main/java/org/apache/gravitino/exceptions/RESTException.java
-   ./catalogs/catalog-hive/src/main/java/org/apache/gravitino/catalog/hive/CachedClientPool.java
-   ./catalogs/catalog-hive/src/main/java/org/apache/gravitino/catalog/hive/HiveClientPool.java
-   ./catalogs/catalog-hive/src/main/java/org/apache/gravitino/catalog/hive/dyn/DynConstructors.java
-   ./catalogs/catalog-hive/src/main/java/org/apache/gravitino/catalog/hive/dyn/DynFields.java
-   ./catalogs/catalog-hive/src/main/java/org/apache/gravitino/catalog/hive/dyn/DynMethods.java
-   ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/miniHMS/MiniHiveMetastore.java
-   ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/miniHMS/MiniHiveMetastoreService.java
-   ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/miniHMS/ScriptRunner.java
-   ./catalogs/catalog-hive/src/test/java/org/apache/gravitino/catalog/hive/TestCachedClientPool.java
+   ./catalogs/hive-metastore-common/src/main/java/org/apache/gravitino/hive/CachedClientPool.java
+   ./catalogs/hive-metastore-common/src/main/java/org/apache/gravitino/hive/HiveClientPool.java
+   ./catalogs/hive-metastore-common/src/main/java/org/apache/gravitino/hive/dyn/DynConstructors.java
+   ./catalogs/hive-metastore-common/src/main/java/org/apache/gravitino/hive/dyn/DynFields.java
+   ./catalogs/hive-metastore-common/src/main/java/org/apache/gravitino/hive/dyn/DynMethods.java
+   ./catalogs/hive-metastore-common/src/test/java/org/apache/gravitino/hive/hms/MiniHiveMetastore.java
+   ./catalogs/hive-metastore-common/src/test/java/org/apache/gravitino/hive/hms/MiniHiveMetastoreService.java
+   ./catalogs/hive-metastore-common/src/test/java/org/apache/gravitino/hive/hms/ScriptRunner.java
+   ./catalogs/hive-metastore-common/src/test/java/org/apache/gravitino/hive/TestCachedClientPool.java
    ./catalogs/catalog-lakehouse-iceberg/src/main/java/org/apache/gravitino/catalog/lakehouse/iceberg/converter/DescribeIcebergSortOrderVisitor.java
    ./catalogs/catalog-lakehouse-iceberg/src/main/java/org/apache/gravitino/catalog/lakehouse/iceberg/utils/IcebergTablePropertiesUtil.java
    ./clients/client-java/src/main/java/org/apache/gravitino/client/HTTPClient.java
@@ -249,13 +253,12 @@
    ./clients/client-java/src/main/java/org/apache/gravitino/client/OAuth2ClientUtil.java
    ./iceberg/iceberg-rest-server/src/main/java/org/apache/gravitino/iceberg/service/IcebergExceptionMapper.java
    ./iceberg/iceberg-common/src/main/java/org/apache/gravitino/iceberg/common/utils/IcebergHiveCachedClientPool.java
-   ./gradlew
 
    Apache Paimon
    ./catalogs/catalog-lakehouse-paimon/src/main/java/org/apache/gravitino/catalog/lakehouse/paimon/utils/TypeUtils.java
 
    Apache Hive
-   ./catalogs/catalog-hive/src/test/resources/hive-schema-3.1.0.derby.sql
+   ./catalogs/hive-metastore-common/src/test/resources/hive-schema-3.1.0.derby.sql
 
    Apache Zeppelin
    ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/CommandExecutor.java
@@ -273,8 +276,7 @@
    ./server-common/src/main/java/org/apache/gravitino/server/authentication/KerberosServerUtils.java
 
    Apache Kafka
-   ./integration-test/src/test/resources/run
-   ./catalogs/catalog-kafka/src/test/resources/run
+   ./integration-test-common/docker-script/init/kafka/run
    ./core/src/main/java/org/apache/gravitino/utils/Bytes.java
 
    Apache Submarine
@@ -287,24 +289,23 @@
 
    Trino
    ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/CloseableGroup.java
-   ./trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java
+   ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java
 
    Apache Arrow
    ./dev/ci/util_free_space.sh
+
+   Apache Ranger
+   ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/JsonDateSerializer.java
+   ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/RangerCommonEnums.java
+   ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VList.java
+   ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXDataObject.java
+   ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXGroup.java
+   ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXGroupList.java
+   ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXUser.java
+   ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXUserList.java
 
    This product bundles a third-party component under the
    MIT License.
 
    Kyligence/kylinpy
-   ./clients/client-python/gravitino/utils/exceptions.py
    ./clients/client-python/gravitino/utils/http_client.py
-
-   Apache Ranger
-   ./security-admin/src/main/java/org/apache/ranger/defines/JsonDateSerializer.java
-   ./security-admin/src/main/java/org/apache/ranger/defines/RangerCommonEnums.java
-   ./security-admin/src/main/java/org/apache/ranger/view/VList.java
-   ./security-admin/src/main/java/org/apache/ranger/view/VXDataObject.java
-   ./security-admin/src/main/java/org/apache/ranger/view/VXGroup.java
-   ./security-admin/src/main/java/org/apache/ranger/view/VXGroupList.java
-   ./security-admin/src/main/java/org/apache/ranger/view/VXUser.java
-   ./security-admin/src/main/java/org/apache/ranger/view/VXUserList.java

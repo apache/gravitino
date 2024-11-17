@@ -22,33 +22,33 @@ package org.apache.gravitino.cli.commands;
 import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 
-public class DeleteGroup extends Command {
+public class DeleteRole extends Command {
 
-  protected final String metalake;
-  protected final String group;
-  protected final boolean force;
+  protected String metalake;
+  protected String role;
+  protected boolean force;
 
   /**
-   * Delete a group.
+   * Delete a role.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param force Force operation.
    * @param metalake The name of the metalake.
-   * @param group The name of the group.
+   * @param role The name of the role.
    */
-  public DeleteGroup(
-      String url, boolean ignoreVersions, boolean force, String metalake, String group) {
+  public DeleteRole(
+      String url, boolean ignoreVersions, boolean force, String metalake, String role) {
     super(url, ignoreVersions);
-    this.force = force;
     this.metalake = metalake;
-    this.group = group;
+    this.force = force;
+    this.role = role;
   }
 
-  /** Delete a group. */
+  /** Delete a role. */
   @Override
   public void handle() {
     boolean deleted = false;
@@ -59,12 +59,12 @@ public class DeleteGroup extends Command {
 
     try {
       GravitinoClient client = buildClient(metalake);
-      deleted = client.removeGroup(group);
+      deleted = client.deleteRole(role);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchGroupException err) {
-      System.err.println(ErrorMessages.UNKNOWN_GROUP);
+    } catch (NoSuchRoleException err) {
+      System.err.println(ErrorMessages.UNKNOWN_ROLE);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
@@ -72,9 +72,9 @@ public class DeleteGroup extends Command {
     }
 
     if (deleted) {
-      System.out.println(group + " deleted.");
+      System.out.println(role + " deleted.");
     } else {
-      System.out.println(group + " not deleted.");
+      System.out.println(role + " not deleted.");
     }
   }
 }
