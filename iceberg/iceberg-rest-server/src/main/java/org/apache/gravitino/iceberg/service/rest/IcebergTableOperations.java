@@ -249,7 +249,7 @@ public class IcebergTableOperations {
     TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
     boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
     if (exists) {
-      return IcebergRestUtils.okWithoutContent();
+      return IcebergRestUtils.noContent();
     } else {
       return IcebergRestUtils.notExists();
     }
