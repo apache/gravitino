@@ -19,51 +19,45 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.cli.AreYouSure;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 
-public class DeleteGroup extends Command {
+public class RoleDetails extends Command {
 
-  protected final String metalake;
-  protected final String group;
-  protected final boolean force;
+  protected String metalake;
+  protected String role;
 
   /**
-   * Delete a group.
+   * Displays the securable objects in a role.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
    * @param metalake The name of the metalake.
-   * @param group The name of the group.
+   * @param role The name of the role.
    */
-  public DeleteGroup(
-      String url, boolean ignoreVersions, boolean force, String metalake, String group) {
+  public RoleDetails(String url, boolean ignoreVersions, String metalake, String role) {
     super(url, ignoreVersions);
-    this.force = force;
     this.metalake = metalake;
-    this.group = group;
+    this.role = role;
   }
 
-  /** Delete a group. */
+  /** Displays the securable objects of a specified role. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
-    if (!AreYouSure.really(force)) {
-      return;
-    }
+    List<SecurableObject> objects = null;
 
     try {
       GravitinoClient client = buildClient(metalake);
-      deleted = client.removeGroup(group);
+      objects = client.getRole(role).securableObjects();
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchGroupException err) {
+    } catch (NoSuchUserException err) {
       System.err.println(ErrorMessages.UNKNOWN_GROUP);
       return;
     } catch (Exception exp) {
@@ -71,10 +65,9 @@ public class DeleteGroup extends Command {
       return;
     }
 
-    if (deleted) {
-      System.out.println(group + " deleted.");
-    } else {
-      System.out.println(group + " not deleted.");
-    }
+    // TODO expand in securable objects PR
+    String all = objects.stream().map(SecurableObject::name).collect(Collectors.joining(","));
+
+    System.out.println(all.toString());
   }
 }

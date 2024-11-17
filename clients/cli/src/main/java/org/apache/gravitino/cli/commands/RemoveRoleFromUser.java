@@ -19,62 +19,59 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.cli.AreYouSure;
+import java.util.ArrayList;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 
-public class DeleteGroup extends Command {
+/** Removes a role from a user. */
+public class RemoveRoleFromUser extends Command {
 
-  protected final String metalake;
-  protected final String group;
-  protected final boolean force;
+  protected String metalake;
+  protected String user;
+  protected String role;
 
   /**
-   * Delete a group.
+   * Removes a role from a user.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
-   * @param force Force operation.
    * @param metalake The name of the metalake.
-   * @param group The name of the group.
+   * @param user The name of the user.
+   * @param role The name of the role.
    */
-  public DeleteGroup(
-      String url, boolean ignoreVersions, boolean force, String metalake, String group) {
+  public RemoveRoleFromUser(
+      String url, boolean ignoreVersions, String metalake, String user, String role) {
     super(url, ignoreVersions);
-    this.force = force;
     this.metalake = metalake;
-    this.group = group;
+    this.user = user;
+    this.role = role;
   }
 
-  /** Delete a group. */
+  /** Removes a role from a user. */
   @Override
   public void handle() {
-    boolean deleted = false;
-
-    if (!AreYouSure.really(force)) {
-      return;
-    }
-
     try {
       GravitinoClient client = buildClient(metalake);
-      deleted = client.removeGroup(group);
+      ArrayList<String> roles = new ArrayList<>();
+      roles.add(role);
+      client.revokeRolesFromUser(roles, user);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
-    } catch (NoSuchGroupException err) {
-      System.err.println(ErrorMessages.UNKNOWN_GROUP);
+    } catch (NoSuchRoleException err) {
+      System.err.println(ErrorMessages.UNKNOWN_ROLE);
+      return;
+    } catch (NoSuchUserException err) {
+      System.err.println(ErrorMessages.UNKNOWN_USER);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    if (deleted) {
-      System.out.println(group + " deleted.");
-    } else {
-      System.out.println(group + " not deleted.");
-    }
+    System.out.println(role + " removed from " + user);
   }
 }
