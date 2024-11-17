@@ -346,3 +346,22 @@ export const providers = [
     ]
   }
 ]
+
+export const relationalTypes = [
+  { label: 'Boolean', value: 'boolean' },
+  { label: 'Byte', value: 'byte' },
+  { label: 'Short', value: 'short' },
+  { label: 'Integer', value: 'integer' },
+  { label: 'Long', value: 'long' },
+  { label: 'Float', value: 'float' },
+  { label: 'Double', value: 'double' },
+  { label: 'Date', value: 'date' },
+  { label: 'Time', value: 'time' },
+  { label: 'Timestamp', value: 'timestamp' },
+  { label: 'Timestamp_tz', value: 'timestamp_tz' },
+  { label: 'String', value: 'string' },
+  { label: 'Interval_day', value: 'interval_day' },
+  { label: 'Interval_year', value: 'interval_year' },
+  { label: 'Uuid', value: 'uuid' },
+  { label: 'Binary', value: 'binary' }
+]

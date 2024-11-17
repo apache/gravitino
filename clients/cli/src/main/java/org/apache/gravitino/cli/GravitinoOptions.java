@@ -46,9 +46,8 @@ public class GravitinoOptions {
   public static final String AUTO = "auto";
   public static final String DEFAULT = "default";
   public static final String FILESET = "fileset";
-  public static final String MANAGED = "managed";
-  public static final String LOCATION = "location";
   public static final String OWNER = "owner";
+  public static final String ROLE = "role";
   public static final String AUDIT = "audit";
   public static final String FORCE = "force";
 
@@ -71,7 +70,7 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
 
     // Create/update options
-    options.addOption(createArgOption("r", RENAME, "new entity name"));
+    options.addOption(createArgOption(null, RENAME, "new entity name"));
     options.addOption(createArgOption("c", COMMENT, "entity comment"));
     options.addOption(createArgOption("P", PROPERTY, "property name"));
     options.addOption(createArgOption("V", VALUE, "property value"));
@@ -86,11 +85,10 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(NULL, "column value can be null"));
     options.addOption(createSimpleOption(AUTO, "column value auto-increments"));
     options.addOption(createArgOption(DEFAULT, "default column value"));
-    options.addOption(createArgOption("f", FILESET, "fileset name"));
-    options.addOption(createSimpleOption("m", MANAGED, "a managed fileset"));
-    options.addOption(createArgOption("l", LOCATION, "fieset location"));
+    options.addOption(createArgOption(null, FILESET, "fileset name"));
     options.addOption(createArgOption("t", TAG, "tag name"));
-    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
+    options.addOption(createSimpleOption("o", OWNER, "entity owner"));
+    options.addOption(createArgOption("r", ROLE, "role name"));
 
     // Properties option can have multiple values
     Option properties =
