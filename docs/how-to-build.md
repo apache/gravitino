@@ -44,9 +44,7 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew build
    ```
 
-   The default specified JDK version is 8, but if you want to use JDK 11 or 17 to build,
-   modify the property `jdkVersion` to 11 or 17 in the `gradle.properties` file, or specify the version
-   with `-P`, like:
+   The default specified JDK version is 8, but if you want to use JDK 11 or 17 to build, modify the property `jdkVersion` to 11 or 17 in the `gradle.properties` file, or specify the version with `-P`, like:
 
    ```shell
    ./gradlew build -PjdkVersion=11
