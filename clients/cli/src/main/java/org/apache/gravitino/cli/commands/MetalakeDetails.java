@@ -19,7 +19,11 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.cli.TablePrinter;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 
@@ -54,6 +58,10 @@ public class MetalakeDetails extends Command {
       return;
     }
 
-    System.out.println(metalake + "," + comment);
+    List<String> headers = Arrays.asList("metalake", "comment");
+    List<List<String>> rows = new ArrayList<>();
+    rows.add(Arrays.asList(metalake, comment));
+    TablePrinter tablePrinter = new TablePrinter();
+    tablePrinter.print(headers, rows);
   }
 }
