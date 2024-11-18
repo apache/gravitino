@@ -30,7 +30,7 @@ public class TablePartition extends TableCommand {
   protected final String table;
 
   /**
-   * Displays the details of a table's distirbution.
+   * Displays the details of a table's partition.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
