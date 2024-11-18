@@ -19,6 +19,11 @@
 
 package org.apache.gravitino.cli;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
@@ -175,7 +180,9 @@ public class GravitinoCommandLine {
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand() {
-    if (entity.equals(CommandEntities.COLUMN)) {
+    if (command.equals(CommandActions.HELP)) {
+      handleHelpCommand();
+    } else if (entity.equals(CommandEntities.COLUMN)) {
       handleColumnCommand();
     } else if (entity.equals(CommandEntities.TABLE)) {
       handleTableCommand();
@@ -511,6 +518,23 @@ public class GravitinoCommandLine {
 
     if (CommandActions.LIST.equals(command)) {
       new ListColumns(url, ignore, metalake, catalog, schema, table).handle();
+    }
+  }
+
+  private void handleHelpCommand() {
+    String helpFile = entity.toLowerCase() + "_help.txt";
+
+    try (InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(helpFile);
+        BufferedReader reader =
+            new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+      StringBuilder helpMessage = new StringBuilder();
+      String helpLine;
+      while ((helpLine = reader.readLine()) != null) {
+        helpMessage.append(helpLine).append(System.lineSeparator());
+      }
+      System.err.print(helpMessage.toString());
+    } catch (IOException e) {
+      System.err.println("Failed to load help message: " + e.getMessage());
     }
   }
 
