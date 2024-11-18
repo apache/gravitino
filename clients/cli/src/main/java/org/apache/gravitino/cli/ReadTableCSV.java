@@ -32,10 +32,11 @@ import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.gravitino.rel.Column;
 
 public class ReadTableCSV {
 
-  private enum Column {
+  private enum ExpectedColumns {
     NAME("Name"),
     DATATYPE("Datatype"),
     COMMENT("Comment"),
@@ -46,7 +47,7 @@ public class ReadTableCSV {
 
     private final String name;
 
-    Column(String name) {
+    ExpectedColumns(String name) {
       this.name = name;
     }
 
@@ -55,11 +56,49 @@ public class ReadTableCSV {
     }
   }
 
+  public Column[] columns(Map<String, List<String>> tableData) {
+    List<String> names = tableData.get(ExpectedColumns.NAME.getName());
+    List<String> datatypes = tableData.get(ExpectedColumns.DATATYPE.getName());
+    List<String> comments = tableData.get(ExpectedColumns.COMMENT.getName());
+    List<String> nullables = tableData.get(ExpectedColumns.NULLABLE.getName());
+    List<String> autos = tableData.get(ExpectedColumns.AUTOINCREMENT.getName());
+    List<String> defaultTypes = tableData.get(ExpectedColumns.DEFAULTTYPE.getName());
+    List<String> defaulValues = tableData.get(ExpectedColumns.DEFAULTVALUE.getName());
+    int size = names.size();
+    Column[] columns = new Column[size];
+
+    for (int i = 0; i < size; i++) {
+      String columnName = names.get(i);
+      String datatype = datatypes.get(i);
+      String columnComment = comments.get(i);
+      boolean nullable = nullables.get(i).equals("true");
+      boolean auto = autos.get(i).equals("true");
+      String defaultValue = defaulValues.get(i);
+      String defaultType = defaultTypes.get(i);
+
+      if (defaultType == null || defaultType.isEmpty()) {
+        defaultType = datatype;
+      }
+
+      Column column =
+          Column.of(
+              columnName,
+              ParseType.toType(datatype),
+              columnComment,
+              nullable,
+              auto,
+              DefaultConverter.convert(defaultValue, defaultType));
+      columns[i] = column;
+    }
+
+    return columns;
+  }
+
   public Map<String, List<String>> parse(String csvFile) {
 
     // Initialize a Map to store each column's values in a list
     HashMap<String, List<String>> tableData = new HashMap<>();
-    for (Column column : Column.values()) {
+    for (ExpectedColumns column : ExpectedColumns.values()) {
       tableData.put(column.getName(), new ArrayList<>());
     }
 
@@ -70,7 +109,9 @@ public class ReadTableCSV {
               reader,
               CSVFormat.Builder.create()
                   .setHeader(
-                      Arrays.stream(Column.values()).map(Column::getName).toArray(String[]::new))
+                      Arrays.stream(ExpectedColumns.values())
+                          .map(ExpectedColumns::getName)
+                          .toArray(String[]::new))
                   .setIgnoreHeaderCase(true)
                   .setSkipHeaderRecord(true)
                   .setTrim(true)
@@ -80,7 +121,7 @@ public class ReadTableCSV {
         String defaultValue = null;
         String value = null;
 
-        for (Column column : Column.values()) {
+        for (ExpectedColumns column : ExpectedColumns.values()) {
           switch (column) {
             case NULLABLE:
               defaultValue = "true";

@@ -50,6 +50,7 @@ public class GravitinoOptions {
   public static final String ROLE = "role";
   public static final String AUDIT = "audit";
   public static final String FORCE = "force";
+  public static final String COLUMNFILE = "csv";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -86,9 +87,10 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption(AUTO, "column value auto-increments"));
     options.addOption(createArgOption(DEFAULT, "default column value"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
-    options.addOption(createArgOption(null, FILESET, "fileset name"));
+    options.addOption(createArgOption(FILESET, "fileset name"));
     options.addOption(createArgOption("t", TAG, "tag name"));
     options.addOption(createArgOption("r", ROLE, "role name"));
+    options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
 
     // Properties option can have multiple values
     Option properties =

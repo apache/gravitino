@@ -19,18 +19,24 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.List;
+import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.cli.ReadTableCSV;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
-import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.rel.Column;
 
 public class CreateTable extends Command {
   protected final String metalake;
   protected final String catalog;
   protected final String schema;
   protected final String table;
-  protected final String columns;
+  protected final String columnFile;
   protected final String comment;
 
   /**
@@ -42,8 +48,8 @@ public class CreateTable extends Command {
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
    * @param table The name of the table.
-   * @param columns The file name containing the CSV column info.
-   * @param comment The schema's comment.
+   * @param columnFile The file name containing the CSV column info.
+   * @param comment The table's comment.
    */
   public CreateTable(
       String url,
@@ -52,47 +58,28 @@ public class CreateTable extends Command {
       String catalog,
       String schema,
       String table,
-      String columns,
+      String columnFile,
       String comment) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
     this.table = table;
-    this.columns = columns;
+    this.columnFile = columnFile;
     this.comment = comment;
   }
 
-  /** Create a new schema. */
+  /** Create a new table. */
   @Override
   public void handle() {
     try {
       NameIdentifier tableName = NameIdentifier.of(schema, table);
       GravitinoClient client = buildClient(metalake);
-      Column[] columns;
       ReadTableCSV readTableCSV = new ReadTableCSV();
-      Map<String, List<String>> tableData = readTableCSV.parse(tempFile.toString());
-      List<String> names = data.tableData.get("Name");  
-      List<String> datatypes = data.tableData.get("Datatype");
-      List<String> comments = tableData.get("Comment");
-      List<String> nullables = tableData.get("Nullable");
-      List<String> autos = tableData.get("AutoIncrement");
-      List<String> defaultTypes = tableData.get("DefaultValue");
-      List<String> defaulValues = tableData.get("DefaultType");
+      Map<String, List<String>> tableData = readTableCSV.parse(columnFile);
+      Column[] columns = readTableCSV.columns(tableData);
 
-      for (i = 0; i < name.size(); i++) {
-        String columnName = names.get(i);
-        String datatype = datatypes.get(i);
-        String comment = comments.get(i);
-        String nullable = nullables.get(i);
-        String auto = autos.get(i);
-        String defaultType = defaultTypes.get(i);
-        String defaulValue = defaulValues.get(i);
-        Column column = new Column(columnName, datatype, comment, nullable, auto, defaultType, defaulValue);
-        columns.add(column);
-      }
-
-      client.loadCatalog(catalog).asSchemas().createTable(tableName, columns, comment, null);
+      client.loadCatalog(catalog).asTableCatalog().createTable(tableName, columns, comment, null);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
       return;
@@ -102,11 +89,14 @@ public class CreateTable extends Command {
     } catch (NoSuchSchemaException err) {
       System.err.println(ErrorMessages.UNKNOWN_SCHEMA);
       return;
+    } catch (TableAlreadyExistsException err) {
+      System.err.println(ErrorMessages.TABLE_EXISTS);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    System.out.println(schema + " created");
+    System.out.println(table + " created");
   }
 }

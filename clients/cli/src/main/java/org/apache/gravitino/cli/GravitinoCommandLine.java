@@ -35,6 +35,7 @@ import org.apache.gravitino.cli.commands.CreateGroup;
 import org.apache.gravitino.cli.commands.CreateMetalake;
 import org.apache.gravitino.cli.commands.CreateRole;
 import org.apache.gravitino.cli.commands.CreateSchema;
+import org.apache.gravitino.cli.commands.CreateTable;
 import org.apache.gravitino.cli.commands.CreateTag;
 import org.apache.gravitino.cli.commands.CreateUser;
 import org.apache.gravitino.cli.commands.DeleteCatalog;
@@ -377,7 +378,9 @@ public class GravitinoCommandLine {
         new TableDetails(url, ignore, metalake, catalog, schema, table).handle();
       }
     } else if (CommandActions.CREATE.equals(command)) {
-      // TODO
+      String columnFile = line.getOptionValue(GravitinoOptions.COLUMNFILE);
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      new CreateTable(url, ignore, metalake, catalog, schema, table, columnFile, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
       new DeleteTable(url, ignore, force, metalake, catalog, schema, table).handle();

@@ -29,7 +29,10 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
+import org.apache.gravitino.cli.DefaultConverter;
+import org.apache.gravitino.cli.ParseType;
 import org.apache.gravitino.cli.ReadTableCSV;
+import org.apache.gravitino.rel.Column;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -98,5 +101,53 @@ public class TestReadTableCSV {
         Arrays.asList(null, null, "String"),
         tableData.get("DefaultType"),
         "DefaultType column should match");
+  }
+
+  @Test
+  void testColumns() {
+    ReadTableCSV readTableCSV = new ReadTableCSV();
+    Map<String, List<String>> tableData = readTableCSV.parse(tempFile.toString());
+    Column[] columns = readTableCSV.columns(tableData);
+    Column expectedColumn1 =
+        Column.of("name", ParseType.toType("STRING"), "Sample comment", true, false, null);
+    Column expectedColumn2 =
+        Column.of(
+            "ID",
+            ParseType.toType("INTEGER"),
+            "Another comment",
+            false,
+            true,
+            DefaultConverter.convert("0", "INTEGER"));
+    Column expectedColumn3 =
+        Column.of(
+            "location",
+            ParseType.toType("STRING"),
+            "More comments",
+            false,
+            false,
+            DefaultConverter.convert("Sydney", "STRING"));
+
+    assertEquals(3, columns.length, "Number of columns should match");
+
+    assertEquals(expectedColumn1.name(), columns[0].name());
+    assertEquals(expectedColumn1.dataType(), columns[0].dataType());
+    assertEquals(expectedColumn1.comment(), columns[0].comment());
+    assertEquals(expectedColumn1.nullable(), columns[0].nullable());
+    assertEquals(expectedColumn1.autoIncrement(), columns[0].autoIncrement());
+    assertEquals(expectedColumn1.defaultValue(), columns[0].defaultValue());
+
+    assertEquals(expectedColumn2.name(), columns[1].name());
+    assertEquals(expectedColumn2.dataType(), columns[1].dataType());
+    assertEquals(expectedColumn2.comment(), columns[1].comment());
+    assertEquals(expectedColumn2.nullable(), columns[1].nullable());
+    assertEquals(expectedColumn2.autoIncrement(), columns[1].autoIncrement());
+    assertEquals(expectedColumn2.defaultValue(), columns[1].defaultValue());
+
+    assertEquals(expectedColumn3.name(), columns[2].name());
+    assertEquals(expectedColumn3.dataType(), columns[2].dataType());
+    assertEquals(expectedColumn3.comment(), columns[2].comment());
+    assertEquals(expectedColumn3.nullable(), columns[2].nullable());
+    assertEquals(expectedColumn3.autoIncrement(), columns[2].autoIncrement());
+    assertEquals(expectedColumn3.defaultValue(), columns[2].defaultValue());
   }
 }
