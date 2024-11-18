@@ -30,8 +30,10 @@ public class IcebergLoadTableEvent extends IcebergTableEvent {
   private LoadTableResponse loadTableResponse;
 
   public IcebergLoadTableEvent(
-      String user, NameIdentifier resourceIdentifier, LoadTableResponse loadTableResponse) {
-    super(user, resourceIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      LoadTableResponse loadTableResponse) {
+    super(icebergRequestContext, resourceIdentifier);
     this.loadTableResponse =
         IcebergRestUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
   }

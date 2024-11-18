@@ -35,14 +35,25 @@ from gravitino.filesystem.gvfs_config import GVFSConfig
 logger = logging.getLogger(__name__)
 
 
-@unittest.skip("This test require S3 service account")
+def s3_is_configured():
+    return all(
+        [
+            os.environ.get("S3_ACCESS_KEY_ID") is not None,
+            os.environ.get("S3_SECRET_ACCESS_KEY") is not None,
+            os.environ.get("S3_ENDPOINT") is not None,
+            os.environ.get("S3_BUCKET_NAME") is not None,
+        ]
+    )
+
+
+@unittest.skipUnless(s3_is_configured(), "S3 is not configured.")
 class TestGvfsWithS3(TestGvfsWithHDFS):
     # Before running this test, please set the make sure aws-bundle-x.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
-    s3_access_key = "your_access_key"
-    s3_secret_key = "your_secret_key"
-    s3_endpoint = "your_endpoint"
-    bucket_name = "your_bucket_name"
+    s3_access_key = os.environ.get("S3_ACCESS_KEY_ID")
+    s3_secret_key = os.environ.get("S3_SECRET_ACCESS_KEY")
+    s3_endpoint = os.environ.get("S3_ENDPOINT")
+    bucket_name = os.environ.get("S3_BUCKET_NAME")
 
     metalake_name: str = "TestGvfsWithS3_metalake" + str(randint(1, 10000))
 

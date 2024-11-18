@@ -275,8 +275,10 @@ Please refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#
 in relational catalog for more details. For a fileset catalog, the schema drop operation is the
 same.
 
-Note that the drop operation will also remove all of the filesets as well as the managed files
-under this schema path if `cascade` is set to `true`.
+Note that the drop operation will delete all the fileset metadata under this schema if `cascade`
+set to `true`. Besides, for `MANAGED` fileset, this drop operation will also **remove** all the
+files/directories of this fileset; for `EXTERNAL` fileset, this drop operation will only delete
+the metadata of this fileset.
 
 ### List all schemas under a catalog
 

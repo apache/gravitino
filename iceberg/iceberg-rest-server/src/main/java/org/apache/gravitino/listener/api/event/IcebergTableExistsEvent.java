@@ -27,8 +27,11 @@ import org.apache.gravitino.annotation.DeveloperApi;
 public class IcebergTableExistsEvent extends IcebergTableEvent {
   private boolean isExists;
 
-  public IcebergTableExistsEvent(String user, NameIdentifier resourceIdentifier, boolean isExists) {
-    super(user, resourceIdentifier);
+  public IcebergTableExistsEvent(
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      boolean isExists) {
+    super(icebergRequestContext, resourceIdentifier);
     this.isExists = isExists;
   }
 

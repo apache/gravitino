@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an abstract table pre event in Gravitino Iceberg REST server. */
 @DeveloperApi
 public abstract class IcebergTablePreEvent extends IcebergPreEvent {
-  protected IcebergTablePreEvent(String user, NameIdentifier resourceIdentifier) {
-    super(user, resourceIdentifier);
+  protected IcebergTablePreEvent(IcebergRequestContext context, NameIdentifier resourceIdentifier) {
+    super(context, resourceIdentifier);
   }
 }

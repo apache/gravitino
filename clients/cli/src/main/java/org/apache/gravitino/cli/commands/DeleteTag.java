@@ -47,7 +47,8 @@ public class DeleteTag extends Command {
     this.tag = tag;
   }
 
-  /** Delete a catalog. */
+  /** Delete a tag. */
+  @Override
   public void handle() {
     boolean deleted = false;
 
