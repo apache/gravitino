@@ -547,7 +547,7 @@ tasks.rat {
     "clients/client-python/tests/integration/htmlcov/*",
     "clients/client-python/docs/build",
     "clients/client-python/docs/source/generated",
-    "clients/cli/src/main/resources/**.txt"
+    "clients/cli/src/main/resources/*.txt"
   )
 
   // Add .gitignore excludes to the Apache Rat exclusion list.
