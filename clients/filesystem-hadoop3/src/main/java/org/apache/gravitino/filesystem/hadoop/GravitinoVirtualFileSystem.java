@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
@@ -50,6 +51,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.shaded.com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -57,6 +59,8 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Progressable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -557,6 +561,19 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   public long getDefaultBlockSize(Path f) {
     FilesetContextPair context = getFilesetContext(f, FilesetDataOperation.GET_DEFAULT_BLOCK_SIZE);
     return context.getFileSystem().getDefaultBlockSize(context.getActualFileLocation());
+  }
+
+  @Override
+  public Token<?>[] addDelegationTokens(String renewer, Credentials credentials) {
+    List<Token<?>> tokenList = Lists.newArrayList();
+    for (FileSystem fileSystem : internalFileSystemCache.asMap().values()) {
+      try {
+        tokenList.addAll(Arrays.asList(fileSystem.addDelegationTokens(renewer, credentials)));
+      } catch (IOException e) {
+        Logger.warn("Failed to add delegation tokens for filesystem: {}", fileSystem.getUri(), e);
+      }
+    }
+    return tokenList.stream().distinct().toArray(Token[]::new);
   }
 
   @Override
