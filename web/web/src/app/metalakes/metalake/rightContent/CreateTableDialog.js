@@ -609,25 +609,38 @@ const CreateTableDialog = props => {
                               </Box>
                               {selectedColumnIndex === index &&
                                 column.type &&
-                                tableColumnTypes
-                                  .find(t => t.key === column.type)
-                                  ?.params?.map((param, paramIndex) => (
-                                    <TextField
-                                      key={paramIndex}
-                                      size='small'
-                                      type='number'
-                                      sx={{ minWidth: 60 }}
-                                      value={column.paramValues?.[paramIndex] || ''}
-                                      onChange={e => {
-                                        const newParamValues = [...(column.paramValues || [])]
-                                        newParamValues[paramIndex] = e.target.value
-                                        handleColumnChange({ index, field: 'paramValues', value: newParamValues })
-                                      }}
-                                      placeholder={`${param}`}
-                                      data-refer={`column-param-${index}-${paramIndex}`}
-                                      inputProps={{ min: 0 }}
-                                    />
-                                  ))}
+                                (() => {
+                                  // Process typeSuffix before mapping
+                                  if (column.typeSuffix && !column.paramValues) {
+                                    const paramStr = column.typeSuffix.slice(1, -1) // Remove parentheses
+                                    const values = paramStr.split(',').map(v => v.trim())
+                                    handleColumnChange({
+                                      index,
+                                      field: 'paramValues',
+                                      value: values
+                                    })
+                                  }
+
+                                  return tableColumnTypes
+                                    .find(t => t.key === column.type)
+                                    ?.params?.map((param, paramIndex) => (
+                                      <TextField
+                                        key={paramIndex}
+                                        size='small'
+                                        type='number'
+                                        sx={{ minWidth: 60 }}
+                                        value={column.paramValues?.[paramIndex] || ''}
+                                        onChange={e => {
+                                          const newParamValues = [...(column.paramValues || [])]
+                                          newParamValues[paramIndex] = e.target.value
+                                          handleColumnChange({ index, field: 'paramValues', value: newParamValues })
+                                        }}
+                                        placeholder={`${param}`}
+                                        data-refer={`column-param-${index}-${paramIndex}`}
+                                        inputProps={{ min: 0 }}
+                                      />
+                                    ))
+                                })()}
                               {selectedColumnIndex !== index &&
                                 tableColumnTypes.find(type => type.key === column.type)?.params &&
                                 column.paramValues &&
