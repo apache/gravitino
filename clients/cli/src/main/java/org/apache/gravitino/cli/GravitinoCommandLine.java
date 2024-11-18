@@ -78,6 +78,7 @@ import org.apache.gravitino.cli.commands.SetTagProperty;
 import org.apache.gravitino.cli.commands.TableAudit;
 import org.apache.gravitino.cli.commands.TableDetails;
 import org.apache.gravitino.cli.commands.TableDistribution;
+import org.apache.gravitino.cli.commands.TablePartition;
 import org.apache.gravitino.cli.commands.TagDetails;
 import org.apache.gravitino.cli.commands.TagEntity;
 import org.apache.gravitino.cli.commands.UntagEntity;
@@ -355,6 +356,8 @@ public class GravitinoCommandLine {
         new ListIndexes(url, ignore, metalake, catalog, schema, table).handle();
       } else if (line.hasOption(GravitinoOptions.DISTRIBUTION)) {
         new TableDistribution(url, ignore, metalake, catalog, schema, table).handle();
+      } else if (line.hasOption(GravitinoOptions.Partition)) {
+        new TablePartition(url, ignore, metalake, catalog, schema, table).handle();
       } else {
         new TableDetails(url, ignore, metalake, catalog, schema, table).handle();
       }
