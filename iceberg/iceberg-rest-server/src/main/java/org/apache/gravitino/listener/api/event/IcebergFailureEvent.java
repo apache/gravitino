@@ -25,7 +25,15 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an abstract failure event in Gravitino Iceberg REST server. */
 @DeveloperApi
 public abstract class IcebergFailureEvent extends FailureEvent {
-  protected IcebergFailureEvent(String user, NameIdentifier nameIdentifier, Exception e) {
-    super(user, nameIdentifier, e);
+  private IcebergRequestContext icebergRequestContext;
+
+  protected IcebergFailureEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
+    super(icebergRequestContext.userName(), nameIdentifier, e);
+    this.icebergRequestContext = icebergRequestContext;
+  }
+
+  public IcebergRequestContext icebergRequestContext() {
+    return icebergRequestContext;
   }
 }

@@ -71,6 +71,12 @@ public class TestCatalogEvent {
     Assertions.assertEquals(CreateCatalogEvent.class, event.getClass());
     CatalogInfo catalogInfo = ((CreateCatalogEvent) event).createdCatalogInfo();
     checkCatalogInfo(catalogInfo, catalog);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(CreateCatalogPreEvent.class, preEvent.getClass());
+    CatalogInfo preCatalogInfo = ((CreateCatalogPreEvent) preEvent).createCatalogRequest();
+    checkCatalogInfo(preCatalogInfo, catalog);
   }
 
   @Test
@@ -82,6 +88,10 @@ public class TestCatalogEvent {
     Assertions.assertEquals(LoadCatalogEvent.class, event.getClass());
     CatalogInfo catalogInfo = ((LoadCatalogEvent) event).loadedCatalogInfo();
     checkCatalogInfo(catalogInfo, catalog);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(LoadCatalogPreEvent.class, preEvent.getClass());
   }
 
   @Test
@@ -97,6 +107,13 @@ public class TestCatalogEvent {
     CatalogChange[] catalogChanges = ((AlterCatalogEvent) event).catalogChanges();
     Assertions.assertEquals(1, catalogChanges.length);
     Assertions.assertEquals(catalogChange, catalogChanges[0]);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(AlterCatalogPreEvent.class, preEvent.getClass());
+    CatalogChange[] preCatalogChanges = ((AlterCatalogPreEvent) preEvent).catalogChanges();
+    Assertions.assertEquals(1, preCatalogChanges.length);
+    Assertions.assertEquals(catalogChange, preCatalogChanges[0]);
   }
 
   @Test
@@ -107,6 +124,10 @@ public class TestCatalogEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropCatalogEvent.class, event.getClass());
     Assertions.assertEquals(true, ((DropCatalogEvent) event).isExists());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropCatalogPreEvent.class, preEvent.getClass());
   }
 
   @Test
@@ -117,6 +138,11 @@ public class TestCatalogEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListCatalogEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListCatalogEvent) event).namespace());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListCatalogPreEvent) preEvent).namespace());
   }
 
   @Test
@@ -127,6 +153,11 @@ public class TestCatalogEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListCatalogEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListCatalogEvent) event).namespace());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListCatalogPreEvent) preEvent).namespace());
   }
 
   @Test

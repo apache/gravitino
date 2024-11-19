@@ -27,11 +27,13 @@ import org.apache.iceberg.rest.requests.RenameTableRequest;
 /** Represent an event after rename Iceberg table successfully. */
 @DeveloperApi
 public class IcebergRenameTableEvent extends IcebergTableEvent {
-  private RenameTableRequest renameTableRequest;
+  private final RenameTableRequest renameTableRequest;
 
   public IcebergRenameTableEvent(
-      String user, NameIdentifier resourceIdentifier, RenameTableRequest renameTableRequest) {
-    super(user, resourceIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      RenameTableRequest renameTableRequest) {
+    super(icebergRequestContext, resourceIdentifier);
     this.renameTableRequest =
         IcebergRestUtils.cloneIcebergRESTObject(renameTableRequest, RenameTableRequest.class);
   }

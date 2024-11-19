@@ -35,7 +35,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHivePrivilege;
+import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHadoopSQLPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.slf4j.Logger;
@@ -96,26 +96,28 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   public Map<Privilege.Name, Set<RangerPrivilege>> privilegesMappingRule() {
     return ImmutableMap.of(
         Privilege.Name.CREATE_CATALOG,
-        ImmutableSet.of(RangerHivePrivilege.CREATE),
+        ImmutableSet.of(RangerHadoopSQLPrivilege.CREATE),
         Privilege.Name.USE_CATALOG,
-        ImmutableSet.of(RangerHivePrivilege.SELECT),
+        ImmutableSet.of(RangerHadoopSQLPrivilege.SELECT),
         Privilege.Name.CREATE_SCHEMA,
-        ImmutableSet.of(RangerHivePrivilege.CREATE),
+        ImmutableSet.of(RangerHadoopSQLPrivilege.CREATE),
         Privilege.Name.USE_SCHEMA,
-        ImmutableSet.of(RangerHivePrivilege.SELECT),
+        ImmutableSet.of(RangerHadoopSQLPrivilege.SELECT),
         Privilege.Name.CREATE_TABLE,
-        ImmutableSet.of(RangerHivePrivilege.CREATE),
+        ImmutableSet.of(RangerHadoopSQLPrivilege.CREATE),
         Privilege.Name.MODIFY_TABLE,
         ImmutableSet.of(
-            RangerHivePrivilege.UPDATE, RangerHivePrivilege.ALTER, RangerHivePrivilege.WRITE),
+            RangerHadoopSQLPrivilege.UPDATE,
+            RangerHadoopSQLPrivilege.ALTER,
+            RangerHadoopSQLPrivilege.WRITE),
         Privilege.Name.SELECT_TABLE,
-        ImmutableSet.of(RangerHivePrivilege.READ, RangerHivePrivilege.SELECT));
+        ImmutableSet.of(RangerHadoopSQLPrivilege.READ, RangerHadoopSQLPrivilege.SELECT));
   }
 
   @Override
   /** Set the default owner rule. */
   public Set<RangerPrivilege> ownerMappingRule() {
-    return ImmutableSet.of(RangerHivePrivilege.ALL);
+    return ImmutableSet.of(RangerHadoopSQLPrivilege.ALL);
   }
 
   @Override

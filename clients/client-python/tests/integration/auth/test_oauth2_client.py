@@ -34,6 +34,7 @@ from tests.integration.integration_test_env import (
     check_gravitino_server_status,
 )
 from tests.integration.containers.oauth2_container import OAuth2Container
+from tests.integration.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
         jwk_uri = f"{cls.oauth2_server_uri}/oauth2/jwks"
 
         # Get JWK from OAuth2 Server
-        res = requests.get(jwk_uri).json()
+        res = requests.get(jwk_uri, timeout=Config.REQUEST["TIMEOUT"]).json()
         key = res["keys"][0]
 
         # Convert JWK to PEM

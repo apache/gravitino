@@ -443,23 +443,36 @@ public class TestHadoopCatalogOperations {
       Assertions.assertFalse(fs.exists(schemaPath));
 
       // Test drop non-empty schema with cascade = false
-      Path subPath = new Path(schemaPath, "test1");
-      fs.mkdirs(subPath);
-      Assertions.assertTrue(fs.exists(subPath));
+      Fileset fs1 = createFileset("fs1", name, "comment", Fileset.Type.MANAGED, catalogPath, null);
+      Path fs1Path = new Path(fs1.storageLocation());
 
       Throwable exception1 =
           Assertions.assertThrows(NonEmptySchemaException.class, () -> ops.dropSchema(id, false));
-      Assertions.assertEquals(
-          "Schema m1.c1.schema20 with location " + schemaPath + " is not empty",
-          exception1.getMessage());
+      Assertions.assertEquals("Schema m1.c1.schema20 is not empty", exception1.getMessage());
 
       // Test drop non-empty schema with cascade = true
       ops.dropSchema(id, true);
       Assertions.assertFalse(fs.exists(schemaPath));
+      Assertions.assertFalse(fs.exists(fs1Path));
 
-      // Test drop empty schema
-      Assertions.assertFalse(ops.dropSchema(id, true), "schema should be non-existent");
-      Assertions.assertFalse(ops.dropSchema(id, false), "schema should be non-existent");
+      // Test drop both managed and external filesets
+      Fileset fs2 = createFileset("fs2", name, "comment", Fileset.Type.MANAGED, catalogPath, null);
+      Path fs2Path = new Path(fs2.storageLocation());
+
+      Path fs3Path = new Path(schemaPath, "fs3");
+      createFileset("fs3", name, "comment", Fileset.Type.EXTERNAL, catalogPath, fs3Path.toString());
+
+      ops.dropSchema(id, true);
+      Assertions.assertTrue(fs.exists(schemaPath));
+      Assertions.assertFalse(fs.exists(fs2Path));
+      // The path of external fileset should not be deleted
+      Assertions.assertTrue(fs.exists(fs3Path));
+
+      // Test drop schema with different storage location
+      Path fs4Path = new Path(TEST_ROOT_PATH + "/fs4");
+      createFileset("fs4", name, "comment", Fileset.Type.MANAGED, catalogPath, fs4Path.toString());
+      ops.dropSchema(id, true);
+      Assertions.assertFalse(fs.exists(fs4Path));
     }
   }
 

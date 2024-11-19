@@ -194,7 +194,7 @@ public class BaseIT {
                   gravitinoHome
                       + String.format(
                           "/scripts/postgresql/schema-%s-postgresql.sql",
-                          ConfigConstants.VERSION_0_7_0)),
+                          ConfigConstants.VERSION_0_8_0)),
               "UTF-8");
 
       String[] initPGBackendSqls =
@@ -239,7 +239,7 @@ public class BaseIT {
               new File(
                   gravitinoHome
                       + String.format(
-                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_7_0)),
+                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_8_0)),
               "UTF-8");
 
       String[] initMySQLBackendSqls =

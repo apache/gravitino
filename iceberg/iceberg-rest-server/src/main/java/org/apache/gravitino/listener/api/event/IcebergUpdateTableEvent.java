@@ -29,15 +29,15 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
 @DeveloperApi
 public class IcebergUpdateTableEvent extends IcebergTableEvent {
 
-  private UpdateTableRequest updateTableRequest;
-  private LoadTableResponse loadTableResponse;
+  private final UpdateTableRequest updateTableRequest;
+  private final LoadTableResponse loadTableResponse;
 
   public IcebergUpdateTableEvent(
-      String user,
+      IcebergRequestContext icebergRequestContext,
       NameIdentifier resourceIdentifier,
       UpdateTableRequest updateTableRequest,
       LoadTableResponse loadTableResponse) {
-    super(user, resourceIdentifier);
+    super(icebergRequestContext, resourceIdentifier);
     this.updateTableRequest =
         IcebergRestUtils.cloneIcebergRESTObject(updateTableRequest, UpdateTableRequest.class);
     this.loadTableResponse =

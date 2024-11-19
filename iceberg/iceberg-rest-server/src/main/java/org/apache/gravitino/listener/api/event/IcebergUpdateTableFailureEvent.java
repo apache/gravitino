@@ -27,14 +27,14 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 /** Represent a failure event when updating Iceberg table failed. */
 @DeveloperApi
 public class IcebergUpdateTableFailureEvent extends IcebergTableFailureEvent {
-  private UpdateTableRequest updateTableRequest;
+  private final UpdateTableRequest updateTableRequest;
 
   public IcebergUpdateTableFailureEvent(
-      String user,
+      IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
       UpdateTableRequest updateTableRequest,
       Exception e) {
-    super(user, nameIdentifier, e);
+    super(icebergRequestContext, nameIdentifier, e);
     this.updateTableRequest =
         IcebergRestUtils.cloneIcebergRESTObject(updateTableRequest, UpdateTableRequest.class);
   }

@@ -129,11 +129,12 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 
 ##### Pre-event
 
-Pre-event is only generated before Iceberg REST server table operations, the other operation doesn't generate pre-event for now.
-
-| Operation type                      | Pre-event                                                                                                                                                                                                  | Since Version    |
-|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| Iceberg REST server table operation | `IcebergCreateTablePreEvent`, `IcebergUpdateTablePreEvent`, `IcebergDropTablePreEvent`, `IcebergLoadTablePreEvent`, `IcebergListTablePreEvent`, `IcebergTableExistsPreEvent`, `IcebergRenameTablePreEvent` | 0.7.0-incubating |
+| Operation type                      | Pre-event                                                                                                                                                                                                  | Since Version     |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
+| Iceberg REST server table operation | `IcebergCreateTablePreEvent`, `IcebergUpdateTablePreEvent`, `IcebergDropTablePreEvent`, `IcebergLoadTablePreEvent`, `IcebergListTablePreEvent`, `IcebergTableExistsPreEvent`, `IcebergRenameTablePreEvent` | 0.7.0-incubating  |
+| Gravitino server table operation    | `CreateTablePreEvent`, `AlterTablePreEvent`, `DropTablePreEvent`, `PurgeTablePreEvent`, `LoadTablePreEvent`, `ListTablePreEvent`                                                                           | 0.8.0-incubating  |
+| Gravitino server schema operation   | `CreateSchemaPreEvent`, `AlterSchemaPreEvent`, `DropSchemaPreEvent`, `LoadSchemaPreEvent`, `ListSchemaPreEvent`                                                                                            | 0.8.0-incubating  |
+| Gravitino server catalog operation  | `CreateCatalogPreEvent`, `AlterCatalogPreEvent`, `DropCatalogPreEvent`, `LoadCatalogPreEvent`, `ListCatalogPreEvent`                                                                                       | 0.8.0-incubating  |
 
 #### Event listener plugin
 
@@ -169,7 +170,7 @@ The Formatter defines an interface that formats metadata audit logs into a unifi
 
 The `AuditLogWriter` defines an interface that enables the writing of metadata audit logs to different storage mediums such as files, databases, etc.
 
-Writer configuration begins with `gravitino.audit.writer.${name}`, where ${name} is replaced with the actual writer name defined in method `name()`. `FileAuditWriter` is a default implement to log audit information, whose name is `file`.
+Writer configuration begins with `gravitino.audit.writer.${name}`, where `${name}` is replaced with the actual writer name defined in method `name()`. `FileAuditWriter` is a default implement to log audit information, whose name is `file`.
 
 | Property name                                   | Description                                                                   | Default value       | Required | Since Version    |
 |-------------------------------------------------|-------------------------------------------------------------------------------|---------------------|----------|------------------|

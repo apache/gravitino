@@ -25,11 +25,13 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represent an event after dropping Iceberg table successfully. */
 @DeveloperApi
 public class IcebergDropTableEvent extends IcebergTableEvent {
-  private boolean purgeRequested;
+  private final boolean purgeRequested;
 
   public IcebergDropTableEvent(
-      String user, NameIdentifier resourceIdentifier, boolean purgeRequested) {
-    super(user, resourceIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      boolean purgeRequested) {
+    super(icebergRequestContext, resourceIdentifier);
     this.purgeRequested = purgeRequested;
   }
 

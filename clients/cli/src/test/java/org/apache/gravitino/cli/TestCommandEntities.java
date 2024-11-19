@@ -38,6 +38,8 @@ public class TestCommandEntities {
     assertTrue(
         CommandEntities.isValidEntity(CommandEntities.TABLE), "TABLE should be a valid entity");
     assertTrue(CommandEntities.isValidEntity(CommandEntities.TAG), "TAG should be a valid entity");
+    assertTrue(
+        CommandEntities.isValidEntity(CommandEntities.ROLE), "ROLE should be a valid entity");
   }
 
   @Test

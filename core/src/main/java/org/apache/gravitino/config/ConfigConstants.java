@@ -67,4 +67,7 @@ public final class ConfigConstants {
 
   /** The version number for the 0.7.0 release. */
   public static final String VERSION_0_7_0 = "0.7.0";
+
+  /** The version number for the 0.8.0 release. */
+  public static final String VERSION_0_8_0 = "0.8.0";
 }

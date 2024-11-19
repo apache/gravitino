@@ -25,7 +25,7 @@ import org.apache.gravitino.authorization.Privilege;
 
 public class RangerPrivileges {
   /** Ranger Hive privileges enumeration. */
-  public enum RangerHivePrivilege implements RangerPrivilege {
+  public enum RangerHadoopSQLPrivilege implements RangerPrivilege {
     ALL("all"),
     SELECT("select"),
     UPDATE("update"),
@@ -41,7 +41,7 @@ public class RangerPrivileges {
 
     private final String name; // Access a type in the Ranger policy item
 
-    RangerHivePrivilege(String name) {
+    RangerHadoopSQLPrivilege(String name) {
       this.name = name;
     }
 
@@ -117,7 +117,7 @@ public class RangerPrivileges {
 
   static List<Class<? extends Enum<? extends RangerPrivilege>>> allRangerPrivileges =
       Lists.newArrayList(
-          RangerPrivileges.RangerHivePrivilege.class, RangerPrivileges.RangerHdfsPrivilege.class);
+          RangerHadoopSQLPrivilege.class, RangerPrivileges.RangerHdfsPrivilege.class);
 
   public static RangerPrivilege valueOf(String name) {
     Preconditions.checkArgument(name != null, "Privilege name string cannot be null!");

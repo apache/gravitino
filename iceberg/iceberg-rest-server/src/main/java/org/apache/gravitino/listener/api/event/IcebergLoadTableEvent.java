@@ -27,11 +27,13 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
 /** Represent an event after loading Iceberg table successfully. */
 @DeveloperApi
 public class IcebergLoadTableEvent extends IcebergTableEvent {
-  private LoadTableResponse loadTableResponse;
+  private final LoadTableResponse loadTableResponse;
 
   public IcebergLoadTableEvent(
-      String user, NameIdentifier resourceIdentifier, LoadTableResponse loadTableResponse) {
-    super(user, resourceIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      LoadTableResponse loadTableResponse) {
+    super(icebergRequestContext, resourceIdentifier);
     this.loadTableResponse =
         IcebergRestUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
   }

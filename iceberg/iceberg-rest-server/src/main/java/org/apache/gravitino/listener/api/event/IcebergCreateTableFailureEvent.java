@@ -27,14 +27,14 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 /** Represent a failure event when creating Iceberg table failed. */
 @DeveloperApi
 public class IcebergCreateTableFailureEvent extends IcebergTableFailureEvent {
-  private CreateTableRequest createTableRequest;
+  private final CreateTableRequest createTableRequest;
 
   public IcebergCreateTableFailureEvent(
-      String user,
+      IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
       CreateTableRequest createTableRequest,
       Exception e) {
-    super(user, nameIdentifier, e);
+    super(icebergRequestContext, nameIdentifier, e);
     this.createTableRequest =
         IcebergRestUtils.cloneIcebergRESTObject(createTableRequest, CreateTableRequest.class);
   }

@@ -27,6 +27,7 @@ import MetalakePath from './MetalakePath'
 import CreateCatalogDialog from './CreateCatalogDialog'
 import CreateSchemaDialog from './CreateSchemaDialog'
 import CreateFilesetDialog from './CreateFilesetDialog'
+import CreateTableDialog from './CreateTableDialog'
 import TabsContent from './tabsContent/TabsContent'
 import { useSearchParams } from 'next/navigation'
 import { useAppSelector } from '@/lib/hooks/useStore'
@@ -35,10 +36,12 @@ const RightContent = () => {
   const [open, setOpen] = useState(false)
   const [openSchema, setOpenSchema] = useState(false)
   const [openFileset, setOpenFileset] = useState(false)
+  const [openTable, setOpenTable] = useState(false)
   const searchParams = useSearchParams()
   const [isShowBtn, setBtnVisible] = useState(true)
   const [isShowSchemaBtn, setSchemaBtnVisible] = useState(false)
   const [isShowFilesetBtn, setFilesetBtnVisible] = useState(false)
+  const [isShowTableBtn, setTableBtnVisible] = useState(false)
   const store = useAppSelector(state => state.metalakes)
 
   const handleCreateCatalog = () => {
@@ -51,6 +54,10 @@ const RightContent = () => {
 
   const handleCreateFileset = () => {
     setOpenFileset(true)
+  }
+
+  const handleCreateTable = () => {
+    setOpenTable(true)
   }
 
   useEffect(() => {
@@ -77,6 +84,14 @@ const RightContent = () => {
         !['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider)
       setSchemaBtnVisible(isSchemaList)
     }
+
+    const isTableList =
+      paramsSize == 4 &&
+      searchParams.has('metalake') &&
+      searchParams.has('catalog') &&
+      searchParams.get('type') === 'relational' &&
+      searchParams.has('schema')
+    setTableBtnVisible(isTableList)
   }, [searchParams, store.catalogs, store.catalogs.length])
 
   return (
@@ -138,6 +153,20 @@ const RightContent = () => {
               Create Fileset
             </Button>
             <CreateFilesetDialog open={openFileset} setOpen={setOpenFileset} />
+          </Box>
+        )}
+        {isShowTableBtn && (
+          <Box className={`twc-flex twc-items-center`}>
+            <Button
+              variant='contained'
+              startIcon={<Icon icon='mdi:plus-box' />}
+              onClick={handleCreateTable}
+              sx={{ width: 200 }}
+              data-refer='create-table-btn'
+            >
+              Create Table
+            </Button>
+            <CreateTableDialog open={openTable} setOpen={setOpenTable} />
           </Box>
         )}
       </Box>

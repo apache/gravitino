@@ -26,13 +26,18 @@ import shutil
 import requests
 
 from gravitino.exceptions.base import GravitinoRuntimeException
+from tests.integration.config import Config
 
 logger = logging.getLogger(__name__)
 
 
 def get_gravitino_server_version(**kwargs):
     try:
-        response = requests.get("http://localhost:8090/api/version", **kwargs)
+        response = requests.get(
+            "http://localhost:8090/api/version",
+            timeout=Config.REQUEST["TIMEOUT"],
+            **kwargs,
+        )
         response.raise_for_status()  # raise an exception for bad status codes
         response.close()
         return True
