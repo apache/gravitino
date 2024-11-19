@@ -22,12 +22,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.TableInfo;
 import org.apache.gravitino.listener.api.info.partitions.PartitionInfo;
+
 /** Represents an event triggered before creating a partition. */
 @DeveloperApi
 public class AddPartitionPreEvent extends PartitionPreEvent {
 
   private final PartitionInfo createdPartitionInfo;
-
 
   public AddPartitionPreEvent(
       String user, NameIdentifier identifier, PartitionInfo createdPartitionInfo) {
@@ -38,8 +38,8 @@ public class AddPartitionPreEvent extends PartitionPreEvent {
   /**
    * Retrieves the create partition request.
    *
-   * @return A {@link TableInfo} instance encapsulating the comprehensive details of create partition
-   *     request.
+   * @return A {@link TableInfo} instance encapsulating the comprehensive details of create
+   *     partition request.
    */
   public PartitionInfo createdPartitionRequest() {
     return createdPartitionInfo;
