@@ -39,6 +39,11 @@ public abstract class IcebergFailureEvent extends FailureEvent {
     return EventSource.GRAVITINO_ICEBERG_REST_SERVER;
   }
 
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.FAILURE;
+  }
+
   public IcebergRequestContext icebergRequestContext() {
     return icebergRequestContext;
   }

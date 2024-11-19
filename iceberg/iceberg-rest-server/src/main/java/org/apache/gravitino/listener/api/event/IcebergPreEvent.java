@@ -44,6 +44,11 @@ public abstract class IcebergPreEvent extends PreEvent {
   }
 
   @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.NOT_PROCESS;
+  }
+
+  @Override
   public String remoteAddr() {
     return icebergRequestContext.remoteHostName();
   }

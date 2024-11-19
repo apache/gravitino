@@ -54,6 +54,6 @@ public class IcebergCreateViewEvent extends IcebergViewEvent {
 
   @Override
   public OperationType operationType() {
-    return OperationType.TABLE_EXISTS;
+    return OperationType.CREATE_VIEW;
   }
 }

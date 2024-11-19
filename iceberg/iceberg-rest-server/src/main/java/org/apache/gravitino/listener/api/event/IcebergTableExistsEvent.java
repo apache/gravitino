@@ -41,6 +41,6 @@ public class IcebergTableExistsEvent extends IcebergTableEvent {
 
   @Override
   public OperationType operationType() {
-    return OperationType.CREATE_TABLE;
+    return OperationType.TABLE_EXISTS;
   }
 }
