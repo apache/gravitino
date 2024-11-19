@@ -29,6 +29,10 @@ import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 
+/**
+ * Compared to {@link org.apache.gravitino.audit.SimpleAuditLog}, it add support audit log for
+ * Iceberg REST server, add eventSource and remoteAddr to audit log.
+ */
 public class SimpleAuditLogV2 implements AuditLog {
 
   private final BaseEvent event;
@@ -45,8 +49,7 @@ public class SimpleAuditLogV2 implements AuditLog {
   @Override
   @SuppressWarnings("deprecation")
   public Operation operation() {
-    // TODO: transform OperationType to Operation to keep compatibility.
-    return Operation.UNKNOWN_OPERATION;
+    return CompatibilityUtils.toAuditLogOperation(event.operationType());
   }
 
   @Override
@@ -62,8 +65,7 @@ public class SimpleAuditLogV2 implements AuditLog {
   @Override
   @SuppressWarnings("deprecation")
   public Status status() {
-    // TODO: transform OperationStatus to Operation to keep compatibility.
-    return Status.SUCCESS;
+    return CompatibilityUtils.toAuditLogStatus(event.operationStatus());
   }
 
   @Override
@@ -87,8 +89,8 @@ public class SimpleAuditLogV2 implements AuditLog {
   }
 
   @Override
-  public Map<String, String> customData() {
-    return AuditLog.super.customData();
+  public Map<String, String> customInfo() {
+    return event.customInfo();
   }
 
   @Override

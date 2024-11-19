@@ -98,8 +98,8 @@ public class TestTableEvent {
     Assertions.assertEquals(CreateTablePreEvent.class, preEvent.getClass());
     tableInfo = ((CreateTablePreEvent) preEvent).createTableRequest();
     checkTableInfo(tableInfo, table);
-    Assertions.assertEquals(OperationType.CREATE_TABLE, event.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.CREATE_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
   }
 
   @Test
@@ -118,8 +118,8 @@ public class TestTableEvent {
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(LoadTablePreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.LOAD_TABLE, event.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.LOAD_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
   }
 
   @Test
@@ -143,8 +143,8 @@ public class TestTableEvent {
     Assertions.assertEquals(AlterTablePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(1, ((AlterTablePreEvent) preEvent).tableChanges().length);
     Assertions.assertEquals(change, ((AlterTablePreEvent) preEvent).tableChanges()[0]);
-    Assertions.assertEquals(OperationType.ALTER_TABLE, event.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.ALTER_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
   }
 
   @Test
@@ -162,8 +162,8 @@ public class TestTableEvent {
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropTablePreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.DROP_TABLE, event.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.DROP_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
   }
 
   @Test
@@ -181,8 +181,8 @@ public class TestTableEvent {
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(PurgeTablePreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.PURGE_TABLE, event.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.PURGE_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
   }
 
   @Test
@@ -201,8 +201,8 @@ public class TestTableEvent {
     Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
     Assertions.assertEquals(ListTablePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(namespace, ((ListTablePreEvent) preEvent).namespace());
-    Assertions.assertEquals(OperationType.LIST_TABLE, event.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_TABLE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
   }
 
   @Test
@@ -226,6 +226,8 @@ public class TestTableEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((CreateTableFailureEvent) event).exception().getClass());
     checkTableInfo(((CreateTableFailureEvent) event).createTableRequest(), table);
+    Assertions.assertEquals(OperationType.CREATE_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -238,6 +240,8 @@ public class TestTableEvent {
     Assertions.assertEquals(LoadTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((LoadTableFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LOAD_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -253,6 +257,8 @@ public class TestTableEvent {
         GravitinoRuntimeException.class, ((AlterTableFailureEvent) event).exception().getClass());
     Assertions.assertEquals(1, ((AlterTableFailureEvent) event).tableChanges().length);
     Assertions.assertEquals(change, ((AlterTableFailureEvent) event).tableChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -265,6 +271,8 @@ public class TestTableEvent {
     Assertions.assertEquals(DropTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((DropTableFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DROP_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -277,6 +285,8 @@ public class TestTableEvent {
     Assertions.assertEquals(PurgeTableFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((PurgeTableFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.PURGE_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -290,6 +300,8 @@ public class TestTableEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListTableFailureEvent) event).exception().getClass());
     Assertions.assertEquals(namespace, ((ListTableFailureEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   private void checkTableInfo(TableInfo tableInfo, Table table) {

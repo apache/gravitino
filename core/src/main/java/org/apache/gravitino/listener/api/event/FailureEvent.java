@@ -60,6 +60,6 @@ public abstract class FailureEvent extends Event {
 
   @Override
   public OperationStatus operationStatus() {
-    return OperationStatus.FAIL;
+    return OperationStatus.FAILURE;
   }
 }

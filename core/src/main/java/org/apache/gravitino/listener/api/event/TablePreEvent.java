@@ -28,9 +28,4 @@ public abstract class TablePreEvent extends PreEvent {
   protected TablePreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
-
-  @Override
-  public OperationType operationType() {
-    return OperationType.CREATE_TABLE;
-  }
 }

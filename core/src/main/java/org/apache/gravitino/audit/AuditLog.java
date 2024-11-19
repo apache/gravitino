@@ -151,7 +151,7 @@ public interface AuditLog {
   }
 
   /** @since 0.8.0 */
-  default Map<String, String> customData() {
+  default Map<String, String> customInfo() {
     return ImmutableMap.of();
   }
 
@@ -324,6 +324,7 @@ public interface AuditLog {
 
   enum Status {
     SUCCESS,
-    FAILURE
+    FAILURE,
+    UNKNOWN
   }
 }
