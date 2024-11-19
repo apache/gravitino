@@ -19,11 +19,8 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 import org.apache.gravitino.Metalake;
-import org.apache.gravitino.cli.TablePrinter;
+import org.apache.gravitino.cli.CommandLineOutputs;
 import org.apache.gravitino.client.GravitinoAdminClient;
 
 /** Lists all metalakes. */
@@ -42,21 +39,13 @@ public class ListMetalakes extends Command {
   /** Lists all metalakes. */
   @Override
   public void handle() {
-    Metalake[] metalakes = new Metalake[0];
+    Metalake[] metalakes;
     try {
       GravitinoAdminClient client = buildAdminClient();
       metalakes = client.listMetalakes();
+      CommandLineOutputs.output(metalakes);
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
-      return;
     }
-
-    List<String> headers = Arrays.asList("metalake");
-    List<List<String>> rows = new ArrayList<>();
-    for (int i = 0; i < metalakes.length; i++) {
-      rows.add(Arrays.asList(metalakes[i].name()));
-    }
-    TablePrinter tablePrinter = new TablePrinter();
-    tablePrinter.print(headers, rows);
   }
 }

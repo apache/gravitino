@@ -30,7 +30,7 @@ import org.apache.commons.cli.Options;
 public class GravitinoCommandLine extends TestableCommandLine {
 
   private final CommandLine line;
-  private final Options options;
+  private static Options options = null;
   private final String entity;
   private final String command;
   private String urlEnv;
@@ -52,9 +52,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
    */
   public GravitinoCommandLine(CommandLine line, Options options, String entity, String command) {
     this.line = line;
-    this.options = options;
     this.entity = entity;
     this.command = command;
+    GravitinoCommandLine.options = options;
   }
 
   /** Handles the parsed command line arguments and executes the corresponding actions. */
@@ -525,5 +525,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     // Return the default localhost URL
     return DEFAULT_URL;
+  }
+
+  public static Options getOptions() {
+    return options;
   }
 }
