@@ -107,11 +107,8 @@ public class GravitinoCommandLine {
    * Gravitino Command line.
    *
    * @param line Parsed command line object.
-   * @param options Available options for the CLI. <<<<<<< HEAD
-   * @param entity The entity to apply the command to e.g. metalake, catalog, schema, table etc etc.
-   *     =======
+   * @param options Available options for the CLI.
    * @param entity The entity to apply the command to e.g. metalake, catalog, schema, table etc.
-   *     >>>>>>> main
    * @param command The type of command to run i.e. list, details, update, delete, or create.
    */
   public GravitinoCommandLine(CommandLine line, Options options, String entity, String command) {

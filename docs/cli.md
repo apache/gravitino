@@ -84,7 +84,6 @@ As you need to set the Gravitino URL for every command, you can set the URL in s
 
 The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
-<<<<<<< HEAD
 ### Setting the Gravitino Authentication Type
 
 The authentication type can also be set in several ways.
@@ -93,8 +92,6 @@ The authentication type can also be set in several ways.
 2. Set via the 'GRAVITINO_AUTH' environment variable.
 3. Stored in the Gravitino CLI configuration file.
 
-=======
->>>>>>> main
 ### Gravitino CLI configuration file
 
 The gravitino CLI can read commonly used CLI options from a configuration file. By default, the file is `.gravitino` in the user's home directory. The metalake, URL and ignore parameters can be set in this file.
@@ -379,19 +376,13 @@ gcli table list --name catalog_postgres.hr
 #### Show tables details
 
 ```bash
-<<<<<<< HEAD
-gcli column list --name catalog_postgres.hr.departments
-=======
 gcli table details --name catalog_postgres.hr.departments
->>>>>>> main
 ```
 
 #### Show tables audit information
 
 ```bash
 gcli table details --name catalog_postgres.hr.departments --audit
-<<<<<<< HEAD
-=======
 ```
 #### Show tables distribution information
 
@@ -399,7 +390,6 @@ gcli table details --name catalog_postgres.hr.departments --audit
 
 ```bash
 gcli table details --name catalog_mysql.db.iceberg_namespace_properties --index
->>>>>>> main
 ```
 
 #### Delete a table
