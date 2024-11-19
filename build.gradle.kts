@@ -803,6 +803,7 @@ tasks {
         from("${it.name}/build/libs")
         into("distribution/package/libs")
         include("*.jar")
+        exclude("gravitino-docs-*.jar")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
       }
     }
