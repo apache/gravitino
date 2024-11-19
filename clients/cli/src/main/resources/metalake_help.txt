@@ -20,11 +20,11 @@ Create a metalake
 gcli metalake create --metalake my_metalake --comment "This is my metalake"
 
 Delete a metalake
-Note:This is a potentially dangerous command to run
+Note:This is a potentially dangerous command to run and result in data loss.
 gcli metalake delete
 
 Rename a metalake
-Note:This is a potentially dangerous command to run
+Note:This is a potentially dangerous command to run and may result in unpredictable behaviour.
 gcli metalake update  --rename demo
 
 Update a metalake's comment
