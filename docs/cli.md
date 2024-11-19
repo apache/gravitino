@@ -384,7 +384,16 @@ gcli table details --name catalog_postgres.hr.departments
 ```bash
 gcli table details --name catalog_postgres.hr.departments --audit
 ```
+
 #### Show tables distribution information
+```bash
+gcli table details --name catalog_postgres.hr.departments --distribution
+```
+
+#### Show tables partition information
+```bash
+gcli table details --name catalog_postgres.hr.departments --partition
+```
 
 ### Show table indexes
 

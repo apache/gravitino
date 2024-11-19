@@ -47,6 +47,7 @@ public class GravitinoOptions {
   public static final String LOGIN = "login";
   public static final String INDEX = "index";
   public static final String DISTRIBUTION = "distribution";
+  public static final String PARTITION = "partition";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -69,6 +70,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption(null, LOGIN, "user name"));
     options.addOption(createSimpleOption("x", INDEX, "Display index infromation"));
     options.addOption(createSimpleOption("d", DISTRIBUTION, "Display distribution information"));
+    options.addOption(createSimpleOption(null, PARTITION, "Display partition information"));
 
     // Create/update options
     options.addOption(createArgOption(null, RENAME, "new entity name"));
