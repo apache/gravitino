@@ -54,6 +54,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@SuppressWarnings("removal")
 public class SecureHadoopCatalogOperations
     implements CatalogOperations, SupportsSchemas, FilesetCatalog {
 
@@ -242,8 +243,7 @@ public class SecureHadoopCatalogOperations
       Catalog.Type type,
       String provider,
       String comment,
-      Map<String, String> properties)
-      throws Exception {
+      Map<String, String> properties) {
     hadoopCatalogOperations.testConnection(catalogIdent, type, provider, comment, properties);
   }
 
