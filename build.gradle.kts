@@ -771,6 +771,7 @@ tasks {
     subprojects.forEach() {
       if (!it.name.startsWith("catalog") &&
         !it.name.startsWith("authorization") &&
+        !it.name.startsWith("cli") &&
         !it.name.startsWith("client") && !it.name.startsWith("filesystem") && !it.name.startsWith("spark") && !it.name.startsWith("iceberg") && it.name != "trino-connector" &&
         it.name != "integration-test" && it.name != "bundled-catalog" && !it.name.startsWith("flink") &&
         it.name != "integration-test" && it.name != "hive-metastore-common" && !it.name.startsWith("flink") &&
