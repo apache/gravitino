@@ -42,6 +42,8 @@ public class GravitinoOptions {
   public static final String TAG = "tag";
   public static final String AUDIT = "audit";
   public static final String FORCE = "force";
+  public static final String SIMPLE = "simple";
+  public static final String LOGIN = "login";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -60,6 +62,8 @@ public class GravitinoOptions {
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
+    options.addOption(createSimpleOption(null, SIMPLE, "simple authentication"));
+    options.addOption(createArgOption(null, LOGIN, "user name"));
 
     // Create/update options
     options.addOption(createArgOption("r", RENAME, "new entity name"));

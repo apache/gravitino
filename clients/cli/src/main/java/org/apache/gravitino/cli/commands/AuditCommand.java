@@ -25,9 +25,11 @@ public abstract class AuditCommand extends Command {
   /**
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param authentication Authentication type i.e. "simple"
+   * @param userName User name for simple authentication.
    */
-  public AuditCommand(String url, boolean ignoreVersions) {
-    super(url, ignoreVersions);
+  public AuditCommand(String url, boolean ignoreVersions, String authentication, String userName) {
+    super(url, ignoreVersions, authentication, userName);
   }
 
   /* Overridden in parent - do nothing  */

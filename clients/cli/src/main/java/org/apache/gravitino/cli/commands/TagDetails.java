@@ -35,11 +35,19 @@ public class TagDetails extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param authentication Authentication type i.e. "simple"
+   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    */
-  public TagDetails(String url, boolean ignoreVersions, String metalake, String tag) {
-    super(url, ignoreVersions);
+  public TagDetails(
+      String url,
+      boolean ignoreVersions,
+      String authentication,
+      String userName,
+      String metalake,
+      String tag) {
+    super(url, ignoreVersions, authentication, userName);
     this.metalake = metalake;
     this.tag = tag;
   }

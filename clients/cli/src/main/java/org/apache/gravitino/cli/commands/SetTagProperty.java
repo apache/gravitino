@@ -38,6 +38,8 @@ public class SetTagProperty extends Command {
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param authentication Authentication type i.e. "simple"
+   * @param userName User name for simple authentication.
    * @param metalake The name of the metalake.
    * @param tag The name of the tag.
    * @param property The name of the property.
@@ -46,11 +48,13 @@ public class SetTagProperty extends Command {
   public SetTagProperty(
       String url,
       boolean ignoreVersions,
+      String authentication,
+      String userName,
       String metalake,
       String tag,
       String property,
       String value) {
-    super(url, ignoreVersions);
+    super(url, ignoreVersions, authentication, userName);
     this.metalake = metalake;
     this.tag = tag;
     this.property = property;

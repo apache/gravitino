@@ -82,6 +82,14 @@ As you need to set the Gravitino URL for every command, you can set the URL in s
 
 The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
+### Setting the Gravitino Authentication Type
+
+The authentication type can also be set in several ways.
+
+1. Passed in on the command line via the `--simple` flag.
+2. Set via the 'GRAVITINO_AUTH' environment variable.
+3. Stored in the Gravitino CLI configuration file.
+
 ### Gravitino CLI configuration file
 
 The gravitino CLI can read commonly used CLI options from a configuration file. By default, the file is `.gravitino` in the user's home directory. The metalake, URL and ignore parameters can be set in this file.
@@ -99,6 +107,9 @@ URL=http://localhost:8090
 
 # Ignore client/server version mismatch
 ignore=true
+
+# Authentication
+auth=simple
 
 ```
 
@@ -502,4 +513,17 @@ gcli tag update --tag tagA --rename newTag
 
 ```bash
 gcli tag update --tag tagA --comment "new comment"
+```
+
+### Authentication
+
+#### Simple authentication
+
+```bash
+gcli <normal command> --simple
+
+#### Simple authentication with user name
+
+```bash
+gcli <normal command> --simple --login userName
 ```

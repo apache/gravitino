@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.cli.commands;
 
+import static org.apache.gravitino.client.GravitinoClientBase.Builder;
+
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -27,16 +29,22 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 public abstract class Command {
   private final String url;
   private final boolean ignoreVersions;
+  private final String authentication;
+  private final String userName;
 
   /**
    * Command constructor.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param authentication Authentication type i.e. "simple"
+   * @param userName User name for simple authentication.
    */
-  public Command(String url, boolean ignoreVersions) {
+  public Command(String url, boolean ignoreVersions, String authentication, String userName) {
     this.url = url;
     this.ignoreVersions = ignoreVersions;
+    this.authentication = authentication;
+    this.userName = userName;
   }
 
   /** All commands have a handle method to handle and run the required command. */
@@ -50,11 +58,22 @@ public abstract class Command {
    * @throws NoSuchMetalakeException if the specified metalake does not exist.
    */
   protected GravitinoClient buildClient(String metalake) throws NoSuchMetalakeException {
+    Builder<GravitinoClient> client = GravitinoClient.builder(url).withMetalake(metalake);
+
     if (ignoreVersions) {
-      return GravitinoClient.builder(url).withMetalake(metalake).withVersionCheckDisabled().build();
-    } else {
-      return GravitinoClient.builder(url).withMetalake(metalake).build();
+      client = client.withVersionCheckDisabled();
     }
+    if (authentication != null) {
+      if (authentication.equals("simple")) {
+        if (userName != null && !userName.isEmpty()) {
+          client = client.withSimpleAuth(userName);
+        } else {
+          client = client.withSimpleAuth();
+        }
+      }
+    }
+
+    return client.build();
   }
 
   /**
@@ -63,10 +82,21 @@ public abstract class Command {
    * @return A configured {@link GravitinoAdminClient} instance.
    */
   protected GravitinoAdminClient buildAdminClient() {
+    Builder<GravitinoAdminClient> client = GravitinoAdminClient.builder(url);
+
     if (ignoreVersions) {
-      return GravitinoAdminClient.builder(url).withVersionCheckDisabled().build();
-    } else {
-      return GravitinoAdminClient.builder(url).build();
+      client = client.withVersionCheckDisabled();
     }
+    if (authentication != null) {
+      if (authentication.equals("simple")) {
+        if (userName != null && !userName.isEmpty()) {
+          client = client.withSimpleAuth(userName);
+        } else {
+          client = client.withSimpleAuth();
+        }
+      }
+    }
+
+    return client.build();
   }
 }

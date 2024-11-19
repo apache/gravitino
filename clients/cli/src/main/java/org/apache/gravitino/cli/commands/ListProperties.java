@@ -28,10 +28,13 @@ public class ListProperties extends Command {
    * List the properties of an entity.
    *
    * @param url The URL of the Gravitino server.
+   * @param authentication Authentication type i.e. "simple"
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param userName User name for simple authentication.
    */
-  public ListProperties(String url, boolean ignoreVersions) {
-    super(url, ignoreVersions);
+  public ListProperties(
+      String url, boolean ignoreVersions, String authentication, String userName) {
+    super(url, ignoreVersions, authentication, userName);
   }
 
   @Override
