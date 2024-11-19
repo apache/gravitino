@@ -34,6 +34,7 @@ public abstract class IcebergFailureEvent extends FailureEvent {
     this.icebergRequestContext = icebergRequestContext;
   }
 
+  @Override
   public EventSource eventSource() {
     return EventSource.GRAVITINO_ICEBERG_REST_SERVER;
   }
@@ -42,11 +43,13 @@ public abstract class IcebergFailureEvent extends FailureEvent {
     return icebergRequestContext;
   }
 
+  @Override
   public String remoteAddr() {
     return icebergRequestContext.remoteHostName();
   }
 
-  public Map<String, String> httpHeaders() {
+  @Override
+  public Map<String, String> customInfo() {
     return icebergRequestContext.httpHeaders();
   }
 }

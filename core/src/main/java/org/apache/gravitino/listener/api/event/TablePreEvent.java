@@ -29,11 +29,8 @@ public abstract class TablePreEvent extends PreEvent {
     super(user, identifier);
   }
 
-  public EventSource eventSource() {
-    return EventSource.GRAVITINO_SERVER;
-  }
-
-  public OperationStatus operationStatus() {
-    return OperationStatus.NOT_PROCESS;
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TABLE;
   }
 }

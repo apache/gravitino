@@ -50,10 +50,6 @@ public abstract class BaseEvent {
     this.eventTime = System.currentTimeMillis();
   }
 
-  public abstract EventSource eventSource();
-
-  public abstract OperationStatus operationStatus();
-
   /**
    * Retrieves the user associated with this event.
    *
@@ -90,10 +86,22 @@ public abstract class BaseEvent {
     return OperationType.UNKNOWN;
   }
 
+  // done
   public String remoteAddr() {
     return "unknown";
   }
 
+  // done
+  public EventSource eventSource() {
+    return EventSource.GRAVITINO_SERVER;
+  }
+
+  // done
+  public OperationStatus operationStatus() {
+    return OperationStatus.UNKNOWN;
+  }
+
+  // done
   public Map<String, String> customInfo() {
     return ImmutableMap.of();
   }

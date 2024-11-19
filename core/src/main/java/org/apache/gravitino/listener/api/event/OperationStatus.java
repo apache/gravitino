@@ -23,5 +23,6 @@ public enum OperationStatus {
   NOT_PROCESS,
   SUCCESS,
   FAIL,
+
   UNKNOWN,
 }

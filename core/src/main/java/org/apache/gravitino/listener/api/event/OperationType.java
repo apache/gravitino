@@ -20,9 +20,69 @@
 package org.apache.gravitino.listener.api.event;
 
 public enum OperationType {
+  // Table operations
   CREATE_TABLE,
   DROP_TABLE,
+  PURGE_TABLE,
   LOAD_TABLE,
+  LIST_TABLE,
+  ALTER_TABLE,
+  RENAME_TABLE,
+  TABLE_EXISTS,
+
+  // Schema operations
+  CREATE_SCHEMA,
+  DROP_SCHEMA,
+  ALTER_SCHEMA,
+  LOAD_SCHEMA,
+  LIST_SCHEMA,
+
+  // Fileset operations
+  DROP_FILESET,
+  ALTER_FILESET,
+  CREATE_FILESET,
+  LIST_FILESET,
+  LOAD_FILESET,
+  GET_FILESET_LOCATION,
+
+  // Catalog operations
+  CREATE_CATALOG,
+  DROP_CATALOG,
+  ALTER_CATALOG,
+  LOAD_CATALOG,
+  LIST_CATALOG,
+
+  // Partition event
+  ADD_PARTITION,
+  DROP_PARTITION,
+  PURGE_PARTITION,
+  PARTITION_EXISTS,
+  LOAD_PARTITION,
+  LIST_PARTITION,
+  LIST_PARTITION_NAMES,
+
+  // Topic event
+  CREATE_TOPIC,
+  ALTER_TOPIC,
+  DROP_TOPIC,
+  LIST_TOPIC,
+  LOAD_TOPIC,
+
+  // Metalake event
+  CREATE_METALAKE,
+  ALTER_METALAKE,
+  LIST_METALAKE,
+  DROP_METALAKE,
+  LOAD_METALAKE,
+
+  // View event
+  CREATE_VIEW,
+  ALTER_VIEW,
+  DROP_VIEW,
+  LOAD_VIEW,
+  VIEW_EXISTS,
+  RENAME_VIEW,
+  LIST_VIEW,
 
   UNKNOWN,
 }

@@ -38,4 +38,9 @@ public abstract class CatalogEvent extends Event {
   protected CatalogEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }

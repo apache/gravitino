@@ -29,4 +29,14 @@ public final class LoadCatalogPreEvent extends CatalogPreEvent {
   public LoadCatalogPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_CATALOG;
+  }
 }

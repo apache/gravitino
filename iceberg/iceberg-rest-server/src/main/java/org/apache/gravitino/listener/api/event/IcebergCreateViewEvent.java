@@ -51,4 +51,9 @@ public class IcebergCreateViewEvent extends IcebergViewEvent {
   public LoadViewResponse loadViewResponse() {
     return loadViewResponse;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.TABLE_EXISTS;
+  }
 }

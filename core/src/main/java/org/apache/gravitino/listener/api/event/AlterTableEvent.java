@@ -69,4 +69,14 @@ public final class AlterTableEvent extends TableEvent {
   public TableChange[] tableChanges() {
     return tableChanges;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_TABLE;
+  }
 }

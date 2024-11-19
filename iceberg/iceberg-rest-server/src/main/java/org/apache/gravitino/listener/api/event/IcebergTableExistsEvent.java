@@ -38,4 +38,9 @@ public class IcebergTableExistsEvent extends IcebergTableEvent {
   public boolean isExists() {
     return isExists;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TABLE;
+  }
 }

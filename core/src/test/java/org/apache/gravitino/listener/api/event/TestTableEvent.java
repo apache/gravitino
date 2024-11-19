@@ -90,12 +90,16 @@ public class TestTableEvent {
     Assertions.assertEquals(CreateTableEvent.class, event.getClass());
     TableInfo tableInfo = ((CreateTableEvent) event).createdTableInfo();
     checkTableInfo(tableInfo, table);
+    Assertions.assertEquals(OperationType.CREATE_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(CreateTablePreEvent.class, preEvent.getClass());
     tableInfo = ((CreateTablePreEvent) preEvent).createTableRequest();
     checkTableInfo(tableInfo, table);
+    Assertions.assertEquals(OperationType.CREATE_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
   }
 
   @Test
@@ -108,10 +112,14 @@ public class TestTableEvent {
     Assertions.assertEquals(LoadTableEvent.class, event.getClass());
     TableInfo tableInfo = ((LoadTableEvent) event).loadedTableInfo();
     checkTableInfo(tableInfo, table);
+    Assertions.assertEquals(OperationType.LOAD_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(LoadTablePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LOAD_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
   }
 
   @Test
@@ -127,12 +135,16 @@ public class TestTableEvent {
     checkTableInfo(tableInfo, table);
     Assertions.assertEquals(1, ((AlterTableEvent) event).tableChanges().length);
     Assertions.assertEquals(change, ((AlterTableEvent) event).tableChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(AlterTablePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(1, ((AlterTablePreEvent) preEvent).tableChanges().length);
     Assertions.assertEquals(change, ((AlterTablePreEvent) preEvent).tableChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
   }
 
   @Test
@@ -144,10 +156,14 @@ public class TestTableEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropTableEvent.class, event.getClass());
     Assertions.assertEquals(true, ((DropTableEvent) event).isExists());
+    Assertions.assertEquals(OperationType.DROP_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropTablePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DROP_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
   }
 
   @Test
@@ -159,10 +175,14 @@ public class TestTableEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(PurgeTableEvent.class, event.getClass());
     Assertions.assertEquals(true, ((PurgeTableEvent) event).isExists());
+    Assertions.assertEquals(OperationType.PURGE_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(PurgeTablePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.PURGE_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
   }
 
   @Test
@@ -174,11 +194,15 @@ public class TestTableEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListTableEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListTableEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
     Assertions.assertEquals(ListTablePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(namespace, ((ListTablePreEvent) preEvent).namespace());
+    Assertions.assertEquals(OperationType.LIST_TABLE, event.operationType());
+    Assertions.assertEquals(OperationStatus.NOT_PROCESS, event.operationStatus());
   }
 
   @Test
