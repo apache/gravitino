@@ -21,12 +21,14 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Box, Typography } from '@mui/material'
 import { Star } from '@mui/icons-material'
+import { useAppSelector } from '@/lib/hooks/useStore'
 
-const GitHubInfo = ({ stars, forks, username, repository }) => {
-  const githubUrl = `https://github.com/${username}/${repository}`
-  const githubForkUrl = `https://github.com/${username}/${repository}/fork`
+const GitHubInfo = () => {
+  const githubUrl = 'https://github.com/apache/gravitino'
+  const githubForkUrl = 'https://github.com/apache/gravitino/fork'
   const githubLogoUrl = (process.env.NEXT_PUBLIC_BASE_PATH ?? '') + '/icons/github-mark.svg'
   const forkLogoUrl = (process.env.NEXT_PUBLIC_BASE_PATH ?? '') + '/icons/git-fork.svg'
+  const store = useAppSelector(state => state.sys)
 
   return (
     <Box className={'twc-flex  twc-gap-x-3 twc-bg-customs-lightBg twc-px-3 twc-py-2 twc-rounded-full'}>
@@ -50,12 +52,12 @@ const GitHubInfo = ({ stars, forks, username, repository }) => {
             <Image
               className={'twc-align-middle twc-text-customs-white'}
               src={forkLogoUrl}
-              overrideSrc={githubLogoUrl}
+              overrideSrc={forkLogoUrl}
               width={24}
               height={24}
               alt='logo'
             />
-            {forks} Forks
+            {store.forks} Forks
           </Typography>
         </Link>
         <Link href={githubUrl} className={'twc-no-underline  twc-bg-customs-dark twc-rounded-full '}>
@@ -65,7 +67,7 @@ const GitHubInfo = ({ stars, forks, username, repository }) => {
             }
           >
             <Star className={'twc-text-customs-black'} />
-            {stars} Stars
+            {store.stars} Stars
           </Typography>
         </Link>
       </Box>

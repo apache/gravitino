@@ -45,6 +45,13 @@ export const loggerVersion = version => {
   )
 }
 
+export const loggerGitHubInfo = (stars, forks) => {
+  console.log(
+    `Gravitino GitHubInfo: %c Stars ${stars}, Forks ${forks}`,
+    `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
+  )
+}
+
 export const genUpdates = (originalData, newData) => {
   const updates = []
 
