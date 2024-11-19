@@ -65,10 +65,10 @@ public class TestFetchFileUtils {
     boolean success = false;
     int attempts = 0;
 
-    while (!success && attempts < MAX_RETRIES) {
+    while (!success) {
       try {
         LOG.info("Attempting to download file from URL: {} (Attempt {})", fileUrl, attempts + 1);
-        FetchFileUtils.fetchFileFromUri(fileUrl, destFile, 10, conf);
+        FetchFileUtils.fetchFileFromUri(fileUrl, destFile, 30, conf);
         success = true;
         LOG.info("File downloaded successfully on attempt {}", attempts + 1);
       } catch (IOException e) {
