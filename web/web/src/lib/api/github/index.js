@@ -18,13 +18,8 @@
  */
 
 import { defHttp } from '@/lib/utils/axios'
-import { ContentTypeEnum } from '@/lib/enums/httpEnum'
 
 const githubApis = {
-  headers: {
-    'Content-Type': ContentTypeEnum.JSON,
-    Accept: 'application/vnd.github+json'
-  },
   GET: 'https://api.github.com/repos/apache/gravitino'
 }
 
