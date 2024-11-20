@@ -347,16 +347,8 @@ export const providers = [
   }
 ]
 
-export const tableColumnTypes = [
-  { key: 'boolean' },
-  { key: 'byte' },
-  { key: 'short' },
-  { key: 'integer' },
-  { key: 'long' },
-  { key: 'float' },
-  { key: 'double' },
-  {
-    key: 'decimal',
+const parameterizedColumnTypes = {
+  decimal: {
     params: ['precision', 'scale'],
     validateParams: params => {
       if (params.length !== 2) {
@@ -386,13 +378,7 @@ export const tableColumnTypes = [
       }
     }
   },
-  { key: 'date' },
-  { key: 'time' },
-  { key: 'timestamp' },
-  { key: 'timestamp_tz' },
-  { key: 'string' },
-  {
-    key: 'char',
+  char: {
     params: ['length'],
     validateParams: params => {
       if (params.length !== 1) {
@@ -416,8 +402,7 @@ export const tableColumnTypes = [
       }
     }
   },
-  {
-    key: 'varchar',
+  varchar: {
     params: ['length'],
     validateParams: params => {
       if (params.length !== 1) {
@@ -441,10 +426,7 @@ export const tableColumnTypes = [
       }
     }
   },
-  { key: 'interval_day' },
-  { key: 'interval_year' },
-  {
-    key: 'fixed',
+  fixed: {
     params: ['length'],
     validateParams: params => {
       if (params.length !== 1) {
@@ -467,7 +449,128 @@ export const tableColumnTypes = [
         valid: true
       }
     }
-  },
-  { key: 'uuid' },
-  { key: 'binary' }
-]
+  }
+}
+
+export const getParameterizedColumnType = type => {
+  if (Object.keys(parameterizedColumnTypes).includes(type)) {
+    return parameterizedColumnTypes[type]
+  }
+}
+
+const relationalColumnTypeMap = {
+  'lakehouse-iceberg': [
+    'boolean',
+    'integer',
+    'long',
+    'float',
+    'double',
+    'string',
+    'date',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'decimal',
+    'fixed',
+    'binary',
+    'uuid'
+  ],
+
+  hive: [
+    'boolean',
+    'byte',
+    'short',
+    'integer',
+    'long',
+    'float',
+    'double',
+    'decimal',
+    'string',
+    'char',
+    'varchar',
+    'timestamp',
+    'date',
+    'interval_year',
+    'interval_day',
+    'binary'
+  ],
+
+  'jdbc-mysql': [
+    'byte',
+    'short',
+    'integer',
+    'long',
+    'float',
+    'double',
+    'string',
+    'date',
+    'time',
+    'timestamp',
+    'decimal',
+    'varchar',
+    'char',
+    'binary'
+  ],
+
+  'jdbc-postgresql': [
+    'boolean',
+    'short',
+    'integer',
+    'long',
+    'float',
+    'double',
+    'string',
+    'date',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'decimal',
+    'varchar',
+    'char',
+    'binary'
+  ],
+
+  'jdbc-doris': [
+    'boolean',
+    'byte',
+    'short',
+    'integer',
+    'long',
+    'float',
+    'double',
+    'decimal',
+    'date',
+    'timestamp',
+    'varchar',
+    'char',
+    'string'
+  ],
+
+  'lakehouse-paimon': [
+    'boolean',
+    'byte',
+    'short',
+    'integer',
+    'long',
+    'float',
+    'double',
+    'decimal',
+    'string',
+    'varchar',
+    'char',
+    'date',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'binary',
+    'fixed'
+  ]
+}
+
+export const getRelationalColumnTypeMap = catalog => {
+  if (Object.keys(relationalColumnTypeMap).includes(catalog)) {
+    return relationalColumnTypeMap[catalog]
+  }
+
+  return []
+}
