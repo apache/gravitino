@@ -503,12 +503,10 @@ public class GravitinoCommandLine {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       String value = line.getOptionValue(GravitinoOptions.VALUE);
 
-      if (name == null && property != null && value != null) {
+      if (property != null && value != null) {
         new SetTagProperty(url, ignore, metalake, tag, property, value).handle();
-      } else if (name != null && property == null && value == null) {
-        new TagEntity(url, ignore, metalake, name, tag).handle();
       } else {
-        System.err.println(ErrorMessages.INVALID_SET_COMMAND);
+        new TagEntity(url, ignore, metalake, name, tag).handle();
       }
     } else if (CommandActions.REMOVE.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
