@@ -356,7 +356,7 @@ public class GravitinoCommandLine {
         new ListIndexes(url, ignore, metalake, catalog, schema, table).handle();
       } else if (line.hasOption(GravitinoOptions.DISTRIBUTION)) {
         new TableDistribution(url, ignore, metalake, catalog, schema, table).handle();
-      } else if (line.hasOption(GravitinoOptions.Partition)) {
+      } else if (line.hasOption(GravitinoOptions.PARTITION)) {
         new TablePartition(url, ignore, metalake, catalog, schema, table).handle();
       } else {
         new TableDetails(url, ignore, metalake, catalog, schema, table).handle();
