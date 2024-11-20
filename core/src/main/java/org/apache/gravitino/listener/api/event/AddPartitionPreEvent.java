@@ -27,12 +27,12 @@ import org.apache.gravitino.listener.api.info.partitions.PartitionInfo;
 @DeveloperApi
 public class AddPartitionPreEvent extends PartitionPreEvent {
 
-  private final PartitionInfo createdPartitionInfo;
+  private final PartitionInfo createPartitionRequest;
 
   public AddPartitionPreEvent(
-      String user, NameIdentifier identifier, PartitionInfo createdPartitionInfo) {
+      String user, NameIdentifier identifier, PartitionInfo createPartitionRequest) {
     super(user, identifier);
-    this.createdPartitionInfo = createdPartitionInfo;
+    this.createPartitionRequest = createPartitionRequest;
   }
 
   /**
@@ -42,6 +42,6 @@ public class AddPartitionPreEvent extends PartitionPreEvent {
    *     partition request.
    */
   public PartitionInfo createdPartitionRequest() {
-    return createdPartitionInfo;
+    return createPartitionRequest;
   }
 }

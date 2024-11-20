@@ -23,7 +23,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents a pre-event for partition operations. */
 @DeveloperApi
-public class PartitionPreEvent extends PreEvent {
+public abstract class PartitionPreEvent extends PreEvent {
 
   protected PartitionPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
