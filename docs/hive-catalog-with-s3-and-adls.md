@@ -11,7 +11,7 @@ license: "This software is licensed under the Apache License version 2."
 
 Since Hive 2.x, Hive has supported S3 as a storage backend, enabling users to store and manage data in Amazon S3 directly through Hive. Gravitino enhances this capability by supporting the Hive catalog with S3, allowing users to efficiently manage the storage locations of files located in S3. This integration simplifies data operations and enables seamless access to S3 data from Hive queries.
 
-For ADLS, the integration is similar to S3. The only difference is the configuration properties for ADLS. The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3 as a storage backend, including configuration details and examples for creating databases and tables.
+For ADLS (or Azure Blob storage(abs), or Azure Data lake storage(v2)), the integration is similar to S3. The only difference is the configuration properties for ADLS. The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3 as a storage backend, including configuration details and examples for creating databases and tables.
 
 The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3 as a storage backend, including configuration details and examples for creating databases and tables.
 
