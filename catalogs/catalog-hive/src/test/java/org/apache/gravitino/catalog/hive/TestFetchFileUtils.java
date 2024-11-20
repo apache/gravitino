@@ -68,7 +68,7 @@ public class TestFetchFileUtils {
     while (!success) {
       try {
         LOG.info("Attempting to download file from URL: {} (Attempt {})", fileUrl, attempts + 1);
-        FetchFileUtils.fetchFileFromUri(fileUrl, destFile, 30, conf);
+        FetchFileUtils.fetchFileFromUri(fileUrl, destFile, 45, conf);
         success = true;
         LOG.info("File downloaded successfully on attempt {}", attempts + 1);
       } catch (IOException e) {
@@ -76,7 +76,7 @@ public class TestFetchFileUtils {
         LOG.error("Download attempt {} failed due to: {}", attempts, e.getMessage(), e);
         if (attempts < MAX_RETRIES) {
           long retryDelay = INITIAL_RETRY_DELAY_MS * (1L << (attempts - 1));
-          LOG.warn("Retrying in {}ms", retryDelay);
+          LOG.warn("Retrying in {} ms", retryDelay);
           Thread.sleep(retryDelay);
         } else {
           throw new AssertionError("Failed to download file after " + MAX_RETRIES + " attempts", e);
