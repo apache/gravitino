@@ -134,6 +134,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return CatalogHandlers.loadNamespace(asNamespaceCatalog, namespace);
   }
 
+  public boolean existNamespace(Namespace namespace) {
+    validateNamespace(Optional.of(namespace));
+    return asNamespaceCatalog.namespaceExists(namespace);
+  }
+
   public ListNamespacesResponse listNamespace(Namespace parent) {
     validateNamespace(Optional.empty());
     return CatalogHandlers.listNamespaces(asNamespaceCatalog, parent);

@@ -29,8 +29,8 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
 @DeveloperApi
 public class IcebergUpdateTableEvent extends IcebergTableEvent {
 
-  private UpdateTableRequest updateTableRequest;
-  private LoadTableResponse loadTableResponse;
+  private final UpdateTableRequest updateTableRequest;
+  private final LoadTableResponse loadTableResponse;
 
   public IcebergUpdateTableEvent(
       IcebergRequestContext icebergRequestContext,

@@ -347,21 +347,127 @@ export const providers = [
   }
 ]
 
-export const relationalTypes = [
-  { label: 'Boolean', value: 'boolean' },
-  { label: 'Byte', value: 'byte' },
-  { label: 'Short', value: 'short' },
-  { label: 'Integer', value: 'integer' },
-  { label: 'Long', value: 'long' },
-  { label: 'Float', value: 'float' },
-  { label: 'Double', value: 'double' },
-  { label: 'Date', value: 'date' },
-  { label: 'Time', value: 'time' },
-  { label: 'Timestamp', value: 'timestamp' },
-  { label: 'Timestamp_tz', value: 'timestamp_tz' },
-  { label: 'String', value: 'string' },
-  { label: 'Interval_day', value: 'interval_day' },
-  { label: 'Interval_year', value: 'interval_year' },
-  { label: 'Uuid', value: 'uuid' },
-  { label: 'Binary', value: 'binary' }
+export const tableColumnTypes = [
+  { key: 'boolean' },
+  { key: 'byte' },
+  { key: 'short' },
+  { key: 'integer' },
+  { key: 'long' },
+  { key: 'float' },
+  { key: 'double' },
+  {
+    key: 'decimal',
+    params: ['precision', 'scale'],
+    validateParams: params => {
+      if (params.length !== 2) {
+        return {
+          valid: false,
+          message: 'Please set precision and scale'
+        }
+      }
+
+      const [param1, param2] = params
+      if (param1 <= 0 || param1 > 38) {
+        return {
+          valid: false,
+          message: 'The precision must be between 1 and 38'
+        }
+      }
+
+      if (param2 < 0 || param2 > param1) {
+        return {
+          valid: false,
+          message: 'The scale must be between 0 and the precision'
+        }
+      }
+
+      return {
+        valid: true
+      }
+    }
+  },
+  { key: 'date' },
+  { key: 'time' },
+  { key: 'timestamp' },
+  { key: 'timestamp_tz' },
+  { key: 'string' },
+  {
+    key: 'char',
+    params: ['length'],
+    validateParams: params => {
+      if (params.length !== 1) {
+        return {
+          valid: false,
+          message: 'Please set length'
+        }
+      }
+
+      const length = params[0]
+
+      if (length <= 0) {
+        return {
+          valid: false,
+          message: 'The length must be greater than 0'
+        }
+      }
+
+      return {
+        valid: true
+      }
+    }
+  },
+  {
+    key: 'varchar',
+    params: ['length'],
+    validateParams: params => {
+      if (params.length !== 1) {
+        return {
+          valid: false,
+          message: 'Please set length'
+        }
+      }
+
+      const length = params[0]
+
+      if (length <= 0) {
+        return {
+          valid: false,
+          message: 'The length must be greater than 0'
+        }
+      }
+
+      return {
+        valid: true
+      }
+    }
+  },
+  { key: 'interval_day' },
+  { key: 'interval_year' },
+  {
+    key: 'fixed',
+    params: ['length'],
+    validateParams: params => {
+      if (params.length !== 1) {
+        return {
+          valid: false,
+          message: 'Please set length'
+        }
+      }
+
+      const length = params[0]
+
+      if (length <= 0) {
+        return {
+          valid: false,
+          message: 'The length must be greater than 0'
+        }
+      }
+
+      return {
+        valid: true
+      }
+    }
+  },
+  { key: 'uuid' },
+  { key: 'binary' }
 ]
