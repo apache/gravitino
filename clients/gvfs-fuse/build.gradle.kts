@@ -19,10 +19,11 @@
 
 import org.gradle.api.tasks.Exec
 
+val rustPath = System.getenv("PATH") + ":" + System.getenv("HOME") + "/.cargo/bin"
+
 val checkRustEnvironment by tasks.registering(Exec::class) {
   description = "Check if Rust environment is properly set up using an external script"
   group = "verification"
-  environment("PATH", System.getenv("PATH") + ":" + System.getenv("HOME") + "/.cargo/bin")
   commandLine("bash", "$projectDir/check_rust_env.sh")
   isIgnoreExitValue = false
 }
@@ -31,14 +32,16 @@ val compileRust by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
   description = "Compile the Rust project"
   workingDir = file("$projectDir")
+  environment("PATH", rustPath)
   commandLine("cargo", "build", "--release")
 }
 
-tasks.register("testRust", Exec::class) {
+val testRust by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
   description = "Run tests in the Rust project"
   group = "verification"
   workingDir = file("$projectDir")
+  environment("PATH", rustPath)
   commandLine("cargo", "test")
 
   standardOutput = System.out
