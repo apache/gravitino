@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represent an event after dropping Iceberg table successfully. */
 @DeveloperApi
 public class IcebergDropTableEvent extends IcebergTableEvent {
-  private boolean purgeRequested;
+  private final boolean purgeRequested;
 
   public IcebergDropTableEvent(
       IcebergRequestContext icebergRequestContext,

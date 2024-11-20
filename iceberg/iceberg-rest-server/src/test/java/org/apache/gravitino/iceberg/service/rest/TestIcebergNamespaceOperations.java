@@ -93,6 +93,10 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
     return getNamespaceClientBuilder(Optional.of(name)).get();
   }
 
+  private Response doNamespaceExists(String name) {
+    return getNamespaceClientBuilder(Optional.of(name)).head();
+  }
+
   private Response doDropNamespace(String name) {
     return getNamespaceClientBuilder(Optional.of(name)).delete();
   }
@@ -118,6 +122,11 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
 
   private void verifyDropNamespaceFail(int status, String name) {
     Response response = doDropNamespace(name);
+    Assertions.assertEquals(status, response.getStatus());
+  }
+
+  private void verifyNamespaceExistsStatusCode(int status, String name) {
+    Response response = doNamespaceExists(name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
@@ -165,6 +174,13 @@ public class TestIcebergNamespaceOperations extends IcebergTestBase {
     verifyLoadNamespaceSucc("load_foo1");
     // load a schema not exists
     verifyLoadNamespaceFail(404, "load_foo2");
+  }
+
+  @Test
+  void testNamespaceExists() {
+    verifyNamespaceExistsStatusCode(404, "exists_foo1");
+    verifyCreateNamespaceSucc("exists_foo1");
+    verifyNamespaceExistsStatusCode(204, "exists_foo1");
   }
 
   @Test

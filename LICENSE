@@ -206,6 +206,10 @@
    This product bundles various third-party components also under the
    Apache Software License 2.0.
 
+   Gradle (https://github.com/gradle/gradle)
+   ./gradlew
+   ./gradle/wrapper/gradle-wrapper.properties
+
    Apache Spark
    ./api/src/main/java/org/apache/gravitino/SchemaChange.java
    ./api/src/main/java/org/apache/gravitino/SupportsSchemas.java
@@ -249,7 +253,6 @@
    ./clients/client-java/src/main/java/org/apache/gravitino/client/OAuth2ClientUtil.java
    ./iceberg/iceberg-rest-server/src/main/java/org/apache/gravitino/iceberg/service/IcebergExceptionMapper.java
    ./iceberg/iceberg-common/src/main/java/org/apache/gravitino/iceberg/common/utils/IcebergHiveCachedClientPool.java
-   ./gradlew
 
    Apache Paimon
    ./catalogs/catalog-lakehouse-paimon/src/main/java/org/apache/gravitino/catalog/lakehouse/paimon/utils/TypeUtils.java

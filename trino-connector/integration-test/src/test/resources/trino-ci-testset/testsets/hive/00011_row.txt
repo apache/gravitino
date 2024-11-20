@@ -1,0 +1,95 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+INSERT: 2 rows
+
+"{id=1, name=Alice}"
+"{id=2, name=NULL}"
+
+INSERT: 1 row
+
+INSERT: 3 rows
+
+"1","Alice"
+"1","Alice"
+"2",""
+"2",""
+"3","Bob"
+
+CREATE TABLE
+
+CREATE TABLE
+
+INSERT: 1 row
+
+INSERT: 1 row
+
+"Springfield"
+
+CREATE TABLE
+
+CREATE TABLE
+
+INSERT: 1 row
+
+INSERT: 1 row
+
+"{int_val=100, str_val=text, arr_val=[1, 2, 3], map_val={a=10, b=20}}"
+
+INSERT: 1 row
+
+INSERT: 4 rows
+
+"{id=1, name=Alice}"
+"{id=1, name=Alice}"
+"{id=1, name=Alice}"
+"{id=2, name=NULL}"
+"{id=2, name=NULL}"
+"{id=2, name=NULL}"
+"{id=3, name=Bob}"
+"{id=3, name=Bob}"
+"{id=NULL, name=NULL}"
+
+CREATE TABLE
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+INSERT: 2 rows
+
+INSERT: 1 row
+
+INSERT: 3 rows
+
+INSERT: 7 rows
+
+"1","6"
+"2","5"
+"3","3"
+"","2"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

@@ -27,27 +27,28 @@ Or you use the `gcli.sh` script found in the `clients/cli/bin/` directory to run
 The general structure for running commands with the Gravitino CLI is `gcli entity command [options]`.
 
  ```bash
- usage: gcli [metalake|catalog|schema|table|column] [list|details|create|delete|update|set|remove|properties] [options]
+ usage: gcli [metalake|catalog|schema|table|column] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
  Options
- -a,--audit            display audit information
- -c,--comment <arg>    entity comment
- -f,--force            force operation
- -g,--group <arg>      group name
- -h,--help             command help information
- -i,--ignore           ignore client/sever version check
- -l,--user <arg>       user name
- -m,--metalake <arg>   metalake name
- -n,--name <arg>       full entity name (dot separated)
- -P,--property <arg>   property name
- -r,--role <arg>       role name
-    --rename <arg>     new entity name
- -s,--server           Gravitino server version
- -t,--tag <arg>        tag name
- -u,--url <arg>        Gravitino URL (default: http://localhost:8090)
- -v,--version          Gravitino client version
- -V,--value <arg>      property value
- -z,--provider <arg>   provider one of hadoop, hive, mysql, postgres,
-                       iceberg, kafka
+ -a,--audit              display audit information
+ -c,--comment <arg>      entity comment
+ -f,--force              force operation
+ -g,--group <arg>        group name
+ -h,--help               command help information
+ -i,--ignore             ignore client/sever version check
+ -l,--user <arg>         user name
+ -m,--metalake <arg>     metalake name
+ -n,--name <arg>         full entity name (dot separated)
+ -P,--property <arg>     property name
+ -p,--properties <arg>   property name/value pairs
+ -r,--role <arg>         role name
+    --rename <arg>       new entity name
+ -s,--server             Gravitino server version
+ -t,--tag <arg>          tag name
+ -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
+ -v,--version            Gravitino client version
+ -V,--value <arg>        property value
+ -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
+                         iceberg, kafka
  ```
 
 ## Commands
@@ -364,13 +365,29 @@ gcli table list --name catalog_postgres.hr
 #### Show tables details
 
 ```bash
-gcli column list --name catalog_postgres.hr.departments
+gcli table details --name catalog_postgres.hr.departments
 ```
 
 #### Show tables audit information
 
 ```bash
 gcli table details --name catalog_postgres.hr.departments --audit
+```
+
+#### Show tables distribution information
+```bash
+gcli table details --name catalog_postgres.hr.departments --distribution
+```
+
+#### Show tables partition information
+```bash
+gcli table details --name catalog_postgres.hr.departments --partition
+```
+
+### Show table indexes
+
+```bash
+gcli table details --name catalog_mysql.db.iceberg_namespace_properties --index
 ```
 
 #### Delete a table
@@ -523,10 +540,33 @@ gcli role list
 
 ```bash
 gcli role create --role admin
- ```
+```
 
 #### Delete a role
 
 ```bash
 gcli role delete --role admin
- ```
+```
+
+#### Add a role to a user
+
+```bash
+gcli user grant --user new_user --role admin
+```
+
+#### Remove a role from a user
+
+```bash
+gcli user revoke --user new_user --role admin
+```
+
+#### Add a role to a group
+
+```bash
+gcli group grant --group groupA --role admin
+```
+
+#### Remove a role from a group
+```bash
+gcli group revoke  --group groupA --role admin
+```

@@ -210,7 +210,7 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
 
     verifyCreateTableSucc("exists_foo1");
     dummyEventListener.clearEvent();
-    verifyTableExistsStatusCode("exists_foo1", 200);
+    verifyTableExistsStatusCode("exists_foo1", 204);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergTableExistsPreEvent);
     postEvent = dummyEventListener.popPostEvent();
     Assertions.assertTrue(postEvent instanceof IcebergTableExistsEvent);
@@ -430,7 +430,7 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
     Response response = doRenameTable(source, dest);
     System.out.println(response);
     System.out.flush();
-    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 
   private void verifyRenameTableFail(String source, String dest, int status) {

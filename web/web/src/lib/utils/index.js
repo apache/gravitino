@@ -102,7 +102,7 @@ export const genUpdates = (originalData, newData) => {
           newFieldName: newColumnsMap[key].name
         })
       }
-      if (originalColumnsMap[key].type !== newColumnsMap[key].type) {
+      if ((originalColumnsMap[key].type + originalColumnsMap[key].typeSuffix || '') !== newColumnsMap[key].type) {
         updates.push({
           '@type': 'updateColumnType',
           fieldName: [newColumnsMap[key].name],

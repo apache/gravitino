@@ -34,6 +34,8 @@ public class CommandActions {
   public static final String SET = "set";
   public static final String REMOVE = "remove";
   public static final String PROPERTIES = "properties";
+  public static final String REVOKE = "revoke";
+  public static final String GRANT = "grant";
 
   private static final HashSet<String> VALID_COMMANDS = new HashSet<>();
 
@@ -46,6 +48,8 @@ public class CommandActions {
     VALID_COMMANDS.add(SET);
     VALID_COMMANDS.add(REMOVE);
     VALID_COMMANDS.add(PROPERTIES);
+    VALID_COMMANDS.add(REVOKE);
+    VALID_COMMANDS.add(GRANT);
   }
 
   /**
