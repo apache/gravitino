@@ -512,10 +512,8 @@ public class GravitinoCommandLine {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       if (property != null) {
         new RemoveTagProperty(url, ignore, metalake, tag, property).handle();
-      } else if (name != null) {
-        new UntagEntity(url, ignore, metalake, name, tag).handle();
       } else {
-        System.err.println(ErrorMessages.INVALID_REMOVE_COMMAND);
+        new UntagEntity(url, ignore, metalake, name, tag).handle();
       }
     } else if (CommandActions.PROPERTIES.equals(command)) {
       new ListTagProperties(url, ignore, metalake, tag).handle();
