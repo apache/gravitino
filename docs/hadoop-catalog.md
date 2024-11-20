@@ -90,7 +90,7 @@ Similar to the above, you need to place the corresponding bundle jar [`gravitino
 
 :::note
 - Gravitino contains builtin file system providers for local file system(`builtin-local`) and HDFS(`builtin-hdfs`), that is to say if `filesystem-providers` is not set, Gravitino will still support local file system and HDFS. Apart from that, you can set the `filesystem-providers` to support other file systems like S3, GCS, OSS or custom file system.
-- `default-filesystem-provider` is used to set the default file system provider for the Hadoop catalog. If the user does not specify the scheme in the URI, Gravitino will use the default file system provider to access the fileset. For example, if the default file system provider is set to `builtin-local`, the user can omit the prefix `file://` in the location. 
+- `default-filesystem-provider` is used to set the default file system provider for the Hadoop catalog. If the user does not specify the scheme in the URI, Gravitino will use the default file system provider to access the fileset. For example, if the default file system provider is set to `builtin-local`, the user can omit the prefix `file:///` in the location. 
 :::
 
 #### How to custom your own HCFS file system fileset?

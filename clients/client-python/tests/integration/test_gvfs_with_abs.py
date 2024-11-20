@@ -120,7 +120,7 @@ class TestGvfsWithABS(TestGvfsWithHDFS):
             provider=cls.catalog_provider,
             comment="",
             properties={
-                "filesystem-providers": "abfs",
+                "filesystem-providers": "abs",
                 "abs-account-name": cls.azure_abs_account_name,
                 "abs-account-key": cls.azure_abs_account_key,
             },

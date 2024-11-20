@@ -459,10 +459,10 @@ The following properties are required if you want to access the OSS fileset via 
 
 For Azure blob storage fileset, you need to configure the following properties:
 
-| Configuration item           | Description                            | Default value | Required                                  | Since version    |
-|------------------------------|----------------------------------------|---------------|-------------------------------------------|------------------|
-| `azure_storage_account_name` | The account name of Azure blob storage | (none)        | Yes if it's a Azure blob storage fileset. | 0.8.0-incubating |
-| `azure_storage_account_key`  | The account key of Azure blob storage  | (none)        | Yes if it's a Azure blob storage fileset. | 0.8.0-incubating |
+| Configuration item | Description                            | Default value | Required                                  | Since version    |
+|--------------------|----------------------------------------|---------------|-------------------------------------------|------------------|
+| `abs_account_name` | The account name of Azure Blob storage | (none)        | Yes if it's a Azure Blob storage fileset. | 0.8.0-incubating |
+| `abs_account_key`  | The account key of Azure Blob storage  | (none)        | Yes if it's a Azure Blob storage fileset. | 0.8.0-incubating |
 
 
 You can configure these properties when obtaining the `Gravitino Virtual FileSystem` in Python like this:
