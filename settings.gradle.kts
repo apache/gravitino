@@ -48,7 +48,7 @@ include(
   "clients:filesystem-hadoop3-runtime",
   "clients:client-python",
   "clients:cli",
-  "clients:gvfs-fuse"
+  "clients:filesystem-fuse"
 )
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")

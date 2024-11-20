@@ -34,15 +34,12 @@ if ! command -v cargo &> /dev/null; then
     fi
 
     export PATH="$HOME/.cargo/bin:$PATH"
-    echo "Rust has been installed successfully."
+    if command -v cargo &> /dev/null; then
+        echo "Rust has been installed successfully."
+    else
+        echo "Error: Rust installation failed. Please check your setup."
+        exit 1
+    fi
 else
     echo "Rust is already installed: $(cargo --version)"
 fi
-
-if command -v cargo &> /dev/null; then
-    echo "Rust environment is set up correctly."
-else
-    echo "Error: Rust installation failed. Please check your setup."
-    exit 1
-fi
-
