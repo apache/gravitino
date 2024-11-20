@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
-import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_FILESYSTEM_PROVIDERS;
-
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
@@ -135,8 +133,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     initializeClient(configuration);
 
     // Register the default local and HDFS FileSystemProvider
-    String fileSystemProviders = configuration.get(FS_FILESYSTEM_PROVIDERS);
-    fileSystemProvidersMap.putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders));
+    fileSystemProvidersMap.putAll(FileSystemUtils.getFileSystemProviders(null));
 
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
