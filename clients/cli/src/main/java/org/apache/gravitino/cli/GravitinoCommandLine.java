@@ -207,36 +207,36 @@ public class GravitinoCommandLine {
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
-        new MetalakeAudit(url, ignore, metalake).handle();
+        createMetalakeAudit(url, ignore, metalake).handle();
       } else {
-        new MetalakeDetails(url, ignore, metalake).handle();
+        createMetalakeDetails(url, ignore, metalake).handle();
       }
     } else if (CommandActions.LIST.equals(command)) {
-      new ListMetalakes(url, ignore).handle();
+      createListMetalakes(url, ignore).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-      new CreateMetalake(url, ignore, metalake, comment).handle();
+      createCreateMetalake(url, ignore, metalake, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
-      new DeleteMetalake(url, ignore, force, metalake).handle();
+      createDeleteMetalake(url, ignore, force, metalake).handle();
     } else if (CommandActions.SET.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       String value = line.getOptionValue(GravitinoOptions.VALUE);
-      new SetMetalakeProperty(url, ignore, metalake, property, value).handle();
+      createSetMetalakeProperty(url, ignore, metalake, property, value).handle();
     } else if (CommandActions.REMOVE.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-      new RemoveMetalakeProperty(url, ignore, metalake, property).handle();
+      createRemoveMetalakeProperty(url, ignore, metalake, property).handle();
     } else if (CommandActions.PROPERTIES.equals(command)) {
-      new ListMetalakeProperties(url, ignore, metalake).handle();
+      createListMetalakeProperties(url, ignore, metalake).handle();
     } else if (CommandActions.UPDATE.equals(command)) {
       if (line.hasOption(GravitinoOptions.COMMENT)) {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        new UpdateMetalakeComment(url, ignore, metalake, comment).handle();
+        createUpdateMetalakeComment(url, ignore, metalake, comment).handle();
       }
       if (line.hasOption(GravitinoOptions.RENAME)) {
         String newName = line.getOptionValue(GravitinoOptions.RENAME);
         boolean force = line.hasOption(GravitinoOptions.FORCE);
-        new UpdateMetalakeName(url, ignore, force, metalake, newName).handle();
+        createUpdateMetalakeName(url, ignore, force, metalake, newName).handle();
       }
     }
   }
@@ -553,5 +553,52 @@ public class GravitinoCommandLine {
 
     // Return the default localhost URL
     return DEFAULT_URL;
+  }
+
+  /* Methods used for testing - basically a seam where we can see what it passed and use mocks to see if the correct command is created. */
+
+  protected MetalakeAudit createMetalakeAudit(String url, boolean ignore, String metalake) {
+    return new MetalakeAudit(url, ignore, metalake);
+  }
+
+  protected MetalakeDetails createMetalakeDetails(String url, boolean ignore, String metalake) {
+    return new MetalakeDetails(url, ignore, metalake);
+  }
+
+  protected ListMetalakes createListMetalakes(String url, boolean ignore) {
+    return new ListMetalakes(url, ignore);
+  }
+
+  CreateMetalake createCreateMetalake(String url, boolean ignore, String metalake, String comment) {
+    return new CreateMetalake(url, ignore, metalake, comment);
+  }
+
+  protected DeleteMetalake createDeleteMetalake(
+      String url, boolean ignore, boolean force, String metalake) {
+    return new DeleteMetalake(url, ignore, force, metalake);
+  }
+
+  protected SetMetalakeProperty createSetMetalakeProperty(
+      String url, boolean ignore, String metalake, String property, String value) {
+    return new SetMetalakeProperty(url, ignore, metalake, property, value);
+  }
+
+  protected RemoveMetalakeProperty createRemoveMetalakeProperty(
+      String url, boolean ignore, String metalake, String property) {
+    return new RemoveMetalakeProperty(url, ignore, metalake, property);
+  }
+
+  ListMetalakeProperties createListMetalakeProperties(String url, boolean ignore, String metalake) {
+    return new ListMetalakeProperties(url, ignore, metalake);
+  }
+
+  UpdateMetalakeComment createUpdateMetalakeComment(
+      String url, boolean ignore, String metalake, String comment) {
+    return new UpdateMetalakeComment(url, ignore, metalake, comment);
+  }
+
+  UpdateMetalakeName createUpdateMetalakeName(
+      String url, boolean ignore, boolean force, String metalake, String newName) {
+    return new UpdateMetalakeName(url, ignore, force, metalake, newName);
   }
 }
