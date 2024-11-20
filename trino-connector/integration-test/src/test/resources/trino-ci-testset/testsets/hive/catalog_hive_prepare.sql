@@ -6,3 +6,6 @@ call gravitino.system.create_catalog(
         array['${hive_uri}']
     )
 );
+
+-- use hive connector to read external table
+create catalog gt_hive2 using hive with ("hive.metastore.uri" = '${hive_uri}');

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.integration.test;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -130,6 +131,23 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     String catalogPrefix = "catalog_" + catalog + "_";
     TrinoQueryRunner queryRunner = new TrinoQueryRunner(TrinoQueryITBase.trinoUri);
     executeSqlFile(testSetDirName, catalogPrefix + "prepare.sql", queryRunner, catalog);
+
+    if (new File(ITUtils.joinPath(testSetDirName, catalogPrefix + "cascading_test.sql")).exists()) {
+      Awaitility.await()
+          .atMost(30, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                try {
+                  executeSqlFile(
+                      testSetDirName, catalogPrefix + "cascading_test.sql", queryRunner, catalog);
+                  return true;
+                } catch (Exception e) {
+                  LOG.error("Failed to run query using trino cascading connector", e);
+                  return false;
+                }
+              });
+    }
 
     Arrays.sort(testerNames);
     for (String testerName : testerNames) {

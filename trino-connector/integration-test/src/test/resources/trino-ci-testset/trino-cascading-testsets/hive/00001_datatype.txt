@@ -1,0 +1,37 @@
+USE
+
+"Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages metadata directly in different sources, types, and regions, providing users with unified metadata access for data and AI assets.                              "
+
+"a"
+
+"test abc"
+
+"12345.67"
+"-9999999.99"
+"0.01"
+
+"10703.691"
+
+"3567.897"
+
+
+"133.55"
+
+"1246.845"
+
+"12.22"
+
+"-99999999999999.9999"
+"99999999999999.9999"
+
+""
+"123.45"
+""
+
+"CREATE SCHEMA gt_hive1.gt_datatype"
+
+"gt_datatype"
+
+"test_decimal_bounds"
+
+"name","varchar","",""
