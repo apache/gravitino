@@ -21,6 +21,9 @@ package org.apache.gravitino.cli.commands;
 
 import static org.apache.gravitino.client.GravitinoClientBase.Builder;
 
+import org.apache.gravitino.cli.GravitinoConfig;
+import org.apache.gravitino.cli.OAuthData;
+import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -70,6 +73,18 @@ public abstract class Command {
         } else {
           client = client.withSimpleAuth();
         }
+      } else if (authentication.equals("oauth")) {
+        GravitinoConfig config = new GravitinoConfig(null);
+        OAuthData oauth = config.getOAuth();
+        DefaultOAuth2TokenProvider tokenProvider =
+            DefaultOAuth2TokenProvider.builder()
+                .withUri(oauth.getServerURI())
+                .withCredential(oauth.getCredential())
+                .withPath(oauth.getToken())
+                .withScope(oauth.getScope())
+                .build();
+
+        client = client.withOAuth(tokenProvider);
       }
     }
 
@@ -94,6 +109,18 @@ public abstract class Command {
         } else {
           client = client.withSimpleAuth();
         }
+      } else if (authentication.equals("oauth")) {
+        GravitinoConfig config = new GravitinoConfig(null);
+        OAuthData oauth = config.getOAuth();
+        DefaultOAuth2TokenProvider tokenProvider =
+            DefaultOAuth2TokenProvider.builder()
+                .withUri(oauth.getServerURI())
+                .withCredential(oauth.getCredential())
+                .withPath(oauth.getToken())
+                .withScope(oauth.getScope())
+                .build();
+
+        client = client.withOAuth(tokenProvider);
       }
     }
 
