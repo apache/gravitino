@@ -40,8 +40,12 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
+  public static final String ROLE = "role";
   public static final String AUDIT = "audit";
+  public static final String INDEX = "index";
   public static final String FORCE = "force";
+  public static final String DISTRIBUTION = "distribution";
+  public static final String PARTITION = "partition";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -60,9 +64,12 @@ public class GravitinoOptions {
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
+    options.addOption(createSimpleOption("x", INDEX, "Display index infromation"));
+    options.addOption(createSimpleOption("d", DISTRIBUTION, "Display distribution information"));
+    options.addOption(createSimpleOption(null, PARTITION, "Display partition information"));
 
     // Create/update options
-    options.addOption(createArgOption("r", RENAME, "new entity name"));
+    options.addOption(createArgOption(null, RENAME, "new entity name"));
     options.addOption(createArgOption("c", COMMENT, "entity comment"));
     options.addOption(createArgOption("P", PROPERTY, "property name"));
     options.addOption(createArgOption("V", VALUE, "property value"));
@@ -72,6 +79,7 @@ public class GravitinoOptions {
     options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
     options.addOption(createArgOption("t", TAG, "tag name"));
+    options.addOption(createArgOption("r", ROLE, "role name"));
 
     // Properties option can have multiple values
     Option properties =

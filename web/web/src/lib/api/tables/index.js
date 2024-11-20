@@ -27,7 +27,13 @@ const Apis = {
   GET_DETAIL: ({ metalake, catalog, schema, table }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
       catalog
-    )}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}`
+    )}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}`,
+  CREATE: ({ metalake, catalog, schema }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}/tables`,
+  UPDATE: ({ metalake, catalog, schema, table }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}`,
+  DELETE: ({ metalake, catalog, schema, table }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}/tables/${encodeURIComponent(table)}`
 }
 
 export const getTablesApi = params => {
@@ -40,4 +46,16 @@ export const getTableDetailsApi = ({ metalake, catalog, schema, table }) => {
   return defHttp.get({
     url: `${Apis.GET_DETAIL({ metalake, catalog, schema, table })}`
   })
+}
+
+export const createTableApi = ({ metalake, catalog, schema, data }) => {
+  return defHttp.post({ url: `${Apis.CREATE({ metalake, catalog, schema })}`, data })
+}
+
+export const updateTableApi = ({ metalake, catalog, schema, table, data }) => {
+  return defHttp.put({ url: `${Apis.UPDATE({ metalake, catalog, schema, table })}`, data })
+}
+
+export const deleteTableApi = ({ metalake, catalog, schema, table }) => {
+  return defHttp.delete({ url: `${Apis.DELETE({ metalake, catalog, schema, table })}` })
 }
