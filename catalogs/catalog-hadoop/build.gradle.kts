@@ -106,7 +106,7 @@ tasks {
     }
 
     // remove common-text:1.4.jar as it conflicts with common-text:1.10.jar introduced by
-    // hadoop-common 3.3.6;
+    // hadoop-common 3.3.1;
     exclude("commons-text-1.4.jar")
 
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
