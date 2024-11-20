@@ -68,7 +68,25 @@ public interface ModelCatalog {
 
   /**
    * Register a model in the catalog if the model is not existed, otherwise the {@link
-   * ModelAlreadyExistsException} will be throw. The {@link Model} object will be created when the
+   * ModelAlreadyExistsException} will be thrown. The {@link Model} object will be created the model
+   * is registered, users can call {@link Model#link(String[], String, String, Map)} to link the
+   * model version to the registered {@link Model}.
+   *
+   * @param ident The name identifier of the model.
+   * @param comment The comment of the model. The comment is optional and can be null.
+   * @param properties The properties of the model. The properties are optional and can be null or
+   *     empty.
+   * @return The registered model object.
+   * @throws ModelAlreadyExistsException If the model already registered.
+   */
+  default Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
+      throws ModelAlreadyExistsException {
+    return registerModel(ident, new String[0], comment, null, properties);
+  }
+
+  /**
+   * Register a model in the catalog if the model is not existed, otherwise the {@link
+   * ModelAlreadyExistsException} will be thrown. The {@link Model} object will be created when the
    * model is registered, in the meantime, the model version (version 0) will also be created and
    * linked to the registered model.
    *
