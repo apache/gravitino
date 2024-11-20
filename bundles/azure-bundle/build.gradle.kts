@@ -25,11 +25,12 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":core"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
+  compileOnly(project(":catalogs:catalog-hadoop")) {
+    exclude(group = "*")
+  }
 
-  compileOnly(libs.hadoop3.common)
+  compileOnly(libs.hadoop3.client.api)
+  compileOnly(libs.hadoop3.client.runtime)
 
   implementation(libs.commons.lang3)
   // runtime used
@@ -47,8 +48,10 @@ tasks.withType(ShadowJar::class.java) {
 
   // Relocate dependencies to avoid conflicts
   relocate("org.apache.httpcomponents", "org.apache.gravitino.azure.shaded.org.apache.httpcomponents")
-  relocate("org.apache.commons", "org.apache.gravitino.azure.shaded.org.apache.commons")
-  relocate("com.fasterxml", "org.apache.gravitino.azure.shaded.com.fasterxml")
+  // Why do we do this changes? If we shade the prefixes 'org.apache.commons', some jar like `commons-io`
+  // will be shaded mistakenly and will lead to some errors.
+  relocate("org.apache.commons.lang3", "org.apache.gravitino.azure.shaded.org.apache.commons.lang3")
+  relocate("org.apache.commons.logging", "org.apache.gravitino.azure.shaded.org.apache.commons.logging")
   relocate("com.google.guava", "org.apache.gravitino.azure.shaded.com.google.guava")
 }
 

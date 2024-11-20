@@ -36,6 +36,7 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   archiveClassifier.set("")
 
   // Relocate dependencies to avoid conflicts
+  relocate("org.apache.commons.lang3", "org.apache.gravitino.shaded.org.apache.commons.lang3")
   relocate("com.google", "org.apache.gravitino.shaded.com.google")
   relocate("com.github.benmanes.caffeine", "org.apache.gravitino.shaded.com.github.benmanes.caffeine")
 }

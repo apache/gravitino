@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.storage.ABSProperties;
@@ -42,8 +41,7 @@ public class AzureFileSystemProvider implements FileSystemProvider {
   private static final String ABFS_IMPL_KEY = "fs.abfss.impl";
 
   @Override
-  public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
-      throws IOException {
+  public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Configuration configuration = new Configuration();
 
     Map<String, String> hadoopConfMap =

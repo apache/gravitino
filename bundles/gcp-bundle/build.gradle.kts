@@ -25,12 +25,18 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":core"))
-  compileOnly(project(":catalogs:catalog-common"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
+  compileOnly(project(":api")) {
+    exclude("*")
+  }
+  compileOnly(project(":core")) {
+    exclude("*")
+  }
 
-  compileOnly(libs.hadoop3.common)
+  compileOnly(project(":catalogs:catalog-hadoop")) {
+    exclude(group = "*")
+  }
+  compileOnly(libs.hadoop3.client.api)
+  compileOnly(libs.hadoop3.client.runtime)
 
   implementation(libs.commons.lang3)
   // runtime used

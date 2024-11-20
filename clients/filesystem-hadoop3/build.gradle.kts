@@ -25,7 +25,9 @@ plugins {
 
 dependencies {
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
-  compileOnly(libs.hadoop3.common)
+  compileOnly(libs.hadoop3.client.api)
+  compileOnly(libs.hadoop3.client.runtime)
+
   implementation(project(":catalogs:catalog-hadoop")) {
     exclude(group = "*")
   }
@@ -33,6 +35,8 @@ dependencies {
     exclude(group = "*")
   }
 
+  implementation(libs.guava)
+  implementation(libs.commons.lang3)
   implementation(libs.caffeine)
 
   testImplementation(project(":api"))
@@ -52,11 +56,8 @@ dependencies {
   testImplementation(libs.bundles.jwt)
   testImplementation(libs.testcontainers)
   testImplementation(libs.guava)
-  testImplementation(libs.hadoop3.client)
-  testImplementation(libs.hadoop3.common) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet", "servlet-api")
-  }
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
   testImplementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
     exclude("javax.servlet", "servlet-api")

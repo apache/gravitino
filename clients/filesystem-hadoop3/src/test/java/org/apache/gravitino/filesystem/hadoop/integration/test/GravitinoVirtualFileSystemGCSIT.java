@@ -41,7 +41,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@EnabledIf(value = "isGCPConfigured", disabledReason = "GCP is not configured")
+@EnabledIf(value = "isGCSConfigured", disabledReason = "GCS is not configured")
 public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemGCSIT.class);
 
@@ -99,8 +99,8 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
   public void tearDown() throws IOException {
     Catalog catalog = metalake.loadCatalog(catalogName);
     catalog.asSchemas().dropSchema(schemaName, true);
-    metalake.dropCatalog(catalogName);
-    client.dropMetalake(metalakeName);
+    metalake.dropCatalog(catalogName, true);
+    client.dropMetalake(metalakeName, true);
 
     if (client != null) {
       client.close();
@@ -142,7 +142,7 @@ public class GravitinoVirtualFileSystemGCSIT extends GravitinoVirtualFileSystemI
       "GCS does not support append, java.io.IOException: The append operation is not supported")
   public void testAppend() throws IOException {}
 
-  private static boolean isGCPConfigured() {
+  private static boolean isGCSConfigured() {
     return StringUtils.isNotBlank(System.getenv("GCS_SERVICE_ACCOUNT_JSON_PATH"))
         && StringUtils.isNotBlank(System.getenv("GCS_BUCKET_NAME"));
   }

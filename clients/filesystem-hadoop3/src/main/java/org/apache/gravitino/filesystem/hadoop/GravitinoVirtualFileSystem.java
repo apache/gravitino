@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
@@ -391,6 +392,11 @@ public class GravitinoVirtualFileSystem extends FileSystem {
                 }
 
                 Map<String, String> maps = getConfigMap(getConf());
+
+                // Reset the FileSystem service loader to make sure the FileSystem will reload the
+                // service file systems, this is a temporary solution to fix the issue
+                // https://github.com/apache/gravitino/issues/5609
+                resetFileSystemServiceLoader(scheme);
                 return provider.getFileSystem(filePath, maps);
               } catch (IOException ioe) {
                 throw new GravitinoRuntimeException(
@@ -400,6 +406,24 @@ public class GravitinoVirtualFileSystem extends FileSystem {
             });
 
     return new FilesetContextPair(new Path(actualFileLocation), fs);
+  }
+
+  private void resetFileSystemServiceLoader(String fsScheme) {
+    try {
+      Map<String, Class<? extends FileSystem>> serviceFileSystems =
+          (Map<String, Class<? extends FileSystem>>)
+              FieldUtils.getField(FileSystem.class, "SERVICE_FILE_SYSTEMS", true).get(null);
+
+      if (serviceFileSystems.containsKey(fsScheme)) {
+        return;
+      }
+
+      // Set this value to false so that FileSystem will reload the service file systems when
+      // needed.
+      FieldUtils.getField(FileSystem.class, "FILE_SYSTEMS_LOADED", true).set(null, false);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private Map<String, String> getConfigMap(Configuration configuration) {

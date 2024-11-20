@@ -40,7 +40,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 
-@EnabledIf(value = "isGCPConfigured", disabledReason = "GCP is not configured.")
+@EnabledIf(value = "isGCSConfigured", disabledReason = "GCS is not configured.")
 public class HadoopGCSCatalogIT extends HadoopCatalogIT {
 
   public static final String BUCKET_NAME = System.getenv("GCS_BUCKET_NAME");
@@ -170,7 +170,7 @@ public class HadoopGCSCatalogIT extends HadoopCatalogIT {
     metalake.dropCatalog(localCatalogName, true);
   }
 
-  private static boolean isGCPConfigured() {
+  private static boolean isGCSConfigured() {
     return StringUtils.isNotBlank(System.getenv("GCS_SERVICE_ACCOUNT_JSON_PATH"))
         && StringUtils.isNotBlank(System.getenv("GCS_BUCKET_NAME"));
   }

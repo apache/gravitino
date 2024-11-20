@@ -25,12 +25,23 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":core"))
-  compileOnly(project(":catalogs:catalog-common"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
-  compileOnly(libs.hadoop3.common)
+  compileOnly(project(":api")) {
+    exclude("*")
+  }
 
+  compileOnly(project(":core")) {
+    exclude("*")
+  }
+
+  compileOnly(project(":catalogs:catalog-hadoop")) {
+    exclude("*")
+  }
+
+  compileOnly(libs.hadoop3.client.api)
+  compileOnly(libs.hadoop3.client.runtime)
+
+  implementation(libs.commons.lang3)
+  implementation(libs.guava)
   implementation(libs.aws.iam)
   implementation(libs.aws.policy)
   implementation(libs.aws.sts)
@@ -44,6 +55,9 @@ tasks.withType(ShadowJar::class.java) {
   isZip64 = true
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
+
+  relocate("com.google.common", "org.apache.gravitino.shaded.com.google.common")
+  relocate("org.apache.commons.lang3", "org.apache.gravitino.shaded.org.apache.commons.lang3")
 }
 
 tasks.jar {

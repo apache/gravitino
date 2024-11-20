@@ -41,18 +41,11 @@ dependencies {
   }
 
   compileOnly(libs.guava)
+  compileOnly(libs.commons.lang3)
+  compileOnly(libs.commons.io)
 
-  implementation(libs.hadoop3.common) {
-    exclude("com.sun.jersey")
-    exclude("javax.servlet", "servlet-api")
-    exclude("org.eclipse.jetty", "*")
-    exclude("org.apache.hadoop", "hadoop-auth")
-    exclude("org.apache.curator", "curator-client")
-    exclude("org.apache.curator", "curator-framework")
-    exclude("org.apache.curator", "curator-recipes")
-    exclude("org.apache.avro", "avro")
-    exclude("com.sun.jersey", "jersey-servlet")
-  }
+  implementation(libs.hadoop3.client.api)
+  implementation(libs.hadoop3.client.runtime)
 
   implementation(libs.hadoop3.hdfs) {
     exclude("com.sun.jersey")
@@ -63,14 +56,6 @@ dependencies {
     exclude("io.netty")
     exclude("org.fusesource.leveldbjni")
   }
-  implementation(libs.hadoop3.client) {
-    exclude("org.apache.hadoop", "hadoop-mapreduce-client-core")
-    exclude("org.apache.hadoop", "hadoop-mapreduce-client-jobclient")
-    exclude("org.apache.hadoop", "hadoop-yarn-api")
-    exclude("org.apache.hadoop", "hadoop-yarn-client")
-    exclude("com.squareup.okhttp", "okhttp")
-  }
-
   implementation(libs.slf4j.api)
 
   testImplementation(project(":clients:client-java"))
@@ -119,6 +104,11 @@ tasks {
       exclude("kerb-*.jar")
       exclude("kerby-*.jar")
     }
+
+    // remove common-text:1.4.jar as it conflicts with common-text:1.10.jar introduced by
+    // hadoop-common 3.3.6;
+    exclude("commons-text-1.4.jar")
+
     into("$rootDir/distribution/package/catalogs/hadoop/libs")
   }
 

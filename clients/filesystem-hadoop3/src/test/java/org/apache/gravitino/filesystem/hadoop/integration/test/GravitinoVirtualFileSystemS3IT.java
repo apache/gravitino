@@ -26,11 +26,8 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
-import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.s3.fs.S3FileSystemProvider;
 import org.apache.gravitino.storage.S3Properties;
@@ -39,79 +36,27 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
+@EnabledIf(value = "s3IsConfigured", disabledReason = "S3 is not configured.")
 public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemS3IT.class);
-
-  private String bucketName = "s3-bucket-" + UUID.randomUUID().toString().replace("-", "");
-  private String accessKey;
-  private String secretKey;
-  private String s3Endpoint;
-
-  private GravitinoLocalStackContainer gravitinoLocalStackContainer;
+  private static final String S3_BUCKET_NAME = System.getenv("S3_BUCKET_NAME");
+  private static final String S3_ACCESS_KEY = System.getenv("S3_ACCESS_KEY_ID");
+  private static final String S3_SECRET_KEY = System.getenv("S3_SECRET_ACCESS_KEY");
+  private static final String S3_END_POINT = System.getenv("S3_ENDPOINT");
 
   @BeforeAll
   public void startIntegrationTest() {
     // Do nothing
   }
 
-  private void startS3Mocker() {
-    containerSuite.startLocalStackContainer();
-    gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
-
-    Awaitility.await()
-        .atMost(60, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result =
-                    gravitinoLocalStackContainer.executeInContainer(
-                        "awslocal", "iam", "create-user", "--user-name", "anonymous");
-                return result.getExitCode() == 0;
-              } catch (Exception e) {
-                LOG.info("LocalStack is not ready yet for: ", e);
-                return false;
-              }
-            });
-
-    gravitinoLocalStackContainer.executeInContainer("awslocal", "s3", "mb", "s3://" + bucketName);
-
-    Container.ExecResult result =
-        gravitinoLocalStackContainer.executeInContainer(
-            "awslocal", "iam", "create-access-key", "--user-name", "anonymous");
-
-    gravitinoLocalStackContainer.executeInContainer(
-        "awslocal",
-        "s3api",
-        "put-bucket-acl",
-        "--bucket",
-        "my-test-bucket",
-        "--acl",
-        "public-read-write");
-
-    // Get access key and secret key from result
-    String[] lines = result.getStdout().split("\n");
-    accessKey = lines[3].split(":")[1].trim().substring(1, 21);
-    secretKey = lines[5].split(":")[1].trim().substring(1, 41);
-
-    LOG.info("Access key: " + accessKey);
-    LOG.info("Secret key: " + secretKey);
-
-    s3Endpoint =
-        String.format("http://%s:%d", gravitinoLocalStackContainer.getContainerIpAddress(), 4566);
-  }
-
   @BeforeAll
   public void startUp() throws Exception {
     copyBundleJarsToHadoop("aws-bundle");
-
-    // Start s3 simulator
-    startS3Mocker();
 
     // Need to download jars to gravitino server
     super.startIntegrationTest();
@@ -131,9 +76,9 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
     Assertions.assertTrue(client.metalakeExists(metalakeName));
 
     Map<String, String> properties = Maps.newHashMap();
-    properties.put("gravitino.bypass.fs.s3a.access.key", accessKey);
-    properties.put("gravitino.bypass.fs.s3a.secret.key", secretKey);
-    properties.put("gravitino.bypass.fs.s3a.endpoint", s3Endpoint);
+    properties.put("gravitino.bypass.fs.s3a.access.key", S3_ACCESS_KEY);
+    properties.put("gravitino.bypass.fs.s3a.secret.key", S3_SECRET_KEY);
+    properties.put("gravitino.bypass.fs.s3a.endpoint", S3_END_POINT);
     properties.put(
         "gravitino.bypass.fs.s3a.aws.credentials.provider",
         "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
@@ -154,9 +99,9 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
     conf.set("fs.gravitino.client.metalake", metalakeName);
 
     // Pass this configuration to the real file system
-    conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, accessKey);
-    conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, secretKey);
-    conf.set(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
+    conf.set(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
+    conf.set(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
+    conf.set(S3Properties.GRAVITINO_S3_ENDPOINT, S3_END_POINT);
     conf.set(FS_FILESYSTEM_PROVIDERS, "s3");
   }
 
@@ -199,10 +144,17 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
   }
 
   protected String genStorageLocation(String fileset) {
-    return String.format("s3a://%s/%s", bucketName, fileset);
+    return String.format("s3a://%s/%s", S3_BUCKET_NAME, fileset);
   }
 
   @Disabled(
-      "GCS does not support append, java.io.IOException: The append operation is not supported")
+      "S3 does not support append, java.io.IOException: The append operation is not supported")
   public void testAppend() throws IOException {}
+
+  private static boolean s3IsConfigured() {
+    return StringUtils.isNotBlank(System.getenv("S3_ACCESS_KEY_ID"))
+        && StringUtils.isNotBlank(System.getenv("S3_SECRET_ACCESS_KEY"))
+        && StringUtils.isNotBlank(System.getenv("S3_ENDPOINT"))
+        && StringUtils.isNotBlank(System.getenv("S3_BUCKET_NAME"));
+  }
 }

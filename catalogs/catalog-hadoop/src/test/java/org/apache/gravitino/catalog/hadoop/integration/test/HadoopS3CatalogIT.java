@@ -26,13 +26,10 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
@@ -43,72 +40,27 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
+import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.Container;
-import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 @Tag("gravitino-docker-test")
+@EnabledIf(value = "s3IsConfigured", disabledReason = "S3 is not configured.")
 public class HadoopS3CatalogIT extends HadoopCatalogIT {
-  private static final Logger LOG = LoggerFactory.getLogger(HadoopOSSCatalogIT.class);
-  private String bucketName = "s3-bucket-" + UUID.randomUUID().toString().replace("-", "");
-  private String accessKey;
-  private String secretKey;
-  private String s3Endpoint;
 
-  private GravitinoLocalStackContainer gravitinoLocalStackContainer;
+  private static final Logger LOG = LoggerFactory.getLogger(HadoopOSSCatalogIT.class);
+
+  private static final String S3_BUCKET_NAME = System.getenv("S3_BUCKET_NAME");
+  private static final String S3_ACCESS_KEY = System.getenv("S3_ACCESS_KEY_ID");
+  private static final String S3_SECRET_KEY = System.getenv("S3_SECRET_ACCESS_KEY");
+  private static final String S3_END_POINT = System.getenv("S3_ENDPOINT");
 
   @VisibleForTesting
   public void startIntegrationTest() throws Exception {}
 
   @Override
-  protected void startNecessaryContainer() {
-
-    containerSuite.startLocalStackContainer();
-    gravitinoLocalStackContainer = containerSuite.getLocalStackContainer();
-
-    Awaitility.await()
-        .atMost(60, TimeUnit.SECONDS)
-        .pollInterval(1, TimeUnit.SECONDS)
-        .until(
-            () -> {
-              try {
-                Container.ExecResult result =
-                    gravitinoLocalStackContainer.executeInContainer(
-                        "awslocal", "iam", "create-user", "--user-name", "anonymous");
-                return result.getExitCode() == 0;
-              } catch (Exception e) {
-                LOG.info("LocalStack is not ready yet for: ", e);
-                return false;
-              }
-            });
-
-    gravitinoLocalStackContainer.executeInContainer("awslocal", "s3", "mb", "s3://" + bucketName);
-
-    Container.ExecResult result =
-        gravitinoLocalStackContainer.executeInContainer(
-            "awslocal", "iam", "create-access-key", "--user-name", "anonymous");
-
-    gravitinoLocalStackContainer.executeInContainer(
-        "awslocal",
-        "s3api",
-        "put-bucket-acl",
-        "--bucket",
-        "my-test-bucket",
-        "--acl",
-        "public-read-write");
-
-    // Get access key and secret key from result
-    String[] lines = result.getStdout().split("\n");
-    accessKey = lines[3].split(":")[1].trim().substring(1, 21);
-    secretKey = lines[5].split(":")[1].trim().substring(1, 41);
-
-    LOG.info("Access key: " + accessKey);
-    LOG.info("Secret key: " + secretKey);
-
-    s3Endpoint =
-        String.format("http://%s:%d", gravitinoLocalStackContainer.getContainerIpAddress(), 4566);
-  }
+  protected void startNecessaryContainer() {}
 
   @BeforeAll
   public void setup() throws IOException {
@@ -129,12 +81,12 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
     schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     Configuration conf = new Configuration();
 
-    conf.set("fs.s3a.access.key", accessKey);
-    conf.set("fs.s3a.secret.key", secretKey);
-    conf.set("fs.s3a.endpoint", s3Endpoint);
+    conf.set("fs.s3a.access.key", S3_ACCESS_KEY);
+    conf.set("fs.s3a.secret.key", S3_SECRET_KEY);
+    conf.set("fs.s3a.endpoint", S3_END_POINT);
     conf.set(
         "fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
-    fileSystem = FileSystem.get(URI.create(String.format("s3a://%s", bucketName)), conf);
+    fileSystem = FileSystem.get(URI.create(String.format("s3a://%s", S3_BUCKET_NAME)), conf);
 
     createMetalake();
     createCatalog();
@@ -161,7 +113,8 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
         Path bucket =
             new Path(
                 String.format(
-                    "s3a://%s/%s", bucketName, GravitinoITUtils.genRandomName("CatalogFilesetIT")));
+                    "s3a://%s/%s",
+                    S3_BUCKET_NAME, GravitinoITUtils.genRandomName("CatalogFilesetIT")));
         if (!fileSystem.exists(bucket)) {
           fileSystem.mkdirs(bucket);
         }
@@ -177,9 +130,9 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
 
   protected void createCatalog() {
     Map<String, String> map = Maps.newHashMap();
-    map.put(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
-    map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
-    map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
+    map.put(S3Properties.GRAVITINO_S3_ENDPOINT, S3_END_POINT);
+    map.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
+    map.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
     map.put(FILESYSTEM_PROVIDERS, "s3");
 
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
@@ -195,12 +148,12 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
   public void testCreateSchemaAndFilesetWithSpecialLocation() {
     String localCatalogName = GravitinoITUtils.genRandomName("local_catalog");
 
-    String s3Location = String.format("s3a://%s", bucketName);
+    String s3Location = String.format("s3a://%s", S3_BUCKET_NAME);
     Map<String, String> catalogProps = Maps.newHashMap();
     catalogProps.put("location", s3Location);
-    catalogProps.put(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
-    catalogProps.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
-    catalogProps.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
+    catalogProps.put(S3Properties.GRAVITINO_S3_ENDPOINT, S3_END_POINT);
+    catalogProps.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, S3_ACCESS_KEY);
+    catalogProps.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, S3_SECRET_KEY);
     catalogProps.put(FILESYSTEM_PROVIDERS, "s3");
 
     Catalog localCatalog =
@@ -251,5 +204,12 @@ public class HadoopS3CatalogIT extends HadoopCatalogIT {
 
     // Delete catalog
     metalake.dropCatalog(localCatalogName, true);
+  }
+
+  protected static boolean s3IsConfigured() {
+    return StringUtils.isNotBlank(System.getenv("S3_ACCESS_KEY_ID"))
+        && StringUtils.isNotBlank(System.getenv("S3_SECRET_ACCESS_KEY"))
+        && StringUtils.isNotBlank(System.getenv("S3_ENDPOINT"))
+        && StringUtils.isNotBlank(System.getenv("S3_BUCKET_NAME"));
   }
 }
