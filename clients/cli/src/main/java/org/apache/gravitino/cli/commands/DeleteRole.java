@@ -19,51 +19,62 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.Audit;
+import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchRoleException;
 
-/** Displays the audit information of a metalake. */
-public class MetalakeAuditInfo extends Command {
-  protected final String metalake;
+public class DeleteRole extends Command {
+
+  protected String metalake;
+  protected String role;
+  protected boolean force;
 
   /**
-   * Displays metalake audit information.
+   * Delete a role.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param force Force operation.
    * @param metalake The name of the metalake.
+   * @param role The name of the role.
    */
-  public MetalakeAuditInfo(String url, boolean ignoreVersions, String metalake) {
+  public DeleteRole(
+      String url, boolean ignoreVersions, boolean force, String metalake, String role) {
     super(url, ignoreVersions);
     this.metalake = metalake;
+    this.force = force;
+    this.role = role;
   }
 
-  /** Displays the audit information of a metalake. */
+  /** Delete a role. */
+  @Override
   public void handle() {
-    Audit audit;
-    try (GravitinoClient client = buildClient(metalake)) {
-      audit = client.loadMetalake(metalake).auditInfo();
+    boolean deleted = false;
+
+    if (!AreYouSure.really(force)) {
+      return;
+    }
+
+    try {
+      GravitinoClient client = buildClient(metalake);
+      deleted = client.deleteRole(role);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchRoleException err) {
+      System.err.println(ErrorMessages.UNKNOWN_ROLE);
       return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
       return;
     }
 
-    String auditInfo =
-        "creator,createTime,lastModifier,lastModifiedTime"
-            + System.lineSeparator()
-            + audit.creator()
-            + ","
-            + audit.createTime()
-            + ","
-            + audit.lastModifier()
-            + ","
-            + audit.lastModifiedTime();
-
-    System.out.println(auditInfo);
+    if (deleted) {
+      System.out.println(role + " deleted.");
+    } else {
+      System.out.println(role + " not deleted.");
+    }
   }
 }

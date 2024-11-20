@@ -22,6 +22,7 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -64,8 +65,10 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
@@ -89,7 +92,7 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
 
   private CatalogInfo catalogInfo;
 
-  private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
+  private Map<String, FileSystemProvider> fileSystemProvidersMap;
 
   private FileSystemProvider defaultFileSystemProvider;
 
@@ -133,7 +136,10 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
             propertiesMetadata
                 .catalogPropertiesMetadata()
                 .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
-    this.fileSystemProvidersMap.putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders));
+    this.fileSystemProvidersMap =
+        ImmutableMap.<String, FileSystemProvider>builder()
+            .putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders))
+            .build();
 
     String defaultFileSystemProviderName =
         (String)
@@ -581,31 +587,87 @@ public class HadoopCatalogOperations implements CatalogOperations, SupportsSchem
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     try {
+      Namespace filesetNs =
+          NamespaceUtil.ofFileset(
+              ident.namespace().level(0), // metalake name
+              ident.namespace().level(1), // catalog name
+              ident.name() // schema name
+              );
+
+      List<FilesetEntity> filesets =
+          store.list(filesetNs, FilesetEntity.class, Entity.EntityType.FILESET);
+      if (!filesets.isEmpty() && !cascade) {
+        throw new NonEmptySchemaException("Schema %s is not empty", ident);
+      }
+
+      // Delete all the managed filesets no matter whether the storage location is under the
+      // schema path or not.
+      // The reason why we delete the managed fileset's storage location one by one is because we
+      // may mis-delete the storage location of the external fileset if it happens to be under
+      // the schema path.
+      ClassLoader cl = Thread.currentThread().getContextClassLoader();
+      filesets
+          .parallelStream()
+          .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
+          .forEach(
+              f -> {
+                ClassLoader oldCl = Thread.currentThread().getContextClassLoader();
+                try {
+                  // parallelStream uses forkjoin thread pool, which has a different classloader
+                  // than the catalog thread. We need to set the context classloader to the
+                  // catalog's classloader to avoid classloading issues.
+                  Thread.currentThread().setContextClassLoader(cl);
+                  Path filesetPath = new Path(f.storageLocation());
+                  FileSystem fs = getFileSystem(filesetPath, conf);
+                  if (fs.exists(filesetPath)) {
+                    if (!fs.delete(filesetPath, true)) {
+                      LOG.warn("Failed to delete fileset {} location {}", f.name(), filesetPath);
+                    }
+                  }
+                } catch (IOException ioe) {
+                  LOG.warn(
+                      "Failed to delete fileset {} location {}",
+                      f.name(),
+                      f.storageLocation(),
+                      ioe);
+                } finally {
+                  Thread.currentThread().setContextClassLoader(oldCl);
+                }
+              });
+
       SchemaEntity schemaEntity = store.get(ident, Entity.EntityType.SCHEMA, SchemaEntity.class);
       Map<String, String> properties =
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
 
+      // Delete the schema path if it exists and is empty.
       Path schemaPath = getSchemaPath(ident.name(), properties);
       // Nothing to delete if the schema path is not set.
       if (schemaPath == null) {
         return false;
       }
+
       FileSystem fs = getFileSystem(schemaPath, conf);
       // Nothing to delete if the schema path does not exist.
       if (!fs.exists(schemaPath)) {
         return false;
       }
 
-      if (fs.listStatus(schemaPath).length > 0 && !cascade) {
-        throw new NonEmptySchemaException(
-            "Schema %s with location %s is not empty", ident, schemaPath);
-      } else {
-        fs.delete(schemaPath, true);
+      FileStatus[] statuses = fs.listStatus(schemaPath);
+      if (statuses.length == 0) {
+        if (fs.delete(schemaPath, true)) {
+          LOG.info("Deleted schema {} location {}", ident, schemaPath);
+        } else {
+          LOG.warn("Failed to delete schema {} location {}", ident, schemaPath);
+          return false;
+        }
       }
 
-      LOG.info("Deleted schema {} location {}", ident, schemaPath);
+      LOG.info("Deleted schema {}", ident);
       return true;
 
+    } catch (NoSuchEntityException ne) {
+      LOG.warn("Schema {} does not exist", ident);
+      return false;
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete schema " + ident + " location", ioe);
     }

@@ -41,7 +41,7 @@ import org.junit.platform.commons.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@EnabledIf("absEnabled")
+@EnabledIf("absIsConfigured")
 public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemABSIT.class);
 
@@ -56,7 +56,7 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
 
   @BeforeAll
   public void startUp() throws Exception {
-    // Copy the GCP jars to the gravitino server if in deploy mode.
+    // Copy the Azure jars to the gravitino server if in deploy mode.
     copyBundleJarsToHadoop("azure-bundle");
     // Need to download jars to gravitino server
     super.startIntegrationTest();
@@ -64,7 +64,7 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
     // This value can be by tune by the user, please change it accordingly.
     defaultBockSize = 32 * 1024 * 1024;
 
-    // This value is 1 for ABFS, 3 for GCS, and 1 for S3A.
+    // This value is 1 for ABS, 3 for GCS, and 1 for S3A.
     defaultReplication = 1;
 
     metalakeName = GravitinoITUtils.genRandomName("gvfs_it_metalake");
@@ -157,7 +157,7 @@ public class GravitinoVirtualFileSystemABSIT extends GravitinoVirtualFileSystemI
   @Disabled("java.lang.UnsupportedOperationException: Append Support not enabled")
   public void testAppend() throws IOException {}
 
-  private static boolean absEnabled() {
+  private static boolean absIsConfigured() {
     return StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_NAME"))
         && StringUtils.isNotBlank(System.getenv("ABS_ACCOUNT_KEY"))
         && StringUtils.isNotBlank(System.getenv("ABS_CONTAINER_NAME"));

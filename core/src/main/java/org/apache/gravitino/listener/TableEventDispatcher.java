@@ -29,16 +29,22 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.listener.api.event.AlterTableEvent;
 import org.apache.gravitino.listener.api.event.AlterTableFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterTablePreEvent;
 import org.apache.gravitino.listener.api.event.CreateTableEvent;
 import org.apache.gravitino.listener.api.event.CreateTableFailureEvent;
+import org.apache.gravitino.listener.api.event.CreateTablePreEvent;
 import org.apache.gravitino.listener.api.event.DropTableEvent;
 import org.apache.gravitino.listener.api.event.DropTableFailureEvent;
+import org.apache.gravitino.listener.api.event.DropTablePreEvent;
 import org.apache.gravitino.listener.api.event.ListTableEvent;
 import org.apache.gravitino.listener.api.event.ListTableFailureEvent;
+import org.apache.gravitino.listener.api.event.ListTablePreEvent;
 import org.apache.gravitino.listener.api.event.LoadTableEvent;
 import org.apache.gravitino.listener.api.event.LoadTableFailureEvent;
+import org.apache.gravitino.listener.api.event.LoadTablePreEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
+import org.apache.gravitino.listener.api.event.PurgeTablePreEvent;
 import org.apache.gravitino.listener.api.info.TableInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -56,6 +62,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * for event-driven workflows or monitoring of table operations.
  */
 public class TableEventDispatcher implements TableDispatcher {
+
   private final EventBus eventBus;
   private final TableDispatcher dispatcher;
 
@@ -73,6 +80,7 @@ public class TableEventDispatcher implements TableDispatcher {
 
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
+    eventBus.dispatchEvent(new ListTablePreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listTables(namespace);
       eventBus.dispatchEvent(new ListTableEvent(PrincipalUtils.getCurrentUserName(), namespace));
@@ -86,6 +94,7 @@ public class TableEventDispatcher implements TableDispatcher {
 
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    eventBus.dispatchEvent(new LoadTablePreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       Table table = dispatcher.loadTable(ident);
       eventBus.dispatchEvent(
@@ -109,6 +118,19 @@ public class TableEventDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    TableInfo createTableRequest =
+        new TableInfo(
+            ident.name(),
+            columns,
+            comment,
+            properties,
+            partitions,
+            distribution,
+            sortOrders,
+            indexes,
+            null);
+    eventBus.dispatchEvent(
+        new CreateTablePreEvent(PrincipalUtils.getCurrentUserName(), ident, createTableRequest));
     try {
       Table table =
           dispatcher.createTable(
@@ -117,17 +139,6 @@ public class TableEventDispatcher implements TableDispatcher {
           new CreateTableEvent(PrincipalUtils.getCurrentUserName(), ident, new TableInfo(table)));
       return table;
     } catch (Exception e) {
-      TableInfo createTableRequest =
-          new TableInfo(
-              ident.name(),
-              columns,
-              comment,
-              properties,
-              partitions,
-              distribution,
-              sortOrders,
-              indexes,
-              null);
       eventBus.dispatchEvent(
           new CreateTableFailureEvent(
               PrincipalUtils.getCurrentUserName(), ident, e, createTableRequest));
@@ -138,6 +149,8 @@ public class TableEventDispatcher implements TableDispatcher {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
+    eventBus.dispatchEvent(
+        new AlterTablePreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
     try {
       Table table = dispatcher.alterTable(ident, changes);
       eventBus.dispatchEvent(
@@ -153,6 +166,7 @@ public class TableEventDispatcher implements TableDispatcher {
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
+    eventBus.dispatchEvent(new DropTablePreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       boolean isExists = dispatcher.dropTable(ident);
       eventBus.dispatchEvent(
@@ -167,6 +181,7 @@ public class TableEventDispatcher implements TableDispatcher {
 
   @Override
   public boolean purgeTable(NameIdentifier ident) {
+    eventBus.dispatchEvent(new PurgeTablePreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       boolean isExists = dispatcher.purgeTable(ident);
       eventBus.dispatchEvent(

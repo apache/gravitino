@@ -348,7 +348,7 @@ public class RangerHiveIT {
             RangerMetadataObject.Type.TABLE,
             ImmutableSet.of(
                 new RangerPrivileges.RangerHivePrivilegeImpl(
-                    RangerPrivileges.RangerHivePrivilege.ALL, Privilege.Condition.ALLOW)));
+                    RangerPrivileges.RangerHadoopSQLPrivilege.ALL, Privilege.Condition.ALLOW)));
     Assertions.assertNull(rangerHelper.findManagedPolicy(rangerSecurableObject));
 
     // Add a policy for `db3.tab1`
@@ -398,7 +398,7 @@ public class RangerHiveIT {
     policyItem.setAccesses(
         Arrays.asList(
             new RangerPolicy.RangerPolicyItemAccess(
-                RangerPrivileges.RangerHivePrivilege.SELECT.toString())));
+                RangerPrivileges.RangerHadoopSQLPrivilege.SELECT.toString())));
     RangerITEnv.updateOrCreateRangerPolicy(
         RangerDefines.SERVICE_TYPE_HIVE,
         RangerITEnv.RANGER_HIVE_REPO_NAME,

@@ -150,7 +150,7 @@ public class TestJDBCBackend {
 
   private static void prepareJdbcTable() {
     // Read the ddl sql to create table
-    String scriptPath = "h2/schema-0.7.0-h2.sql";
+    String scriptPath = "h2/schema-0.8.0-h2.sql";
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection();

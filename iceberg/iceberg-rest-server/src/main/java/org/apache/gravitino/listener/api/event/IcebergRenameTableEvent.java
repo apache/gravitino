@@ -30,8 +30,10 @@ public class IcebergRenameTableEvent extends IcebergTableEvent {
   private RenameTableRequest renameTableRequest;
 
   public IcebergRenameTableEvent(
-      String user, NameIdentifier resourceIdentifier, RenameTableRequest renameTableRequest) {
-    super(user, resourceIdentifier);
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      RenameTableRequest renameTableRequest) {
+    super(icebergRequestContext, resourceIdentifier);
     this.renameTableRequest =
         IcebergRestUtils.cloneIcebergRESTObject(renameTableRequest, RenameTableRequest.class);
   }

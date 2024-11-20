@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.cli.AreYouSure;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -33,12 +34,14 @@ public class DeleteTable extends Command {
   protected final String catalog;
   protected final String schema;
   protected final String table;
+  protected final boolean force;
 
   /**
    * Delete a table.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
+   * @param force Force operation.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
    * @param schema The name of the schema.
@@ -47,11 +50,13 @@ public class DeleteTable extends Command {
   public DeleteTable(
       String url,
       boolean ignoreVersions,
+      boolean force,
       String metalake,
       String catalog,
       String schema,
       String table) {
     super(url, ignoreVersions);
+    this.force = force;
     this.metalake = metalake;
     this.catalog = catalog;
     this.schema = schema;
@@ -62,6 +67,10 @@ public class DeleteTable extends Command {
   @Override
   public void handle() {
     boolean deleted = false;
+
+    if (!AreYouSure.really(force)) {
+      return;
+    }
 
     try {
       GravitinoClient client = buildClient(metalake);

@@ -72,6 +72,11 @@ public class DummyEventListener implements EventListenerPlugin {
     return postEvents.removeLast();
   }
 
+  public PreEvent popPreEvent() {
+    Assertions.assertTrue(preEvents.size() > 0, "No events to pop");
+    return preEvents.removeLast();
+  }
+
   public static class DummyAsyncEventListener extends DummyEventListener {
     public List<Event> tryGetPostEvents() {
       Awaitility.await()

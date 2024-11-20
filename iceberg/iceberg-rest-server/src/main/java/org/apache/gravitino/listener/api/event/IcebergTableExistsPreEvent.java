@@ -25,7 +25,8 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represent a pre event before checking Iceberg table exists. */
 @DeveloperApi
 public class IcebergTableExistsPreEvent extends IcebergTablePreEvent {
-  public IcebergTableExistsPreEvent(String user, NameIdentifier tableIdentifier) {
-    super(user, tableIdentifier);
+  public IcebergTableExistsPreEvent(
+      IcebergRequestContext icebergRequestContext, NameIdentifier tableIdentifier) {
+    super(icebergRequestContext, tableIdentifier);
   }
 }
