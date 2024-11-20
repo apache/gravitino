@@ -172,7 +172,7 @@ hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.
 hadoop3-client-api = { group = "org.apache.hadoop", name = "hadoop-client-api", version.ref = "hadoop3"}
 hadoop3-client-runtime = { group = "org.apache.hadoop", name = "hadoop-client-runtime", version.ref = "hadoop3"}
 
-hadoop3-minicluster = { group = "org.apache.hadoop", name = "hadoop-minicluster", version.ref = "hadoop-minikdc"}
+hadoop3-minicluster = { group = "org.apache.hadoop", name = "hadoop-client-minicluster", version.ref = "hadoop-minikdc"}
 hadoop3-gcs = { group = "com.google.cloud.bigdataoss", name = "gcs-connector", version.ref = "hadoop3-gcs"}
 hadoop3-oss = { group = "org.apache.hadoop", name = "hadoop-aliyun", version.ref = "hadoop3-aliyun"}
 hadoop3-abs = { group = "org.apache.hadoop", name = "hadoop-azure", version.ref = "hadoop3-abs"}
