@@ -497,9 +497,13 @@ const relationalColumnTypeMap = {
 
   'jdbc-mysql': [
     'byte',
+    'byte unsigned',
     'short',
+    'short unsigned',
     'integer',
+    'integer unsigned',
     'long',
+    'long unsigned',
     'float',
     'double',
     'string',
