@@ -28,14 +28,14 @@ val checkRustEnvironment by tasks.registering(Exec::class) {
 
 val compileRust by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
-  description = "Compile the Rust submodule"
+  description = "Compile the Rust project"
   workingDir = file("$projectDir")
   commandLine("cargo", "build", "--release")
 }
 
 tasks.register("testRust", Exec::class) {
   dependsOn(checkRustEnvironment)
-  description = "Run tests in the Rust submodule"
+  description = "Run tests in the Rust project"
   group = "verification"
   workingDir = file("$projectDir")
   commandLine("cargo", "test")
