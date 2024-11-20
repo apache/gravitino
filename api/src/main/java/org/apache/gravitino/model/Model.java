@@ -134,24 +134,33 @@ public interface Model extends Auditable {
    *     otherwise the {@link ModelVersionAliasesAlreadyExistsException} will be thrown. The aliases
    *     are optional and can be empty.
    * @param comment The comment of the model version. The comment is optional and can be null.
-   * @param url The model artifact URL.
+   * @param uri The model artifact URI.
    * @param properties The properties of the model version. The properties are optional and can be
    *     null or empty.
    * @return The created model version object.
    * @throws NoSuchModelException If the model does not exist.
    * @throws ModelVersionAliasesAlreadyExistsException If the aliases already exist in the model.
    */
-  ModelVersion link(String[] aliases, String comment, String url, Map<String, String> properties)
+  ModelVersion link(String[] aliases, String comment, String uri, Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistsException;
 
   /**
-   * Remove the model version object of a model by the version number. If the version does not exit,
-   * it will return false.
+   * Remove the model version object of a model by the version number. If the version does not
+   * exist, it will return false.
    *
    * @param version The version number of the model.
    * @return True if the version is removed, false if the version does not exist.
    */
   boolean deleteVersion(int version);
+
+  /**
+   * Remove the model version object of a model by the version alias. If the version does not exist,
+   * it will return false.
+   *
+   * @param alias The version alias of the model.
+   * @return True if the version is removed, false if the version does not exist.
+   */
+  boolean deleteVersion(String alias);
 
   /**
    * @return The {@link SupportsTags} if the model supports tag operations.

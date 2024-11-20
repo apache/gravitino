@@ -59,12 +59,12 @@ public interface ModelVersion extends Auditable {
   String[] aliases();
 
   /**
-   * The URL of the model artifact. The URL is the location of the model artifact. The URL can be a
-   * file path or a remote URL.
+   * The URI of the model artifact. The URI is the location of the model artifact. The URI can be a
+   * file path or a remote URI.
    *
-   * @return The URL of the model artifact.
+   * @return The URI of the model artifact.
    */
-  String url();
+  String uri();
 
   /**
    * The properties of the model version. The properties are key-value pairs that can be used to
