@@ -1,6 +1,6 @@
-CREATE SCHEMA gt_hive2.gt_external_db2;
+CREATE SCHEMA gt_hive_conn.gt_external_db2;
 
-USE gt_hive2.gt_external_db2;
+USE gt_hive_conn.gt_external_db2;
 
 CREATE TABLE ext_tb01 (
     c_tinyint tinyint,

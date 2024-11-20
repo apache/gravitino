@@ -35,7 +35,7 @@ GRAVITINO_HOME_DIR=`realpath $GRAVITINO_HOME_DIR`
 # Set the test set and test environment directories
 # Set the test arguments and parameters for the test TrinoQueryTestTools
 TRINO_TEST_DOCKER_HOME=trino-cascading-env
-TRINO_TEST_SETS_DIR=$GRAVITINO_HOME_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/trino-cascading-testsets/test
+TRINO_TEST_SETS_DIR=$GRAVITINO_HOME_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/trino-cascading-testsets
 TRINO_TEST_ARGS=
 TRINO_TEST_PARAMS=
 
@@ -84,13 +84,13 @@ echo "The args: $args"
 sleep 5
 $GRAVITINO_HOME_DIR/trino-connector/integration-test/trino-test-tools/trino_test.sh $args
 
-# if [ $? -ne 0 ]; then
-#     echo "Test failed"
-#     # clean up
-#     $TRINO_TEST_DOCKER_HOME/shutdown.sh
-#     exit 1
-# fi
-#
-# echo "Test success"
-# # clean up
-# $TRINO_TEST_DOCKER_HOME/shutdown.sh
+if [ $? -ne 0 ]; then
+    echo "Test failed"
+    # clean up
+    $TRINO_TEST_DOCKER_HOME/shutdown.sh
+    exit 1
+fi
+
+echo "Test success"
+# clean up
+$TRINO_TEST_DOCKER_HOME/shutdown.sh
