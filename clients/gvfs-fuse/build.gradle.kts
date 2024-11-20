@@ -22,6 +22,7 @@ import org.gradle.api.tasks.Exec
 val checkRustEnvironment by tasks.registering(Exec::class) {
   description = "Check if Rust environment is properly set up using an external script"
   group = "verification"
+  environment("PATH", System.getenv("PATH") + ":" + System.getenv("HOME") + "/.cargo/bin")
   commandLine("bash", "$projectDir/check_rust_env.sh")
   isIgnoreExitValue = false
 }
