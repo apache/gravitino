@@ -49,7 +49,7 @@ public abstract class IcebergEvent extends Event {
   }
 
   @Override
-  public String remoteAddr() {
+  public String remoteAddress() {
     return icebergRequestContext.remoteHostName();
   }
 

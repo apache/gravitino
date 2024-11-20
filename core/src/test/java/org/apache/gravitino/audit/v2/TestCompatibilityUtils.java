@@ -76,7 +76,6 @@ public class TestCompatibilityUtils {
       {null, Operation.UNKNOWN_OPERATION}
     };
 
-    // Run each test case
     for (Object[] testCase : testCases) {
       OperationType input = (OperationType) testCase[0];
       Operation expected = (Operation) testCase[1];

@@ -82,26 +82,52 @@ public abstract class BaseEvent {
     return eventTime;
   }
 
+  /**
+   * The type of the operation.
+   *
+   * @return The operation status.
+   * @since 0.8.0
+   */
   public OperationType operationType() {
     return OperationType.UNKNOWN;
   }
 
-  // done
-  public String remoteAddr() {
+  /**
+   * The remote address of the operation.
+   *
+   * @return The remote address string.
+   * @since 0.8.0
+   */
+  public String remoteAddress() {
     return "unknown";
   }
 
-  // done
+  /**
+   * The event source.
+   *
+   * @return the event source.
+   * @since 0.8.0
+   */
   public EventSource eventSource() {
     return EventSource.GRAVITINO_SERVER;
   }
 
-  // done
+  /**
+   * The status of the operation.
+   *
+   * @return The operation status.
+   * @since 0.8.0
+   */
   public OperationStatus operationStatus() {
     return OperationStatus.UNKNOWN;
   }
 
-  // done
+  /**
+   * The custom information.
+   *
+   * @return the custom information.
+   * @since 0.8.0
+   */
   public Map<String, String> customInfo() {
     return ImmutableMap.of();
   }

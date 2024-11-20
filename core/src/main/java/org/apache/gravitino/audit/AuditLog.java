@@ -108,8 +108,10 @@ public interface AuditLog {
   String user();
 
   /**
-   * @deprecated 0.8.0 The operation name.
+   * The operation name.
+   *
    * @return operation name.
+   * @deprecated use {@code #operationType()} instead.
    */
   @Deprecated
   Operation operation();
@@ -129,33 +131,60 @@ public interface AuditLog {
   long timestamp();
 
   /**
-   * @deprecated 0.8.0 The status of the operation.
+   * The status of the operation.
+   *
    * @return operation status.
+   * @deprecated use {@link #operationStatus()} instead.
    */
   @Deprecated
   Status status();
 
-  /** @since 0.8.0 */
-  default String remoteAddr() {
+  /**
+   * The remote address of the operation.
+   *
+   * @return The remote address string.
+   * @since 0.8.0
+   */
+  default String remoteAddress() {
     return "unknown";
   }
 
-  /** @since 0.8.0 */
+  /**
+   * The status of the operation.
+   *
+   * @return The operation status.
+   * @since 0.8.0
+   */
   default OperationStatus operationStatus() {
     return OperationStatus.UNKNOWN;
   }
 
-  /** @since 0.8.0 */
+  /**
+   * The type of the operation.
+   *
+   * @return The operation status.
+   * @since 0.8.0
+   */
   default OperationType operationType() {
     return OperationType.UNKNOWN;
   }
 
-  /** @since 0.8.0 */
+  /**
+   * The custom information.
+   *
+   * @return the custom information.
+   * @since 0.8.0
+   */
   default Map<String, String> customInfo() {
     return ImmutableMap.of();
   }
 
-  /** @since 0.8.0 */
+  /**
+   * The event source.
+   *
+   * @return the event source.
+   * @since 0.8.0
+   */
   default EventSource eventSource() {
     return EventSource.GRAVITINO_SERVER;
   }

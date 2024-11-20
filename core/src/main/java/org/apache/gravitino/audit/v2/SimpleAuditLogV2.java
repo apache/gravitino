@@ -30,8 +30,8 @@ import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 
 /**
- * Compared to {@link org.apache.gravitino.audit.SimpleAuditLog}, it add support audit log for
- * Iceberg REST server, add eventSource and remoteAddr to audit log.
+ * Compared to {@link org.apache.gravitino.audit.SimpleAuditLog}, adds audit log for Iceberg REST
+ * server, add eventSource and remoteAddress to audit log.
  */
 public class SimpleAuditLogV2 implements AuditLog {
 
@@ -69,8 +69,8 @@ public class SimpleAuditLogV2 implements AuditLog {
   }
 
   @Override
-  public String remoteAddr() {
-    return event.remoteAddr();
+  public String remoteAddress() {
+    return event.remoteAddress();
   }
 
   @Override
@@ -103,6 +103,6 @@ public class SimpleAuditLogV2 implements AuditLog {
         identifier(),
         operationStatus(),
         eventSource(),
-        remoteAddr());
+        remoteAddress());
   }
 }
