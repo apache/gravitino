@@ -19,8 +19,10 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -129,6 +131,74 @@ public class TestMain {
 
     assertTrue(errContent.toString().contains("Error parsing command line")); // Expect error
     assertTrue(outContent.toString().contains("usage:")); // Expect help output
+  }
+
+  @Test
+  public void tagWithMultiArgs() throws ParseException {
+    Options options = new GravitinoOptions().options();
+    CommandLineParser parser = new DefaultParser();
+
+    // gcli tag create --tag tagA tagB
+    String[] args = {"tag", "create", "--tag", "tagA", "tagB"};
+    CommandLine line = parser.parse(options, args);
+    String[] tags = line.getOptionValues("tag");
+    assertArrayEquals(tags, new Object[] {"tagA", "tagB"});
+
+    // gcli tag delete --tag tagA tagB
+    String[] deleteArgs = {"tag", "delete", "--tag", "tagA", "tagB"};
+    CommandLine deleteLine = parser.parse(options, deleteArgs);
+    String[] deleteTags = deleteLine.getOptionValues("tag");
+    assertArrayEquals(deleteTags, new Object[] {"tagA", "tagB"});
+
+    // gcli tag set --name catalog_postgres.hr --tag tagA tagB
+    String[] setArgs = {"tag", "set", "--name", "catalog_postgres.hr", "--tag", "tagA", "tagB"};
+    CommandLine setLine = parser.parse(options, setArgs);
+    String[] setTags = setLine.getOptionValues("tag");
+    assertArrayEquals(setTags, new Object[] {"tagA", "tagB"});
+
+    // gcli tag remove --name catalog_postgres.hr --tag tagA tagB
+    String[] removeArgs = {
+      "tag", "remove", "--name", "catalog_postgres.hr", "--tag", "tagA", "tagB"
+    };
+    CommandLine removeLine = parser.parse(options, removeArgs);
+    String[] removeTags = removeLine.getOptionValues("tag");
+    assertArrayEquals(removeTags, new Object[] {"tagA", "tagB"});
+  }
+
+  @Test
+  public void tagWithMultiArgsError() throws UnsupportedEncodingException {
+    String[] args = {"tag", "properties", "--tag", "tagA", "tagB"};
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> Main.main(args),
+        "Error: The current command only supports one --tag option.");
+
+    String[] setArgs = {
+      "tag",
+      "set",
+      "--name",
+      "catalog_postgres.hr",
+      "--tag",
+      "tagA",
+      "tagB",
+      "--property",
+      "test",
+      "--value",
+      "value"
+    };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> Main.main(setArgs),
+        "Error: The current command only supports one --tag option.");
+
+    String[] removeArgs = {
+      "tag", "properties", "--tag", "tagA", "tagB", "--property", "test",
+    };
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> Main.main(removeArgs),
+        "Error: The current command only supports one --tag option.");
   }
 
   @Test
