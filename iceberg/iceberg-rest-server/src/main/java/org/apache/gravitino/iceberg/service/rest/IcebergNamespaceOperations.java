@@ -26,6 +26,7 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.HEAD;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -93,6 +94,24 @@ public class IcebergNamespaceOperations {
             .getOps(prefix)
             .loadNamespace(RESTUtil.decodeNamespace(namespace));
     return IcebergRestUtils.ok(getNamespaceResponse);
+  }
+
+  @HEAD
+  @Path("{namespace}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "namespace-exists", absolute = true)
+  public Response namespaceExists(
+      @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
+    boolean exists =
+        icebergCatalogWrapperManager
+            .getOps(prefix)
+            .existNamespace(RESTUtil.decodeNamespace(namespace));
+    if (exists) {
+      return IcebergRestUtils.noContent();
+    } else {
+      return IcebergRestUtils.notExists();
+    }
   }
 
   @DELETE
