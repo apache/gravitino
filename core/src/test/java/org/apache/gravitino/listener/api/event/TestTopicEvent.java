@@ -65,17 +65,32 @@ public class TestTopicEvent {
   void testCreateTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.createTopic(identifier, topic.comment(), null, topic.properties());
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(identifier, event.identifier());
-    Assertions.assertEquals(CreateTopicEvent.class, event.getClass());
-    TopicInfo topicInfo = ((CreateTopicEvent) event).createdTopicInfo();
-    checkTopicInfo(topicInfo, topic);
+    {
+      PreEvent preEvent = dummyEventListener.popPreEvent();
+      Assertions.assertEquals(identifier, preEvent.identifier());
+      Assertions.assertEquals(CreateTopicPreEvent.class, preEvent.getClass());
+      TopicInfo topicInfo = ((CreateTopicPreEvent) preEvent).createTopicRequest();
+      checkTopicInfo(topicInfo, topic);
+    }
+
+    {
+      Event event = dummyEventListener.popPostEvent();
+      Assertions.assertEquals(identifier, event.identifier());
+      Assertions.assertEquals(CreateTopicEvent.class, event.getClass());
+      TopicInfo topicInfo = ((CreateTopicEvent) event).createdTopicInfo();
+      checkTopicInfo(topicInfo, topic);
+    }
   }
 
   @Test
   void testLoadTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.loadTopic(identifier);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(LoadTopicPreEvent.class, preEvent.getClass());
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(LoadTopicEvent.class, event.getClass());
@@ -88,6 +103,13 @@ public class TestTopicEvent {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     TopicChange topicChange = TopicChange.setProperty("a", "b");
     dispatcher.alterTopic(identifier, topicChange);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(AlterTopicPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(1, ((AlterTopicPreEvent) preEvent).topicChanges().length);
+    Assertions.assertEquals(topicChange, ((AlterTopicPreEvent) preEvent).topicChanges()[0]);
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(AlterTopicEvent.class, event.getClass());
@@ -101,6 +123,11 @@ public class TestTopicEvent {
   void testDropTopicEvent() {
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "topic");
     dispatcher.dropTopic(identifier);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropTopicPreEvent.class, preEvent.getClass());
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropTopicEvent.class, event.getClass());
@@ -111,6 +138,12 @@ public class TestTopicEvent {
   void testListTopicEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     dispatcher.listTopics(namespace);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListTopicPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListTopicPreEvent) preEvent).namespace());
+
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListTopicEvent.class, event.getClass());

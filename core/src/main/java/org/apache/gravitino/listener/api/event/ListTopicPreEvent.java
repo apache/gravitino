@@ -16,20 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-'use client'
 
-import { Typography } from '@mui/material'
+package org.apache.gravitino.listener.api.event;
 
-import { useAppSelector } from '@/lib/hooks/useStore'
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.annotation.DeveloperApi;
 
-const VersionView = () => {
-  const store = useAppSelector(state => state.sys)
+/** Represents an event triggered before listing of topics within a namespace. */
+@DeveloperApi
+public class ListTopicPreEvent extends TopicPreEvent {
+  private final Namespace namespace;
 
-  return (
-    <Typography variant='subtitle2' id='gravitino_version' className={'twc-flex twc-justify-end twc-ml-2'}>
-      {store.version}
-    </Typography>
-  )
+  public ListTopicPreEvent(String user, Namespace namespace) {
+    super(user, NameIdentifier.of(namespace.levels()));
+    this.namespace = namespace;
+  }
+
+  /**
+   * Provides the namespace associated with this event.
+   *
+   * @return A {@link Namespace} instance from which topics were listed.
+   */
+  public Namespace namespace() {
+    return namespace;
+  }
 }
-
-export default VersionView

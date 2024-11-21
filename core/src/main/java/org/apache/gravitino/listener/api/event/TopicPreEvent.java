@@ -16,20 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-'use client'
 
-import { Typography } from '@mui/material'
+package org.apache.gravitino.listener.api.event;
 
-import { useAppSelector } from '@/lib/hooks/useStore'
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.annotation.DeveloperApi;
 
-const VersionView = () => {
-  const store = useAppSelector(state => state.sys)
-
-  return (
-    <Typography variant='subtitle2' id='gravitino_version' className={'twc-flex twc-justify-end twc-ml-2'}>
-      {store.version}
-    </Typography>
-  )
+/** Represents a pre-event for topic operations. */
+@DeveloperApi
+public abstract class TopicPreEvent extends PreEvent {
+  protected TopicPreEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
+  }
 }
-
-export default VersionView

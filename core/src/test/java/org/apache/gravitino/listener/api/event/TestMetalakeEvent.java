@@ -69,6 +69,12 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(CreateMetalakeEvent.class, event.getClass());
     MetalakeInfo metalakeInfo = ((CreateMetalakeEvent) event).createdMetalakeInfo();
     checkMetalakeInfo(metalakeInfo, metalake);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(CreateMetalakePreEvent.class, preEvent.getClass());
+    metalakeInfo = ((CreateMetalakePreEvent) preEvent).createMetalakeRequest();
+    checkMetalakeInfo(metalakeInfo, metalake);
   }
 
   @Test
@@ -80,6 +86,10 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(LoadMetalakeEvent.class, event.getClass());
     MetalakeInfo metalakeInfo = ((LoadMetalakeEvent) event).loadedMetalakeInfo();
     checkMetalakeInfo(metalakeInfo, metalake);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(LoadMetalakePreEvent.class, preEvent.getClass());
   }
 
   @Test
@@ -95,6 +105,13 @@ public class TestMetalakeEvent {
     MetalakeChange[] metalakeChanges = ((AlterMetalakeEvent) event).metalakeChanges();
     Assertions.assertTrue(metalakeChanges.length == 1);
     Assertions.assertEquals(metalakeChange, metalakeChanges[0]);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(AlterMetalakePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(1, ((AlterMetalakePreEvent) preEvent).metalakeChanges().length);
+    Assertions.assertEquals(
+        metalakeChange, ((AlterMetalakePreEvent) preEvent).metalakeChanges()[0]);
   }
 
   @Test
@@ -105,6 +122,10 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropMetalakeEvent.class, event.getClass());
     Assertions.assertTrue(((DropMetalakeEvent) event).isExists());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropMetalakePreEvent.class, preEvent.getClass());
   }
 
   @Test

@@ -16,20 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-'use client'
 
-import { Typography } from '@mui/material'
+import { defHttp } from '@/lib/utils/axios'
 
-import { useAppSelector } from '@/lib/hooks/useStore'
-
-const VersionView = () => {
-  const store = useAppSelector(state => state.sys)
-
-  return (
-    <Typography variant='subtitle2' id='gravitino_version' className={'twc-flex twc-justify-end twc-ml-2'}>
-      {store.version}
-    </Typography>
-  )
+const githubApis = {
+  GET: 'https://api.github.com/repos/apache/gravitino'
 }
 
-export default VersionView
+export const getGitHubApi = () => {
+  return defHttp.get({
+    url: `${githubApis.GET}`,
+    headers: {
+      Accept: 'application/vnd.github+json'
+    }
+  })
+}
