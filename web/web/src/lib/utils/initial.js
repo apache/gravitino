@@ -475,7 +475,6 @@ const relationalColumnTypeMap = {
     'timestamp_tz',
     'uuid'
   ],
-
   hive: [
     'binary',
     'boolean',
@@ -494,7 +493,6 @@ const relationalColumnTypeMap = {
     'timestamp',
     'varchar'
   ],
-
   'jdbc-mysql': [
     'binary',
     'byte',
@@ -532,7 +530,6 @@ const relationalColumnTypeMap = {
     'timestamp_tz',
     'varchar'
   ],
-
   'jdbc-doris': [
     'boolean',
     'byte',
@@ -548,7 +545,6 @@ const relationalColumnTypeMap = {
     'timestamp',
     'varchar'
   ],
-
   'lakehouse-paimon': [
     'binary',
     'boolean',
@@ -570,10 +566,64 @@ const relationalColumnTypeMap = {
   ]
 }
 
-export const getRelationalColumnTypeMap = catalog => {
+export const getRelationalColumnType = catalog => {
   if (Object.keys(relationalColumnTypeMap).includes(catalog)) {
     return relationalColumnTypeMap[catalog]
   }
 
   return []
+}
+
+const relationalTablePropInfoMap = {
+  'lakehouse-iceberg': {
+    reserved: ['location'],
+    allowDelete: true,
+    allowAdd: true
+  },
+  hive: {
+    reserved: ['comment', 'numFiles', 'totalSize', 'EXTERNAL', 'transient_lastDdlTime'],
+    allowDelete: true,
+    allowAdd: true
+  },
+  'jdbc-mysql': {
+    reserved: [],
+    allowDelete: false,
+    allowAdd: true
+  },
+  'jdbc-postgresql': {
+    reserved: [],
+    allowDelete: false,
+    allowAdd: false
+  },
+  'jdbc-doris': {
+    reserved: [],
+    allowDelete: true,
+    allowAdd: true
+  },
+  'lakehouse-paimon': {
+    reserved: [
+      'comment',
+      'owner',
+      'bucket-key',
+      'merge-engine',
+      'sequence.field',
+      'rowkind.field',
+      'primary-key',
+      'partition'
+    ],
+    allowDelete: true,
+    allowAdd: true
+  }
+}
+
+export const getRelationalTablePropInfo = catalog => {
+  if (Object.keys(relationalTablePropInfoMap).includes(catalog)) {
+    return relationalTablePropInfoMap[catalog]
+  }
+
+  return {
+    reserved: [],
+    allowDelete: true,
+    allowAdd: true
+  }
 }
