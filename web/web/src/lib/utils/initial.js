@@ -348,6 +348,30 @@ export const providers = [
 ]
 
 const parameterizedColumnTypes = {
+  char: {
+    params: ['length'],
+    validateParams: params => {
+      if (params.length !== 1) {
+        return {
+          valid: false,
+          message: 'Please set length'
+        }
+      }
+
+      const length = params[0]
+
+      if (length <= 0) {
+        return {
+          valid: false,
+          message: 'The length must be greater than 0'
+        }
+      }
+
+      return {
+        valid: true
+      }
+    }
+  },
   decimal: {
     params: ['precision', 'scale'],
     validateParams: params => {
@@ -378,7 +402,7 @@ const parameterizedColumnTypes = {
       }
     }
   },
-  char: {
+  fixed: {
     params: ['length'],
     validateParams: params => {
       if (params.length !== 1) {
@@ -425,30 +449,6 @@ const parameterizedColumnTypes = {
         valid: true
       }
     }
-  },
-  fixed: {
-    params: ['length'],
-    validateParams: params => {
-      if (params.length !== 1) {
-        return {
-          valid: false,
-          message: 'Please set length'
-        }
-      }
-
-      const length = params[0]
-
-      if (length <= 0) {
-        return {
-          valid: false,
-          message: 'The length must be greater than 0'
-        }
-      }
-
-      return {
-        valid: true
-      }
-    }
   }
 }
 
@@ -460,114 +460,113 @@ export const getParameterizedColumnType = type => {
 
 const relationalColumnTypeMap = {
   'lakehouse-iceberg': [
+    'binary',
     'boolean',
+    'date',
+    'decimal',
+    'double',
+    'fixed',
+    'float',
     'integer',
     'long',
-    'float',
-    'double',
     'string',
-    'date',
     'time',
     'timestamp',
     'timestamp_tz',
-    'decimal',
-    'fixed',
-    'binary',
     'uuid'
   ],
 
   hive: [
+    'binary',
     'boolean',
     'byte',
-    'short',
-    'integer',
-    'long',
-    'float',
-    'double',
-    'decimal',
-    'string',
     'char',
-    'varchar',
-    'timestamp',
     'date',
-    'interval_year',
+    'decimal',
+    'double',
+    'float',
+    'integer',
     'interval_day',
-    'binary'
+    'interval_year',
+    'long',
+    'short',
+    'string',
+    'timestamp',
+    'varchar'
   ],
 
   'jdbc-mysql': [
+    'binary',
     'byte',
     'byte unsigned',
-    'short',
-    'short unsigned',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
     'integer',
     'integer unsigned',
     'long',
     'long unsigned',
-    'float',
-    'double',
+    'short',
+    'short unsigned',
     'string',
-    'date',
     'time',
     'timestamp',
-    'decimal',
-    'varchar',
-    'char',
-    'binary'
+    'varchar'
   ],
-
   'jdbc-postgresql': [
+    'binary',
     'boolean',
-    'short',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
     'integer',
     'long',
-    'float',
-    'double',
+    'short',
     'string',
-    'date',
     'time',
     'timestamp',
     'timestamp_tz',
-    'decimal',
-    'varchar',
-    'char',
-    'binary'
+    'varchar'
   ],
 
   'jdbc-doris': [
     'boolean',
     'byte',
-    'short',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
     'integer',
     'long',
-    'float',
-    'double',
-    'decimal',
-    'date',
+    'short',
+    'string',
     'timestamp',
-    'varchar',
-    'char',
-    'string'
+    'varchar'
   ],
 
   'lakehouse-paimon': [
+    'binary',
     'boolean',
     'byte',
-    'short',
-    'integer',
-    'long',
-    'float',
-    'double',
-    'decimal',
-    'string',
-    'varchar',
     'char',
     'date',
+    'decimal',
+    'double',
+    'fixed',
+    'float',
+    'integer',
+    'long',
+    'short',
+    'string',
     'time',
     'timestamp',
     'timestamp_tz',
-    'binary',
-    'fixed'
+    'varchar'
   ]
 }
 
