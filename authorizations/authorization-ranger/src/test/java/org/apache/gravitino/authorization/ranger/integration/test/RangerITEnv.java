@@ -377,7 +377,9 @@ public class RangerITEnv {
     try {
       rangerRole =
           RangerITEnv.rangerClient.getRole(
-              role.name(), rangerAuthPlugin.rangerAdminName, RangerITEnv.RANGER_HIVE_REPO_NAME);
+              RangerHelper.GRAVITINO_ROLE_PREFIX + role.name(),
+              rangerAuthPlugin.rangerAdminName,
+              RangerITEnv.RANGER_HIVE_REPO_NAME);
       LOG.info("rangerRole: " + rangerRole.toString());
     } catch (RangerServiceException e) {
       throw new RuntimeException(e);
@@ -468,7 +470,11 @@ public class RangerITEnv {
                                       .allMatch(
                                           policyItem -> {
                                             // Verify role name in Ranger policy item
-                                            return policyItem.getRoles().contains(role.name());
+                                            return policyItem
+                                                .getRoles()
+                                                .contains(
+                                                    RangerHelper.GRAVITINO_ROLE_PREFIX
+                                                        + role.name());
                                           });
                               Assertions.assertTrue(match);
                             });

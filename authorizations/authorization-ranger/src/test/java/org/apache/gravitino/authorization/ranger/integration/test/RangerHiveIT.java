@@ -50,7 +50,6 @@ import org.apache.gravitino.authorization.ranger.RangerMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.authorization.ranger.RangerSecurableObject;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
-import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -209,9 +208,9 @@ public class RangerHiveIT {
     Role mockCatalogRole = mockCatalogRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(mockCatalogRole));
     // Check if exist this policy
-    assertFindManagedPolicy(mockCatalogRole, true);
+    assertFindManagedPolicyItems(mockCatalogRole, true);
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(mockCatalogRole));
-    assertFindManagedPolicy(mockCatalogRole, false);
+    assertFindManagedPolicyItems(mockCatalogRole, false);
   }
 
   @Test
@@ -232,7 +231,7 @@ public class RangerHiveIT {
 
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(mockCatalogRole));
     // Check if exist this policy
-    assertFindManagedPolicy(mockCatalogRole, true);
+    assertFindManagedPolicyItems(mockCatalogRole, true);
     mockCatalogRole.securableObjects().stream()
         .forEach(
             securableObject -> {
@@ -250,7 +249,7 @@ public class RangerHiveIT {
             });
 
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(mockCatalogRole));
-    assertFindManagedPolicy(mockCatalogRole, false);
+    assertFindManagedPolicyItems(mockCatalogRole, false);
   }
 
   @Test
@@ -258,12 +257,12 @@ public class RangerHiveIT {
     // prepare to create a role
     RoleEntity role = mock3TableRole(currentFunName());
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
-    assertFindManagedPolicy(role, true);
+    assertFindManagedPolicyItems(role, true);
 
     // delete this role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role));
     // Check if the policy is deleted
-    assertFindManagedPolicy(role, false);
+    assertFindManagedPolicyItems(role, false);
   }
 
   @Test
@@ -274,7 +273,7 @@ public class RangerHiveIT {
     // delete this role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(mockCatalogRole));
     // Check if exist this policy
-    assertFindManagedPolicy(mockCatalogRole, false);
+    assertFindManagedPolicyItems(mockCatalogRole, false);
   }
 
   @Test
@@ -293,7 +292,7 @@ public class RangerHiveIT {
     // delete this role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role));
     // Because this metaobject has owner, so the policy should not be deleted
-    assertFindManagedPolicy(role, true);
+    assertFindManagedPolicyItems(role, false);
   }
 
   @Test
@@ -356,7 +355,7 @@ public class RangerHiveIT {
   }
 
   @Test
-  public void testManagedByGravitinoLabel() {
+  public void testGravitinoAddItemsToExistingPolicy() {
     RoleEntity role = mock3TableRole(currentFunName());
     role.securableObjects().stream()
         .forEach(
@@ -370,8 +369,7 @@ public class RangerHiveIT {
               createHivePolicy(Lists.newArrayList(names), DOT_JOINER.join(names));
             });
     // Use role to create Ranger Policy
-    Assertions.assertThrows(
-        AuthorizationPluginException.class, () -> rangerAuthHivePlugin.onRoleCreated(role));
+    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
   }
 
   static void createHivePolicy(List<String> metaObjects, String roleName) {
@@ -466,7 +464,7 @@ public class RangerHiveIT {
             mockCatalogRole,
             RoleChange.addSecurableObject(
                 mockCatalogRole.name(), mockCatalogRole.securableObjects().get(0))));
-    assertFindManagedPolicy(mockCatalogRole, true);
+    assertFindManagedPolicyItems(mockCatalogRole, true);
   }
 
   @Test
@@ -510,7 +508,7 @@ public class RangerHiveIT {
             mockCatalogRole,
             RoleChange.removeSecurableObject(
                 mockCatalogRole.name(), mockCatalogRole.securableObjects().get(0))));
-    assertFindManagedPolicy(mockCatalogRole, false);
+    assertFindManagedPolicyItems(mockCatalogRole, false);
   }
 
   @Test
@@ -614,7 +612,7 @@ public class RangerHiveIT {
                 mockCatalogRole.name(),
                 mockCatalogRole.securableObjects().get(0),
                 newSecurableObject)));
-    assertFindManagedPolicy(mockCatalogRole, false);
+    assertFindManagedPolicyItems(mockCatalogRole, false);
   }
 
   @Test
@@ -636,7 +634,7 @@ public class RangerHiveIT {
             .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
             .build();
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
-    assertFindManagedPolicy(role, true);
+    assertFindManagedPolicyItems(role, true);
 
     MetadataObject newMetadataObject =
         MetadataObjects.parse(
@@ -656,7 +654,7 @@ public class RangerHiveIT {
             .withAuditInfo(auditInfo)
             .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
             .build();
-    assertFindManagedPolicy(newRole, true);
+    assertFindManagedPolicyItems(newRole, true);
   }
 
   @Test
@@ -678,7 +676,7 @@ public class RangerHiveIT {
             .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
             .build();
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
-    assertFindManagedPolicy(role, true);
+    assertFindManagedPolicyItems(role, true);
 
     MetadataObject newMetadataObject =
         MetadataObjects.parse(
@@ -698,7 +696,7 @@ public class RangerHiveIT {
             .withAuditInfo(auditInfo)
             .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
             .build();
-    assertFindManagedPolicy(newRole, true);
+    assertFindManagedPolicyItems(newRole, true);
   }
 
   @Test
@@ -720,7 +718,7 @@ public class RangerHiveIT {
             .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
             .build();
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
-    assertFindManagedPolicy(role, true);
+    assertFindManagedPolicyItems(role, true);
 
     MetadataObject newMetadataObject =
         MetadataObjects.parse(
@@ -728,7 +726,7 @@ public class RangerHiveIT {
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
             MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
-    assertFindManagedPolicy(role, false);
+    assertFindManagedPolicyItems(role, false);
     SecurableObject newSecurableObject1 =
         SecurableObjects.parse(
             newMetadataObject.fullName(),
@@ -741,7 +739,7 @@ public class RangerHiveIT {
             .withAuditInfo(auditInfo)
             .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
             .build();
-    assertFindManagedPolicy(newRole, true);
+    assertFindManagedPolicyItems(newRole, true);
   }
 
   @Test
@@ -763,7 +761,7 @@ public class RangerHiveIT {
             .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
             .build();
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
-    assertFindManagedPolicy(role, true);
+    assertFindManagedPolicyItems(role, true);
 
     MetadataObject newMetadataObject =
         MetadataObjects.parse(
@@ -771,7 +769,7 @@ public class RangerHiveIT {
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
             MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
-    assertFindManagedPolicy(role, false);
+    assertFindManagedPolicyItems(role, false);
     SecurableObject newSecurableObject1 =
         SecurableObjects.parse(
             newMetadataObject.fullName(),
@@ -784,7 +782,7 @@ public class RangerHiveIT {
             .withAuditInfo(auditInfo)
             .withSecurableObjects(Lists.newArrayList(newSecurableObject1))
             .build();
-    assertFindManagedPolicy(newRole, true);
+    assertFindManagedPolicyItems(newRole, true);
   }
 
   @Test
@@ -830,11 +828,11 @@ public class RangerHiveIT {
             .withSecurableObjects(Lists.newArrayList(oldSecurableObject1))
             .build();
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
-    assertFindManagedPolicy(role, true);
+    assertFindManagedPolicyItems(role, true);
 
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(MetadataObjectChange.remove(metadataObject)));
-    assertFindManagedPolicy(role, false);
+    assertFindManagedPolicyItems(role, false);
 
     Assertions.assertEquals(
         0, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
@@ -867,7 +865,7 @@ public class RangerHiveIT {
             .withSecurableObjects(Lists.newArrayList(schemaSecurableObject, tableSecurableObject))
             .build();
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
-    assertFindManagedPolicy(role, true);
+    assertFindManagedPolicyItems(role, true);
     Assertions.assertEquals(
         4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
 
@@ -880,9 +878,9 @@ public class RangerHiveIT {
             .withAuditInfo(auditInfo)
             .withSecurableObjects(Lists.newArrayList(schemaSecurableObject))
             .build();
-    assertFindManagedPolicy(roleVerify, false);
+    assertFindManagedPolicyItems(roleVerify, false);
     Assertions.assertEquals(
-        2, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+        4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
   }
 
   @Test
@@ -912,7 +910,7 @@ public class RangerHiveIT {
             .withSecurableObjects(Lists.newArrayList(securableObjectSchema, securableObjectTab))
             .build();
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
-    assertFindManagedPolicy(role, true);
+    assertFindManagedPolicyItems(role, true);
 
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(MetadataObjectChange.remove(tableObject)));
@@ -930,10 +928,10 @@ public class RangerHiveIT {
             .withAuditInfo(auditInfo)
             .withSecurableObjects(Lists.newArrayList(securableObjectTab))
             .build();
-    assertFindManagedPolicy(verifyScheamRole, true);
-    assertFindManagedPolicy(verifyTableRole, false);
+    assertFindManagedPolicyItems(verifyScheamRole, true);
+    assertFindManagedPolicyItems(verifyTableRole, false);
     Assertions.assertEquals(
-        2, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
+        4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
   }
 
   @Test
@@ -995,8 +993,8 @@ public class RangerHiveIT {
 
     // Delete the role
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(verifyRole));
-    // Because these metaobjects have an owner, so the policy will not be deleted.
-    assertFindManagedPolicy(role, true);
+    // policy item will be deleted.
+    assertFindManagedPolicyItems(role, false);
     rangerAuthHivePlugin.translateOwner(oldMetadataObject).stream()
         .forEach(
             rangerSecurableObject -> {
@@ -1152,7 +1150,7 @@ public class RangerHiveIT {
         rangerAuthHivePlugin, role, null, null, null, Lists.newArrayList(groupName1));
   }
 
-  private void assertFindManagedPolicy(Role role, boolean policyExist) {
+  private void assertFindManagedPolicyItems(Role role, boolean gravitinoPolicyItemExist) {
     role.securableObjects().stream()
         .forEach(
             securableObject ->
@@ -1160,14 +1158,36 @@ public class RangerHiveIT {
                     .forEach(
                         rangerSecurableObject -> {
                           LOG.info("rangerSecurableObject: " + rangerSecurableObject);
-                          if (policyExist) {
-                            Assertions.assertNotNull(
-                                rangerHelper.findManagedPolicy(rangerSecurableObject));
+                          RangerPolicy policy =
+                              rangerHelper.findManagedPolicy(rangerSecurableObject);
+                          List<RangerPolicy.RangerPolicyItem> policyItems = new ArrayList<>();
+                          if (policy != null) {
+                            policyItems.addAll(policy.getPolicyItems());
+                            policyItems.addAll(policy.getDenyPolicyItems());
+                            policyItems.addAll(policy.getRowFilterPolicyItems());
+                            policyItems.addAll(policy.getDataMaskPolicyItems());
+                          }
+
+                          if (gravitinoPolicyItemExist) {
+                            Assertions.assertNotNull(policy);
+                            Assertions.assertTrue(
+                                hasGravitinoManagedPolicyItemAccess(policyItems, role.name()));
                           } else {
-                            Assertions.assertNull(
-                                rangerHelper.findManagedPolicy(rangerSecurableObject));
+                            Assertions.assertTrue(
+                                (policy == null)
+                                    || !hasGravitinoManagedPolicyItemAccess(
+                                        policyItems, role.name()));
                           }
                         }));
+  }
+
+  public boolean hasGravitinoManagedPolicyItemAccess(
+      List<RangerPolicy.RangerPolicyItem> items, String roleName) {
+    return items.stream()
+        .anyMatch(
+            i ->
+                i.getRoles().stream()
+                    .anyMatch(r -> r.equals(RangerHelper.GRAVITINO_ROLE_PREFIX + roleName)));
   }
 
   private static class MockOwner implements Owner {
@@ -1718,14 +1738,14 @@ public class RangerHiveIT {
         Lists.newArrayList(groupName1, groupName2, groupName3));
 
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role1));
-    // Because role1's secrable object have owner, so the policy will not be deleted.
-    assertFindManagedPolicy(role1, true);
+    // policy items will be deleted.
+    assertFindManagedPolicyItems(role1, false);
 
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role2));
-    assertFindManagedPolicy(role2, true);
+    assertFindManagedPolicyItems(role2, false);
 
     Assertions.assertTrue(rangerAuthHivePlugin.onRoleDeleted(role3));
-    assertFindManagedPolicy(role3, true);
+    assertFindManagedPolicyItems(role3, false);
   }
 
   /**

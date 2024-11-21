@@ -60,6 +60,9 @@ public class RangerHelper {
   public static final String GRAVITINO_METALAKE_OWNER_ROLE = "GRAVITINO_METALAKE_OWNER_ROLE";
   public static final String GRAVITINO_CATALOG_OWNER_ROLE = "GRAVITINO_CATALOG_OWNER_ROLE";
 
+  // marking owner policy items
+  public static final String GRAVITINO_PLACEHOLDER_OWNER_ROLE = "GRAVITINO_PLACEHOLDER_OWNER_ROLE";
+
   public static final String GRAVITINO_ROLE_PREFIX = "GRAVITINO_";
 
   public RangerHelper(
@@ -249,7 +252,7 @@ public class RangerHelper {
     return policy;
   }
 
-  boolean isGravitinoManagedPolicyItemAccess(RangerPolicy.RangerPolicyItem policyItem) {
+  public boolean isGravitinoManagedPolicyItemAccess(RangerPolicy.RangerPolicyItem policyItem) {
     return policyItem.getRoles().stream().anyMatch(role -> role.startsWith(GRAVITINO_ROLE_PREFIX));
   }
 
@@ -302,8 +305,9 @@ public class RangerHelper {
     if (isOwnerRole) {
       Preconditions.checkArgument(
           roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
-              || roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE),
-          "The role name should be GRAVITINO_METALAKE_OWNER_ROLE or GRAVITINO_CATALOG_OWNER_ROLE");
+              || roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE)
+              || roleName.equalsIgnoreCase(GRAVITINO_PLACEHOLDER_OWNER_ROLE),
+          "The role name should be GRAVITINO_METALAKE_OWNER_ROLE or GRAVITINO_CATALOG_OWNER_ROLE or GRAVITINO_PLACEHOLDER_OWNER_ROLE");
     } else {
       Preconditions.checkArgument(
           !roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
@@ -346,6 +350,7 @@ public class RangerHelper {
                                     });
                           });
                 })
+            .filter(this::isGravitinoManagedPolicyItemAccess)
             .collect(Collectors.toList());
     // Add or remove the owner in the policy item
     matchPolicyItems.forEach(
@@ -397,6 +402,8 @@ public class RangerHelper {
                 } else {
                   policyItem.getGroups().add(newOwner.name());
                 }
+                // mark the policy item is created by Gravitino
+                policyItem.getRoles().add(GRAVITINO_PLACEHOLDER_OWNER_ROLE);
               }
               policy.getPolicyItems().add(policyItem);
             });
@@ -431,6 +438,8 @@ public class RangerHelper {
             } else {
               policyItem.getGroups().add(newOwner.name());
             }
+            // mark the policy item is created by Gravitino
+            policyItem.getRoles().add(GRAVITINO_PLACEHOLDER_OWNER_ROLE);
           }
           policy.getPolicyItems().add(policyItem);
         });

@@ -148,7 +148,8 @@ public abstract class RangerAuthorizationPlugin
             .toArray(RoleChange[]::new));
     // Lastly, delete the role in the Ranger
     try {
-      rangerClient.deleteRole(role.name(), rangerAdminName, rangerServiceName);
+      rangerClient.deleteRole(
+          rangerHelper.rangerRoleName(role.name()), rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
       // Ignore exception to support idempotent operation
       LOG.warn("Ranger delete role: {} failed!", role, e);
@@ -333,6 +334,8 @@ public abstract class RangerAuthorizationPlugin
           ownerRoleName = RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE;
         }
         rangerHelper.createRangerRoleIfNotExists(ownerRoleName, true);
+        rangerHelper.createRangerRoleIfNotExists(
+            RangerHelper.GRAVITINO_PLACEHOLDER_OWNER_ROLE, true);
         try {
           if (preOwnerUserName != null || preOwnerGroupName != null) {
             GrantRevokeRoleRequest revokeRoleRequest =
@@ -724,11 +727,7 @@ public abstract class RangerAuthorizationPlugin
                     && policyItem.getGroups().isEmpty());
 
     try {
-      if (policy.getPolicyItems().isEmpty() && policy.getDenyPolicyItems().isEmpty()) {
-        rangerClient.deletePolicy(policy.getId());
-      } else {
-        rangerClient.updatePolicy(policy.getId(), policy);
-      }
+      rangerClient.updatePolicy(policy.getId(), policy);
     } catch (RangerServiceException e) {
       LOG.error("Failed to remove the policy item from the Ranger policy {}!", policy);
       throw new AuthorizationPluginException(
