@@ -41,4 +41,9 @@ public class IcebergRenameTableEvent extends IcebergTableEvent {
   public RenameTableRequest renameTableRequest() {
     return renameTableRequest;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.RENAME_TABLE;
+  }
 }

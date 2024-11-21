@@ -41,4 +41,9 @@ public class IcebergLoadViewEvent extends IcebergViewEvent {
   public LoadViewResponse loadViewResponse() {
     return loadViewResponse;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_VIEW;
+  }
 }

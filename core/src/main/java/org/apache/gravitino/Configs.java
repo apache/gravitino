@@ -24,7 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.audit.FileAuditWriter;
-import org.apache.gravitino.audit.SimpleFormatter;
+import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -366,5 +366,5 @@ public class Configs {
           .doc("Gravitino event log formatter class name")
           .version(ConfigConstants.VERSION_0_7_0)
           .stringConf()
-          .createWithDefault(SimpleFormatter.class.getName());
+          .createWithDefault(SimpleFormatterV2.class.getName());
 }

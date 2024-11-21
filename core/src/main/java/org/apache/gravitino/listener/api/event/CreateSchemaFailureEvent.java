@@ -46,4 +46,14 @@ public final class CreateSchemaFailureEvent extends SchemaFailureEvent {
   public SchemaInfo createSchemaRequest() {
     return createSchemaRequest;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_SCHEMA;
+  }
 }
