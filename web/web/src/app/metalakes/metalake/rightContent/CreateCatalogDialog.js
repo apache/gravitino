@@ -246,7 +246,9 @@ const CreateCatalogDialog = props => {
       propItems[0]?.value === 'rest' &&
       providerSelect === 'lakehouse-iceberg'
     ) {
-      nextProps = propItems.filter(item => !['jdbc-driver', 'jdbc-user', 'jdbc-password', 'warehouse'].includes(item.key))
+      nextProps = propItems.filter(
+        item => !['jdbc-driver', 'jdbc-user', 'jdbc-password', 'warehouse'].includes(item.key)
+      )
     }
     const parentField = nextProps.find(i => i.key === 'authentication.type')
     if (!parentField || parentField?.value === 'simple') {

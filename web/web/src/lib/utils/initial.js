@@ -99,7 +99,7 @@ export const providers = [
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive', 'rest'],
+        hide: ['hive', 'rest']
       },
       {
         key: 'jdbc-password',
