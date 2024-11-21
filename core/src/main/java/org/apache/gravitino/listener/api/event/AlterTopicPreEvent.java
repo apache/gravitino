@@ -42,4 +42,14 @@ public class AlterTopicPreEvent extends TopicPreEvent {
   public TopicChange[] topicChanges() {
     return topicChanges;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_TOPIC;
+  }
 }

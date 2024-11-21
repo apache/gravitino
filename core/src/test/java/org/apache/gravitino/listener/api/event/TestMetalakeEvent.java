@@ -96,7 +96,7 @@ public class TestMetalakeEvent {
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(LoadMetalakePreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.CREATE_METALAKE, preEvent.operationType());
+    Assertions.assertEquals(OperationType.LOAD_METALAKE, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
   }
 
@@ -122,7 +122,7 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(1, ((AlterMetalakePreEvent) preEvent).metalakeChanges().length);
     Assertions.assertEquals(
         metalakeChange, ((AlterMetalakePreEvent) preEvent).metalakeChanges()[0]);
-    Assertions.assertEquals(OperationType.CREATE_METALAKE, preEvent.operationType());
+    Assertions.assertEquals(OperationType.ALTER_METALAKE, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
 
   }
@@ -141,7 +141,7 @@ public class TestMetalakeEvent {
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropMetalakePreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.CREATE_METALAKE, preEvent.operationType());
+    Assertions.assertEquals(OperationType.DROP_METALAKE, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
 
   }

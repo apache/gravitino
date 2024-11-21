@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event triggered before altering a metalake. */
 @DeveloperApi
-public class AlterMetalakePreEvent extends PreEvent {
+public class AlterMetalakePreEvent extends MetalakePreEvent {
   private final MetalakeChange[] metalakeChanges;
 
   public AlterMetalakePreEvent(
@@ -42,5 +42,15 @@ public class AlterMetalakePreEvent extends PreEvent {
    */
   public MetalakeChange[] metalakeChanges() {
     return metalakeChanges;
+  }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_METALAKE;
   }
 }
