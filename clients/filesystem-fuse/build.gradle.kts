@@ -50,5 +50,5 @@ tasks.named("build") {
   dependsOn(compileRust)
 }
 tasks.named("test") {
-  dependsOn("testRust")
+  dependsOn(testRust)
 }
