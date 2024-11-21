@@ -123,6 +123,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
   @Override
   /** Set Ranger policy resource rule. */
   public List<String> policyResourceDefinesRule() {
+
     return ImmutableList.of(
         PolicyResource.DATABASE.getName(),
         PolicyResource.TABLE.getName(),
