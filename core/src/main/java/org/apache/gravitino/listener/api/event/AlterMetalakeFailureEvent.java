@@ -58,4 +58,14 @@ public final class AlterMetalakeFailureEvent extends MetalakeFailureEvent {
   public MetalakeChange[] metalakeChanges() {
     return metalakeChanges;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_METALAKE;
+  }
 }

@@ -31,6 +31,7 @@ import org.apache.gravitino.listener.DummyEventListener.DummyAsyncEventListener;
 import org.apache.gravitino.listener.DummyEventListener.DummyAsyncIsolatedEventListener;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.PreEvent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,11 @@ public class TestEventListenerManager {
 
     protected DummyPostEvent(String user, NameIdentifier identifier) {
       super(user, identifier);
+    }
+
+    @Override
+    public OperationStatus operationStatus() {
+      return OperationStatus.SUCCESS;
     }
   }
 

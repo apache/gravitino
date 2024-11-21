@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
@@ -78,5 +80,55 @@ public abstract class BaseEvent {
    */
   public long eventTime() {
     return eventTime;
+  }
+
+  /**
+   * The type of the operation.
+   *
+   * @return The operation status.
+   * @since 0.8.0
+   */
+  public OperationType operationType() {
+    return OperationType.UNKNOWN;
+  }
+
+  /**
+   * The remote address of the operation.
+   *
+   * @return The remote address string.
+   * @since 0.8.0
+   */
+  public String remoteAddress() {
+    return "unknown";
+  }
+
+  /**
+   * The event source.
+   *
+   * @return the event source.
+   * @since 0.8.0
+   */
+  public EventSource eventSource() {
+    return EventSource.GRAVITINO_SERVER;
+  }
+
+  /**
+   * The status of the operation.
+   *
+   * @return The operation status.
+   * @since 0.8.0
+   */
+  public OperationStatus operationStatus() {
+    return OperationStatus.UNKNOWN;
+  }
+
+  /**
+   * The custom information.
+   *
+   * @return the custom information.
+   * @since 0.8.0
+   */
+  public Map<String, String> customInfo() {
+    return ImmutableMap.of();
   }
 }

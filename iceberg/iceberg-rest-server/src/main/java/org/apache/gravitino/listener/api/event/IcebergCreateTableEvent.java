@@ -44,6 +44,11 @@ public class IcebergCreateTableEvent extends IcebergTableEvent {
         IcebergRestUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
   }
 
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TABLE;
+  }
+
   public CreateTableRequest createTableRequest() {
     return createTableRequest;
   }

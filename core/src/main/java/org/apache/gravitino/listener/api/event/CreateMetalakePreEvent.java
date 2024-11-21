@@ -42,4 +42,14 @@ public class CreateMetalakePreEvent extends MetalakePreEvent {
   public MetalakeInfo createMetalakeRequest() {
     return createMetalakeRequest;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_METALAKE;
+  }
 }
