@@ -347,16 +347,32 @@ export const providers = [
   }
 ]
 
-export const tableColumnTypes = [
-  { key: 'boolean' },
-  { key: 'byte' },
-  { key: 'short' },
-  { key: 'integer' },
-  { key: 'long' },
-  { key: 'float' },
-  { key: 'double' },
-  {
-    key: 'decimal',
+const parameterizedColumnTypes = {
+  char: {
+    params: ['length'],
+    validateParams: params => {
+      if (params.length !== 1) {
+        return {
+          valid: false,
+          message: 'Please set length'
+        }
+      }
+
+      const length = params[0]
+
+      if (length <= 0) {
+        return {
+          valid: false,
+          message: 'The length must be greater than 0'
+        }
+      }
+
+      return {
+        valid: true
+      }
+    }
+  },
+  decimal: {
     params: ['precision', 'scale'],
     validateParams: params => {
       if (params.length !== 2) {
@@ -386,13 +402,7 @@ export const tableColumnTypes = [
       }
     }
   },
-  { key: 'date' },
-  { key: 'time' },
-  { key: 'timestamp' },
-  { key: 'timestamp_tz' },
-  { key: 'string' },
-  {
-    key: 'char',
+  fixed: {
     params: ['length'],
     validateParams: params => {
       if (params.length !== 1) {
@@ -416,8 +426,7 @@ export const tableColumnTypes = [
       }
     }
   },
-  {
-    key: 'varchar',
+  varchar: {
     params: ['length'],
     validateParams: params => {
       if (params.length !== 1) {
@@ -440,34 +449,131 @@ export const tableColumnTypes = [
         valid: true
       }
     }
-  },
-  { key: 'interval_day' },
-  { key: 'interval_year' },
-  {
-    key: 'fixed',
-    params: ['length'],
-    validateParams: params => {
-      if (params.length !== 1) {
-        return {
-          valid: false,
-          message: 'Please set length'
-        }
-      }
+  }
+}
 
-      const length = params[0]
+export const getParameterizedColumnType = type => {
+  if (Object.keys(parameterizedColumnTypes).includes(type)) {
+    return parameterizedColumnTypes[type]
+  }
+}
 
-      if (length <= 0) {
-        return {
-          valid: false,
-          message: 'The length must be greater than 0'
-        }
-      }
+const relationalColumnTypeMap = {
+  'lakehouse-iceberg': [
+    'binary',
+    'boolean',
+    'date',
+    'decimal',
+    'double',
+    'fixed',
+    'float',
+    'integer',
+    'long',
+    'string',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'uuid'
+  ],
 
-      return {
-        valid: true
-      }
-    }
-  },
-  { key: 'uuid' },
-  { key: 'binary' }
-]
+  hive: [
+    'binary',
+    'boolean',
+    'byte',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'interval_day',
+    'interval_year',
+    'long',
+    'short',
+    'string',
+    'timestamp',
+    'varchar'
+  ],
+
+  'jdbc-mysql': [
+    'binary',
+    'byte',
+    'byte unsigned',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'integer unsigned',
+    'long',
+    'long unsigned',
+    'short',
+    'short unsigned',
+    'string',
+    'time',
+    'timestamp',
+    'varchar'
+  ],
+  'jdbc-postgresql': [
+    'binary',
+    'boolean',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'long',
+    'short',
+    'string',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'varchar'
+  ],
+
+  'jdbc-doris': [
+    'boolean',
+    'byte',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'long',
+    'short',
+    'string',
+    'timestamp',
+    'varchar'
+  ],
+
+  'lakehouse-paimon': [
+    'binary',
+    'boolean',
+    'byte',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'fixed',
+    'float',
+    'integer',
+    'long',
+    'short',
+    'string',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'varchar'
+  ]
+}
+
+export const getRelationalColumnTypeMap = catalog => {
+  if (Object.keys(relationalColumnTypeMap).includes(catalog)) {
+    return relationalColumnTypeMap[catalog]
+  }
+
+  return []
+}
