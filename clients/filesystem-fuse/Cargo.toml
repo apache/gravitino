@@ -16,10 +16,14 @@
 # under the License.
 
 [package]
-name = "gvfs-fuse"
-version = "0.1.0"
+name = "filesystem-fuse"
+version = "0.8.0-incubating-SNAPSHOT"
 edition = "2021"
 rust-version = "1.75"
+
+[[bin]]
+name = "gvfs-fuse"
+path = "src/main.rs"
 
 [dependencies]
 fuse3 = { version = "0.8.1", "features" = ["tokio-runtime", "unprivileged"] }

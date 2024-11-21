@@ -19,8 +19,6 @@
 
 set -e
 
-#!/bin/bash
-
 if ! command -v cargo &> /dev/null; then
     echo "Rust is not installed. Installing Rust..."
 
