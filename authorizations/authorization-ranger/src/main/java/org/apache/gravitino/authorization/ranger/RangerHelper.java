@@ -19,7 +19,6 @@
 package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -225,7 +224,7 @@ public class RangerHelper {
     }
     // Only return the policies that are managed by Gravitino.
     if (policies.size() > 1) {
-      throw new AuthorizationPluginException("Every metadata object has only a policy.");
+      throw new AuthorizationPluginException("Each metadata object can have at most one policy.");
     }
 
     if (policies.isEmpty()) {
@@ -252,10 +251,6 @@ public class RangerHelper {
 
   boolean isGravitinoManagedPolicyItemAccess(RangerPolicy.RangerPolicyItem policyItem) {
     return policyItem.getRoles().stream().anyMatch(role -> role.startsWith(GRAVITINO_ROLE_PREFIX));
-  }
-
-  boolean isNotGravitinoManagedPolicyItemAccess(RangerPolicy.RangerPolicyItem policyItem) {
-    return !isGravitinoManagedPolicyItemAccess(policyItem);
   }
 
   protected boolean checkRangerRole(String roleName) throws AuthorizationPluginException {

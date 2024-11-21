@@ -980,19 +980,19 @@ public abstract class RangerAuthorizationPlugin
               try {
                 policy.setPolicyItems(
                     policy.getPolicyItems().stream()
-                        .filter(rangerHelper::isNotGravitinoManagedPolicyItemAccess)
+                        .filter(i -> !rangerHelper.isGravitinoManagedPolicyItemAccess(i))
                         .collect(Collectors.toList()));
                 policy.setDenyPolicyItems(
                     policy.getDenyPolicyItems().stream()
-                        .filter(rangerHelper::isNotGravitinoManagedPolicyItemAccess)
+                        .filter(i -> !rangerHelper.isGravitinoManagedPolicyItemAccess(i))
                         .collect(Collectors.toList()));
                 policy.setRowFilterPolicyItems(
                     policy.getRowFilterPolicyItems().stream()
-                        .filter(rangerHelper::isNotGravitinoManagedPolicyItemAccess)
+                        .filter(i -> !rangerHelper.isGravitinoManagedPolicyItemAccess(i))
                         .collect(Collectors.toList()));
                 policy.setDataMaskPolicyItems(
                     policy.getDataMaskPolicyItems().stream()
-                        .filter(rangerHelper::isNotGravitinoManagedPolicyItemAccess)
+                        .filter(i -> !rangerHelper.isGravitinoManagedPolicyItemAccess(i))
                         .collect(Collectors.toList()));
                 rangerClient.updatePolicy(policy.getId(), policy);
               } catch (RangerServiceException e) {

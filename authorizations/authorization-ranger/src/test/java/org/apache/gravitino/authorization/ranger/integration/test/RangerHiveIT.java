@@ -327,20 +327,16 @@ public class RangerHiveIT {
     String dbName = currentFunName();
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", dbName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()),
-        true);
+        GravitinoITUtils.genRandomName(currentFunName()));
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", dbName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()),
-        true);
+        GravitinoITUtils.genRandomName(currentFunName()));
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()),
-        true);
+        GravitinoITUtils.genRandomName(currentFunName()));
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()),
-        true);
+        GravitinoITUtils.genRandomName(currentFunName()));
     // findManagedPolicy function use precise search, so return null
     RangerSecurableObject rangerSecurableObject =
         rangerAuthHivePlugin.generateRangerSecurableObject(
@@ -354,8 +350,7 @@ public class RangerHiveIT {
     // Add a policy for `db3.tab1`
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", dbName), "tab1"),
-        GravitinoITUtils.genRandomName(currentFunName()),
-        true);
+        GravitinoITUtils.genRandomName(currentFunName()));
     // findManagedPolicy function use precise search, so return not null
     Assertions.assertNotNull(rangerHelper.findManagedPolicy(rangerSecurableObject));
   }
@@ -372,15 +367,14 @@ public class RangerHiveIT {
                       SecurableObjects.DOT_SPLITTER.splitToList(securableObject.fullName()));
               names.remove(0); // remove catalog node
               // Manual create the Ranger Policy
-              createHivePolicy(Lists.newArrayList(names), DOT_JOINER.join(names), false);
+              createHivePolicy(Lists.newArrayList(names), DOT_JOINER.join(names));
             });
     // Use role to create Ranger Policy
     Assertions.assertThrows(
         AuthorizationPluginException.class, () -> rangerAuthHivePlugin.onRoleCreated(role));
   }
 
-  static void createHivePolicy(
-      List<String> metaObjects, String roleName, boolean labelManagedByGravitino) {
+  static void createHivePolicy(List<String> metaObjects, String roleName) {
     Assertions.assertTrue(metaObjects.size() < 4);
     Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap = new HashMap<>();
     for (int i = 0; i < metaObjects.size(); i++) {
@@ -404,8 +398,7 @@ public class RangerHiveIT {
         RangerITEnv.RANGER_HIVE_REPO_NAME,
         roleName,
         policyResourceMap,
-        Collections.singletonList(policyItem),
-        labelManagedByGravitino);
+        Collections.singletonList(policyItem));
   }
 
   static boolean deleteHivePolicy(RangerSecurableObject rangerSecurableObject) {
@@ -808,20 +801,16 @@ public class RangerHiveIT {
       throws RangerServiceException {
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", funcName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()),
-        true);
+        GravitinoITUtils.genRandomName(currentFunName()));
     createHivePolicy(
         Lists.newArrayList(String.format("%s*", funcName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()),
-        true);
+        GravitinoITUtils.genRandomName(currentFunName()));
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", funcName), "*"),
-        GravitinoITUtils.genRandomName(currentFunName()),
-        true);
+        GravitinoITUtils.genRandomName(currentFunName()));
     createHivePolicy(
         Lists.newArrayList(String.format("%s3", funcName), "tab*"),
-        GravitinoITUtils.genRandomName(currentFunName()),
-        true);
+        GravitinoITUtils.genRandomName(currentFunName()));
     Assertions.assertEquals(
         4, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
 
@@ -1764,7 +1753,6 @@ public class RangerHiveIT {
     }
 
     Assertions.assertEquals(policy.getName(), policyName);
-    Assertions.assertTrue(policy.getPolicyLabels().contains(RangerHelper.MANAGED_BY_GRAVITINO));
 
     // verify namespace
     List<String> metaObjNamespaces = rangerSecurableObject.names();

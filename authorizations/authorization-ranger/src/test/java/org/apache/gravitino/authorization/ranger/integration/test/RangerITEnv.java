@@ -20,7 +20,6 @@ package org.apache.gravitino.authorization.ranger.integration.test;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -180,8 +179,7 @@ public class RangerITEnv {
         RANGER_HDFS_REPO_NAME,
         policyName,
         policyResourceMap,
-        Collections.singletonList(policyItem),
-        false);
+        Collections.singletonList(policyItem));
   }
 
   /**
@@ -218,8 +216,7 @@ public class RangerITEnv {
         RANGER_HIVE_REPO_NAME,
         policyName,
         policyResourceMap,
-        Collections.singletonList(policyItem),
-        false);
+        Collections.singletonList(policyItem));
   }
 
   public void createRangerTrinoRepository(String trinoIp) {
@@ -515,13 +512,11 @@ public class RangerITEnv {
       String serviceName,
       String policyName,
       Map<String, RangerPolicy.RangerPolicyResource> policyResourceMap,
-      List<RangerPolicy.RangerPolicyItem> policyItems,
-      boolean labelManagedByGravitino) {
+      List<RangerPolicy.RangerPolicyItem> policyItems) {
 
     Map<String, String> resourceFilter = new HashMap<>(); // use to match the precise policy
     Map<String, String> policyFilter = new HashMap<>();
     policyFilter.put(SearchFilter.SERVICE_NAME, serviceName);
-    policyFilter.put(SearchFilter.POLICY_LABELS_PARTIAL, RangerHelper.MANAGED_BY_GRAVITINO);
     final int[] index = {0};
     policyResourceMap.forEach(
         (k, v) -> {
@@ -575,9 +570,6 @@ public class RangerITEnv {
         policy.setServiceType(type);
         policy.setService(serviceName);
         policy.setName(policyName);
-        if (labelManagedByGravitino) {
-          policy.setPolicyLabels(Lists.newArrayList(RangerHelper.MANAGED_BY_GRAVITINO));
-        }
         policy.setResources(policyResourceMap);
         policy.setPolicyItems(policyItems);
         rangerClient.createPolicy(policy);
