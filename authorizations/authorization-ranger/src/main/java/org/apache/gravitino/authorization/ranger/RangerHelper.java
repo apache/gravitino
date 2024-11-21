@@ -146,7 +146,7 @@ public class RangerHelper {
                     new RangerPolicy.RangerPolicyItemAccess();
                 access.setType(rangerPrivilege.getName());
                 policyItem.getAccesses().add(access);
-                policyItem.getRoles().add(GRAVITINO_ROLE_PREFIX + roleName);
+                policyItem.getRoles().add(generateGravitinoRoleName(roleName));
                 if (Privilege.Condition.ALLOW == rangerPrivilege.condition()) {
                   policy.getPolicyItems().add(policyItem);
                 } else {
@@ -158,8 +158,10 @@ public class RangerHelper {
                     .forEach(
                         policyItem -> {
                           // If the role is not in the policy item, then add it
-                          if (!policyItem.getRoles().contains(GRAVITINO_ROLE_PREFIX + roleName)) {
-                            policyItem.getRoles().add(GRAVITINO_ROLE_PREFIX + roleName);
+                          if (!policyItem
+                              .getRoles()
+                              .contains(generateGravitinoRoleName(roleName))) {
+                            policyItem.getRoles().add(generateGravitinoRoleName(roleName));
                           }
                         });
               }
@@ -257,7 +259,7 @@ public class RangerHelper {
   }
 
   protected boolean checkRangerRole(String roleName) throws AuthorizationPluginException {
-    roleName = rangerRoleName(roleName);
+    roleName = generateGravitinoRoleName(roleName);
     try {
       rangerClient.getRole(roleName, rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
@@ -267,7 +269,7 @@ public class RangerHelper {
     return true;
   }
 
-  String rangerRoleName(String roleName) {
+  public String generateGravitinoRoleName(String roleName) {
     if (roleName.startsWith(GRAVITINO_ROLE_PREFIX)) {
       return roleName;
     }
@@ -276,7 +278,7 @@ public class RangerHelper {
 
   protected GrantRevokeRoleRequest createGrantRevokeRoleRequest(
       String roleName, String userName, String groupName) {
-    roleName = rangerRoleName(roleName);
+    roleName = generateGravitinoRoleName(roleName);
     Set<String> users =
         StringUtils.isEmpty(userName) ? Sets.newHashSet() : Sets.newHashSet(userName);
     Set<String> groups =
@@ -301,7 +303,7 @@ public class RangerHelper {
    * @param isOwnerRole The role is owner role or not
    */
   protected RangerRole createRangerRoleIfNotExists(String roleName, boolean isOwnerRole) {
-    roleName = rangerRoleName(roleName);
+    roleName = generateGravitinoRoleName(roleName);
     if (isOwnerRole) {
       Preconditions.checkArgument(
           roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
@@ -457,7 +459,7 @@ public class RangerHelper {
           policyItem
               .getAccesses()
               .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
-          policyItem.getRoles().add(rangerRoleName(ownerRoleName));
+          policyItem.getRoles().add(generateGravitinoRoleName(ownerRoleName));
           policy.getPolicyItems().add(policyItem);
         });
     return policy;
@@ -483,8 +485,8 @@ public class RangerHelper {
     // Add or remove the owner role in the policy item
     matchPolicyItems.forEach(
         policyItem -> {
-          if (!policyItem.getRoles().contains(rangerRoleName(ownerRoleName))) {
-            policyItem.getRoles().add(rangerRoleName(ownerRoleName));
+          if (!policyItem.getRoles().contains(generateGravitinoRoleName(ownerRoleName))) {
+            policyItem.getRoles().add(generateGravitinoRoleName(ownerRoleName));
           }
         });
 
@@ -509,8 +511,8 @@ public class RangerHelper {
               policyItem
                   .getAccesses()
                   .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
-              if (!policyItem.getRoles().contains(rangerRoleName(ownerRoleName))) {
-                policyItem.getRoles().add(rangerRoleName(ownerRoleName));
+              if (!policyItem.getRoles().contains(generateGravitinoRoleName(ownerRoleName))) {
+                policyItem.getRoles().add(generateGravitinoRoleName(ownerRoleName));
               }
               policy.getPolicyItems().add(policyItem);
             });

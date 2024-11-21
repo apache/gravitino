@@ -1187,7 +1187,7 @@ public class RangerHiveIT {
         .anyMatch(
             i ->
                 i.getRoles().stream()
-                    .anyMatch(r -> r.equals(RangerHelper.GRAVITINO_ROLE_PREFIX + roleName)));
+                    .anyMatch(r -> r.equals(rangerHelper.generateGravitinoRoleName(roleName))));
   }
 
   private static class MockOwner implements Owner {

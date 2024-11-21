@@ -149,7 +149,7 @@ public abstract class RangerAuthorizationPlugin
     // Lastly, delete the role in the Ranger
     try {
       rangerClient.deleteRole(
-          rangerHelper.rangerRoleName(role.name()), rangerAdminName, rangerServiceName);
+          rangerHelper.generateGravitinoRoleName(role.name()), rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
       // Ignore exception to support idempotent operation
       LOG.warn("Ranger delete role: {} failed!", role, e);
@@ -625,7 +625,9 @@ public abstract class RangerAuthorizationPlugin
           policy.getPolicyItems().stream()
               .filter(
                   policyItem ->
-                      policyItem.getRoles().contains(rangerHelper.rangerRoleName(roleName)))
+                      policyItem
+                          .getRoles()
+                          .contains(rangerHelper.generateGravitinoRoleName(roleName)))
               .flatMap(policyItem -> policyItem.getAccesses().stream())
               .map(RangerPolicy.RangerPolicyItemAccess::getType)
               .map(RangerPrivileges::valueOf)
@@ -635,7 +637,9 @@ public abstract class RangerAuthorizationPlugin
           policy.getDenyPolicyItems().stream()
               .filter(
                   policyItem ->
-                      policyItem.getRoles().contains(rangerHelper.rangerRoleName(roleName)))
+                      policyItem
+                          .getRoles()
+                          .contains(rangerHelper.generateGravitinoRoleName(roleName)))
               .flatMap(policyItem -> policyItem.getAccesses().stream())
               .map(RangerPolicy.RangerPolicyItemAccess::getType)
               .map(RangerPrivileges::valueOf)
@@ -740,7 +744,7 @@ public abstract class RangerAuthorizationPlugin
       RangerPolicy.RangerPolicyItem policyItem,
       RangerSecurableObject rangerSecurableObject,
       String roleName) {
-    roleName = rangerHelper.rangerRoleName(roleName);
+    roleName = rangerHelper.generateGravitinoRoleName(roleName);
     boolean match =
         policyItem.getAccesses().stream()
             .allMatch(

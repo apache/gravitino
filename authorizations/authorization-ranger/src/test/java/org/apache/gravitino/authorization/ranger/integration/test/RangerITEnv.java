@@ -377,7 +377,7 @@ public class RangerITEnv {
     try {
       rangerRole =
           RangerITEnv.rangerClient.getRole(
-              RangerHelper.GRAVITINO_ROLE_PREFIX + role.name(),
+              rangerHelper.generateGravitinoRoleName(role.name()),
               rangerAuthPlugin.rangerAdminName,
               RangerITEnv.RANGER_HIVE_REPO_NAME);
       LOG.info("rangerRole: " + rangerRole.toString());
