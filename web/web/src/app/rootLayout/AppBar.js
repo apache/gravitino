@@ -38,7 +38,6 @@ import {
 } from '@mui/material'
 
 import clsx from 'clsx'
-import axios from 'axios'
 
 import VersionView from './VersionView'
 import LogoutButton from './Logout'
