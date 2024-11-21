@@ -91,7 +91,7 @@ public class TestCompatibilityUtils {
     Assertions.assertEquals(
         Status.SUCCESS, CompatibilityUtils.toAuditLogStatus(OperationStatus.SUCCESS));
     Assertions.assertEquals(
-        Status.UNKNOWN, CompatibilityUtils.toAuditLogStatus(OperationStatus.NOT_PROCESS));
+        Status.UNKNOWN, CompatibilityUtils.toAuditLogStatus(OperationStatus.UNPROCESSED));
     Assertions.assertEquals(
         Status.UNKNOWN, CompatibilityUtils.toAuditLogStatus(OperationStatus.UNKNOWN));
   }

@@ -81,7 +81,7 @@ public class TestSchemaEvent {
     SchemaInfo preSchemaInfo = ((CreateSchemaPreEvent) preEvent).createSchemaRequest();
     checkSchemaInfo(preSchemaInfo, schema);
     Assertions.assertEquals(OperationType.CREATE_SCHEMA, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -101,7 +101,7 @@ public class TestSchemaEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(LoadSchemaPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.LOAD_SCHEMA, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -121,7 +121,7 @@ public class TestSchemaEvent {
     Assertions.assertEquals(ListSchemaPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(namespace, ((ListSchemaPreEvent) preEvent).namespace());
     Assertions.assertEquals(OperationType.LIST_SCHEMA, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -146,7 +146,7 @@ public class TestSchemaEvent {
     Assertions.assertEquals(1, ((AlterSchemaPreEvent) preEvent).schemaChanges().length);
     Assertions.assertEquals(schemaChange, ((AlterSchemaPreEvent) preEvent).schemaChanges()[0]);
     Assertions.assertEquals(OperationType.ALTER_SCHEMA, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -166,7 +166,7 @@ public class TestSchemaEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropSchemaPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.DROP_SCHEMA, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test

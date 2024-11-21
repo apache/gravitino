@@ -99,7 +99,7 @@ public class TestTableEvent {
     tableInfo = ((CreateTablePreEvent) preEvent).createTableRequest();
     checkTableInfo(tableInfo, table);
     Assertions.assertEquals(OperationType.CREATE_TABLE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -119,7 +119,7 @@ public class TestTableEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(LoadTablePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.LOAD_TABLE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -144,7 +144,7 @@ public class TestTableEvent {
     Assertions.assertEquals(1, ((AlterTablePreEvent) preEvent).tableChanges().length);
     Assertions.assertEquals(change, ((AlterTablePreEvent) preEvent).tableChanges()[0]);
     Assertions.assertEquals(OperationType.ALTER_TABLE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -163,7 +163,7 @@ public class TestTableEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropTablePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.DROP_TABLE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -182,7 +182,7 @@ public class TestTableEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(PurgeTablePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.PURGE_TABLE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -202,7 +202,7 @@ public class TestTableEvent {
     Assertions.assertEquals(ListTablePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(namespace, ((ListTablePreEvent) preEvent).namespace());
     Assertions.assertEquals(OperationType.LIST_TABLE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test

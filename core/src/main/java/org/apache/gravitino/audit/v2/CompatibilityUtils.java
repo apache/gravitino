@@ -91,11 +91,7 @@ public class CompatibilityUtils {
   }
 
   static Operation toAuditLogOperation(OperationType operationType) {
-    if (operationTypeMap.containsKey(operationType)) {
-      return operationTypeMap.get(operationType);
-    }
-
-    return Operation.UNKNOWN_OPERATION;
+    return operationTypeMap.getOrDefault(operationType, Operation.UNKNOWN_OPERATION);
   }
 
   static Status toAuditLogStatus(OperationStatus operationStatus) {

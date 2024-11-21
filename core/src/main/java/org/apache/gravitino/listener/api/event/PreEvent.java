@@ -31,6 +31,6 @@ public abstract class PreEvent extends BaseEvent {
 
   @Override
   public OperationStatus operationStatus() {
-    return OperationStatus.NOT_PROCESS;
+    return OperationStatus.UNPROCESSED;
   }
 }

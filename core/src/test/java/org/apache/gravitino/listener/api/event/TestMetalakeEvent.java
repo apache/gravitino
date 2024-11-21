@@ -78,7 +78,7 @@ public class TestMetalakeEvent {
     metalakeInfo = ((CreateMetalakePreEvent) preEvent).createMetalakeRequest();
     checkMetalakeInfo(metalakeInfo, metalake);
     Assertions.assertEquals(OperationType.CREATE_METALAKE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -97,7 +97,7 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(LoadMetalakePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.LOAD_METALAKE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -123,8 +123,7 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(
         metalakeChange, ((AlterMetalakePreEvent) preEvent).metalakeChanges()[0]);
     Assertions.assertEquals(OperationType.ALTER_METALAKE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
-
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -142,8 +141,7 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropMetalakePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.DROP_METALAKE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
-
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -156,10 +154,10 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(null , preEvent.identifier());
+    Assertions.assertEquals(null, preEvent.identifier());
     Assertions.assertEquals(ListMetalakePreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.LIST_METALAKE, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test

@@ -72,7 +72,7 @@ public class TestTopicEvent {
     TopicInfo topicInfo = ((CreateTopicPreEvent) preEvent).createTopicRequest();
     checkTopicInfo(topicInfo, topic);
     Assertions.assertEquals(OperationType.CREATE_TOPIC, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
@@ -92,7 +92,7 @@ public class TestTopicEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(LoadTopicPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.LOAD_TOPIC, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
@@ -115,7 +115,7 @@ public class TestTopicEvent {
     Assertions.assertEquals(1, ((AlterTopicPreEvent) preEvent).topicChanges().length);
     Assertions.assertEquals(topicChange, ((AlterTopicPreEvent) preEvent).topicChanges()[0]);
     Assertions.assertEquals(OperationType.ALTER_TOPIC, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
@@ -137,7 +137,7 @@ public class TestTopicEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropTopicPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.DROP_TOPIC, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier, event.identifier());
@@ -157,7 +157,7 @@ public class TestTopicEvent {
     Assertions.assertEquals(ListTopicPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(namespace, ((ListTopicPreEvent) preEvent).namespace());
     Assertions.assertEquals(OperationType.LIST_TOPIC, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
@@ -262,7 +262,7 @@ public class TestTopicEvent {
   private TopicDispatcher mockTopicDispatcher() {
     TopicDispatcher dispatcher = mock(TopicDispatcher.class);
     when(dispatcher.createTopic(
-        any(NameIdentifier.class), any(String.class), isNull(), any(Map.class)))
+            any(NameIdentifier.class), any(String.class), isNull(), any(Map.class)))
         .thenReturn(topic);
     when(dispatcher.loadTopic(any(NameIdentifier.class))).thenReturn(topic);
     when(dispatcher.dropTopic(any(NameIdentifier.class))).thenReturn(true);

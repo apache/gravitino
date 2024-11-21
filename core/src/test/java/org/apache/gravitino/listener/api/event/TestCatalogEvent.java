@@ -80,7 +80,7 @@ public class TestCatalogEvent {
     CatalogInfo preCatalogInfo = ((CreateCatalogPreEvent) preEvent).createCatalogRequest();
     checkCatalogInfo(preCatalogInfo, catalog);
     Assertions.assertEquals(OperationType.CREATE_CATALOG, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -99,7 +99,7 @@ public class TestCatalogEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(LoadCatalogPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.LOAD_CATALOG, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -125,7 +125,7 @@ public class TestCatalogEvent {
     Assertions.assertEquals(1, preCatalogChanges.length);
     Assertions.assertEquals(catalogChange, preCatalogChanges[0]);
     Assertions.assertEquals(OperationType.ALTER_CATALOG, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -143,7 +143,7 @@ public class TestCatalogEvent {
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropCatalogPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(OperationType.DROP_CATALOG, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -162,7 +162,7 @@ public class TestCatalogEvent {
     Assertions.assertEquals(ListCatalogPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(namespace, ((ListCatalogPreEvent) preEvent).namespace());
     Assertions.assertEquals(OperationType.LIST_CATALOG, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -181,7 +181,7 @@ public class TestCatalogEvent {
     Assertions.assertEquals(ListCatalogPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(namespace, ((ListCatalogPreEvent) preEvent).namespace());
     Assertions.assertEquals(OperationType.LIST_CATALOG, preEvent.operationType());
-    Assertions.assertEquals(OperationStatus.NOT_PROCESS, preEvent.operationStatus());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test

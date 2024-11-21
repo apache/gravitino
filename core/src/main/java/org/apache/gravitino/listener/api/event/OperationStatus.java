@@ -20,7 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 public enum OperationStatus {
-  NOT_PROCESS,
+  UNPROCESSED,
   SUCCESS,
   FAILURE,
 

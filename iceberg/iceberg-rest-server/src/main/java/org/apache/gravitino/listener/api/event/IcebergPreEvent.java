@@ -45,7 +45,7 @@ public abstract class IcebergPreEvent extends PreEvent {
 
   @Override
   public OperationStatus operationStatus() {
-    return OperationStatus.NOT_PROCESS;
+    return OperationStatus.UNPROCESSED;
   }
 
   @Override
