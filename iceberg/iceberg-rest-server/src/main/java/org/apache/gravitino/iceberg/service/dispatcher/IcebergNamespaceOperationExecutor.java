@@ -82,7 +82,7 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
   public boolean namespaceExists(IcebergRequestContext context, Namespace namespace) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .existNamespace(namespace);
+        .namespaceExists(namespace);
   }
 
   @Override
