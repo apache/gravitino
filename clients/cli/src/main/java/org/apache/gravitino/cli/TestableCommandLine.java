@@ -115,7 +115,8 @@ public class TestableCommandLine {
     return new ListMetalakes(url, ignore);
   }
 
-  protected CreateMetalake newCreateMetalake(String url, boolean ignore, String metalake, String comment) {
+  protected CreateMetalake newCreateMetalake(
+      String url, boolean ignore, String metalake, String comment) {
     return new CreateMetalake(url, ignore, metalake, comment);
   }
 
@@ -134,7 +135,8 @@ public class TestableCommandLine {
     return new RemoveMetalakeProperty(url, ignore, metalake, property);
   }
 
-  protected ListMetalakeProperties newListMetalakeProperties(String url, boolean ignore, String metalake) {
+  protected ListMetalakeProperties newListMetalakeProperties(
+      String url, boolean ignore, String metalake) {
     return new ListMetalakeProperties(url, ignore, metalake);
   }
 
@@ -368,7 +370,8 @@ public class TestableCommandLine {
     return new ListAllTags(url, ignore, metalake);
   }
 
-  protected CreateTag newCreateTag(String url, boolean ignore, String metalake, String tag, String comment) {
+  protected CreateTag newCreateTag(
+      String url, boolean ignore, String metalake, String tag, String comment) {
     return new CreateTag(url, ignore, metalake, tag, comment);
   }
 
@@ -387,7 +390,8 @@ public class TestableCommandLine {
     return new RemoveTagProperty(url, ignore, metalake, tag, property);
   }
 
-  protected ListTagProperties newListTagProperties(String url, boolean ignore, String metalake, String tag) {
+  protected ListTagProperties newListTagProperties(
+      String url, boolean ignore, String metalake, String tag) {
     return new ListTagProperties(url, ignore, metalake, tag);
   }
 
