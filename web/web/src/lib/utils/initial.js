@@ -453,7 +453,7 @@ const parameterizedColumnTypes = {
 }
 
 export const getParameterizedColumnType = type => {
-  if (Object.keys(parameterizedColumnTypes).includes(type)) {
+  if (Object.hasOwn(parameterizedColumnTypes, type)) {
     return parameterizedColumnTypes[type]
   }
 }
@@ -567,7 +567,7 @@ const relationalColumnTypeMap = {
 }
 
 export const getRelationalColumnType = catalog => {
-  if (Object.keys(relationalColumnTypeMap).includes(catalog)) {
+  if (Object.hasOwn(relationalColumnTypeMap, catalog)) {
     return relationalColumnTypeMap[catalog]
   }
 
@@ -617,7 +617,7 @@ const relationalTablePropInfoMap = {
 }
 
 export const getRelationalTablePropInfo = catalog => {
-  if (Object.keys(relationalTablePropInfoMap).includes(catalog)) {
+  if (Object.hasOwn(relationalTablePropInfoMap, catalog)) {
     return relationalTablePropInfoMap[catalog]
   }
 
