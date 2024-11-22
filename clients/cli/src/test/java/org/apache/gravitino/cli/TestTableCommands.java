@@ -48,7 +48,7 @@ class TestTableCommands {
   }
 
   @Test
-  void listTablesCommand() {
+  void testListTablesCommand() {
     ListTables mockList = mock(ListTables.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
@@ -68,7 +68,7 @@ class TestTableCommands {
   }
 
   @Test
-  void tableDetailsCommand() {
+  void testTableDetailsCommand() {
     TableDetails mockDetails = mock(TableDetails.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -88,7 +88,7 @@ class TestTableCommands {
   }
 
   @Test
-  void tableIndexCommand() {
+  void testTableIndexCommand() {
     ListIndexes mockIndex = mock(ListIndexes.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -108,7 +108,7 @@ class TestTableCommands {
   }
 
   @Test
-  void tablePartitionCommand() {
+  void testTablePartitionCommand() {
     TablePartition mockPartition = mock(TablePartition.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -128,7 +128,7 @@ class TestTableCommands {
   }
 
   @Test
-  void tableDistributionCommand() {
+  void testTableDistributionCommand() {
     TableDistribution mockDistribution = mock(TableDistribution.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -148,7 +148,7 @@ class TestTableCommands {
   }
 
   @Test
-  void tableAuditCommand() {
+  void testTableAuditCommand() {
     TableAudit mockAudit = mock(TableAudit.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -168,7 +168,7 @@ class TestTableCommands {
   }
 
   @Test
-  void deleteTableCommand() {
+  void testDeleteTableCommand() {
     DeleteTable mockDelete = mock(DeleteTable.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -193,7 +193,7 @@ class TestTableCommands {
   }
 
   @Test
-  void deleteTableForceCommand() {
+  void testDeleteTableForceCommand() {
     DeleteTable mockDelete = mock(DeleteTable.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");

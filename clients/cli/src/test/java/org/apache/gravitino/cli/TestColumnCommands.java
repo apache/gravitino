@@ -42,7 +42,7 @@ class TestColumnCommands {
   }
 
   @Test
-  void listColumnsCommand() {
+  void testListColumnsCommand() {
     ListColumns mockList = mock(ListColumns.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");

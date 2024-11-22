@@ -55,7 +55,7 @@ class TestTagCommands {
   }
 
   @Test
-  void listTagsCommand() {
+  void testListTagsCommand() {
     ListAllTags mockList = mock(ListAllTags.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
@@ -71,7 +71,7 @@ class TestTagCommands {
   }
 
   @Test
-  void metalakeDetailsCommand() {
+  void testMetalakeDetailsCommand() {
     TagDetails mockDetails = mock(TagDetails.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -89,7 +89,7 @@ class TestTagCommands {
   }
 
   @Test
-  void createTagCommand() {
+  void testCreateTagCommand() {
     CreateTag mockCreate = mock(CreateTag.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -109,7 +109,7 @@ class TestTagCommands {
   }
 
   @Test
-  void createTagCommandNoComment() {
+  void testCreateTagCommandNoComment() {
     CreateTag mockCreate = mock(CreateTag.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -127,7 +127,7 @@ class TestTagCommands {
   }
 
   @Test
-  void deleteTagCommand() {
+  void testDeleteTagCommand() {
     DeleteTag mockDelete = mock(DeleteTag.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -145,7 +145,7 @@ class TestTagCommands {
   }
 
   @Test
-  void deleteTagForceCommand() {
+  void testDeleteTagForceCommand() {
     DeleteTag mockDelete = mock(DeleteTag.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -164,7 +164,7 @@ class TestTagCommands {
   }
 
   @Test
-  void setTagPropertyCommand() {
+  void testSetTagPropertyCommand() {
     SetTagProperty mockSetProperty = mock(SetTagProperty.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -187,7 +187,7 @@ class TestTagCommands {
   }
 
   @Test
-  void removeTagPropertyCommand() {
+  void testRemoveTagPropertyCommand() {
     RemoveTagProperty mockRemoveProperty = mock(RemoveTagProperty.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -208,7 +208,7 @@ class TestTagCommands {
   }
 
   @Test
-  void listTagPropertiesCommand() {
+  void testListTagPropertiesCommand() {
     ListTagProperties mockListProperties = mock(ListTagProperties.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -226,7 +226,7 @@ class TestTagCommands {
   }
 
   @Test
-  void updateTagCommentCommand() {
+  void testUpdateTagCommentCommand() {
     UpdateTagComment mockUpdateComment = mock(UpdateTagComment.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -247,7 +247,7 @@ class TestTagCommands {
   }
 
   @Test
-  void updateTagNameCommand() {
+  void testUpdateTagNameCommand() {
     UpdateTagName mockUpdateName = mock(UpdateTagName.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -267,7 +267,7 @@ class TestTagCommands {
   }
 
   @Test
-  void listEntityTagsCommand() {
+  void testListEntityTagsCommand() {
     ListEntityTags mockListTags = mock(ListEntityTags.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -286,7 +286,7 @@ class TestTagCommands {
   }
 
   @Test
-  void tagEntityCommand() {
+  void testTagEntityCommand() {
     TagEntity mockTagEntity = mock(TagEntity.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -311,7 +311,7 @@ class TestTagCommands {
   }
 
   @Test
-  void untagEntityCommand() {
+  void testUntagEntityCommand() {
     UntagEntity mockUntagEntity = mock(UntagEntity.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");

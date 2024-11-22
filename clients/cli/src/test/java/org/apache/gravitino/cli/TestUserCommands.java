@@ -46,7 +46,7 @@ class TestUserCommands {
   }
 
   @Test
-  void listUsersCommand() {
+  void testListUsersCommand() {
     ListUsers mockList = mock(ListUsers.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
@@ -62,7 +62,7 @@ class TestUserCommands {
   }
 
   @Test
-  void userDetailsCommand() {
+  void testUserDetailsCommand() {
     UserDetails mockDetails = mock(UserDetails.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -80,7 +80,7 @@ class TestUserCommands {
   }
 
   @Test
-  void createUserCommand() {
+  void testCreateUserCommand() {
     CreateUser mockCreate = mock(CreateUser.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -98,7 +98,7 @@ class TestUserCommands {
   }
 
   @Test
-  void deleteUserCommand() {
+  void testDeleteUserCommand() {
     DeleteUser mockDelete = mock(DeleteUser.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -116,7 +116,7 @@ class TestUserCommands {
   }
 
   @Test
-  void deleteUserForceCommand() {
+  void testDeleteUserForceCommand() {
     DeleteUser mockDelete = mock(DeleteUser.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -134,7 +134,7 @@ class TestUserCommands {
     verify(mockDelete).handle();
   }
 
-  void removeRoleFromUserCommand() {
+  void testRemoveRoleFromUserCommand() {
     RemoveRoleFromUser mockRemove = mock(RemoveRoleFromUser.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -154,7 +154,7 @@ class TestUserCommands {
     verify(mockRemove).handle();
   }
 
-  void addRoleToUserCommand() {
+  void testAddRoleToUserCommand() {
     RemoveRoleFromUser mockAdd = mock(RemoveRoleFromUser.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");

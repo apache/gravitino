@@ -51,7 +51,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void listMetalakesCommand() {
+  void testListMetalakesCommand() {
     ListMetalakes mockList = mock(ListMetalakes.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
@@ -65,7 +65,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void metalakeDetailsCommand() {
+  void testMetalakeDetailsCommand() {
     MetalakeDetails mockDetails = mock(MetalakeDetails.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -82,7 +82,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void metalakeAuditCommand() {
+  void testMetalakeAuditCommand() {
     MetalakeAudit mockAudit = mock(MetalakeAudit.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -99,7 +99,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void createMetalakeCommand() {
+  void testCreateMetalakeCommand() {
     CreateMetalake mockCreate = mock(CreateMetalake.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -117,7 +117,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void createMetalakeCommandNoComment() {
+  void testCreateMetalakeCommandNoComment() {
     CreateMetalake mockCreate = mock(CreateMetalake.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -133,7 +133,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void deleteMetalakeCommand() {
+  void testDeleteMetalakeCommand() {
     DeleteMetalake mockDelete = mock(DeleteMetalake.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -149,7 +149,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void deleteMetalakeForceCommand() {
+  void testDeleteMetalakeForceCommand() {
     DeleteMetalake mockDelete = mock(DeleteMetalake.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -166,7 +166,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void setMetalakePropertyCommand() {
+  void testSetMetalakePropertyCommand() {
     SetMetalakeProperty mockSetProperty = mock(SetMetalakeProperty.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -187,7 +187,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void removeMetalakePropertyCommand() {
+  void testRemoveMetalakePropertyCommand() {
     RemoveMetalakeProperty mockRemoveProperty = mock(RemoveMetalakeProperty.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -206,7 +206,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void listMetalakePropertiesCommand() {
+  void testListMetalakePropertiesCommand() {
     ListMetalakeProperties mockListProperties = mock(ListMetalakeProperties.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -222,7 +222,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void updateMetalakeCommentCommand() {
+  void testUpdateMetalakeCommentCommand() {
     UpdateMetalakeComment mockUpdateComment = mock(UpdateMetalakeComment.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -241,7 +241,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void updateMetalakeNameCommand() {
+  void testUpdateMetalakeNameCommand() {
     UpdateMetalakeName mockUpdateName = mock(UpdateMetalakeName.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -260,7 +260,7 @@ class TestMetalakeCommands {
   }
 
   @Test
-  void updateMetalakeNameForceCommand() {
+  void testUpdateMetalakeNameForceCommand() {
     UpdateMetalakeName mockUpdateName = mock(UpdateMetalakeName.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");

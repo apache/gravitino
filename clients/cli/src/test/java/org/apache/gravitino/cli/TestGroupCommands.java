@@ -47,7 +47,7 @@ class TestGroupCommands {
   }
 
   @Test
-  void listGroupsCommand() {
+  void testListGroupsCommand() {
     ListGroups mockList = mock(ListGroups.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
@@ -63,7 +63,7 @@ class TestGroupCommands {
   }
 
   @Test
-  void groupDetailsCommand() {
+  void testGroupDetailsCommand() {
     GroupDetails mockDetails = mock(GroupDetails.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -81,7 +81,7 @@ class TestGroupCommands {
   }
 
   @Test
-  void createGroupCommand() {
+  void testCreateGroupCommand() {
     CreateGroup mockCreate = mock(CreateGroup.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -99,7 +99,7 @@ class TestGroupCommands {
   }
 
   @Test
-  void deleteGroupCommand() {
+  void testDeleteGroupCommand() {
     DeleteGroup mockDelete = mock(DeleteGroup.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -117,7 +117,7 @@ class TestGroupCommands {
   }
 
   @Test
-  void deleteGroupForceCommand() {
+  void testDeleteGroupForceCommand() {
     DeleteGroup mockDelete = mock(DeleteGroup.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -136,7 +136,7 @@ class TestGroupCommands {
   }
 
   @Test
-  void removeRoleFromGroupCommand() {
+  void testRemoveRoleFromGroupCommand() {
     RemoveRoleFromGroup mockRemove = mock(RemoveRoleFromGroup.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -157,7 +157,7 @@ class TestGroupCommands {
   }
 
   @Test
-  void addRoleToGroupCommand() {
+  void testAddRoleToGroupCommand() {
     AddRoleToGroup mockAdd = mock(AddRoleToGroup.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");

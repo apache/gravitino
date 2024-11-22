@@ -49,7 +49,7 @@ class TestSchemaCommands {
   }
 
   @Test
-  void listSchemasCommand() {
+  void testListSchemasCommand() {
     ListSchema mockList = mock(ListSchema.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(CommandEntities.METALAKE)).thenReturn("metalake_demo");
@@ -67,7 +67,7 @@ class TestSchemaCommands {
   }
 
   @Test
-  void schemaDetailsCommand() {
+  void testSchemaDetailsCommand() {
     SchemaDetails mockDetails = mock(SchemaDetails.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -87,7 +87,7 @@ class TestSchemaCommands {
   }
 
   @Test
-  void schemaAuditCommand() {
+  void testSchemaAuditCommand() {
     SchemaAudit mockAudit = mock(SchemaAudit.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -107,7 +107,7 @@ class TestSchemaCommands {
   }
 
   @Test
-  void createSchemaCommand() {
+  void testCreateSchemaCommand() {
     CreateSchema mockCreate = mock(CreateSchema.class);
 
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
@@ -134,7 +134,7 @@ class TestSchemaCommands {
   }
 
   @Test
-  void deleteSchemaCommand() {
+  void testDeleteSchemaCommand() {
     DeleteSchema mockDelete = mock(DeleteSchema.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -153,7 +153,7 @@ class TestSchemaCommands {
   }
 
   @Test
-  void deleteSchemaForceCommand() {
+  void testDeleteSchemaForceCommand() {
     DeleteSchema mockDelete = mock(DeleteSchema.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -173,7 +173,7 @@ class TestSchemaCommands {
   }
 
   @Test
-  void setSchemaPropertyCommand() {
+  void testSetSchemaPropertyCommand() {
     SetSchemaProperty mockSetProperty = mock(SetSchemaProperty.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -202,7 +202,7 @@ class TestSchemaCommands {
   }
 
   @Test
-  void removeSchemaPropertyCommand() {
+  void testRemoveSchemaPropertyCommand() {
     RemoveSchemaProperty mockRemoveProperty = mock(RemoveSchemaProperty.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
@@ -228,7 +228,7 @@ class TestSchemaCommands {
   }
 
   @Test
-  void listSchemaPropertiesCommand() {
+  void testListSchemaPropertiesCommand() {
     ListSchemaProperties mockListProperties = mock(ListSchemaProperties.class);
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
