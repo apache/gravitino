@@ -43,4 +43,14 @@ public class CreateCatalogPreEvent extends CatalogPreEvent {
   public CatalogInfo createCatalogRequest() {
     return createCatalogRequest;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_CATALOG;
+  }
 }

@@ -38,6 +38,11 @@ public class IcebergLoadTableEvent extends IcebergTableEvent {
         IcebergRestUtils.cloneIcebergRESTObject(loadTableResponse, LoadTableResponse.class);
   }
 
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_TABLE;
+  }
+
   public LoadTableResponse loadTableResponse() {
     return loadTableResponse;
   }

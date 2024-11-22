@@ -69,12 +69,16 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(CreateMetalakeEvent.class, event.getClass());
     MetalakeInfo metalakeInfo = ((CreateMetalakeEvent) event).createdMetalakeInfo();
     checkMetalakeInfo(metalakeInfo, metalake);
+    Assertions.assertEquals(OperationType.CREATE_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(CreateMetalakePreEvent.class, preEvent.getClass());
     metalakeInfo = ((CreateMetalakePreEvent) preEvent).createMetalakeRequest();
     checkMetalakeInfo(metalakeInfo, metalake);
+    Assertions.assertEquals(OperationType.CREATE_METALAKE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -86,10 +90,14 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(LoadMetalakeEvent.class, event.getClass());
     MetalakeInfo metalakeInfo = ((LoadMetalakeEvent) event).loadedMetalakeInfo();
     checkMetalakeInfo(metalakeInfo, metalake);
+    Assertions.assertEquals(OperationType.LOAD_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(LoadMetalakePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LOAD_METALAKE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -105,6 +113,8 @@ public class TestMetalakeEvent {
     MetalakeChange[] metalakeChanges = ((AlterMetalakeEvent) event).metalakeChanges();
     Assertions.assertTrue(metalakeChanges.length == 1);
     Assertions.assertEquals(metalakeChange, metalakeChanges[0]);
+    Assertions.assertEquals(OperationType.ALTER_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
@@ -112,6 +122,8 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(1, ((AlterMetalakePreEvent) preEvent).metalakeChanges().length);
     Assertions.assertEquals(
         metalakeChange, ((AlterMetalakePreEvent) preEvent).metalakeChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_METALAKE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -122,10 +134,14 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropMetalakeEvent.class, event.getClass());
     Assertions.assertTrue(((DropMetalakeEvent) event).isExists());
+    Assertions.assertEquals(OperationType.DROP_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropMetalakePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DROP_METALAKE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -134,6 +150,14 @@ public class TestMetalakeEvent {
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertNull(event.identifier());
     Assertions.assertEquals(ListMetalakeEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.LIST_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(null, preEvent.identifier());
+    Assertions.assertEquals(ListMetalakePreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_METALAKE, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -151,6 +175,8 @@ public class TestMetalakeEvent {
         GravitinoRuntimeException.class,
         ((CreateMetalakeFailureEvent) event).exception().getClass());
     checkMetalakeInfo(((CreateMetalakeFailureEvent) event).createMetalakeRequest(), metalake);
+    Assertions.assertEquals(OperationType.CREATE_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -163,6 +189,8 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(LoadMetalakeFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((LoadMetalakeFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LOAD_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -181,6 +209,8 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(1, ((AlterMetalakeFailureEvent) event).metalakeChanges().length);
     Assertions.assertEquals(
         metalakeChange, ((AlterMetalakeFailureEvent) event).metalakeChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -193,6 +223,8 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(DropMetalakeFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((DropMetalakeFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DROP_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -204,6 +236,8 @@ public class TestMetalakeEvent {
     Assertions.assertEquals(ListMetalakeFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListMetalakeFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LIST_METALAKE, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   private void checkMetalakeInfo(MetalakeInfo metalakeInfo, Metalake metalake) {

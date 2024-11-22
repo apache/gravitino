@@ -39,4 +39,9 @@ public class IcebergUpdateTablePreEvent extends IcebergTablePreEvent {
   public UpdateTableRequest updateTableRequest() {
     return updateTableRequest;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_TABLE;
+  }
 }

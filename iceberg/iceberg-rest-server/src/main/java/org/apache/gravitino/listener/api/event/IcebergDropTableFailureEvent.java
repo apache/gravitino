@@ -39,4 +39,9 @@ public class IcebergDropTableFailureEvent extends IcebergTableFailureEvent {
   public boolean purgeRequested() {
     return purgeRequested;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_TABLE;
+  }
 }

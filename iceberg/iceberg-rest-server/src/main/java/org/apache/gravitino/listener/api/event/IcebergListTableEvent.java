@@ -35,4 +35,9 @@ public class IcebergListTableEvent extends IcebergTableEvent {
       IcebergRequestContext icebergRequestContext, NameIdentifier resourceIdentifier) {
     super(icebergRequestContext, resourceIdentifier);
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_TABLE;
+  }
 }

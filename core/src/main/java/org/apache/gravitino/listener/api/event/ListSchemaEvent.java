@@ -41,4 +41,14 @@ public final class ListSchemaEvent extends SchemaEvent {
   public Namespace namespace() {
     return namespace;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_SCHEMA;
+  }
 }

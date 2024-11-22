@@ -797,7 +797,8 @@ tasks {
         !it.name.startsWith("trino-connector") &&
         it.name != "bundled-catalog" &&
         it.name != "hive-metastore-common" && it.name != "gcp-bundle" &&
-        it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle"
+        it.name != "aliyun-bundle" && it.name != "aws-bundle" && it.name != "azure-bundle" &&
+        it.name != "docs"
       ) {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs")

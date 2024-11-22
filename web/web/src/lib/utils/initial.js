@@ -70,7 +70,7 @@ export const providers = [
         defaultValue: 'hive',
         required: true,
         description: 'Apache Iceberg catalog type choose properties',
-        select: ['hive', 'jdbc']
+        select: ['hive', 'jdbc', 'rest']
       },
       {
         key: 'uri',
@@ -82,6 +82,8 @@ export const providers = [
         key: 'warehouse',
         value: '',
         required: true,
+        parentField: 'catalog-backend',
+        hide: ['rest'],
         description: 'Apache Iceberg catalog warehouse config'
       },
       {
@@ -89,7 +91,7 @@ export const providers = [
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive'],
+        hide: ['hive', 'rest'],
         description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`
       },
       {
@@ -97,14 +99,14 @@ export const providers = [
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive']
+        hide: ['hive', 'rest']
       },
       {
         key: 'jdbc-password',
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive']
+        hide: ['hive', 'rest']
       },
       {
         key: 'authentication.type',

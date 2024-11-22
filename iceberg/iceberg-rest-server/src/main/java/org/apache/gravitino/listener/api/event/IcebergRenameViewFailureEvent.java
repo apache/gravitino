@@ -40,4 +40,9 @@ public class IcebergRenameViewFailureEvent extends IcebergViewFailureEvent {
   public RenameTableRequest renameViewRequest() {
     return renameViewRequest;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.RENAME_VIEW;
+  }
 }

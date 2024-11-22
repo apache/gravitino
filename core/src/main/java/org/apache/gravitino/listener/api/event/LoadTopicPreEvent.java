@@ -28,4 +28,14 @@ public class LoadTopicPreEvent extends TopicPreEvent {
   public LoadTopicPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_TOPIC;
+  }
 }
