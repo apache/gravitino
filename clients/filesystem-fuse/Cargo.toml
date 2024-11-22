@@ -27,8 +27,8 @@ path = "src/main.rs"
 
 [dependencies]
 fuse3 = { version = "0.8.1", "features" = ["tokio-runtime", "unprivileged"] }
-tokio = { version = "1.38.0", features = ["full"] }
 futures-util = "0.3.30"
 libc = "0.2.164"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 log = "0.4.22"
+tokio = { version = "1.38.0", features = ["full"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
