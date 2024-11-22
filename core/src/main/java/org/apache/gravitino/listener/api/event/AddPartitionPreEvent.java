@@ -44,4 +44,14 @@ public class AddPartitionPreEvent extends PartitionPreEvent {
   public PartitionInfo createdPartitionRequest() {
     return createPartitionRequest;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ADD_PARTITION;
+  }
 }

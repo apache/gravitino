@@ -28,4 +28,13 @@ public class ListPartitionPreEvent extends PartitionPreEvent {
   public ListPartitionPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_PARTITION;
+  }
 }
