@@ -25,7 +25,7 @@ rootProject.name = "gravitino"
 val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion"]?.toString()
   ?: settings.extra["defaultScalaVersion"].toString()
 
-include("api", "common", "core", "meta", "server", "server-common")
+include("api", "common", "core", "server", "server-common")
 include("catalogs:catalog-common")
 include("catalogs:catalog-hive")
 include("catalogs:hive-metastore-common")

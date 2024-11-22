@@ -26,7 +26,6 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":meta"))
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
@@ -41,7 +40,6 @@ dependencies {
     exclude("com.google.guava", "guava")
       .because("Brings in Guava for Android, which we don't want (and breaks multimaps).")
   }
-  implementation(libs.rocksdbjni)
 
   annotationProcessor(libs.lombok)
 
