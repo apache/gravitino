@@ -123,6 +123,8 @@ public class TestPartitionEvent {
     Assertions.assertEquals(AddPartitionPreEvent.class, preEvent.getClass());
     partitionInfo = ((AddPartitionPreEvent) preEvent).createdPartitionRequest();
     checkPartitionInfo(partitionInfo, partition);
+    Assertions.assertEquals(OperationType.ADD_PARTITION,event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS,event.operationStatus());
   }
 
   @Test
@@ -139,6 +141,8 @@ public class TestPartitionEvent {
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropPartitionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DROP_PARTITION,event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS,event.operationStatus());
   }
 
   @Test
@@ -167,6 +171,8 @@ public class TestPartitionEvent {
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(ListPartitionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_PARTITION,event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS,event.operationStatus());
   }
 
   @Test
@@ -183,6 +189,8 @@ public class TestPartitionEvent {
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(ListPartitionNamesPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_PARTITION_NAMES,event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS,event.operationStatus());
   }
 
   @Test
@@ -199,6 +207,8 @@ public class TestPartitionEvent {
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(PurgePartitionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.PURGE_PARTITION,event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS,event.operationStatus());
   }
 
   @Test
