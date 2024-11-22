@@ -86,6 +86,9 @@ public class RangerHelper {
    */
   void checkPolicyItemAccess(RangerPolicy.RangerPolicyItem policyItem)
       throws AuthorizationPluginException {
+    if (!isGravitinoManagedPolicyItemAccess(policyItem)) {
+      return;
+    }
     if (policyItem.getAccesses().size() != 1) {
       throw new AuthorizationPluginException(
           "The access type only have one in the delegate Gravitino management policy");
@@ -124,7 +127,9 @@ public class RangerHelper {
                             policyItem -> {
                               return policyItem.getAccesses().stream()
                                   .anyMatch(
-                                      access -> access.getType().equals(rangerPrivilege.getName()));
+                                      access ->
+                                          access.getType().equals(rangerPrivilege.getName())
+                                              && isGravitinoManagedPolicyItemAccess(policyItem));
                             })
                         .collect(Collectors.toList());
               } else {
@@ -134,7 +139,9 @@ public class RangerHelper {
                             policyItem -> {
                               return policyItem.getAccesses().stream()
                                   .anyMatch(
-                                      access -> access.getType().equals(rangerPrivilege.getName()));
+                                      access ->
+                                          access.getType().equals(rangerPrivilege.getName())
+                                              && isGravitinoManagedPolicyItemAccess(policyItem));
                             })
                         .collect(Collectors.toList());
               }
@@ -238,18 +245,10 @@ public class RangerHelper {
 
     RangerPolicy policy = policies.get(0);
     // Delegating Gravitino management policies cannot contain duplicate privilege
-    policy.getPolicyItems().stream()
-        .filter(this::isGravitinoManagedPolicyItemAccess)
-        .forEach(this::checkPolicyItemAccess);
-    policy.getDenyPolicyItems().stream()
-        .filter(this::isGravitinoManagedPolicyItemAccess)
-        .forEach(this::checkPolicyItemAccess);
-    policy.getRowFilterPolicyItems().stream()
-        .filter(this::isGravitinoManagedPolicyItemAccess)
-        .forEach(this::checkPolicyItemAccess);
-    policy.getDataMaskPolicyItems().stream()
-        .filter(this::isGravitinoManagedPolicyItemAccess)
-        .forEach(this::checkPolicyItemAccess);
+    policy.getPolicyItems().forEach(this::checkPolicyItemAccess);
+    policy.getDenyPolicyItems().forEach(this::checkPolicyItemAccess);
+    policy.getRowFilterPolicyItems().forEach(this::checkPolicyItemAccess);
+    policy.getDataMaskPolicyItems().forEach(this::checkPolicyItemAccess);
 
     return policy;
   }

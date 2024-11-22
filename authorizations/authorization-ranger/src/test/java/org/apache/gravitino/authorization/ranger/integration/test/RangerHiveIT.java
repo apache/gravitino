@@ -33,7 +33,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.MetadataObjectChange;
@@ -355,7 +357,7 @@ public class RangerHiveIT {
   }
 
   @Test
-  public void testGravitinoAddItemsToExistingPolicy() {
+  public void testGravitinoCompatibleWithExistingPolicy() {
     RoleEntity role = mock3TableRole(currentFunName());
     role.securableObjects().stream()
         .forEach(
@@ -368,8 +370,66 @@ public class RangerHiveIT {
               // Manual create the Ranger Policy
               createHivePolicy(Lists.newArrayList(names), DOT_JOINER.join(names));
             });
-    // Use role to create Ranger Policy
-    Assertions.assertTrue(rangerAuthHivePlugin.onRoleCreated(role));
+    List<String> existingPolicyNames =
+        findRoleResourceRelatedPolicies(role).stream()
+            .map(RangerPolicy::getName)
+            .collect(Collectors.toList());
+    rangerAuthHivePlugin.onRoleCreated(role);
+    findRoleResourceRelatedPolicies(role)
+        .forEach(
+            policy -> {
+              List<RangerPolicy.RangerPolicyItem> policyItems = new ArrayList<>();
+              policyItems.addAll(policy.getPolicyItems());
+              policyItems.addAll(policy.getDenyPolicyItems());
+              policyItems.addAll(policy.getRowFilterPolicyItems());
+              policyItems.addAll(policy.getDataMaskPolicyItems());
+
+              if (existingPolicyNames.contains(policy.getName())) {
+                Assertions.assertTrue(
+                    policyItems.stream()
+                        .anyMatch(
+                            i ->
+                                !i.getRoles()
+                                    .contains(
+                                        rangerHelper.generateGravitinoRoleName(role.name()))));
+              }
+              Assertions.assertTrue(
+                  policyItems.stream()
+                      .anyMatch(
+                          i ->
+                              i.getRoles()
+                                  .contains(rangerHelper.generateGravitinoRoleName(role.name()))));
+            });
+
+    rangerAuthHivePlugin.onRoleDeleted(role);
+    findRoleResourceRelatedPolicies(role)
+        .forEach(
+            policy -> {
+              List<RangerPolicy.RangerPolicyItem> policyItems = new ArrayList<>();
+              policyItems.addAll(policy.getPolicyItems());
+              policyItems.addAll(policy.getDenyPolicyItems());
+              policyItems.addAll(policy.getRowFilterPolicyItems());
+              policyItems.addAll(policy.getDataMaskPolicyItems());
+
+              if (existingPolicyNames.contains(policy.getName())) {
+                Assertions.assertFalse(
+                    policyItems.stream()
+                        .anyMatch(
+                            i ->
+                                i.getRoles()
+                                    .contains(
+                                        rangerHelper.generateGravitinoRoleName(role.name()))));
+                Assertions.assertTrue(
+                    policyItems.stream()
+                        .anyMatch(
+                            i ->
+                                !i.getRoles()
+                                    .contains(
+                                        rangerHelper.generateGravitinoRoleName(role.name()))));
+              } else {
+                Assertions.assertEquals(0, policyItems.size());
+              }
+            });
   }
 
   static void createHivePolicy(List<String> metaObjects, String roleName) {
@@ -1151,34 +1211,39 @@ public class RangerHiveIT {
   }
 
   private void assertFindManagedPolicyItems(Role role, boolean gravitinoPolicyItemExist) {
-    role.securableObjects().stream()
-        .forEach(
+    List<RangerPolicy> policies = findRoleResourceRelatedPolicies(role);
+
+    if (gravitinoPolicyItemExist) {
+      Assertions.assertTrue(policies.size() > 0);
+    }
+
+    policies.forEach(
+        policy -> {
+          List<RangerPolicy.RangerPolicyItem> policyItems = new ArrayList<>();
+          policyItems.addAll(policy.getPolicyItems());
+          policyItems.addAll(policy.getDenyPolicyItems());
+          policyItems.addAll(policy.getRowFilterPolicyItems());
+          policyItems.addAll(policy.getDataMaskPolicyItems());
+          if (gravitinoPolicyItemExist) {
+            Assertions.assertTrue(hasGravitinoManagedPolicyItemAccess(policyItems, role.name()));
+          } else {
+            Assertions.assertFalse(hasGravitinoManagedPolicyItemAccess(policyItems, role.name()));
+          }
+        });
+  }
+
+  private List<RangerPolicy> findRoleResourceRelatedPolicies(Role role) {
+    return role.securableObjects().stream()
+        .flatMap(
             securableObject ->
                 rangerAuthHivePlugin.translatePrivilege(securableObject).stream()
-                    .forEach(
+                    .map(
                         rangerSecurableObject -> {
                           LOG.info("rangerSecurableObject: " + rangerSecurableObject);
-                          RangerPolicy policy =
-                              rangerHelper.findManagedPolicy(rangerSecurableObject);
-                          List<RangerPolicy.RangerPolicyItem> policyItems = new ArrayList<>();
-                          if (policy != null) {
-                            policyItems.addAll(policy.getPolicyItems());
-                            policyItems.addAll(policy.getDenyPolicyItems());
-                            policyItems.addAll(policy.getRowFilterPolicyItems());
-                            policyItems.addAll(policy.getDataMaskPolicyItems());
-                          }
-
-                          if (gravitinoPolicyItemExist) {
-                            Assertions.assertNotNull(policy);
-                            Assertions.assertTrue(
-                                hasGravitinoManagedPolicyItemAccess(policyItems, role.name()));
-                          } else {
-                            Assertions.assertTrue(
-                                (policy == null)
-                                    || !hasGravitinoManagedPolicyItemAccess(
-                                        policyItems, role.name()));
-                          }
-                        }));
+                          return rangerHelper.findManagedPolicy(rangerSecurableObject);
+                        }))
+        .filter(Objects::nonNull)
+        .collect(Collectors.toList());
   }
 
   public boolean hasGravitinoManagedPolicyItemAccess(
