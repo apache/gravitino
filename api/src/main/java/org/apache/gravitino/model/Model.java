@@ -24,18 +24,15 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
-import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistsException;
-import org.apache.gravitino.exceptions.NoSuchModelException;
-import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
  * An interface representing an ML model under a schema {@link Namespace}. A model is a metadata
  * object that represents the model artifact in ML. Users can register a model object in Gravitino
- * to manage the mode metadata. The typical use case is to manage the model in ML lifecycle with a
+ * to manage the model metadata. The typical use case is to manage the model in ML lifecycle with a
  * unified way in Gravitino, and access the model artifact with a unified identifier. Also, with the
- * model registered in Gravitino, users can also govern the model with Gravitino's unified audit,
- * tag, and role management.
+ * model registered in Gravitino, users can govern the model with Gravitino's unified audit, tag,
+ * and role management.
  *
  * <p>The difference of Model and tabular data is that the model is schema-free, and the main
  * property of the model is the model artifact URL. The difference compared to the fileset is that
@@ -70,97 +67,12 @@ public interface Model extends Auditable {
   }
 
   /**
-   * The versions of the model object. The model object can have multiple versions. Each version
-   * contains the detailed information of the model artifact, like the URL, the training properties,
-   * etc.
+   * The latest version of the model object. The latest version is the version number of the latest
+   * model checkpoint / snapshot that is linked to the registered model.
    *
-   * @return The versions of the model object.
+   * @return The latest version of the model object.
    */
-  ModelVersion[] versions();
-
-  /**
-   * Get the model version by the version number. If the version does not exist, throw an exception.
-   *
-   * @param version The version number of the model.
-   * @return The model version object.
-   * @throws NoSuchModelVersionException if the version does not exist.
-   */
-  ModelVersion version(int version) throws NoSuchModelVersionException;
-
-  /**
-   * Get the model version by the version alias. If the version does not exist, throw an exception.
-   *
-   * @param alias The version alias of the model.
-   * @return The model version object.
-   * @throws NoSuchModelVersionException if the version does not exist.
-   */
-  ModelVersion versionAlias(String alias) throws NoSuchModelVersionException;
-
-  /**
-   * Check if the model version exists by the version number.
-   *
-   * @param version The version number of the model.
-   * @return True if the version exists, false otherwise.
-   */
-  default boolean versionExists(int version) {
-    try {
-      version(version);
-      return true;
-    } catch (NoSuchModelVersionException e) {
-      return false;
-    }
-  }
-
-  /**
-   * Check if the model version exists by the version alias.
-   *
-   * @param alias The version alias of the model.
-   * @return True if the version exists, false otherwise.
-   */
-  default boolean versionExists(String alias) {
-    try {
-      versionAlias(alias);
-      return true;
-    } catch (NoSuchModelVersionException e) {
-      return false;
-    }
-  }
-
-  /**
-   * Link a new version model to the registered model object. The new version model will be added to
-   * the model object. If the model object does not exist, it will throw an exception.
-   *
-   * @param aliases The aliases of the model version. The aliases should be unique in this model,
-   *     otherwise the {@link ModelVersionAliasesAlreadyExistsException} will be thrown. The aliases
-   *     are optional and can be empty.
-   * @param comment The comment of the model version. The comment is optional and can be null.
-   * @param uri The model artifact URI.
-   * @param properties The properties of the model version. The properties are optional and can be
-   *     null or empty.
-   * @return The created model version object.
-   * @throws NoSuchModelException If the model does not exist.
-   * @throws ModelVersionAliasesAlreadyExistsException If the aliases already exist in the model.
-   */
-  ModelVersion link(String[] aliases, String comment, String uri, Map<String, String> properties)
-      throws NoSuchModelException, ModelVersionAliasesAlreadyExistsException;
-
-  /**
-   * Remove the model version object of a model by the version number. If the version does not
-   * exist, it will return false.
-   *
-   * @param version The version number of the model.
-   * @return True if the version is removed, false if the version does not exist.
-   */
-  boolean deleteVersion(int version);
-
-  /**
-   * Remove the model version object of a model by the version alias. If the version does not exist,
-   * it will return false.
-   *
-   * @param alias The version alias of the model.
-   * @return True if the version is removed, false if the version does not exist.
-   */
-  boolean deleteVersion(String alias);
+  int latestVersion();
 
   /**
    * @return The {@link SupportsTags} if the model supports tag operations.

@@ -23,7 +23,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
 /**
@@ -68,9 +70,9 @@ public interface ModelCatalog {
 
   /**
    * Register a model in the catalog if the model is not existed, otherwise the {@link
-   * ModelAlreadyExistsException} will be thrown. The {@link Model} object will be created the model
-   * is registered, users can call {@link Model#link(String[], String, String, Map)} to link the
-   * model version to the registered {@link Model}.
+   * ModelAlreadyExistsException} will be thrown. The {@link Model} object will be created when the
+   * model is registered, users can call {@link ModelCatalog#linkModelVersion(NameIdentifier,
+   * String, String[], String, Map)} to link the model version to the registered {@link Model}.
    *
    * @param ident The name identifier of the model.
    * @param comment The comment of the model. The comment is optional and can be null.
@@ -81,7 +83,7 @@ public interface ModelCatalog {
    */
   default Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
       throws ModelAlreadyExistsException {
-    return registerModel(ident, new String[0], comment, null, properties);
+    return registerModel(ident, null, new String[0], comment, properties);
   }
 
   /**
@@ -91,21 +93,22 @@ public interface ModelCatalog {
    * linked to the registered model.
    *
    * @param ident The name identifier of the model.
+   * @param uri The model artifact URI.
    * @param aliases The aliases of the model version. The alias are optional and can be empty.
    * @param comment The comment of the model. The comment is optional and can be null.
-   * @param url The model artifact URL.
    * @param properties The properties of the model. The properties are optional and can be null or
    *     empty.
    * @return The registered model object.
    * @throws ModelAlreadyExistsException If the model already registered.
+   * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
    */
   Model registerModel(
       NameIdentifier ident,
+      String uri,
       String[] aliases,
       String comment,
-      String url,
       Map<String, String> properties)
-      throws ModelAlreadyExistsException;
+      throws ModelAlreadyExistsException, ModelVersionAliasesAlreadyExistException;
 
   /**
    * Delete the model from the catalog. If the model does not exist, return false. Otherwise, return
@@ -115,4 +118,114 @@ public interface ModelCatalog {
    * @return True if the model is deleted, false if the model does not exist.
    */
   boolean deleteModel(NameIdentifier ident);
+
+  /**
+   * List all the versions of the register model by {@link NameIdentifier} in the catalog.
+   *
+   * @param ident The name identifier of the model.
+   * @return An array of version numbers of the model.
+   * @throws NoSuchModelException If the model does not exist.
+   */
+  int[] listModelVersions(NameIdentifier ident) throws NoSuchModelException;
+
+  /**
+   * Get a model version by the {@link NameIdentifier} and version number from the catalog.
+   *
+   * @param ident The name identifier of the model.
+   * @param version The version number of the model.
+   * @return The model version object.
+   * @throws NoSuchModelVersionException If the model version does not exist.
+   */
+  ModelVersion getModelVersion(NameIdentifier ident, int version)
+      throws NoSuchModelVersionException;
+
+  /**
+   * Get a model version by the {@link NameIdentifier} and version alias from the catalog.
+   *
+   * @param ident The name identifier of the model.
+   * @param alias The version alias of the model.
+   * @return The model version object.
+   * @throws NoSuchModelVersionException If the model version does not exist.
+   */
+  ModelVersion getModelVersion(NameIdentifier ident, String alias)
+      throws NoSuchModelVersionException;
+
+  /**
+   * Check if the model version exists by the {@link NameIdentifier} and version number. If the
+   * model version exists, return true, otherwise return false.
+   *
+   * @param ident The name identifier of the model.
+   * @param version The version number of the model.
+   * @return True if the model version exists, false if the model version does not exist.
+   */
+  default boolean modelVersionExists(NameIdentifier ident, int version) {
+    try {
+      getModelVersion(ident, version);
+      return true;
+    } catch (NoSuchModelVersionException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Check if the model version exists by the {@link NameIdentifier} and version alias. If the model
+   * version exists, return true, otherwise return false.
+   *
+   * @param ident The name identifier of the model.
+   * @param alias The version alias of the model.
+   * @return True if the model version exists, false if the model version does not exist.
+   */
+  default boolean modelVersionExists(NameIdentifier ident, String alias) {
+    try {
+      getModelVersion(ident, alias);
+      return true;
+    } catch (NoSuchModelVersionException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Link a new model version to the registered model object. The new model version will be added to
+   * the model object. If the model object does not exist, it will throw an exception. If the
+   * version alias already exists in the model, it will throw an exception.
+   *
+   * @param ident The name identifier of the model.
+   * @param uri The URI of the model version artifact.
+   * @param aliases The aliases of the model version. The aliases should be unique in this model,
+   *     otherwise the {@link ModelVersionAliasesAlreadyExistException} will be thrown. The aliases
+   *     are optional and can be empty.
+   * @param comment The comment of the model version. The comment is optional and can be null.
+   * @param properties The properties of the model version. The properties are optional and can be
+   *     null or empty.
+   * @return The model version object.
+   * @throws NoSuchModelException If the model does not exist.
+   * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
+   */
+  ModelVersion linkModelVersion(
+      NameIdentifier ident,
+      String uri,
+      String[] aliases,
+      String comment,
+      Map<String, String> properties)
+      throws NoSuchModelException, ModelVersionAliasesAlreadyExistException;
+
+  /**
+   * Delete the model version by the {@link NameIdentifier} and version number. If the model version
+   * does not exist, return false. If the model version is deleted, return true.
+   *
+   * @param ident The name identifier of the model.
+   * @param version The version number of the model.
+   * @return True if the model version is deleted, false if the model version does not exist.
+   */
+  boolean deleteModelVersion(NameIdentifier ident, int version);
+
+  /**
+   * Delete the model version by the {@link NameIdentifier} and version alias. If the model version
+   * does not exist, return false. If the model version is deleted, return true.
+   *
+   * @param ident The name identifier of the model.
+   * @param alias The version alias of the model.
+   * @return True if the model version is deleted, false if the model version does not exist.
+   */
+  boolean deleteModelVersion(NameIdentifier ident, String alias);
 }

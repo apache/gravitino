@@ -21,8 +21,8 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** Exception thrown when the model version aliases already exists. */
-public class ModelVersionAliasesAlreadyExistsException extends AlreadyExistsException {
+/** Exception thrown when the model version aliases already exist. */
+public class ModelVersionAliasesAlreadyExistException extends AlreadyExistsException {
 
   /**
    * Constructs a new exception with the specified detail message.
@@ -31,7 +31,7 @@ public class ModelVersionAliasesAlreadyExistsException extends AlreadyExistsExce
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public ModelVersionAliasesAlreadyExistsException(@FormatString String message, Object... args) {
+  public ModelVersionAliasesAlreadyExistException(@FormatString String message, Object... args) {
     super(message, args);
   }
 
@@ -43,7 +43,7 @@ public class ModelVersionAliasesAlreadyExistsException extends AlreadyExistsExce
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public ModelVersionAliasesAlreadyExistsException(
+  public ModelVersionAliasesAlreadyExistException(
       Throwable cause, @FormatString String message, Object... args) {
     super(cause, message, args);
   }
