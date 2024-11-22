@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.model;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
@@ -72,5 +73,7 @@ public interface ModelVersion extends Auditable {
    *
    * @return the properties of the model version.
    */
-  Map<String, String> properties();
+  default Map<String, String> properties() {
+    return Collections.emptyMap();
+  }
 }
