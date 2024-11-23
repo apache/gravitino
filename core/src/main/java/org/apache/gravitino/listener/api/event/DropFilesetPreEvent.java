@@ -25,17 +25,17 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an event that is triggered before dropping a fileset. */
 @DeveloperApi
 public final class DropFilesetPreEvent extends FilesetPreEvent {
-    public DropFilesetPreEvent(String user, NameIdentifier identifier) {
-        super(user, identifier);
-    }
+  public DropFilesetPreEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.DROP_FILESET;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_FILESET;
+  }
 }

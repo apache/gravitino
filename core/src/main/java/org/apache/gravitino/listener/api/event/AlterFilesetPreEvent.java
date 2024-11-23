@@ -20,35 +20,36 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.file.FilesetChange;
 
 @DeveloperApi
 public final class AlterFilesetPreEvent extends FilesetPreEvent {
-    private final FilesetChange[] filesetChanges;
+  private final FilesetChange[] filesetChanges;
 
-    public AlterFilesetPreEvent(String user, NameIdentifier identifier, FilesetChange[] filesetChanges) {
-        super(user, identifier);
-        this.filesetChanges = filesetChanges;
-    }
+  public AlterFilesetPreEvent(
+      String user, NameIdentifier identifier, FilesetChange[] filesetChanges) {
+    super(user, identifier);
+    this.filesetChanges = filesetChanges;
+  }
 
-    /**
-     * Retrieves the specific changes that were made to the fileset during the alteration process.
-     *
-     * @return An array of {@link FilesetChange} objects detailing each modification applied to the
-     *     fileset.
-     */
-    public FilesetChange[] filesetChanges() {
-        return filesetChanges;
-    }
+  /**
+   * Retrieves the specific changes that were made to the fileset during the alteration process.
+   *
+   * @return An array of {@link FilesetChange} objects detailing each modification applied to the
+   *     fileset.
+   */
+  public FilesetChange[] filesetChanges() {
+    return filesetChanges;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.ALTER_FILESET;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_FILESET;
+  }
 }

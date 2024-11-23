@@ -104,9 +104,10 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
       String storageLocation,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    FilesetInfo createFileRequest = new FilesetInfo(ident.name(), comment, type, storageLocation, properties, null);
+    FilesetInfo createFileRequest =
+        new FilesetInfo(ident.name(), comment, type, storageLocation, properties, null);
     eventBus.dispatchEvent(
-            new CreateFilesetPreEvent(PrincipalUtils.getCurrentUserName(), ident, createFileRequest));
+        new CreateFilesetPreEvent(PrincipalUtils.getCurrentUserName(), ident, createFileRequest));
     try {
       Fileset fileset = dispatcher.createFileset(ident, comment, type, storageLocation, properties);
       eventBus.dispatchEvent(
@@ -128,7 +129,7 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
     eventBus.dispatchEvent(
-            new AlterFilesetPreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
+        new AlterFilesetPreEvent(PrincipalUtils.getCurrentUserName(), ident, changes));
     try {
       Fileset fileset = dispatcher.alterFileset(ident, changes);
       eventBus.dispatchEvent(
@@ -160,7 +161,8 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath)
       throws NoSuchFilesetException {
-    eventBus.dispatchEvent(new GetFileLocationPreEvent(PrincipalUtils.getCurrentUserName(), ident, subPath, null));
+    eventBus.dispatchEvent(
+        new GetFileLocationPreEvent(PrincipalUtils.getCurrentUserName(), ident, subPath));
     try {
       String actualFileLocation = dispatcher.getFileLocation(ident, subPath);
       // get the audit info from the thread local context

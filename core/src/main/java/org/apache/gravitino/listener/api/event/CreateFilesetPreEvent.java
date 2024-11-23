@@ -26,31 +26,31 @@ import org.apache.gravitino.listener.api.info.FilesetInfo;
 /** Represents an event triggered before creating a fileset. */
 @DeveloperApi
 public class CreateFilesetPreEvent extends FilesetPreEvent {
-    private final FilesetInfo createFilesetRequest;
+  private final FilesetInfo createFilesetRequest;
 
-    public CreateFilesetPreEvent(
-            String user, NameIdentifier identifier, FilesetInfo createFilesetRequest) {
-        super(user, identifier);
-        this.createFilesetRequest = createFilesetRequest;
-    }
+  public CreateFilesetPreEvent(
+      String user, NameIdentifier identifier, FilesetInfo createFilesetRequest) {
+    super(user, identifier);
+    this.createFilesetRequest = createFilesetRequest;
+  }
 
-    /**
-     * Retrieves the create fileset request.
-     *
-     * @return A {@link FilesetInfo} instance encapsulating the comprehensive details of create
-     *     fileset request.
-     */
-    public FilesetInfo createFilesetRequest() {
-        return createFilesetRequest;
-    }
+  /**
+   * Retrieves the create fileset request.
+   *
+   * @return A {@link FilesetInfo} instance encapsulating the comprehensive details of create
+   *     fileset request.
+   */
+  public FilesetInfo createFilesetRequest() {
+    return createFilesetRequest;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.CREATE_FILESET;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_FILESET;
+  }
 }

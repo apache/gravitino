@@ -25,7 +25,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents a pre-event for fileset operations. */
 @DeveloperApi
 public abstract class FilesetPreEvent extends PreEvent {
-    protected FilesetPreEvent(String user, NameIdentifier identifier) {
-        super(user, identifier);
-    }
+  protected FilesetPreEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
+  }
 }

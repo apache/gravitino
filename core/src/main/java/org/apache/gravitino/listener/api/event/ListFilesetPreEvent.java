@@ -26,29 +26,29 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an event that is triggered before listing of filesets within a namespace. */
 @DeveloperApi
 public final class ListFilesetPreEvent extends FilesetPreEvent {
-    private final Namespace namespace;
+  private final Namespace namespace;
 
-    public ListFilesetPreEvent(String user, Namespace namespace) {
-        super(user, NameIdentifier.of(namespace.levels()));
-        this.namespace = namespace;
-    }
+  public ListFilesetPreEvent(String user, Namespace namespace) {
+    super(user, NameIdentifier.of(namespace.levels()));
+    this.namespace = namespace;
+  }
 
-    /**
-     * Provides the namespace associated with this event.
-     *
-     * @return A {@link Namespace} instance from which filesets were listed.
-     */
-    public Namespace namespace() {
-        return namespace;
-    }
+  /**
+   * Provides the namespace associated with this event.
+   *
+   * @return A {@link Namespace} instance from which filesets were listed.
+   */
+  public Namespace namespace() {
+    return namespace;
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.LIST_FILESET;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_FILESET;
+  }
 }

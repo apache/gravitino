@@ -25,17 +25,17 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /** Represents an event triggered before loading a fileset. */
 @DeveloperApi
 public class LoadFilesetPreEvent extends FilesetPreEvent {
-    public LoadFilesetPreEvent(String user, NameIdentifier identifier) {
-        super(user, identifier);
-    }
+  public LoadFilesetPreEvent(String user, NameIdentifier identifier) {
+    super(user, identifier);
+  }
 
-    /**
-     * Returns the type of operation.
-     *
-     * @return the operation type.
-     */
-    @Override
-    public OperationType operationType() {
-        return OperationType.LOAD_FILESET;
-    }
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_FILESET;
+  }
 }
