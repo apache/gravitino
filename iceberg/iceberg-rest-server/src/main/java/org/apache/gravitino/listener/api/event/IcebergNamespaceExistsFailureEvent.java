@@ -30,5 +30,8 @@ public class IcebergNamespaceExistsFailureEvent extends IcebergNamespaceFailureE
     super(icebergRequestContext, nameIdentifier, e);
   }
 
-  // TODO: operationType.SCHEMA_EXISTS
+  @Override
+  public OperationType operationType() {
+    return OperationType.SCHEMA_EXISTS;
+  }
 }

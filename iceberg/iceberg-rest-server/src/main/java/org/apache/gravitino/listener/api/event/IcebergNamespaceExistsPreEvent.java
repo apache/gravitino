@@ -30,5 +30,8 @@ public class IcebergNamespaceExistsPreEvent extends IcebergNamespacePreEvent {
     super(icebergRequestContext, nameIdentifier);
   }
 
-  // TODO: operationType.SCHEMA_EXISTS
+  @Override
+  public OperationType operationType() {
+    return OperationType.SCHEMA_EXISTS;
+  }
 }

@@ -43,5 +43,8 @@ public class IcebergRegisterTableFailureEvent extends IcebergNamespaceFailureEve
     return registerTableRequest;
   }
 
-  // TODO: operationType.SCHEMA_REGISTER_TABLE
+  @Override
+  public OperationType operationType() {
+    return OperationType.REGISTER_TABLE;
+  }
 }

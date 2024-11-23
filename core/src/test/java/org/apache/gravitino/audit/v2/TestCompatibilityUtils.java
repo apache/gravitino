@@ -48,6 +48,7 @@ public class TestCompatibilityUtils {
       {OperationType.DROP_SCHEMA, Operation.DROP_SCHEMA},
       {OperationType.LOAD_SCHEMA, Operation.LOAD_SCHEMA},
       {OperationType.LIST_SCHEMA, Operation.LIST_SCHEMA},
+      {OperationType.SCHEMA_EXISTS, Operation.UNKNOWN_OPERATION},
       {OperationType.CREATE_TABLE, Operation.CREATE_TABLE},
       {OperationType.ALTER_TABLE, Operation.ALTER_TABLE},
       {OperationType.DROP_TABLE, Operation.DROP_TABLE},
@@ -55,6 +56,8 @@ public class TestCompatibilityUtils {
       {OperationType.LOAD_TABLE, Operation.LOAD_TABLE},
       {OperationType.TABLE_EXISTS, Operation.UNKNOWN_OPERATION},
       {OperationType.LIST_TABLE, Operation.LIST_TABLE},
+      {OperationType.RENAME_TABLE, Operation.UNKNOWN_OPERATION},
+      {OperationType.REGISTER_TABLE, Operation.UNKNOWN_OPERATION},
       {OperationType.ADD_PARTITION, Operation.UNKNOWN_OPERATION},
       {OperationType.DROP_PARTITION, Operation.UNKNOWN_OPERATION},
       {OperationType.PURGE_PARTITION, Operation.PURGE_PARTITION},
@@ -73,6 +76,13 @@ public class TestCompatibilityUtils {
       {OperationType.DROP_TOPIC, Operation.DROP_TOPIC},
       {OperationType.LOAD_TOPIC, Operation.LOAD_TOPIC},
       {OperationType.LIST_TOPIC, Operation.LIST_TOPIC},
+      {OperationType.CREATE_VIEW, Operation.UNKNOWN_OPERATION},
+      {OperationType.ALTER_VIEW, Operation.UNKNOWN_OPERATION},
+      {OperationType.DROP_VIEW, Operation.UNKNOWN_OPERATION},
+      {OperationType.LOAD_VIEW, Operation.UNKNOWN_OPERATION},
+      {OperationType.VIEW_EXISTS, Operation.UNKNOWN_OPERATION},
+      {OperationType.RENAME_VIEW, Operation.UNKNOWN_OPERATION},
+      {OperationType.LIST_VIEW, Operation.UNKNOWN_OPERATION},
       {null, Operation.UNKNOWN_OPERATION}
     };
 

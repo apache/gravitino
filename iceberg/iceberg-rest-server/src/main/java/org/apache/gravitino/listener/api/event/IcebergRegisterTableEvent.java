@@ -52,5 +52,8 @@ public class IcebergRegisterTableEvent extends IcebergNamespaceEvent {
     return loadTableResponse;
   }
 
-  // TODO: operationType.SCHEMA_REGISTER_TABLE
+  @Override
+  public OperationType operationType() {
+    return OperationType.REGISTER_TABLE;
+  }
 }
