@@ -22,7 +22,7 @@ from gravitino.api.expressions.named_reference import NamedReference, FieldRefer
 class TestNamedReference(unittest.TestCase):
     def test_field_reference_creation(self):
         field = FieldReference(["student", "name"])
-        self.assertEqual(field.field_name(), ["student", "name"])
+        self.assertEqual(field.field_names(), ["student", "name"])
         self.assertEqual(str(field), "student.name")
 
     def test_field_reference_equality(self):
@@ -33,7 +33,7 @@ class TestNamedReference(unittest.TestCase):
 
     def test_named_reference_static_methods(self):
         ref = NamedReference.field(["student", "name"])
-        self.assertEqual(ref.field_name(), ["student", "name"])
+        self.assertEqual(ref.field_names(), ["student", "name"])
 
         ref2 = NamedReference.field_from_column("student")
-        self.assertEqual(ref2.field_name(), ["student"])
+        self.assertEqual(ref2.field_names(), ["student"])

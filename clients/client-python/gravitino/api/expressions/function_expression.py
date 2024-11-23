@@ -84,6 +84,7 @@ class FuncExpressionImpl(FunctionExpression):
                 self._function_name == other._function_name
                 and self._arguments == other._arguments
             )
+        # TODO: Consider handling other cases or adding custom equality checks
         return False
 
     def __hash__(self) -> int:
