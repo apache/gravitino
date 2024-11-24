@@ -49,6 +49,34 @@ export const messagingProviders = [
 
 export const providers = [
   {
+    label: 'Apache Doris',
+    value: 'jdbc-doris',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. com.mysql.jdbc.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:mysql://localhost:9030'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
+      }
+    ]
+  },
+  {
     label: 'Apache Hive',
     value: 'hive',
     defaultProps: [
@@ -57,6 +85,26 @@ export const providers = [
         value: '',
         required: true,
         description: 'The Apache Hive metastore URIs'
+      }
+    ]
+  },
+  {
+    label: 'Apache Hudi',
+    value: 'lakehouse-hudi',
+    defaultProps: [
+      {
+        key: 'catalog-backend',
+        value: 'hms',
+        defaultValue: 'hms',
+        required: true,
+        select: ['hms'],
+        description: 'Apache Hudi catalog type choose properties'
+      },
+      {
+        key: 'uri',
+        value: '',
+        required: true,
+        description: 'Apache Hudi catalog uri config'
       }
     ]
   },
@@ -136,95 +184,6 @@ export const providers = [
     ]
   },
   {
-    label: 'MySQL',
-    value: 'jdbc-mysql',
-    defaultProps: [
-      {
-        key: 'jdbc-driver',
-        value: '',
-        required: true,
-        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
-      },
-      {
-        key: 'jdbc-url',
-        value: '',
-        required: true,
-        description: 'e.g. jdbc:mysql://localhost:3306'
-      },
-      {
-        key: 'jdbc-user',
-        value: '',
-        required: true
-      },
-      {
-        key: 'jdbc-password',
-        value: '',
-        required: true
-      }
-    ]
-  },
-  {
-    label: 'PostgreSQL',
-    value: 'jdbc-postgresql',
-    defaultProps: [
-      {
-        key: 'jdbc-driver',
-        value: '',
-        required: true,
-        description: 'e.g. org.postgresql.Driver'
-      },
-      {
-        key: 'jdbc-url',
-        value: '',
-        required: true,
-        description: 'e.g. jdbc:postgresql://localhost:5432/your_database'
-      },
-      {
-        key: 'jdbc-user',
-        value: '',
-        required: true
-      },
-      {
-        key: 'jdbc-password',
-        value: '',
-        required: true
-      },
-      {
-        key: 'jdbc-database',
-        value: '',
-        required: true
-      }
-    ]
-  },
-  {
-    label: 'Apache Doris',
-    value: 'jdbc-doris',
-    defaultProps: [
-      {
-        key: 'jdbc-driver',
-        value: '',
-        required: true,
-        description: 'e.g. com.mysql.jdbc.Driver'
-      },
-      {
-        key: 'jdbc-url',
-        value: '',
-        required: true,
-        description: 'e.g. jdbc:mysql://localhost:9030'
-      },
-      {
-        key: 'jdbc-user',
-        value: '',
-        required: true
-      },
-      {
-        key: 'jdbc-password',
-        value: '',
-        required: true
-      }
-    ]
-  },
-  {
     label: 'Apache Paimon',
     value: 'lakehouse-paimon',
     defaultProps: [
@@ -300,22 +259,30 @@ export const providers = [
     ]
   },
   {
-    label: 'Apache Hudi',
-    value: 'lakehouse-hudi',
+    label: 'MySQL',
+    value: 'jdbc-mysql',
     defaultProps: [
       {
-        key: 'catalog-backend',
-        value: 'hms',
-        defaultValue: 'hms',
-        required: true,
-        select: ['hms'],
-        description: 'Apache Hudi catalog type choose properties'
-      },
-      {
-        key: 'uri',
+        key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'Apache Hudi catalog uri config'
+        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:mysql://localhost:3306'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
       }
     ]
   },
@@ -342,6 +309,39 @@ export const providers = [
       },
       {
         key: 'jdbc-password',
+        value: '',
+        required: true
+      }
+    ]
+  },
+  {
+    label: 'PostgreSQL',
+    value: 'jdbc-postgresql',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. org.postgresql.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:postgresql://localhost:5432/your_database'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-database',
         value: '',
         required: true
       }
