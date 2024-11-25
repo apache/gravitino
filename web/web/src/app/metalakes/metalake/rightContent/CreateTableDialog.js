@@ -433,7 +433,7 @@ const CreateTableDialog = props => {
         return {
           key,
           value,
-          disabled: propInfo.reserved.includes(key)
+          disabled: propInfo.reserved.includes(key) || propInfo.immutable.includes(key)
         }
       })
 

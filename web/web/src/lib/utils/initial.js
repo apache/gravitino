@@ -575,42 +575,76 @@ export const getRelationalColumnType = catalog => {
 }
 
 const relationalTablePropInfoMap = {
-  'lakehouse-iceberg': {
-    reserved: ['location'],
-    allowDelete: true,
-    allowAdd: true
-  },
   hive: {
-    reserved: ['comment', 'numFiles', 'totalSize', 'EXTERNAL', 'transient_lastDdlTime'],
+    reserved: ['comment', 'EXTERNAL', 'numFiles', 'totalSize', 'transient_lastDdlTime'],
+    immutable: [
+      'format',
+      'input-format',
+      'location',
+      'output-format',
+      'serde-name',
+      'serde-lib',
+      'serde.parameter',
+      'table-type'
+    ],
     allowDelete: true,
     allowAdd: true
-  },
-  'jdbc-mysql': {
-    reserved: [],
-    allowDelete: false,
-    allowAdd: true
-  },
-  'jdbc-postgresql': {
-    reserved: [],
-    allowDelete: false,
-    allowAdd: false
   },
   'jdbc-doris': {
     reserved: [],
     allowDelete: true,
     allowAdd: true
   },
+  'jdbc-mysql': {
+    reserved: [],
+    immutable: ['auto-increment-offset', 'engine'],
+    allowDelete: false,
+    allowAdd: true
+  },
+  'jdbc-oceanbase': {
+    reserved: [],
+    immutable: [],
+    allowDelete: false,
+    allowAdd: false
+  },
+  'jdbc-postgresql': {
+    reserved: [],
+    immutable: [],
+    allowDelete: false,
+    allowAdd: false
+  },
+  'lakehouse-hudi': {
+    reserved: [],
+    immutable: [],
+    allowDelete: true,
+    allowAdd: true
+  },
+  'lakehouse-iceberg': {
+    reserved: [
+      'cherry-pick-snapshot-id',
+      'comment',
+      'creator',
+      'current-snapshot-id',
+      'identifier-fields',
+      'sort-order',
+      'write.distribution-mode'
+    ], // Can't be set or modified
+    immutable: ['location', 'provider', 'format', 'format-version'], // Can't be modified after creation
+    allowDelete: true,
+    allowAdd: true
+  },
   'lakehouse-paimon': {
     reserved: [
-      'comment',
-      'owner',
       'bucket-key',
+      'comment',
       'merge-engine',
-      'sequence.field',
-      'rowkind.field',
+      'owner',
+      'partition',
       'primary-key',
-      'partition'
+      'rowkind.field',
+      'sequence.field'
     ],
+    immutable: ['merge-engine', 'rowkind.field', 'sequence.field'],
     allowDelete: true,
     allowAdd: true
   }
@@ -623,6 +657,7 @@ export const getRelationalTablePropInfo = catalog => {
 
   return {
     reserved: [],
+    immutable: [],
     allowDelete: true,
     allowAdd: true
   }
