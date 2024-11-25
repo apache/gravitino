@@ -18,7 +18,11 @@
  */
 package org.apache.gravitino.connector.authorization;
 
+import org.apache.gravitino.authorization.SecurableObject;
+
 import java.io.Closeable;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Authorization operations plugin interfaces. <br>
