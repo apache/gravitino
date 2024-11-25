@@ -47,9 +47,13 @@ include(
   "clients:filesystem-hadoop3",
   "clients:filesystem-hadoop3-runtime",
   "clients:client-python",
-  "clients:cli",
-  "clients:filesystem-fuse"
+  "clients:cli"
 )
+if (gradle.startParameter.projectProperties.containsKey("enable_gvfs_fuse")) {
+  include("clients:filesystem-fuse")
+} else {
+  println("Skipping Gvfs-fuse tasks since -Penable_gvfs_fuse is not enabled.")
+}
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
 include("authorizations:authorization-ranger")

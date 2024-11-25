@@ -19,27 +19,24 @@
 
 import org.gradle.api.tasks.Exec
 
-val enablePgvfsFuse = project.hasProperty("enable_gvfs_fuse")
+val checkRustEnvironment by tasks.registering(Exec::class) {
+  description = "Check if Rust environment."
+  group = "verification"
+  commandLine("bash", "-c", "cargo --version")
+  standardOutput = System.out
+  errorOutput = System.err
+  isIgnoreExitValue = false
+}
 
-if (enablePgvfsFuse) {
-  val checkRustEnvironment by tasks.registering(Exec::class) {
-    description = "Check if Rust environment."
-    group = "verification"
-    commandLine("bash", "-c", "cargo --version")
-    standardOutput = System.out
-    errorOutput = System.err
-    isIgnoreExitValue = false
-  }
+val compileRust by tasks.registering(Exec::class) {
+  dependsOn(checkRustEnvironment)
+  description = "Compile the Rust project"
+  workingDir = file("$projectDir")
 
-  val compileRust by tasks.registering(Exec::class) {
-    dependsOn(checkRustEnvironment)
-    description = "Compile the Rust project"
-    workingDir = file("$projectDir")
-
-    commandLine(
-      "bash",
-      "-c",
-      """
+  commandLine(
+    "bash",
+    "-c",
+    """
           set -e
           echo "Checking the code format"
           cargo fmt --all -- --check
@@ -49,27 +46,25 @@ if (enablePgvfsFuse) {
 
           echo "Compiling Rust project"
           cargo build --release
-      """.trimIndent()
-    )
-  }
+    """.trimIndent()
+  )
+}
 
-  val testRust by tasks.registering(Exec::class) {
-    dependsOn(checkRustEnvironment)
-    description = "Run tests in the Rust project"
-    group = "verification"
-    workingDir = file("$projectDir")
-    commandLine("bash", "-c", "cargo test --release")
+val testRust by tasks.registering(Exec::class) {
+  dependsOn(checkRustEnvironment)
+  description = "Run tests in the Rust project"
+  group = "verification"
+  workingDir = file("$projectDir")
+  commandLine("bash", "-c", "cargo test --release")
 
-    standardOutput = System.out
-    errorOutput = System.err
-  }
+  standardOutput = System.out
+  errorOutput = System.err
+}
 
-  tasks.named("build") {
-    dependsOn(compileRust)
-  }
-  tasks.named("test") {
-    dependsOn(testRust)
-  }
-} else {
-  println("Skipping Gvfs-fuse tasks since -Penable_gvfs_fuse is not enabled.")
+tasks.named("build") {
+  dependsOn(compileRust)
+}
+
+tasks.named("test") {
+  dependsOn(testRust)
 }
