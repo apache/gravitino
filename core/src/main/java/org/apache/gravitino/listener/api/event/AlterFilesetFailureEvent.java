@@ -57,4 +57,14 @@ public final class AlterFilesetFailureEvent extends FilesetFailureEvent {
   public FilesetChange[] filesetChanges() {
     return filesetChanges;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_FILESET;
+  }
 }

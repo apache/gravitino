@@ -33,6 +33,8 @@ import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.audit.v2.SimpleAuditLogV2;
+import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
@@ -125,6 +127,7 @@ public class TestAuditManager {
   }
 
   /** Test audit log with default audit writer and formatter. */
+  @SuppressWarnings("deprecation")
   @Test
   public void testFileAuditLog() {
     Config config = new Config(false) {};
@@ -136,7 +139,7 @@ public class TestAuditManager {
     eventBus.dispatchEvent(dummyEvent);
     Assertions.assertInstanceOf(FileAuditWriter.class, auditLogManager.getAuditLogWriter());
     Assertions.assertInstanceOf(
-        SimpleFormatter.class, (auditLogManager.getAuditLogWriter()).getFormatter());
+        SimpleFormatterV2.class, (auditLogManager.getAuditLogWriter()).getFormatter());
 
     FileAuditWriter fileAuditWriter = (FileAuditWriter) auditLogManager.getAuditLogWriter();
     String fileName = fileAuditWriter.fileName;
@@ -148,7 +151,7 @@ public class TestAuditManager {
 
     String auditLog = readAuditLog(fileName);
     Formatter formatter = fileAuditWriter.getFormatter();
-    SimpleAuditLog formattedAuditLog = (SimpleAuditLog) formatter.format(dummyEvent);
+    SimpleAuditLogV2 formattedAuditLog = (SimpleAuditLogV2) formatter.format(dummyEvent);
 
     Assertions.assertNotNull(formattedAuditLog);
     Assertions.assertEquals(formattedAuditLog.toString(), auditLog);

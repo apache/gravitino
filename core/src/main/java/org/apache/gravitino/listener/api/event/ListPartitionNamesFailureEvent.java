@@ -38,4 +38,14 @@ public final class ListPartitionNamesFailureEvent extends PartitionFailureEvent 
   public ListPartitionNamesFailureEvent(String user, NameIdentifier ident, Exception exception) {
     super(user, ident, exception);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LIST_PARTITION_NAMES;
+  }
 }

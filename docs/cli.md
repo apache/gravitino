@@ -366,13 +366,29 @@ gcli table list --name catalog_postgres.hr
 #### Show tables details
 
 ```bash
-gcli column list --name catalog_postgres.hr.departments
+gcli table details --name catalog_postgres.hr.departments
 ```
 
 #### Show tables audit information
 
 ```bash
 gcli table details --name catalog_postgres.hr.departments --audit
+```
+
+#### Show tables distribution information
+```bash
+gcli table details --name catalog_postgres.hr.departments --distribution
+```
+
+#### Show tables partition information
+```bash
+gcli table details --name catalog_postgres.hr.departments --partition
+```
+
+### Show table indexes
+
+```bash
+gcli table details --name catalog_mysql.db.iceberg_namespace_properties --index
 ```
 
 #### Delete a table

@@ -43,4 +43,14 @@ public final class CreateSchemaPreEvent extends SchemaPreEvent {
   public SchemaInfo createSchemaRequest() {
     return createSchemaRequest;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_SCHEMA;
+  }
 }

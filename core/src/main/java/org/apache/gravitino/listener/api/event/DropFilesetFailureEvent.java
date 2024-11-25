@@ -38,4 +38,14 @@ public final class DropFilesetFailureEvent extends FilesetFailureEvent {
   public DropFilesetFailureEvent(String user, NameIdentifier identifier, Exception exception) {
     super(user, identifier, exception);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_FILESET;
+  }
 }
