@@ -26,7 +26,7 @@ import org.apache.iceberg.rest.requests.RegisterTableRequest;
 
 /** Represent a failure event when registering Iceberg table failed. */
 @DeveloperApi
-public class IcebergRegisterTableFailureEvent extends IcebergNamespaceFailureEvent {
+public class IcebergRegisterTableFailureEvent extends IcebergTableFailureEvent {
   private final RegisterTableRequest registerTableRequest;
 
   public IcebergRegisterTableFailureEvent(

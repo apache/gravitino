@@ -45,6 +45,7 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespacePreEvent;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
@@ -200,8 +201,10 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
       IcebergRequestContext context,
       Namespace namespace,
       RegisterTableRequest registerTableRequest) {
+    TableIdentifier tableIdentifier = TableIdentifier.of(namespace, registerTableRequest.name());
     NameIdentifier nameIdentifier =
-        IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
+        IcebergRestUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), tableIdentifier);
 
     eventBus.dispatchEvent(
         new IcebergRegisterTablePreEvent(context, nameIdentifier, registerTableRequest));

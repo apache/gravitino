@@ -25,7 +25,7 @@ import org.apache.iceberg.rest.requests.RegisterTableRequest;
 
 /** Represent a pre event before registering Iceberg table. */
 @DeveloperApi
-public class IcebergRegisterTablePreEvent extends IcebergNamespacePreEvent {
+public class IcebergRegisterTablePreEvent extends IcebergTablePreEvent {
   private final RegisterTableRequest registerTableRequest;
 
   public IcebergRegisterTablePreEvent(

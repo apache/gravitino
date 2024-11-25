@@ -27,7 +27,7 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
 
 /** Represent an event after registering Iceberg table successfully. */
 @DeveloperApi
-public class IcebergRegisterTableEvent extends IcebergNamespaceEvent {
+public class IcebergRegisterTableEvent extends IcebergTableEvent {
 
   private final RegisterTableRequest registerTableRequest;
   private final LoadTableResponse loadTableResponse;
