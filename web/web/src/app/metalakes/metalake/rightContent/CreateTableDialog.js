@@ -440,7 +440,7 @@ const CreateTableDialog = props => {
       setInnerProps(propertyItems)
       setValue('propItems', propertyItems)
     }
-  }, [open, data, setValue, type, propInfo.reserved])
+  }, [open, data, setValue, type, propInfo])
 
   // Handle click outside of table rows
   useEffect(() => {
@@ -700,8 +700,9 @@ const CreateTableDialog = props => {
                             sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                             data-refer={`table-props-${index}`}
                           >
-                            <Box>
+                            <Box sx={{ width: '30%' }}>
                               <TextField
+                                sx={{ width: '95%' }}
                                 size='small'
                                 name='key'
                                 label='Key'
@@ -712,8 +713,9 @@ const CreateTableDialog = props => {
                                 data-refer={`props-key-${index}`}
                               />
                             </Box>
-                            <Box>
+                            <Box sx={{ width: '65%' }}>
                               <TextField
+                                sx={{ width: '95%' }}
                                 size='small'
                                 name='value'
                                 label='Value'
