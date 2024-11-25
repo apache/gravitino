@@ -42,4 +42,9 @@ public class IcebergReplaceViewFailureEvent extends IcebergViewFailureEvent {
   public UpdateTableRequest replaceViewRequest() {
     return replaceViewRequest;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_VIEW;
+  }
 }

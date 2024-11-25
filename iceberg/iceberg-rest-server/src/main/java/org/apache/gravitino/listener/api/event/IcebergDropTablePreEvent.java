@@ -38,4 +38,9 @@ public class IcebergDropTablePreEvent extends IcebergTablePreEvent {
   public boolean purgeRequested() {
     return purgeRequested;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_TABLE;
+  }
 }

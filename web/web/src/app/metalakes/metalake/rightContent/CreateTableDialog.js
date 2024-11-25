@@ -72,7 +72,7 @@ import {
 import Icon from '@/components/Icon'
 
 // Import Redux hooks and actions
-import { useAppDispatch } from '@/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { createTable, updateTable } from '@/lib/store/metalakes'
 
 // Import form validation libraries
@@ -85,7 +85,7 @@ import { groupBy } from 'lodash-es'
 import { genUpdates } from '@/lib/utils'
 import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
-import { relationalTypes } from '@/lib/utils/initial'
+import { getRelationalColumnTypeMap, getParameterizedColumnType } from '@/lib/utils/initial'
 
 // Default form values
 const defaultFormValues = {
@@ -138,10 +138,15 @@ const CreateTableDialog = props => {
   const catalogType = searchParams.get('type')
   const schemaName = searchParams.get('schema')
 
+  const store = useAppSelector(state => state.metalakes)
+  const currentCatalog = store.catalogs.find(ca => ca.name === catalog)
+  const columnTypes = getRelationalColumnTypeMap(currentCatalog?.provider)
+
   // Component state
   const [innerProps, setInnerProps] = useState([])
   const [tableColumns, setTableColumns] = useState([{ name: '', type: '', nullable: true, comment: '' }])
   const [initialTableData, setInitialTableData] = useState()
+  const [selectedColumnIndex, setSelectedColumnIndex] = useState(null)
   const dispatch = useAppDispatch()
 
   // Initialize form with react-hook-form
@@ -205,6 +210,35 @@ const CreateTableDialog = props => {
       }
     }
 
+    // reset type suffix and param errors
+    if (field === 'type') {
+      updatedColumns[index].typeSuffix = ''
+      updatedColumns[index].paramErrors = ''
+
+      if (getParameterizedColumnType(value)) {
+        updatedColumns[index].paramValues = []
+      }
+    }
+
+    setTableColumns(updatedColumns)
+    setValue('columns', updatedColumns)
+  }
+
+  const transformParamValues = index => {
+    let updatedColumns = [...tableColumns]
+
+    const validateParams = getParameterizedColumnType(updatedColumns[index].type)?.validateParams
+    const paramValues = updatedColumns[index].paramValues.filter(param => param !== undefined).map(Number)
+    const validateResult = validateParams(paramValues)
+
+    if (validateResult.valid) {
+      updatedColumns[index].typeSuffix = `(${paramValues.join(',')})`
+      updatedColumns[index].paramErrors = ''
+    } else {
+      updatedColumns[index].paramErrors = validateResult.message
+    }
+
+    updatedColumns[index].paramValues = undefined
     setTableColumns(updatedColumns)
     setValue('columns', updatedColumns)
   }
@@ -303,7 +337,9 @@ const CreateTableDialog = props => {
           filteredCols.findIndex(otherCol => otherCol !== col && otherCol.name.trim() === col.name.trim()) !== -1
       )
 
-    if (hasDuplicateKeys || hasInvalidKeys || hasDuplicateColumnNames) {
+    const hasInvalidColumnTypes = tableColumns.some(col => col.paramErrors)
+
+    if (hasDuplicateKeys || hasInvalidKeys || hasDuplicateColumnNames || hasInvalidColumnTypes) {
       return
     }
 
@@ -321,7 +357,14 @@ const CreateTableDialog = props => {
         const tableData = {
           name: formData.name,
           comment: formData.comment,
-          columns: formData.columns.map(({ hasDuplicateName, ...rest }) => rest),
+
+          // remove redundant fields
+          columns: formData.columns.map(({ hasDuplicateName, paramErrors, typeSuffix, ...rest }) => {
+            return {
+              ...rest,
+              type: rest.type + typeSuffix || '' // combine type and type suffix, like decimal(10,2)
+            }
+          }),
           properties
         }
 
@@ -381,6 +424,13 @@ const CreateTableDialog = props => {
         // Set uniqueId to the column name to detect changes
         column.uniqueId = column.name
 
+        // Extract type suffix for types with parameters
+        const match = column.type.match(/(\w+)(\([\d,]+\))/)
+        if (match && match.length === 3) {
+          column.typeSuffix = match[2]
+          column.type = match[1]
+        }
+
         return {
           ...column
         }
@@ -401,10 +451,32 @@ const CreateTableDialog = props => {
     }
   }, [open, data, setValue, type])
 
+  // Handle click outside of table rows
+  useEffect(() => {
+    const handleClickOutside = e => {
+      const selectElements = document.querySelectorAll('[role="listbox"]')
+      const isClickInsideSelect = Array.from(selectElements).some(el => el.contains(e.target))
+      if (isClickInsideSelect) {
+        return
+      }
+
+      const isClickInsideTableCell = e.target.closest('td')
+      if (isClickInsideTableCell) {
+        return
+      }
+
+      setSelectedColumnIndex(null)
+    }
+
+    document.addEventListener('click', handleClickOutside)
+
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
+
   return (
     <Dialog
       fullWidth
-      maxWidth='md'
+      maxWidth='lg'
       scroll='body'
       TransitionComponent={Transition}
       open={open}
@@ -484,10 +556,10 @@ const CreateTableDialog = props => {
                 <Table stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ minWidth: 100 }}>Name</TableCell>
+                      <TableCell sx={{ minWidth: 100, width: 200 }}>Name</TableCell>
                       <TableCell sx={{ minWidth: 100 }}>Type</TableCell>
                       <TableCell sx={{ minWidth: 100 }}>Nullable</TableCell>
-                      <TableCell sx={{ minWidth: 200 }}>Comment</TableCell>
+                      <TableCell sx={{ minWidth: 200, width: 550 }}>Comment</TableCell>
                       <TableCell sx={{ minWidth: 50 }}>Action</TableCell>
                     </TableRow>
                   </TableHead>
@@ -512,25 +584,71 @@ const CreateTableDialog = props => {
                             )}
                           </FormControl>
                         </TableCell>
-                        <TableCell sx={{ verticalAlign: 'top' }}>
+                        <TableCell sx={{ verticalAlign: 'top' }} onClick={() => setSelectedColumnIndex(index)}>
                           <FormControl fullWidth>
-                            <Select
-                              size='small'
-                              fullWidth
-                              value={column.type}
-                              onChange={e => handleColumnChange({ index, field: 'type', value: e.target.value })}
-                              error={!column.type.trim()}
-                              data-refer={`column-type-${index}`}
-                            >
-                              {relationalTypes.map(type => (
-                                <MenuItem key={type.value} value={type.value}>
-                                  {type.label}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                            {!column.type.trim() && (
-                              <FormHelperText className={'twc-text-error-main'}>Type is required</FormHelperText>
-                            )}
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Box sx={{ minWidth: 120 }}>
+                                <Select
+                                  size='small'
+                                  fullWidth
+                                  value={column.type}
+                                  onChange={e => handleColumnChange({ index, field: 'type', value: e.target.value })}
+                                  error={!column.type.trim() || column.paramErrors}
+                                  data-refer={`column-type-${index}`}
+                                  renderValue={selected => <Box>{`${selected}${column.typeSuffix || ''}`}</Box>}
+                                >
+                                  {columnTypes.map(type => (
+                                    <MenuItem key={type} value={type}>
+                                      {type}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                                {!column.type.trim() && (
+                                  <FormHelperText className={'twc-text-error-main'}>Type is required</FormHelperText>
+                                )}
+                                {column.paramErrors && (
+                                  <FormHelperText className={'twc-text-error-main'}>
+                                    {column.paramErrors}
+                                  </FormHelperText>
+                                )}
+                              </Box>
+                              {selectedColumnIndex === index &&
+                                column.type &&
+                                (() => {
+                                  // Process typeSuffix before mapping
+                                  if (column.typeSuffix && !column.paramValues) {
+                                    const paramStr = column.typeSuffix.slice(1, -1) // Remove parentheses
+                                    const values = paramStr.split(',').map(v => v.trim())
+                                    handleColumnChange({
+                                      index,
+                                      field: 'paramValues',
+                                      value: values
+                                    })
+                                  }
+
+                                  return getParameterizedColumnType(column.type)?.params?.map((param, paramIndex) => (
+                                    <TextField
+                                      key={paramIndex}
+                                      size='small'
+                                      type='number'
+                                      sx={{ minWidth: 60 }}
+                                      value={column.paramValues?.[paramIndex] || ''}
+                                      onChange={e => {
+                                        const newParamValues = [...(column.paramValues || [])]
+                                        newParamValues[paramIndex] = e.target.value
+                                        handleColumnChange({ index, field: 'paramValues', value: newParamValues })
+                                      }}
+                                      placeholder={`${param}`}
+                                      data-refer={`column-param-${index}-${paramIndex}`}
+                                      inputProps={{ min: 0 }}
+                                    />
+                                  ))
+                                })()}
+                              {selectedColumnIndex !== index &&
+                                getParameterizedColumnType(column.type)?.params &&
+                                column.paramValues &&
+                                transformParamValues(index)}
+                            </Box>
                           </FormControl>
                         </TableCell>
                         <TableCell sx={{ verticalAlign: 'top' }}>
