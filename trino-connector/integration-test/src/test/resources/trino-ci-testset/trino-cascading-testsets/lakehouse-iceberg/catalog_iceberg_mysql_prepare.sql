@@ -1,24 +1,26 @@
 call gravitino.system.create_catalog(
-    'gt_iceberg1_1',
+    'gt_iceberg_mysql1_1',
     'lakehouse-iceberg',
     map(
-        array['uri', 'catalog-backend', 'warehouse'],
-        array['${hive_uri}', 'hive', '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT']
+        array['uri', 'catalog-backend', 'warehouse', 'jdbc-user', 'jdbc-password', 'jdbc-driver'],
+        array['${mysql_uri}/iceberg_db?createDatabaseIfNotExist=true&useSSL=false', 'jdbc',
+            '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver']
     )
 );
 
 call gravitino.system.create_catalog(
-    'gt_iceberg1',
+    'gt_iceberg_mysql1',
     'lakehouse-iceberg',
     map(
-        array['uri', 'catalog-backend', 'warehouse', 'cloud.region-code', 'cloud.trino.connection-url', 'cloud.trino.connection-user', 'cloud.trino.connection-password'],
-        array['${hive_uri}', 'hive', '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT','c2', '${trino_remote_jdbc_uri}', 'admin', '']
+        array['uri', 'catalog-backend', 'warehouse', 'jdbc-user', 'jdbc-password', 'jdbc-driver', 'cloud.region-code', 'cloud.trino.connection-url', 'cloud.trino.connection-user', 'cloud.trino.connection-password'],
+        array['${mysql_uri}/iceberg_db?createDatabaseIfNotExist=true&useSSL=false', 'jdbc',
+            '${hdfs_uri}/user/iceberg/warehouse/TrinoQueryIT', 'trino', 'ds123', 'com.mysql.cj.jdbc.Driver','c2', '${trino_remote_jdbc_uri}', 'admin', '']
     )
 );
 
-CREATE SCHEMA gt_iceberg1_1.gt_db2;
+CREATE SCHEMA gt_iceberg_mysql1_1.gt_db2;
 
-USE gt_iceberg1_1.gt_db2;
+USE gt_iceberg_mysql1_1.gt_db2;
 
 -- Unsupported Type: CHAR TINYINT, SMALLINT
 CREATE TABLE tb01 (
@@ -111,3 +113,5 @@ WITH (
     partitioning = ARRAY['day(commitdate)', 'month(shipdate)', 'bucket(partkey, 2)', 'truncate(shipinstruct, 2)'],
     sorted_by = ARRAY['partkey asc nulls last', 'extendedprice DESC NULLS FIRST']
 );
+
+USE gt_iceberg_mysql1.gt_db2;

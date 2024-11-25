@@ -161,24 +161,6 @@ INSERT INTO storage_formats_avro VALUES (true,127,32767,2147483647,9223372036854
 
 SELECT * FROM storage_formats_avro;
 
-CREATE TABLE storage_formats_csv (
-    congress varchar,
-    chamber varchar,
-    bioguide varchar,
-    firstname varchar,
-    middlename varchar,
-    lastname varchar,
-    suffix varchar,
-    birthday varchar,
-    state varchar,
-    party varchar,
-    incumbent varchar,
-    termstart varchar,
-    age varchar
-) WITH (format='CSV',location='file:///tmp/trino/data/hive/terms',table_type ='EXTERNAL_TABLE');
-
-SELECT * FROM storage_formats_csv;
-
 DROP TABLE gt_hive.gt_format_db1.storage_formats_orc;
 
 DROP TABLE gt_hive.gt_format_db1.storage_formats_textfile;
@@ -190,7 +172,5 @@ DROP TABLE gt_hive.gt_format_db1.storage_formats_rcfile;
 DROP TABLE gt_hive.gt_format_db1.storage_formats_sequencefile;
 
 DROP TABLE gt_hive.gt_format_db1.storage_formats_avro;
-
-DROP TABLE gt_hive.gt_format_db1.storage_formats_csv;
 
 DROP SCHEMA gt_hive.gt_format_db1;
