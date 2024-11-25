@@ -140,7 +140,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
               () -> {
                 try {
                   executeSqlFile(
-                      testSetDirName,"catalog_cascading_precheck.sql", queryRunner, catalog);
+                      testSetDirName, "catalog_cascading_precheck.sql", queryRunner, catalog);
                   return true;
                 } catch (Exception e) {
                   LOG.error("Failed to run query using trino cascading connector", e);
@@ -550,7 +550,12 @@ public class TrinoQueryIT extends TrinoQueryITBase {
 
   static String[] getTesterNames(String testSetDirName, String testFilterPrefix) throws Exception {
     return Arrays.stream(listDirectory(testSetDirName))
-        .filter(s -> !s.endsWith("prepare.sql") && !s.endsWith("cleanup.sql") && !s.endsWith("check.sql") && s.endsWith(".sql"))
+        .filter(
+            s ->
+                !s.endsWith("prepare.sql")
+                    && !s.endsWith("cleanup.sql")
+                    && !s.endsWith("check.sql")
+                    && s.endsWith(".sql"))
         .filter(s -> testFilterPrefix.isEmpty() || s.startsWith(testFilterPrefix))
         .toArray(String[]::new);
   }
