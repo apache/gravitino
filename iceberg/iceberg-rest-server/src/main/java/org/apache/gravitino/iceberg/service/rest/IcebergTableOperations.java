@@ -54,6 +54,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDisp
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
@@ -296,7 +297,14 @@ public class IcebergTableOperations {
     }
     Credential credential =
         CredentialUtils.vendCredential(
-            credentialProvider, loadTableResponse.tableMetadata().location());
+            credentialProvider,
+            new String[] {
+              loadTableResponse.tableMetadata().location(),
+              loadTableResponse.tableMetadata().property(TableProperties.WRITE_DATA_LOCATION, ""),
+              loadTableResponse
+                  .tableMetadata()
+                  .property(TableProperties.WRITE_METADATA_LOCATION, "")
+            });
     if (credential == null) {
       throw new ServiceUnavailableException(
           "Couldn't generate credential for %s", credentialProvider.credentialType());
