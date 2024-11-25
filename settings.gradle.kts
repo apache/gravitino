@@ -49,10 +49,10 @@ include(
   "clients:client-python",
   "clients:cli"
 )
-if (gradle.startParameter.projectProperties.containsKey("enable_gvfs_fuse")) {
+if (gradle.startParameter.projectProperties.containsKey("enableFuse")) {
   include("clients:filesystem-fuse")
 } else {
-  println("Skipping Gvfs-fuse tasks since -Penable_gvfs_fuse is not enabled.")
+  println("Skipping Gvfs-fuse tasks since -PenableFuse is not enabled.")
 }
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
