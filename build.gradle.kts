@@ -413,6 +413,8 @@ subprojects {
           artifact(javadocJar)
         }
 
+        artifactId = "${rootProject.name.lowercase(Locale.getDefault())}-${project.name}"
+
         pom {
           name.set("Gravitino")
           description.set("Gravitino is a high-performance, geo-distributed and federated metadata lake.")
