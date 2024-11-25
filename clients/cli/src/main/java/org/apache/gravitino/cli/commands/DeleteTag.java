@@ -90,16 +90,12 @@ public class DeleteTag extends Command {
     if (deleted.size() < tags.length) {
       List<String> remaining = Arrays.asList(tags);
       remaining.removeAll(deleted);
-      System.out.println("Tags " + String.join(",", deleted) + " not deleted.");
+      System.out.println("Tags " + String.join(",", remaining) + " not deleted.");
     }
   }
 
   private void handleOnlyOneTag() {
     boolean deleted = false;
-
-    if (!AreYouSure.really(force)) {
-      return;
-    }
 
     try {
       GravitinoClient client = buildClient(metalake);
@@ -116,9 +112,9 @@ public class DeleteTag extends Command {
     }
 
     if (deleted) {
-      System.out.println(tags[0] + " deleted.");
+      System.out.println("Tag " + tags[0] + " deleted.");
     } else {
-      System.out.println(tags[0] + " not deleted.");
+      System.out.println("Tag " + tags[0] + " not deleted.");
     }
   }
 }

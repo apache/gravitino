@@ -370,7 +370,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
 
     String[] tags = line.getOptionValues(GravitinoOptions.TAG);
-    tags = tags != null ? Arrays.stream(tags).distinct().toArray(String[]::new) : null;
+    if (tags != null) {
+      tags = Arrays.stream(tags).distinct().toArray(String[]::new);
+    }
     if (CommandActions.DETAILS.equals(command)) {
       newTagDetails(url, ignore, metalake, getOneTag(tags)).handle();
     } else if (CommandActions.LIST.equals(command)) {
