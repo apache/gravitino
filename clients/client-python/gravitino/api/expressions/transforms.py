@@ -22,22 +22,26 @@ from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.expressions.literals import Literals
 
 
+# set up for temporal usage, need to delete when we implement Partition class
 class Partition(ABC):
     """Base class for partitioning types."""
 
     pass
 
 
+# set up for temporal usage, need to delete when we implement Partitions class
 class Partitions:
     EMPTY_PARTITIONS = []  # Default empty partitions list
 
 
+# set up for temporal usage, need to delete when we implement ListPartition class
 class ListPartition(Partition):
     """Represents list partitioning."""
 
     pass
 
 
+# set up for temporal usage, need to delete when we implement RangePartition class
 class RangePartition(Partition):
     """Represents range partitioning."""
 
