@@ -21,7 +21,6 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -95,18 +94,6 @@ public class RangerHelper {
       throw new AuthorizationPluginException(
           "The access type only have one in the delegate Gravitino management policy");
     }
-    Set<String> setAccesses = new HashSet<>();
-    policyItem
-        .getAccesses()
-        .forEach(
-            access -> {
-              if (setAccesses.contains(access.getType())) {
-                throw new AuthorizationPluginException(
-                    "Contain duplicate privilege(%s) in the delegate Gravitino management policy ",
-                    access.getType());
-              }
-              setAccesses.add(access.getType());
-            });
   }
 
   /**
