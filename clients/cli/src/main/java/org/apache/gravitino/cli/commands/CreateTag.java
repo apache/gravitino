@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -51,6 +52,33 @@ public class CreateTag extends Command {
   /** Create tags. */
   @Override
   public void handle() {
+    boolean hasOnlyOneTag = tags.length == 1;
+    if (hasOnlyOneTag) {
+      handleOnlyOneTag();
+    } else {
+      handleMultipleTags();
+    }
+  }
+
+  private void handleOnlyOneTag() {
+    try {
+      GravitinoClient client = buildClient(metalake);
+      client.createTag(tags[0], comment, null);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (TagAlreadyExistsException err) {
+      System.err.println(ErrorMessages.TAG_EXISTS);
+      return;
+    } catch (Exception exp) {
+      System.err.println(exp.getMessage());
+      return;
+    }
+
+    System.out.println(tags[0] + " created");
+  }
+
+  private void handleMultipleTags() {
     List<String> created = new ArrayList<>();
     try {
       GravitinoClient client = buildClient(metalake);
@@ -60,14 +88,21 @@ public class CreateTag extends Command {
       }
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (TagAlreadyExistsException err) {
       System.err.println(ErrorMessages.TAG_EXISTS);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
-    } finally {
-      if (!created.isEmpty()) {
-        System.out.println("Tags " + String.join(",", created) + " created");
-      }
+      return;
+    }
+    if (!created.isEmpty()) {
+      System.out.println("Tags " + String.join(",", created) + " created");
+    }
+    if (created.size() < tags.length) {
+      List<String> remaining = Arrays.asList(tags);
+      remaining.removeAll(created);
+      System.out.println("Tags " + String.join(",", remaining) + " not created");
     }
   }
 }

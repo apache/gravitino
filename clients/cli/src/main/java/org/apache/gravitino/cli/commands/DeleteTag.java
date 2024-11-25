@@ -57,6 +57,15 @@ public class DeleteTag extends Command {
     if (!AreYouSure.really(force)) {
       return;
     }
+    boolean hasOnlyOneTag = tags.length == 1;
+    if (hasOnlyOneTag) {
+      handleOnlyOneTag();
+    } else {
+      handleMultipleTags();
+    }
+  }
+
+  private void handleMultipleTags() {
     List<String> deleted = new ArrayList<>();
     try {
       GravitinoClient client = buildClient(metalake);
@@ -67,19 +76,49 @@ public class DeleteTag extends Command {
       }
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
     } catch (NoSuchTagException err) {
       System.err.println(ErrorMessages.UNKNOWN_TAG);
+      return;
     } catch (Exception exp) {
       System.err.println(exp.getMessage());
-    } finally {
-      if (!deleted.isEmpty()) {
-        System.out.println("Tags " + String.join(",", deleted) + " deleted.");
-        if (deleted.size() < tags.length) {
-          List<String> remaining = Arrays.asList(tags);
-          remaining.removeAll(deleted);
-          System.out.println("Tags " + String.join(",", deleted) + " not deleted.");
-        }
-      }
+      return;
+    }
+    if (!deleted.isEmpty()) {
+      System.out.println("Tags " + String.join(",", deleted) + " deleted.");
+    }
+    if (deleted.size() < tags.length) {
+      List<String> remaining = Arrays.asList(tags);
+      remaining.removeAll(deleted);
+      System.out.println("Tags " + String.join(",", deleted) + " not deleted.");
+    }
+  }
+
+  private void handleOnlyOneTag() {
+    boolean deleted = false;
+
+    if (!AreYouSure.really(force)) {
+      return;
+    }
+
+    try {
+      GravitinoClient client = buildClient(metalake);
+      deleted = client.deleteTag(tags[0]);
+    } catch (NoSuchMetalakeException err) {
+      System.err.println(ErrorMessages.UNKNOWN_METALAKE);
+      return;
+    } catch (NoSuchTagException err) {
+      System.err.println(ErrorMessages.UNKNOWN_TAG);
+      return;
+    } catch (Exception exp) {
+      System.err.println(exp.getMessage());
+      return;
+    }
+
+    if (deleted) {
+      System.out.println(tags[0] + " deleted.");
+    } else {
+      System.out.println(tags[0] + " not deleted.");
     }
   }
 }

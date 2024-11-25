@@ -370,7 +370,7 @@ public class TestableCommandLine {
     return new ListAllTags(url, ignore, metalake);
   }
 
-  protected CreateTag newCreateTag(
+  protected CreateTag newCreateTags(
       String url, boolean ignore, String metalake, String[] tags, String comment) {
     return new CreateTag(url, ignore, metalake, tags, comment);
   }

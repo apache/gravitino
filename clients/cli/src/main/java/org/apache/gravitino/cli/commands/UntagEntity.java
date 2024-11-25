@@ -110,6 +110,6 @@ public class UntagEntity extends Command {
     }
 
     System.out.println(
-        entity + " removed tag " + String.join(",", tags) + ", now tagged with " + all);
+        entity + " removed tag " + String.join(",", tags) + " now tagged with " + all);
   }
 }
