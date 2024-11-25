@@ -25,18 +25,24 @@ import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.listener.api.event.AddPartitionEvent;
 import org.apache.gravitino.listener.api.event.AddPartitionFailureEvent;
+import org.apache.gravitino.listener.api.event.AddPartitionPreEvent;
 import org.apache.gravitino.listener.api.event.DropPartitionEvent;
 import org.apache.gravitino.listener.api.event.DropPartitionFailureEvent;
+import org.apache.gravitino.listener.api.event.DropPartitionPreEvent;
 import org.apache.gravitino.listener.api.event.GetPartitionEvent;
 import org.apache.gravitino.listener.api.event.GetPartitionFailureEvent;
+import org.apache.gravitino.listener.api.event.GetPartitionPreEvent;
 import org.apache.gravitino.listener.api.event.ListPartitionEvent;
 import org.apache.gravitino.listener.api.event.ListPartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.ListPartitionNamesEvent;
 import org.apache.gravitino.listener.api.event.ListPartitionNamesFailureEvent;
+import org.apache.gravitino.listener.api.event.ListPartitionNamesPreEvent;
+import org.apache.gravitino.listener.api.event.ListPartitionPreEvent;
 import org.apache.gravitino.listener.api.event.PartitionExistsEvent;
 import org.apache.gravitino.listener.api.event.PartitionExistsFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
+import org.apache.gravitino.listener.api.event.PurgePartitionPreEvent;
 import org.apache.gravitino.listener.api.info.partitions.PartitionInfo;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -66,6 +72,9 @@ public class PartitionEventDispatcher implements PartitionDispatcher {
   @Override
   public Partition addPartition(NameIdentifier ident, Partition partition)
       throws NoSuchPartitionException, PartitionAlreadyExistsException {
+    eventBus.dispatchEvent(
+        new AddPartitionPreEvent(
+            PrincipalUtils.getCurrentUserName(), ident, PartitionInfo.of(partition)));
     try {
       Partition newPartition = dispatcher.addPartition(ident, partition);
       eventBus.dispatchEvent(
@@ -84,6 +93,8 @@ public class PartitionEventDispatcher implements PartitionDispatcher {
   @Override
   public Partition getPartition(NameIdentifier ident, String partitionName)
       throws NoSuchPartitionException {
+    eventBus.dispatchEvent(
+        new GetPartitionPreEvent(PrincipalUtils.getCurrentUserName(), ident, partitionName));
     try {
       Partition partition = dispatcher.getPartition(ident, partitionName);
       eventBus.dispatchEvent(
@@ -100,6 +111,8 @@ public class PartitionEventDispatcher implements PartitionDispatcher {
 
   @Override
   public boolean dropPartition(NameIdentifier ident, String partitionName) {
+    eventBus.dispatchEvent(
+        new DropPartitionPreEvent(PrincipalUtils.getCurrentUserName(), ident, partitionName));
     try {
       boolean isExists = dispatcher.dropPartition(ident, partitionName);
       eventBus.dispatchEvent(
@@ -116,6 +129,7 @@ public class PartitionEventDispatcher implements PartitionDispatcher {
 
   @Override
   public Partition[] listPartitions(NameIdentifier ident) {
+    eventBus.dispatchEvent(new ListPartitionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       Partition[] listPartitions = dispatcher.listPartitions(ident);
       eventBus.dispatchEvent(new ListPartitionEvent(PrincipalUtils.getCurrentUserName(), ident));
@@ -129,6 +143,8 @@ public class PartitionEventDispatcher implements PartitionDispatcher {
 
   @Override
   public String[] listPartitionNames(NameIdentifier ident) {
+    eventBus.dispatchEvent(
+        new ListPartitionNamesPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       String[] listPartitionNames = dispatcher.listPartitionNames(ident);
       eventBus.dispatchEvent(
@@ -159,6 +175,8 @@ public class PartitionEventDispatcher implements PartitionDispatcher {
 
   @Override
   public boolean purgePartition(NameIdentifier ident, String partitionName) {
+    eventBus.dispatchEvent(
+        new PurgePartitionPreEvent(PrincipalUtils.getCurrentUserName(), ident, partitionName));
     try {
       boolean isExists = dispatcher.purgePartition(ident, partitionName);
       eventBus.dispatchEvent(

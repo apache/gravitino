@@ -136,6 +136,7 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 | Gravitino server schema operation   | `CreateSchemaPreEvent`, `AlterSchemaPreEvent`, `DropSchemaPreEvent`, `LoadSchemaPreEvent`, `ListSchemaPreEvent`                                                                                            | 0.8.0-incubating  |
 | Gravitino server catalog operation  | `CreateCatalogPreEvent`, `AlterCatalogPreEvent`, `DropCatalogPreEvent`, `LoadCatalogPreEvent`, `ListCatalogPreEvent`                                                                                       | 0.8.0-incubating  |
 | Gravitino server metalake operation | `CreateMetalakePreEvent`, `AlterMetalakePreEvent`,`DropMetalakePreEvent`,`LoadMetalakePreEvent`,`ListMetalakePreEvent`                                                                                     | 0.8.0-incubating |
+| Gravitino server partition operation| `AddPartitionPreEvent`, `DropPartitionPreEvent`, `GetPartitionPreEvent`, `PurgePartitionPreEvent`,`ListPartitionPreEvent`,`ListPartitionNamesPreEvent`                                                     | 0.8.0-incubating |
 
 #### Event listener plugin
 
