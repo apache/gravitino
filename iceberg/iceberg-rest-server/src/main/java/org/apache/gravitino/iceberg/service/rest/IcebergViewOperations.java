@@ -138,7 +138,7 @@ public class IcebergViewOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Replace Iceberg view, catalog: {}, namespace: {}, table: {}, replaceViewRequest: {}",
+        "Replace Iceberg view, catalog: {}, namespace: {}, view: {}, replaceViewRequest: {}",
         catalogName,
         icebergNS,
         view,
@@ -162,7 +162,7 @@ public class IcebergViewOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Drop Iceberg view, catalog: {}, namespace: {}, table: {}", catalogName, icebergNS, view);
+        "Drop Iceberg view, catalog: {}, namespace: {}, view: {}", catalogName, icebergNS, view);
     TableIdentifier viewIdentifier = TableIdentifier.of(namespace, view);
     IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     viewOperationDispatcher.dropView(context, viewIdentifier);
@@ -181,7 +181,7 @@ public class IcebergViewOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Check Iceberg view exists, catalog: {}, namespace: {}, table: {}",
+        "Check Iceberg view exists, catalog: {}, namespace: {}, view: {}",
         catalogName,
         icebergNS,
         view);

@@ -77,7 +77,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
+public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private static final Schema tableSchema =
       new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
@@ -94,7 +94,7 @@ public class TestIcebergTableOperations extends TestIcebergNamespaceOperations {
         IcebergRestTestUtil.getIcebergResourceConfig(
             MockIcebergTableOperations.class, true, Arrays.asList(dummyEventListener));
     // create namespace before each table test
-    resourceConfig.register(IcebergNamespaceOperations.class);
+    resourceConfig.register(MockIcebergNamespaceOperations.class);
     resourceConfig.register(MockIcebergTableRenameOperations.class);
 
     return resourceConfig;
