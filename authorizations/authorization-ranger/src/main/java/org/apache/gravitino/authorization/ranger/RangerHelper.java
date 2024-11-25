@@ -79,7 +79,9 @@ public class RangerHelper {
   }
 
   /**
-   * For easy management, each privilege will create one RangerPolicyItemAccess in the policy.
+   * There are two types of policy items:
+   * Gravitino managed policy items: They contain one privilege each.
+   * User-defined policy items: They could contain multiple privileges and not be managed and checked by Gravitino.
    *
    * @param policyItem The policy item to check
    * @throws AuthorizationPluginException If the policy item contains more than one access type
