@@ -370,14 +370,14 @@ public class TestableCommandLine {
     return new ListAllTags(url, ignore, metalake);
   }
 
-  protected CreateTag newCreateTag(
-      String url, boolean ignore, String metalake, String tag, String comment) {
-    return new CreateTag(url, ignore, metalake, tag, comment);
+  protected CreateTag newCreateTags(
+      String url, boolean ignore, String metalake, String[] tags, String comment) {
+    return new CreateTag(url, ignore, metalake, tags, comment);
   }
 
   protected DeleteTag newDeleteTag(
-      String url, boolean ignore, boolean force, String metalake, String tag) {
-    return new DeleteTag(url, ignore, force, metalake, tag);
+      String url, boolean ignore, boolean force, String metalake, String[] tags) {
+    return new DeleteTag(url, ignore, force, metalake, tags);
   }
 
   protected SetTagProperty newSetTagProperty(
@@ -411,13 +411,13 @@ public class TestableCommandLine {
   }
 
   protected TagEntity newTagEntity(
-      String url, boolean ignore, String metalake, FullName name, String tag) {
-    return new TagEntity(url, ignore, metalake, name, tag);
+      String url, boolean ignore, String metalake, FullName name, String[] tags) {
+    return new TagEntity(url, ignore, metalake, name, tags);
   }
 
   protected UntagEntity newUntagEntity(
-      String url, boolean ignore, String metalake, FullName name, String tag) {
-    return new UntagEntity(url, ignore, metalake, name, tag);
+      String url, boolean ignore, String metalake, FullName name, String[] tags) {
+    return new UntagEntity(url, ignore, metalake, name, tags);
   }
 
   protected ListColumns newListColumns(
