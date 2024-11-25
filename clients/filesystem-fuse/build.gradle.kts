@@ -19,36 +19,57 @@
 
 import org.gradle.api.tasks.Exec
 
-val envFile = System.getenv("HOME") + "/.cargo/env"
+val enablePgvfsFuse = project.hasProperty("enable_gvfs_fuse")
 
-val checkRustEnvironment by tasks.registering(Exec::class) {
-  description = "Check if Rust environment is properly set up using an external script"
-  group = "verification"
-  commandLine("bash", "$projectDir/check_rust_env.sh")
-  isIgnoreExitValue = false
-}
+if (enablePgvfsFuse) {
+  val checkRustEnvironment by tasks.registering(Exec::class) {
+    description = "Check if Rust environment."
+    group = "verification"
+    commandLine("bash", "-c", "cargo --version")
+    standardOutput = System.out
+    errorOutput = System.err
+    isIgnoreExitValue = false
+  }
 
-val compileRust by tasks.registering(Exec::class) {
-  dependsOn(checkRustEnvironment)
-  description = "Compile the Rust project"
-  workingDir = file("$projectDir")
-  commandLine("bash", "-c", ". $envFile && cargo build --release")
-}
+  val compileRust by tasks.registering(Exec::class) {
+    dependsOn(checkRustEnvironment)
+    description = "Compile the Rust project"
+    workingDir = file("$projectDir")
 
-val testRust by tasks.registering(Exec::class) {
-  dependsOn(checkRustEnvironment)
-  description = "Run tests in the Rust project"
-  group = "verification"
-  workingDir = file("$projectDir")
-  commandLine("bash", "-c", ". $envFile && cargo test --release")
+    commandLine(
+      "bash",
+      "-c",
+      """
+          set -e
+          echo "Checking the code format"
+          cargo fmt --all -- --check
 
-  standardOutput = System.out
-  errorOutput = System.err
-}
+          echo "Running clippy"
+          cargo clippy --all-targets --all-features --workspace -- -D warnings
 
-tasks.named("build") {
-  dependsOn(compileRust)
-}
-tasks.named("test") {
-  dependsOn(testRust)
+          echo "Compiling Rust project"
+          cargo build --release
+      """.trimIndent()
+    )
+  }
+
+  val testRust by tasks.registering(Exec::class) {
+    dependsOn(checkRustEnvironment)
+    description = "Run tests in the Rust project"
+    group = "verification"
+    workingDir = file("$projectDir")
+    commandLine("bash", "-c", "cargo test --release")
+
+    standardOutput = System.out
+    errorOutput = System.err
+  }
+
+  tasks.named("build") {
+    dependsOn(compileRust)
+  }
+  tasks.named("test") {
+    dependsOn(testRust)
+  }
+} else {
+  println("Skipping Gvfs-fuse tasks since -Penable_gvfs_fuse is not enabled.")
 }

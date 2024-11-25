@@ -17,14 +17,14 @@
  * under the License.
  */
 
-use fuse3::Result;
-use log::info;
 use log::debug;
+use log::info;
+use std::process::exit;
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
     tracing_subscriber::fmt().with_env_filter("debug").init();
     info!("Starting filesystem...");
     debug!("Shutdown filesystem...");
-    Ok(())
+    exit(0);
 }

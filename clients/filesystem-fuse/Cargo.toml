@@ -26,7 +26,6 @@ name = "gvfs-fuse"
 path = "src/main.rs"
 
 [dependencies]
-fuse3 = { version = "0.8.1", "features" = ["tokio-runtime", "unprivileged"] }
 futures-util = "0.3.30"
 libc = "0.2.164"
 log = "0.4.22"
