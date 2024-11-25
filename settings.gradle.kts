@@ -49,7 +49,7 @@ include(
   "clients:client-python",
   "clients:cli"
 )
-if (gradle.startParameter.projectProperties.containsKey("enableFuse")) {
+if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() ?: false) {
   include("clients:filesystem-fuse")
 } else {
   println("Skipping Gvfs-fuse tasks since -PenableFuse is not enabled.")
