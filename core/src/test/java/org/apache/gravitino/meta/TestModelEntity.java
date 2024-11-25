@@ -38,6 +38,7 @@ public class TestModelEntity {
             .withId(1L)
             .withName("test")
             .withComment("test comment")
+            .withLatestVersion(1)
             .withNamespace(Namespace.of("m1", "c1", "s1"))
             .withProperties(properties)
             .withAuditInfo(auditInfo)
@@ -46,6 +47,7 @@ public class TestModelEntity {
     Assertions.assertEquals(1L, modelEntity.id());
     Assertions.assertEquals("test", modelEntity.name());
     Assertions.assertEquals("test comment", modelEntity.comment());
+    Assertions.assertEquals(1, modelEntity.latestVersion());
     Assertions.assertEquals(Namespace.of("m1", "c1", "s1"), modelEntity.namespace());
     Assertions.assertEquals(properties, modelEntity.properties());
     Assertions.assertEquals(auditInfo, modelEntity.auditInfo());
@@ -54,6 +56,7 @@ public class TestModelEntity {
         ModelEntity.builder()
             .withId(1L)
             .withName("test")
+            .withLatestVersion(1)
             .withNamespace(Namespace.of("m1", "c1", "s1"))
             .withProperties(properties)
             .withAuditInfo(auditInfo)
@@ -65,6 +68,7 @@ public class TestModelEntity {
             .withId(1L)
             .withName("test")
             .withComment("test comment")
+            .withLatestVersion(1)
             .withNamespace(Namespace.of("m1", "c1", "s1"))
             .withAuditInfo(auditInfo)
             .build();
@@ -93,6 +97,19 @@ public class TestModelEntity {
               .withId(1L)
               .withName("test")
               .withNamespace(Namespace.of("m1", "c1", "s1"))
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build();
+        });
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          ModelEntity.builder()
+              .withId(1L)
+              .withName("test")
+              .withNamespace(Namespace.of("m1", "c1", "s1"))
+              .withLatestVersion(1)
               .build();
         });
   }

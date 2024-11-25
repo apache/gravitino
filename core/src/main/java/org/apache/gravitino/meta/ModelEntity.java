@@ -38,6 +38,8 @@ public class ModelEntity implements Entity, Auditable, HasIdentifier {
       Field.required("name", String.class, "The name of the model entity.");
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment or description of the model entity.");
+  public static final Field LATEST_VERSION =
+      Field.required("latest_version", Integer.class, "The latest version of the model entity.");
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the model entity.");
   public static final Field AUDIT_INFO =
@@ -51,6 +53,8 @@ public class ModelEntity implements Entity, Auditable, HasIdentifier {
 
   private String comment;
 
+  private Integer latestVersion;
+
   private AuditInfo auditInfo;
 
   private Map<String, String> properties;
@@ -63,6 +67,7 @@ public class ModelEntity implements Entity, Auditable, HasIdentifier {
     fields.put(ID, id);
     fields.put(NAME, name);
     fields.put(COMMENT, comment);
+    fields.put(LATEST_VERSION, latestVersion);
     fields.put(PROPERTIES, properties);
     fields.put(AUDIT_INFO, auditInfo);
 
@@ -86,6 +91,10 @@ public class ModelEntity implements Entity, Auditable, HasIdentifier {
 
   public String comment() {
     return comment;
+  }
+
+  public Integer latestVersion() {
+    return latestVersion;
   }
 
   public Map<String, String> properties() {
@@ -116,13 +125,14 @@ public class ModelEntity implements Entity, Auditable, HasIdentifier {
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(comment, that.comment)
+        && Objects.equals(latestVersion, that.latestVersion)
         && Objects.equals(properties, that.properties)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, comment, properties, auditInfo);
+    return Objects.hash(id, name, comment, latestVersion, properties, auditInfo);
   }
 
   public static Builder builder() {
@@ -153,6 +163,11 @@ public class ModelEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withComment(String comment) {
       model.comment = comment;
+      return this;
+    }
+
+    public Builder withLatestVersion(Integer latestVersion) {
+      model.latestVersion = latestVersion;
       return this;
     }
 
