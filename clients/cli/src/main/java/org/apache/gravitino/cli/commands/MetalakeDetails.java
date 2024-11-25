@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.Metalake;
-import org.apache.gravitino.cli.CommandLineOutputs;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -35,9 +34,10 @@ public class MetalakeDetails extends Command {
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
+   * @param OutputFormat The output format.
    */
-  public MetalakeDetails(String url, boolean ignoreVersions, String metalake) {
-    super(url, ignoreVersions);
+  public MetalakeDetails(String url, boolean ignoreVersions, String metalake, String OutputFormat) {
+    super(url, ignoreVersions, OutputFormat);
     this.metalake = metalake;
   }
 
@@ -47,7 +47,7 @@ public class MetalakeDetails extends Command {
     try {
       GravitinoClient client = buildClient(metalake);
       Metalake metalakeEntity = client.loadMetalake(metalake);
-      CommandLineOutputs.output(metalakeEntity);
+      output(metalakeEntity);
     } catch (NoSuchMetalakeException err) {
       System.err.println(ErrorMessages.UNKNOWN_METALAKE);
     } catch (Exception exp) {

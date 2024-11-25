@@ -30,7 +30,7 @@ import org.apache.commons.cli.Options;
 public class GravitinoCommandLine extends TestableCommandLine {
 
   private final CommandLine line;
-  private static Options options = null;
+  private final Options options;
   private final String entity;
   private final String command;
   private String urlEnv;
@@ -52,9 +52,9 @@ public class GravitinoCommandLine extends TestableCommandLine {
    */
   public GravitinoCommandLine(CommandLine line, Options options, String entity, String command) {
     this.line = line;
+    this.options = options;
     this.entity = entity;
     this.command = command;
-    GravitinoCommandLine.options = options;
   }
 
   /** Handles the parsed command line arguments and executes the corresponding actions. */
@@ -142,15 +142,16 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
+    String outputFormat = line.getOptionValue(GravitinoOptions.OUTPUT);
 
     if (CommandActions.DETAILS.equals(command)) {
       if (line.hasOption(GravitinoOptions.AUDIT)) {
         newMetalakeAudit(url, ignore, metalake).handle();
       } else {
-        newMetalakeDetails(url, ignore, metalake).handle();
+        newMetalakeDetails(url, ignore, metalake, outputFormat).handle();
       }
     } else if (CommandActions.LIST.equals(command)) {
-      newListMetalakes(url, ignore).handle();
+      newListMetalakes(url, ignore, outputFormat).handle();
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
       newCreateMetalake(url, ignore, metalake, comment).handle();
@@ -525,9 +526,5 @@ public class GravitinoCommandLine extends TestableCommandLine {
 
     // Return the default localhost URL
     return DEFAULT_URL;
-  }
-
-  public static Options getOptions() {
-    return options;
   }
 }

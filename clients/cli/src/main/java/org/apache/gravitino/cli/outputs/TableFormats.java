@@ -24,8 +24,8 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.Metalake;
 
-/** TableFormat to print a pretty table to standard out. */
-public class TableFormat {
+/** TableFormats to print a pretty table to standard out. */
+public class TableFormats {
   public static void output(Object object) {
     if (object instanceof Metalake) {
       new MetalakeTableFormat().output((Metalake) object);
@@ -73,7 +73,7 @@ public class TableFormat {
     }
 
     public void print(List<String> headers, List<List<String>> rows) {
-      if (headers.size() != rows.get(0).size()) {
+      if (rows.size() > 0 && headers.size() != rows.get(0).size()) {
         throw new IllegalArgumentException("Number of columns is not equal.");
       }
       maxElementLengths = new int[headers.size()];
