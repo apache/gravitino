@@ -70,7 +70,7 @@ export const providers = [
         defaultValue: 'hive',
         required: true,
         description: 'Apache Iceberg catalog type choose properties',
-        select: ['hive', 'jdbc']
+        select: ['hive', 'jdbc', 'rest']
       },
       {
         key: 'uri',
@@ -82,6 +82,8 @@ export const providers = [
         key: 'warehouse',
         value: '',
         required: true,
+        parentField: 'catalog-backend',
+        hide: ['rest'],
         description: 'Apache Iceberg catalog warehouse config'
       },
       {
@@ -89,7 +91,7 @@ export const providers = [
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive'],
+        hide: ['hive', 'rest'],
         description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`
       },
       {
@@ -97,14 +99,14 @@ export const providers = [
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive']
+        hide: ['hive', 'rest']
       },
       {
         key: 'jdbc-password',
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive']
+        hide: ['hive', 'rest']
       },
       {
         key: 'authentication.type',
@@ -347,21 +349,233 @@ export const providers = [
   }
 ]
 
-export const relationalTypes = [
-  { label: 'Boolean', value: 'boolean' },
-  { label: 'Byte', value: 'byte' },
-  { label: 'Short', value: 'short' },
-  { label: 'Integer', value: 'integer' },
-  { label: 'Long', value: 'long' },
-  { label: 'Float', value: 'float' },
-  { label: 'Double', value: 'double' },
-  { label: 'Date', value: 'date' },
-  { label: 'Time', value: 'time' },
-  { label: 'Timestamp', value: 'timestamp' },
-  { label: 'Timestamp_tz', value: 'timestamp_tz' },
-  { label: 'String', value: 'string' },
-  { label: 'Interval_day', value: 'interval_day' },
-  { label: 'Interval_year', value: 'interval_year' },
-  { label: 'Uuid', value: 'uuid' },
-  { label: 'Binary', value: 'binary' }
-]
+const parameterizedColumnTypes = {
+  char: {
+    params: ['length'],
+    validateParams: params => {
+      if (params.length !== 1) {
+        return {
+          valid: false,
+          message: 'Please set length'
+        }
+      }
+
+      const length = params[0]
+
+      if (length <= 0) {
+        return {
+          valid: false,
+          message: 'The length must be greater than 0'
+        }
+      }
+
+      return {
+        valid: true
+      }
+    }
+  },
+  decimal: {
+    params: ['precision', 'scale'],
+    validateParams: params => {
+      if (params.length !== 2) {
+        return {
+          valid: false,
+          message: 'Please set precision and scale'
+        }
+      }
+
+      const [param1, param2] = params
+      if (param1 <= 0 || param1 > 38) {
+        return {
+          valid: false,
+          message: 'The precision must be between 1 and 38'
+        }
+      }
+
+      if (param2 < 0 || param2 > param1) {
+        return {
+          valid: false,
+          message: 'The scale must be between 0 and the precision'
+        }
+      }
+
+      return {
+        valid: true
+      }
+    }
+  },
+  fixed: {
+    params: ['length'],
+    validateParams: params => {
+      if (params.length !== 1) {
+        return {
+          valid: false,
+          message: 'Please set length'
+        }
+      }
+
+      const length = params[0]
+
+      if (length <= 0) {
+        return {
+          valid: false,
+          message: 'The length must be greater than 0'
+        }
+      }
+
+      return {
+        valid: true
+      }
+    }
+  },
+  varchar: {
+    params: ['length'],
+    validateParams: params => {
+      if (params.length !== 1) {
+        return {
+          valid: false,
+          message: 'Please set length'
+        }
+      }
+
+      const length = params[0]
+
+      if (length <= 0) {
+        return {
+          valid: false,
+          message: 'The length must be greater than 0'
+        }
+      }
+
+      return {
+        valid: true
+      }
+    }
+  }
+}
+
+export const getParameterizedColumnType = type => {
+  if (Object.keys(parameterizedColumnTypes).includes(type)) {
+    return parameterizedColumnTypes[type]
+  }
+}
+
+const relationalColumnTypeMap = {
+  'lakehouse-iceberg': [
+    'binary',
+    'boolean',
+    'date',
+    'decimal',
+    'double',
+    'fixed',
+    'float',
+    'integer',
+    'long',
+    'string',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'uuid'
+  ],
+
+  hive: [
+    'binary',
+    'boolean',
+    'byte',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'interval_day',
+    'interval_year',
+    'long',
+    'short',
+    'string',
+    'timestamp',
+    'varchar'
+  ],
+
+  'jdbc-mysql': [
+    'binary',
+    'byte',
+    'byte unsigned',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'integer unsigned',
+    'long',
+    'long unsigned',
+    'short',
+    'short unsigned',
+    'string',
+    'time',
+    'timestamp',
+    'varchar'
+  ],
+  'jdbc-postgresql': [
+    'binary',
+    'boolean',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'long',
+    'short',
+    'string',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'varchar'
+  ],
+
+  'jdbc-doris': [
+    'boolean',
+    'byte',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'long',
+    'short',
+    'string',
+    'timestamp',
+    'varchar'
+  ],
+
+  'lakehouse-paimon': [
+    'binary',
+    'boolean',
+    'byte',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'fixed',
+    'float',
+    'integer',
+    'long',
+    'short',
+    'string',
+    'time',
+    'timestamp',
+    'timestamp_tz',
+    'varchar'
+  ]
+}
+
+export const getRelationalColumnTypeMap = catalog => {
+  if (Object.keys(relationalColumnTypeMap).includes(catalog)) {
+    return relationalColumnTypeMap[catalog]
+  }
+
+  return []
+}

@@ -42,4 +42,14 @@ public final class LoadSchemaEvent extends SchemaEvent {
   public SchemaInfo loadedSchemaInfo() {
     return loadedSchemaInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_SCHEMA;
+  }
 }
