@@ -38,8 +38,8 @@ class Strategy:
         if name in ("EVEN", "RANDOM"):
             return Strategy.EVEN
         raise ValueError(
-            f"Invalid distribution strategy: {name}. Valid values are: {', '.join(
-                [Strategy.NONE, Strategy.HASH, Strategy.RANGE, Strategy.EVEN])}"
+            f"Invalid distribution strategy: {name}. "
+            f"Valid values are: {', '.join([Strategy.NONE, Strategy.HASH, Strategy.RANGE, Strategy.EVEN])}"
         )
 
 
