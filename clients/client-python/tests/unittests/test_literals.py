@@ -17,12 +17,13 @@
 
 import unittest
 from datetime import date, time, datetime
-from gravitino.api.expressions.literals import Literals
+
+from gravitino.api.expressions.literals.literals import Literals
 
 
 class TestLiterals(unittest.TestCase):
     def test_null_literal(self):
-        null_val = Literals.null_literal()
+        null_val = Literals.NULL
         self.assertEqual(null_val.value(), None)
         self.assertEqual(null_val.data_type(), "NullType")
         self.assertEqual(str(null_val), "LiteralImpl(value=None, data_type=NullType)")

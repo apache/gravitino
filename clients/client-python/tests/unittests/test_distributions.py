@@ -16,7 +16,10 @@
 # under the License.
 
 import unittest
-from gravitino.api.expressions.distributions import Distributions, Strategy
+from gravitino.api.expressions.distributions.distributions import (
+    Distributions,
+    Strategy,
+)
 
 
 class TestDistribution(unittest.TestCase):

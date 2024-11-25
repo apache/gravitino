@@ -18,7 +18,7 @@
 
 from __future__ import annotations
 from abc import abstractmethod
-from typing import List, Union
+from typing import List
 from gravitino.api.expressions.expression import Expression
 
 
@@ -61,6 +61,9 @@ class FuncExpressionImpl(FunctionExpression):
     A concrete implementation of the FunctionExpression interface.
     """
 
+    _function_name: str
+    _arguments: List[Expression]
+
     def __init__(self, function_name: str, arguments: List[Expression]):
         super().__init__()
         self._function_name = function_name
@@ -78,14 +81,15 @@ class FuncExpressionImpl(FunctionExpression):
         arguments_str = ", ".join(map(str, self._arguments))
         return f"{self._function_name}({arguments_str})"
 
-    def __eq__(self, other: Union[FuncExpressionImpl, object]) -> bool:
-        if isinstance(other, FuncExpressionImpl):
-            return (
-                self._function_name == other._function_name
-                and self._arguments == other._arguments
-            )
-        # TODO: Consider handling other cases or adding custom equality checks
-        return False
+    def __eq__(self, other: FuncExpressionImpl) -> bool:
+        if self is other:
+            return True
+        if other is None or self.__class__ is not other.__class__:
+            return False
+        return (
+            self._function_name == other.function_name()
+            and self._arguments == other.arguments()
+        )
 
     def __hash__(self) -> int:
         return hash((self._function_name, tuple(self._arguments)))

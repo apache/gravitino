@@ -15,42 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from abc import ABC, abstractmethod
+from decimal import Decimal
 from typing import Union
 from datetime import date, time, datetime
 
-
-# Abstract base class for Literal
-class Literal(ABC):
-    """
-    Represents a constant literal value in the expression API.
-    """
-
-    @abstractmethod
-    def value(self) -> Union[int, float, str, datetime, time, date, bool]:
-        """
-        Returns the literal value.
-        """
-        pass
-
-    @abstractmethod
-    def data_type(self) -> str:
-        """
-        Returns the data type of the literal.
-        """
-        pass
-
-    def children(self):
-        """
-        Returns the child expressions. By default, this is an empty list.
-        """
-        return []
+from gravitino.api.expressions.literals.literal import Literal
 
 
-# Concrete implementation of Literal
 class LiteralImpl(Literal):
+    """Creates a literal with the given type value."""
+
+    _value: Union[int, float, str, datetime, time, date, bool, Decimal, None]
+    _data_type: (
+        str  # TODO: Need implement `api/src/main/java/org/apache/gravitino/rel/types`
+    )
+
     def __init__(
-        self, value: Union[int, float, str, datetime, time, date, bool], data_type: str
+        self,
+        value: Union[int, float, str, datetime, time, date, bool, Decimal, None],
+        data_type: str,
     ):
         self._value = value
         self._data_type = data_type
@@ -73,11 +56,14 @@ class LiteralImpl(Literal):
         return f"LiteralImpl(value={self._value}, data_type={self._data_type})"
 
 
-# Helper class to create literals
 class Literals:
+    """The helper class to create literals to pass into Apache Gravitino."""
+
+    NULL = LiteralImpl(None, "NullType")
+
     @staticmethod
-    def null_literal() -> Literal:
-        return LiteralImpl(None, "NullType")
+    def of(value, data_type) -> Literal:
+        return LiteralImpl(value, data_type)
 
     @staticmethod
     def boolean_literal(value: bool) -> Literal:
@@ -88,16 +74,32 @@ class Literals:
         return LiteralImpl(value, "Byte")
 
     @staticmethod
+    def unsigned_byte_literal(value: int) -> Literal:
+        return LiteralImpl(value, "Unsigned Byte")
+
+    @staticmethod
     def short_literal(value: int) -> Literal:
         return LiteralImpl(value, "Short")
+
+    @staticmethod
+    def unsigned_short_literal(value: int) -> Literal:
+        return LiteralImpl(value, "Unsigned Short")
 
     @staticmethod
     def integer_literal(value: int) -> Literal:
         return LiteralImpl(value, "Integer")
 
     @staticmethod
+    def unsigned_integer_literal(value: int) -> Literal:
+        return LiteralImpl(value, "Unsigned Integer")
+
+    @staticmethod
     def long_literal(value: int) -> Literal:
         return LiteralImpl(value, "Long")
+
+    @staticmethod
+    def unsigned_long_literal(value: Decimal) -> Literal:
+        return LiteralImpl(value, "Unsigned Long")
 
     @staticmethod
     def float_literal(value: float) -> Literal:
@@ -110,14 +112,6 @@ class Literals:
     @staticmethod
     def decimal_literal(value: float) -> Literal:
         return LiteralImpl(value, "Decimal")
-
-    @staticmethod
-    def string_literal(value: str) -> Literal:
-        return LiteralImpl(value, "String")
-
-    @staticmethod
-    def varchar_literal(length: int, value: str) -> Literal:
-        return LiteralImpl(value, f"Varchar({length})")
 
     @staticmethod
     def date_literal(value: date) -> Literal:
@@ -134,3 +128,11 @@ class Literals:
     @staticmethod
     def timestamp_literal_from_string(value: str) -> Literal:
         return Literals.timestamp_literal(datetime.fromisoformat(value))
+
+    @staticmethod
+    def string_literal(value: str) -> Literal:
+        return LiteralImpl(value, "String")
+
+    @staticmethod
+    def varchar_literal(length: int, value: str) -> Literal:
+        return LiteralImpl(value, f"Varchar({length})")

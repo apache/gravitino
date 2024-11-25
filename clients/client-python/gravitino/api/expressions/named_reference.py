@@ -27,7 +27,15 @@ class NamedReference(Expression):
 
     @staticmethod
     def field(field_name: List[str]) -> FieldReference:
-        """Returns a FieldReference for the given field name(s)."""
+        """
+        Returns a FieldReference for the given field name(s). The array of field name(s) is
+        used to reference nested fields. For example, if we have a struct column named "student" with a
+        data type of StructType{"name": StringType, "age": IntegerType}, we can reference the field
+        "name" by calling field("student", "name").
+
+        @param field_name the field name(s)
+        @return a FieldReference for the given field name(s)
+        """
         return FieldReference(field_name)
 
     @staticmethod
@@ -55,6 +63,8 @@ class FieldReference(NamedReference):
     """
     A NamedReference that references a field or column.
     """
+
+    _field_names: List[str]
 
     def __init__(self, field_names: List[str]):
         super().__init__()

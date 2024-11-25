@@ -24,7 +24,7 @@ from gravitino.api.expressions.expression import Expression
 class UnparsedExpression(Expression):
     """
     Represents an expression that is not parsed yet.
-    The parsed expression is represented by FunctionExpression, Literal, or NamedReference.
+    The parsed expression is represented by FunctionExpression, literal.py, or NamedReference.
     """
 
     def unparsed_expression(self) -> str:

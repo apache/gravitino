@@ -16,7 +16,10 @@
 # under the License.
 
 import unittest
-from gravitino.api.expressions.transforms import (
+
+from gravitino.api.expressions.literals.literals import Literals
+from gravitino.api.expressions.named_reference import NamedReference, FieldReference
+from gravitino.api.expressions.transforms.transforms import (
     Transforms,
     IdentityTransform,
     YearTransform,
@@ -29,8 +32,6 @@ from gravitino.api.expressions.transforms import (
     RangeTransform,
     ApplyTransform,
 )
-from gravitino.api.expressions.named_reference import NamedReference, FieldReference
-from gravitino.api.expressions.literals import Literals
 
 
 class TestTransforms(unittest.TestCase):

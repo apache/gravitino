@@ -16,7 +16,7 @@
 # under the License.
 
 from __future__ import annotations
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import List, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -27,10 +27,20 @@ class Expression(ABC):
     """Base class of the public logical expression API."""
 
     EMPTY_EXPRESSION: List[Expression] = []
+    """
+    `EMPTY_EXPRESSION` is only used as an input when the default `children` method builds the result.
+    """
 
+    EMPTY_NAMED_REFERENCE: List[NamedReference] = []
+    """
+    `EMPTY_NAMED_REFERENCE` is only used as an input when the default `references` method builds
+    the result array to avoid repeatedly allocating an empty array.
+    """
+
+    @abstractmethod
     def children(self) -> List[Expression]:
         """Returns a list of the children of this node. Children should not change."""
-        return self.EMPTY_EXPRESSION
+        pass
 
     def references(self) -> List[NamedReference]:
         """Returns a list of fields or columns that are referenced by this expression."""

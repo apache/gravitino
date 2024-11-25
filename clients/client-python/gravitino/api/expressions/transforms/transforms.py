@@ -1,121 +1,38 @@
-# Licensed to the Apache Software Foundation (ASF) under one
-# or more contributor license agreements.  See the NOTICE file
-# distributed with this work for additional information
-# regarding copyright ownership.  The ASF licenses this file
-# to you under the Apache License, Version 2.0 (the
-# "License"); you may not use this file except in compliance
-# with the License.  You may obtain a copy of the License at
-#
-#   http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied.  See the License for the
-# specific language governing permissions and limitations
-# under the License.
-
-from abc import ABC
 from typing import List
+
 from gravitino.api.expressions.expression import Expression
+from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.expressions.named_reference import NamedReference
-from gravitino.api.expressions.literals import Literals
-
-
-# set up for temporal usage, need to delete when we implement Partition class
-class Partition(ABC):
-    """Base class for partitioning types."""
-
-    pass
-
-
-# set up for temporal usage, need to delete when we implement Partitions class
-class Partitions:
-    EMPTY_PARTITIONS = []  # Default empty partitions list
-
-
-# set up for temporal usage, need to delete when we implement ListPartition class
-class ListPartition(Partition):
-    """Represents list partitioning."""
-
-    pass
-
-
-# set up for temporal usage, need to delete when we implement RangePartition class
-class RangePartition(Partition):
-    """Represents range partitioning."""
-
-    pass
-
-
-class Transform(Expression, ABC):
-    """Represents a transform function."""
-
-    def name(self) -> str:
-        """Returns the transform function name."""
-        pass
-
-    def arguments(self) -> List[Expression]:
-        """Returns the arguments passed to the transform function."""
-        pass
-
-    def assignments(self) -> List[Partition]:
-        """
-        Returns the preassigned partitions for the transform.
-        By default, it returns an empty list of partitions,
-        as only some transforms like ListTransform and RangeTransform
-        need to deal with assignments.
-        """
-        return Partitions.EMPTY_PARTITIONS
-
-    def children(self) -> List[Expression]:
-        """Returns the children expressions. By default, it is the arguments."""
-        return self.arguments()
-
-
-class SingleFieldTransform(Transform):
-    """Base class for transforms on a single field."""
-
-    def __init__(self, ref: NamedReference):
-        self.ref = ref
-
-    def field_name(self) -> List[str]:
-        """Returns the referenced field name as a list of string parts."""
-        return self.ref.field_name()
-
-    def references(self) -> List[NamedReference]:
-        """Returns a list of references (i.e., the field reference)."""
-        return [self.ref]
-
-    def arguments(self) -> List[Expression]:
-        """Returns a list of arguments for the transform, which is just `ref`."""
-        return [self.ref]
-
-    def __eq__(self, other: object) -> bool:
-        """Checks equality based on the `ref`."""
-        if not isinstance(other, SingleFieldTransform):
-            return False
-        return self.ref == other.ref
-
-    def __hash__(self) -> int:
-        """Generates a hash based on `ref`."""
-        return hash(self.ref)
+from gravitino.api.expressions.partitions.partitions import (
+    ListPartition,
+    RangePartition,
+)
+from gravitino.api.expressions.transforms.transform import Transform
 
 
 class Transforms(Transform):
     """Helper methods to create logical transforms to pass into Apache Gravitino."""
 
-    # Constants
-    EMPTY_TRANSFORM = []
-    NAME_OF_IDENTITY = "identity"
-    NAME_OF_YEAR = "year"
-    NAME_OF_MONTH = "month"
-    NAME_OF_DAY = "day"
-    NAME_OF_HOUR = "hour"
-    NAME_OF_BUCKET = "bucket"
-    NAME_OF_TRUNCATE = "truncate"
-    NAME_OF_LIST = "list"
-    NAME_OF_RANGE = "range"
+    EMPTY_TRANSFORM: List[Transform] = []
+    """An empty array of transforms."""
+    NAME_OF_IDENTITY: str = "identity"
+    """The name of the identity transform."""
+    NAME_OF_YEAR: str = "year"
+    """The name of the year transform. The year transform returns the year of the input value."""
+    NAME_OF_MONTH: str = "month"
+    """The name of the month transform. The month transform returns the month of the input value."""
+    NAME_OF_DAY: str = "day"
+    """The name of the day transform. The day transform returns the day of the input value."""
+    NAME_OF_HOUR: str = "hour"
+    """The name of the hour transform. The hour transform returns the hour of the input value."""
+    NAME_OF_BUCKET: str = "bucket"
+    """The name of the bucket transform. The bucket transform returns the bucket of the input value."""
+    NAME_OF_TRUNCATE: str = "truncate"
+    """The name of the truncate transform. The truncate transform returns the truncated value of the"""
+    NAME_OF_LIST: str = "list"
+    """The name of the list transform. The list transform includes multiple fields in a list."""
+    NAME_OF_RANGE: str = "range"
+    """The name of the range transform. The range transform returns the range of the input value."""
 
     @staticmethod
     def identity(field_name: List[str]) -> "IdentityTransform":
@@ -255,7 +172,7 @@ class Transforms(Transform):
         )
 
     @staticmethod
-    def apply(name: str, *arguments: "Expression") -> "ApplyTransform":
+    def apply(name: str, *arguments: Expression) -> "ApplyTransform":
         """
         Create a transform that applies a function to the input value.
 
@@ -269,13 +186,13 @@ class Transforms(Transform):
 class IdentityTransform(Transforms):
     """A transform that returns the input value."""
 
-    def __init__(self, ref: "NamedReference"):
+    def __init__(self, ref: NamedReference):
         self.ref = ref
 
     def name(self) -> str:
         return Transforms.NAME_OF_IDENTITY
 
-    def arguments(self) -> List["Expression"]:
+    def arguments(self) -> List[Expression]:
         return [self.ref]
 
     def __eq__(self, other):
@@ -288,7 +205,7 @@ class IdentityTransform(Transforms):
 class YearTransform(Transforms):
     """A transform that returns the year of the input value."""
 
-    def __init__(self, ref: "NamedReference"):
+    def __init__(self, ref: NamedReference):
         self.ref = ref
 
     def name(self) -> str:
@@ -297,7 +214,7 @@ class YearTransform(Transforms):
     def children(self) -> List[Expression]:
         return [self.ref]
 
-    def arguments(self) -> List["Expression"]:
+    def arguments(self) -> List[Expression]:
         return [self.ref]
 
     def __eq__(self, other):
@@ -310,7 +227,7 @@ class YearTransform(Transforms):
 class MonthTransform(Transforms):
     """A transform that returns the month of the input value."""
 
-    def __init__(self, ref: "NamedReference"):
+    def __init__(self, ref: NamedReference):
         self.ref = ref
 
     def name(self) -> str:
@@ -319,7 +236,7 @@ class MonthTransform(Transforms):
     def children(self) -> List[Expression]:
         return [self.ref]
 
-    def arguments(self) -> List["Expression"]:
+    def arguments(self) -> List[Expression]:
         return [self.ref]
 
     def __eq__(self, other):
@@ -332,7 +249,7 @@ class MonthTransform(Transforms):
 class DayTransform(Transforms):
     """A transform that returns the day of the input value."""
 
-    def __init__(self, ref: "NamedReference"):
+    def __init__(self, ref: NamedReference):
         self.ref = ref
 
     def name(self) -> str:
@@ -341,7 +258,7 @@ class DayTransform(Transforms):
     def children(self) -> List[Expression]:
         return [self.ref]
 
-    def arguments(self) -> List["Expression"]:
+    def arguments(self) -> List[Expression]:
         return [self.ref]
 
     def __eq__(self, other):
@@ -354,7 +271,7 @@ class DayTransform(Transforms):
 class HourTransform(Transforms):
     """A transform that returns the hour of the input value."""
 
-    def __init__(self, ref: "NamedReference"):
+    def __init__(self, ref: NamedReference):
         self.ref = ref
 
     def name(self) -> str:
@@ -363,7 +280,7 @@ class HourTransform(Transforms):
     def children(self) -> List[Expression]:
         return [self.ref]
 
-    def arguments(self) -> List["Expression"]:
+    def arguments(self) -> List[Expression]:
         return [self.ref]
 
     def __eq__(self, other):
@@ -376,7 +293,7 @@ class HourTransform(Transforms):
 class BucketTransform(Transforms):
     """A transform that returns the bucket of the input value."""
 
-    def __init__(self, num_buckets: int, fields: List["NamedReference"]):
+    def __init__(self, num_buckets: int, fields: List[NamedReference]):
         self._num_buckets = num_buckets
         self.fields = fields
 
@@ -393,7 +310,7 @@ class BucketTransform(Transforms):
     def name(self) -> str:
         return Transforms.NAME_OF_BUCKET
 
-    def arguments(self) -> List["Expression"]:
+    def arguments(self) -> List[Expression]:
         return [str(Literals.integer_literal(self.num_buckets))] + [
             field_name for field in self.fields for field_name in field.field_name()
         ]
@@ -413,7 +330,7 @@ class BucketTransform(Transforms):
 class TruncateTransform(Transforms):
     """A transform that returns the truncated value of the input value with the given width."""
 
-    def __init__(self, width: int, field: "NamedReference"):
+    def __init__(self, width: int, field: NamedReference):
         self._width = width
         self.field = field
 
@@ -428,7 +345,7 @@ class TruncateTransform(Transforms):
     def name(self) -> str:
         return Transforms.NAME_OF_TRUNCATE
 
-    def arguments(self) -> List["Expression"]:
+    def arguments(self) -> List[Expression]:
         return [self.width, self.field]
 
     def __eq__(self, other):
@@ -447,8 +364,8 @@ class ListTransform(Transforms):
 
     def __init__(
         self,
-        fields: List["NamedReference"],
-        assignments: List["ListPartition"] = None,
+        fields: List[NamedReference],
+        assignments: List[ListPartition] = None,
     ):
         if assignments is None:
             assignments = []
@@ -478,9 +395,7 @@ class ListTransform(Transforms):
 class RangeTransform(Transforms):
     """A transform that returns the range of the input value."""
 
-    def __init__(
-        self, field: "NamedReference", assignments: List["RangePartition"] = None
-    ):
+    def __init__(self, field: NamedReference, assignments: List[RangePartition] = None):
         if assignments is None:
             assignments = []
         self.field = field
@@ -493,10 +408,10 @@ class RangeTransform(Transforms):
     def name(self) -> str:
         return Transforms.NAME_OF_RANGE
 
-    def arguments(self) -> List["Expression"]:
+    def arguments(self) -> List[Expression]:
         return [self.field]
 
-    def assignments(self) -> List["RangePartition"]:
+    def assignments(self) -> List[RangePartition]:
         return self.assignments
 
     def __eq__(self, other):
@@ -509,14 +424,14 @@ class RangeTransform(Transforms):
 class ApplyTransform(Transforms):
     """A transform that applies a function to the input value."""
 
-    def __init__(self, name: str, arguments: List["Expression"]):
+    def __init__(self, name: str, arguments: List[Expression]):
         self._name = name
         self._arguments = list(arguments)
 
     def name(self) -> str:
         return self._name
 
-    def arguments(self) -> List["Expression"]:
+    def arguments(self) -> List[Expression]:
         return self._arguments
 
     def __eq__(self, other):

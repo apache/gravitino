@@ -16,12 +16,10 @@
 # under the License.
 
 import unittest
-from gravitino.api.expressions.sorts import (
-    SortDirection,
-    NullOrdering,
-    SortImpl,
-    SortOrders,
-)
+
+from gravitino.api.expressions.sorts.null_ordering import NullOrdering
+from gravitino.api.expressions.sorts.sort_direction import SortDirection
+from gravitino.api.expressions.sorts.sort_orders import SortImpl, SortOrders
 
 
 class TestSortImpl(unittest.TestCase):
@@ -130,11 +128,3 @@ class TestSortOrders(unittest.TestCase):
         self.assertEqual(sort_order.expression(), expr)
         self.assertEqual(sort_order.direction(), SortDirection.DESCENDING)
         self.assertEqual(sort_order.null_ordering(), NullOrdering.NULLS_FIRST)
-
-    def test_from_string(self):
-        # Test the from_string method of SortOrders
-        expr = "column_name"
-        sort_order = SortOrders.from_string(expr, "asc", "nulls_last")
-        self.assertEqual(sort_order.expression(), expr)
-        self.assertEqual(sort_order.direction(), SortDirection.ASCENDING)
-        self.assertEqual(sort_order.null_ordering(), NullOrdering.NULLS_LAST)
