@@ -39,7 +39,8 @@ public interface Capability {
     COLUMN,
     FILESET,
     TOPIC,
-    PARTITION
+    PARTITION,
+    MODEL
   }
 
   /**
