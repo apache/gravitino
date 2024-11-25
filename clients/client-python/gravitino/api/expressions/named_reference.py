@@ -60,7 +60,7 @@ class FieldReference(NamedReference):
         super().__init__()
         self._field_names = field_names
 
-    def field_names(self) -> List[str]:
+    def field_name(self) -> List[str]:
         return self._field_names
 
     def __eq__(self, other: object) -> bool:
