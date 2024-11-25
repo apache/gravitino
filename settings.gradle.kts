@@ -52,7 +52,7 @@ include(
 if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() ?: false) {
   include("clients:filesystem-fuse")
 } else {
-  println("Skipping Gvfs-fuse tasks since -PenableFuse is not enabled.")
+  println("Skipping Gvfs-fuse tasks since -PenableFuse=true is not enabled.")
 }
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
