@@ -84,13 +84,13 @@ echo "The args: $args"
 sleep 5
 $GRAVITINO_HOME_DIR/trino-connector/integration-test/trino-test-tools/trino_test.sh $args
 
-# if [ $? -ne 0 ]; then
-#     echo "Test failed"
-#     # clean up
-#     $TRINO_TEST_DOCKER_HOME/shutdown.sh
-#     exit 1
-# fi
-#
-# echo "Test success"
-# # clean up
-# $TRINO_TEST_DOCKER_HOME/shutdown.sh
+if [ $? -ne 0 ]; then
+    echo "Test failed"
+    # clean up
+    $TRINO_TEST_DOCKER_HOME/shutdown.sh
+    exit 1
+fi
+
+echo "Test success"
+# clean up
+$TRINO_TEST_DOCKER_HOME/shutdown.sh

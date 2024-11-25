@@ -16,9 +16,5 @@
 # specific language governing permissions and limitations
 # under the License.
 
-sed -i '$d' /usr/local/sbin/start.sh
-sed -i '$d' /usr/local/sbin/start.sh
 sed -i 's|hdfs://localhost:9000|hdfs://hive:9000|g' /usr/local/hive/conf/hive-site.xml
 /bin/bash /usr/local/sbin/start.sh
-
-tail -f /dev/null
