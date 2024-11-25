@@ -72,7 +72,7 @@ import {
 import Icon from '@/components/Icon'
 
 // Import Redux hooks and actions
-import { useAppDispatch } from '@/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { createTable, updateTable } from '@/lib/store/metalakes'
 
 // Import form validation libraries
@@ -85,7 +85,7 @@ import { groupBy } from 'lodash-es'
 import { genUpdates } from '@/lib/utils'
 import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
-import { tableColumnTypes } from '@/lib/utils/initial'
+import { getRelationalColumnTypeMap, getParameterizedColumnType } from '@/lib/utils/initial'
 
 // Default form values
 const defaultFormValues = {
@@ -137,6 +137,10 @@ const CreateTableDialog = props => {
   const catalog = searchParams.get('catalog')
   const catalogType = searchParams.get('type')
   const schemaName = searchParams.get('schema')
+
+  const store = useAppSelector(state => state.metalakes)
+  const currentCatalog = store.catalogs.find(ca => ca.name === catalog)
+  const columnTypes = getRelationalColumnTypeMap(currentCatalog?.provider)
 
   // Component state
   const [innerProps, setInnerProps] = useState([])
@@ -210,7 +214,8 @@ const CreateTableDialog = props => {
     if (field === 'type') {
       updatedColumns[index].typeSuffix = ''
       updatedColumns[index].paramErrors = ''
-      if (tableColumnTypes.find(type => type.key === value)?.params) {
+
+      if (getParameterizedColumnType(value)) {
         updatedColumns[index].paramValues = []
       }
     }
@@ -222,7 +227,7 @@ const CreateTableDialog = props => {
   const transformParamValues = index => {
     let updatedColumns = [...tableColumns]
 
-    const validateParams = tableColumnTypes.find(type => type.key === updatedColumns[index].type)?.validateParams
+    const validateParams = getParameterizedColumnType(updatedColumns[index].type)?.validateParams
     const paramValues = updatedColumns[index].paramValues.filter(param => param !== undefined).map(Number)
     const validateResult = validateParams(paramValues)
 
@@ -592,9 +597,9 @@ const CreateTableDialog = props => {
                                   data-refer={`column-type-${index}`}
                                   renderValue={selected => <Box>{`${selected}${column.typeSuffix || ''}`}</Box>}
                                 >
-                                  {tableColumnTypes.map(type => (
-                                    <MenuItem key={type.key} value={type.key}>
-                                      {type.key}
+                                  {columnTypes.map(type => (
+                                    <MenuItem key={type} value={type}>
+                                      {type}
                                     </MenuItem>
                                   ))}
                                 </Select>
@@ -621,28 +626,26 @@ const CreateTableDialog = props => {
                                     })
                                   }
 
-                                  return tableColumnTypes
-                                    .find(t => t.key === column.type)
-                                    ?.params?.map((param, paramIndex) => (
-                                      <TextField
-                                        key={paramIndex}
-                                        size='small'
-                                        type='number'
-                                        sx={{ minWidth: 60 }}
-                                        value={column.paramValues?.[paramIndex] || ''}
-                                        onChange={e => {
-                                          const newParamValues = [...(column.paramValues || [])]
-                                          newParamValues[paramIndex] = e.target.value
-                                          handleColumnChange({ index, field: 'paramValues', value: newParamValues })
-                                        }}
-                                        placeholder={`${param}`}
-                                        data-refer={`column-param-${index}-${paramIndex}`}
-                                        inputProps={{ min: 0 }}
-                                      />
-                                    ))
+                                  return getParameterizedColumnType(column.type)?.params?.map((param, paramIndex) => (
+                                    <TextField
+                                      key={paramIndex}
+                                      size='small'
+                                      type='number'
+                                      sx={{ minWidth: 60 }}
+                                      value={column.paramValues?.[paramIndex] || ''}
+                                      onChange={e => {
+                                        const newParamValues = [...(column.paramValues || [])]
+                                        newParamValues[paramIndex] = e.target.value
+                                        handleColumnChange({ index, field: 'paramValues', value: newParamValues })
+                                      }}
+                                      placeholder={`${param}`}
+                                      data-refer={`column-param-${index}-${paramIndex}`}
+                                      inputProps={{ min: 0 }}
+                                    />
+                                  ))
                                 })()}
                               {selectedColumnIndex !== index &&
-                                tableColumnTypes.find(type => type.key === column.type)?.params &&
+                                getParameterizedColumnType(column.type)?.params &&
                                 column.paramValues &&
                                 transformParamValues(index)}
                             </Box>

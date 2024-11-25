@@ -29,4 +29,9 @@ public class IcebergTableExistsPreEvent extends IcebergTablePreEvent {
       IcebergRequestContext icebergRequestContext, NameIdentifier tableIdentifier) {
     super(icebergRequestContext, tableIdentifier);
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.TABLE_EXISTS;
+  }
 }

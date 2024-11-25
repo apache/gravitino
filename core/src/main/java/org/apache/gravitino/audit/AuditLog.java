@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.audit;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.listener.api.event.AlterCatalogEvent;
 import org.apache.gravitino.listener.api.event.AlterCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterFilesetEvent;
@@ -56,6 +58,7 @@ import org.apache.gravitino.listener.api.event.DropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.DropTopicEvent;
 import org.apache.gravitino.listener.api.event.DropTopicFailureEvent;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationFailureEvent;
 import org.apache.gravitino.listener.api.event.GetPartitionEvent;
@@ -86,6 +89,8 @@ import org.apache.gravitino.listener.api.event.LoadTableEvent;
 import org.apache.gravitino.listener.api.event.LoadTableFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadTopicEvent;
 import org.apache.gravitino.listener.api.event.LoadTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.OperationStatus;
+import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.listener.api.event.PartitionExistsEvent;
 import org.apache.gravitino.listener.api.event.PartitionExistsFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
@@ -106,7 +111,9 @@ public interface AuditLog {
    * The operation name.
    *
    * @return operation name.
+   * @deprecated use {@code #operationType()} instead.
    */
+  @Deprecated
   Operation operation();
 
   /**
@@ -127,8 +134,60 @@ public interface AuditLog {
    * The status of the operation.
    *
    * @return operation status.
+   * @deprecated use {@link #operationStatus()} instead.
    */
+  @Deprecated
   Status status();
+
+  /**
+   * The remote address of the operation.
+   *
+   * @return The remote address string.
+   * @since 0.8.0
+   */
+  default String remoteAddress() {
+    return "unknown";
+  }
+
+  /**
+   * The status of the operation.
+   *
+   * @return The operation status.
+   * @since 0.8.0
+   */
+  default OperationStatus operationStatus() {
+    return OperationStatus.UNKNOWN;
+  }
+
+  /**
+   * The type of the operation.
+   *
+   * @return The operation status.
+   * @since 0.8.0
+   */
+  default OperationType operationType() {
+    return OperationType.UNKNOWN;
+  }
+
+  /**
+   * The custom information.
+   *
+   * @return the custom information.
+   * @since 0.8.0
+   */
+  default Map<String, String> customInfo() {
+    return ImmutableMap.of();
+  }
+
+  /**
+   * The event source.
+   *
+   * @return the event source.
+   * @since 0.8.0
+   */
+  default EventSource eventSource() {
+    return EventSource.GRAVITINO_SERVER;
+  }
 
   /** Define user metadata operation. */
   enum Operation {
@@ -294,6 +353,7 @@ public interface AuditLog {
 
   enum Status {
     SUCCESS,
-    FAILURE
+    FAILURE,
+    UNKNOWN
   }
 }

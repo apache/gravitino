@@ -30,4 +30,9 @@ public class IcebergDropViewPreEvent extends IcebergViewPreEvent {
       IcebergRequestContext icebergRequestContext, NameIdentifier viewIdentifier) {
     super(icebergRequestContext, viewIdentifier);
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_VIEW;
+  }
 }

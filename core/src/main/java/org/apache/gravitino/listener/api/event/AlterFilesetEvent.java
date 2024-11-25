@@ -69,4 +69,14 @@ public final class AlterFilesetEvent extends FilesetEvent {
   public FilesetInfo updatedFilesetInfo() {
     return updatedFilesetInfo;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_FILESET;
+  }
 }

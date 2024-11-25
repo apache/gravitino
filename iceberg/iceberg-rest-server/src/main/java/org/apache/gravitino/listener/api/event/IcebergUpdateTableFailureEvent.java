@@ -42,4 +42,9 @@ public class IcebergUpdateTableFailureEvent extends IcebergTableFailureEvent {
   public UpdateTableRequest updateTableRequest() {
     return updateTableRequest;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_TABLE;
+  }
 }

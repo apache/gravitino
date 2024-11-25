@@ -55,4 +55,14 @@ public final class AlterCatalogFailureEvent extends CatalogFailureEvent {
   public CatalogChange[] catalogChanges() {
     return catalogChanges;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.ALTER_CATALOG;
+  }
 }
