@@ -34,10 +34,10 @@ public class MetalakeDetails extends Command {
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
-   * @param OutputFormat The output format.
+   * @param outputFormat The output format.
    */
-  public MetalakeDetails(String url, boolean ignoreVersions, String metalake, String OutputFormat) {
-    super(url, ignoreVersions, OutputFormat);
+  public MetalakeDetails(String url, boolean ignoreVersions, String metalake, String outputFormat) {
+    super(url, ignoreVersions, outputFormat);
     this.metalake = metalake;
   }
 

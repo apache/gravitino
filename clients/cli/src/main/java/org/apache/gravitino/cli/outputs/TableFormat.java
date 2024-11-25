@@ -24,8 +24,8 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.Metalake;
 
-/** TableFormats to print a pretty table to standard out. */
-public class TableFormats {
+/** Table format to print a pretty table to standard out. */
+public class TableFormat {
   public static void output(Object object) {
     if (object instanceof Metalake) {
       new MetalakeTableFormat().output((Metalake) object);

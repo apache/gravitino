@@ -61,7 +61,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.LIST));
     doReturn(mockList)
         .when(commandLine)
-        .newListMetalakes(GravitinoCommandLine.DEFAULT_URL, false, "");
+        .newListMetalakes(GravitinoCommandLine.DEFAULT_URL, false, null);
     commandLine.handleCommandLine();
     verify(mockList).handle();
   }
@@ -78,7 +78,7 @@ class TestMetalakeCommands {
                 mockCommandLine, mockOptions, CommandEntities.METALAKE, CommandActions.DETAILS));
     doReturn(mockDetails)
         .when(commandLine)
-        .newMetalakeDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "");
+        .newMetalakeDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", null);
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }

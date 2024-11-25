@@ -23,8 +23,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Metalake;
 
-/** Comma separator format to print a pretty string to standard out. */
-public class CommaSeparatorFormats {
+/** Plain format to print a pretty string to standard out. */
+public class PlainFormat {
   public static void output(Object enitity) {
     if (enitity instanceof Metalake) {
       new MetalakeStringFormat().output((Metalake) enitity);

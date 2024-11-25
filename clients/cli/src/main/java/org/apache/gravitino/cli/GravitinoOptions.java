@@ -91,7 +91,7 @@ public class GravitinoOptions {
     // Force delete entity and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
 
-    options.addOption(createArgOption(null, OUTPUT, "output format (table)"));
+    options.addOption(createArgOption(null, OUTPUT, "output format (plain/table)"));
     return options;
   }
 

@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.cli.commands;
 
-import org.apache.gravitino.cli.outputs.CommaSeparatorFormats;
-import org.apache.gravitino.cli.outputs.TableFormats;
+import org.apache.gravitino.cli.outputs.PlainFormat;
+import org.apache.gravitino.cli.outputs.TableFormat;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -85,9 +85,9 @@ public abstract class Command {
    */
   protected <T> void output(T entity) {
     if (outputFormat != null && outputFormat.equals("table")) {
-      TableFormats.output(entity);
+      TableFormat.output(entity);
     } else {
-      CommaSeparatorFormats.output(entity);
+      PlainFormat.output(entity);
     }
   }
 }
