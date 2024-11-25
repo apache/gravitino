@@ -23,6 +23,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.file.FilesetChange;
 
+/** Represents an event triggered before altering a fileset. */
 @DeveloperApi
 public final class AlterFilesetPreEvent extends FilesetPreEvent {
   private final FilesetChange[] filesetChanges;
