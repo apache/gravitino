@@ -32,7 +32,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 @EnabledIf(
     value = "isAzureBlobStorageConfigured",
-    disabledReason = "Azure Blob Storage is not enabled")
+    disabledReason = "Azure Blob Storage is not prepared.")
 public class CatalogHiveABSIT extends CatalogHiveIT {
 
   private static final String ABS_BUCKET_NAME = System.getenv("ABS_CONTAINER_NAME");
@@ -43,9 +43,9 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
   protected void startNecessaryContainer() {
     Map<String, String> hiveContainerEnv =
         ImmutableMap.of(
-            "ADLS_ACCOUNT_NAME",
+            "ABS_ACCOUNT_NAME",
             ABS_USER_ACCOUNT_NAME,
-            "ADLS_ACCOUNT_KEY",
+            "ABS_ACCOUNT_KEY",
             ABS_USER_ACCOUNT_KEY,
             HiveContainer.HIVE_RUNTIME_VERSION,
             HiveContainer.HIVE3);

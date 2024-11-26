@@ -69,8 +69,8 @@
   </property>
 
   <property>
-    <name>fs.azure.account.key.ADLS_ACCOUNT_NAME.dfs.core.windows.net</name>
-    <value>ADLS_ACCOUNT_KEY</value>
+    <name>fs.azure.account.key.ABS_ACCOUNT_NAME.dfs.core.windows.net</name>
+    <value>ABS_ACCOUNT_KEY</value>
   </property>
 
 </configuration>

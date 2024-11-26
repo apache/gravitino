@@ -52,15 +52,15 @@ It's also applicable for ADLS.
 </property>
 
 
-<!-- The following are for ADLS -->
+<!-- The following are for Azure Blob Storage(ADLS) -->
 <property>
 <name>fs.abfss.impl</name>
 <value>org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem</value>
 </property>
 
 <property>
-<name>fs.azure.account.key.ADLS_ACCOUNT_NAME.dfs.core.windows.net</name>
-<value>ADLS_ACCOUNT_KEY</value>
+<name>fs.azure.account.key.ABS_ACCOUNT_NAME.dfs.core.windows.net</name>
+<value>ABS_ACCOUNT_KEY</value>
 </property>
 
 ```
@@ -214,7 +214,7 @@ To access S3-stored tables using Spark, you need to configure the SparkSession a
             .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.endpoint", getS3Endpoint)
             .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
-            ## This two is for ADLS only
+            ## This two is for Azure Blob Storage(ADLS) only
             .config(
                 String.format(
                     "spark.sql.catalog.{hive_catalog_name}.fs.azure.account.key.%s.dfs.core.windows.net",

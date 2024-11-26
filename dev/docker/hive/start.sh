@@ -49,9 +49,9 @@ if [[ -n "${S3_ACCESS_KEY}" && -n "${S3_SECRET_KEY}" && -n "${S3_ENDPOINT}" ]]; 
 fi
 
 # whether ADLS is set
-if [[ -n "${ADLS_ACCOUNT_NAME}" && -n "${ADLS_ACCOUNT_KEY}" ]]; then
-  sed -i "s|ADLS_ACCOUNT_NAME|${ADLS_ACCOUNT_NAME}|g" ${HIVE_CONF_DIR}/hive-site.xml
-  sed -i "s|ADLS_ACCOUNT_KEY|${ADLS_ACCOUNT_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
+if [[ -n "${ABS_ACCOUNT_NAME}" && -n "${ABS_ACCOUNT_KEY}" ]]; then
+  sed -i "s|ABS_ACCOUNT_NAME|${ABS_ACCOUNT_NAME}|g" ${HIVE_CONF_DIR}/hive-site.xml
+  sed -i "s|ABS_ACCOUNT_KEY|${ABS_ACCOUNT_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
 fi
 
 # Link mysql-connector-java after deciding where HIVE_HOME symbolic link points to.
