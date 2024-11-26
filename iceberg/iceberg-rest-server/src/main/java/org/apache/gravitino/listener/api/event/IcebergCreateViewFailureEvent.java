@@ -42,4 +42,9 @@ public class IcebergCreateViewFailureEvent extends IcebergViewFailureEvent {
   public CreateViewRequest createViewRequest() {
     return createViewRequest;
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_VIEW;
+  }
 }

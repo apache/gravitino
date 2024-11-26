@@ -72,12 +72,16 @@ public class TestSchemaEvent {
     Assertions.assertEquals(CreateSchemaEvent.class, event.getClass());
     SchemaInfo schemaInfo = ((CreateSchemaEvent) event).createdSchemaInfo();
     checkSchemaInfo(schemaInfo, schema);
+    Assertions.assertEquals(OperationType.CREATE_SCHEMA, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(CreateSchemaPreEvent.class, preEvent.getClass());
     SchemaInfo preSchemaInfo = ((CreateSchemaPreEvent) preEvent).createSchemaRequest();
     checkSchemaInfo(preSchemaInfo, schema);
+    Assertions.assertEquals(OperationType.CREATE_SCHEMA, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -90,10 +94,14 @@ public class TestSchemaEvent {
     Assertions.assertEquals(LoadSchemaEvent.class, event.getClass());
     SchemaInfo schemaInfo = ((LoadSchemaEvent) event).loadedSchemaInfo();
     checkSchemaInfo(schemaInfo, schema);
+    Assertions.assertEquals(OperationType.LOAD_SCHEMA, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(LoadSchemaPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LOAD_SCHEMA, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -105,11 +113,15 @@ public class TestSchemaEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListSchemaEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListSchemaEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_SCHEMA, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
     Assertions.assertEquals(ListSchemaPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(namespace, ((ListSchemaPreEvent) preEvent).namespace());
+    Assertions.assertEquals(OperationType.LIST_SCHEMA, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -125,12 +137,16 @@ public class TestSchemaEvent {
     checkSchemaInfo(schemaInfo, schema);
     Assertions.assertEquals(1, ((AlterSchemaEvent) event).schemaChanges().length);
     Assertions.assertEquals(schemaChange, ((AlterSchemaEvent) event).schemaChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_SCHEMA, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(AlterSchemaPreEvent.class, preEvent.getClass());
     Assertions.assertEquals(1, ((AlterSchemaPreEvent) preEvent).schemaChanges().length);
     Assertions.assertEquals(schemaChange, ((AlterSchemaPreEvent) preEvent).schemaChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_SCHEMA, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -143,10 +159,14 @@ public class TestSchemaEvent {
     Assertions.assertEquals(DropSchemaEvent.class, event.getClass());
     Assertions.assertEquals(true, ((DropSchemaEvent) event).cascade());
     Assertions.assertEquals(false, ((DropSchemaEvent) event).isExists());
+    Assertions.assertEquals(OperationType.DROP_SCHEMA, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(identifier, preEvent.identifier());
     Assertions.assertEquals(DropSchemaPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DROP_SCHEMA, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -161,6 +181,8 @@ public class TestSchemaEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((CreateSchemaFailureEvent) event).exception().getClass());
     checkSchemaInfo(((CreateSchemaFailureEvent) event).createSchemaRequest(), schema);
+    Assertions.assertEquals(OperationType.CREATE_SCHEMA, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -173,6 +195,8 @@ public class TestSchemaEvent {
     Assertions.assertEquals(LoadSchemaFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((LoadSchemaFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LOAD_SCHEMA, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -190,6 +214,8 @@ public class TestSchemaEvent {
         GravitinoRuntimeException.class, ((AlterSchemaFailureEvent) event).exception().getClass());
     Assertions.assertEquals(1, ((AlterSchemaFailureEvent) event).schemaChanges().length);
     Assertions.assertEquals(schemaChange, ((AlterSchemaFailureEvent) event).schemaChanges()[0]);
+    Assertions.assertEquals(OperationType.ALTER_SCHEMA, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -203,6 +229,8 @@ public class TestSchemaEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((DropSchemaFailureEvent) event).exception().getClass());
     Assertions.assertEquals(true, ((DropSchemaFailureEvent) event).cascade());
+    Assertions.assertEquals(OperationType.DROP_SCHEMA, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -216,6 +244,8 @@ public class TestSchemaEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListSchemaFailureEvent) event).exception().getClass());
     Assertions.assertEquals(namespace, ((ListSchemaFailureEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_SCHEMA, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   private void checkSchemaInfo(SchemaInfo schemaInfo, Schema schema) {

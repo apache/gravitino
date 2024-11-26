@@ -134,7 +134,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return CatalogHandlers.loadNamespace(asNamespaceCatalog, namespace);
   }
 
-  public boolean existNamespace(Namespace namespace) {
+  public boolean namespaceExists(Namespace namespace) {
     validateNamespace(Optional.of(namespace));
     return asNamespaceCatalog.namespaceExists(namespace);
   }
@@ -234,7 +234,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     CatalogHandlers.renameView(getViewCatalog(), request);
   }
 
-  public boolean existView(TableIdentifier viewIdentifier) {
+  public boolean viewExists(TableIdentifier viewIdentifier) {
     return getViewCatalog().viewExists(viewIdentifier);
   }
 

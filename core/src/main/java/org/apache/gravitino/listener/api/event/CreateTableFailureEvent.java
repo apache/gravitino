@@ -58,4 +58,14 @@ public final class CreateTableFailureEvent extends TableFailureEvent {
   public TableInfo createTableRequest() {
     return createTableRequest;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TABLE;
+  }
 }

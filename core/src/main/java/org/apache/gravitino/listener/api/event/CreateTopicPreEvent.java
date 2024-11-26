@@ -42,4 +42,14 @@ public class CreateTopicPreEvent extends TopicPreEvent {
   public TopicInfo createTopicRequest() {
     return createTopicRequest;
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.CREATE_TOPIC;
+  }
 }

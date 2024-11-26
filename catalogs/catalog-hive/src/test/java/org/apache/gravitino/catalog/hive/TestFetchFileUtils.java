@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,7 @@ public class TestFetchFileUtils {
   }
 
   @Test
+  @Disabled("The network errors in CI maybe cause the test failed")
   public void testDownloadFromHTTP() throws Exception {
     File destFile = new File("dest");
     String fileUrl = "https://downloads.apache.org/hadoop/common/KEYS";

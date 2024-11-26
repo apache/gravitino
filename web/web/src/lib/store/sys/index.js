@@ -19,9 +19,11 @@
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
-import { loggerVersion, to } from '@/lib/utils'
+import { loggerVersion, to, formatNumber, loggerGitHubInfo } from '@/lib/utils'
 
 import { getVersionApi } from '@/lib/api/version'
+
+import { getGitHubApi } from '@/lib/api/github'
 
 export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params, { getState }) => {
   let version = null
@@ -39,23 +41,54 @@ export const initialVersion = createAsyncThunk('sys/fetchVersion', async (params
   return version
 })
 
+export const fetchGitHubInfo = createAsyncThunk('sys/fetchGitHubInfo', async (params, { getState }) => {
+  let stars = 0
+  let forks = 0
+  const [err, res] = await to(getGitHubApi())
+  if (err || !res) {
+    console.error('Error fetching repository status : ', err)
+  }
+
+  stars = formatNumber(res.stargazers_count)
+  forks = formatNumber(res.forks_count)
+  loggerGitHubInfo(stars, forks)
+
+  return {
+    stars: stars,
+    forks: forks
+  }
+})
+
 export const sysSlice = createSlice({
   name: 'sys',
   initialState: {
-    version: ''
+    version: '',
+    stars: 0,
+    forks: 0
   },
   reducers: {
     setVersion(state, action) {
       state.version = action.payload
+    },
+    setStars(state, action) {
+      state.stars = action.payload
+    },
+    setForks(state, action) {
+      state.forks = action.payload
     }
   },
   extraReducers: builder => {
-    builder.addCase(initialVersion.fulfilled, (state, action) => {
-      state.version = action.payload.version
-    })
+    builder
+      .addCase(initialVersion.fulfilled, (state, action) => {
+        state.version = action.payload.version
+      })
+      .addCase(fetchGitHubInfo.fulfilled, (state, action) => {
+        state.stars = action.payload.stars
+        state.forks = action.payload.forks
+      })
   }
 })
 
-export const { setVersion } = sysSlice.actions
+export const { setVersion, setStars, setForks } = sysSlice.actions
 
 export default sysSlice.reducer

@@ -28,4 +28,14 @@ public final class DropSchemaPreEvent extends SchemaPreEvent {
   public DropSchemaPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.DROP_SCHEMA;
+  }
 }

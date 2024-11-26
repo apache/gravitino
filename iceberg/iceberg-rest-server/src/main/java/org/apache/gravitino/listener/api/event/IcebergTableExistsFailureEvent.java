@@ -29,4 +29,9 @@ public class IcebergTableExistsFailureEvent extends IcebergTableFailureEvent {
       IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier, Exception e) {
     super(icebergRequestContext, nameIdentifier, e);
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.TABLE_EXISTS;
+  }
 }

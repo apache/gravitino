@@ -456,10 +456,10 @@ gcli group delete --group new_group
 gcli tag details --tag tagA
 ```
 
-#### Create a tag
+#### Create tags
 
 ```bash
- gcli tag create --tag tagA
+ gcli tag create --tag tagA tagB
  ```
 
 #### List all tag
@@ -468,22 +468,22 @@ gcli tag details --tag tagA
 gcli tag list
 ```
 
-#### Delete a tag
+#### Delete tags
 
 ```bash
-gcli tag delete --tag tagA
+gcli tag delete --tag tagA tagB
 ```
 
-#### Add a tag to an entity
+#### Add tags to an entity
 
 ```bash
-gcli tag set --name catalog_postgres.hr --tag tagA
+gcli tag set --name catalog_postgres.hr --tag tagA tagB
 ```
 
-#### Remove a tag from an entity
+#### Remove tags from an entity
 
 ```bash
-gcli tag remove --name catalog_postgres.hr --tag tagA
+gcli tag remove --name catalog_postgres.hr --tag tagA tagB
 ```
 
 #### List all tags on an entity
