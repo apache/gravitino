@@ -16,12 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization;
 
-import org.apache.gravitino.authorization.Privilege;
-
-/** RangerPrivilege interface is used to define the Ranger privileges. */
-public interface RangerPrivilege {
+/** AuthorizationPrivilege interface is used to define the underlying data source privileges. */
+public interface AuthorizationPrivilege {
   String getName();
 
   Privilege.Condition condition();
