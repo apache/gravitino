@@ -28,14 +28,14 @@ val checkRustEnvironment by tasks.registering(Exec::class) {
   isIgnoreExitValue = false
 }
 
-val buildRust by tasks.registering(Exec::class) {
+val buildRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
   description = "Compile the Rust project"
   workingDir = file("$projectDir")
   commandLine("bash", "-c", "cargo build --release")
 }
 
-val checkRust by tasks.registering(Exec::class) {
+val checkRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
   description = "Check the Rust project"
   workingDir = file("$projectDir")
@@ -54,7 +54,7 @@ val checkRust by tasks.registering(Exec::class) {
   )
 }
 
-val testRust by tasks.registering(Exec::class) {
+val testRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
   description = "Run tests in the Rust project"
   group = "verification"
@@ -65,23 +65,23 @@ val testRust by tasks.registering(Exec::class) {
   errorOutput = System.err
 }
 
-tasks.named("testRust") {
-  mustRunAfter("checkRust")
+tasks.named("testRustProject") {
+  mustRunAfter("checkRustProject")
 }
-tasks.named("buildRust") {
-  mustRunAfter("testRust")
+tasks.named("buildRustProject") {
+  mustRunAfter("testRustProject")
 }
 
 tasks.named("build") {
-  dependsOn(testRust)
-  dependsOn(buildRust)
+  dependsOn(testRustProject)
+  dependsOn(buildRustProject)
 }
 
 tasks.named("check") {
   dependsOn.clear()
-  dependsOn(checkRust)
+  dependsOn(checkRustProject)
 }
 
 tasks.named("test") {
-  dependsOn(testRust)
+  dependsOn(testRustProject)
 }
