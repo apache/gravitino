@@ -16,7 +16,6 @@
 # under the License.
 from abc import abstractmethod
 from typing import List
-
 from gravitino.api.expressions.expression import Expression
 
 
