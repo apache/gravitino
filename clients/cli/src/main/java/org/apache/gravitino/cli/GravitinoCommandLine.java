@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.cli;
 
+import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
@@ -424,10 +426,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
-    String tag = line.getOptionValue(GravitinoOptions.TAG);
 
+    String[] tags = line.getOptionValues(GravitinoOptions.TAG);
+    tags = tags != null ? Arrays.stream(tags).distinct().toArray(String[]::new) : null;
     if (CommandActions.DETAILS.equals(command)) {
-      newTagDetails(url, ignore, metalake, tag).handle();
+      newTagDetails(url, ignore, metalake, getOneTag(tags)).handle();
     } else if (CommandActions.LIST.equals(command)) {
       if (!name.hasCatalogName()) {
         newListTags(url, ignore, metalake).handle();
@@ -436,38 +439,42 @@ public class GravitinoCommandLine extends TestableCommandLine {
       }
     } else if (CommandActions.CREATE.equals(command)) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-      newCreateTag(url, ignore, metalake, tag, comment).handle();
+      newCreateTags(url, ignore, metalake, tags, comment).handle();
     } else if (CommandActions.DELETE.equals(command)) {
       boolean force = line.hasOption(GravitinoOptions.FORCE);
-      newDeleteTag(url, ignore, force, metalake, tag).handle();
+      newDeleteTag(url, ignore, force, metalake, tags).handle();
     } else if (CommandActions.SET.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       String value = line.getOptionValue(GravitinoOptions.VALUE);
-
       if (property != null && value != null) {
-        newSetTagProperty(url, ignore, metalake, tag, property, value).handle();
-      } else {
-        newTagEntity(url, ignore, metalake, name, tag).handle();
+        newSetTagProperty(url, ignore, metalake, getOneTag(tags), property, value).handle();
+      } else if (property == null && value == null) {
+        newTagEntity(url, ignore, metalake, name, tags).handle();
       }
     } else if (CommandActions.REMOVE.equals(command)) {
       String property = line.getOptionValue(GravitinoOptions.PROPERTY);
       if (property != null) {
-        newRemoveTagProperty(url, ignore, metalake, tag, property).handle();
+        newRemoveTagProperty(url, ignore, metalake, getOneTag(tags), property).handle();
       } else {
-        newUntagEntity(url, ignore, metalake, name, tag).handle();
+        newUntagEntity(url, ignore, metalake, name, tags).handle();
       }
     } else if (CommandActions.PROPERTIES.equals(command)) {
-      newListTagProperties(url, ignore, metalake, tag).handle();
+      newListTagProperties(url, ignore, metalake, getOneTag(tags)).handle();
     } else if (CommandActions.UPDATE.equals(command)) {
       if (line.hasOption(GravitinoOptions.COMMENT)) {
         String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        newUpdateTagComment(url, ignore, metalake, tag, comment).handle();
+        newUpdateTagComment(url, ignore, metalake, getOneTag(tags), comment).handle();
       }
       if (line.hasOption(GravitinoOptions.RENAME)) {
         String newName = line.getOptionValue(GravitinoOptions.RENAME);
-        newUpdateTagName(url, ignore, metalake, tag, newName).handle();
+        newUpdateTagName(url, ignore, metalake, getOneTag(tags), newName).handle();
       }
     }
+  }
+
+  private String getOneTag(String[] tags) {
+    Preconditions.checkArgument(tags.length <= 1, ErrorMessages.MULTIPLE_TAG_COMMAND_ERROR);
+    return tags[0];
   }
 
   /** Handles the command execution for Roles based on command type and the command line options. */

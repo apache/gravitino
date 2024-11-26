@@ -28,6 +28,7 @@ public enum OperationType {
   LIST_TABLE,
   ALTER_TABLE,
   RENAME_TABLE,
+  REGISTER_TABLE,
   TABLE_EXISTS,
 
   // Schema operations
@@ -36,6 +37,7 @@ public enum OperationType {
   ALTER_SCHEMA,
   LOAD_SCHEMA,
   LIST_SCHEMA,
+  SCHEMA_EXISTS,
 
   // Fileset operations
   DROP_FILESET,

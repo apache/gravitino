@@ -117,4 +117,9 @@ public class GravitinoOptions {
   public Option createArgOption(String shortName, String longName, String description) {
     return new Option(shortName, longName, true, description);
   }
+
+  public Option createArgsOption(String shortName, String longName, String description) {
+    // Support multiple arguments
+    return Option.builder().option(shortName).longOpt(longName).hasArgs().desc(description).build();
+  }
 }

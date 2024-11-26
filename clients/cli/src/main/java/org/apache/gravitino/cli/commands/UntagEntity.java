@@ -34,30 +34,30 @@ import org.apache.gravitino.rel.Table;
 public class UntagEntity extends Command {
   protected final String metalake;
   protected final FullName name;
-  protected final String tag;
+  protected final String[] tags;
 
   /**
-   * Untag an entity with an existing tag.
+   * Remove existing tags from an entity.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
-   * @param tag The name of the tag.
+   * @param tags The names of the tags.
    */
   public UntagEntity(
-      String url, boolean ignoreVersions, String metalake, FullName name, String tag) {
+      String url, boolean ignoreVersions, String metalake, FullName name, String[] tags) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.name = name;
-    this.tag = tag;
+    this.tags = tags;
   }
 
-  /** Create a new tag. */
+  /** Remove tags from an entity. */
   @Override
   public void handle() {
     String entity = "unknown";
-    String[] tags = new String[0];
+    String[] removeTags = new String[0];
 
     try {
       GravitinoClient client = buildClient(metalake);
@@ -72,18 +72,18 @@ public class UntagEntity extends Command {
                 .loadCatalog(catalog)
                 .asTableCatalog()
                 .loadTable(NameIdentifier.of(schema, table));
-        tags = gTable.supportsTags().associateTags(null, new String[] {tag});
+        removeTags = gTable.supportsTags().associateTags(null, tags);
         entity = table;
       } else if (name.hasSchemaName()) {
         String catalog = name.getCatalogName();
         String schema = name.getSchemaName();
         Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
-        tags = gSchema.supportsTags().associateTags(null, new String[] {tag});
+        removeTags = gSchema.supportsTags().associateTags(null, tags);
         entity = schema;
       } else if (name.hasCatalogName()) {
         String catalog = name.getCatalogName();
         Catalog gCatalog = client.loadCatalog(catalog);
-        tags = gCatalog.supportsTags().associateTags(null, new String[] {tag});
+        removeTags = gCatalog.supportsTags().associateTags(null, tags);
         entity = catalog;
       }
     } catch (NoSuchMetalakeException err) {
@@ -103,12 +103,13 @@ public class UntagEntity extends Command {
       return;
     }
 
-    String all = String.join(",", tags);
+    String all = String.join(",", removeTags);
 
     if (all.equals("")) {
       all = "nothing";
     }
 
-    System.out.println(entity + " removed tag " + tag + ", now tagged with " + all);
+    System.out.println(
+        entity + " removed tag " + String.join(",", tags) + " now tagged with " + all);
   }
 }
