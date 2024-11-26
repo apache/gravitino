@@ -105,6 +105,6 @@ public class TagEntity extends Command {
 
     String all = String.join(",", tagsToAdd);
 
-    System.out.println(entity + " tagged with " + all);
+    System.out.println(entity + " now tagged with " + all);
   }
 }

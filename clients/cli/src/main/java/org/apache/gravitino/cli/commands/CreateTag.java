@@ -75,7 +75,7 @@ public class CreateTag extends Command {
       return;
     }
 
-    System.out.println(tags[0] + " created");
+    System.out.println("Tag " + tags[0] + " created");
   }
 
   private void handleMultipleTags() {
