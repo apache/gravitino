@@ -327,7 +327,6 @@ class TestGvfsWithABS(TestGvfsWithHDFS):
         self.fs.touch(ls_actual_file)
         self.assertTrue(self.fs.exists(ls_actual_file))
 
-        # Azure block storage with wasbs protocol does not support listing files.
         # test detail = false
         file_list_without_detail = fs.ls(ls_dir, detail=False)
         self.assertEqual(1, len(file_list_without_detail))
