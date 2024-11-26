@@ -27,15 +27,20 @@ else
   ln -s ${HADOOP2_HOME} ${HADOOP_HOME}
 fi
 
- cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
+cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
 
 # Copy Hadoop and Hive configuration file and update hostname
 cp -f ${HADOOP_TMP_CONF_DIR}/* ${HADOOP_CONF_DIR}
 cp -f ${HIVE_TMP_CONF_DIR}/* ${HIVE_CONF_DIR}
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/core-site.xml
 sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HADOOP_CONF_DIR}/hdfs-site.xml
-sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HIVE_CONF_DIR}/hive-site.xml
 
+if [[ -n "${ENABLE_JDBC_AUTHORIZATION}" ]]; then
+  cp -f ${HIVE_CONF_DIR}/hive-site-for-jdbc.xml ${HIVE_CONF_DIR}/hive-site.xml
+  cp -f ${HIVE_CONF_DIR}/hiveserver2-site-for-jdbc.xml ${HIVE_CONF_DIR}/hiveserver2-site.xml
+fi
+
+sed -i "s/__REPLACE__HOST_NAME/$(hostname)/g" ${HIVE_CONF_DIR}/hive-site.xml
 sed -i "s|S3_ACCESS_KEY_ID|${S3_ACCESS_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
 sed -i "s|S3_SECRET_KEY_ID|${S3_SECRET_KEY}|g" ${HIVE_CONF_DIR}/hive-site.xml
 sed -i "s|S3_ENDPOINT_ID|${S3_ENDPOINT}|g" ${HIVE_CONF_DIR}/hive-site.xml
