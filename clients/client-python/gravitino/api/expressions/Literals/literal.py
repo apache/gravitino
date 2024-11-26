@@ -27,12 +27,12 @@ class Literal(Expression):
     @abstractmethod
     def value(self):
         """The literal value."""
-        pass
+        raise NotImplementedError("Subclasses must implement the `value` method.")
 
     @abstractmethod
     def data_type(self):
         """The data type of the literal."""
-        pass
+        raise NotImplementedError("Subclasses must implement the `data_type` method.")
 
     def children(self) -> List[Expression]:
         return Expression.EMPTY_EXPRESSION
