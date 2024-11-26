@@ -55,10 +55,10 @@ DOCKER_TEST = os.environ.get("DOCKER_TEST")
 #  The Hadoop distribution package does not have native hdfs libraries for macOS / Windows systems
 #  (`libhdfs.dylib` for macOS and `libhdfs.dll` for Windows), so the integration tests cannot be run
 #  on these two systems at present.
-@unittest.skipIf(
-    DOCKER_TEST == "false" or platform.system() != "Linux",
-    "Skipping tests on non-Linux systems or when DOCKER_TEST=false",
-)
+# @unittest.skipIf(
+#     DOCKER_TEST == "false" or platform.system() != "Linux",
+#     "Skipping tests on non-Linux systems or when DOCKER_TEST=false",
+# )
 class TestGvfsWithHDFS(IntegrationTestEnv):
     hdfs_container: HDFSContainer = None
     config: Dict = None

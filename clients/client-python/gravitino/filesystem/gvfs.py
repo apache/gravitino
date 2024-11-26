@@ -583,19 +583,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             ops = infer_storage_options(storage_location)
             if "username" not in ops or "host" not in ops or "path" not in ops:
                 raise GravitinoRuntimeException(
-                    f"Storage location:{storage_location} doesn't support now. as the username,"
+                    f"Storage location:{storage_location} doesn't support now, the username,"
                     f"host and path are required in the storage location."
                 )
             actual_prefix = f"{StorageType.ABS.value}://{ops['username']}@{ops['host']}{ops['path']}"
-
-            # For ABS, the actual path should be the same as the virtual path is like
-            # 'wasbs//bucket1@xiaoyu123.blob.core.windows.net/test_gvfs_catalog6588/test_gvfs_schema/
-            # test_gvfs_fileset/test_cat/test.file'
-            # we need to add ':' after the wasbs
-            if actual_path.startswith(f"{StorageType.ABS.value}//"):
-                actual_path = actual_path.replace(
-                    f"{StorageType.ABS.value}//", f"{StorageType.ABS.value}://"
-                )
 
             # the actual path may be '{container}/{path}', we need to add the host and username
             # get the path from {container}/{path}
@@ -818,8 +809,9 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         if storage_type == StorageType.LOCAL:
             return path[len(f"{StorageType.LOCAL.value}:") :]
 
-        ## We need to remove the protocol and host from the path for instance
-        # 'wsabs://container@account/path' to 'container/path'
+        ## We need to remove the protocol and accout from the path, for instance,
+        # the path can be converted from 'abfss://container@account/path' to
+        # 'container/path'.
         if storage_type == StorageType.ABS:
             ops = infer_storage_options(path)
             return ops["username"] + ops["path"]

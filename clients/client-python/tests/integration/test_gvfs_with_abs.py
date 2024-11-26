@@ -47,7 +47,7 @@ def azure_abs_is_prepared():
 
 @unittest.skipUnless(azure_abs_is_prepared(), "Azure Blob Storage is not prepared.")
 class TestGvfsWithABS(TestGvfsWithHDFS):
-    # Before running this test, please set the make sure aliyun-azure-x.jar has been
+    # Before running this test, please set the make sure azure-bundle-xxx.jar has been
     # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
     azure_abs_account_key = os.environ.get("ABS_ACCOUNT_KEY")
     azure_abs_account_name = os.environ.get("ABS_ACCOUNT_NAME")
@@ -179,7 +179,6 @@ class TestGvfsWithABS(TestGvfsWithHDFS):
         self.assertEqual(b"test_cat_file", content)
 
     def check_mkdir(self, gvfs_dir, actual_dir, gvfs_instance):
-        # OSS will not create a directory, so the directory will not exist.
         self.fs.mkdir(actual_dir)
         self.assertFalse(self.fs.exists(actual_dir))
         self.assertFalse(gvfs_instance.exists(gvfs_dir))
@@ -200,13 +199,6 @@ class TestGvfsWithABS(TestGvfsWithHDFS):
         )
 
         self.check_mkdir(modified_dir, modified_actual_dir, fs)
-        # S3 only supports getting the `object` modify time, so the modified time will be None
-        # if it's a directory.
-        # >>> gcs.mkdir('example_qazwsx/catalog/schema/fileset3')
-        # >>> r = gcs.modified('example_qazwsx/catalog/schema/fileset3')
-        # >>> print(r)
-        # None
-        # self.assertIsNone(fs.modified(modified_dir))
 
         # create a file under the dir 'modified_dir'.
         file_path = modified_dir + "/test.txt"

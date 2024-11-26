@@ -457,7 +457,7 @@ The following properties are required if you want to access the OSS fileset via 
 | `oss_access_key_id`        | The access key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset. | 0.7.0-incubating |
 | `oss_secret_access_key`    | The secret key of the Aliyun OSS. | (none)        | Yes if it's a OSS fileset. | 0.7.0-incubating |
 
-For Azure blob storage fileset, you need to configure the following properties:
+For Azure Blob storage fileset, you need to configure the following properties:
 
 | Configuration item | Description                            | Default value | Required                                  | Since version    |
 |--------------------|----------------------------------------|---------------|-------------------------------------------|------------------|
