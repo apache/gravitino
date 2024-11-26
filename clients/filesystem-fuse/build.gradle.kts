@@ -65,7 +65,6 @@ val testRust by tasks.registering(Exec::class) {
   errorOutput = System.err
 }
 
-tasks.named("checkRust")
 tasks.named("testRust") {
   mustRunAfter("checkRust")
 }
