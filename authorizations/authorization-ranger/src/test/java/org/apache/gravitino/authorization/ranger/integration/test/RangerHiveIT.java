@@ -896,9 +896,12 @@ public class RangerHiveIT {
 
     Assertions.assertEquals(
         6, rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).size());
-    rangerClient.getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME).forEach(policy -> {
-      Assertions.assertFalse(rangerHelper.hasGravitinoManagedPolicyItem(policy));
-    });
+    rangerClient
+        .getPoliciesInService(RangerITEnv.RANGER_HIVE_REPO_NAME)
+        .forEach(
+            policy -> {
+              Assertions.assertFalse(rangerHelper.hasGravitinoManagedPolicyItem(policy));
+            });
   }
 
   @Test
