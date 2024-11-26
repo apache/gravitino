@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import org.apache.gravitino.cli.GravitinoOptions;
 import org.apache.gravitino.cli.Main;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -56,7 +57,7 @@ public class TableFormatOutputIT extends BaseIT {
     // Restore the original System.out
     System.setOut(originalOut);
     // Get the output and verify it
-    String output = outputStream.toString().trim();
+    String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals("+----------+\n" + "| metalake |\n" + "+----------+\n" + "+----------+", output);
   }
 
