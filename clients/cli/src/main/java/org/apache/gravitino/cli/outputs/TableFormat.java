@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 
 /** Table format to print a pretty table to standard out. */
@@ -31,6 +32,8 @@ public class TableFormat {
       new MetalakeTableFormat().output((Metalake) object);
     } else if (object instanceof Metalake[]) {
       new MetalakesTableFormat().output((Metalake[]) object);
+    } else if (object instanceof Catalog) {
+      new CatalogTableFormat().output((Catalog) object);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -55,6 +58,22 @@ public class TableFormat {
       for (int i = 0; i < metalakes.length; i++) {
         rows.add(Arrays.asList(metalakes[i].name()));
       }
+      TableFormatImpl tableFormat = new TableFormatImpl();
+      tableFormat.print(headers, rows);
+    }
+  }
+
+  static final class CatalogTableFormat implements OutputFormat<Catalog> {
+    @Override
+    public void output(Catalog catalog) {
+      List<String> headers = Arrays.asList("catalog", "type", "provider", "comment");
+      List<List<String>> rows = new ArrayList<>();
+      rows.add(
+          Arrays.asList(
+              catalog.name(),
+              catalog.type().toString(),
+              catalog.provider(),
+              catalog.comment() + ""));
       TableFormatImpl tableFormat = new TableFormatImpl();
       tableFormat.print(headers, rows);
     }

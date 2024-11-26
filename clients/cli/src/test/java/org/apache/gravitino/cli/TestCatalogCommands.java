@@ -81,7 +81,8 @@ class TestCatalogCommands {
                 mockCommandLine, mockOptions, CommandEntities.CATALOG, CommandActions.DETAILS));
     doReturn(mockDetails)
         .when(commandLine)
-        .newCatalogDetails(GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog");
+        .newCatalogDetails(
+            GravitinoCommandLine.DEFAULT_URL, false, "metalake_demo", "catalog", null);
     commandLine.handleCommandLine();
     verify(mockDetails).handle();
   }

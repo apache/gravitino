@@ -21,15 +21,18 @@ package org.apache.gravitino.cli.outputs;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 
 /** Plain format to print a pretty string to standard out. */
 public class PlainFormat {
-  public static void output(Object enitity) {
-    if (enitity instanceof Metalake) {
-      new MetalakeStringFormat().output((Metalake) enitity);
-    } else if (enitity instanceof Metalake[]) {
-      new MetalakesStringFormat().output((Metalake[]) enitity);
+  public static void output(Object object) {
+    if (object instanceof Metalake) {
+      new MetalakeStringFormat().output((Metalake) object);
+    } else if (object instanceof Metalake[]) {
+      new MetalakesStringFormat().output((Metalake[]) object);
+    } else if (object instanceof Catalog) {
+      new CatalogStringFormat().output((Catalog) object);
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
@@ -49,6 +52,20 @@ public class PlainFormat {
           Arrays.stream(metalakes).map(Metalake::name).collect(Collectors.toList());
       String all = String.join(System.lineSeparator(), metalakeNames);
       System.out.println(all);
+    }
+  }
+
+  static final class CatalogStringFormat implements OutputFormat<Catalog> {
+    @Override
+    public void output(Catalog catalog) {
+      System.out.println(
+          catalog.name()
+              + ","
+              + catalog.type()
+              + ","
+              + catalog.provider()
+              + ","
+              + catalog.comment());
     }
   }
 }
