@@ -28,7 +28,7 @@ val checkRustEnvironment by tasks.registering(Exec::class) {
   isIgnoreExitValue = false
 }
 
-val compileRust by tasks.registering(Exec::class) {
+val buildRust by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
   description = "Compile the Rust project"
   workingDir = file("$projectDir")
@@ -65,11 +65,21 @@ val testRust by tasks.registering(Exec::class) {
   errorOutput = System.err
 }
 
+tasks.named("checkRust")
+tasks.named("testRust") {
+  mustRunAfter("checkRust")
+}
+tasks.named("buildRust") {
+  mustRunAfter("testRust")
+}
+
 tasks.named("build") {
-  dependsOn(compileRust)
+  dependsOn(testRust)
+  dependsOn(buildRust)
 }
 
 tasks.named("check") {
+  dependsOn.clear()
   dependsOn(checkRust)
 }
 
