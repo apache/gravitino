@@ -15,9 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-
 from __future__ import annotations
 from typing import List
+
 from gravitino.api.expressions.expression import Expression
 
 
