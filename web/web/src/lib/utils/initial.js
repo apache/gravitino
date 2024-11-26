@@ -455,7 +455,7 @@ const parameterizedColumnTypes = {
 }
 
 export const getParameterizedColumnType = type => {
-  if (Object.keys(parameterizedColumnTypes).includes(type)) {
+  if (Object.hasOwn(parameterizedColumnTypes, type)) {
     return parameterizedColumnTypes[type]
   }
 }
@@ -477,7 +477,6 @@ const relationalColumnTypeMap = {
     'timestamp_tz',
     'uuid'
   ],
-
   hive: [
     'binary',
     'boolean',
@@ -496,7 +495,6 @@ const relationalColumnTypeMap = {
     'timestamp',
     'varchar'
   ],
-
   'jdbc-mysql': [
     'binary',
     'byte',
@@ -534,7 +532,6 @@ const relationalColumnTypeMap = {
     'timestamp_tz',
     'varchar'
   ],
-
   'jdbc-doris': [
     'boolean',
     'byte',
@@ -550,7 +547,6 @@ const relationalColumnTypeMap = {
     'timestamp',
     'varchar'
   ],
-
   'lakehouse-paimon': [
     'binary',
     'boolean',
@@ -572,10 +568,99 @@ const relationalColumnTypeMap = {
   ]
 }
 
-export const getRelationalColumnTypeMap = catalog => {
-  if (Object.keys(relationalColumnTypeMap).includes(catalog)) {
+export const getRelationalColumnType = catalog => {
+  if (Object.hasOwn(relationalColumnTypeMap, catalog)) {
     return relationalColumnTypeMap[catalog]
   }
 
   return []
+}
+
+const relationalTablePropInfoMap = {
+  hive: {
+    reserved: ['comment', 'EXTERNAL', 'numFiles', 'totalSize', 'transient_lastDdlTime'],
+    immutable: [
+      'format',
+      'input-format',
+      'location',
+      'output-format',
+      'serde-name',
+      'serde-lib',
+      'serde.parameter',
+      'table-type'
+    ],
+    allowDelete: true,
+    allowAdd: true
+  },
+  'jdbc-doris': {
+    reserved: [],
+    allowDelete: true,
+    allowAdd: true
+  },
+  'jdbc-mysql': {
+    reserved: [],
+    immutable: ['auto-increment-offset', 'engine'],
+    allowDelete: false,
+    allowAdd: true
+  },
+  'jdbc-oceanbase': {
+    reserved: [],
+    immutable: [],
+    allowDelete: false,
+    allowAdd: false
+  },
+  'jdbc-postgresql': {
+    reserved: [],
+    immutable: [],
+    allowDelete: false,
+    allowAdd: false
+  },
+  'lakehouse-hudi': {
+    reserved: [],
+    immutable: [],
+    allowDelete: true,
+    allowAdd: true
+  },
+  'lakehouse-iceberg': {
+    reserved: [
+      'cherry-pick-snapshot-id',
+      'comment',
+      'creator',
+      'current-snapshot-id',
+      'identifier-fields',
+      'sort-order',
+      'write.distribution-mode'
+    ], // Can't be set or modified
+    immutable: ['location', 'provider', 'format', 'format-version'], // Can't be modified after creation
+    allowDelete: true,
+    allowAdd: true
+  },
+  'lakehouse-paimon': {
+    reserved: [
+      'bucket-key',
+      'comment',
+      'merge-engine',
+      'owner',
+      'partition',
+      'primary-key',
+      'rowkind.field',
+      'sequence.field'
+    ],
+    immutable: ['merge-engine', 'rowkind.field', 'sequence.field'],
+    allowDelete: true,
+    allowAdd: true
+  }
+}
+
+export const getRelationalTablePropInfo = catalog => {
+  if (Object.hasOwn(relationalTablePropInfoMap, catalog)) {
+    return relationalTablePropInfoMap[catalog]
+  }
+
+  return {
+    reserved: [],
+    immutable: [],
+    allowDelete: true,
+    allowAdd: true
+  }
 }
