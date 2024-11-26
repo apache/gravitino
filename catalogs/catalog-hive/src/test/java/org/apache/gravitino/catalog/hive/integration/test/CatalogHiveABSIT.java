@@ -69,7 +69,7 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
     conf.set("fs.abfss.impl", "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem");
 
     String path =
-        String.format("abfs://%s@%s.dfs.core.windows.net", ABS_BUCKET_NAME, ABS_USER_ACCOUNT_NAME);
+        String.format("abfss://%s@%s.dfs.core.windows.net", ABS_BUCKET_NAME, ABS_USER_ACCOUNT_NAME);
     fileSystem = FileSystem.get(URI.create(path), conf);
   }
 
@@ -106,7 +106,7 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
     properties.put(
         "location",
         String.format(
-            "abfs://%s@%s.dfs.core.windows.net/test-%s",
+            "abfss://%s@%s.dfs.core.windows.net/test-%s",
             ABS_BUCKET_NAME, ABS_USER_ACCOUNT_NAME, System.currentTimeMillis()));
     return properties;
   }
