@@ -237,7 +237,7 @@ To access S3-stored tables using Spark, you need to configure the SparkSession a
 
 :::Note
 Please download [Hadoop AWS jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of the Spark. If the JARs are missing, Spark will not be able to access the S3 storage.
-ADLS requires the [Hadoop Azure jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-azure), [Azure cloud sdk jar](https://mvnrepository.com/artifact/com.azure/azure-storage-blob) to be placed in the classpath of the Spark.
+Azure Blob Storage(ADLS) requires the [Hadoop Azure jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-azure), [Azure cloud sdk jar](https://mvnrepository.com/artifact/com.azure/azure-storage-blob) to be placed in the classpath of the Spark.
 :::
 
 By following these instructions, you can effectively manage and access your S3-stored data through both Hive CLI and Spark, leveraging the capabilities of Gravitino for optimal data management.
