@@ -162,6 +162,6 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
     Capability capability = getCapability(ident, catalogManager);
-    return applyCapabilities(ident, Capability.Scope.TOPIC, capability);
+    return applyCapabilities(ident, Capability.Scope.MODEL, capability);
   }
 }
