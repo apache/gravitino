@@ -30,6 +30,8 @@ public abstract class Command {
   private final String url;
   private final boolean ignoreVersions;
   private final String outputFormat;
+  static String OUTPUT_FORMAT_TABLE = "table";
+  static String OUTPUT_FORMAT_PLAIN = "plain";
 
   /**
    * Command constructor.
@@ -84,7 +86,7 @@ public abstract class Command {
    * @param entity The entity to output.
    */
   protected <T> void output(T entity) {
-    if (outputFormat != null && outputFormat.equals("table")) {
+    if (outputFormat != null && outputFormat.equals(OUTPUT_FORMAT_TABLE)) {
       TableFormat.output(entity);
     } else {
       PlainFormat.output(entity);
