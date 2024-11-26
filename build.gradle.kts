@@ -31,6 +31,8 @@ import org.gradle.kotlin.dsl.support.serviceOf
 import java.io.IOException
 import java.util.Locale
 
+Locale.setDefault(Locale.US)
+
 plugins {
   `maven-publish`
   id("java")
@@ -413,7 +415,7 @@ subprojects {
           artifact(javadocJar)
         }
 
-        artifactId = "${rootProject.name.lowercase(Locale.getDefault())}-${project.name}"
+        artifactId = "${rootProject.name.lowercase()}-${project.name}"
 
         pom {
           name.set("Gravitino")
@@ -490,7 +492,7 @@ subprojects {
   version = "$version"
 
   tasks.withType<Jar> {
-    archiveBaseName.set("${rootProject.name.lowercase(Locale.getDefault())}-${project.name}")
+    archiveBaseName.set("${rootProject.name.lowercase()}-${project.name}")
     if (project.name == "server") {
       from(sourceSets.main.get().resources)
       setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
@@ -965,7 +967,7 @@ fun checkOrbStackStatus() {
     if (exitCode == 0) {
       val currentContext = process.inputStream.bufferedReader().readText()
       println("Current docker context is: $currentContext")
-      project.extra["isOrbStack"] = currentContext.lowercase(Locale.getDefault()).contains("orbstack")
+      project.extra["isOrbStack"] = currentContext.lowercase().contains("orbstack")
     } else {
       println("checkOrbStackStatus Command execution failed with exit code $exitCode")
     }
