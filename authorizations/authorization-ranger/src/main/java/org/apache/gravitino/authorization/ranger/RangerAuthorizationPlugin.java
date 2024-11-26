@@ -800,15 +800,8 @@ public abstract class RangerAuthorizationPlugin
       try {
         List<RangerPolicy> policies = rangerClient.getPoliciesInService(rangerServiceName);
         policies.stream()
-            .forEach(
-                policy -> {
-                  try {
-                    rangerClient.deletePolicy(policy.getId());
-                  } catch (RangerServiceException e) {
-                    LOG.error("Failed to rename the policy {}!", policy);
-                    throw new RuntimeException(e);
-                  }
-                });
+            .filter(rangerHelper::hasGravitinoManagedPolicyItem)
+            .forEach(rangerHelper::removeAllGravitinoManagedPolicyItem);
       } catch (RangerServiceException e) {
         throw new RuntimeException(e);
       }
@@ -977,32 +970,7 @@ public abstract class RangerAuthorizationPlugin
                                         .getValues()
                                         .contains(preciseFilters.get(entry.getKey()))))
             .collect(Collectors.toList());
-    policies.stream()
-        .forEach(
-            policy -> {
-              try {
-                policy.setPolicyItems(
-                    policy.getPolicyItems().stream()
-                        .filter(i -> !rangerHelper.isGravitinoManagedPolicyItemAccess(i))
-                        .collect(Collectors.toList()));
-                policy.setDenyPolicyItems(
-                    policy.getDenyPolicyItems().stream()
-                        .filter(i -> !rangerHelper.isGravitinoManagedPolicyItemAccess(i))
-                        .collect(Collectors.toList()));
-                policy.setRowFilterPolicyItems(
-                    policy.getRowFilterPolicyItems().stream()
-                        .filter(i -> !rangerHelper.isGravitinoManagedPolicyItemAccess(i))
-                        .collect(Collectors.toList()));
-                policy.setDataMaskPolicyItems(
-                    policy.getDataMaskPolicyItems().stream()
-                        .filter(i -> !rangerHelper.isGravitinoManagedPolicyItemAccess(i))
-                        .collect(Collectors.toList()));
-                rangerClient.updatePolicy(policy.getId(), policy);
-              } catch (RangerServiceException e) {
-                LOG.error("Failed to rename the policy {}!", policy);
-                throw new RuntimeException(e);
-              }
-            });
+    policies.forEach(rangerHelper::removeAllGravitinoManagedPolicyItem);
   }
 
   private void updatePolicyByMetadataObject(

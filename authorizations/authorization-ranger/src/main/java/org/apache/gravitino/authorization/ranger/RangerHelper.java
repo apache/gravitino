@@ -246,6 +246,39 @@ public class RangerHelper {
     return policyItem.getRoles().stream().anyMatch(role -> role.startsWith(GRAVITINO_ROLE_PREFIX));
   }
 
+  public boolean hasGravitinoManagedPolicyItem(RangerPolicy policy) {
+    List<RangerPolicy.RangerPolicyItem> policyItems = policy.getPolicyItems();
+    policyItems.addAll(policy.getDenyPolicyItems());
+    policyItems.addAll(policy.getRowFilterPolicyItems());
+    policyItems.addAll(policy.getDataMaskPolicyItems());
+    return policyItems.stream().anyMatch(this::isGravitinoManagedPolicyItemAccess);
+  }
+
+  public void removeAllGravitinoManagedPolicyItem(RangerPolicy policy) {
+    try {
+      policy.setPolicyItems(
+          policy.getPolicyItems().stream()
+              .filter(i -> !isGravitinoManagedPolicyItemAccess(i))
+              .collect(Collectors.toList()));
+      policy.setDenyPolicyItems(
+          policy.getDenyPolicyItems().stream()
+              .filter(i -> !isGravitinoManagedPolicyItemAccess(i))
+              .collect(Collectors.toList()));
+      policy.setRowFilterPolicyItems(
+          policy.getRowFilterPolicyItems().stream()
+              .filter(i -> !isGravitinoManagedPolicyItemAccess(i))
+              .collect(Collectors.toList()));
+      policy.setDataMaskPolicyItems(
+          policy.getDataMaskPolicyItems().stream()
+              .filter(i -> !isGravitinoManagedPolicyItemAccess(i))
+              .collect(Collectors.toList()));
+      rangerClient.updatePolicy(policy.getId(), policy);
+    } catch (RangerServiceException e) {
+      LOG.error("Failed to update the policy {}!", policy);
+      throw new RuntimeException(e);
+    }
+  }
+
   protected boolean checkRangerRole(String roleName) throws AuthorizationPluginException {
     roleName = generateGravitinoRoleName(roleName);
     try {
