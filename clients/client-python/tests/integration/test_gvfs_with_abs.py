@@ -23,6 +23,7 @@ import unittest
 
 from adlfs import AzureBlobFileSystem
 
+from gravitino.filesystem.gvfs import StorageType
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
 from gravitino import (
     gvfs,
@@ -279,7 +280,7 @@ class TestGvfsWithABS(TestGvfsWithHDFS):
         self.assertFalse(self.fs.exists(mkdir_actual_dir))
         self.assertFalse(fs.exists(mkdir_dir))
 
-        self.assertFalse(self.fs.exists("wasbs://" + new_bucket))
+        self.assertFalse(self.fs.exists(f"{StorageType.ABS.value}://{new_bucket}"))
 
     def test_makedirs(self):
         mkdir_dir = self.fileset_gvfs_location + "/test_mkdir"
@@ -307,7 +308,7 @@ class TestGvfsWithABS(TestGvfsWithHDFS):
         self.assertFalse(self.fs.exists(mkdir_actual_dir))
 
         self.assertFalse(fs.exists(mkdir_dir))
-        self.assertFalse(self.fs.exists("wsabs://" + new_bucket))
+        self.assertFalse(self.fs.exists(f"{StorageType.ABS.value}://{new_bucket}"))
 
     def test_ls(self):
         ls_dir = self.fileset_gvfs_location + "/test_ls"
