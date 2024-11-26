@@ -150,6 +150,11 @@ RUN ln -s /opt/hadoop-${HADOOP2_VERSION} ${HADOOP2_HOME}
 ADD packages/hadoop-${HADOOP3_VERSION}.tar.gz /opt/
 RUN ln -s /opt/hadoop-${HADOOP3_VERSION} ${HADOOP3_HOME}
 
+
+# Add gcs connector for hadoop2 and hadoop3
+ADD packages/gcs-connector-hadoop2-2.2.23-shaded.jar ${HADOOP2_HOME}/share/hadoop/common/lib/gcs-connector-hadoop2-latest.jar
+ADD packages/gcs-connector-hadoop3-2.2.23-shaded.jar ${HADOOP3_HOME}/share/hadoop/common/lib/gcs-connector-hadoop3-latest.jar
+
 # Add hadoop configuration to temporary directory
 ADD core-site.xml ${HADOOP_TMP_CONF_DIR}/core-site.xml
 ADD hadoop-env.sh ${HADOOP_TMP_CONF_DIR}/hadoop-env.sh

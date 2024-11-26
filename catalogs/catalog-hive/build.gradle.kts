@@ -130,6 +130,7 @@ dependencies {
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.hadoop2.aws)
   testImplementation(libs.hadoop3.abs)
+  testImplementation(libs.hadoop3.gcs)
 
   // You need this to run test CatalogHiveABSIT
   // testImplementation(libs.hadoop3.common)
