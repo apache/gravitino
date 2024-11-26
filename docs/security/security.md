@@ -13,6 +13,8 @@ Gravitino provides features that ensure the highest levels of security for you.
 
 Gravitino has supported the following security features:
 
+### [Authorization push down](./authorization-pushdown.md)
+
 ### [Authentication](how-to-authenticate.md)
 
 ### [HTTPS](how-to-use-https.md)
