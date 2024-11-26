@@ -23,7 +23,7 @@ import unittest
 
 from adlfs import AzureBlobFileSystem
 
-from gravitino.filesystem.gvfs import StorageType
+
 from tests.integration.test_gvfs_with_hdfs import TestGvfsWithHDFS
 from gravitino import (
     gvfs,
@@ -33,6 +33,7 @@ from gravitino import (
 )
 from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.filesystem.gvfs_config import GVFSConfig
+from gravitino.filesystem.gvfs import StorageType
 
 
 logger = logging.getLogger(__name__)
