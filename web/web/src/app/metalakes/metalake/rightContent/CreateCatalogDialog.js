@@ -525,9 +525,9 @@ const CreateCatalogDialog = props => {
                       disabled={type === 'update'}
                       data-refer='catalog-type-selector'
                     >
-                      <MenuItem value={'relational'}>relational</MenuItem>
-                      <MenuItem value={'fileset'}>fileset</MenuItem>
-                      <MenuItem value={'messaging'}>messaging</MenuItem>
+                      <MenuItem value={'relational'}>Relational</MenuItem>
+                      <MenuItem value={'fileset'}>Fileset</MenuItem>
+                      <MenuItem value={'messaging'}>Messaging</MenuItem>
                     </Select>
                   )}
                 />
