@@ -32,6 +32,13 @@ val compileRust by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
   description = "Compile the Rust project"
   workingDir = file("$projectDir")
+  commandLine("bash", "-c", "cargo build --release")
+}
+
+val checkRust by tasks.registering(Exec::class) {
+  dependsOn(checkRustEnvironment)
+  description = "Check the Rust project"
+  workingDir = file("$projectDir")
 
   commandLine(
     "bash",
@@ -43,9 +50,6 @@ val compileRust by tasks.registering(Exec::class) {
 
           echo "Running clippy"
           cargo clippy --all-targets --all-features --workspace -- -D warnings
-
-          echo "Compiling Rust project"
-          cargo build --release
     """.trimIndent()
   )
 }
@@ -63,6 +67,10 @@ val testRust by tasks.registering(Exec::class) {
 
 tasks.named("build") {
   dependsOn(compileRust)
+}
+
+tasks.named("check") {
+  dependsOn(checkRust)
 }
 
 tasks.named("test") {
