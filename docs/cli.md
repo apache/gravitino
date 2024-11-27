@@ -582,30 +582,30 @@ gcli group revoke  --group groupA --role admin
 #### Display a topic's details
 
 ```bash
-gcli topic details --metalake metalake_demo --name kafka.default --topic topic3
+gcli topic details --name kafka.default --topic topic3
 ```
 
 #### Create a tag
 
 ```bash
-gcli topic create --metalake metalake_demo --name kafka.default --topic topic3
+gcli topic create --name kafka.default --topic topic3
 ```
 
 #### List all topics
 
 ```bash
-gcli topic list --metalake metalake_demo --name kafka.default 
+gcli topic list --name kafka.default
 ```
 
 #### Delete a topic
 
 ```bash
-gcli topic delete --metalake metalake_demo --name kafka.default --topic topic3
+gcli topic delete --name kafka.default --topic topic3
 ```
 
 #### Change a topic's comment
 
 ```bash
-gcli topic update --metalake metalake_demo --name kafka.default --topic topic3 --comment new_comment
+gcli topic update --name kafka.default --topic topic3 --comment new_comment
 ```
 
