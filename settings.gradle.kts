@@ -49,6 +49,11 @@ include(
   "clients:client-python",
   "clients:cli"
 )
+if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() ?: false) {
+  include("clients:filesystem-fuse")
+} else {
+  println("Skipping filesystem-fuse module since enableFuse is set to false")
+}
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
 include("authorizations:authorization-ranger")
@@ -74,3 +79,4 @@ include("integration-test-common")
 include(":bundles:aws-bundle")
 include(":bundles:gcp-bundle")
 include(":bundles:aliyun-bundle")
+include("bundles:azure-bundle")

@@ -1,0 +1,71 @@
+CREATE SCHEMA
+
+USE
+
+CREATE TABLE
+
+INSERT: 3 rows
+
+"[1, 2, 3]"
+"[4, 5, NULL, 7]"
+"[]"
+
+"[1, 2, 3]","3"
+"[4, 5, NULL, 7]","4"
+"[]","0"
+
+CREATE TABLE
+
+INSERT: 1 row
+
+"apple","banana"
+
+"[1, 2, 3]"
+
+CREATE TABLE
+
+INSERT: 1 row
+
+"[1, 2, 3]","[4, 5]","[1, 2, 3, 4, 5]"
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"[3, 1, 2]","[1, 2, 3]"
+"[9, 7, 8]","[7, 8, 9]"
+
+CREATE TABLE
+
+INSERT: 2 rows
+
+"[1, NULL, 3]","3"
+"[NULL, NULL]","2"
+
+CREATE TABLE
+
+INSERT: 4 rows
+
+"[1, 2, 3, 4]"
+
+CREATE TABLE
+
+INSERT: 1 row
+
+"[[a, b], [c, d]]"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

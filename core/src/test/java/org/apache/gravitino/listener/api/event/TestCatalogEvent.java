@@ -71,6 +71,16 @@ public class TestCatalogEvent {
     Assertions.assertEquals(CreateCatalogEvent.class, event.getClass());
     CatalogInfo catalogInfo = ((CreateCatalogEvent) event).createdCatalogInfo();
     checkCatalogInfo(catalogInfo, catalog);
+    Assertions.assertEquals(OperationType.CREATE_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(CreateCatalogPreEvent.class, preEvent.getClass());
+    CatalogInfo preCatalogInfo = ((CreateCatalogPreEvent) preEvent).createCatalogRequest();
+    checkCatalogInfo(preCatalogInfo, catalog);
+    Assertions.assertEquals(OperationType.CREATE_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -82,6 +92,14 @@ public class TestCatalogEvent {
     Assertions.assertEquals(LoadCatalogEvent.class, event.getClass());
     CatalogInfo catalogInfo = ((LoadCatalogEvent) event).loadedCatalogInfo();
     checkCatalogInfo(catalogInfo, catalog);
+    Assertions.assertEquals(OperationType.LOAD_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(LoadCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LOAD_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -97,6 +115,17 @@ public class TestCatalogEvent {
     CatalogChange[] catalogChanges = ((AlterCatalogEvent) event).catalogChanges();
     Assertions.assertEquals(1, catalogChanges.length);
     Assertions.assertEquals(catalogChange, catalogChanges[0]);
+    Assertions.assertEquals(OperationType.ALTER_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(AlterCatalogPreEvent.class, preEvent.getClass());
+    CatalogChange[] preCatalogChanges = ((AlterCatalogPreEvent) preEvent).catalogChanges();
+    Assertions.assertEquals(1, preCatalogChanges.length);
+    Assertions.assertEquals(catalogChange, preCatalogChanges[0]);
+    Assertions.assertEquals(OperationType.ALTER_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -107,6 +136,14 @@ public class TestCatalogEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropCatalogEvent.class, event.getClass());
     Assertions.assertEquals(true, ((DropCatalogEvent) event).isExists());
+    Assertions.assertEquals(OperationType.DROP_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DROP_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -117,6 +154,15 @@ public class TestCatalogEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListCatalogEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListCatalogEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListCatalogPreEvent) preEvent).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -127,6 +173,15 @@ public class TestCatalogEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListCatalogEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListCatalogEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(namespace.toString(), preEvent.identifier().toString());
+    Assertions.assertEquals(ListCatalogPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(namespace, ((ListCatalogPreEvent) preEvent).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -148,6 +203,8 @@ public class TestCatalogEvent {
         GravitinoRuntimeException.class,
         ((CreateCatalogFailureEvent) event).exception().getClass());
     checkCatalogInfo(((CreateCatalogFailureEvent) event).createCatalogRequest(), catalog);
+    Assertions.assertEquals(OperationType.CREATE_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -160,6 +217,8 @@ public class TestCatalogEvent {
     Assertions.assertEquals(LoadCatalogFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((LoadCatalogFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LOAD_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -177,6 +236,8 @@ public class TestCatalogEvent {
     CatalogChange[] catalogChanges = ((AlterCatalogFailureEvent) event).catalogChanges();
     Assertions.assertEquals(1, catalogChanges.length);
     Assertions.assertEquals(catalogChange, catalogChanges[0]);
+    Assertions.assertEquals(OperationType.ALTER_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -189,6 +250,8 @@ public class TestCatalogEvent {
     Assertions.assertEquals(DropCatalogFailureEvent.class, event.getClass());
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((DropCatalogFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.DROP_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -201,6 +264,8 @@ public class TestCatalogEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListCatalogFailureEvent) event).exception().getClass());
     Assertions.assertEquals(namespace, ((ListCatalogFailureEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -213,6 +278,8 @@ public class TestCatalogEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class, ((ListCatalogFailureEvent) event).exception().getClass());
     Assertions.assertEquals(namespace, ((ListCatalogFailureEvent) event).namespace());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   private void checkCatalogInfo(CatalogInfo catalogInfo, Catalog catalog) {

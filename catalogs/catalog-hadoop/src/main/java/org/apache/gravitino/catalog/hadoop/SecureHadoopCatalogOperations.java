@@ -243,8 +243,7 @@ public class SecureHadoopCatalogOperations
       Catalog.Type type,
       String provider,
       String comment,
-      Map<String, String> properties)
-      throws Exception {
+      Map<String, String> properties) {
     hadoopCatalogOperations.testConnection(catalogIdent, type, provider, comment, properties);
   }
 

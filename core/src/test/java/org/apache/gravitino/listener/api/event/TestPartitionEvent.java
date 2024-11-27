@@ -115,6 +115,16 @@ public class TestPartitionEvent {
     Assertions.assertEquals(AddPartitionEvent.class, event.getClass());
     PartitionInfo partitionInfo = ((AddPartitionEvent) event).createdPartitionInfo();
     checkPartitionInfo(partitionInfo, partition);
+    Assertions.assertEquals(OperationType.ADD_PARTITION, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(AddPartitionPreEvent.class, preEvent.getClass());
+    partitionInfo = ((AddPartitionPreEvent) preEvent).createdPartitionRequest();
+    checkPartitionInfo(partitionInfo, partition);
+    Assertions.assertEquals(OperationType.ADD_PARTITION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -125,6 +135,14 @@ public class TestPartitionEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(DropPartitionEvent.class, event.getClass());
     Assertions.assertEquals(false, ((DropPartitionEvent) event).isExists());
+    Assertions.assertEquals(OperationType.DROP_PARTITION, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropPartitionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.DROP_PARTITION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -135,6 +153,8 @@ public class TestPartitionEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(PartitionExistsEvent.class, event.getClass());
     Assertions.assertEquals(false, ((PartitionExistsEvent) event).isExists());
+    Assertions.assertEquals(OperationType.PARTITION_EXISTS, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
   }
 
   @Test
@@ -145,6 +165,14 @@ public class TestPartitionEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(ListPartitionEvent.class, event.getClass());
     Assertions.assertEquals(identifier, ((ListPartitionEvent) event).identifier());
+    Assertions.assertEquals(OperationType.LIST_PARTITION, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(ListPartitionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_PARTITION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -155,6 +183,14 @@ public class TestPartitionEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(ListPartitionNamesEvent.class, event.getClass());
     Assertions.assertEquals(identifier, ((ListPartitionNamesEvent) event).identifier());
+    Assertions.assertEquals(OperationType.LIST_PARTITION_NAMES, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(ListPartitionNamesPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_PARTITION_NAMES, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -165,6 +201,14 @@ public class TestPartitionEvent {
     Assertions.assertEquals(identifier, event.identifier());
     Assertions.assertEquals(PurgePartitionEvent.class, event.getClass());
     Assertions.assertEquals(identifier, ((PurgePartitionEvent) event).identifier());
+    Assertions.assertEquals(OperationType.PURGE_PARTITION, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(PurgePartitionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.PURGE_PARTITION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
   }
 
   @Test
@@ -179,6 +223,8 @@ public class TestPartitionEvent {
         GravitinoRuntimeException.class, ((AddPartitionFailureEvent) event).exception().getClass());
     checkPartitionInfo(((AddPartitionFailureEvent) event).createdPartitionInfo(), partition);
     Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(OperationType.ADD_PARTITION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -193,6 +239,13 @@ public class TestPartitionEvent {
         GravitinoRuntimeException.class,
         ((DropPartitionFailureEvent) event).exception().getClass());
     Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(OperationType.DROP_PARTITION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(DropPartitionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(partition.name(), ((DropPartitionPreEvent) preEvent).partitionName());
   }
 
   @Test
@@ -207,6 +260,8 @@ public class TestPartitionEvent {
         GravitinoRuntimeException.class,
         ((PartitionExistsFailureEvent) event).exception().getClass());
     Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(OperationType.PARTITION_EXISTS, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -220,6 +275,8 @@ public class TestPartitionEvent {
         GravitinoRuntimeException.class,
         ((ListPartitionFailureEvent) event).exception().getClass());
     Assertions.assertEquals(identifier, ((ListPartitionFailureEvent) event).identifier());
+    Assertions.assertEquals(OperationType.LIST_PARTITION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -233,6 +290,8 @@ public class TestPartitionEvent {
         GravitinoRuntimeException.class,
         ((ListPartitionNamesFailureEvent) event).exception().getClass());
     Assertions.assertEquals(identifier, ((ListPartitionNamesFailureEvent) event).identifier());
+    Assertions.assertEquals(OperationType.LIST_PARTITION_NAMES, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   @Test
@@ -247,6 +306,8 @@ public class TestPartitionEvent {
         GravitinoRuntimeException.class,
         ((PurgePartitionFailureEvent) event).exception().getClass());
     Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(OperationType.PURGE_PARTITION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
   private void checkPartitionInfo(PartitionInfo partitionInfo, Partition partition) {

@@ -43,4 +43,9 @@ public abstract class TableEvent extends Event {
   protected TableEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
   }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }

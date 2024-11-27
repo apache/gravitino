@@ -34,29 +34,30 @@ import org.apache.gravitino.rel.Table;
 public class TagEntity extends Command {
   protected final String metalake;
   protected final FullName name;
-  protected final String tag;
+  protected final String[] tags;
 
   /**
-   * Tag an entity with an existing tag.
+   * Tag an entity with existing tags.
    *
    * @param url The URL of the Gravitino server.
    * @param ignoreVersions If true don't check the client/server versions match.
    * @param metalake The name of the metalake.
    * @param name The name of the entity.
-   * @param tag The name of the tag.
+   * @param tags The names of the tags.
    */
-  public TagEntity(String url, boolean ignoreVersions, String metalake, FullName name, String tag) {
+  public TagEntity(
+      String url, boolean ignoreVersions, String metalake, FullName name, String[] tags) {
     super(url, ignoreVersions);
     this.metalake = metalake;
     this.name = name;
-    this.tag = tag;
+    this.tags = tags;
   }
 
-  /** Create a new tag. */
+  /** Add tags for an entity. */
   @Override
   public void handle() {
     String entity = "unknown";
-    String[] tags = new String[0];
+    String[] tagsToAdd = new String[0];
 
     try {
       GravitinoClient client = buildClient(metalake);
@@ -71,18 +72,18 @@ public class TagEntity extends Command {
                 .loadCatalog(catalog)
                 .asTableCatalog()
                 .loadTable(NameIdentifier.of(schema, table));
-        tags = gTable.supportsTags().associateTags(new String[] {tag}, null);
+        tagsToAdd = gTable.supportsTags().associateTags(tags, null);
         entity = table;
       } else if (name.hasSchemaName()) {
         String catalog = name.getCatalogName();
         String schema = name.getSchemaName();
         Schema gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
-        tags = gSchema.supportsTags().associateTags(new String[] {tag}, null);
+        tagsToAdd = gSchema.supportsTags().associateTags(tags, null);
         entity = schema;
       } else if (name.hasCatalogName()) {
         String catalog = name.getCatalogName();
         Catalog gCatalog = client.loadCatalog(catalog);
-        tags = gCatalog.supportsTags().associateTags(new String[] {tag}, null);
+        tagsToAdd = gCatalog.supportsTags().associateTags(tags, null);
         entity = catalog;
       }
     } catch (NoSuchMetalakeException err) {
@@ -102,8 +103,8 @@ public class TagEntity extends Command {
       return;
     }
 
-    String all = String.join(",", tags);
+    String all = String.join(",", tagsToAdd);
 
-    System.out.println(entity + " tagged with " + all);
+    System.out.println(entity + " now tagged with " + all);
   }
 }

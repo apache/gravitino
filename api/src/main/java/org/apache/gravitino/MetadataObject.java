@@ -59,7 +59,9 @@ public interface MetadataObject {
     /** A column is a sub-collection of the table that represents a group of same type data. */
     COLUMN,
     /** A role is an object contains specific securable objects with privileges */
-    ROLE
+    ROLE,
+    /** A model is mapped to the model artifact in ML. */
+    MODEL
   }
 
   /**

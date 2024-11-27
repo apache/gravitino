@@ -10,7 +10,7 @@ license: 'This software is licensed under the Apache License version 2.'
 
 This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
 
-Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, and tables. Future updates will expand on these capabilities to include roles, users, and tags.
+Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, users, roles, groups, tags and topics. Future updates will expand on these capabilities.
 
 ## Running the CLI
 
@@ -27,7 +27,8 @@ Or you use the `gcli.sh` script found in the `clients/cli/bin/` directory to run
 The general structure for running commands with the Gravitino CLI is `gcli entity command [options]`.
 
  ```bash
- usage: gcli [metalake|catalog|schema|table|column] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+ [options]
+ usage: gcli [metalake|catalog|schema|table|column|user|group|tag] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
  Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
@@ -365,13 +366,29 @@ gcli table list --name catalog_postgres.hr
 #### Show tables details
 
 ```bash
-gcli column list --name catalog_postgres.hr.departments
+gcli table details --name catalog_postgres.hr.departments
 ```
 
 #### Show tables audit information
 
 ```bash
 gcli table details --name catalog_postgres.hr.departments --audit
+```
+
+#### Show tables distribution information
+```bash
+gcli table details --name catalog_postgres.hr.departments --distribution
+```
+
+#### Show tables partition information
+```bash
+gcli table details --name catalog_postgres.hr.departments --partition
+```
+
+### Show table indexes
+
+```bash
+gcli table details --name catalog_mysql.db.iceberg_namespace_properties --index
 ```
 
 #### Delete a table
@@ -440,11 +457,11 @@ gcli group delete --group new_group
 gcli tag details --tag tagA
 ```
 
-#### Create a tag
+#### Create tags
 
 ```bash
-gcli tag create --tag tagA
-```
+ gcli tag create --tag tagA tagB
+ ```
 
 #### List all tag
 
@@ -452,22 +469,22 @@ gcli tag create --tag tagA
 gcli tag list
 ```
 
-#### Delete a tag
+#### Delete tags
 
 ```bash
-gcli tag delete --tag tagA
+gcli tag delete --tag tagA tagB
 ```
 
-#### Add a tag to an entity
+#### Add tags to an entity
 
 ```bash
-gcli tag set --name catalog_postgres.hr --tag tagA
+gcli tag set --name catalog_postgres.hr --tag tagA tagB
 ```
 
-#### Remove a tag from an entity
+#### Remove tags from an entity
 
 ```bash
-gcli tag remove --name catalog_postgres.hr --tag tagA
+gcli tag remove --name catalog_postgres.hr --tag tagA tagB
 ```
 
 #### List all tags on an entity
@@ -504,38 +521,6 @@ gcli tag update --tag tagA --rename newTag
 
 ```bash
 gcli tag update --tag tagA --comment "new comment"
-```
-
-### Topic commands
-
-#### Display a topic's details
-
-```bash
-gcli topic details --metalake metalake_demo --name kafka.default --topic topic3
-```
-
-#### Create a tag
-
-```bash
-gcli topic create --metalake metalake_demo --name kafka.default --topic topic3
-```
-
-#### List all topics
-
-```bash
-gcli topic list --metalake metalake_demo --name kafka.default 
-```
-
-#### Delete a topic
-
-```bash
-gcli topic delete --metalake metalake_demo --name kafka.default --topic topic3
-```
-
-#### Change a topic's comment
-
-```bash
-gcli topic update --metalake metalake_demo --name kafka.default --topic topic3 --comment new_comment
 ```
 
 ### Role commands
@@ -586,3 +571,36 @@ gcli group grant --group groupA --role admin
 ```bash
 gcli group revoke  --group groupA --role admin
 ```
+
+### Topic commands
+
+#### Display a topic's details
+
+```bash
+gcli topic details --metalake metalake_demo --name kafka.default --topic topic3
+```
+
+#### Create a tag
+
+```bash
+gcli topic create --metalake metalake_demo --name kafka.default --topic topic3
+```
+
+#### List all topics
+
+```bash
+gcli topic list --metalake metalake_demo --name kafka.default 
+```
+
+#### Delete a topic
+
+```bash
+gcli topic delete --metalake metalake_demo --name kafka.default --topic topic3
+```
+
+#### Change a topic's comment
+
+```bash
+gcli topic update --metalake metalake_demo --name kafka.default --topic topic3 --comment new_comment
+```
+

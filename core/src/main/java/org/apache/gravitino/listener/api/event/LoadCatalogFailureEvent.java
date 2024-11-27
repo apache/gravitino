@@ -36,4 +36,14 @@ public final class LoadCatalogFailureEvent extends CatalogFailureEvent {
   public LoadCatalogFailureEvent(String user, NameIdentifier identifier, Exception exception) {
     super(user, identifier, exception);
   }
+
+  /**
+   * Returns the type of operation.
+   *
+   * @return the operation type.
+   */
+  @Override
+  public OperationType operationType() {
+    return OperationType.LOAD_CATALOG;
+  }
 }

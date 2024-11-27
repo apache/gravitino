@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.sql.SQLException;
 import java.util.regex.Pattern;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
@@ -109,6 +110,9 @@ public class DorisExceptionConverter extends JdbcExceptionConverter {
       case CODE_PARTITION_ALREADY_EXISTS:
         return new PartitionAlreadyExistsException(se, se.getMessage());
       default:
+        if (se.getMessage() != null && se.getMessage().contains("Access denied")) {
+          return new ConnectionFailedException(se, se.getMessage());
+        }
         return new GravitinoRuntimeException(se, se.getMessage());
     }
   }
