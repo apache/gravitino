@@ -148,7 +148,8 @@ public abstract class RangerAuthorizationPlugin
             .toArray(RoleChange[]::new));
     // Lastly, delete the role in the Ranger
     try {
-      rangerClient.deleteRole(role.name(), rangerAdminName, rangerServiceName);
+      rangerClient.deleteRole(
+          rangerHelper.generateGravitinoRoleName(role.name()), rangerAdminName, rangerServiceName);
     } catch (RangerServiceException e) {
       // Ignore exception to support idempotent operation
       LOG.warn("Ranger delete role: {} failed!", role, e);
@@ -333,6 +334,7 @@ public abstract class RangerAuthorizationPlugin
           ownerRoleName = RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE;
         }
         rangerHelper.createRangerRoleIfNotExists(ownerRoleName, true);
+        rangerHelper.createRangerRoleIfNotExists(RangerHelper.GRAVITINO_OWNER_ROLE, true);
         try {
           if (preOwnerUserName != null || preOwnerGroupName != null) {
             GrantRevokeRoleRequest revokeRoleRequest =
@@ -607,7 +609,6 @@ public abstract class RangerAuthorizationPlugin
    */
   private boolean doAddSecurableObject(String roleName, RangerSecurableObject securableObject) {
     RangerPolicy policy = rangerHelper.findManagedPolicy(securableObject);
-
     if (policy != null) {
       // Check the policy item's accesses and roles equal the Ranger securable object's privilege
       List<RangerPrivilege> allowPrivilies =
@@ -621,7 +622,11 @@ public abstract class RangerAuthorizationPlugin
 
       Set<RangerPrivilege> policyPrivileges =
           policy.getPolicyItems().stream()
-              .filter(policyItem -> policyItem.getRoles().contains(roleName))
+              .filter(
+                  policyItem ->
+                      policyItem
+                          .getRoles()
+                          .contains(rangerHelper.generateGravitinoRoleName(roleName)))
               .flatMap(policyItem -> policyItem.getAccesses().stream())
               .map(RangerPolicy.RangerPolicyItemAccess::getType)
               .map(RangerPrivileges::valueOf)
@@ -629,7 +634,11 @@ public abstract class RangerAuthorizationPlugin
 
       Set<RangerPrivilege> policyDenyPrivileges =
           policy.getDenyPolicyItems().stream()
-              .filter(policyItem -> policyItem.getRoles().contains(roleName))
+              .filter(
+                  policyItem ->
+                      policyItem
+                          .getRoles()
+                          .contains(rangerHelper.generateGravitinoRoleName(roleName)))
               .flatMap(policyItem -> policyItem.getAccesses().stream())
               .map(RangerPolicy.RangerPolicyItemAccess::getType)
               .map(RangerPrivileges::valueOf)
@@ -721,11 +730,7 @@ public abstract class RangerAuthorizationPlugin
                     && policyItem.getGroups().isEmpty());
 
     try {
-      if (policy.getPolicyItems().isEmpty() && policy.getDenyPolicyItems().isEmpty()) {
-        rangerClient.deletePolicy(policy.getId());
-      } else {
-        rangerClient.updatePolicy(policy.getId(), policy);
-      }
+      rangerClient.updatePolicy(policy.getId(), policy);
     } catch (RangerServiceException e) {
       LOG.error("Failed to remove the policy item from the Ranger policy {}!", policy);
       throw new AuthorizationPluginException(
@@ -738,6 +743,7 @@ public abstract class RangerAuthorizationPlugin
       RangerPolicy.RangerPolicyItem policyItem,
       RangerSecurableObject rangerSecurableObject,
       String roleName) {
+    roleName = rangerHelper.generateGravitinoRoleName(roleName);
     boolean match =
         policyItem.getAccesses().stream()
             .allMatch(
@@ -793,15 +799,8 @@ public abstract class RangerAuthorizationPlugin
       try {
         List<RangerPolicy> policies = rangerClient.getPoliciesInService(rangerServiceName);
         policies.stream()
-            .forEach(
-                policy -> {
-                  try {
-                    rangerClient.deletePolicy(policy.getId());
-                  } catch (RangerServiceException e) {
-                    LOG.error("Failed to rename the policy {}!", policy);
-                    throw new RuntimeException(e);
-                  }
-                });
+            .filter(rangerHelper::hasGravitinoManagedPolicyItem)
+            .forEach(rangerHelper::removeAllGravitinoManagedPolicyItem);
       } catch (RangerServiceException e) {
         throw new RuntimeException(e);
       }
@@ -970,16 +969,7 @@ public abstract class RangerAuthorizationPlugin
                                         .getValues()
                                         .contains(preciseFilters.get(entry.getKey()))))
             .collect(Collectors.toList());
-    policies.stream()
-        .forEach(
-            policy -> {
-              try {
-                rangerClient.deletePolicy(policy.getId());
-              } catch (RangerServiceException e) {
-                LOG.error("Failed to rename the policy {}!", policy);
-                throw new RuntimeException(e);
-              }
-            });
+    policies.forEach(rangerHelper::removeAllGravitinoManagedPolicyItem);
   }
 
   private void updatePolicyByMetadataObject(
@@ -1003,25 +993,29 @@ public abstract class RangerAuthorizationPlugin
         .forEach(
             policy -> {
               try {
-                // Update the policy name
                 String policyName = policy.getName();
-                List<String> policyNames = Lists.newArrayList(DOT_SPLITTER.splitToList(policyName));
-                Preconditions.checkArgument(
-                    policyNames.size() >= oldMetadataNames.size(),
-                    String.format("The policy name(%s) is invalid!", policyName));
                 int index = operationTypeIndex.get(operationType);
-                if (policyNames.get(index).equals(RangerHelper.RESOURCE_ALL)) {
-                  // Doesn't need to rename the policy `*`
-                  return;
+
+                // Update the policy name is following Gravitino's spec
+                if (policy.getName().equals(DOT_JOINER.join(oldMetadataNames))) {
+                  List<String> policyNames =
+                      Lists.newArrayList(DOT_SPLITTER.splitToList(policyName));
+                  Preconditions.checkArgument(
+                      policyNames.size() >= oldMetadataNames.size(),
+                      String.format("The policy name(%s) is invalid!", policyName));
+                  if (policyNames.get(index).equals(RangerHelper.RESOURCE_ALL)) {
+                    // Doesn't need to rename the policy `*`
+                    return;
+                  }
+                  policyNames.set(index, newMetadataNames.get(index));
+                  policy.setName(DOT_JOINER.join(policyNames));
                 }
-                policyNames.set(index, newMetadataNames.get(index));
                 // Update the policy resource name to new name
                 policy
                     .getResources()
                     .put(
                         rangerHelper.policyResourceDefines.get(index),
                         new RangerPolicy.RangerPolicyResource(newMetadataNames.get(index)));
-                policy.setName(DOT_JOINER.join(policyNames));
 
                 boolean alreadyExist =
                     existNewPolicies.stream()

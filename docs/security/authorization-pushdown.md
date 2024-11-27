@@ -28,6 +28,12 @@ In order to use the Ranger Hadoop SQL Plugin, you need to configure the followin
 
 Once you have used the correct configuration, you can perform authorization operations by calling Gravitino [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-roles-to-a-user).
 
+Gravitino will initially create three roles in Apache Ranger:
+
+- GRAVITINO_METALAKE_OWNER_ROLE: Includes users and user groups designated as metalake owners, corresponding to the owner's privileges in Ranger policies.
+- GRAVITINO_CATALOG_OWNER_ROLE: Includes users and user groups designated as catalog owners, corresponding to the owner's privileges in Ranger policies.
+- GRAVITINO_OWNER_ROLE: Used to label Ranger policy items related to schema and table owner privileges. It does not include any users or user groups.
+
 #### Example of using the Ranger Hadoop SQL Plugin
 
 Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions.
