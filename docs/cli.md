@@ -528,19 +528,19 @@ gcli tag update --tag tagA --comment "new comment"
 #### List an owner
 
 ```bash
-gcli catalog details --name postgres --owner
+gcli catalog details --owner --name postgres
 ```
 
 #### Set an owner to a user
 
 ```bash
-gcli catalog set --name postgres --user admin
+gcli catalog set --owner --user admin --name postgres
 ```
 
 #### Set an owner to a group
 
 ```bash
-gcli catalog set --name postgres --group groupA
+gcli catalog set --owner --group groupA --name postgres
 ```
 
 ### Role commands

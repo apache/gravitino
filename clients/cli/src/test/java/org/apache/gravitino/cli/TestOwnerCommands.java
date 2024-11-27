@@ -52,6 +52,7 @@ class TestOwnerCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.USER)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.USER)).thenReturn("admin");
     when(mockCommandLine.hasOption(GravitinoOptions.GROUP)).thenReturn(false);
+    when(mockCommandLine.hasOption(GravitinoOptions.OWNER)).thenReturn(true);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -80,6 +81,7 @@ class TestOwnerCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.GROUP)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.GROUP)).thenReturn("ITdept");
     when(mockCommandLine.hasOption(GravitinoOptions.USER)).thenReturn(false);
+    when(mockCommandLine.hasOption(GravitinoOptions.OWNER)).thenReturn(true);
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
