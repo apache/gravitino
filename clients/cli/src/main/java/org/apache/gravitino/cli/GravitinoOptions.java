@@ -40,6 +40,7 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String GROUP = "group";
   public static final String TAG = "tag";
+  public static final String OWNER = "owner";
   public static final String ROLE = "role";
   public static final String AUDIT = "audit";
   public static final String INDEX = "index";
@@ -78,7 +79,8 @@ public class GravitinoOptions {
             "z", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
     options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
-    options.addOption(createArgsOption("t", TAG, "tag name"));
+    options.addOption(createArgOption("t", TAG, "tag name"));
+    options.addOption(createSimpleOption("o", OWNER, "entity owner"));
     options.addOption(createArgOption("r", ROLE, "role name"));
 
     // Properties option can have multiple values

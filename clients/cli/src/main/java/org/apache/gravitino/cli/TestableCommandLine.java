@@ -59,6 +59,7 @@ import org.apache.gravitino.cli.commands.ListTagProperties;
 import org.apache.gravitino.cli.commands.ListUsers;
 import org.apache.gravitino.cli.commands.MetalakeAudit;
 import org.apache.gravitino.cli.commands.MetalakeDetails;
+import org.apache.gravitino.cli.commands.OwnerDetails;
 import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
 import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
@@ -71,6 +72,7 @@ import org.apache.gravitino.cli.commands.SchemaDetails;
 import org.apache.gravitino.cli.commands.ServerVersion;
 import org.apache.gravitino.cli.commands.SetCatalogProperty;
 import org.apache.gravitino.cli.commands.SetMetalakeProperty;
+import org.apache.gravitino.cli.commands.SetOwner;
 import org.apache.gravitino.cli.commands.SetSchemaProperty;
 import org.apache.gravitino.cli.commands.SetTagProperty;
 import org.apache.gravitino.cli.commands.TableAudit;
@@ -423,5 +425,21 @@ public class TestableCommandLine {
   protected ListColumns newListColumns(
       String url, boolean ignore, String metalake, String catalog, String schema, String table) {
     return new ListColumns(url, ignore, metalake, catalog, schema, table);
+  }
+
+  protected SetOwner newSetOwner(
+      String url,
+      boolean ignore,
+      String metalake,
+      String entity,
+      String entityType,
+      String owner,
+      boolean isGroup) {
+    return new SetOwner(url, ignore, metalake, entity, entityType, owner, isGroup);
+  }
+
+  protected OwnerDetails newOwnerDetails(
+      String url, boolean ignore, String metalake, String entity, String entityType) {
+    return new OwnerDetails(url, ignore, metalake, entity, entityType);
   }
 }

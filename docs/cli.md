@@ -10,7 +10,7 @@ license: 'This software is licensed under the Apache License version 2.'
 
 This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
 
-Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, and tables. Future updates will expand on these capabilities to include roles, users, and tags.
+Currently, the CLI allows users to view metadata information for metalakes, catalogs, schemas, tables, users groups and tags. Future updates will expand on these capabilities to include roles, topics and filesets.
 
 ## Running the CLI
 
@@ -27,7 +27,8 @@ Or you use the `gcli.sh` script found in the `clients/cli/bin/` directory to run
 The general structure for running commands with the Gravitino CLI is `gcli entity command [options]`.
 
  ```bash
- usage: gcli [metalake|catalog|schema|table|column] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+ [options]
+ usage: gcli [metalake|catalog|schema|table|column|user|group|tag] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
  Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
@@ -520,6 +521,26 @@ gcli tag update --tag tagA --rename newTag
 
 ```bash
 gcli tag update --tag tagA --comment "new comment"
+```
+
+### Owners commands
+
+#### List an owner
+
+```bash
+gcli catalog details --owner --name postgres
+```
+
+#### Set an owner to a user
+
+```bash
+gcli catalog set --owner --user admin --name postgres
+```
+
+#### Set an owner to a group
+
+```bash
+gcli catalog set --owner --group groupA --name postgres
 ```
 
 ### Role commands
