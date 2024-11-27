@@ -16,13 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.ranger;
+package org.apache.gravitino.authorization;
 
 import java.util.List;
 
-/** Different underlying datasource have different Ranger metadata object rules */
-interface RangerMetadataObjectRule {
-  /** Validate different underlying datasource Ranger metadata object */
-  void validateRangerMetadataObject(List<String> names, RangerMetadataObject.Type type)
-      throws IllegalArgumentException;
+/**
+ * The authorization securable object is the entity which access can be granted. Unless allowed by a
+ * grant, access is denied. <br>
+ * There is a clear difference between underlying datasource's Securable Object and Gravitino's
+ * Securable Object, authorization's Securable Object does not have the concept of `METALAKE`, so it
+ * needs to be defined specifically.
+ */
+public interface AuthorizationSecurableObject extends AuthorizationMetadataObject {
+  /**
+   * The privileges of the authorization securable object.
+   *
+   * @return The privileges of the securable object.
+   */
+  List<AuthorizationPrivilege> privileges();
 }

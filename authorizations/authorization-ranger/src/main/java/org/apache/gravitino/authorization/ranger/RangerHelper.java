@@ -26,6 +26,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang.StringUtils;
+import org.apache.gravitino.authorization.AuthorizationMetadataObject;
+import org.apache.gravitino.authorization.AuthorizationPrivilege;
+import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
@@ -49,7 +52,7 @@ public class RangerHelper {
   /** The `*` gives access to all resources */
   public static final String RESOURCE_ALL = "*";
   /** The owner privileges, the owner can do anything on the metadata object */
-  private final Set<RangerPrivilege> ownerPrivileges;
+  private final Set<AuthorizationPrivilege> ownerPrivileges;
   /** The policy search keys */
   protected final List<String> policyResourceDefines;
 
@@ -69,7 +72,7 @@ public class RangerHelper {
       RangerClient rangerClient,
       String rangerAdminName,
       String rangerServiceName,
-      Set<RangerPrivilege> ownerPrivileges,
+      Set<AuthorizationPrivilege> ownerPrivileges,
       List<String> resourceDefines) {
     this.rangerClient = rangerClient;
     this.rangerAdminName = rangerAdminName;
@@ -102,7 +105,8 @@ public class RangerHelper {
    * We cannot clean the policy items because one Ranger policy maybe contains multiple Gravitino
    * securable objects. <br>
    */
-  void addPolicyItem(RangerPolicy policy, String roleName, RangerSecurableObject securableObject) {
+  void addPolicyItem(
+      RangerPolicy policy, String roleName, AuthorizationSecurableObject securableObject) {
     // Add the policy items by the securable object's privileges
     securableObject
         .privileges()
@@ -191,12 +195,12 @@ public class RangerHelper {
   /**
    * Find the managed policy for the ranger securable object.
    *
-   * @param rangerMetadataObject The ranger securable object to find the managed policy.
+   * @param AuthorizationMetadataObject The ranger securable object to find the managed policy.
    * @return The managed policy for the metadata object.
    */
-  public RangerPolicy findManagedPolicy(RangerMetadataObject rangerMetadataObject)
+  public RangerPolicy findManagedPolicy(AuthorizationMetadataObject AuthorizationMetadataObject)
       throws AuthorizationPluginException {
-    List<RangerPolicy> policies = wildcardSearchPolies(rangerMetadataObject.names());
+    List<RangerPolicy> policies = wildcardSearchPolies(AuthorizationMetadataObject.names());
     if (!policies.isEmpty()) {
       /**
        * Because Ranger doesn't support the precise search, Ranger will return the policy meets the
@@ -204,7 +208,7 @@ public class RangerHelper {
        * match `db1.table1`, `db1.table2`, `db*.table*`, So we need to manually precisely filter
        * this research results.
        */
-      List<String> nsMetadataObj = rangerMetadataObject.names();
+      List<String> nsMetadataObj = AuthorizationMetadataObject.names();
       Map<String, String> preciseFilters = new HashMap<>();
       for (int i = 0; i < nsMetadataObj.size(); i++) {
         preciseFilters.put(policyResourceDefines.get(i), nsMetadataObj.get(i));
@@ -438,7 +442,7 @@ public class RangerHelper {
             });
   }
 
-  protected RangerPolicy createPolicyAddResources(RangerMetadataObject metadataObject) {
+  protected RangerPolicy createPolicyAddResources(AuthorizationMetadataObject metadataObject) {
     RangerPolicy policy = new RangerPolicy();
     policy.setService(rangerServiceName);
     policy.setName(metadataObject.fullName());
@@ -451,7 +455,8 @@ public class RangerHelper {
     return policy;
   }
 
-  protected RangerPolicy addOwnerToNewPolicy(RangerMetadataObject metadataObject, Owner newOwner) {
+  protected RangerPolicy addOwnerToNewPolicy(
+      AuthorizationMetadataObject metadataObject, Owner newOwner) {
     RangerPolicy policy = createPolicyAddResources(metadataObject);
 
     ownerPrivileges.forEach(
@@ -476,7 +481,7 @@ public class RangerHelper {
   }
 
   protected RangerPolicy addOwnerRoleToNewPolicy(
-      RangerMetadataObject metadataObject, String ownerRoleName) {
+      AuthorizationMetadataObject metadataObject, String ownerRoleName) {
     RangerPolicy policy = createPolicyAddResources(metadataObject);
 
     ownerPrivileges.forEach(
