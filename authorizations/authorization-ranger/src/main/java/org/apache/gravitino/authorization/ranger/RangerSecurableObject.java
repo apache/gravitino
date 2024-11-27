@@ -22,9 +22,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import java.util.List;
 import java.util.Set;
-import org.apache.gravitino.authorization.AuthorizationMetadataObject;
-import org.apache.gravitino.authorization.AuthorizationPrivilege;
-import org.apache.gravitino.authorization.AuthorizationSecurableObject;
+import org.apache.gravitino.connector.authorization.AuthorizationMetadataObject;
+import org.apache.gravitino.connector.authorization.AuthorizationPrivilege;
+import org.apache.gravitino.connector.authorization.AuthorizationSecurableObject;
 
 /** The helper class for {@link RangerSecurableObject}. */
 public class RangerSecurableObject extends RangerMetadataObject

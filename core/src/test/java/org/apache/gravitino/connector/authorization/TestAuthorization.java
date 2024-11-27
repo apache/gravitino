@@ -54,7 +54,7 @@ public class TestAuthorization {
 
     hiveCatalog =
         new TestCatalog()
-            .withCatalogConf(ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "ranger"))
+            .withCatalogConf(ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "test_ranger"))
             .withCatalogEntity(hiveCatalogEntity);
     IsolatedClassLoader isolatedClassLoader =
         new IsolatedClassLoader(
@@ -73,7 +73,7 @@ public class TestAuthorization {
 
     mySQLCatalog =
         new TestCatalog()
-            .withCatalogConf(ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "mysql"))
+            .withCatalogConf(ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, "test_mysql"))
             .withCatalogEntity(mySQLEntity);
     mySQLCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
   }

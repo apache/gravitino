@@ -19,11 +19,15 @@
 package org.apache.gravitino.catalog;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -67,12 +71,87 @@ public class PropertiesMetadataHelpers {
         "Properties are required and must be set: %s",
         absentProperties);
 
+    wildcardPropertyChecker(propertiesMetadata, properties);
+
     // use decode function to validate the property values
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       String key = entry.getKey();
       String value = entry.getValue();
       if (propertiesMetadata.containsProperty(key)) {
         checkValueFormat(key, value, propertiesMetadata.propertyEntries().get(key)::decode);
+      }
+    }
+  }
+
+  private static void wildcardPropertyChecker(
+      PropertiesMetadata propertiesMetadata, Map<String, String> properties)
+      throws IllegalArgumentException {
+    List<String> wildcardProperties =
+        propertiesMetadata.propertyEntries().keySet().stream()
+            .filter(propertiesMetadata::isWildcardProperty)
+            .collect(Collectors.toList());
+    if (wildcardProperties.size() > 0) {
+      List<String> wildcardConfigKeys =
+          wildcardProperties.stream()
+              .filter(key -> !key.contains(AuthorizationPropertiesMeta.getChainPlugsWildcard()))
+              .collect(Collectors.toList());
+      Preconditions.checkArgument(
+          wildcardConfigKeys.size() == 1,
+          "Wildcard properties `%s` not a valid wildcard config with values: %s",
+          wildcardConfigKeys);
+      String wildcardConfigKey = wildcardConfigKeys.get(0);
+      List<String> wildcardConfigValues =
+          Arrays.stream(
+                  properties
+                      .get(wildcardConfigKey)
+                      .split(AuthorizationPropertiesMeta.getChainPluginsSplitter()))
+              .map(String::trim)
+              .collect(Collectors.toList());
+
+      wildcardConfigValues.stream()
+          .filter(v -> v.contains("."))
+          .forEach(
+              v -> {
+                throw new IllegalArgumentException(
+                    String.format(
+                        "Wildcard property values cannot be set with `.` character in the `%s = %s`.",
+                        wildcardConfigKey, properties.get(wildcardConfigKey)));
+              });
+
+      List<Pattern> patterns =
+          wildcardProperties.stream()
+              .filter(k -> k.contains(AuthorizationPropertiesMeta.getChainPlugsWildcard()))
+              .collect(Collectors.toList())
+              .stream()
+              .map(
+                  wildcard ->
+                      wildcard
+                          .replace(".", "\\.")
+                          .replace(AuthorizationPropertiesMeta.getChainPlugsWildcard(), "([^.]+)"))
+              .map(Pattern::compile)
+              .collect(Collectors.toList());
+
+      for (String key :
+          properties.keySet().stream()
+              .filter(k -> !k.equals(wildcardConfigKey))
+              .collect(Collectors.toList())) {
+        boolean matches =
+            patterns.stream()
+                .anyMatch(
+                    pattern -> {
+                      Matcher matcher = pattern.matcher(key);
+                      if (matcher.find()) {
+                        String group = matcher.group(1);
+                        return wildcardConfigValues.contains(group);
+                      } else {
+                        return false;
+                      }
+                    });
+        Preconditions.checkArgument(
+            matches,
+            "Wildcard properties `%s` not a valid wildcard config with values: %s",
+            key,
+            wildcardConfigValues);
       }
     }
   }

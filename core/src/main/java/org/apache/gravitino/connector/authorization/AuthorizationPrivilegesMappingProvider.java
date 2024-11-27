@@ -16,12 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.connector.authorization;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.SecurableObject;
 
 /**
  * Authorization use this provider to mapping Gravitino privilege to the underlying data source

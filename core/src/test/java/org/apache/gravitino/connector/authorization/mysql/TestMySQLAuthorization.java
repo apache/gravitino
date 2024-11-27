@@ -28,7 +28,7 @@ public class TestMySQLAuthorization extends BaseAuthorization<TestMySQLAuthoriza
 
   @Override
   public String shortName() {
-    return "mysql";
+    return "test_mysql";
   }
 
   @Override

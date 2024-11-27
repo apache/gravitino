@@ -21,7 +21,7 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.AuthorizationMetadataObject;
+import org.apache.gravitino.connector.authorization.AuthorizationMetadataObject;
 
 /** The helper class for {@link AuthorizationMetadataObject}. */
 public class RangerMetadataObject implements AuthorizationMetadataObject {

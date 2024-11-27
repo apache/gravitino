@@ -21,25 +21,127 @@ package org.apache.gravitino.connector;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 
-public class AuthorizationPropertiesMeta {
+public class AuthorizationPropertiesMeta extends BasePropertiesMetadata {
+  private static final String AUTHORIZATION_PREFIX = "authorization";
+
+  public static final String getAuthorizationPrefix() {
+    return AUTHORIZATION_PREFIX;
+  }
   /** Ranger admin web URIs */
-  public static final String RANGER_ADMIN_URL = "authorization.ranger.admin.url";
+  private static final String RANGER_ADMIN_URL_KEY = "ranger.admin.url";
+
+  public static final String RANGER_ADMIN_URL = generatePluginKey(RANGER_ADMIN_URL_KEY);
   /** Ranger authentication type kerberos or simple */
-  public static final String RANGER_AUTH_TYPE = "authorization.ranger.auth.type";
+  private static final String RANGER_AUTH_TYPE_KEY = "ranger.auth.type";
+
+  public static final String RANGER_AUTH_TYPE = generatePluginKey(RANGER_AUTH_TYPE_KEY);
   /**
    * Ranger admin web login username(auth_type=simple), or kerberos principal(auth_type=kerberos)
    */
-  public static final String RANGER_USERNAME = "authorization.ranger.username";
+  private static final String RANGER_USERNAME_KEY = "ranger.username";
+
+  public static final String RANGER_USERNAME = generatePluginKey(RANGER_USERNAME_KEY);
   /**
    * Ranger admin web login user password(auth_type=simple), or path of the keytab
    * file(auth_type=kerberos)
    */
-  public static final String RANGER_PASSWORD = "authorization.ranger.password";
-  /** Ranger service name */
-  public static final String RANGER_SERVICE_NAME = "authorization.ranger.service.name";
+  private static final String RANGER_PASSWORD_KEY = "ranger.password";
 
-  public static final Map<String, PropertyEntry<?>> RANGER_AUTHORIZATION_PROPERTY_ENTRIES =
+  public static final String RANGER_PASSWORD = generatePluginKey(RANGER_PASSWORD_KEY);
+  /** Ranger service name */
+  private static final String RANGER_SERVICE_NAME_KEY = "ranger.service.name";
+
+  public static final String RANGER_SERVICE_NAME = generatePluginKey(RANGER_SERVICE_NAME_KEY);
+
+  private static final String CHAIN_PLUGINS_WILDCARD = "*";
+
+  public static final String getChainPlugsWildcard() {
+    return CHAIN_PLUGINS_WILDCARD;
+  }
+
+  private static final String CHAIN_PLUGINS_SPLITTER = ",";
+
+  public static final String getChainPluginsSplitter() {
+    return CHAIN_PLUGINS_SPLITTER;
+  }
+
+  private static final String CHAIN_PREFIX = String.format("%s.chain", AUTHORIZATION_PREFIX);
+
+  public static final String getChainPrefix() {
+    return CHAIN_PREFIX;
+  }
+  /** Chain authorization plugins */
+  public static final String CHAIN_PLUGINS = String.format("%s.plugins", CHAIN_PREFIX);
+  /** Chain authorization plugin provider */
+  private static final String CHAIN_PROVIDER_KEY = "provider";
+
+  public static final String getChainProviderKey() {
+    return CHAIN_PROVIDER_KEY;
+  }
+
+  public static final String CHAIN_PROVIDER =
+      generateChainPluginsKey(CHAIN_PLUGINS_WILDCARD, CHAIN_PROVIDER_KEY);
+  /** Chain authorization Ranger admin web URIs */
+  public static final String CHAIN_RANGER_ADMIN_URL =
+      generateChainPluginsKey(CHAIN_PLUGINS_WILDCARD, RANGER_ADMIN_URL_KEY);
+  /** Chain authorization Ranger authentication type kerberos or simple */
+  public static final String CHAIN_RANGER_AUTH_TYPES =
+      generateChainPluginsKey(CHAIN_PLUGINS_WILDCARD, RANGER_AUTH_TYPE_KEY);
+  /** Chain authorization Ranger username */
+  public static final String CHAIN_RANGER_USERNAME =
+      generateChainPluginsKey(CHAIN_PLUGINS_WILDCARD, RANGER_USERNAME_KEY);
+  /**
+   * Chain authorization Ranger admin web login user password(auth_type=simple), or path of the
+   * keytab file(auth_type=kerberos)
+   */
+  public static final String CHAIN_RANGER_PASSWORD =
+      generateChainPluginsKey(CHAIN_PLUGINS_WILDCARD, RANGER_PASSWORD_KEY);
+  /** Chain authorization Ranger service name */
+  public static final String CHAIN_RANGER_SERVICE_NAME =
+      generateChainPluginsKey(CHAIN_PLUGINS_WILDCARD, RANGER_SERVICE_NAME_KEY);
+
+  public static String generateChainPluginsKey(String pluginName, String key) {
+    return String.format("%s.%s.%s", CHAIN_PREFIX, pluginName, key);
+  }
+
+  public static String generatePluginKey(String key) {
+    return String.format("%s.%s", AUTHORIZATION_PREFIX, key);
+  }
+
+  public static String chainKeyToPluginKey(String chainKey, String plugin) {
+    return chainKey.replace(String.format("%s.%s", CHAIN_PREFIX, plugin), AUTHORIZATION_PREFIX);
+  }
+
+  public static final Map<String, PropertyEntry<?>> AUTHORIZATION_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
+          .put(
+              CHAIN_PLUGINS,
+              PropertyEntry.wildcardPropertyEntry(CHAIN_PLUGINS, "The Chain authorization plugins"))
+          .put(
+              CHAIN_PROVIDER,
+              PropertyEntry.wildcardPropertyEntry(
+                  CHAIN_PROVIDER, "The Chain authorization plugin provider"))
+          .put(
+              CHAIN_RANGER_SERVICE_NAME,
+              PropertyEntry.wildcardPropertyEntry(
+                  CHAIN_RANGER_SERVICE_NAME, "The Chain authorization Ranger service name"))
+          .put(
+              CHAIN_RANGER_ADMIN_URL,
+              PropertyEntry.wildcardPropertyEntry(
+                  CHAIN_RANGER_ADMIN_URL, "The Chain authorization Ranger admin web URIs"))
+          .put(
+              CHAIN_RANGER_AUTH_TYPES,
+              PropertyEntry.wildcardPropertyEntry(
+                  CHAIN_RANGER_AUTH_TYPES,
+                  "The Chain authorization Ranger admin web auth type (kerberos/simple)"))
+          .put(
+              CHAIN_RANGER_USERNAME,
+              PropertyEntry.wildcardPropertyEntry(
+                  CHAIN_RANGER_USERNAME, "The Chain authorization Ranger admin web login username"))
+          .put(
+              CHAIN_RANGER_PASSWORD,
+              PropertyEntry.wildcardPropertyEntry(
+                  CHAIN_RANGER_PASSWORD, "The Chain authorization Ranger admin web login password"))
           .put(
               RANGER_SERVICE_NAME,
               PropertyEntry.stringOptionalPropertyEntry(
@@ -65,4 +167,9 @@ public class AuthorizationPropertiesMeta {
               PropertyEntry.stringOptionalPropertyEntry(
                   RANGER_PASSWORD, "The Ranger admin web login password", true, null, false))
           .build();
+
+  @Override
+  protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
+    return AUTHORIZATION_PROPERTY_ENTRIES;
+  }
 }

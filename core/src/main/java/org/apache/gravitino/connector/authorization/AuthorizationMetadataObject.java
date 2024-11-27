@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.connector.authorization;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;

@@ -16,13 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.connector.authorization;
 
-/** AuthorizationPrivilege interface is used to define the underlying data source privileges. */
-public interface AuthorizationPrivilege {
-  String getName();
+import java.util.List;
 
-  Privilege.Condition condition();
-
-  boolean equalsTo(String value);
+/**
+ * The authorization securable object is the entity which access can be granted. Unless allowed by a
+ * grant, access is denied. <br>
+ * There is a clear difference between underlying datasource's Securable Object and Gravitino's
+ * Securable Object, authorization's Securable Object does not have the concept of `METALAKE`, so it
+ * needs to be defined specifically.
+ */
+public interface AuthorizationSecurableObject extends AuthorizationMetadataObject {
+  /**
+   * The privileges of the authorization securable object.
+   *
+   * @return The privileges of the securable object.
+   */
+  List<AuthorizationPrivilege> privileges();
 }

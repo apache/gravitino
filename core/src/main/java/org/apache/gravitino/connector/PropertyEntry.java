@@ -39,6 +39,7 @@ public final class PropertyEntry<T> {
   private final Function<T, String> encoder;
   private final boolean hidden;
   private final boolean reserved;
+  private final boolean wildcard;
 
   /**
    * @param name The name of the property
@@ -64,7 +65,8 @@ public final class PropertyEntry<T> {
       Function<String, T> decoder,
       Function<T, String> encoder,
       boolean hidden,
-      boolean reserved) {
+      boolean reserved,
+      boolean wildcard) {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(description), "description cannot be null or empty");
@@ -87,6 +89,7 @@ public final class PropertyEntry<T> {
     this.encoder = encoder;
     this.hidden = hidden;
     this.reserved = reserved;
+    this.wildcard = wildcard;
   }
 
   public static class Builder<T> {
@@ -100,6 +103,7 @@ public final class PropertyEntry<T> {
     private Function<T, String> encoder;
     private boolean hidden;
     private boolean reserved;
+    private boolean wildcard;
 
     public Builder<T> withName(String name) {
       this.name = name;
@@ -151,6 +155,11 @@ public final class PropertyEntry<T> {
       return this;
     }
 
+    public Builder<T> withWildcard(boolean wildcard) {
+      this.wildcard = wildcard;
+      return this;
+    }
+
     public PropertyEntry<T> build() {
       return new PropertyEntry<T>(
           name,
@@ -162,7 +171,8 @@ public final class PropertyEntry<T> {
           decoder,
           encoder,
           hidden,
-          reserved);
+          reserved,
+          wildcard);
     }
   }
 
@@ -266,6 +276,22 @@ public final class PropertyEntry<T> {
   public static PropertyEntry<Boolean> booleanReservedPropertyEntry(
       String name, String description, boolean defaultValue, boolean hidden) {
     return booleanPropertyEntry(name, description, false, true, defaultValue, hidden, true);
+  }
+
+  public static PropertyEntry<String> wildcardPropertyEntry(String name, String description) {
+    return new Builder<String>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(false)
+        .withImmutable(false)
+        .withJavaType(String.class)
+        .withDefaultValue(null)
+        .withDecoder(Function.identity())
+        .withEncoder(Function.identity())
+        .withHidden(false)
+        .withReserved(false)
+        .withWildcard(true)
+        .build();
   }
 
   public static PropertyEntry<Boolean> booleanPropertyEntry(

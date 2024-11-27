@@ -36,10 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.AuthorizationMetadataObject;
-import org.apache.gravitino.authorization.AuthorizationPrivilege;
-import org.apache.gravitino.authorization.AuthorizationPrivilegesMappingProvider;
-import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.MetadataObjectChange;
 import org.apache.gravitino.authorization.Owner;
@@ -53,7 +49,11 @@ import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
 import org.apache.gravitino.connector.AuthorizationPropertiesMeta;
+import org.apache.gravitino.connector.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.connector.authorization.AuthorizationPrivilege;
+import org.apache.gravitino.connector.authorization.AuthorizationPrivilegesMappingProvider;
+import org.apache.gravitino.connector.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -244,7 +244,8 @@ public abstract class RangerAuthorizationPlugin
   }
 
   @Override
-  public Boolean onMetadataUpdated(MetadataObjectChange... changes) throws RuntimeException {
+  public Boolean onMetadataUpdated(MetadataObjectChange... changes)
+      throws AuthorizationPluginException {
     for (MetadataObjectChange change : changes) {
       if (change instanceof MetadataObjectChange.RenameMetadataObject) {
         MetadataObject metadataObject =

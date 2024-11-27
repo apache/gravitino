@@ -21,8 +21,8 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.List;
-import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.connector.authorization.AuthorizationPrivilege;
 
 public class RangerPrivileges {
   /** Ranger Hive privileges enumeration. */

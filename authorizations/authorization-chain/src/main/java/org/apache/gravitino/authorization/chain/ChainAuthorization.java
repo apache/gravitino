@@ -16,23 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.connector.authorization.ranger;
+package org.apache.gravitino.authorization.chain;
 
 import java.util.Map;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
-public class TestRangerAuthorization extends BaseAuthorization<TestRangerAuthorization> {
-
-  public TestRangerAuthorization() {}
-
+/** Implementation of a Chain authorization in Gravitino. */
+public class ChainAuthorization extends BaseAuthorization<ChainAuthorization> {
   @Override
   public String shortName() {
-    return "test_ranger";
+    return "chain";
   }
 
   @Override
   protected AuthorizationPlugin newPlugin(String catalogProvider, Map<String, String> config) {
-    return new TestRangerAuthorizationPlugin();
+    switch (catalogProvider) {
+      case "hive":
+      case "test": // For testing purposes
+        return ChainAuthorizationPlugin.getInstance(catalogProvider, config);
+      default:
+        throw new IllegalArgumentException("Unknown catalog provider: " + catalogProvider);
+    }
   }
 }

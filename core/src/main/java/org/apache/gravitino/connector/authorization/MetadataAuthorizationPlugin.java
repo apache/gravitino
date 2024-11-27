@@ -19,6 +19,7 @@
 package org.apache.gravitino.connector.authorization;
 
 import org.apache.gravitino.authorization.MetadataObjectChange;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 
 /**
  * Interface for authorization User and Group plugin operation of the underlying access control
@@ -33,5 +34,5 @@ interface MetadataAuthorizationPlugin {
    * @return True if the update operation is successful; False if the update operation fails.
    * @throws RuntimeException If update role encounters storage issues.
    */
-  Boolean onMetadataUpdated(MetadataObjectChange... changes) throws RuntimeException;
+  Boolean onMetadataUpdated(MetadataObjectChange... changes) throws AuthorizationPluginException;
 }
