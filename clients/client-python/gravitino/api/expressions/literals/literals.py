@@ -20,15 +20,26 @@ from typing import Union
 from datetime import date, time, datetime
 
 from gravitino.api.expressions.literals.literal import Literal
+from gravitino.api.types import Types
 
 
 class LiteralImpl(Literal):
     """Creates a literal with the given type value."""
 
-    _value: Union[int, float, str, datetime, time, date, bool, Decimal, None]
-    _data_type: (
-        str  # TODO: Need implement `api/src/main/java/org/apache/gravitino/rel/types`
-    )
+    _value: Union[int, float, Decimal, str, date, time, datetime, bool, None]
+    _data_type: Union[
+        Types.IntegerType,
+        Types.LongType,
+        Types.FloatType,
+        Types.DoubleType,
+        Types.DecimalType,
+        Types.StringType,
+        Types.DateType,
+        Types.TimeType,
+        Types.TimestampType,
+        Types.BooleanType,
+        Types.NullType,
+    ]
 
     def __init__(
         self,
