@@ -25,8 +25,14 @@ plugins {
 }
 
 dependencies {
+  compileOnly(project(":api"))
+  compileOnly(project(":core"))
+  compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-hadoop"))
   compileOnly(libs.hadoop3.common)
+
+  implementation(libs.aliyun.credentials.sdk)
+  implementation(libs.aliyun.kms.sdk)
   implementation(libs.hadoop3.oss)
 
   // oss needs StringUtils from commons-lang3 or the following error will occur in 3.3.0
