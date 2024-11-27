@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -861,6 +862,42 @@ public class CatalogDorisIT extends BaseIT {
     assertPartition(p4, loadedListPartitions.get("p4"));
     assertTrue(loadedListPartitions.containsKey("p5"));
     assertPartition(p5, loadedListPartitions.get("p5"));
+  }
+
+  @Test
+  void testTableWithTimeStampColumn() {
+    // create a table
+    String tableName = GravitinoITUtils.genRandomName("test_table_with_timestamp_column");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    columns =
+        ArrayUtils.add(columns, Column.of("timestamp_col", Types.TimestampType.withoutTimeZone()));
+    Distribution distribution = createDistribution();
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.PRIMARY_KEY, "k1_index", new String[][] {{DORIS_COL_NAME1}})
+        };
+    Map<String, String> properties = createTableProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        distribution,
+        null,
+        indexes);
+
+    // load table
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+    Column timestampColumn =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> "timestamp_col".equals(c.name()))
+            .findFirst()
+            .get();
+
+    Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), timestampColumn.dataType());
   }
 
   @Test
