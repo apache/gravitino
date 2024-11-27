@@ -28,10 +28,11 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
 
  ```bash
  [options]
- usage: gcli [metalake|catalog|schema|table|column|user|group|tag] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+ usage: gcli [metalake|catalog|schema|table|column|user|group|tag|topic] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
  Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
+ -d,--distribution       Display distribution information
  -f,--force              force operation
  -g,--group <arg>        group name
  -h,--help               command help information
@@ -39,15 +40,19 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -l,--user <arg>         user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
+ -o,--owner              display entity owner
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
+    --partition          Display partition information
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
  -t,--tag <arg>          tag name
+    --topic <arg>        topic name
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
+ -x,--index              Display index information
  -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
                          iceberg, kafka
  ```
