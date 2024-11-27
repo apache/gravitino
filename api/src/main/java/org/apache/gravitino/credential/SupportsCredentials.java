@@ -35,10 +35,10 @@ public interface SupportsCredentials {
    * @return An array of {@link Credential} objects. If the credential type is not empty, there will
    *     be at most one credential in the array. If empty, in most cases the array only contains one
    *     credential. If the object like {@link org.apache.gravitino.file.Fileset} contains multi
-   *     locations for different storages like HDFS, S3, etc. The array will contain multi
-   *     credentials. The array could be empty if you request a credential for a catalog but the
-   *     credential provider couldn't generate the credential for the catalog, like S3 token
-   *     credential provider only generate credential for the specific object like {@link
+   *     locations for different storages like HDFS, S3, the array will contain multi credentials.
+   *     The array could be empty if you request a credential for a catalog but the credential
+   *     provider couldn't generate the credential for the catalog, like S3 token credential
+   *     provider only generate credential for the specific object like {@link
    *     org.apache.gravitino.file.Fileset}, {@link org.apache.gravitino.rel.Table}. There will be
    *     at most one credential for one credential type.
    * @throws NoSuchCredentialException If the specified credential type cannot be found in the
