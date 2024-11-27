@@ -1023,9 +1023,12 @@ public abstract class RangerAuthorizationPlugin
                 int index = operationTypeIndex.get(operationType);
 
                 // Update the policy name is following Gravitino's spec
-                if (policy.getName().equals(AuthorizationSecurableObject.DOT_JOINER.join(oldMetadataNames))) {
+                if (policy
+                    .getName()
+                    .equals(AuthorizationSecurableObject.DOT_JOINER.join(oldMetadataNames))) {
                   List<String> policyNames =
-                      Lists.newArrayList(AuthorizationSecurableObject.DOT_SPLITTER.splitToList(policyName));
+                      Lists.newArrayList(
+                          AuthorizationSecurableObject.DOT_SPLITTER.splitToList(policyName));
                   Preconditions.checkArgument(
                       policyNames.size() >= oldMetadataNames.size(),
                       String.format("The policy name(%s) is invalid!", policyName));
