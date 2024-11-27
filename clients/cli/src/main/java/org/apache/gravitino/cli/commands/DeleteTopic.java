@@ -63,7 +63,8 @@ public class DeleteTopic extends Command {
     this.topic = topic;
   }
 
-  /** Add a topic. */
+  /** Delete a topic. */
+  @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, topic);
     boolean deleted = false;
