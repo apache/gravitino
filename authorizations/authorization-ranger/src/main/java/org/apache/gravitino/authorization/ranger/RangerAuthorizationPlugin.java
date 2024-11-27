@@ -334,8 +334,7 @@ public abstract class RangerAuthorizationPlugin
           ownerRoleName = RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE;
         }
         rangerHelper.createRangerRoleIfNotExists(ownerRoleName, true);
-        rangerHelper.createRangerRoleIfNotExists(
-            RangerHelper.GRAVITINO_PLACEHOLDER_OWNER_ROLE, true);
+        rangerHelper.createRangerRoleIfNotExists(RangerHelper.GRAVITINO_OWNER_ROLE, true);
         try {
           if (preOwnerUserName != null || preOwnerGroupName != null) {
             GrantRevokeRoleRequest revokeRoleRequest =

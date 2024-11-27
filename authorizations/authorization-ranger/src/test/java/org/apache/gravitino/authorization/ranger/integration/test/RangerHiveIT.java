@@ -388,16 +388,16 @@ public class RangerHiveIT {
                 Assertions.assertTrue(
                     policyItems.stream()
                         .anyMatch(
-                            i ->
-                                !i.getRoles()
+                            item ->
+                                !item.getRoles()
                                     .contains(
                                         rangerHelper.generateGravitinoRoleName(role.name()))));
               }
               Assertions.assertTrue(
                   policyItems.stream()
                       .anyMatch(
-                          i ->
-                              i.getRoles()
+                          item ->
+                              item.getRoles()
                                   .contains(rangerHelper.generateGravitinoRoleName(role.name()))));
             });
 
@@ -415,15 +415,15 @@ public class RangerHiveIT {
                 Assertions.assertFalse(
                     policyItems.stream()
                         .anyMatch(
-                            i ->
-                                i.getRoles()
+                            item ->
+                                item.getRoles()
                                     .contains(
                                         rangerHelper.generateGravitinoRoleName(role.name()))));
                 Assertions.assertTrue(
                     policyItems.stream()
                         .anyMatch(
-                            i ->
-                                !i.getRoles()
+                            item ->
+                                !item.getRoles()
                                     .contains(
                                         rangerHelper.generateGravitinoRoleName(role.name()))));
               } else {
@@ -1256,8 +1256,8 @@ public class RangerHiveIT {
       List<RangerPolicy.RangerPolicyItem> items, String roleName) {
     return items.stream()
         .anyMatch(
-            i ->
-                i.getRoles().stream()
+            item ->
+                item.getRoles().stream()
                     .anyMatch(r -> r.equals(rangerHelper.generateGravitinoRoleName(roleName))));
   }
 

@@ -56,13 +56,14 @@ public class RangerHelper {
   private final RangerClient rangerClient;
   private final String rangerAdminName;
   private final String rangerServiceName;
-  public static final String GRAVITINO_METALAKE_OWNER_ROLE = "GRAVITINO_METALAKE_OWNER_ROLE";
-  public static final String GRAVITINO_CATALOG_OWNER_ROLE = "GRAVITINO_CATALOG_OWNER_ROLE";
-
-  // marking owner policy items
-  public static final String GRAVITINO_PLACEHOLDER_OWNER_ROLE = "GRAVITINO_PLACEHOLDER_OWNER_ROLE";
 
   public static final String GRAVITINO_ROLE_PREFIX = "GRAVITINO_";
+  public static final String GRAVITINO_METALAKE_OWNER_ROLE =
+      GRAVITINO_ROLE_PREFIX + "METALAKE_OWNER_ROLE";
+  public static final String GRAVITINO_CATALOG_OWNER_ROLE =
+      GRAVITINO_ROLE_PREFIX + "CATALOG_OWNER_ROLE";
+  // marking owner policy items
+  public static final String GRAVITINO_OWNER_ROLE = GRAVITINO_ROLE_PREFIX + "OWNER_ROLE";
 
   public RangerHelper(
       RangerClient rangerClient,
@@ -258,19 +259,19 @@ public class RangerHelper {
     try {
       policy.setPolicyItems(
           policy.getPolicyItems().stream()
-              .filter(i -> !isGravitinoManagedPolicyItemAccess(i))
+              .filter(item -> !isGravitinoManagedPolicyItemAccess(item))
               .collect(Collectors.toList()));
       policy.setDenyPolicyItems(
           policy.getDenyPolicyItems().stream()
-              .filter(i -> !isGravitinoManagedPolicyItemAccess(i))
+              .filter(item -> !isGravitinoManagedPolicyItemAccess(item))
               .collect(Collectors.toList()));
       policy.setRowFilterPolicyItems(
           policy.getRowFilterPolicyItems().stream()
-              .filter(i -> !isGravitinoManagedPolicyItemAccess(i))
+              .filter(item -> !isGravitinoManagedPolicyItemAccess(item))
               .collect(Collectors.toList()));
       policy.setDataMaskPolicyItems(
           policy.getDataMaskPolicyItems().stream()
-              .filter(i -> !isGravitinoManagedPolicyItemAccess(i))
+              .filter(item -> !isGravitinoManagedPolicyItemAccess(item))
               .collect(Collectors.toList()));
       rangerClient.updatePolicy(policy.getId(), policy);
     } catch (RangerServiceException e) {
@@ -329,13 +330,18 @@ public class RangerHelper {
       Preconditions.checkArgument(
           roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
               || roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE)
-              || roleName.equalsIgnoreCase(GRAVITINO_PLACEHOLDER_OWNER_ROLE),
-          "The role name should be GRAVITINO_METALAKE_OWNER_ROLE or GRAVITINO_CATALOG_OWNER_ROLE or GRAVITINO_PLACEHOLDER_OWNER_ROLE");
+              || roleName.equalsIgnoreCase(GRAVITINO_OWNER_ROLE),
+          String.format(
+              "The role name should be %s or %s or %s",
+              GRAVITINO_METALAKE_OWNER_ROLE, GRAVITINO_CATALOG_OWNER_ROLE, GRAVITINO_OWNER_ROLE));
     } else {
       Preconditions.checkArgument(
           !roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
-              && !roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE),
-          "The role name should not be GRAVITINO_METALAKE_OWNER_ROLE or GRAVITINO_CATALOG_OWNER_ROLE");
+              && !roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE)
+              && !roleName.equalsIgnoreCase(GRAVITINO_OWNER_ROLE),
+          String.format(
+              "The role name should not be %s or %s or %s",
+              GRAVITINO_METALAKE_OWNER_ROLE, GRAVITINO_CATALOG_OWNER_ROLE, GRAVITINO_OWNER_ROLE));
     }
 
     RangerRole rangerRole = null;
@@ -426,7 +432,7 @@ public class RangerHelper {
                   policyItem.getGroups().add(newOwner.name());
                 }
                 // mark the policy item is created by Gravitino
-                policyItem.getRoles().add(GRAVITINO_PLACEHOLDER_OWNER_ROLE);
+                addRoleToPolicyItemIfNoExists(policyItem, GRAVITINO_OWNER_ROLE);
               }
               policy.getPolicyItems().add(policyItem);
             });
@@ -462,7 +468,7 @@ public class RangerHelper {
               policyItem.getGroups().add(newOwner.name());
             }
             // mark the policy item is created by Gravitino
-            policyItem.getRoles().add(GRAVITINO_PLACEHOLDER_OWNER_ROLE);
+            policyItem.getRoles().add(GRAVITINO_OWNER_ROLE);
           }
           policy.getPolicyItems().add(policyItem);
         });
@@ -506,9 +512,7 @@ public class RangerHelper {
     // Add or remove the owner role in the policy item
     matchPolicyItems.forEach(
         policyItem -> {
-          if (!policyItem.getRoles().contains(generateGravitinoRoleName(ownerRoleName))) {
-            policyItem.getRoles().add(generateGravitinoRoleName(ownerRoleName));
-          }
+          addRoleToPolicyItemIfNoExists(policyItem, ownerRoleName);
         });
 
     // If the policy item is not equal to owner's privileges, then update the policy
@@ -532,10 +536,16 @@ public class RangerHelper {
               policyItem
                   .getAccesses()
                   .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
-              if (!policyItem.getRoles().contains(generateGravitinoRoleName(ownerRoleName))) {
-                policyItem.getRoles().add(generateGravitinoRoleName(ownerRoleName));
-              }
+              addRoleToPolicyItemIfNoExists(policyItem, ownerRoleName);
               policy.getPolicyItems().add(policyItem);
             });
+  }
+
+  private void addRoleToPolicyItemIfNoExists(
+      RangerPolicy.RangerPolicyItem policyItem, String roleName) {
+    String gravitinoRoleName = generateGravitinoRoleName(roleName);
+    if (!policyItem.getRoles().contains(gravitinoRoleName)) {
+      policyItem.getRoles().add(gravitinoRoleName);
+    }
   }
 }
