@@ -20,10 +20,15 @@
 package org.apache.gravitino.cli;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 
 /* Gravitino Command line */
@@ -140,40 +145,74 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String url = getUrl();
     FullName name = new FullName(line);
     String metalake = name.getMetalakeName();
+    Map<Set<String>, Runnable> commandMap = new HashMap<>();
 
-    if (CommandActions.DETAILS.equals(command)) {
-      if (line.hasOption(GravitinoOptions.AUDIT)) {
-        newMetalakeAudit(url, ignore, metalake).handle();
-      } else {
-        newMetalakeDetails(url, ignore, metalake).handle();
-      }
-    } else if (CommandActions.LIST.equals(command)) {
-      newListMetalakes(url, ignore).handle();
-    } else if (CommandActions.CREATE.equals(command)) {
-      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-      newCreateMetalake(url, ignore, metalake, comment).handle();
-    } else if (CommandActions.DELETE.equals(command)) {
-      boolean force = line.hasOption(GravitinoOptions.FORCE);
-      newDeleteMetalake(url, ignore, force, metalake).handle();
-    } else if (CommandActions.SET.equals(command)) {
-      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-      String value = line.getOptionValue(GravitinoOptions.VALUE);
-      newSetMetalakeProperty(url, ignore, metalake, property, value).handle();
-    } else if (CommandActions.REMOVE.equals(command)) {
-      String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-      newRemoveMetalakeProperty(url, ignore, metalake, property).handle();
-    } else if (CommandActions.PROPERTIES.equals(command)) {
-      newListMetalakeProperties(url, ignore, metalake).handle();
-    } else if (CommandActions.UPDATE.equals(command)) {
-      if (line.hasOption(GravitinoOptions.COMMENT)) {
-        String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-        newUpdateMetalakeComment(url, ignore, metalake, comment).handle();
-      }
-      if (line.hasOption(GravitinoOptions.RENAME)) {
-        String newName = line.getOptionValue(GravitinoOptions.RENAME);
-        boolean force = line.hasOption(GravitinoOptions.FORCE);
-        newUpdateMetalakeName(url, ignore, force, metalake, newName).handle();
-      }
+    commandMap.put(
+        Sets.newHashSet(CommandActions.DETAILS),
+        () -> {
+          newMetalakeDetails(url, ignore, metalake).handle();
+        });
+    commandMap.put(
+        Sets.newHashSet(CommandActions.DETAILS, GravitinoOptions.AUDIT),
+        () -> {
+          newMetalakeAudit(url, ignore, metalake).handle();
+        });
+    commandMap.put(
+        Sets.newHashSet(CommandActions.LIST), () -> newListMetalakes(url, ignore).handle());
+    commandMap.put(
+        Sets.newHashSet(CommandActions.CREATE),
+        () -> {
+          String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+          newCreateMetalake(url, ignore, metalake, comment).handle();
+        });
+    commandMap.put(
+        Sets.newHashSet(CommandActions.DELETE),
+        () -> {
+          boolean force = line.hasOption(GravitinoOptions.FORCE);
+          newDeleteMetalake(url, ignore, force, metalake).handle();
+        });
+    commandMap.put(
+        Sets.newHashSet(CommandActions.SET, GravitinoOptions.PROPERTY, GravitinoOptions.VALUE),
+        () -> {
+          String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+          String value = line.getOptionValue(GravitinoOptions.VALUE);
+          newSetMetalakeProperty(url, ignore, metalake, property, value).handle();
+        });
+    commandMap.put(
+        Sets.newHashSet(CommandActions.REMOVE, GravitinoOptions.PROPERTY),
+        () -> {
+          String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+          newRemoveMetalakeProperty(url, ignore, metalake, property).handle();
+        });
+    commandMap.put(
+        Sets.newHashSet(CommandActions.PROPERTIES),
+        () -> newListMetalakeProperties(url, ignore, metalake).handle());
+    commandMap.put(
+        Sets.newHashSet(CommandActions.UPDATE, GravitinoOptions.COMMENT),
+        () -> {
+          String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+          newUpdateMetalakeComment(url, ignore, metalake, comment).handle();
+        });
+    commandMap.put(
+        Sets.newHashSet(CommandActions.UPDATE, GravitinoOptions.RENAME),
+        () -> {
+          String newName = line.getOptionValue(GravitinoOptions.RENAME);
+          boolean force = line.hasOption(GravitinoOptions.FORCE);
+          newUpdateMetalakeName(url, ignore, force, metalake, newName).handle();
+        });
+
+    Set<String> flags = new HashSet<>();
+    flags.add(command);
+    for (Option option : line.getOptions()) {
+      flags.add(option.getLongOpt());
+    }
+
+    Runnable commandHandler = commandMap.get(flags);
+    if (commandHandler != null) {
+      commandHandler.run();
+    } else {
+      System.err.println("Invalid metalake command");
+      displayHelp(options);
     }
   }
 
