@@ -66,6 +66,9 @@ public class GravitinoOptions {
     options.addOption(createArgOption("m", METALAKE, "metalake name"));
     options.addOption(createSimpleOption("i", IGNORE, "ignore client/sever version check"));
     options.addOption(createSimpleOption("a", AUDIT, "display audit information"));
+    options.addOption(createSimpleOption("x", INDEX, "Display index information"));
+    options.addOption(createSimpleOption("d", DISTRIBUTION, "Display distribution information"));
+    options.addOption(createSimpleOption(null, PARTITION, "Display partition information"));
 
     // Create/update options
     options.addOption(createArgOption(null, RENAME, "new entity name"));
@@ -77,17 +80,15 @@ public class GravitinoOptions {
             "z", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
     options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
-    options.addOption(createArgOption("t", TAG, "tag name"));
-    options.addOption(createArgOption("t", TOPIC, "topic name"));
+    options.addOption(createArgOption(null, TOPIC, "topic name"));
     options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption("r", ROLE, "role name"));
 
-    // Properties option can have multiple values
-    Option properties =
-        Option.builder("p").longOpt(PROPERTIES).desc("property name/value pairs").hasArgs().build();
-    options.addOption(properties);
+    // Properties and tags can have multiple values
+    options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
+    options.addOption(createArgsOption("t", TAG, "tag name"));
 
-    // Force delete entity and rename metalake operations
+    // Force delete entities and rename metalake operations
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
 
     return options;
@@ -115,5 +116,18 @@ public class GravitinoOptions {
    */
   public Option createArgOption(String shortName, String longName, String description) {
     return new Option(shortName, longName, true, description);
+  }
+
+  /**
+   * Helper method to create an Option that requires multiple argument.
+   *
+   * @param shortName The option name as a single letter
+   * @param longName The long option name.
+   * @param description The option description.
+   * @return The Option object.
+   */
+  public Option createArgsOption(String shortName, String longName, String description) {
+    // Support multiple arguments
+    return Option.builder().option(shortName).longOpt(longName).hasArgs().desc(description).build();
   }
 }
