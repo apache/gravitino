@@ -204,7 +204,10 @@ public class GravitinoCommandLine extends TestableCommandLine {
     Set<String> flags = new HashSet<>();
     flags.add(command);
     for (Option option : line.getOptions()) {
-      flags.add(option.getLongOpt());
+      String flag = option.getLongOpt();
+      if (!flag.equals(GravitinoOptions.METALAKE)) {
+        flags.add(option.getLongOpt());
+      }
     }
 
     Runnable commandHandler = commandMap.get(flags);
