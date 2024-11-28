@@ -80,7 +80,6 @@ public class GravitinoOptions {
             "z", PROVIDER, "provider one of hadoop, hive, mysql, postgres, iceberg, kafka"));
     options.addOption(createArgOption("l", USER, "user name"));
     options.addOption(createArgOption("g", GROUP, "group name"));
-    options.addOption(createArgOption("a", TAG, "tag name"));
     options.addOption(createArgOption(null, FILESET, "fileset name"));
     options.addOption(createArgOption("t", TAG, "tag name"));
     options.addOption(createSimpleOption("o", OWNER, "entity owner"));

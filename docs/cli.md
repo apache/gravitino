@@ -30,7 +30,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  [options]
  usage: gcli [metalake|catalog|schema|table|column|user|group|tag|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
  Options
- -a,--tag <arg>          tag name
+ -a,--audit              display audit information
  -c,--comment <arg>      entity comment
  -d,--distribution       Display distribution information
  -f,--force              force operation
