@@ -51,7 +51,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
- -x,--index              Display index information
+ -x,--index              display index information
  -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
                          iceberg, kafka
  ```
