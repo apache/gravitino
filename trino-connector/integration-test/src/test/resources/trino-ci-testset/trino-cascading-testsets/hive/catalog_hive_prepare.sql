@@ -21,19 +21,3 @@ CREATE TABLE gt_hive1_1.gt_datatype.tb03 (name char);
 INSERT INTO gt_hive1_1.gt_datatype.tb03 VALUES ('a');
 
 <RETRY WITH NOT EXISTS> SELECT * FROM gt_hive1.gt_datatype.tb03;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
