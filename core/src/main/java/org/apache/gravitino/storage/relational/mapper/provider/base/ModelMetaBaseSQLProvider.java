@@ -27,7 +27,7 @@ public class ModelMetaBaseSQLProvider {
   public String insertModelMeta(@Param("modelMeta") ModelPO modelPO) {
     return "INSERT INTO "
         + ModelMetaMapper.TABLE_NAME
-        + "(model_id, model_name, metalake_id, catalog_id, schema_id,"
+        + " (model_id, model_name, metalake_id, catalog_id, schema_id,"
         + " model_comment, model_properties, model_latest_version, audit_info, deleted_at)"
         + " VALUES (#{modelMeta.modelId}, #{modelMeta.modelName}, #{modelMeta.metalakeId},"
         + " #{modelMeta.catalogId}, #{modelMeta.schemaId}, #{modelMeta.modelComment},"
@@ -38,7 +38,7 @@ public class ModelMetaBaseSQLProvider {
   public String insertModelMetaOnDuplicateKeyUpdate(@Param("modelMeta") ModelPO modelPO) {
     return "INSERT INTO "
         + ModelMetaMapper.TABLE_NAME
-        + "(model_id, model_name, metalake_id, catalog_id, schema_id,"
+        + " (model_id, model_name, metalake_id, catalog_id, schema_id,"
         + " model_comment, model_properties, model_latest_version, audit_info, deleted_at)"
         + " VALUES (#{modelMeta.modelId}, #{modelMeta.modelName}, #{modelMeta.metalakeId},"
         + " #{modelMeta.catalogId}, #{modelMeta.schemaId}, #{modelMeta.modelComment},"
@@ -57,10 +57,10 @@ public class ModelMetaBaseSQLProvider {
   }
 
   public String listModelPOsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "SELECT model_id as modelId, model_name as modelName, metalake_id as metalakeId,"
-        + " catalog_id as catalogId, schema_id as schemaId, model_comment as modelComment,"
-        + " model_properties as modelProperties, model_latest_version as"
-        + " modelLatestVersion, audit_info as auditInfo, deleted_at as deletedAt"
+    return "SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
+        + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
+        + " model_properties AS modelProperties, model_latest_version AS"
+        + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
@@ -68,10 +68,10 @@ public class ModelMetaBaseSQLProvider {
 
   public String selectModelMetaBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
-    return "SELECT model_id as modelId, model_name as modelName, metalake_id as metalakeId,"
-        + " catalog_id as catalogId, schema_id as schemaId, model_comment as modelComment,"
-        + " model_properties as modelProperties, model_latest_version as"
-        + " modelLatestVersion, audit_info as auditInfo, deleted_at as deletedAt"
+    return "SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
+        + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
+        + " model_properties AS modelProperties, model_latest_version AS"
+        + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
@@ -86,10 +86,10 @@ public class ModelMetaBaseSQLProvider {
   }
 
   public String selectModelMetaByModelId(@Param("modelId") Long modelId) {
-    return "SELECT model_id as modelId, model_name as modelName, metalake_id as metalakeId,"
-        + " catalog_id as catalogId, schema_id as schemaId, model_comment as modelComment,"
-        + " model_properties as modelProperties, model_latest_version as "
-        + " modelLatestVersion, audit_info as auditInfo, deleted_at as deletedAt"
+    return "SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
+        + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
+        + " model_properties AS modelProperties, model_latest_version AS "
+        + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE model_id = #{modelId} AND deleted_at = 0";
