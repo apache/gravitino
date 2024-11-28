@@ -11,13 +11,14 @@ license: "This software is licensed under the Apache License version 2."
 
 Since Hive 2.x, Hive has supported S3 as a storage backend, enabling users to store and manage data in Amazon S3 directly through Hive. Gravitino enhances this capability by supporting the Hive catalog with S3, allowing users to efficiently manage the storage locations of files located in S3. This integration simplifies data operations and enables seamless access to S3 data from Hive queries.
 
-For ADLS (or Azure Blob storage(abs), or Azure Data lake storage(v2)), the integration is similar to S3. The only difference is the configuration properties for ADLS. The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3 as a storage backend, including configuration details and examples for creating databases and tables.
+For ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2)), the integration is similar to S3. The only difference is the configuration properties for ADLS(see below). 
 
-The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3 as a storage backend, including configuration details and examples for creating databases and tables.
+The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3 and ADLS as a storage backend, including configuration details and examples for creating databases and tables.
 
 ## Hive metastore configuration
 
-To use the Hive catalog with S3, you must configure your Hive metastore to recognize S3 as a storage backend. The following example illustrates the required changes in the `hive-site.xml` configuration file:
+
+The following will mainly focus on configuring the Hive metastore to use S3 as a storage backend. The same configuration can be applied to ADLS with minor changes in the configuration properties. 
 
 ### Example Configuration Changes
 
@@ -47,20 +48,20 @@ property, you can omit the location property in the schema and table definitions
 It's also applicable for ADLS.
 -->
 <property>
-   <name>hive.metastore.warehouse.dir</name>
-   <value>S3_BUCKET_PATH</value>
+  <name>hive.metastore.warehouse.dir</name>
+  <value>S3_BUCKET_PATH</value>
 </property>
 
 
 <!-- The following are for Azure Blob Storage(ADLS) -->
 <property>
-<name>fs.abfss.impl</name>
-<value>org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem</value>
+  <name>fs.abfss.impl</name>
+  <value>org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem</value>
 </property>
 
 <property>
-<name>fs.azure.account.key.ABS_ACCOUNT_NAME.dfs.core.windows.net</name>
-<value>ABS_ACCOUNT_KEY</value>
+  <name>fs.azure.account.key.ABS_ACCOUNT_NAME.dfs.core.windows.net</name>
+  <value>ABS_ACCOUNT_KEY</value>
 </property>
 
 ```
@@ -70,8 +71,13 @@ It's also applicable for ADLS.
 After updating the `hive-site.xml`, you need to ensure that the necessary S3-related JARs are included in the Hive classpath. You can do this by executing the following command:
 ```shell
 cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
+
+# For Azure Blob Storage(ADLS)
+cp ${HADOOP_HOME}/share/hadoop/tools/lib/*azure* ${HIVE_HOME}/lib
 ```
+
 Alternatively, you can download the required JARs from the Maven repository and place them in the Hive classpath. It is crucial to verify that the JARs are compatible with the version of Hadoop you are using to avoid any compatibility issue.
+
 
 ### Restart Hive metastore
 
@@ -95,8 +101,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "hive_schema",
   "comment": "comment",
   "properties": {
+    "location": "s3a://bucket-name/path"
+     
+     # The following line is for Azure Blob Storage(ADLS)
      # "location": "abfss://container-name@user-account-name.dfs.core.windows.net/path"
-    "location": "s3a://bucket-name/path" 
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
@@ -117,7 +125,10 @@ SupportsSchemas supportsSchemas = catalog.asSchemas();
 
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .put("location", "s3a://bucket-name/path")
+    
+    // The following line is for Azure Blob Storage(ADLS)
     // .put("location", "abfss://container-name@user-account-name.dfs.core.windows.net/path")
+    
     .build();
 Schema schema = supportsSchemas.createSchema("hive_schema",
     "This is a schema",
