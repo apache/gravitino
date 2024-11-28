@@ -28,19 +28,23 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
 
  ```bash
  [options]
- usage: gcli [metalake|catalog|schema|table|column|user|group|tag] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+ usage: gcli [metalake|catalog|schema|table|column|user|group|tag|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
  Options
- -a,--audit              display audit information
+ -a,--tag <arg>          tag name
  -c,--comment <arg>      entity comment
+ -d,--distribution       Display distribution information
  -f,--force              force operation
+    --fileset <arg>      fileset name
  -g,--group <arg>        group name
  -h,--help               command help information
  -i,--ignore             ignore client/sever version check
  -l,--user <arg>         user name
  -m,--metalake <arg>     metalake name
  -n,--name <arg>         full entity name (dot separated)
+ -o,--owner              entity owner
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
+    --partition          Display partition information
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
@@ -48,6 +52,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
+ -x,--index              Display index information
  -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
                          iceberg, kafka
  ```
@@ -522,6 +527,7 @@ gcli tag update --tag tagA --rename newTag
 ```bash
 gcli tag update --tag tagA --comment "new comment"
 ```
+
 ### Owners commands
 
 #### List an owner
