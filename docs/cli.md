@@ -32,9 +32,8 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
- -d,--distribution       Display distribution information
+ -d,--distribution       display distribution information
  -f,--force              force operation
-    --fileset <arg>      fileset name
  -g,--group <arg>        group name
  -h,--help               command help information
  -i,--ignore             ignore client/sever version check
@@ -44,7 +43,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -o,--owner              entity owner
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
-    --partition          Display partition information
+    --partition          display partition information
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
@@ -52,7 +51,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
- -x,--index              Display index information
+ -x,--index              display index information
  -z,--provider <arg>     provider one of hadoop, hive, mysql, postgres,
                          iceberg, kafka
  ```
@@ -602,23 +601,23 @@ gcli group revoke  --group groupA --role admin
 #### Create a fileset
 
 ```bash
-gcli fileset create --name hadoop.fileset.schema --fileset example --properties managed=true,location=file:/tmp/root/schema/example
+gcli fileset create --name hadoop.schema.fileset --properties managed=true,location=file:/tmp/root/schema/example
 ```
 
 #### List filesets
 
 ```bash
-gcli fileset list --name hadoop.fileset.schema
+gcli fileset list --name hadoop.schema
 ```
 
 #### Display a fileset's details
 
 ```bash
-gcli fileset create --name hadoop.fileset.schema --fileset example --properties managed=true,location=file:/tmp/root/schema/example
+gcli fileset details --name hadoop.schema.fileset
 ```
 
 #### Delete a fileset
 
 ```bash
-gcli fileset delete --name hadoop.fileset.schema --fileset example
+gcli fileset delete --name hadoop.schema.fileset
 ```

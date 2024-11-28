@@ -71,9 +71,8 @@ class TestFilesetCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
-    when(mockCommandLine.hasOption(GravitinoOptions.FILESET)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.FILESET)).thenReturn("fileset");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -97,11 +96,10 @@ class TestFilesetCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
     when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
-    when(mockCommandLine.hasOption(GravitinoOptions.FILESET)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.FILESET)).thenReturn("fileset");
 
     GravitinoCommandLine commandLine =
         spy(
@@ -128,9 +126,8 @@ class TestFilesetCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
-    when(mockCommandLine.hasOption(GravitinoOptions.FILESET)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.FILESET)).thenReturn("fileset");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -155,10 +152,9 @@ class TestFilesetCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
     when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(true);
-    when(mockCommandLine.hasOption(GravitinoOptions.FILESET)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.FILESET)).thenReturn("fileset");
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
