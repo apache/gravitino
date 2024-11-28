@@ -31,8 +31,8 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
-// Apart from the following dependencies, this test also needs hadoop3-common, please see
-// L135 in the file `${GRAVITINO_HOME}/catalogs/catalog-hive/build.gradle.kts`
+// Apart from the following dependencies on environment, this test also needs hadoop3-common, please
+// refer to L135 in the file `${GRAVITINO_HOME}/catalogs/catalog-hive/build.gradle.kts`
 @EnabledIf(
     value = "isAzureBlobStorageConfigured",
     disabledReason = "Azure Blob Storage is not prepared.")

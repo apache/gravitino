@@ -131,7 +131,11 @@ dependencies {
   testImplementation(libs.hadoop2.aws)
   testImplementation(libs.hadoop3.abs)
 
-  // You need this to run test CatalogHiveABSIT
+  // You need this to run test CatalogHiveABSIT as it required hadoop3 environment introduced by hadoop3.abs
+  // However, as the there already exists hadoop2.common in the test classpath, If we added the following
+  // dependencies directly, it will cause the conflict between hadoop2 and hadoop3, resulting test
+  // failures, so we comment the following line temporarily, if you want to run the test, please uncomment it.
+  // In the future, we may need to refactor the test to avoid the conflict.
   // testImplementation(libs.hadoop3.common)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
