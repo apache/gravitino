@@ -35,7 +35,7 @@ public class TableFormatOutputIT extends BaseIT {
   @BeforeAll
   public void startUp() {
     gravitinoUrl = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
-    String[] args = {
+    String[] create_metalake_args = {
       "metalake",
       "create",
       commandArg(GravitinoOptions.METALAKE),
@@ -45,7 +45,23 @@ public class TableFormatOutputIT extends BaseIT {
       commandArg(GravitinoOptions.URL),
       gravitinoUrl
     };
-    Main.main(args);
+    Main.main(create_metalake_args);
+
+    String[] create_catalog_args = {
+      "catalog",
+      "create",
+      commandArg(GravitinoOptions.METALAKE),
+      "my_metalake",
+      commandArg(GravitinoOptions.NAME),
+      "postgres",
+      commandArg(GravitinoOptions.PROVIDER),
+      "postgres",
+      commandArg(GravitinoOptions.PROPERTIES),
+      "jdbc-url=jdbc:postgresql://postgresql-host/mydb,jdbc-user=user,jdbc-password=password,jdbc-database=db,jdbc-driver=org.postgresql.Driver",
+      commandArg(GravitinoOptions.URL),
+      gravitinoUrl
+    };
+    Main.main(create_catalog_args);
   }
 
   @Test
@@ -107,6 +123,40 @@ public class TableFormatOutputIT extends BaseIT {
             + "+-------------+-------------+\n"
             + "| my_metalake | my metalake |\n"
             + "+-------------+-------------+",
+        output);
+  }
+
+  @Test
+  public void testCatalogDetailsCommand() {
+    // Create a byte array output stream to capture the output of the command
+    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+    PrintStream originalOut = System.out;
+    System.setOut(new PrintStream(outputStream));
+
+    String[] args = {
+      "catalog",
+      "details",
+      commandArg(GravitinoOptions.METALAKE),
+      "my_metalake",
+      commandArg(GravitinoOptions.NAME),
+      "postgres",
+      commandArg(GravitinoOptions.OUTPUT),
+      "table",
+      commandArg(GravitinoOptions.URL),
+      gravitinoUrl
+    };
+    Main.main(args);
+
+    // Restore the original System.out
+    System.setOut(originalOut);
+    // Get the output and verify it
+    String output = new String(outputStream.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(
+        "+----------+------------+-----------------+---------+\n"
+            + "| catalog  | type       | provider        | comment |\n"
+            + "+----------+------------+-----------------+---------+\n"
+            + "| postgres | RELATIONAL | jdbc-postgresql | null    |\n"
+            + "+----------+------------+-----------------+---------+",
         output);
   }
 
