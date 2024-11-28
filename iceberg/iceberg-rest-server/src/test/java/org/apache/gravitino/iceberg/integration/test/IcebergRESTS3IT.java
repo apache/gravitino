@@ -30,9 +30,13 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
+import org.apache.iceberg.TableProperties;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.platform.commons.util.StringUtils;
 
+@SuppressWarnings("FormatStringAnnotation")
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
 public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
 
@@ -123,5 +127,65 @@ public class IcebergRESTS3IT extends IcebergRESTJdbcCatalogIT {
   private String getFromEnvOrDefault(String envVar, String defaultValue) {
     String envValue = System.getenv(envVar);
     return Optional.ofNullable(envValue).orElse(defaultValue);
+  }
+
+  /**
+   * Parses a string representing table properties into a map of key-value pairs.
+   *
+   * @param tableProperties A string representing the table properties in the format:
+   *     "[key1=value1,key2=value2,...]"
+   * @return A Map where each key is a property name (String) and the corresponding value is the
+   *     property value (String). Example input:
+   *     "[write.data.path=path/to/data,write.metadata.path=path/to/metadata]" Example output: {
+   *     "write.data.path" -> "path/to/data", "write.metadata.path" -> "path/to/metadata" }
+   */
+  private Map<String, String> parseTableProperties(String tableProperties) {
+    Map<String, String> propertiesMap = new HashMap<>();
+    String[] pairs = tableProperties.substring(1, tableProperties.length() - 1).split(",");
+    for (String pair : pairs) {
+      String[] keyValue = pair.split("=", 2); // Split at most once
+      if (keyValue.length == 2) {
+        propertiesMap.put(keyValue[0].trim(), keyValue[1].trim());
+      }
+    }
+    return propertiesMap;
+  }
+
+  @Test
+  void testWritePathCredential() {
+    String namespaceName = ICEBERG_REST_NS_PREFIX + "credential";
+    String tableName = namespaceName + ".pathCredential";
+
+    String writeDataPath = this.s3Warehouse + "/test_data_location";
+    String writeMetaDataPath = this.s3Warehouse + "/test_metadata_location";
+
+    sql("CREATE DATABASE IF NOT EXISTS " + namespaceName);
+    sql(
+        String.format(
+            "CREATE TABLE %s (id bigint) USING iceberg OPTIONS ('%s' = '%s', '%s' = '%s')",
+            tableName,
+            TableProperties.WRITE_DATA_LOCATION,
+            writeDataPath,
+            TableProperties.WRITE_METADATA_LOCATION,
+            writeMetaDataPath));
+
+    Map<String, String> tableDetails =
+        convertToStringMap(sql("DESCRIBE TABLE EXTENDED " + tableName));
+    String tableProperties = tableDetails.get("Table Properties");
+    Assertions.assertNotNull(tableProperties, "Table Properties should not be null");
+
+    Map<String, String> propertiesMap = parseTableProperties(tableProperties);
+    Assertions.assertEquals(
+        writeDataPath,
+        propertiesMap.get(TableProperties.WRITE_DATA_LOCATION),
+        String.format(
+            "Expected write.data.path to be '%s', but was '%s'",
+            writeDataPath, propertiesMap.get(TableProperties.WRITE_DATA_LOCATION)));
+    Assertions.assertEquals(
+        writeMetaDataPath,
+        propertiesMap.get(TableProperties.WRITE_METADATA_LOCATION),
+        String.format(
+            "Expected write.metadata.path to be '%s', but was '%s'",
+            writeMetaDataPath, propertiesMap.get(TableProperties.WRITE_METADATA_LOCATION)));
   }
 }
