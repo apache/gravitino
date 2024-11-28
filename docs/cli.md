@@ -32,7 +32,7 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  Options
  -a,--audit              display audit information
  -c,--comment <arg>      entity comment
- -d,--distribution       Display distribution information
+ -d,--distribution       display distribution information
  -f,--force              force operation
  -g,--group <arg>        group name
  -h,--help               command help information
@@ -43,12 +43,11 @@ The general structure for running commands with the Gravitino CLI is `gcli entit
  -o,--owner              display entity owner
  -P,--property <arg>     property name
  -p,--properties <arg>   property name/value pairs
-    --partition          Display partition information
+    --partition          display partition information
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
  -t,--tag <arg>          tag name
-    --topic <arg>        topic name
  -u,--url <arg>          Gravitino URL (default: http://localhost:8090)
  -v,--version            Gravitino client version
  -V,--value <arg>        property value
@@ -602,13 +601,13 @@ gcli group revoke  --group groupA --role admin
 #### Display a topic's details
 
 ```bash
-gcli topic details --name kafka.default --topic topic3
+gcli topic details --name kafka.default.topic3
 ```
 
 #### Create a tag
 
 ```bash
-gcli topic create --name kafka.default --topic topic3
+gcli topic create --name kafka.default.topic3
 ```
 
 #### List all topics
@@ -620,12 +619,12 @@ gcli topic list --name kafka.default
 #### Delete a topic
 
 ```bash
-gcli topic delete --name kafka.default --topic topic3
+gcli topic delete --name kafka.default.topic3
 ```
 
 #### Change a topic's comment
 
 ```bash
-gcli topic update --name kafka.default --topic topic3 --comment new_comment
+gcli topic update --name kafka.default.topic3 --comment new_comment
 ```
 

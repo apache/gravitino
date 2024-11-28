@@ -500,7 +500,7 @@ public class GravitinoCommandLine extends TestableCommandLine {
     String metalake = name.getMetalakeName();
     String catalog = name.getCatalogName();
     String schema = name.getSchemaName();
-    String topic = line.getOptionValue(GravitinoOptions.TOPIC);
+    String topic = name.getTopicName();
 
     if (CommandActions.LIST.equals(command)) {
       newListTopics(url, ignore, metalake, catalog, schema).handle();

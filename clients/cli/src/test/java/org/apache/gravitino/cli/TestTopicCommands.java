@@ -70,9 +70,7 @@ class TestTopicCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
-    when(mockCommandLine.hasOption(GravitinoOptions.TOPIC)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.TOPIC)).thenReturn("topic");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.topic");
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -92,11 +90,9 @@ class TestTopicCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.topic");
     when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
-    when(mockCommandLine.hasOption(GravitinoOptions.TOPIC)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.TOPIC)).thenReturn("topic");
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -121,9 +117,7 @@ class TestTopicCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
-    when(mockCommandLine.hasOption(GravitinoOptions.TOPIC)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.TOPIC)).thenReturn("topic");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.topic");
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -148,10 +142,8 @@ class TestTopicCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.topic");
     when(mockCommandLine.hasOption(GravitinoOptions.FORCE)).thenReturn(true);
-    when(mockCommandLine.hasOption(GravitinoOptions.TOPIC)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.TOPIC)).thenReturn("topic");
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
@@ -177,11 +169,9 @@ class TestTopicCommands {
     when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
     when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema");
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.topic");
     when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
     when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("new comment");
-    when(mockCommandLine.hasOption(GravitinoOptions.TOPIC)).thenReturn(true);
-    when(mockCommandLine.getOptionValue(GravitinoOptions.TOPIC)).thenReturn("topic");
     GravitinoCommandLine commandLine =
         spy(
             new GravitinoCommandLine(
