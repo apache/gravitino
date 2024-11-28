@@ -32,9 +32,8 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 // Apart from the following dependencies on environment, this test also needs hadoop3-common, please
-// refer to L135 in the file `${GRAVITINO_HOME}/catalogs/catalog-hive/build.gradle.kts` or
-// initFileSystem
-// method in this file will fail to run due to missing hadoop3-common.
+// refer to L135 in the file `${GRAVITINO_HOME}/catalogs/catalog-hive/build.gradle.kts`, otherwise
+// initFileSystem method in this file will fail to run due to missing hadoop3-common.
 @EnabledIf(
     value = "isAzureBlobStorageConfigured",
     disabledReason = "Azure Blob Storage is not prepared.")
@@ -66,7 +65,7 @@ public class CatalogHiveABSIT extends CatalogHiveIT {
 
   @Override
   protected void initFileSystem() throws IOException {
-    // Use S3a file system
+    // Use Azure Blob Storage file system
     Configuration conf = new Configuration();
     conf.set(
         String.format("fs.azure.account.key.%s.dfs.core.windows.net", ABS_USER_ACCOUNT_NAME),
